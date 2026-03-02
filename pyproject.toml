@@ -1,0 +1,47 @@
+[project]
+name = "cloud-sdk-python"
+version = "0.0.0"
+description = "SAP Cloud SDK for Python"
+readme = "README.md"
+authors = [
+    { name = "Application Foundation Toolkit Libraries", email = "DL_689DD138C23CEF3C7511D37A@global.corp.sap" }
+]
+requires-python = ">=3.11"
+dependencies = [
+    "minio>=7.2.16",
+    "setuptools>=80.9.0",
+    "testcontainers>=4.13.1",
+    "requests>=2.31.0",
+    "requests-oauthlib>=1.4.0",
+    "pydantic>=2.12.3",
+    "hatchling>=1.27.0",
+    "opentelemetry-exporter-otlp-proto-grpc>=1.20.0",
+    "traceloop-sdk"
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.4.0",
+    "mypy>=1.5.0",
+    "pytest-cov>=4.0.0",
+]
+local-dev = [
+    "testcontainers[minio]>=4.13.1",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/cloud_sdk_python"]
+
+[dependency-groups]
+dev = [
+    "mypy>=1.18.2",
+    "pytest>=8.4.2",
+    "pytest-cov>=7.0.0",
+    "pytest-bdd>=7.2.0",
+    "python-dotenv>=1.0.0",
+    "cryptography>=46.0.3",
+]

@@ -1,0 +1,37 @@
+# uv
+#   Keep uv.lock for reproducible builds, but ignore cache
+.uv/
+.uv_cache/
+
+# Python
+__pycache__/
+
+# Environments
+.env*
+!.env*.example
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+piperBuild-env/
+
+# IDEs
+.vscode/
+.idea/
+
+# Logs
+logs/
+*.log
+
+# Coverage reports
+.coverage
+coverage.*
+test-results.*
+
+# SonarQube Reports
+.sonar*
+
+# Local Mode
+localauditlog.jsonl

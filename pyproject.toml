@@ -1,6 +1,6 @@
 [project]
-name = "cloud-sdk-python"
-version = "0.0.0"
+name = "sap-cloud-sdk"
+version = "0.0.1"
 description = "SAP Cloud SDK for Python"
 readme = "README.md"
 authors = [

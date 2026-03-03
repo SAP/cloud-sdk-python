@@ -173,70 +173,6 @@ wheels = [
 ]
 
 [[package]]
-name = "cloud-sdk-python"
-version = "0.0.0"
-source = { editable = "." }
-dependencies = [
-    { name = "hatchling" },
-    { name = "minio" },
-    { name = "opentelemetry-exporter-otlp-proto-grpc" },
-    { name = "pydantic" },
-    { name = "requests" },
-    { name = "requests-oauthlib" },
-    { name = "setuptools" },
-    { name = "testcontainers" },
-    { name = "traceloop-sdk" },
-]
-
-[package.optional-dependencies]
-dev = [
-    { name = "mypy" },
-    { name = "pytest" },
-    { name = "pytest-cov" },
-]
-local-dev = [
-    { name = "testcontainers", extra = ["minio"] },
-]
-
-[package.dev-dependencies]
-dev = [
-    { name = "cryptography" },
-    { name = "mypy" },
-    { name = "pytest" },
-    { name = "pytest-bdd" },
-    { name = "pytest-cov" },
-    { name = "python-dotenv" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "hatchling", specifier = ">=1.27.0" },
-    { name = "minio", specifier = ">=7.2.16" },
-    { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.5.0" },
-    { name = "opentelemetry-exporter-otlp-proto-grpc", specifier = ">=1.20.0" },
-    { name = "pydantic", specifier = ">=2.12.3" },
-    { name = "pytest", marker = "extra == 'dev'", specifier = ">=7.4.0" },
-    { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=4.0.0" },
-    { name = "requests", specifier = ">=2.31.0" },
-    { name = "requests-oauthlib", specifier = ">=1.4.0" },
-    { name = "setuptools", specifier = ">=80.9.0" },
-    { name = "testcontainers", specifier = ">=4.13.1" },
-    { name = "testcontainers", extras = ["minio"], marker = "extra == 'local-dev'", specifier = ">=4.13.1" },
-    { name = "traceloop-sdk" },
-]
-provides-extras = ["dev", "local-dev"]
-
-[package.metadata.requires-dev]
-dev = [
-    { name = "cryptography", specifier = ">=46.0.3" },
-    { name = "mypy", specifier = ">=1.18.2" },
-    { name = "pytest", specifier = ">=8.4.2" },
-    { name = "pytest-bdd", specifier = ">=7.2.0" },
-    { name = "pytest-cov", specifier = ">=7.0.0" },
-    { name = "python-dotenv", specifier = ">=1.0.0" },
-]
-
-[[package]]
 name = "argon2-cffi"
 version = "25.1.0"
 source = { registry = "https://pypi.org/simple" }
@@ -2519,6 +2455,70 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/42/f2/05f29bc3913aea15eb670be136045bf5c5bbf4b99ecb839da9b422bb2c85/requests-oauthlib-2.0.0.tar.gz", hash = "sha256:b3dffaebd884d8cd778494369603a9e7b58d29111bf6b41bdc2dcd87203af4e9", size = 55650, upload-time = "2024-03-22T20:32:29.939Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/3b/5d/63d4ae3b9daea098d5d6f5da83984853c1bbacd5dc826764b249fe119d24/requests_oauthlib-2.0.0-py2.py3-none-any.whl", hash = "sha256:7dd8a5c40426b779b0868c404bdef9768deccf22749cde15852df527e6269b36", size = 24179, upload-time = "2024-03-22T20:32:28.055Z" },
+]
+
+[[package]]
+name = "sap-cloud-sdk"
+version = "0.0.1"
+source = { editable = "." }
+dependencies = [
+    { name = "hatchling" },
+    { name = "minio" },
+    { name = "opentelemetry-exporter-otlp-proto-grpc" },
+    { name = "pydantic" },
+    { name = "requests" },
+    { name = "requests-oauthlib" },
+    { name = "setuptools" },
+    { name = "testcontainers" },
+    { name = "traceloop-sdk" },
+]
+
+[package.optional-dependencies]
+dev = [
+    { name = "mypy" },
+    { name = "pytest" },
+    { name = "pytest-cov" },
+]
+local-dev = [
+    { name = "testcontainers", extra = ["minio"] },
+]
+
+[package.dev-dependencies]
+dev = [
+    { name = "cryptography" },
+    { name = "mypy" },
+    { name = "pytest" },
+    { name = "pytest-bdd" },
+    { name = "pytest-cov" },
+    { name = "python-dotenv" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "hatchling", specifier = ">=1.27.0" },
+    { name = "minio", specifier = ">=7.2.16" },
+    { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.5.0" },
+    { name = "opentelemetry-exporter-otlp-proto-grpc", specifier = ">=1.20.0" },
+    { name = "pydantic", specifier = ">=2.12.3" },
+    { name = "pytest", marker = "extra == 'dev'", specifier = ">=7.4.0" },
+    { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=4.0.0" },
+    { name = "requests", specifier = ">=2.31.0" },
+    { name = "requests-oauthlib", specifier = ">=1.4.0" },
+    { name = "setuptools", specifier = ">=80.9.0" },
+    { name = "testcontainers", specifier = ">=4.13.1" },
+    { name = "testcontainers", extras = ["minio"], marker = "extra == 'local-dev'", specifier = ">=4.13.1" },
+    { name = "traceloop-sdk" },
+]
+provides-extras = ["dev", "local-dev"]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "cryptography", specifier = ">=46.0.3" },
+    { name = "mypy", specifier = ">=1.18.2" },
+    { name = "pytest", specifier = ">=8.4.2" },
+    { name = "pytest-bdd", specifier = ">=7.2.0" },
+    { name = "pytest-cov", specifier = ">=7.0.0" },
+    { name = "python-dotenv", specifier = ">=1.0.0" },
 ]
 
 [[package]]

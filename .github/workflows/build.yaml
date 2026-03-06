@@ -10,17 +10,22 @@ on:
 
 env:
   PYTHON_VERSION: "3.11"
-  SDK_DIST_NAME: "sap-cloud-sdk"
+  SDK_DIST_NAME: "sap_cloud_sdk"
+  COVERAGE_THRESHOLD: "80"
 
 jobs:
   build:
     name: Build SDK
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
     steps:
       - name: "Checkout Repository"
         uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
 
       - name: "Install uv"
         uses: astral-sh/setup-uv@v4
@@ -33,8 +38,78 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
-      - name: "Run Unit Tests"
-        run: uv run pytest -m "not integration"
+      - name: "Run Unit Tests with Coverage"
+        run: uv run pytest -m "not integration" --cov=src/sap_cloud_sdk --cov-report=xml --cov-report=html --cov-report=term-missing
+
+      - name: "Upload Coverage Report"
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: |
+            coverage.xml
+            htmlcov/
+          retention-days: 30
+
+      - name: "Coverage Report Summary"
+        run: |
+          echo "## 📊 Coverage Report" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          uv run coverage report --format=markdown >> $GITHUB_STEP_SUMMARY
+
+      - name: "Post Coverage Comment on PR"
+        if: github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Extract unique module paths from changed files
+          MODULE_PATHS=$(git diff --name-only "${{ github.event.pull_request.base.sha }}" "${{ github.event.pull_request.head.sha }}" \
+            | grep '^src/sap_cloud_sdk/.*\.py$' \
+            | sed -E 's|^(src/sap_cloud_sdk/core/[^/]+).*|\1|; t; s|^(src/sap_cloud_sdk/[^/]+).*|\1|' \
+            | grep -v '__pycache__' \
+            | sort -u)
+          
+          if [ -z "$MODULE_PATHS" ]; then
+            echo "No module-level Python files changed, skipping coverage report"
+            exit 0
+          fi
+          
+          # Initialize tracking
+          FAILED_MODULES=()
+          COMMENT_BODY="## 📊 Coverage Report by Module"$'\n\n'
+          
+          # Process each module
+          while IFS= read -r module_path; do
+            echo "Checking coverage for $module_path..."
+            
+            # Get coverage report and check threshold in one call
+            if MODULE_COVERAGE=$(uv run coverage report \
+              --include="$module_path/*.py,$module_path/**/*.py" \
+              --format=markdown \
+              --skip-empty \
+              --skip-covered \
+              --fail-under=${{ env.COVERAGE_THRESHOLD }} 2>&1); then
+              COMMENT_BODY+="### \`$module_path\` ✅"$'\n\n'"$MODULE_COVERAGE"$'\n\n'
+            else
+              COMMENT_BODY+="### \`$module_path\` ❌"$'\n\n'"$MODULE_COVERAGE"$'\n\n'
+              FAILED_MODULES+=("$module_path")
+            fi
+          done <<< "$MODULE_PATHS"
+          
+          # Add overall status
+          COMMENT_BODY+="---"$'\n\n'
+          if [ ${#FAILED_MODULES[@]} -eq 0 ]; then
+            COMMENT_BODY+="✅ **All changed modules meet the ${{ env.COVERAGE_THRESHOLD }}% coverage threshold!**"
+          else
+            COMMENT_BODY+="❌ **Coverage check failed!** The following modules are below ${{ env.COVERAGE_THRESHOLD }}% coverage: \`$(IFS=', '; echo "${FAILED_MODULES[*]}")\`"
+          fi
+          
+          COMMENT_BODY+=$'\n\n'"---"$'\n'"*Coverage report from commit [\`${GITHUB_SHA:0:7}\`](${{ github.event.pull_request.head.repo.html_url }}/commit/${{ github.event.pull_request.head.sha }})*"
+          
+          # Post comment on PR
+          echo "$COMMENT_BODY" | gh pr comment ${{ github.event.pull_request.number }} --body-file -
+          
+          # Exit with failure if any module failed
+          [ ${#FAILED_MODULES[@]} -eq 0 ] || exit 1
 
       - name: "Build Packages"
         run: uv build

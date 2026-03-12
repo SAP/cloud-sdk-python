@@ -44,6 +44,9 @@ jobs:
       - name: "Run Ruff Formatter Check"
         run: uv run ruff format --check --diff .
 
+      - name: "Run ty Type Check"
+        run: uv run ty check --output-format github --python-version ${{ env.PYTHON_VERSION }} .
+
       - name: "Run Unit Tests with Coverage"
         run: uv run pytest -m "not integration" --cov=src/sap_cloud_sdk --cov-report=xml --cov-report=html --cov-report=term-missing
 

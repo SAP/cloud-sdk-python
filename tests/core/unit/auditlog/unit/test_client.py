@@ -4,7 +4,7 @@ import pytest
 from unittest.mock import MagicMock, patch
 
 from sap_cloud_sdk.core.auditlog.client import AuditLogClient
-from sap_cloud_sdk.core.auditlog._transport import Transport
+from sap_cloud_sdk.core.auditlog._transport import AuditMessage, Transport
 from sap_cloud_sdk.core.auditlog.models import SecurityEvent, FailedMessage
 from sap_cloud_sdk.core.auditlog.exceptions import (
     ClientCreationError,
@@ -86,7 +86,7 @@ class TestAuditLogClient:
     def test_log_batch_all_success(self):
         transport = MockTransport()
         client = AuditLogClient(transport)
-        events = [
+        events: list[AuditMessage] = [
             SecurityEvent(data="Event 1"),
             SecurityEvent(data="Event 2")
         ]
@@ -99,7 +99,7 @@ class TestAuditLogClient:
     def test_log_batch_some_failures(self):
         transport = MockTransport()
         client = AuditLogClient(transport)
-        events = [
+        events: list[AuditMessage] = [
             SecurityEvent(data="Valid event"),
             SecurityEvent(data=""),
             SecurityEvent(data="Another valid")
@@ -115,7 +115,7 @@ class TestAuditLogClient:
     def test_log_batch_transport_failures(self):
         transport = MockTransport()
         client = AuditLogClient(transport)
-        events = [
+        events: list[AuditMessage] = [
             SecurityEvent(data="Event 1"),
             SecurityEvent(data="Event 2")
         ]
@@ -125,7 +125,7 @@ class TestAuditLogClient:
                 raise TransportError("Network error")
             transport.sent_events.append(event)
         
-        transport.send = failing_send
+        transport.send = failing_send  # ty: ignore[invalid-assignment]
         
         failed = client.log_batch(events)
         
@@ -146,7 +146,7 @@ class TestAuditLogClient:
     def test_log_batch_mixed_failures(self):
         transport = MockTransport()
         client = AuditLogClient(transport)
-        events = [
+        events: list[AuditMessage] = [
             SecurityEvent(data="Valid"),
             SecurityEvent(data=""),
             SecurityEvent(data="Also valid")
@@ -157,7 +157,7 @@ class TestAuditLogClient:
                 raise TransportError("Transport error")
             transport.sent_events.append(event)
         
-        transport.send = selective_fail
+        transport.send = selective_fail  # ty: ignore[invalid-assignment]
         
         failed = client.log_batch(events)
         
@@ -177,12 +177,6 @@ class TestAuditLogClient:
         client.close()
         
         assert transport.closed is True
-
-    def test_close_transport_without_close_method(self):
-        transport = MagicMock(spec=[])
-        client = AuditLogClient(transport)
-        
-        client.close()
 
     def test_close_transport_close_failure(self):
         transport = MockTransport()
@@ -233,7 +227,7 @@ class TestAuditLogClient:
     def test_log_batch_preserves_event_order_in_failures(self):
         transport = MockTransport()
         client = AuditLogClient(transport)
-        events = [
+        events: list[AuditMessage] = [
             SecurityEvent(data=""),
             SecurityEvent(data="Valid"),
             SecurityEvent(data="")

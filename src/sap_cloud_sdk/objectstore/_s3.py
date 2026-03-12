@@ -3,8 +3,9 @@
 import io
 import os
 import logging
+from datetime import datetime
 from http.client import HTTPResponse
-from typing import BinaryIO, List
+from typing import BinaryIO, List, cast
 
 import minio.datatypes
 from minio import Minio
@@ -279,9 +280,9 @@ class ObjectStoreClient:
 
         get_err = None
         try:
-            response = self._minio_client.get_object(
+            response = cast(HTTPResponse, self._minio_client.get_object(
                 bucket_name=self._creds_config.bucket, object_name=name
-            )
+            ))
             return response
         except S3Error as e:
             get_err = e
@@ -424,9 +425,9 @@ class ObjectStoreClient:
 
             return ObjectMetadata(
                 key=name,
-                last_modified=stat.last_modified,
-                etag=stat.etag.strip('"'),  # Remove quotes from etag
-                size=stat.size,
+                last_modified=stat.last_modified or datetime.min,
+                etag=(stat.etag or "").strip('"'),  # Remove quotes from etag
+                size=stat.size or 0,
                 storage_class=None,  # stat_object doesn't provide storage class
                 owner=None,  # stat_object doesn't provide owner
             )

@@ -744,7 +744,7 @@ def some_events_succeed_some_fail(context):
         return
     
     if len(context.concurrent_results) == 0 and len(context.individual_attempts) == 0:
-        pytest.fail("Expected mixed success and failures, but no failures were simulated. Check intermittent connectivity setup.")
+        pytest.fail("Expected mixed success and failures, but no failures were simulated. Check intermittent connectivity setup.")  # ty: ignore[invalid-argument-type]
     
     successful_count = sum(1 for r in context.concurrent_results if r.get("success", False))
     failed_count = len(context.concurrent_results) - successful_count

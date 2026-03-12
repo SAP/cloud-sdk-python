@@ -27,7 +27,7 @@
 - Use type annotations throughout the codebase (functions, methods, class attributes)
 - Leverage `typing` module for complex types (Union, Optional, List, Dict, etc.)
 - Use Protocol classes for defining interfaces/contracts
-- Enable strict mypy checking in development
+- Enable strict type checking with ty in development
 - Use `py.typed` marker files to indicate typed packages
 - Use `TypedDict` for structured dictionaries
 

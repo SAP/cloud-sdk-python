@@ -28,7 +28,7 @@ class ObjectStoreTestContext:
         self.last_error: Optional[Exception] = None
         self.test_content: Optional[bytes] = None
         self.object_name: str = ""
-        self.temp_file: Optional[tempfile.NamedTemporaryFile] = None
+        self.temp_file: Optional[tempfile.NamedTemporaryFile] = None  # ty: ignore[invalid-type-form]
         self.downloaded_content: Optional[bytes] = None
         self.metadata = None
         self.object_list: List[Any] = []

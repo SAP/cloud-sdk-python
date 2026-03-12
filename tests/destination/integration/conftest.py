@@ -30,7 +30,7 @@ def destination_client():
         client = create_client()
         return client
     except Exception as e:
-        pytest.fail(f"Failed to create Destination client for cloud integration tests: {e}")
+        pytest.fail(f"Failed to create Destination client for cloud integration tests: {e}")  # ty: ignore[invalid-argument-type]
 
 
 @pytest.fixture(scope="session")
@@ -43,7 +43,7 @@ def fragment_client():
         client = create_fragment_client()
         return client
     except Exception as e:
-        pytest.fail(f"Failed to create Fragment client for cloud integration tests: {e}")
+        pytest.fail(f"Failed to create Fragment client for cloud integration tests: {e}")  # ty: ignore[invalid-argument-type]
 
 
 @pytest.fixture(scope="session")
@@ -56,7 +56,7 @@ def certificate_client():
         client = create_certificate_client()
         return client
     except Exception as e:
-        pytest.fail(f"Failed to create Certificate client for cloud integration tests: {e}")
+        pytest.fail(f"Failed to create Certificate client for cloud integration tests: {e}")  # ty: ignore[invalid-argument-type]
 
 
 @pytest.fixture

@@ -48,7 +48,7 @@ def integration_env() -> Dict[str, str]:
             missing_vars.append(var)
     
     if missing_vars:
-        pytest.skip(f"Missing required environment variables for cloud integration tests: {missing_vars}")
+        pytest.skip(f"Missing required environment variables for cloud integration tests: {missing_vars}")  # ty: ignore[invalid-argument-type, too-many-positional-arguments]
     
     # Ensure SSL is enabled for cloud services
     env_vars["CLOUD_SDK_CFG_OBJECTSTORE_DEFAULT_SSL_ENABLED"] = os.getenv(
@@ -58,7 +58,7 @@ def integration_env() -> Dict[str, str]:
     # Validate that we're not using localhost (cloud-only)
     host = env_vars["CLOUD_SDK_CFG_OBJECTSTORE_DEFAULT_HOST"]
     if host.startswith("localhost") or host.startswith("127.0.0.1"):
-        pytest.skip("Integration tests are cloud-only. Local endpoints not supported.")
+        pytest.skip("Integration tests are cloud-only. Local endpoints not supported.")  # ty: ignore[invalid-argument-type, too-many-positional-arguments]
     
     logger.info(f"Integration environment validated for cloud testing: {host}")
     return env_vars
@@ -78,7 +78,7 @@ def objectstore_client(integration_env):
         client = create_client("default", config=config, disable_ssl=disable_ssl)
         return client
     except Exception as e:
-        pytest.fail(f"Failed to create ObjectStore client for cloud integration tests: {e}")
+        pytest.fail(f"Failed to create ObjectStore client for cloud integration tests: {e}")  # ty: ignore[invalid-argument-type]
 
 
 @pytest.fixture

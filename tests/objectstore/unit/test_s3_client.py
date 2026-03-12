@@ -94,7 +94,7 @@ class TestObjectStoreClient:
             client.put_object_from_bytes("", b"data", "text/plain")
         
         with pytest.raises(ValueError, match="data must be bytes"):
-            client.put_object_from_bytes("test.txt", "not bytes", "text/plain")
+            client.put_object_from_bytes("test.txt", "not bytes", "text/plain")  # ty: ignore[invalid-argument-type]
         
         with pytest.raises(ValueError, match="content_type must be a non-empty string"):
             client.put_object_from_bytes("test.txt", b"data", "")
@@ -369,4 +369,4 @@ class TestObjectStoreClient:
         client = ObjectStoreClient(self.creds)
         
         with pytest.raises(ValueError, match="prefix must be a string"):
-            client.list_objects(123)
+            client.list_objects(123)  # ty: ignore[invalid-argument-type]

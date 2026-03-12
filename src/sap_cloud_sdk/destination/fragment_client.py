@@ -393,7 +393,7 @@ class FragmentClient:
                 )
 
     @staticmethod
-    def _sub_path_for_level(level: Level) -> str:
+    def _sub_path_for_level(level: Optional[Level] = Level.SUB_ACCOUNT) -> str:
         """Return API sub-path for the given level."""
         return (
             _INSTANCE_COLLECTION

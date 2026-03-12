@@ -175,7 +175,7 @@ class TestDestinationHttp:
 
         err = exc.value
         assert err.status_code == 404
-        assert "Not Found" in err.response_text
+        assert "Not Found" in err.response_text  # ty: ignore[unsupported-operator]
         assert "HTTP 404 for GET" in str(err)
 
     def test_request_network_error_wrapped(self):

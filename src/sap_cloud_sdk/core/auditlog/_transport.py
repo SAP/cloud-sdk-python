@@ -36,3 +36,11 @@ class Transport(ABC):
             TransportError: If the transport operation fails.
         """
         pass
+
+    def close(self) -> None:
+        """Close the transport and release resources.
+
+        Default implementation is a no-op. Subclasses may override
+        to perform cleanup (e.g., closing HTTP sessions).
+        """
+        pass

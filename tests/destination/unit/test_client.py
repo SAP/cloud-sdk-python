@@ -131,7 +131,7 @@ class TestDestinationClientReadOperations:
         client = DestinationClient(mock_http)
         result = client.get_destination("my-api")
 
-        assert result is not None
+        assert isinstance(result, Destination)
         assert result.name == "my-api"
         assert result.url == "https://api.example.com"
         assert len(result.auth_tokens) == 1
@@ -199,7 +199,7 @@ class TestDestinationClientReadOperations:
         options = ConsumptionOptions(tenant="tenant-1")
         result = client.get_destination("my-api", options=options)
 
-        assert result is not None
+        assert isinstance(result, Destination)
         assert len(result.auth_tokens) == 1
         assert result.auth_tokens[0].scope == "read write"
 
@@ -311,7 +311,7 @@ class TestDestinationClientReadOperations:
         client = DestinationClient(mock_http)
         result = client.get_destination("my-api")
 
-        assert result is not None
+        assert isinstance(result, Destination)
         assert len(result.auth_tokens) == 2
         assert result.auth_tokens[0].type == "Bearer"
         assert result.auth_tokens[1].type == "ApiKey"
@@ -341,7 +341,7 @@ class TestDestinationClientReadOperations:
         client = DestinationClient(mock_http)
         result = client.get_destination("my-api")
 
-        assert result is not None
+        assert isinstance(result, Destination)
         assert len(result.certificates) == 1
         assert result.certificates[0].name == "client-cert"
         assert result.certificates[0].type == "PEM"
@@ -373,7 +373,7 @@ class TestDestinationClientReadOperations:
         client = DestinationClient(mock_http)
         result = client.get_destination("my-api")
 
-        assert result is not None
+        assert isinstance(result, Destination)
         assert result.auth_tokens[0].refresh_token == "cmVmcmVzaA=="
         assert result.auth_tokens[0].scope == "openid profile"
 
@@ -477,7 +477,7 @@ class TestDestinationClientReadOperations:
         client = DestinationClient(mock_http)
         result = client.get_destination("my-api")
 
-        assert result is not None
+        assert isinstance(result, Destination)
         assert len(result.auth_tokens) == 0
         assert len(result.certificates) == 0
 
@@ -640,7 +640,8 @@ class TestDestinationClientWithTransparentProxy:
         client = DestinationClient(mock_http, use_default_proxy=True)
         
         result = client.get_instance_destination("test-destination", proxy_enabled=True)
-        
+
+        assert isinstance(result, TransparentProxyDestination)
         assert result.url == "http://my-proxy.my-namespace"
         assert result.headers == {"X-destination-name": "test-destination"}
 
@@ -655,7 +656,8 @@ class TestDestinationClientWithTransparentProxy:
         
         destination_name = "complex-destination-name-123"
         result = client.get_instance_destination(destination_name, proxy_enabled=True)
-        
+
+        assert isinstance(result, TransparentProxyDestination)
         assert result.headers["X-destination-name"] == destination_name
 
     @patch("sap_cloud_sdk.destination.client.load_transparent_proxy")
@@ -1278,10 +1280,10 @@ class TestDestinationClientEdgeCases:
         with pytest.raises(DestinationOperationError) as exc_info:
             client.get_subaccount_destination(
                 "test-dest",
-                access_strategy=unknown_strategy,
+                access_strategy=unknown_strategy,  # ty: ignore[invalid-argument-type]
                 tenant="test-tenant"
             )
-        
+
         assert "unknown access strategy" in str(exc_info.value).lower()
 
     def test_list_destinations_non_list_response(self):
@@ -1376,11 +1378,11 @@ class TestDestinationClientEdgeCases:
         
         with pytest.raises(DestinationOperationError) as exc_info:
             client._apply_access_strategy(
-                access_strategy=unknown_strategy,
+                access_strategy=unknown_strategy,  # ty: ignore[invalid-argument-type]
                 tenant="test-tenant",
                 fetch_func=mock_fetch
             )
-        
+
         assert "unknown access strategy" in str(exc_info.value).lower()
 
     def test_get_subaccount_destination_provider_first_both_none(self):
@@ -1465,6 +1467,7 @@ class TestDestinationClientEdgeCases:
             fetch_func=mock_fetch
         )
         
+        assert result is not None
         assert result == filled_paged
         assert len(result.items) == 1
         assert mock_fetch.call_count == 2

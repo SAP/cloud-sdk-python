@@ -242,7 +242,7 @@ class TestHttpTransport:
                 pass
             
             with pytest.raises(TransportError, match="Unknown event type"):
-                transport._get_endpoint(UnknownEvent())
+                transport._get_endpoint(UnknownEvent())  # ty: ignore[invalid-argument-type]
 
     @patch('sap_cloud_sdk.core.auditlog._http_transport.OAuth2Session')
     def test_send_success(self, mock_oauth_session):

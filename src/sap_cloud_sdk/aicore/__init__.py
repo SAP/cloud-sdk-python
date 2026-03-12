@@ -7,6 +7,7 @@ variables and configure them for use with LiteLLM.
 import json
 import logging
 import os
+from typing import Optional
 
 from sap_cloud_sdk.core.telemetry.metrics_decorator import record_metrics
 from sap_cloud_sdk.core.telemetry.module import Module
@@ -17,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 def _get_secret(
     env_var_name: str,
-    file_name: str = None,
+    file_name: Optional[str] = None,
     default: str = "",
     instance_name: str = "aicore-instance",
 ) -> str:

@@ -32,7 +32,7 @@ Tip:
 ## Type Check
 
 ```bash
-uv run mypy src
+uv run ty check .
 ```
 
 ## Build Project

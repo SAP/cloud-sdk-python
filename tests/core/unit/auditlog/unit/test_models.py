@@ -192,7 +192,7 @@ class TestSecurityEvent:
             event.validate()
 
     def test_validate_none_data(self):
-        event = SecurityEvent(data=None)
+        event = SecurityEvent(data=None)  # ty: ignore[invalid-argument-type]
         with pytest.raises(ValueError, match="SecurityEvent data must not be empty"):
             event.validate()
 

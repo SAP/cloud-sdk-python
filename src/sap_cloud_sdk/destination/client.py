@@ -509,7 +509,7 @@ class DestinationClient:
         level: Level,
         tenant_subdomain: Optional[str] = None,
         filter: Optional[ListOptions] = None,
-    ) -> Optional[PagedResult[Destination]]:
+    ) -> PagedResult[Destination]:
         """Internal helper to list destinations with optional tenant context and filters.
 
         Args:
@@ -557,7 +557,7 @@ class DestinationClient:
             return PagedResult(items=destinations, pagination=pagination_info)
         except HttpError as e:
             if getattr(e, "status_code", None) == 404:
-                return None
+                return PagedResult(items=[])
             raise
         except DestinationOperationError:
             raise
@@ -584,7 +584,7 @@ class DestinationClient:
         access_strategy: AccessStrategy,
         tenant: Optional[str],
         fetch_func: Callable[[Optional[str]], T],
-    ) -> Optional[T]:
+    ) -> T:
         """Apply access strategy pattern for fetching resources from subaccount scope.
 
         This generic method handles the access strategy logic (subscriber/provider precedence)
@@ -641,7 +641,7 @@ class DestinationClient:
                 )
 
     @staticmethod
-    def _sub_path_for_level(level: Level) -> str:
+    def _sub_path_for_level(level: Optional[Level] = Level.SUB_ACCOUNT) -> str:
         """Return API sub-path for the given level."""
         return (
             _INSTANCE_COLLECTION

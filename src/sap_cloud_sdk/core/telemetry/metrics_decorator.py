@@ -1,7 +1,7 @@
 """Metrics decorator for telemetry with source detection from client instances."""
 
 from functools import wraps
-from typing import Callable, TypeVar, ParamSpec
+from typing import Callable, Optional, TypeVar, ParamSpec
 
 from sap_cloud_sdk.core.telemetry import (
     Module,
@@ -62,9 +62,9 @@ def record_metrics(
         @wraps(func)
         def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
             # Extract source from the client instance (self is the first argument)
-            source = None
-            if args and hasattr(args[0], "_telemetry_source"):
-                source = args[0]._telemetry_source
+            source: Optional[Module] = None
+            if args:
+                source = getattr(args[0], "_telemetry_source", None)
 
             try:
                 result = func(*args, **kwargs)

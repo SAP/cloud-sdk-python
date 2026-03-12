@@ -92,8 +92,7 @@ class AuditLogClient:
 
     def close(self) -> None:
         """Close the client and cleanup resources."""
-        if hasattr(self._transport, "close"):
-            self._transport.close()
+        self._transport.close()
 
     def __enter__(self):
         """Enter context manager."""

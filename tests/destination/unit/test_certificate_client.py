@@ -784,8 +784,8 @@ class TestCertificateClientEdgeCases:
         mock_http.get.side_effect = http_error
 
         certificates = certificate_client.list_instance_certificates()
-        
-        assert certificates is None
+
+        assert certificates.items == []
 
     def test_list_subaccount_certificates_both_empty_subscriber_first(self, certificate_client, mock_http):
         """Test SUBSCRIBER_FIRST when both subscriber and provider return empty."""

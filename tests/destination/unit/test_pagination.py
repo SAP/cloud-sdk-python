@@ -50,6 +50,7 @@ class TestPagedResult:
 
         assert result.items == items
         assert result.pagination == pagination
+        assert result.pagination is not None
         assert result.pagination.page_count == 5
         assert result.pagination.entity_count == 47
 
@@ -67,6 +68,7 @@ class TestPagedResult:
         result = PagedResult(items=[], pagination=PaginationInfo(page_count=0, entity_count=0))
 
         assert result.items == []
+        assert result.pagination is not None
         assert result.pagination.page_count == 0
         assert result.pagination.entity_count == 0
 

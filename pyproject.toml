@@ -27,11 +27,11 @@ packages = ["src/sap_cloud_sdk"]
 
 [dependency-groups]
 dev = [
-    "mypy>=1.18.2",
     "pytest>=8.4.2",
     "pytest-cov>=7.0.0",
     "pytest-bdd>=7.2.0",
     "python-dotenv>=1.0.0",
+    "ty>=0.0.21",
     "cryptography>=46.0.3",
     "ruff>=0.8.0",
 ]
@@ -81,3 +81,6 @@ quote-style = "double"
 indent-style = "space"
 skip-magic-trailing-comma = false
 line-ending = "auto"
+
+[tool.ty.environment]
+python-version = "3.11"

@@ -117,4 +117,4 @@ class TestCreateClient:
         
         with patch('sap_cloud_sdk.core.auditlog.HttpTransport'):
             with pytest.raises(TypeError):
-                create_client(config)
+                create_client(config)  # ty: ignore[too-many-positional-arguments]

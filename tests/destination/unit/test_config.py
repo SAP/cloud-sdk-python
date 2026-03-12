@@ -136,11 +136,11 @@ class TestLoadFromEnvOrMount:
     def test_load_success_custom_instance(self, mock_read):
         def fake_read_side_effect(*args, **kwargs):
             target = kwargs.get("target")
-            target.clientid = "cid"
-            target.clientsecret = "csecret"
-            target.url = "https://auth.example.com"
-            target.uri = "https://destination.example.com"
-            target.identityzone = "provider-zone"
+            target.clientid = "cid"  # ty: ignore[invalid-assignment]
+            target.clientsecret = "csecret"  # ty: ignore[invalid-assignment]
+            target.url = "https://auth.example.com"  # ty: ignore[invalid-assignment]
+            target.uri = "https://destination.example.com"  # ty: ignore[invalid-assignment]
+            target.identityzone = "provider-zone"  # ty: ignore[invalid-assignment]
 
         mock_read.side_effect = fake_read_side_effect
 
@@ -153,10 +153,10 @@ class TestLoadFromEnvOrMount:
         def fake_read_side_effect(*args, **kwargs):
             target = kwargs.get("target")
             # Populate invalid data to trigger BindingData.validate failure
-            target.clientid = ""
-            target.clientsecret = ""
-            target.url = ""
-            target.uri = ""
+            target.clientid = ""  # ty: ignore[invalid-assignment]
+            target.clientsecret = ""  # ty: ignore[invalid-assignment]
+            target.url = ""  # ty: ignore[invalid-assignment]
+            target.uri = ""  # ty: ignore[invalid-assignment]
 
         mock_read.side_effect = fake_read_side_effect
 

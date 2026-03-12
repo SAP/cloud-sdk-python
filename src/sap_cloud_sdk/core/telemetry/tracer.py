@@ -7,7 +7,7 @@ by auto_instrument().
 """
 
 from contextlib import contextmanager
-from typing import ContextManager, Optional, Dict, Any
+from typing import Optional, Dict, Any
 
 from opentelemetry import trace
 from opentelemetry.trace import Status, StatusCode, Span
@@ -130,7 +130,7 @@ def chat_span(
     conversation_id: Optional[str] = None,
     server_address: Optional[str] = None,
     attributes: Optional[Dict[str, Any]] = None,
-) -> ContextManager[Span]:
+):
     """
     Create a span for LLM chat/completion API calls (OpenTelemetry GenAI Inference span).
 
@@ -209,7 +209,7 @@ def execute_tool_span(
     tool_type: Optional[str] = None,
     tool_description: Optional[str] = None,
     attributes: Optional[Dict[str, Any]] = None,
-) -> ContextManager[Span]:
+):
     """
     Create a span for tool execution in agentic workflows (OpenTelemetry GenAI Execute Tool span).
 
@@ -277,7 +277,7 @@ def invoke_agent_span(
     server_address: Optional[str] = None,
     kind: trace.SpanKind = trace.SpanKind.CLIENT,
     attributes: Optional[Dict[str, Any]] = None,
-) -> ContextManager[Span]:
+):
     """
     Create a span for GenAI agent invocation (OpenTelemetry GenAI Invoke agent span).
 

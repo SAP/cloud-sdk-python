@@ -330,7 +330,7 @@ class CertificateClient:
         level: Level = Level.SUB_ACCOUNT,
         tenant_subdomain: Optional[str] = None,
         filter: Optional[ListOptions] = None,
-    ) -> Optional[PagedResult[Certificate]]:
+    ) -> PagedResult[Certificate]:
         """Internal helper to list certificates with optional filters.
 
         Args:
@@ -368,7 +368,7 @@ class CertificateClient:
             return PagedResult(items=certificates, pagination=pagination_info)
         except HttpError as e:
             if getattr(e, "status_code", None) == 404:
-                return None
+                return PagedResult(items=[])
             raise
         except DestinationOperationError:
             raise
@@ -382,7 +382,7 @@ class CertificateClient:
         access_strategy: AccessStrategy,
         tenant: Optional[str],
         fetch_func: Callable[[Optional[str]], T],
-    ) -> Optional[T]:
+    ) -> T:
         """Apply access strategy pattern for fetching subaccount certificates.
 
         This method handles the access strategy logic (subscriber/provider precedence)
@@ -439,7 +439,7 @@ class CertificateClient:
                 )
 
     @staticmethod
-    def _sub_path_for_level(level: Level) -> str:
+    def _sub_path_for_level(level: Optional[Level] = Level.SUB_ACCOUNT) -> str:
         """Return API sub-path for the given level."""
         return (
             _INSTANCE_COLLECTION

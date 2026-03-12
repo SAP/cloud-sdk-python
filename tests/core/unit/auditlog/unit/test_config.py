@@ -38,7 +38,7 @@ class TestAuditLogConfig:
     def test_none_client_id(self):
         with pytest.raises(ValueError, match="client_id is required"):
             AuditLogConfig(
-                client_id=None,
+                client_id=None,  # ty: ignore[invalid-argument-type]
                 client_secret="test_secret",
                 oauth_url="https://oauth.example.com",
                 service_url="https://service.example.com"

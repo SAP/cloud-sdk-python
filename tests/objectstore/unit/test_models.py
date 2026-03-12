@@ -79,7 +79,7 @@ class TestObjectMetadata:
         )
         
         with pytest.raises(AttributeError):
-            metadata.key = "new_key"
+            metadata.key = "new_key"  # ty: ignore[invalid-assignment]
 
     def test_is_frozen_dataclass(self):
         from dataclasses import is_dataclass

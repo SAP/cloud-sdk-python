@@ -16,14 +16,13 @@ This guide consolidates the full release and deployment process for the Cloud SD
 
 2. Bump version
    - In `pyproject.toml`: set `project.version = "X.Y.Z"` (PEP 440; no leading 'v')
-   - In `version.txt`: set `vX.Y.Z`
 
 3. Update changelog
    - Use the official Changelog template
 
 4. Commit changes
    ```bash
-   git add version.txt pyproject.toml CHANGELOG.md
+   git add pyproject.toml CHANGELOG.md
    git commit -m "feat: did something"
    ```
 

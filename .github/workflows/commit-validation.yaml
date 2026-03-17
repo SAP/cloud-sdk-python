@@ -10,7 +10,7 @@ on:
 
 jobs:
   commit-validation:
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.RUNNER && fromJSON(vars.RUNNER) || 'ubuntu-latest' }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4

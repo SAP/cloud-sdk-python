@@ -16,7 +16,7 @@ env:
 jobs:
   build:
     name: Build SDK
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.RUNNER && fromJSON(vars.RUNNER) || 'ubuntu-latest' }}
     permissions:
       contents: read
       pull-requests: write
@@ -28,7 +28,7 @@ jobs:
           fetch-depth: 0
 
       - name: "Install uv"
-        uses: astral-sh/setup-uv@v4
+        uses: astral-sh/setup-uv@v3
         with:
           version: "latest"
           enable-cache: true
@@ -52,6 +52,7 @@ jobs:
 
       - name: "Upload Coverage Report"
         uses: actions/upload-artifact@v4
+        if: contains(github.server_url, 'github.com')
         with:
           name: coverage-report
           path: |
@@ -153,6 +154,7 @@ jobs:
 
       - name: "Upload Build Artifacts"
         uses: actions/upload-artifact@v4
+        if: contains(github.server_url, 'github.com')
         with:
           name: ${{ env.SDK_DIST_NAME }}
           path: dist/

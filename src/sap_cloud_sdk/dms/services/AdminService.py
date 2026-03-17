@@ -1,4 +1,4 @@
-from typing import Any, Dict, List,Optional
+from typing import Any, Dict, List, Optional, Union
 
 from sap_cloud_sdk.dms.model.dms_credentials import DMSCredentials
 from sap_cloud_sdk.dms.model.repository import Repository

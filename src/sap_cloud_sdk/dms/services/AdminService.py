@@ -1,9 +1,9 @@
 from typing import Any, Dict, List,Optional
 
-from sap_cloud_sdk.dms._models import DMSCredentials
+from sap_cloud_sdk.dms.model.dms_credentials import DMSCredentials
 from sap_cloud_sdk.dms.model.repository import Repository
 from sap_cloud_sdk.dms.services.BaseService import BaseService 
-from sap_cloud_sdk.dms.model.repository_request import InternalRepoRequest
+from sap_cloud_sdk.dms.model.repository_request import InternalRepoRequest, ExternalRepoRequest
 
 _V3_ACCEPT = "application/vnd.sap.sdm.repositories+json;version=3"
 
@@ -44,12 +44,12 @@ class AdminService(BaseService):
         ]
         return repos
     
-    def onboard_repository(self, repo_request: InternalRepoRequest) -> Repository:
+    def onboard_repository(self, repo_request: Union[InternalRepoRequest, ExternalRepoRequest]) -> Repository:
         """
         Onboard a new internal repository.
 
         Args:
-            repo_request: InternalRepoRequest object containing repository details.
+            repo_request: InternalRepoRequest or ExternalRepoRequest object containing repository details.
 
         Returns:
             Repository object representing the newly onboarded repository.
@@ -67,7 +67,7 @@ class AdminService(BaseService):
 
         data: Dict[str, Any] = self._post(
             "/rest/v2/repositories",
-            json_data=payload
+            json_data={"repository": payload}
         )
         return Repository.from_dict(data)
     

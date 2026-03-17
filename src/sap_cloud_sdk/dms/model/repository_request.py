@@ -1,10 +1,8 @@
-# sap_cloud_sdk/dms/model/repository_request.py
-
 from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Literal, Optional
 
-# ── Constrained types ─────────────────────────────────────────────────────────
+# Constrained types
 
 RepositoryCategory = Literal["Collaboration", "Instant", "Favorites"]
 RepositoryType     = Literal["internal", "external"]
@@ -22,7 +20,7 @@ class RepositoryParam:
         }
 
 
-# ── Internal Repository ───────────────────────────────────────────────────────
+#Internal Repository
 
 @dataclass
 class InternalRepoRequest:
@@ -71,7 +69,7 @@ class InternalRepoRequest:
         return payload
 
 
-# ── External Repository ───────────────────────────────────────────────────────
+#External Repository
 
 @dataclass
 class ExternalRepoDetails:

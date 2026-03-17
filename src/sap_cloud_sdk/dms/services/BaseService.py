@@ -1,8 +1,7 @@
 import logging
 import requests
 from typing import Any, Dict, Optional
-
-from sap_cloud_sdk.dms._models import DMSCredentials
+from sap_cloud_sdk.dms.model.dms_credentials import DMSCredentials
 from sap_cloud_sdk.dms.exceptions import DmsException
 
 logger = logging.getLogger(__name__)
@@ -52,10 +51,15 @@ class BaseService:
         json_data: Optional[Dict[str, Any]] = None,
         data: Optional[Dict[str, Any]] = None,
         files: Optional[Any] = None,
+        headers: Optional[Dict[str, str]] = None,
     ) -> Any:
+        #merge headers like Content-Type with auth headers if provided
+        req_headers = self._auth_headers().copy()
+        if headers:
+            req_headers.update(headers)
         resp = self._session.post(
             f"{self._credentials.uri}{path}",
-            headers=self._auth_headers(),
+            headers=req_headers,
             json=json_data,
             data=data,
             files=files,
@@ -78,7 +82,7 @@ class BaseService:
                 return None
             return response.json()
 
-        raise DmsException(
+        raise DmsException( #TODO make this more specific by parsing error details from response if available
             message=response.reason or f"HTTP {response.status_code}",
             status_code=response.status_code,
             error_content=response.text or None,

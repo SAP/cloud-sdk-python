@@ -5,7 +5,7 @@ from urllib.parse import urlparse
 
 from sap_cloud_sdk.core.secret_resolver.resolver import read_from_mount_and_fallback_to_env_var
 from sap_cloud_sdk.destination.exceptions import ConfigError
-from sap_cloud_sdk.dms._models import DMSCredentials
+from sap_cloud_sdk.dms.model.dms_credentials import DMSCredentials
 
 @dataclass
 class BindingData:

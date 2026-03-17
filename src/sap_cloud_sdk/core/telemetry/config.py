@@ -22,32 +22,32 @@ from sap_cloud_sdk.core.telemetry.constants import (
 DEFAULT_UNKNOWN = "unknown"
 
 # Environment variable keys
-ENV_CONHOS_REGION = "APPFND_CONHOS_REGION"
-ENV_CONHOS_ENVIRONMENT = "APPFND_CONHOS_ENVIRONMENT"
-ENV_CONHOS_SUBACCOUNT_ID = "APPFND_CONHOS_SUBACCOUNTID"
-ENV_CONHOS_APP_NAME = "APPFND_CONHOS_APP_NAME"
+ENV_REGION = "APPFND_CONHOS_REGION"
+ENV_ENVIRONMENT = "APPFND_CONHOS_ENVIRONMENT"
+ENV_SUBACCOUNT_ID = "APPFND_CONHOS_SUBACCOUNTID"
+ENV_APP_NAME = "APPFND_CONHOS_APP_NAME"
 ENV_HOSTNAME = "HOSTNAME"
 ENV_SYSTEM_ROLE = "APPFND_CONHOS_SYSTEM_ROLE"
 
 
-def _get_conhos_region() -> str:
-    """Get ConHost region from environment or return default."""
-    return os.getenv(ENV_CONHOS_REGION, DEFAULT_UNKNOWN)
+def _get_region() -> str:
+    """Get region from environment or return default."""
+    return os.getenv(ENV_REGION, DEFAULT_UNKNOWN)
 
 
-def _get_conhos_environment() -> str:
-    """Get ConHost environment from environment or return default."""
-    return os.getenv(ENV_CONHOS_ENVIRONMENT, DEFAULT_UNKNOWN)
+def _get_environment() -> str:
+    """Get environment from environment or return default."""
+    return os.getenv(ENV_ENVIRONMENT, DEFAULT_UNKNOWN)
 
 
-def _get_conhos_subaccount_id() -> str:
-    """Get ConHost subaccount ID from environment or return default."""
-    return os.getenv(ENV_CONHOS_SUBACCOUNT_ID, DEFAULT_UNKNOWN)
+def _get_subaccount_id() -> str:
+    """Get subaccount ID from environment or return default."""
+    return os.getenv(ENV_SUBACCOUNT_ID, DEFAULT_UNKNOWN)
 
 
-def _get_conhos_app_name() -> str:
-    """Get ConHost application name from environment or return default."""
-    return os.getenv(ENV_CONHOS_APP_NAME, DEFAULT_UNKNOWN)
+def _get_app_name() -> str:
+    """Get application name from environment or return default."""
+    return os.getenv(ENV_APP_NAME, DEFAULT_UNKNOWN)
 
 
 def _get_hostname() -> str:
@@ -86,12 +86,12 @@ def create_resource_attributes_from_env() -> dict:
     """
 
     attributes = {
-        SERVICE_NAME: _get_conhos_app_name(),
+        SERVICE_NAME: _get_app_name(),
         ATTR_SERVICE_INSTANCE_ID: _get_hostname(),
-        ATTR_SERVICE_NAME: _get_conhos_app_name(),
-        ATTR_DEPLOYMENT_ENVIRONMENT: _get_conhos_environment(),
-        ATTR_CLOUD_REGION: _get_conhos_region(),
-        ATTR_SAP_SUBACCOUNT_ID: _get_conhos_subaccount_id(),
+        ATTR_SERVICE_NAME: _get_app_name(),
+        ATTR_DEPLOYMENT_ENVIRONMENT: _get_environment(),
+        ATTR_CLOUD_REGION: _get_region(),
+        ATTR_SAP_SUBACCOUNT_ID: _get_subaccount_id(),
         ATTR_SAP_SYSTEM_ROLE: _get_system_role(),
         ATTR_SAP_SDK_NAME: SDK_NAME,
         ATTR_SAP_SDK_LANGUAGE: "python",
@@ -145,7 +145,7 @@ class InstrumentationConfig:
 
         return cls(
             enabled=enabled,
-            service_name=_get_conhos_app_name(),
+            service_name=_get_app_name(),
             otlp_endpoint=otlp_endpoint,
         )
 

@@ -1,10 +1,11 @@
 [project]
 name = "sap-cloud-sdk"
-version = "0.0.1"
+version = "0.1.0"
 description = "SAP Cloud SDK for Python"
 readme = "README.md"
+license = "Apache-2.0"
 authors = [
-    { name = "Application Foundation Toolkit Libraries", email = "DL_689DD138C23CEF3C7511D37A@global.corp.sap" }
+    { name = "SAP SE", email = "ospo@sap.com" }
 ]
 requires-python = ">=3.11"
 dependencies = [

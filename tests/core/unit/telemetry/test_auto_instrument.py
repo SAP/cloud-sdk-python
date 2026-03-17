@@ -16,7 +16,7 @@ def mock_traceloop_components():
             'exporter': stack.enter_context(patch('sap_cloud_sdk.core.telemetry.auto_instrument.OTLPSpanExporter')),
             'transformer': stack.enter_context(patch('sap_cloud_sdk.core.telemetry.auto_instrument.GenAIAttributeTransformer')),
             'create_resource': stack.enter_context(patch('sap_cloud_sdk.core.telemetry.auto_instrument.create_resource_attributes_from_env')),
-            'get_conhos_app_name': stack.enter_context(patch('sap_cloud_sdk.core.telemetry.auto_instrument._get_conhos_app_name')),
+            'get_app_name': stack.enter_context(patch('sap_cloud_sdk.core.telemetry.auto_instrument._get_app_name')),
         }
         yield mocks
 
@@ -37,7 +37,7 @@ class TestAutoInstrument:
 
     def test_auto_instrument_with_endpoint_success(self, mock_traceloop_components):
         """Test successful auto-instrumentation with valid endpoint."""
-        mock_traceloop_components['get_conhos_app_name'].return_value = 'test-app'
+        mock_traceloop_components['get_app_name'].return_value = 'test-app'
         mock_traceloop_components['create_resource'].return_value = {'service.name': 'test-app'}
         
         with patch.dict('os.environ', {'OTEL_EXPORTER_OTLP_ENDPOINT': 'http://localhost:4317'}, clear=True):
@@ -52,7 +52,7 @@ class TestAutoInstrument:
 
     def test_auto_instrument_appends_v1_traces_to_endpoint(self, mock_traceloop_components):
         """Test that auto_instrument appends /v1/traces to endpoint if not present."""
-        mock_traceloop_components['get_conhos_app_name'].return_value = 'test-app'
+        mock_traceloop_components['get_app_name'].return_value = 'test-app'
         mock_traceloop_components['create_resource'].return_value = {}
         
         with patch.dict('os.environ', {'OTEL_EXPORTER_OTLP_ENDPOINT': 'http://localhost:4317'}, clear=True):
@@ -65,7 +65,7 @@ class TestAutoInstrument:
 
     def test_auto_instrument_preserves_existing_v1_traces(self, mock_traceloop_components):
         """Test that auto_instrument doesn't duplicate /v1/traces if already present."""
-        mock_traceloop_components['get_conhos_app_name'].return_value = 'test-app'
+        mock_traceloop_components['get_app_name'].return_value = 'test-app'
         mock_traceloop_components['create_resource'].return_value = {}
         
         with patch.dict('os.environ', {'OTEL_EXPORTER_OTLP_ENDPOINT': 'http://localhost:4317/v1/traces'}, clear=True):
@@ -78,7 +78,7 @@ class TestAutoInstrument:
 
     def test_auto_instrument_creates_resource_with_attributes(self, mock_traceloop_components):
         """Test that auto_instrument creates resource with correct attributes."""
-        mock_traceloop_components['get_conhos_app_name'].return_value = 'test-app'
+        mock_traceloop_components['get_app_name'].return_value = 'test-app'
         mock_traceloop_components['create_resource'].return_value = {
             'service.name': 'test-app',
             'sap.telemetry.sdk.language': 'python'
@@ -99,7 +99,7 @@ class TestAutoInstrument:
 
     def test_auto_instrument_logs_initialization(self, mock_traceloop_components):
         """Test that auto_instrument logs initialization messages."""
-        mock_traceloop_components['get_conhos_app_name'].return_value = 'test-app'
+        mock_traceloop_components['get_app_name'].return_value = 'test-app'
         mock_traceloop_components['create_resource'].return_value = {}
         
         with patch.dict('os.environ', {'OTEL_EXPORTER_OTLP_ENDPOINT': 'http://localhost:4317'}, clear=True):
@@ -114,7 +114,7 @@ class TestAutoInstrument:
 
     def test_auto_instrument_with_trailing_slash(self, mock_traceloop_components):
         """Test that auto_instrument handles endpoint with trailing slash."""
-        mock_traceloop_components['get_conhos_app_name'].return_value = 'test-app'
+        mock_traceloop_components['get_app_name'].return_value = 'test-app'
         mock_traceloop_components['create_resource'].return_value = {}
         
         with patch.dict('os.environ', {'OTEL_EXPORTER_OTLP_ENDPOINT': 'http://localhost:4317/'}, clear=True):
@@ -127,7 +127,7 @@ class TestAutoInstrument:
 
     def test_auto_instrument_passes_transformer_to_traceloop(self, mock_traceloop_components):
         """Test that auto_instrument passes the GenAIAttributeTransformer as exporter to Traceloop."""
-        mock_traceloop_components['get_conhos_app_name'].return_value = 'test-app'
+        mock_traceloop_components['get_app_name'].return_value = 'test-app'
         mock_traceloop_components['create_resource'].return_value = {}
         mock_transformer_instance = MagicMock()
         mock_traceloop_components['transformer'].return_value = mock_transformer_instance
@@ -144,7 +144,7 @@ class TestAutoInstrument:
 
     def test_auto_instrument_legacy_schema_parameter_ignored(self, mock_traceloop_components):
         """Test that legacy_schema parameter is accepted but doesn't affect behavior."""
-        mock_traceloop_components['get_conhos_app_name'].return_value = 'test-app'
+        mock_traceloop_components['get_app_name'].return_value = 'test-app'
         mock_traceloop_components['create_resource'].return_value = {}
         
         with patch.dict('os.environ', {'OTEL_EXPORTER_OTLP_ENDPOINT': 'http://localhost:4317'}, clear=True):

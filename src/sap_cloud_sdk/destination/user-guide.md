@@ -154,10 +154,9 @@ The environment variable `APPFND_CONHOS_TRANSP_PROXY` should be set with the for
 
 ```bash
 export APPFND_CONHOS_TRANSP_PROXY="connectivity-proxy.my-namespace"
-export APPFND_CONHOS_TRANSP_PROXY="connectivity-proxy.my-namespace"
 ```
 
-This setting is automatically configured when running with container hosting (managed runtime).
+**This setting might be automatically configured depending on the runtime**
 
 #### 2. Explicit Proxy Configuration
 

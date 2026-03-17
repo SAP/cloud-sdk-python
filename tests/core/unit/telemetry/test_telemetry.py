@@ -3,10 +3,10 @@
 from unittest.mock import patch, MagicMock
 
 from sap_cloud_sdk.core.telemetry.config import (
-    _get_conhos_region,
-    _get_conhos_environment,
-    _get_conhos_subaccount_id,
-    _get_conhos_app_name,
+    _get_region,
+    _get_environment,
+    _get_subaccount_id,
+    _get_app_name,
     _get_hostname,
     DEFAULT_UNKNOWN,
 )
@@ -35,45 +35,45 @@ from sap_cloud_sdk.core.telemetry.telemetry import (
 class TestEnvironmentHelpers:
     """Test suite for environment variable helper functions."""
 
-    def test_get_conhos_region_with_value(self):
-        """Test getting ConHost region from environment."""
+    def test_get_region_with_value(self):
+        """Test getting region from environment."""
         with patch.dict('os.environ', {'APPFND_CONHOS_REGION': 'eu10'}, clear=True):
-            assert _get_conhos_region() == 'eu10'
+            assert _get_region() == 'eu10'
 
-    def test_get_conhos_region_default(self):
-        """Test getting ConHost region default when not set."""
+    def test_get_region_default(self):
+        """Test getting region default when not set."""
         with patch.dict('os.environ', {}, clear=True):
-            assert _get_conhos_region() == DEFAULT_UNKNOWN
+            assert _get_region() == DEFAULT_UNKNOWN
 
-    def test_get_conhos_environment_with_value(self):
-        """Test getting ConHost environment from environment."""
+    def test_get_environment_with_value(self):
+        """Test getting environment from environment."""
         with patch.dict('os.environ', {'APPFND_CONHOS_ENVIRONMENT': 'prod'}, clear=True):
-            assert _get_conhos_environment() == 'prod'
+            assert _get_environment() == 'prod'
 
-    def test_get_conhos_environment_default(self):
-        """Test getting ConHost environment default when not set."""
+    def test_get_environment_default(self):
+        """Test getting environment default when not set."""
         with patch.dict('os.environ', {}, clear=True):
-            assert _get_conhos_environment() == DEFAULT_UNKNOWN
+            assert _get_environment() == DEFAULT_UNKNOWN
 
-    def test_get_conhos_subaccount_id_with_value(self):
-        """Test getting ConHost subaccount ID from environment."""
+    def test_get_subaccount_id_with_value(self):
+        """Test getting subaccount ID from environment."""
         with patch.dict('os.environ', {'APPFND_CONHOS_SUBACCOUNTID': 'sub-123'}, clear=True):
-            assert _get_conhos_subaccount_id() == 'sub-123'
+            assert _get_subaccount_id() == 'sub-123'
 
-    def test_get_conhos_subaccount_id_default(self):
-        """Test getting ConHost subaccount ID default when not set."""
+    def test_get_subaccount_id_default(self):
+        """Test getting subaccount ID default when not set."""
         with patch.dict('os.environ', {}, clear=True):
-            assert _get_conhos_subaccount_id() == DEFAULT_UNKNOWN
+            assert _get_subaccount_id() == DEFAULT_UNKNOWN
 
-    def test_get_conhos_app_name_with_value(self):
-        """Test getting ConHost app name from environment."""
+    def test_get_app_name_with_value(self):
+        """Test getting app name from environment."""
         with patch.dict('os.environ', {'APPFND_CONHOS_APP_NAME': 'my-app'}, clear=True):
-            assert _get_conhos_app_name() == 'my-app'
+            assert _get_app_name() == 'my-app'
 
-    def test_get_conhos_app_name_default(self):
-        """Test getting ConHost app name default when not set."""
+    def test_get_app_name_default(self):
+        """Test getting app name default when not set."""
         with patch.dict('os.environ', {}, clear=True):
-            assert _get_conhos_app_name() == DEFAULT_UNKNOWN
+            assert _get_app_name() == DEFAULT_UNKNOWN
 
     def test_get_hostname_with_value(self):
         """Test getting hostname from environment."""

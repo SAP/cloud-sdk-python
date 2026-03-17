@@ -52,7 +52,7 @@ print(f"Database: {config.username}@{config.host}:{config.port}")
 The Secret Resolver expects mounted secrets to follow this hierarchy:
 
 ```
-/etc/secrets/
+/etc/secrets/appfnd
 └── <module_name>/
     └── <instance_name>/
         ├── host
@@ -63,7 +63,7 @@ The Secret Resolver expects mounted secrets to follow this hierarchy:
 
 Example for the above configuration:
 ```
-/etc/secrets/
+/etc/secrets/appfnd
 └── database/
     └── primary/
         ├── host          # Contains: "db.example.com"
@@ -122,7 +122,7 @@ read_from_mount_and_fallback_to_env_var(
 
 **Mounted secrets structure:**
 ```
-/etc/secrets/
+/etc/secrets/appfnd
 └── objectstore/
     └── credentials/
         ├── access_key_id

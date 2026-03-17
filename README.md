@@ -10,12 +10,12 @@ The Python SDK offers a clean, type-safe API following Python best practices whi
 
 ### Key Features
 
-- 🤖 **AI Core Integration**
-- 📋 **Audit Log Service**
-- 🌐 **Destination Service**
-- 🗂️ **ObjectStore Service**
-- 🔐 **Secret Resolver**
-- 📊 **Telemetry & Observability**
+- **AI Core Integration**
+- **Audit Log Service**
+- **Destination Service**
+- **ObjectStore Service**
+- **Secret Resolver**
+- **Telemetry & Observability**
 
 ## Requirements and Setup
 
@@ -42,16 +42,6 @@ The SDK automatically resolves configuration from multiple sources with the foll
 2. **Environment variables**: `CLOUD_SDK_CFG_<MODULE>_<INSTANCE>_<FIELD>`
    - For instance names, hyphens (`"-"`) are replaced with underscores (`"_"`) for compatibility with system environment variables.
    - You can see examples in our [env_integration_tests.example](.env_integration_tests.example)
-
-### Telemetry Configuration
-
-For production environments (SAP BTP Managed Runtime), no configuration is needed as `OTEL_EXPORTER_OTLP_ENDPOINT` is automatically injected.
-
-For local development:
-
-```bash
-export OTEL_EXPORTER_OTLP_ENDPOINT="https://otel-collector.example.com"
-```
 
 ### Usage Guides
 

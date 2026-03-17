@@ -218,9 +218,9 @@ This module automatically resolves credentials and configuration from the enviro
 
 ### Cloud Mode
 
-- Reads secrets from mounted files or environment variables (via Application Foundation container hosting)
-  - **Kubernetes-mounted secret** at `/etc/secrets/<module>/<instance>/`
-  - Fallback to environment variables with pattern `<PREFIX>_<MODULE>_<INSTANCE>_<FIELD>`
+- Reads secrets from mounted files or environment variables
+  - **Kubernetes-mounted secret** at `/etc/secrets/appfnd/<module>/<instance>/`
+  - Fallback to environment variables with pattern `CLOUD_SDK_CFG_<MODULE>_<INSTANCE>_<FIELD>`
 - Uses the configured S3-compatible host (e.g., AWS S3, MinIO in cloud)
 - No manual setup required when deployed in Application Foundation
 
@@ -237,7 +237,7 @@ export OBJECTSTORE_CREDENTIALS_HOST="s3.amazonaws.com"
 #### Mounted Secrets (Kubernetes)
 
 ```
-/etc/secrets/objectstore/credentials/
+/etc/secrets/appfnd/objectstore/credentials/
 ├── access_key_id
 ├── secret_access_key
 ├── bucket

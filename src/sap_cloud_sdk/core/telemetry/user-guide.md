@@ -133,9 +133,9 @@ add_span_attribute("request.id", request_id)
 
 ## Configuration
 
-### Production (SAP BTP Managed Runtime)
+### Production
 
-No configuration needed. `OTEL_EXPORTER_OTLP_ENDPOINT` is automatically injected.
+For production environments, you should ensure that `OTEL_EXPORTER_OTLP_ENDPOINT` is configured and points to the expected OTLP endpoint. This variable is a standard environment variable from the OpenTelemetry libraries.
 
 ### Local Development
 

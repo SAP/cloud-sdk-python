@@ -7,7 +7,7 @@ from traceloop.sdk import Traceloop
 from sap_cloud_sdk.core.telemetry import Module, Operation
 from sap_cloud_sdk.core.telemetry.config import (
     create_resource_attributes_from_env,
-    _get_conhos_app_name,
+    _get_app_name,
 )
 from sap_cloud_sdk.core.telemetry.genai_attribute_transformer import (
     GenAIAttributeTransformer,
@@ -44,7 +44,7 @@ def auto_instrument():
 
     resource = create_resource_attributes_from_env()
     Traceloop.init(
-        app_name=_get_conhos_app_name(),
+        app_name=_get_app_name(),
         exporter=exporter,
         resource_attributes=resource,
         should_enrich_metrics=True,

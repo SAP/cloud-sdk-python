@@ -26,7 +26,7 @@ def destination_client():
     _setup_cloud_mode()
 
     try:
-        # Secret resolver handles configuration automatically from /etc/secrets/appfnd or APPFND_CFG
+        # Secret resolver handles configuration automatically from /etc/secrets/appfnd or CLOUD_SDK_CFG
         client = create_client()
         return client
     except Exception as e:

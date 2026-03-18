@@ -1,0 +1,25 @@
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: check-yaml
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+  - repo: local
+    hooks:
+      - id: ruff-format
+        name: ruff format
+        entry: uvx ruff format --force-exclude --check
+        language: system
+        types: [python]
+      - id: ruff-check
+        name: ruff check
+        entry: uvx ruff check --force-exclude --fix
+        language: system
+        types: [python]
+      - id: ty-check
+        name: ty type check
+        entry: uvx ty check .
+        language: system
+        types: [python]
+        pass_filenames: false

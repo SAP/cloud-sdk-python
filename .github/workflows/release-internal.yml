@@ -9,7 +9,7 @@ on:
 jobs:
   publish:
     name: Publish to Artifactory
-    runs-on: ${{ vars.RUNNER && fromJSON(vars.RUNNER) || 'ubuntu-latest' }}
+    runs-on: ["self-hosted"]
     environment: 'artifactory:sap-cloud-sdk'
     if: ${{ !contains(github.server_url, 'github.com') }}
     steps:

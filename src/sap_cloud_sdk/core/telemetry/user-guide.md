@@ -139,7 +139,15 @@ For production environments, you should ensure that `OTEL_EXPORTER_OTLP_ENDPOINT
 
 ### Local Development
 
-Set the OpenTelemetry collector endpoint:
+To print traces directly to the console without an OTLP collector, set:
+
+```bash
+export OTEL_TRACES_EXPORTER=console
+```
+
+Then call `auto_instrument()` as usual — traces will be printed to stdout.
+
+To use an OTLP collector instead:
 
 ```bash
 export OTEL_EXPORTER_OTLP_ENDPOINT="https://otel-collector.example.com"

@@ -14,6 +14,7 @@ def mock_traceloop_components():
         mocks = {
             'traceloop': stack.enter_context(patch('sap_cloud_sdk.core.telemetry.auto_instrument.Traceloop')),
             'exporter': stack.enter_context(patch('sap_cloud_sdk.core.telemetry.auto_instrument.OTLPSpanExporter')),
+            'console_exporter': stack.enter_context(patch('sap_cloud_sdk.core.telemetry.auto_instrument.ConsoleSpanExporter')),
             'transformer': stack.enter_context(patch('sap_cloud_sdk.core.telemetry.auto_instrument.GenAIAttributeTransformer')),
             'create_resource': stack.enter_context(patch('sap_cloud_sdk.core.telemetry.auto_instrument.create_resource_attributes_from_env')),
             'get_app_name': stack.enter_context(patch('sap_cloud_sdk.core.telemetry.auto_instrument._get_app_name')),
@@ -23,17 +24,6 @@ def mock_traceloop_components():
 
 class TestAutoInstrument:
     """Test suite for auto_instrument function."""
-
-    def test_auto_instrument_without_endpoint(self):
-        """Test that auto_instrument warns when OTEL_EXPORTER_OTLP_ENDPOINT is not set."""
-        with patch.dict('os.environ', {}, clear=True):
-            with patch('sap_cloud_sdk.core.telemetry.auto_instrument.logger') as mock_logger:
-                auto_instrument()
-                
-                # Should log warning about missing endpoint
-                mock_logger.warning.assert_called_once()
-                warning_message = mock_logger.warning.call_args[0][0]
-                assert "OTEL_EXPORTER_OTLP_ENDPOINT not set" in warning_message
 
     def test_auto_instrument_with_endpoint_success(self, mock_traceloop_components):
         """Test successful auto-instrumentation with valid endpoint."""
@@ -146,12 +136,73 @@ class TestAutoInstrument:
         """Test that legacy_schema parameter is accepted but doesn't affect behavior."""
         mock_traceloop_components['get_app_name'].return_value = 'test-app'
         mock_traceloop_components['create_resource'].return_value = {}
-        
+
         with patch.dict('os.environ', {'OTEL_EXPORTER_OTLP_ENDPOINT': 'http://localhost:4317'}, clear=True):
             # Should not raise an error
             auto_instrument()
             auto_instrument()
             auto_instrument()
-            
+
             # Verify Traceloop was initialized each time
             assert mock_traceloop_components['traceloop'].init.call_count == 3
+
+    def test_auto_instrument_with_console_exporter(self, mock_traceloop_components):
+        """Test that auto_instrument uses ConsoleSpanExporter when OTEL_TRACES_EXPORTER=console."""
+        mock_traceloop_components['get_app_name'].return_value = 'test-app'
+        mock_traceloop_components['create_resource'].return_value = {}
+
+        with patch.dict('os.environ', {'OTEL_TRACES_EXPORTER': 'console'}, clear=True):
+            auto_instrument()
+
+            mock_traceloop_components['console_exporter'].assert_called_once_with()
+            mock_traceloop_components['exporter'].assert_not_called()
+            mock_traceloop_components['traceloop'].init.assert_called_once()
+
+    def test_auto_instrument_console_exporter_case_insensitive(self, mock_traceloop_components):
+        """Test that OTEL_TRACES_EXPORTER=console matching is case insensitive."""
+        mock_traceloop_components['get_app_name'].return_value = 'test-app'
+        mock_traceloop_components['create_resource'].return_value = {}
+
+        for value in ['CONSOLE', 'Console', 'CONSOLE']:
+            mock_traceloop_components['console_exporter'].reset_mock()
+            mock_traceloop_components['traceloop'].reset_mock()
+            with patch.dict('os.environ', {'OTEL_TRACES_EXPORTER': value}, clear=True):
+                auto_instrument()
+                mock_traceloop_components['console_exporter'].assert_called_once_with()
+
+    def test_auto_instrument_console_wins_when_both_set(self, mock_traceloop_components):
+        """Test that console exporter is used when OTEL_TRACES_EXPORTER=console, even if OTLP endpoint is also set."""
+        mock_traceloop_components['get_app_name'].return_value = 'test-app'
+        mock_traceloop_components['create_resource'].return_value = {}
+
+        with patch.dict('os.environ', {
+            'OTEL_EXPORTER_OTLP_ENDPOINT': 'http://localhost:4317',
+            'OTEL_TRACES_EXPORTER': 'console',
+        }, clear=True):
+            auto_instrument()
+
+            mock_traceloop_components['console_exporter'].assert_called_once_with()
+            mock_traceloop_components['exporter'].assert_not_called()
+
+    def test_auto_instrument_console_wraps_with_transformer(self, mock_traceloop_components):
+        """Test that ConsoleSpanExporter is wrapped with GenAIAttributeTransformer."""
+        mock_traceloop_components['get_app_name'].return_value = 'test-app'
+        mock_traceloop_components['create_resource'].return_value = {}
+        mock_console_instance = MagicMock()
+        mock_traceloop_components['console_exporter'].return_value = mock_console_instance
+
+        with patch.dict('os.environ', {'OTEL_TRACES_EXPORTER': 'console'}, clear=True):
+            auto_instrument()
+
+            mock_traceloop_components['transformer'].assert_called_once_with(mock_console_instance)
+
+    def test_auto_instrument_without_endpoint_or_console(self):
+        """Test that auto_instrument warns when neither OTLP endpoint nor console exporter is configured."""
+        with patch.dict('os.environ', {}, clear=True):
+            with patch('sap_cloud_sdk.core.telemetry.auto_instrument.logger') as mock_logger:
+                auto_instrument()
+
+                mock_logger.warning.assert_called_once()
+                warning_message = mock_logger.warning.call_args[0][0]
+                assert "OTEL_EXPORTER_OTLP_ENDPOINT not set" in warning_message
+

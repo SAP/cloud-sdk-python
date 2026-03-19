@@ -2,6 +2,7 @@ import logging
 import os
 
 from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
+from opentelemetry.sdk.trace.export import ConsoleSpanExporter
 from traceloop.sdk import Traceloop
 
 from sap_cloud_sdk.core.telemetry import Module, Operation
@@ -22,24 +23,27 @@ def auto_instrument():
     """
     Initialize meta-instrumentation for GenAI tracing. Should be initialized before any AI frameworks.
 
-    Traces are exported to the OTEL collector endpoint configured in environment with OTEL_EXPORTER_OTLP_ENDPOINT.
-
-    Args:
+    Traces are exported to the OTEL collector endpoint configured in environment with
+    OTEL_EXPORTER_OTLP_ENDPOINT, or printed to console when OTEL_TRACES_EXPORTER=console.
     """
     otel_endpoint = os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT")
+    console_traces = os.getenv("OTEL_TRACES_EXPORTER", "").lower() == "console"
 
-    if not otel_endpoint:
+    if not otel_endpoint and not console_traces:
         logger.warning(
             "OTEL_EXPORTER_OTLP_ENDPOINT not set. Instrumentation will be disabled."
         )
         return
 
-    if "v1/traces" not in otel_endpoint:
-        otel_endpoint = otel_endpoint.rstrip("/") + "/v1/traces"
+    if console_traces:
+        logger.info("Initializing auto instrumentation with console exporter")
+        base_exporter = ConsoleSpanExporter()
+    else:
+        if "v1/traces" not in otel_endpoint:
+            otel_endpoint = otel_endpoint.rstrip("/") + "/v1/traces"
+        logger.info(f"Initializing auto instrumentation with endpoint: {otel_endpoint}")
+        base_exporter = OTLPSpanExporter(endpoint=otel_endpoint)
 
-    logger.info(f"Initializing auto instrumentation with endpoint: {otel_endpoint}")
-
-    base_exporter = OTLPSpanExporter(endpoint=otel_endpoint)
     exporter = GenAIAttributeTransformer(base_exporter)
 
     resource = create_resource_attributes_from_env()

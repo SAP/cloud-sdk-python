@@ -26,7 +26,7 @@ def auto_instrument():
     Traces are exported to the OTEL collector endpoint configured in environment with
     OTEL_EXPORTER_OTLP_ENDPOINT, or printed to console when OTEL_TRACES_EXPORTER=console.
     """
-    otel_endpoint = os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT")
+    otel_endpoint = os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT", "")
     console_traces = os.getenv("OTEL_TRACES_EXPORTER", "").lower() == "console"
 
     if not otel_endpoint and not console_traces:

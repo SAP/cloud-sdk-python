@@ -53,12 +53,6 @@ def context_overlay(
     """
     Create a context overlay for tracing GenAI operations.
 
-    Works in both sync and async code. The span is automatically closed
-    when exiting the context, and exceptions are automatically recorded.
-    This context manager integrates seamlessly with the auto-instrumentation
-    provided by auto_instrument(), allowing you to create parent spans that
-    wrap auto-instrumented AI framework calls.
-
     Args:
         name: GenAI operation name following OpenTelemetry semantic conventions.
               Example: GenAIOperation.CHAT, GenAIOperation.EMBEDDINGS
@@ -72,46 +66,10 @@ def context_overlay(
     Yields:
         The created span (available for advanced use cases like adding events)
 
-    Examples:
-        Basic GenAI operation:
+    Example:
         ```python
-        from sap_cloud_sdk.core.telemetry import context_overlay, GenAIOperation
-
-        with context_overlay(GenAIOperation.CHAT):
+        with context_overlay(GenAIOperation.CHAT, attributes={"user.id": "123"}):
             response = llm.chat(message)
-        ```
-
-        With custom attributes:
-        ```python
-        with context_overlay(
-            name=GenAIOperation.CHAT,
-            attributes={"user.id": "123", "session.id": "abc"}
-        ):
-            response = llm.chat(message)
-        ```
-
-        In async code (works the same):
-        ```python
-        async def handle_request():
-            with context_overlay(GenAIOperation.CHAT):
-                result = await llm.chat_async(message)
-        ```
-
-        Nested spans:
-        ```python
-        with context_overlay(GenAIOperation.RETRIEVAL):
-            documents = retrieve_documents(query)
-
-            with context_overlay(GenAIOperation.CHAT):
-                response = llm.chat(documents)
-        ```
-
-        Advanced usage with span events:
-        ```python
-        with context_overlay(GenAIOperation.EMBEDDINGS) as span:
-            span.add_event("processing_started")
-            embeddings = generate_embeddings(text)
-            span.add_event("processing_completed")
         ```
     """
     tracer = trace.get_tracer(__name__)
@@ -173,24 +131,11 @@ def chat_span(
     Yields:
         The created Span (e.g. to set gen_ai.usage.input_tokens, gen_ai.response.finish_reason).
 
-    Examples:
-        Agentic workflow with chat and tool execution:
+    Example:
         ```python
-        from sap_cloud_sdk.core.telemetry import chat_span, execute_tool_span
-
-        with chat_span(model="gpt-4", provider="openai") as span:
-            response = client.chat.completions.create(
-                messages=[{"role": "user", "content": "What's the weather?"}],
-                tools=[weather_tool]
-            )
+        with chat_span(model="gpt-4", provider="openai", conversation_id="cid") as span:
+            response = client.chat.completions.create(...)
             span.set_attribute("gen_ai.usage.input_tokens", response.usage.prompt_tokens)
-            span.set_attribute("gen_ai.response.finish_reason", response.choices[0].finish_reason)
-
-            if response.choices[0].message.tool_calls:
-                tool_call = response.choices[0].message.tool_calls[0]
-                with execute_tool_span(tool_name=tool_call.function.name) as tool_span:
-                    result = execute_function(tool_call.function.name, tool_call.function.arguments)
-                    tool_span.set_attribute("gen_ai.tool.call.result", result)
         ```
     """
     tracer = trace.get_tracer(__name__)

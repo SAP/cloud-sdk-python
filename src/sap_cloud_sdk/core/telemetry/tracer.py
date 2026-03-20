@@ -6,14 +6,14 @@ attributes to traces, complementing the automatic instrumentation provided
 by auto_instrument().
 """
 
-from contextlib import contextmanager
+from contextlib import contextmanager, nullcontext
 from typing import Optional, Dict, Any
 
 from opentelemetry import trace
 from opentelemetry.trace import Status, StatusCode, Span
 
 from sap_cloud_sdk.core.telemetry.genai_operation import GenAIOperation
-from sap_cloud_sdk.core.telemetry.telemetry import get_tenant_id
+from sap_cloud_sdk.core.telemetry.telemetry import get_tenant_id, get_propagated_attributes, _propagate_attributes
 from sap_cloud_sdk.core.telemetry.constants import ATTR_SAP_TENANT_ID
 
 # OpenTelemetry GenAI semantic attribute names (avoid duplicate string literals)
@@ -36,6 +36,7 @@ def context_overlay(
     *,
     attributes: Optional[Dict[str, Any]] = None,
     kind: trace.SpanKind = trace.SpanKind.INTERNAL,
+    propagate: bool = False,
 ):
     """
     Create a context overlay for tracing GenAI operations.
@@ -53,6 +54,8 @@ def context_overlay(
                    (e.g., {"user.id": "123", "session.id": "abc"})
         kind: Span kind - usually INTERNAL for application code.
               Other options: SERVER, CLIENT, PRODUCER, CONSUMER
+        propagate: If True, this span's attributes are passed to all nested spans
+                   within its scope as the lowest-priority layer.
 
     Yields:
         The created span (available for advanced use cases like adding events)
@@ -104,23 +107,26 @@ def context_overlay(
     # Convert enum to string if needed
     span_name = str(name)
 
-    # Add tenant_id if set
-    span_attrs = attributes.copy() if attributes else {}
+    # Merge propagated attrs (lowest priority), then user attrs, then required attrs
+    propagated = get_propagated_attributes()
+    span_attrs = {**propagated, **(attributes or {})}
     span_attrs[_ATTR_GEN_AI_OPERATION_NAME] = span_name
     tenant_id = get_tenant_id()
     if tenant_id:
         span_attrs[ATTR_SAP_TENANT_ID] = tenant_id
 
-    with tracer.start_as_current_span(
-        span_name, kind=kind, attributes=span_attrs
-    ) as span:
-        try:
-            yield span
-        except Exception as e:
-            # Record the exception in the span
-            span.set_status(Status(StatusCode.ERROR, str(e)))
-            span.record_exception(e)
-            raise
+    ctx = _propagate_attributes(span_attrs) if propagate else nullcontext()
+    with ctx:
+        with tracer.start_as_current_span(
+            span_name, kind=kind, attributes=span_attrs
+        ) as span:
+            try:
+                yield span
+            except Exception as e:
+                # Record the exception in the span
+                span.set_status(Status(StatusCode.ERROR, str(e)))
+                span.record_exception(e)
+                raise
 
 
 @contextmanager
@@ -131,6 +137,7 @@ def chat_span(
     conversation_id: Optional[str] = None,
     server_address: Optional[str] = None,
     attributes: Optional[Dict[str, Any]] = None,
+    propagate: bool = False,
 ):
     """
     Create a span for LLM chat/completion API calls (OpenTelemetry GenAI Inference span).
@@ -148,6 +155,8 @@ def chat_span(
             (e.g. thread or session ID). Set as gen_ai.conversation.id when provided.
         server_address: Optional server address. If None, server.address is not set.
         attributes: Optional dict of extra attributes to add or override on the span.
+        propagate: If True, this span's attributes are passed to all nested spans
+                   within its scope as the lowest-priority layer.
 
     Yields:
         The created Span (e.g. to set gen_ai.usage.input_tokens, gen_ai.response.finish_reason).
@@ -187,20 +196,23 @@ def chat_span(
     tenant_id = get_tenant_id()
     if tenant_id:
         base_attrs[ATTR_SAP_TENANT_ID] = tenant_id
-    # User attributes first, then base_attrs so required semantic keys are never overridden
-    span_attrs = {**(attributes or {}), **base_attrs}
+    # Propagated attrs (lowest), user attrs, required semantic keys (highest)
+    propagated = get_propagated_attributes()
+    span_attrs = {**propagated, **(attributes or {}), **base_attrs}
 
-    with tracer.start_as_current_span(
-        span_name,
-        kind=trace.SpanKind.CLIENT,
-        attributes=span_attrs,
-    ) as span:
-        try:
-            yield span
-        except Exception as e:
-            span.set_status(Status(StatusCode.ERROR, str(e)))
-            span.record_exception(e)
-            raise
+    ctx = _propagate_attributes(span_attrs) if propagate else nullcontext()
+    with ctx:
+        with tracer.start_as_current_span(
+            span_name,
+            kind=trace.SpanKind.CLIENT,
+            attributes=span_attrs,
+        ) as span:
+            try:
+                yield span
+            except Exception as e:
+                span.set_status(Status(StatusCode.ERROR, str(e)))
+                span.record_exception(e)
+                raise
 
 
 @contextmanager
@@ -210,6 +222,7 @@ def execute_tool_span(
     tool_type: Optional[str] = None,
     tool_description: Optional[str] = None,
     attributes: Optional[Dict[str, Any]] = None,
+    propagate: bool = False,
 ):
     """
     Create a span for tool execution in agentic workflows (OpenTelemetry GenAI Execute Tool span).
@@ -223,6 +236,8 @@ def execute_tool_span(
         tool_type: Optional tool type (e.g. "function").
         tool_description: Optional tool description.
         attributes: Optional dict of extra attributes to add or override on the span.
+        propagate: If True, this span's attributes are passed to all nested spans
+                   within its scope as the lowest-priority layer.
 
     Yields:
         The created Span (e.g. to set gen_ai.tool.call.result after execution).
@@ -251,20 +266,23 @@ def execute_tool_span(
     tenant_id = get_tenant_id()
     if tenant_id:
         base_attrs[ATTR_SAP_TENANT_ID] = tenant_id
-    # User attributes first, then base_attrs so required semantic keys are never overridden
-    span_attrs = {**(attributes or {}), **base_attrs}
+    # Propagated attrs (lowest), user attrs, required semantic keys (highest)
+    propagated = get_propagated_attributes()
+    span_attrs = {**propagated, **(attributes or {}), **base_attrs}
 
-    with tracer.start_as_current_span(
-        span_name,
-        kind=trace.SpanKind.INTERNAL,
-        attributes=span_attrs,
-    ) as span:
-        try:
-            yield span
-        except Exception as e:
-            span.set_status(Status(StatusCode.ERROR, str(e)))
-            span.record_exception(e)
-            raise
+    ctx = _propagate_attributes(span_attrs) if propagate else nullcontext()
+    with ctx:
+        with tracer.start_as_current_span(
+            span_name,
+            kind=trace.SpanKind.INTERNAL,
+            attributes=span_attrs,
+        ) as span:
+            try:
+                yield span
+            except Exception as e:
+                span.set_status(Status(StatusCode.ERROR, str(e)))
+                span.record_exception(e)
+                raise
 
 
 @contextmanager
@@ -278,6 +296,7 @@ def invoke_agent_span(
     server_address: Optional[str] = None,
     kind: trace.SpanKind = trace.SpanKind.CLIENT,
     attributes: Optional[Dict[str, Any]] = None,
+    propagate: bool = False,
 ):
     """
     Create a span for GenAI agent invocation (OpenTelemetry GenAI Invoke agent span).
@@ -299,6 +318,8 @@ def invoke_agent_span(
         server_address: Optional server address. If None, server.address is not set.
         kind: Span kind; CLIENT for remote agents, INTERNAL for in-process.
         attributes: Optional dict of extra attributes to add or override on the span.
+        propagate: If True, this span's attributes are passed to all nested spans
+                   within its scope as the lowest-priority layer.
 
     Yields:
         The created Span (e.g. to set usage, response attributes).
@@ -338,20 +359,23 @@ def invoke_agent_span(
     tenant_id = get_tenant_id()
     if tenant_id:
         base_attrs[ATTR_SAP_TENANT_ID] = tenant_id
-    # User attributes first, then base_attrs so required semantic keys are never overridden
-    span_attrs = {**(attributes or {}), **base_attrs}
+    # Propagated attrs (lowest), user attrs, required semantic keys (highest)
+    propagated = get_propagated_attributes()
+    span_attrs = {**propagated, **(attributes or {}), **base_attrs}
 
-    with tracer.start_as_current_span(
-        span_name,
-        kind=kind,
-        attributes=span_attrs,
-    ) as span:
-        try:
-            yield span
-        except Exception as e:
-            span.set_status(Status(StatusCode.ERROR, str(e)))
-            span.record_exception(e)
-            raise
+    ctx = _propagate_attributes(span_attrs) if propagate else nullcontext()
+    with ctx:
+        with tracer.start_as_current_span(
+            span_name,
+            kind=kind,
+            attributes=span_attrs,
+        ) as span:
+            try:
+                yield span
+            except Exception as e:
+                span.set_status(Status(StatusCode.ERROR, str(e)))
+                span.record_exception(e)
+                raise
 
 
 def get_current_span() -> Span:

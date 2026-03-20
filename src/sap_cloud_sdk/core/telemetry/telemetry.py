@@ -4,6 +4,7 @@ This module provides functions to record telemetry metrics for SDK operations,
 """
 
 import logging
+from contextlib import contextmanager
 from contextvars import ContextVar
 from typing import Optional, Dict, Any
 
@@ -30,6 +31,9 @@ _error_counter: Optional[metrics.Counter] = None
 
 # Context variable for per-request tenant ID
 _tenant_id_var: ContextVar[str] = ContextVar("tenant_id", default="")
+
+# Context variable for propagated span attributes
+_propagated_attrs_var: ContextVar[Dict[str, Any]] = ContextVar("propagated_attrs", default={})
 
 
 def set_tenant_id(tenant_id: str) -> None:
@@ -76,6 +80,28 @@ def get_tenant_id() -> str:
         to set the tenant ID at the request entry point.
     """
     return _tenant_id_var.get()
+
+
+def get_propagated_attributes() -> Dict[str, Any]:
+    """Get the propagated span attributes from the current context.
+
+    Returns:
+        Dict of attributes propagated from an ancestor span with propagate=True,
+        or an empty dict if none are set.
+    """
+    return _propagated_attrs_var.get()
+
+
+@contextmanager
+def _propagate_attributes(attrs: Dict[str, Any]):
+    """Internal: push attrs onto the propagation stack for the duration of the context."""
+    current = _propagated_attrs_var.get()
+    merged = {**current, **attrs}
+    token = _propagated_attrs_var.set(merged)
+    try:
+        yield
+    finally:
+        _propagated_attrs_var.reset(token)
 
 
 def record_request_metric(

@@ -872,3 +872,112 @@ class TestInvokeAgentSpan:
                 span.add_event("agent_step")
 
         mock_span.add_event.assert_called_once_with("agent_step")
+
+
+class TestPropagate:
+    """Test suite for propagate=True attribute propagation across nested spans."""
+
+    def _make_tracer(self, mock_span, capture_list):
+        """Helper: return a mock tracer that records (name, attributes) into capture_list."""
+        mock_tracer = MagicMock()
+
+        @contextmanager
+        def mock_start_as_current_span(name, kind=None, attributes=None):
+            capture_list.append({"name": name, "attributes": dict(attributes or {})})
+            yield mock_span
+
+        mock_tracer.start_as_current_span = mock_start_as_current_span
+        return mock_tracer
+
+    def test_context_overlay_propagate_passes_attributes_to_child_span(self):
+        """Parent context_overlay(propagate=True) attrs appear on nested context_overlay."""
+        mock_span = MagicMock()
+        captures = []
+        mock_tracer = self._make_tracer(mock_span, captures)
+
+        with patch('opentelemetry.trace.get_tracer', return_value=mock_tracer):
+            with context_overlay(GenAIOperation.CHAT, attributes={"x": 1}, propagate=True):
+                with context_overlay(GenAIOperation.EMBEDDINGS):
+                    pass
+
+        child_attrs = captures[1]["attributes"]
+        assert child_attrs.get("x") == 1
+
+    def test_chat_span_propagate_passes_attributes_to_child_span(self):
+        """chat_span(propagate=True) attrs appear on a nested context_overlay."""
+        mock_span = MagicMock()
+        captures = []
+        mock_tracer = self._make_tracer(mock_span, captures)
+
+        with patch('opentelemetry.trace.get_tracer', return_value=mock_tracer):
+            with chat_span("gpt-4", "openai", attributes={"agent.name": "bot"}, propagate=True):
+                with context_overlay(GenAIOperation.CHAT):
+                    pass
+
+        child_attrs = captures[1]["attributes"]
+        assert child_attrs.get("agent.name") == "bot"
+
+    def test_propagate_does_not_override_child_base_attrs(self):
+        """Propagated gen_ai.operation.name from parent does not override child's own value."""
+        mock_span = MagicMock()
+        captures = []
+        mock_tracer = self._make_tracer(mock_span, captures)
+
+        with patch('opentelemetry.trace.get_tracer', return_value=mock_tracer):
+            with context_overlay(GenAIOperation.CHAT, propagate=True):
+                # parent sets gen_ai.operation.name="chat"; child should keep its own
+                with chat_span("gpt-4", "openai"):
+                    pass
+
+        child_attrs = captures[1]["attributes"]
+        assert child_attrs["gen_ai.operation.name"] == "chat"
+        assert child_attrs["gen_ai.request.model"] == "gpt-4"
+
+    def test_propagate_false_does_not_pollute_sibling_spans(self):
+        """After a propagate=True span exits, its attrs don't appear on a sibling span."""
+        mock_span = MagicMock()
+        captures = []
+        mock_tracer = self._make_tracer(mock_span, captures)
+
+        with patch('opentelemetry.trace.get_tracer', return_value=mock_tracer):
+            with context_overlay(GenAIOperation.CHAT, attributes={"secret": "yes"}, propagate=True):
+                pass
+            # sibling — propagation should be reset after the first span exits
+            with context_overlay(GenAIOperation.EMBEDDINGS):
+                pass
+
+        sibling_attrs = captures[1]["attributes"]
+        assert "secret" not in sibling_attrs
+
+    def test_propagate_accumulates_across_nested_levels(self):
+        """Three levels deep, each with propagate=True; deepest gets attrs from all parents."""
+        mock_span = MagicMock()
+        captures = []
+        mock_tracer = self._make_tracer(mock_span, captures)
+
+        with patch('opentelemetry.trace.get_tracer', return_value=mock_tracer):
+            with context_overlay(GenAIOperation.CHAT, attributes={"level": "1", "from_l1": "yes"}, propagate=True):
+                with context_overlay(GenAIOperation.EMBEDDINGS, attributes={"level": "2", "from_l2": "yes"}, propagate=True):
+                    with context_overlay(GenAIOperation.RETRIEVAL):
+                        pass
+
+        deepest_attrs = captures[2]["attributes"]
+        # from_l1 comes from level 1, from_l2 comes from level 2
+        assert deepest_attrs.get("from_l1") == "yes"
+        assert deepest_attrs.get("from_l2") == "yes"
+        # level was set by both; level 2 overwrites level 1 in propagation stack
+        assert deepest_attrs.get("level") == "2"
+
+    def test_propagate_default_is_false(self):
+        """Without propagate param, child spans do not receive parent custom attrs."""
+        mock_span = MagicMock()
+        captures = []
+        mock_tracer = self._make_tracer(mock_span, captures)
+
+        with patch('opentelemetry.trace.get_tracer', return_value=mock_tracer):
+            with context_overlay(GenAIOperation.CHAT, attributes={"custom": "val"}):
+                with context_overlay(GenAIOperation.EMBEDDINGS):
+                    pass
+
+        child_attrs = captures[1]["attributes"]
+        assert "custom" not in child_attrs

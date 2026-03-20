@@ -4,7 +4,6 @@
 
 - **Auto-instruments AI frameworks** - automatic tracing
 - **Creates custom spans** - wrap your code to trace operations and add context
-- **Records metrics** - token usage for LLM calls
 - **Tracks tenant IDs** - per-request tenant tracking in traces and metrics
 
 ## How to use it
@@ -61,7 +60,7 @@ Nest spans for complex workflows:
 ```python
 with context_overlay(GenAIOperation.RETRIEVAL):
     documents = retrieve_documents(query)
-    
+
     with context_overlay(GenAIOperation.CHAT):
         response = llm.chat(messages=[
             {"role": "system", "content": f"Context: {documents}"},
@@ -69,7 +68,51 @@ with context_overlay(GenAIOperation.RETRIEVAL):
         ])
 ```
 
-Add events to spans:
+### Propagate attributes to child spans
+
+Use `propagate=True` to automatically pass attributes from a parent span to all child spans within its scope. This is useful for cross-cutting attributes like `gen_ai.conversation.id`, `gen_ai.agent.name`, or custom keys that should appear on every nested span without repeating them.
+
+```python
+with context_overlay(
+    GenAIOperation.INVOKE_AGENT,
+    attributes={"gen_ai.conversation.id": "conv-123", "user.id": "u-456"},
+    propagate=True
+):
+    # Both child spans automatically receive gen_ai.conversation.id and user.id
+    with chat_span(model="gpt-4", provider="openai") as span:
+        response = client.chat.completions.create(...)
+
+    with execute_tool_span(tool_name="get_weather"):
+        result = call_weather_api(location)
+```
+
+All four span functions support `propagate=True`: `context_overlay`, `chat_span`, `execute_tool_span`, and `invoke_agent_span`.
+
+**Priority rules** — child spans always win over propagated values (highest to lowest):
+1. Required semantic keys set by the span function (e.g. `gen_ai.operation.name`) — always wins
+2. User-provided `attributes` on the child span
+3. Propagated attrs from ancestors — lowest priority, easily overridden
+
+```python
+# Even if the parent propagated gen_ai.operation.name="invoke_agent",
+# the child chat_span always sets it to "chat"
+with invoke_agent_span(provider="openai", propagate=True):
+    with chat_span(model="gpt-4", provider="openai") as span:
+        pass  # span has gen_ai.operation.name="chat", not "invoke_agent"
+```
+
+Propagation is scoped: once the `propagate=True` span exits, its attributes are no longer passed to subsequent sibling spans.
+
+Nesting multiple `propagate=True` spans accumulates attributes from all levels:
+
+```python
+with context_overlay(GenAIOperation.INVOKE_AGENT, attributes={"session": "s1"}, propagate=True):
+    with chat_span("gpt-4", "openai", attributes={"turn": "1"}, propagate=True):
+        with execute_tool_span("search"):
+            pass  # receives both session="s1" and turn="1"
+```
+
+### Add events to spans
 
 ```python
 with context_overlay(GenAIOperation.EMBEDDINGS) as span:

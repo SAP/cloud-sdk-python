@@ -54,7 +54,9 @@ class TestContextOverlay:
             with context_overlay(GenAIOperation.CHAT, attributes=custom_attrs):
                 pass
         
-        assert captured_attributes == custom_attrs
+        assert captured_attributes["user.id"] == "123"
+        assert captured_attributes["session.id"] == "abc"
+        assert captured_attributes["gen_ai.operation.name"] == "chat"
 
     def test_context_overlay_with_different_span_kinds(self):
         """Test context overlay with different span kinds."""

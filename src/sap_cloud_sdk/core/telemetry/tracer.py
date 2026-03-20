@@ -106,6 +106,7 @@ def context_overlay(
 
     # Add tenant_id if set
     span_attrs = attributes.copy() if attributes else {}
+    span_attrs[_ATTR_GEN_AI_OPERATION_NAME] = span_name
     tenant_id = get_tenant_id()
     if tenant_id:
         span_attrs[ATTR_SAP_TENANT_ID] = tenant_id

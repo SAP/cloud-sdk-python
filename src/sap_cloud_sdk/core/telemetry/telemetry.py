@@ -4,7 +4,6 @@ This module provides functions to record telemetry metrics for SDK operations,
 """
 
 import logging
-from contextlib import contextmanager
 from contextvars import ContextVar
 from typing import Optional, Dict, Any
 
@@ -90,18 +89,6 @@ def get_propagated_attributes() -> Dict[str, Any]:
         or an empty dict if none are set.
     """
     return _propagated_attrs_var.get()
-
-
-@contextmanager
-def _propagate_attributes(attrs: Dict[str, Any]):
-    """Internal: push attrs onto the propagation stack for the duration of the context."""
-    current = _propagated_attrs_var.get()
-    merged = {**current, **attrs}
-    token = _propagated_attrs_var.set(merged)
-    try:
-        yield
-    finally:
-        _propagated_attrs_var.reset(token)
 
 
 def record_request_metric(

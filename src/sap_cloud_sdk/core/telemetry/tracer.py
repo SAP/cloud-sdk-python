@@ -13,7 +13,7 @@ from opentelemetry import trace
 from opentelemetry.trace import Status, StatusCode, Span
 
 from sap_cloud_sdk.core.telemetry.genai_operation import GenAIOperation
-from sap_cloud_sdk.core.telemetry.telemetry import get_tenant_id, get_propagated_attributes, _propagate_attributes
+from sap_cloud_sdk.core.telemetry.telemetry import get_tenant_id, get_propagated_attributes, _propagated_attrs_var
 from sap_cloud_sdk.core.telemetry.constants import ATTR_SAP_TENANT_ID
 
 # OpenTelemetry GenAI semantic attribute names (avoid duplicate string literals)
@@ -28,6 +28,18 @@ _ATTR_GEN_AI_AGENT_ID = "gen_ai.agent.id"
 _ATTR_GEN_AI_AGENT_DESCRIPTION = "gen_ai.agent.description"
 _ATTR_GEN_AI_CONVERSATION_ID = "gen_ai.conversation.id"
 _ATTR_SERVER_ADDRESS = "server.address"
+
+
+@contextmanager
+def _propagate_attributes(attrs: Dict[str, Any]):
+    """Push attrs onto the propagation stack for the duration of the context."""
+    current = _propagated_attrs_var.get()
+    merged = {**current, **attrs}
+    token = _propagated_attrs_var.set(merged)
+    try:
+        yield
+    finally:
+        _propagated_attrs_var.reset(token)
 
 
 @contextmanager

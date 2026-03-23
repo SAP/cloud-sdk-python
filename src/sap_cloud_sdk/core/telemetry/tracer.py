@@ -13,7 +13,11 @@ from opentelemetry import trace
 from opentelemetry.trace import Status, StatusCode, Span
 
 from sap_cloud_sdk.core.telemetry.genai_operation import GenAIOperation
-from sap_cloud_sdk.core.telemetry.telemetry import get_tenant_id, get_propagated_attributes, _propagated_attrs_var
+from sap_cloud_sdk.core.telemetry.telemetry import (
+    get_tenant_id,
+    get_propagated_attributes,
+    _propagated_attrs_var,
+)
 from sap_cloud_sdk.core.telemetry.constants import ATTR_SAP_TENANT_ID
 
 # OpenTelemetry GenAI semantic attribute names (avoid duplicate string literals)

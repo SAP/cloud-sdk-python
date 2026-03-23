@@ -32,7 +32,9 @@ _error_counter: Optional[metrics.Counter] = None
 _tenant_id_var: ContextVar[str] = ContextVar("tenant_id", default="")
 
 # Context variable for propagated span attributes
-_propagated_attrs_var: ContextVar[Dict[str, Any]] = ContextVar("propagated_attrs", default={})
+_propagated_attrs_var: ContextVar[Dict[str, Any]] = ContextVar(
+    "propagated_attrs", default={}
+)
 
 
 def set_tenant_id(tenant_id: str) -> None:

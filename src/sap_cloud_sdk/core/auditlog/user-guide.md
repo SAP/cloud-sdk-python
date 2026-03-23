@@ -6,7 +6,7 @@ The module handles configuration, message construction, formatting, and transpor
 
 ## Installation
 
-The audit log module is part of the Cloud SDK for Python and is automatically available when the SDK is installed.
+The audit log module is part of the SAP Cloud SDK for Python and is automatically available when the SDK is installed.
 
 ## Import
 

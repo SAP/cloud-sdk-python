@@ -15,7 +15,7 @@ dependencies = [
     "requests-oauthlib~=2.0.0",
     "pydantic~=2.12.3",
     "hatchling~=1.27.0",
-    "opentelemetry-exporter-otlp-proto-grpc~=1.38.0",
+    "opentelemetry-exporter-otlp-proto-grpc>=1.38,<1.41",
     "traceloop-sdk~=0.52.0"
 ]
 

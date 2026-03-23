@@ -31,6 +31,11 @@ _error_counter: Optional[metrics.Counter] = None
 # Context variable for per-request tenant ID
 _tenant_id_var: ContextVar[str] = ContextVar("tenant_id", default="")
 
+# Context variable for propagated span attributes
+_propagated_attrs_var: ContextVar[Dict[str, Any]] = ContextVar(
+    "propagated_attrs", default={}
+)
+
 
 def set_tenant_id(tenant_id: str) -> None:
     """Set the tenant ID for the current request context.
@@ -76,6 +81,16 @@ def get_tenant_id() -> str:
         to set the tenant ID at the request entry point.
     """
     return _tenant_id_var.get()
+
+
+def get_propagated_attributes() -> Dict[str, Any]:
+    """Get the propagated span attributes from the current context.
+
+    Returns:
+        Dict of attributes propagated from an ancestor span with propagate=True,
+        or an empty dict if none are set.
+    """
+    return _propagated_attrs_var.get()
 
 
 def record_request_metric(

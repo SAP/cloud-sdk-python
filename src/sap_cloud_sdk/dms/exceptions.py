@@ -1,20 +1,22 @@
-from typing import Optional
-
-class DmsException(Exception):
+class DMSError(Exception):
     """Base exception for all DMS SDK errors."""
+
+
+class HttpError(DMSError):
+    """Raised for HTTP-related errors from the DMS service.
+
+    Attributes:
+        status_code: HTTP status code returned by the service, if available.
+        message: Human-readable error message.
+        response_text: Raw response payload for diagnostics, if available.
+    """
 
     def __init__(
         self,
-        message: Optional[str] = None,
-        status_code: Optional[int] = None,
-        error_content: Optional[str] = None,
-        cause: Optional[Exception] = None,
+        message: str,
+        status_code: int | None = None,
+        response_text: str | None = None,
     ) -> None:
-        super().__init__(message if message is not None else "")
+        super().__init__(message)
         self.status_code = status_code
-        self.error_content = error_content
-        if cause is not None:
-            self.__cause__ = cause
-
-    def __repr__(self) -> str:
-        return f"DmsException(status_code={self.status_code}, message={str(self)!r})"
+        self.response_text = response_text

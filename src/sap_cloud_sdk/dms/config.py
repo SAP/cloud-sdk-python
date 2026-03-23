@@ -5,7 +5,7 @@ from urllib.parse import urlparse
 
 from sap_cloud_sdk.core.secret_resolver.resolver import read_from_mount_and_fallback_to_env_var
 from sap_cloud_sdk.destination.exceptions import ConfigError
-from sap_cloud_sdk.dms.model.dms_credentials import DMSCredentials
+from sap_cloud_sdk.dms.model.model import DMSCredentials
 
 @dataclass
 class BindingData:
@@ -60,7 +60,8 @@ class BindingData:
         required_fields = {
             "clientid",
             "clientsecret",
-            "url"
+            "url",
+            "identityzone"
         }
 
         try:
@@ -95,7 +96,8 @@ class BindingData:
             uri=self.uri,
             client_id=uaa_data["clientid"],
             client_secret=uaa_data["clientsecret"],
-            token_url=token_url
+            token_url=token_url,
+            identityzone=uaa_data["identityzone"]
         )
 
 

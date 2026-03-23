@@ -140,7 +140,7 @@ with invoke_agent_span(
         ...
 ```
 
-> **Note:** `propagate=True` is an escape hatch for backends that require attributes to appear on every span individually. In most cases, querying by the parent span is sufficient and preferred.
+> **Note:** `propagate=True` is specific for backends that require attributes to appear on every span individually. In most cases, querying by the parent span is sufficient and preferred.
 
 **Priority rules** — child span values always win (highest to lowest):
 1. Required semantic keys set by the span function (e.g. `gen_ai.operation.name`)

@@ -21,7 +21,7 @@ jobs:
     runs-on: ${{ contains(github.server_url, 'github.com') && 'ubuntu-latest' || fromJSON('["self-hosted"]') }}
     steps:
       - name: "Checkout Repository"
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: "Install uv"
         uses: astral-sh/setup-uv@v3

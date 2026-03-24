@@ -1,0 +1,46 @@
+name: Sync from External Repository
+
+on:
+  schedule:
+    - cron: '0 */3 * * *'
+  workflow_dispatch:
+
+jobs:
+  sync:
+    runs-on: ["self-hosted"]
+    if: ${{ !contains(github.server_url, 'github.com') }}
+    steps:
+      - name: Configure Git
+        run: |
+          git config --global user.name "GitHub Actions Bot"
+          git config --global user.email "actions@github.com"
+
+      - name: Mirror main branch
+        env:
+          EXTERNAL_REPO: https://github.com/SAP/cloud-sdk-python.git
+          INTERNAL_REPO: ${{ format('https://{0}/{1}.git', github.server_url, github.repository) }}
+          INTERNAL_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "Cloning external repository main branch..."
+          git clone --single-branch --branch main "$EXTERNAL_REPO" repo-clone
+          cd repo-clone
+
+          echo "Adding internal remote..."
+          INTERNAL_REPO="https://oauth2:${INTERNAL_TOKEN}@${INTERNAL_REPO#https://}"
+          git remote add internal "$INTERNAL_REPO"
+
+          echo "Pushing main branch to internal repository..."
+          git push internal main:main --force-with-lease
+
+          echo "Mirror completed successfully"
+
+      - name: Summary
+        if: success()
+        run: |
+          echo "### Sync Successful" >> $GITHUB_STEP_SUMMARY
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "External repository **main** branch has been successfully mirrored to internal." >> $GITHUB_STEP_SUMMARY
+          echo "- **External**: https://github.com/SAP/cloud-sdk-python" >> $GITHUB_STEP_SUMMARY
+          echo "- **Branch**: main" >> $GITHUB_STEP_SUMMARY
+          echo "- **Time**: $(date -u)" >> $GITHUB_STEP_SUMMARY

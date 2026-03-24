@@ -13,7 +13,7 @@ class DMSCredentials:
 
 
 from dataclasses import dataclass, field, asdict
-from typing import Any, Optional
+from typing import Any, List, Optional
 from enum import Enum
 
 
@@ -57,3 +57,17 @@ class InternalRepoRequest:
     def to_dict(self) -> dict[str, Any]: 
         raw: dict[str, Any] = asdict(self)
         return {k: v for k, v in raw.items() if v is not None}
+    
+
+@dataclass
+class UserClaim:
+    """Represents user identity claims forwarded to the DMS service.
+
+    Attributes:
+        x_ecm_user_enc: User identifier (e.g. username or email) passed as a request header.
+        x_ecm_add_principals: Additional principals to include in the request.
+            - Groups: prefix the group name with ``~`` (e.g. ``~group1``)
+            - Extra identifiers: plain username or email (e.g. ``username2``)
+    """
+    x_ecm_user_enc: Optional[str] = None
+    x_ecm_add_principals: Optional[List[str]] = field(default_factory=lambda: [])

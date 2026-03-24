@@ -65,7 +65,7 @@ jobs:
           echo "✓ Build artifacts verified: $wheel_count wheel(s), $tar_count source distribution(s)"
 
       - name: "Upload Build Artifacts"
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: contains(github.server_url, 'github.com')
         with:
           name: ${{ env.SDK_DIST_NAME }}

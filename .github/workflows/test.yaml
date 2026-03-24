@@ -38,7 +38,7 @@ jobs:
         run: uv run pytest -m "not integration" --cov=src/sap_cloud_sdk --cov-report=xml --cov-report=html --cov-report=term-missing
 
       - name: "Upload Coverage Report"
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: contains(github.server_url, 'github.com')
         with:
           name: coverage-report

@@ -88,7 +88,7 @@ import io
 stream = io.BytesIO(b"Streamed content")
 client.put_object(
     name="stream.txt",
-    data=stream,
+    stream=stream,
     size=len(b"Streamed content"),
     content_type="text/plain"
 )
@@ -101,7 +101,7 @@ with open("/path/to/file.txt", "rb") as f:
     
     client.put_object(
         name="uploaded.txt",
-        data=f,
+        stream=f,
         size=size,
         content_type="text/plain"
     )

@@ -4,7 +4,7 @@ This module integrates with SAP BTP Destination Service to manage destinations, 
 
 ## Installation
 
-This package is part of the SAP Cloud SDK for Python. Import and use it directly in your application.
+This package is part of the `application_foundation` SDK. Import and use it directly in your application.
 
 ## Quick Start
 
@@ -81,8 +81,8 @@ The fragment client produced by `create_fragment_client()` exposes the following
 class FragmentClient:
     def get_instance_fragment(self, name: str) -> Optional[Fragment]: ...
     def get_subaccount_fragment(self, name: str, access_strategy: AccessStrategy = AccessStrategy.SUBSCRIBER_FIRST, tenant: Optional[str] = None) -> Optional[Fragment]: ...
-    def list_instance_fragments(self, filter: Optional[ListOptions] = None) -> PagedResult[Fragment]: ...
-    def list_subaccount_fragments(self, access_strategy: AccessStrategy = AccessStrategy.SUBSCRIBER_FIRST, tenant: Optional[str] = None, filter: Optional[ListOptions] = None) -> PagedResult[Fragment]: ...
+    def list_instance_fragments(self) -> List[Fragment]: ...
+    def list_subaccount_fragments(self, access_strategy: AccessStrategy = AccessStrategy.SUBSCRIBER_FIRST, tenant: Optional[str] = None) -> List[Fragment]: ...
     def create_fragment(self, fragment: Fragment, level: Optional[Level] = Level.SUB_ACCOUNT) -> None: ...
     def update_fragment(self, fragment: Fragment, level: Optional[Level] = Level.SUB_ACCOUNT) -> None: ...
     def delete_fragment(self, name: str, level: Optional[Level] = Level.SUB_ACCOUNT) -> None: ...
@@ -141,6 +141,7 @@ from sap_cloud_sdk.destination import create_client
 
 # Default: use_default_proxy=False
 # Turning it to true will use TransparentProxy from APPFND_CONHOS_TRANSP_PROXY environment variable
+# Turning it to true will use TransparentProxy from APPFND_CONHOS_TRANSP_PROXY environment variable
 client = create_client(instance="default", use_default_proxy=True)
 
 # All get operations will use the proxy by default
@@ -148,6 +149,7 @@ dest = client.get_instance_destination("my-destination")
 # Returns TransparentProxyDestination
 ```
 
+The environment variable `APPFND_CONHOS_TRANSP_PROXY` should be set with the format `{proxy_name}.{namespace}`:
 The environment variable `APPFND_CONHOS_TRANSP_PROXY` should be set with the format `{proxy_name}.{namespace}`:
 
 ```bash
@@ -197,6 +199,7 @@ from sap_cloud_sdk.destination import create_client, TransparentProxy, AccessStr
 # Example 1: Using environment variable with default proxy
 client = create_client(instance="default", use_default_proxy=True)
 dest = client.get_instance_destination("my-destination")
+# Uses proxy from APPFND_CONHOS_TRANSP_PROXY
 # Uses proxy from APPFND_CONHOS_TRANSP_PROXY
 
 # Example 2: Explicit proxy configuration with set_proxy()
@@ -340,11 +343,13 @@ This ensures only valid headers are used with transparent proxy destinations.
 - Mount path: `/etc/secrets/appfnd/destination/{instance}/`
 - Keys: `clientid`, `clientsecret`, `url` (auth base), `uri` (service base), `identityzone`
 - Fallback env vars: `CLOUD_SDK_CFG_DESTINATION_{INSTANCE}_{FIELD_KEY}` (uppercased)
+- Fallback env vars: `CLOUD_SDK_CFG_DESTINATION_{INSTANCE}_{FIELD_KEY}` (uppercased)
 - The config loader normalizes to a unified binding:
   - `DestinationConfig(url=..., token_url=..., client_id=..., client_secret=..., identityzone=...)`
 
 ### Transparent Proxy
 
+- Environment variable: `APPFND_CONHOS_TRANSP_PROXY`
 - Environment variable: `APPFND_CONHOS_TRANSP_PROXY`
 - Format: `{proxy_name}.{namespace}` (e.g., `connectivity-proxy.my-namespace`)
 - The proxy configuration is loaded and validated when the client is created

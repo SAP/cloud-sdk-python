@@ -2,7 +2,7 @@ from typing import Any, Optional
 from sap_cloud_sdk.dms.model.model import DMSCredentials, InternalRepoRequest
 from sap_cloud_sdk.dms._auth import Auth
 from sap_cloud_sdk.dms._http import HttpInvoker
-
+from sap_cloud_sdk.dms import _endpoints as endpoints
 
 class DMSClient:
     """Client for interacting with the DMS service."""
@@ -27,4 +27,5 @@ class DMSClient:
         tenant: Optional[str] = None,
     ) -> Any:
         """Create a new internal repository."""
-        # return self._http.post("/rest/v2/repositories", request.to_dict(), tenant_subdomain)
+        return self._http.post(endpoints.REPOSITORIES, request.to_dict(), tenant)
+

@@ -1,0 +1,1 @@
+REPOSITORIES = "/rest/v2/repositories"

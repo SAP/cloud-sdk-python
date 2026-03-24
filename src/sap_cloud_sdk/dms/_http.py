@@ -19,37 +19,60 @@ class HttpInvoker:
         self._connect_timeout = connect_timeout or 10
         self._read_timeout = read_timeout or 30
 
-    def get(self, path: str, tenant_subdomain: Optional[str] = None) -> Any:
+    def get(
+        self,
+        path: str,
+        tenant_subdomain: Optional[str] = None,
+        headers: Optional[dict[str, str]] = None,
+    ) -> Any:
         response = requests.get(
             f"{self._base_url}{path}",
-            headers=self._headers(tenant_subdomain),
+            headers=self._merged_headers(tenant_subdomain, headers),
             timeout=(self._connect_timeout, self._read_timeout),
         )
         return self._handle(response)
 
-    def post(self, path: str, payload: dict[str, Any], tenant_subdomain: Optional[str] = None) -> Any:
+    def post(
+        self,
+        path: str,
+        payload: dict[str, Any],
+        tenant_subdomain: Optional[str] = None,
+        headers: Optional[dict[str, str]] = None,
+    ) -> Any:
         response = requests.post(
             f"{self._base_url}{path}",
-            headers=self._headers(tenant_subdomain),
+            headers=self._merged_headers(tenant_subdomain, headers),
             json=payload,
             timeout=(self._connect_timeout, self._read_timeout),
         )
         return self._handle(response)
 
-    def delete(self, path: str, tenant_subdomain: Optional[str] = None) -> Any:
+    def delete(
+        self,
+        path: str,
+        tenant_subdomain: Optional[str] = None,
+        headers: Optional[dict[str, str]] = None,
+    ) -> Any:
         response = requests.delete(
             f"{self._base_url}{path}",
-            headers=self._headers(tenant_subdomain),
+            headers=self._merged_headers(tenant_subdomain, headers),
             timeout=(self._connect_timeout, self._read_timeout),
         )
         return self._handle(response)
 
-    def _headers(self, tenant_subdomain: Optional[str] = None) -> dict[str, str]:
+    def _default_headers(self, tenant_subdomain: Optional[str] = None) -> dict[str, str]:
         return {
             "Authorization": f"Bearer {self._auth.get_token(tenant_subdomain)}",
             "Content-Type": "application/json",
             "Accept": "application/json",
         }
+
+    def _merged_headers(
+        self,
+        tenant_subdomain: Optional[str],
+        overrides: Optional[dict[str, str]],
+    ) -> dict[str, str]:
+        return {**self._default_headers(tenant_subdomain), **(overrides or {})}
 
     def _handle(self, response: requests.Response) -> Any:
         if response.status_code in (200, 201, 204):

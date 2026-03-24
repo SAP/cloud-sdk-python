@@ -4,7 +4,7 @@ This module provides utilities to configure SAP AI Core credentials for use with
 
 ## Installation
 
-The AI Core module is part of the Cloud SDK for Python and is automatically available when the SDK is installed.
+The AI Core module is part of the SAP Cloud SDK for Python and is automatically available when the SDK is installed.
 
 ## Import
 

@@ -98,7 +98,7 @@ class TestDefaultAttributes:
                 operation="log",
                 deprecated=False
             )
-            
+
             assert attrs[ATTR_CAPABILITY] == str(Module.AUDITLOG)
             assert attrs[ATTR_FUNCTIONALITY] == "log"
             assert attrs[ATTR_SOURCE] == "user-facing"
@@ -113,7 +113,7 @@ class TestDefaultAttributes:
             operation="log",
             deprecated=False
         )
-        
+
         assert attrs[ATTR_SOURCE] == str(Module.OBJECTSTORE)
 
     def test_default_attributes_deprecated_true(self):
@@ -124,7 +124,7 @@ class TestDefaultAttributes:
             operation="get_destination",
             deprecated=True
         )
-        
+
         assert attrs[ATTR_DEPRECATED] is True
 
 
@@ -135,17 +135,17 @@ class TestRecordRequestMetric:
     def test_record_request_metric_basic(self):
         """Test recording a basic request metric."""
         import sap_cloud_sdk.core.telemetry.telemetry as telemetry_module
-        
+
         mock_counter = MagicMock()
         telemetry_module._request_counter = mock_counter
-        
+
         record_request_metric(
             module=Module.AUDITLOG,
             source=None,
             operation="log",
             deprecated=False
         )
-        
+
         mock_counter.add.assert_called_once()
         call_args = mock_counter.add.call_args
         assert call_args[0][0] == 1  # Count should be 1
@@ -156,17 +156,17 @@ class TestRecordRequestMetric:
     def test_record_request_metric_with_source(self):
         """Test recording request metric with source."""
         import sap_cloud_sdk.core.telemetry.telemetry as telemetry_module
-        
+
         mock_counter = MagicMock()
         telemetry_module._request_counter = mock_counter
-        
+
         record_request_metric(
             module=Module.DESTINATION,
             source=Module.OBJECTSTORE,
             operation="get_instance_destination",
             deprecated=False
         )
-        
+
         mock_counter.add.assert_called_once()
         call_args = mock_counter.add.call_args
         attrs = call_args[0][1]
@@ -175,35 +175,35 @@ class TestRecordRequestMetric:
     def test_record_request_metric_lazy_initialization(self):
         """Test that request metric initializes counter lazily."""
         import sap_cloud_sdk.core.telemetry.telemetry as telemetry_module
-        
+
         # Reset counter to None to trigger initialization
         telemetry_module._request_counter = None
-        
+
         with patch('sap_cloud_sdk.core.telemetry.telemetry._initialize_metrics') as mock_init:
             mock_counter = MagicMock()
-            
+
             def set_counter():
                 telemetry_module._request_counter = mock_counter
-            
+
             mock_init.side_effect = set_counter
-            
+
             record_request_metric(
                 module=Module.AUDITLOG,
                 source=None,
                 operation="log"
             )
-            
+
             mock_init.assert_called_once()
             mock_counter.add.assert_called_once()
 
     def test_record_request_metric_handles_exception(self):
         """Test that request metric handles exceptions gracefully."""
         import sap_cloud_sdk.core.telemetry.telemetry as telemetry_module
-        
+
         mock_counter = MagicMock()
         mock_counter.add.side_effect = Exception("Test error")
         telemetry_module._request_counter = mock_counter
-        
+
         # Should not raise exception
         record_request_metric(
             module=Module.AUDITLOG,
@@ -214,9 +214,9 @@ class TestRecordRequestMetric:
     def test_record_request_metric_returns_early_if_counter_none(self):
         """Test that function returns early if counter initialization fails."""
         import sap_cloud_sdk.core.telemetry.telemetry as telemetry_module
-        
+
         telemetry_module._request_counter = None
-        
+
         with patch('sap_cloud_sdk.core.telemetry.telemetry._initialize_metrics'):
             # Counter remains None after initialization
             record_request_metric(
@@ -233,17 +233,17 @@ class TestRecordErrorMetric:
     def test_record_error_metric_basic(self):
         """Test recording a basic error metric."""
         import sap_cloud_sdk.core.telemetry.telemetry as telemetry_module
-        
+
         mock_counter = MagicMock()
         telemetry_module._error_counter = mock_counter
-        
+
         record_error_metric(
             module=Module.AUDITLOG,
             source=None,
             operation="log",
             deprecated=False
         )
-        
+
         mock_counter.add.assert_called_once()
         call_args = mock_counter.add.call_args
         assert call_args[0][0] == 1
@@ -254,17 +254,17 @@ class TestRecordErrorMetric:
     def test_record_error_metric_with_source(self):
         """Test recording error metric with source."""
         import sap_cloud_sdk.core.telemetry.telemetry as telemetry_module
-        
+
         mock_counter = MagicMock()
         telemetry_module._error_counter = mock_counter
-        
+
         record_error_metric(
             module=Module.DESTINATION,
             source=Module.AUDITLOG,
             operation="get_destination",
             deprecated=True
         )
-        
+
         mock_counter.add.assert_called_once()
         call_args = mock_counter.add.call_args
         attrs = call_args[0][1]
@@ -274,38 +274,37 @@ class TestRecordErrorMetric:
     def test_record_error_metric_lazy_initialization(self):
         """Test that error metric initializes counter lazily."""
         import sap_cloud_sdk.core.telemetry.telemetry as telemetry_module
-        
+
         telemetry_module._error_counter = None
-        
+
         with patch('sap_cloud_sdk.core.telemetry.telemetry._initialize_metrics') as mock_init:
             mock_counter = MagicMock()
-            
+
             def set_counter():
                 telemetry_module._error_counter = mock_counter
-            
+
             mock_init.side_effect = set_counter
-            
+
             record_error_metric(
                 module=Module.OBJECTSTORE,
                 source=None,
                 operation="put_object"
             )
-            
+
             mock_init.assert_called_once()
             mock_counter.add.assert_called_once()
 
     def test_record_error_metric_handles_exception(self):
         """Test that error metric handles exceptions gracefully."""
         import sap_cloud_sdk.core.telemetry.telemetry as telemetry_module
-        
+
         mock_counter = MagicMock()
         mock_counter.add.side_effect = Exception("Test error")
         telemetry_module._error_counter = mock_counter
-        
+
         # Should not raise exception
         record_error_metric(
             module=Module.DESTINATION,
             source=None,
             operation="create_destination"
         )
-

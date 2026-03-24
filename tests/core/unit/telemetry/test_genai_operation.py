@@ -78,10 +78,10 @@ class TestGenAIOperation:
         """Test GenAI operations for common LLM use cases."""
         # Chat operations
         assert GenAIOperation.CHAT.value == "chat"
-        
+
         # Embedding operations
         assert GenAIOperation.EMBEDDINGS.value == "embeddings"
-        
+
         # Agent operations
         assert GenAIOperation.CREATE_AGENT.value == "create_agent"
         assert GenAIOperation.INVOKE_AGENT.value == "invoke_agent"

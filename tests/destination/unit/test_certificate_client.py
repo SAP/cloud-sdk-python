@@ -103,7 +103,7 @@ class TestCertificateClientRead:
         # Execute & Verify
         with pytest.raises(DestinationOperationError) as exc_info:
             certificate_client.get_instance_certificate("test-cert.pem")
-        
+
         assert "failed to get certificate 'test-cert.pem'" in str(exc_info.value)
 
     def test_get_certificate_invalid_json(self, certificate_client, mock_http):
@@ -117,7 +117,7 @@ class TestCertificateClientRead:
         # Execute & Verify
         with pytest.raises(DestinationOperationError) as exc_info:
             certificate_client.get_instance_certificate("test-cert.pem")
-        
+
         assert "invalid JSON in get certificate response" in str(exc_info.value)
 
     def test_get_subaccount_certificate_access_strategies(self, certificate_client, mock_http):
@@ -172,7 +172,7 @@ class TestCertificateClientRead:
             "Content": "base64-encoded-content",
             "Type": "PEM"
         }
-        
+
         # Test SUBSCRIBER_FIRST fallback (subscriber fails, provider succeeds)
         http_error = HttpError("Not Found")
         http_error.status_code = 404
@@ -180,15 +180,15 @@ class TestCertificateClientRead:
             http_error,  # Subscriber call fails
             mock_response  # Provider call succeeds
         ]
-        
+
         certificate = certificate_client.get_subaccount_certificate(
-            "test-cert.pem", 
-            access_strategy=AccessStrategy.SUBSCRIBER_FIRST, 
+            "test-cert.pem",
+            access_strategy=AccessStrategy.SUBSCRIBER_FIRST,
             tenant="test-tenant"
         )
         assert certificate is not None
         assert mock_http.get.call_count == 2
-        
+
         # Verify calls were made in correct order
         calls = mock_http.get.call_args_list
         assert calls[0] == (("v1/subaccountCertificates/test-cert.pem",), {"tenant_subdomain": "test-tenant"})
@@ -359,7 +359,7 @@ class TestCertificateClientListOperations:
         mock_response.headers = {}
         mock_response.json.return_value = [{"Name": "cert1.pem", "Content": "content1"}]
         mock_http.get.return_value = mock_response
-        
+
         filter_obj = ListOptions(filter_names=["cert1.pem", "cert2.pem"])
 
         # Execute
@@ -381,7 +381,7 @@ class TestCertificateClientListOperations:
         # Execute & Verify
         with pytest.raises(DestinationOperationError) as exc_info:
             certificate_client.list_instance_certificates()
-        
+
         assert "failed to list instance certificates" in str(exc_info.value)
 
     def test_list_instance_certificates_invalid_json_wrapped(self, certificate_client, mock_http):
@@ -395,7 +395,7 @@ class TestCertificateClientListOperations:
         # Execute & Verify
         with pytest.raises(DestinationOperationError) as exc_info:
             certificate_client.list_instance_certificates()
-        
+
         assert "invalid JSON in list certificates response" in str(exc_info.value)
 
     def test_list_subaccount_certificates_requires_tenant_for_subscriber_access(self, certificate_client, mock_http):
@@ -435,7 +435,7 @@ class TestCertificateClientListOperations:
 
         # Execute
         certificates = certificate_client.list_subaccount_certificates(
-            access_strategy=AccessStrategy.SUBSCRIBER_ONLY, 
+            access_strategy=AccessStrategy.SUBSCRIBER_ONLY,
             tenant="test-tenant"
         )
 
@@ -453,7 +453,7 @@ class TestCertificateClientListOperations:
 
         # Execute
         certificates = certificate_client.list_subaccount_certificates(
-            access_strategy=AccessStrategy.SUBSCRIBER_FIRST, 
+            access_strategy=AccessStrategy.SUBSCRIBER_FIRST,
             tenant="test-tenant"
         )
 
@@ -471,12 +471,12 @@ class TestCertificateClientListOperations:
         provider_response = Mock(spec=Response)
         provider_response.headers = {}
         provider_response.json.return_value = [{"Name": "cert1.pem", "Content": "content1"}]
-        
+
         mock_http.get.side_effect = [empty_response, provider_response]
 
         # Execute
         certificates = certificate_client.list_subaccount_certificates(
-            access_strategy=AccessStrategy.SUBSCRIBER_FIRST, 
+            access_strategy=AccessStrategy.SUBSCRIBER_FIRST,
             tenant="test-tenant"
         )
 
@@ -497,7 +497,7 @@ class TestCertificateClientListOperations:
 
         # Execute
         certificates = certificate_client.list_subaccount_certificates(
-            access_strategy=AccessStrategy.PROVIDER_FIRST, 
+            access_strategy=AccessStrategy.PROVIDER_FIRST,
             tenant="test-tenant"
         )
 
@@ -515,12 +515,12 @@ class TestCertificateClientListOperations:
         subscriber_response = Mock(spec=Response)
         subscriber_response.headers = {}
         subscriber_response.json.return_value = [{"Name": "cert1.pem", "Content": "content1"}]
-        
+
         mock_http.get.side_effect = [empty_response, subscriber_response]
 
         # Execute
         certificates = certificate_client.list_subaccount_certificates(
-            access_strategy=AccessStrategy.PROVIDER_FIRST, 
+            access_strategy=AccessStrategy.PROVIDER_FIRST,
             tenant="test-tenant"
         )
 
@@ -538,7 +538,7 @@ class TestCertificateClientListOperations:
         mock_response.headers = {}
         mock_response.json.return_value = [{"Name": "cert1.pem", "Content": "content1"}]
         mock_http.get.return_value = mock_response
-        
+
         filter_obj = ListOptions(filter_names=["cert1.pem"])
 
         # Execute
@@ -563,7 +563,7 @@ class TestCertificateClientListOperations:
         # Execute & Verify
         with pytest.raises(DestinationOperationError) as exc_info:
             certificate_client.list_subaccount_certificates(access_strategy=AccessStrategy.PROVIDER_ONLY)
-        
+
         assert "failed to list subaccount certificates" in str(exc_info.value)
 
 
@@ -576,7 +576,7 @@ class TestCertificateClientAccessStrategy:
         mock_response.headers = {}
         mock_response.json.return_value = [{"Name": "cert1.pem", "Content": "content1"}]
         mock_http.get.return_value = mock_response
-        
+
         certificates = certificate_client._apply_access_strategy(
             access_strategy=AccessStrategy.SUBSCRIBER_ONLY,
             tenant="test-tenant",
@@ -594,7 +594,7 @@ class TestCertificateClientAccessStrategy:
         mock_response.headers = {}
         mock_response.json.return_value = [{"Name": "cert1.pem", "Content": "content1"}]
         mock_http.get.return_value = mock_response
-        
+
         certificates = certificate_client._apply_access_strategy(
             access_strategy=AccessStrategy.PROVIDER_ONLY,
             tenant=None,
@@ -612,7 +612,7 @@ class TestCertificateClientAccessStrategy:
         mock_response.headers = {}
         mock_response.json.return_value = [{"Name": "cert1.pem", "Content": "content1"}]
         mock_http.get.return_value = mock_response
-        
+
         certificates = certificate_client._apply_access_strategy(
             access_strategy=AccessStrategy.SUBSCRIBER_FIRST,
             tenant="test-tenant",
@@ -632,7 +632,7 @@ class TestCertificateClientAccessStrategy:
         provider_response = Mock(spec=Response)
         provider_response.headers = {}
         provider_response.json.return_value = [{"Name": "cert1.pem", "Content": "content1"}]
-        
+
         mock_http.get.side_effect = [empty_response, provider_response]
 
         certificates = certificate_client._apply_access_strategy(
@@ -652,7 +652,7 @@ class TestCertificateClientAccessStrategy:
         mock_response.headers = {}
         mock_response.json.return_value = [{"Name": "cert1.pem", "Content": "content1"}]
         mock_http.get.return_value = mock_response
-        
+
         certificates = certificate_client._apply_access_strategy(
             access_strategy=AccessStrategy.PROVIDER_FIRST,
             tenant="test-tenant",
@@ -672,7 +672,7 @@ class TestCertificateClientAccessStrategy:
         subscriber_response = Mock(spec=Response)
         subscriber_response.headers = {}
         subscriber_response.json.return_value = [{"Name": "cert1.pem", "Content": "content1"}]
-        
+
         mock_http.get.side_effect = [empty_response, subscriber_response]
 
         certificates = certificate_client._apply_access_strategy(
@@ -691,7 +691,7 @@ class TestCertificateClientAccessStrategy:
         empty_response = Mock(spec=Response)
         empty_response.headers = {}
         empty_response.json.return_value = []
-        
+
         mock_http.get.return_value = empty_response
 
         certificates = certificate_client._apply_access_strategy(
@@ -714,17 +714,17 @@ class TestCertificateClientEdgeCases:
         """Test that unknown access strategy raises appropriate error."""
         # Create an invalid access strategy by mocking
         from unittest.mock import patch
-        
+
         mock_response = Mock(spec=Response)
         mock_response.headers = {}
         mock_response.json.return_value = {"Name": "cert1.pem", "Content": "content1"}
         mock_http.get.return_value = mock_response
-        
+
         # Patch AccessStrategy to add an unknown value
         with patch('sap_cloud_sdk.destination.certificate_client.AccessStrategy') as mock_strategy:
             unknown_strategy = Mock()
             unknown_strategy.value = "UNKNOWN_STRATEGY"
-            
+
             with pytest.raises(DestinationOperationError) as exc_info:
                 # Directly call with a value that won't match any case
                 certificate_client.get_subaccount_certificate(
@@ -732,7 +732,7 @@ class TestCertificateClientEdgeCases:
                     access_strategy=unknown_strategy,
                     tenant="test-tenant"
                 )
-            
+
             assert "unknown access strategy" in str(exc_info.value).lower()
 
     def test_create_certificate_unexpected_exception(self, certificate_client, mock_http):
@@ -742,7 +742,7 @@ class TestCertificateClientEdgeCases:
 
         with pytest.raises(DestinationOperationError) as exc_info:
             certificate_client.create_certificate(certificate)
-        
+
         assert "failed to create certificate 'test-cert.pem'" in str(exc_info.value)
         assert "Unexpected error" in str(exc_info.value)
 
@@ -753,7 +753,7 @@ class TestCertificateClientEdgeCases:
 
         with pytest.raises(DestinationOperationError) as exc_info:
             certificate_client.update_certificate(certificate)
-        
+
         assert "failed to update certificate 'test-cert.pem'" in str(exc_info.value)
 
     def test_delete_certificate_unexpected_exception(self, certificate_client, mock_http):
@@ -762,7 +762,7 @@ class TestCertificateClientEdgeCases:
 
         with pytest.raises(DestinationOperationError) as exc_info:
             certificate_client.delete_certificate("test-cert.pem")
-        
+
         assert "failed to delete certificate 'test-cert.pem'" in str(exc_info.value)
 
     def test_list_certificates_non_list_response(self, certificate_client, mock_http):
@@ -774,7 +774,7 @@ class TestCertificateClientEdgeCases:
 
         with pytest.raises(DestinationOperationError) as exc_info:
             certificate_client.list_instance_certificates()
-        
+
         assert "expected JSON array in list certificates response" in str(exc_info.value)
 
     def test_list_certificates_404_returns_none(self, certificate_client, mock_http):
@@ -827,7 +827,7 @@ class TestCertificateClientEdgeCases:
 
         with pytest.raises(DestinationOperationError) as exc_info:
             certificate_client.get_instance_certificate("test-cert")
-        
+
         assert "invalid JSON in get certificate response" in str(exc_info.value)
 
     def test_list_certificates_invalid_certificate_in_array(self, certificate_client, mock_http):
@@ -850,10 +850,10 @@ class TestCertificateClientEdgeCases:
     def test_apply_access_strategy_unknown_strategy(self, certificate_client, mock_http):
         """Test _apply_access_strategy with unknown strategy."""
         from unittest.mock import Mock as MockStrategy
-        
+
         unknown_strategy = MockStrategy()
         unknown_strategy.value = "UNKNOWN"
-        
+
         with pytest.raises(DestinationOperationError) as exc_info:
             certificate_client._apply_access_strategy(
                 access_strategy=unknown_strategy,
@@ -862,7 +862,7 @@ class TestCertificateClientEdgeCases:
                     level=Level.SUB_ACCOUNT, tenant_subdomain=t, filter=None
                 )
             )
-        
+
         assert "unknown access strategy" in str(exc_info.value).lower()
 
     def test_get_subaccount_certificate_provider_first_both_none(self, certificate_client, mock_http):
@@ -903,7 +903,7 @@ class TestCertificateClientEdgeCases:
 
         with pytest.raises(DestinationOperationError) as exc_info:
             certificate_client.list_instance_certificates()
-        
+
         assert "failed to list instance certificates" in str(exc_info.value)
 
     def test_get_certificate_with_http_401_error(self, certificate_client, mock_http):
@@ -914,5 +914,5 @@ class TestCertificateClientEdgeCases:
 
         with pytest.raises(DestinationOperationError) as exc_info:
             certificate_client.get_instance_certificate("test-cert")
-        
+
         assert "failed to get certificate 'test-cert'" in str(exc_info.value)

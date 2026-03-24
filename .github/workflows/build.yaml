@@ -51,17 +51,17 @@ jobs:
           # Check that both wheel and source distribution were created
           wheel_count=$(ls -1 dist/*.whl 2>/dev/null | wc -l)
           tar_count=$(ls -1 dist/*.tar.gz 2>/dev/null | wc -l)
-          
+
           if [ "$wheel_count" -eq 0 ]; then
             echo "ERROR: No wheel file found"
             exit 1
           fi
-          
+
           if [ "$tar_count" -eq 0 ]; then
             echo "ERROR: No source distribution found"
             exit 1
           fi
-          
+
           echo "✓ Build artifacts verified: $wheel_count wheel(s), $tar_count source distribution(s)"
 
       - name: "Upload Build Artifacts"

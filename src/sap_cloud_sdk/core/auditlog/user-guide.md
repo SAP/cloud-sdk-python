@@ -348,7 +348,7 @@ try:
 except AuditLogError as e:
     # Handle the error appropriately
     print(f"Failed to log security event: {e}")
-    
+
     # Consider whether to fail the operation or continue
     # Audit logging failures should generally not break business logic
 ```

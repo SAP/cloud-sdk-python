@@ -15,7 +15,7 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-      
+
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
@@ -32,7 +32,7 @@ jobs:
           pip install toml
           PKG_NAME=$(python -c "import toml; print(toml.load('pyproject.toml')['project']['name'])")
           BASE_VERSION=$(python -c "import toml; print(toml.load('pyproject.toml')['project']['version'])")
-          
+
           echo "Base version: $BASE_VERSION"
           echo "name=$PKG_NAME" >> $GITHUB_OUTPUT
           echo "base_version=$BASE_VERSION" >> $GITHUB_OUTPUT
@@ -41,29 +41,29 @@ jobs:
         id: prerelease
         run: |
           BASE_VERSION="${{ steps.metadata.outputs.base_version }}"
-          
+
           # Get current date in YYYYMMDD format
           DATE=$(date +%Y%m%d)
-          
+
           # Get branch name and sanitize it (remove refs/heads/ prefix and replace / with -)
           BRANCH_NAME="${{ github.head_ref || github.ref_name }}"
           BRANCH_NAME=$(echo "$BRANCH_NAME" | sed 's/refs\/heads\///' | sed 's/\//-/g')
-          
+
           # Get short commit SHA
           SHORT_SHA="${{ github.event.pull_request.head.sha || github.sha }}"
           SHORT_SHA=${SHORT_SHA:0:7}
-          
+
           # Create PEP 440-compliant prerelease version
           # Format: X.Y.Z.devYYYYMMDD+branch.sha
           PRERELEASE_VERSION="${BASE_VERSION}.dev${DATE}+${BRANCH_NAME}.${SHORT_SHA}"
-          
+
           echo "Generated prerelease version: $PRERELEASE_VERSION"
           echo "version=$PRERELEASE_VERSION" >> $GITHUB_OUTPUT
 
       - name: Update version in pyproject.toml
         run: |
           PRERELEASE_VERSION="${{ steps.prerelease.outputs.version }}"
-          
+
           # Update version in pyproject.toml
           python -c "
           import toml
@@ -72,7 +72,7 @@ jobs:
           with open('pyproject.toml', 'w') as f:
               toml.dump(data, f)
           "
-          
+
           echo "Updated pyproject.toml with version: $PRERELEASE_VERSION"
 
       - name: Check if version already exists in Artifactory
@@ -84,20 +84,20 @@ jobs:
         run: |
           PKG_NAME="${{ steps.metadata.outputs.name }}"
           VERSION="${{ steps.prerelease.outputs.version }}"
-          
+
           echo "Checking if $PKG_NAME version $VERSION exists in Artifactory..."
-          
+
           # Convert package name to filename format (replace hyphens with underscores)
           PKG_FILE_NAME=$(echo "$PKG_NAME" | sed 's/-/_/g')
           FILE_PATH="$ARTIFACTORY_URL/$REPOSITORY_NAME/$PKG_NAME/$VERSION/${PKG_FILE_NAME}-${VERSION}.tar.gz"
-          
+
           echo "Checking for file: $FILE_PATH"
-          
+
           # Check if file exists using HEAD request
           HTTP_STATUS=$(curl -I -s -o /dev/null -w "%{http_code}" \
             -u "$ARTIFACTORY_USER:$ARTIFACTORY_TOKEN" \
             "$FILE_PATH")
-          
+
           if [ "$HTTP_STATUS" = "200" ]; then
             echo "ERROR: Version $VERSION of $PKG_NAME already exists in Artifactory!"
             echo "File found: $FILE_PATH"
@@ -119,16 +119,16 @@ jobs:
         run: |
           PKG_NAME="${{ steps.metadata.outputs.name }}"
           VERSION="${{ steps.prerelease.outputs.version }}"
-          
+
           echo "Publishing to Artifactory..."
           echo "Repository URL: $ARTIFACTORY_URL/api/pypi/$REPOSITORY_NAME/"
-          
+
           uv publish \
             --publish-url "$ARTIFACTORY_URL/api/pypi/$REPOSITORY_NAME/" \
             --username "$ARTIFACTORY_USER" \
             --password "$ARTIFACTORY_TOKEN" \
             dist/*
-          
+
           echo "Successfully published $PKG_NAME version $VERSION to Artifactory!"
 
       - name: Generate Installation Summary
@@ -140,32 +140,32 @@ jobs:
           PKG_NAME="${{ steps.metadata.outputs.name }}"
           VERSION="${{ steps.prerelease.outputs.version }}"
           BASE_VERSION="${{ steps.metadata.outputs.base_version }}"
-          
+
           # Write to GitHub Step Summary
           cat >> $GITHUB_STEP_SUMMARY <<EOF
           ## ✅ Package Published Successfully
-          
+
           **Package:** \`$PKG_NAME\`
           **Version:** \`$VERSION\`
           **Base Version:** \`$BASE_VERSION\`
           **Repository:** $ARTIFACTORY_URL/artifactory/api/pypi/$REPOSITORY_NAME/
-          
+
           ---
-          
+
           ## 📦 Installation Instructions
-          
+
           \`\`\`bash
           # uv
           uv add $PKG_NAME==$VERSION --index $ARTIFACTORY_URL/artifactory/api/pypi/$REPOSITORY_NAME/simple/
-          
+
           # Poetry
           poetry add $PKG_NAME==$VERSION --source $ARTIFACTORY_URL/artifactory/api/pypi/$REPOSITORY_NAME/simple/
-          
+
           # Pip
           pip install $PKG_NAME==$VERSION --index-url $ARTIFACTORY_URL/artifactory/api/pypi/$REPOSITORY_NAME/simple/
           \`\`\`
-          
+
           ---
-          
+
           *Published at: $(date -u '+%Y-%m-%d %H:%M:%S UTC')*
           EOF

@@ -40,9 +40,9 @@ body:
         - Python version via `python --version`: ...
         - SAP Cloud SDK for Python version: ...
         - Framework version (if applicable, e.g., Flask, FastAPI): ...
-        
+
         <details><summary>Installed packages via <code>pip list</code> or <code>uv pip list</code></summary>
-            
+
         ```
         Package list here
         ```

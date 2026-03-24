@@ -2,10 +2,10 @@ name: REUSE Compliance Check
 
 on:
   push:
-    branches: 
+    branches:
       - "main"
   pull_request:
-    branches: 
+    branches:
       - "main"
 
 jobs:

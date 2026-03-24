@@ -7,7 +7,7 @@ updates:
       interval: "weekly"
       day: "monday"
       time: "09:00"
-   
+
     # Commit message configuration
     commit-message:
       prefix: "chore"
@@ -19,7 +19,7 @@ updates:
     rebase-strategy: "auto"
     # Target branch for updates
     target-branch: "main"
-  
+
   # Enable version updates for GitHub Actions
   - package-ecosystem: "github-actions"
     directory: "/"

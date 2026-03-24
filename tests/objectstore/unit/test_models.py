@@ -19,7 +19,7 @@ class TestObjectStoreBindingData:
         config = ObjectStoreBindingData(
             access_key_id="test_key",
             secret_access_key="test_secret",
-            bucket="test-bucket", 
+            bucket="test-bucket",
             host="localhost:9000"
         )
         assert config.access_key_id == "test_key"
@@ -77,14 +77,14 @@ class TestObjectMetadata:
             etag="abc123",
             size=100
         )
-        
+
         with pytest.raises(AttributeError):
             metadata.key = "new_key"  # ty: ignore[invalid-assignment]
 
     def test_is_frozen_dataclass(self):
         from dataclasses import is_dataclass
         assert is_dataclass(ObjectMetadata)
-        
+
         test_time = datetime(2023, 1, 1, 12, 0, 0)
         metadata = ObjectMetadata(
             key="test.txt",

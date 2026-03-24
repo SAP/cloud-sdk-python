@@ -15,7 +15,7 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-      
+
       - name: Set up Python
         uses: actions/setup-python@v6
         with:
@@ -40,11 +40,11 @@ jobs:
         run: |
           PKG_NAME="${{ steps.metadata.outputs.name }}"
           VERSION="${{ steps.metadata.outputs.version }}"
-          
+
           echo "Checking if $PKG_NAME version $VERSION exists on PyPI..."
-          
+
           HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "https://pypi.org/pypi/$PKG_NAME/$VERSION/json")
-          
+
           if [ "$HTTP_STATUS" = "200" ]; then
             echo "ERROR: Version $VERSION of $PKG_NAME already exists on PyPI!"
             echo "Please increment the version in pyproject.toml before publishing."

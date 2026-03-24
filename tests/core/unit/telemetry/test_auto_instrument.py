@@ -29,10 +29,10 @@ class TestAutoInstrument:
         """Test successful auto-instrumentation with valid endpoint."""
         mock_traceloop_components['get_app_name'].return_value = 'test-app'
         mock_traceloop_components['create_resource'].return_value = {'service.name': 'test-app'}
-        
+
         with patch.dict('os.environ', {'OTEL_EXPORTER_OTLP_ENDPOINT': 'http://localhost:4317'}, clear=True):
             auto_instrument()
-            
+
             # Verify Traceloop was initialized
             mock_traceloop_components['traceloop'].init.assert_called_once()
             call_kwargs = mock_traceloop_components['traceloop'].init.call_args[1]
@@ -44,10 +44,10 @@ class TestAutoInstrument:
         """Test that auto_instrument appends /v1/traces to endpoint if not present."""
         mock_traceloop_components['get_app_name'].return_value = 'test-app'
         mock_traceloop_components['create_resource'].return_value = {}
-        
+
         with patch.dict('os.environ', {'OTEL_EXPORTER_OTLP_ENDPOINT': 'http://localhost:4317'}, clear=True):
             auto_instrument()
-            
+
             # Verify exporter was called with /v1/traces appended
             mock_traceloop_components['exporter'].assert_called_once_with(
                 endpoint='http://localhost:4317/v1/traces'
@@ -57,10 +57,10 @@ class TestAutoInstrument:
         """Test that auto_instrument doesn't duplicate /v1/traces if already present."""
         mock_traceloop_components['get_app_name'].return_value = 'test-app'
         mock_traceloop_components['create_resource'].return_value = {}
-        
+
         with patch.dict('os.environ', {'OTEL_EXPORTER_OTLP_ENDPOINT': 'http://localhost:4317/v1/traces'}, clear=True):
             auto_instrument()
-            
+
             # Verify exporter was called with original endpoint
             mock_traceloop_components['exporter'].assert_called_once_with(
                 endpoint='http://localhost:4317/v1/traces'
@@ -73,7 +73,7 @@ class TestAutoInstrument:
             'service.name': 'test-app',
             'sap.cloud_sdk.language': 'python'
         }
-        
+
         with patch.dict('os.environ', {
             'OTEL_EXPORTER_OTLP_ENDPOINT': 'http://localhost:4317',
             'APPFND_CONHOS_APP_NAME': 'test-app',
@@ -83,7 +83,7 @@ class TestAutoInstrument:
             'APPFND_CONHOS_SUBACCOUNTID': 'sub-123'
         }, clear=True):
             auto_instrument()
-            
+
             # Verify resource was created
             mock_traceloop_components['create_resource'].assert_called_once()
 
@@ -91,11 +91,11 @@ class TestAutoInstrument:
         """Test that auto_instrument logs initialization messages."""
         mock_traceloop_components['get_app_name'].return_value = 'test-app'
         mock_traceloop_components['create_resource'].return_value = {}
-        
+
         with patch.dict('os.environ', {'OTEL_EXPORTER_OTLP_ENDPOINT': 'http://localhost:4317'}, clear=True):
             with patch('sap_cloud_sdk.core.telemetry.auto_instrument.logger') as mock_logger:
                 auto_instrument()
-                
+
                 # Verify info logs were called
                 assert mock_logger.info.call_count >= 1
                 # Check for initialization message
@@ -106,10 +106,10 @@ class TestAutoInstrument:
         """Test that auto_instrument handles endpoint with trailing slash."""
         mock_traceloop_components['get_app_name'].return_value = 'test-app'
         mock_traceloop_components['create_resource'].return_value = {}
-        
+
         with patch.dict('os.environ', {'OTEL_EXPORTER_OTLP_ENDPOINT': 'http://localhost:4317/'}, clear=True):
             auto_instrument()
-            
+
             # Verify trailing slash is removed before appending /v1/traces
             mock_traceloop_components['exporter'].assert_called_once_with(
                 endpoint='http://localhost:4317/v1/traces'
@@ -121,13 +121,13 @@ class TestAutoInstrument:
         mock_traceloop_components['create_resource'].return_value = {}
         mock_transformer_instance = MagicMock()
         mock_traceloop_components['transformer'].return_value = mock_transformer_instance
-        
+
         with patch.dict('os.environ', {'OTEL_EXPORTER_OTLP_ENDPOINT': 'http://localhost:4317'}, clear=True):
             auto_instrument()
-            
+
             # Verify transformer was created with base exporter
             mock_traceloop_components['transformer'].assert_called_once()
-            
+
             # Verify Traceloop.init was called with the transformer as exporter
             call_kwargs = mock_traceloop_components['traceloop'].init.call_args[1]
             assert call_kwargs['exporter'] == mock_transformer_instance
@@ -205,4 +205,3 @@ class TestAutoInstrument:
                 mock_logger.warning.assert_called_once()
                 warning_message = mock_logger.warning.call_args[0][0]
                 assert "OTEL_EXPORTER_OTLP_ENDPOINT not set" in warning_message
-

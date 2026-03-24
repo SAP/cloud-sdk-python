@@ -29,7 +29,7 @@ def auditlog_client():
 @pytest.fixture
 def failure_simulation():
     """Utilities for simulating various failure conditions using explicit configuration."""
-    
+
     class FailureSimulator:
         def create_client_with_network_failure(self):
             """Create a client configured with an unreachable endpoint."""
@@ -66,16 +66,16 @@ def failure_simulation():
             # Pattern: [Fail, Fail, Success, Fail, Success] - 3 failures, 2 successes out of 5
             self.intermittent_failure_pattern = [True, True, False, True, False]
             self.intermittent_failure_counter = 0
-            
+
         def get_intermittent_client(self):
             if not hasattr(self, 'intermittent_failure_pattern'):
                 self.setup_intermittent_failure()
-                
+
             should_fail = self.intermittent_failure_pattern[
                 self.intermittent_failure_counter % len(self.intermittent_failure_pattern)
             ]
             self.intermittent_failure_counter += 1
-            
+
             if should_fail:
                 return self.create_client_with_network_failure()
             else:
@@ -88,7 +88,7 @@ def failure_simulation():
 def pytest_configure(config):
     """Configure pytest markers."""
     config.addinivalue_line(
-        "markers", 
+        "markers",
         "integration: mark test as integration test"
     )
 

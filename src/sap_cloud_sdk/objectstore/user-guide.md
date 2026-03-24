@@ -10,7 +10,7 @@ Provides a simple and unified way to connect to Object Store services. It abstra
 # Using uv (recommended)
 uv add sap-cloud-sdk
 
-# Using pip  
+# Using pip
 pip install sap-cloud-sdk
 ```
 
@@ -98,7 +98,7 @@ with open("/path/to/file.txt", "rb") as f:
     # Get file size
     import os
     size = os.path.getsize("/path/to/file.txt")
-    
+
     client.put_object(
         name="uploaded.txt",
         data=f,

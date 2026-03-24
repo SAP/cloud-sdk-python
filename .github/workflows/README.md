@@ -12,12 +12,12 @@ The CI pipeline is split into three independent workflows for optimal performanc
 **Purpose**: Fast feedback on code style and type safety
 **Jobs**:
 - `lint` - Ruff linter checks
-- `format` - Ruff formatter checks  
+- `format` - Ruff formatter checks
 - `typecheck` - ty type checker
 
 **Parallelization**: All jobs run in parallel (~1-2 min total)
 
-**Security**: 
+**Security**:
 - Uses `pull_request` trigger (read-only by default)
 - ✅ SAFE: Only runs static analysis tools (no code execution)
 - ❌ NO secrets or write permissions
@@ -31,7 +31,7 @@ The CI pipeline is split into three independent workflows for optimal performanc
 **Jobs**:
 - `test` - Unit tests with coverage reporting
 
-**Permissions**: 
+**Permissions**:
 - `contents: read` - Read-only access
 
 **Security**:
@@ -61,23 +61,23 @@ Fork PR opened
 └─────────────────────────────────────────┘
     ↓ (1-2 min)
     ✓ Quick feedback to contributor
-    
+
     ↓ (Runs in parallel)
-    
+
 ┌─────────────────────────────────────────┐
 │  test.yaml (auto-runs)                  │
 │  └─ test (with coverage)                │
 └─────────────────────────────────────────┘
     ↓ (3-5 min)
-    
+
     ↓ (Maintainer clicks "Approve and run")
-    
+
 ┌─────────────────────────────────────────┐
 │  build.yaml (requires approval)         │
 │  └─ build (package creation)            │
 └─────────────────────────────────────────┘
     ↓ (1-2 min)
-    
+
     ✓ All checks passed, ready to merge
 ```
 

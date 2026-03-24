@@ -14,9 +14,9 @@ class TestCreateClient:
     def test_create_client_cloud_mode(self, mock_client_class, mock_resolver):
         mock_client = Mock()
         mock_client_class.return_value = mock_client
-        
+
         result = create_client("production", disable_ssl=True)
-        
+
         mock_resolver.assert_called_once()
         call_args = mock_resolver.call_args
         assert call_args[1]["module"] == "objectstore"
@@ -29,10 +29,10 @@ class TestCreateClient:
         """Test that create_client raises ValueError for empty instance."""
         with pytest.raises(ValueError, match="instance parameter must be a non-empty string"):
             create_client("")
-        
+
         with pytest.raises(ValueError, match="instance parameter must be a non-empty string"):
             create_client("   ")  # whitespace only
-        
+
         with pytest.raises(ValueError, match="instance parameter must be a non-empty string"):
             create_client(None)  # type: ignore
 
@@ -48,8 +48,8 @@ class TestCreateClient:
         )
         mock_client = Mock()
         mock_client_class.return_value = mock_client
-        
+
         result = create_client("ignored-instance", config=mock_config, disable_ssl=True)
-        
+
         mock_client_class.assert_called_once_with(mock_config, disable_ssl=True)
         assert result == mock_client

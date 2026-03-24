@@ -113,9 +113,9 @@ class TestBindingData:
             url="https://service.example.com",
             uaa=json.dumps(uaa_json)
         )
-        
+
         config = binding.extract_config()
-        
+
         assert config.client_id == "test_client"
         assert config.client_secret == "test_secret"
         assert config.oauth_url == "https://oauth.example.com"
@@ -174,7 +174,7 @@ class TestBindingData:
         uaa_json_with_comments = '''
         {
             "clientid": "test_client",
-            "clientsecret": "test_secret", 
+            "clientsecret": "test_secret",
             "url": "https://oauth.example.com"
             // This would normally break strict JSON parsing
         }
@@ -183,7 +183,7 @@ class TestBindingData:
             url="https://service.example.com",
             uaa=uaa_json_with_comments.replace("//", "").replace("This would normally break strict JSON parsing", "")
         )
-        
+
         config = binding.extract_config()
         assert config.client_id == "test_client"
 
@@ -200,20 +200,20 @@ class TestLoadConfigFromEnv:
             url="https://service.example.com",
             uaa='{"clientid": "test", "clientsecret": "secret", "url": "oauth"}'
         )
-        
+
         def mock_read_side_effect(mount_path, env_var, service, instance, binding_data):
             binding_data.url = mock_binding.url
             binding_data.uaa = mock_binding.uaa
-        
+
         mock_read.side_effect = mock_read_side_effect
-        
+
         config = _load_config_from_env()
-        
+
         assert config.client_id == "test"
         assert config.client_secret == "secret"
         assert config.oauth_url == "oauth"
         assert config.service_url == "https://service.example.com"
-        
+
         mock_read.assert_called_once_with(
             "/etc/secrets/appfnd",
             "CLOUD_SDK_CFG",
@@ -227,16 +227,16 @@ class TestLoadConfigFromEnv:
         def mock_read_side_effect(mount_path, env_var, service, instance, binding_data):
             binding_data.url = ""
             binding_data.uaa = ""
-        
+
         mock_read.side_effect = mock_read_side_effect
-        
+
         with pytest.raises(ClientCreationError, match="Failed to load configuration"):
             _load_config_from_env()
 
     @patch('sap_cloud_sdk.core.secret_resolver.read_from_mount_and_fallback_to_env_var')
     def test_load_config_read_exception(self, mock_read):
         mock_read.side_effect = Exception("Mount read failed")
-        
+
         with pytest.raises(ClientCreationError, match="Failed to load configuration"):
             _load_config_from_env()
 
@@ -245,8 +245,8 @@ class TestLoadConfigFromEnv:
         def mock_read_side_effect(mount_path, env_var, service, instance, binding_data):
             binding_data.url = "https://service.example.com"
             binding_data.uaa = "invalid json"
-        
+
         mock_read.side_effect = mock_read_side_effect
-        
+
         with pytest.raises(ClientCreationError, match="Failed to load configuration"):
             _load_config_from_env()

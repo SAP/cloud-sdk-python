@@ -48,11 +48,11 @@ We use GitHub issues to track bugs, feature requests, and questions. When creati
 1. **Bug Report** - For reporting issues with released features
    - Use the [Bug Report template](https://github.com/SAP/cloud-sdk-python/issues/new?template=bug-report.yml)
    - Provide version information, reproduction steps, and expected behavior
-   
+
 2. **Feature Request** - For proposing new features or enhancements
    - Use the [Feature Request template](https://github.com/SAP/cloud-sdk-python/issues/new?template=feature-request.yml)
    - Describe the problem, proposed solution, and impact
-   
+
 3. **Question** - For asking questions about the SDK
    - Use the [Question template](https://github.com/SAP/cloud-sdk-python/issues/new?template=question.yml)
    - Provide clear and concise questions

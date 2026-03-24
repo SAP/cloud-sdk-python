@@ -19,47 +19,47 @@ logger = logging.getLogger(__name__)
 @pytest.fixture(scope="session")
 def integration_env() -> Dict[str, str]:
     """Load and validate integration test environment variables."""
-    
+
     # Load environment from .env_integration_tests
     env_file = Path(__file__).parent.parent.parent.parent / ".env_integration_tests"
-    
+
     if env_file.exists():
         load_dotenv(env_file)
         logger.info(f"Loaded integration environment from {env_file}")
     else:
         logger.warning(f"Integration environment file not found: {env_file}")
-    
+
     # Required environment variables for cloud-only integration tests
     required_vars = [
         "CLOUD_SDK_CFG_OBJECTSTORE_DEFAULT_HOST",
-        "CLOUD_SDK_CFG_OBJECTSTORE_DEFAULT_ACCESS_KEY_ID", 
+        "CLOUD_SDK_CFG_OBJECTSTORE_DEFAULT_ACCESS_KEY_ID",
         "CLOUD_SDK_CFG_OBJECTSTORE_DEFAULT_SECRET_ACCESS_KEY",
         "CLOUD_SDK_CFG_OBJECTSTORE_DEFAULT_BUCKET",
     ]
-    
+
     env_vars = {}
     missing_vars = []
-    
+
     for var in required_vars:
         value = os.getenv(var)
         if value:
             env_vars[var] = value
         else:
             missing_vars.append(var)
-    
+
     if missing_vars:
         pytest.skip(f"Missing required environment variables for cloud integration tests: {missing_vars}")  # ty: ignore[invalid-argument-type, too-many-positional-arguments]
-    
+
     # Ensure SSL is enabled for cloud services
     env_vars["CLOUD_SDK_CFG_OBJECTSTORE_DEFAULT_SSL_ENABLED"] = os.getenv(
         "CLOUD_SDK_CFG_OBJECTSTORE_DEFAULT_SSL_ENABLED", "true"
     )
-    
+
     # Validate that we're not using localhost (cloud-only)
     host = env_vars["CLOUD_SDK_CFG_OBJECTSTORE_DEFAULT_HOST"]
     if host.startswith("localhost") or host.startswith("127.0.0.1"):
         pytest.skip("Integration tests are cloud-only. Local endpoints not supported.")  # ty: ignore[invalid-argument-type, too-many-positional-arguments]
-    
+
     logger.info(f"Integration environment validated for cloud testing: {host}")
     return env_vars
 
@@ -92,25 +92,25 @@ def test_prefix() -> str:
 def cleanup_by_prefix(client, prefix: str, timeout: float = 10.0) -> bool:
     """Timeout-controlled cleanup with eventual consistency handling."""
     start_time = time.time()
-    
+
     try:
         objects = client.list_objects(prefix)
         cleaned_count = 0
-        
+
         for obj in objects:
             client.delete_object(obj.key)
             cleaned_count += 1
-            
+
             # Check timeout
             if time.time() - start_time > timeout:
                 logger.warning(f"Cleanup timeout reached after {timeout}s, cleaned {cleaned_count} objects")
                 break
-        
+
         if cleaned_count > 0:
             # Eventual consistency delay
             time.sleep(0.1)
             logger.debug(f"Cleaned up {cleaned_count} objects with prefix: {prefix}")
-        
+
         return True
     except Exception as e:
         logger.error(f"Cleanup failed for prefix {prefix}: {e}")
@@ -120,7 +120,7 @@ def cleanup_by_prefix(client, prefix: str, timeout: float = 10.0) -> bool:
 @pytest.fixture(scope="session", autouse=True)
 def integration_test_session_cleanup(objectstore_client):
     """Session-level cleanup of all integration test objects."""
-    
+
     def cleanup_all_test_objects():
         """Clean up all objects under sdk-python-integration-tests/"""
         try:
@@ -131,12 +131,12 @@ def integration_test_session_cleanup(objectstore_client):
                 logger.info("Session cleanup completed")
         except Exception as e:
             logger.warning(f"Session cleanup failed: {e}")
-    
+
     # Cleanup before tests start
     cleanup_all_test_objects()
-    
+
     yield
-    
+
     # Cleanup after all tests complete
     cleanup_all_test_objects()
 
@@ -145,33 +145,33 @@ def integration_test_session_cleanup(objectstore_client):
 def cleanup_objects(objectstore_client, test_prefix):
     """Enhanced fixture for automatic cleanup with timeout and eventual consistency."""
     created_objects = []
-    
+
     def register_object(object_name: str):
         """Register an object for cleanup."""
         created_objects.append(object_name)
-    
+
     # Provide the register function to tests
     yield register_object
-    
+
     # Enhanced cleanup after test with timeout
     if created_objects:
         start_time = time.time()
         cleaned_count = 0
-        
+
         for object_name in created_objects:
             try:
                 objectstore_client.delete_object(object_name)
                 cleaned_count += 1
                 logger.debug(f"Cleaned up object: {object_name}")
-                
+
                 # Respect timeout
                 if time.time() - start_time > 10.0:
                     logger.warning(f"Object cleanup timeout reached, cleaned {cleaned_count}/{len(created_objects)} objects")
                     break
-                    
+
             except Exception as e:
                 logger.warning(f"Failed to cleanup object {object_name}: {e}")
-        
+
         if cleaned_count > 0:
             # Eventual consistency delay
             time.sleep(0.1)
@@ -220,7 +220,7 @@ def failure_simulation(integration_env):
 def pytest_configure(config):
     """Configure pytest markers."""
     config.addinivalue_line(
-        "markers", 
+        "markers",
         "integration: mark test as integration test"
     )
 

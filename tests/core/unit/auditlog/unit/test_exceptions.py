@@ -42,7 +42,7 @@ class TestExceptions:
 
     def test_exceptions_with_chained_causes(self):
         original_error = ValueError("Original cause")
-        
+
         try:
             raise ClientCreationError("Client failed") from original_error
         except ClientCreationError as e:
@@ -52,7 +52,7 @@ class TestExceptions:
     def test_exceptions_inherit_standard_behavior(self):
         error_with_args = TransportError("arg1", "arg2")
         assert error_with_args.args == ("arg1", "arg2")
-        
+
         # Test empty constructor
         empty_error = TransportError()
         assert str(empty_error) == ""

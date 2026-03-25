@@ -1,13 +1,22 @@
 version: 2
 updates:
-  # Enable version updates for Python pip dependencies
+  # Python pip dependencies - security updates only
+  # Regular version updates are disabled because we use compatible release
+  # constraints (~=) in pyproject.toml to pin patch versions.
+  # Dependabot Security Updates (enabled in repo settings) bypass these rules.
   - package-ecosystem: "pip"
     directory: "/"
     schedule:
       interval: "weekly"
       day: "monday"
       time: "09:00"
-
+    # Ignore all regular version updates - security updates still come through
+    ignore:
+      - dependency-name: "*"
+        update-types:
+          - "version-update:semver-major"
+          - "version-update:semver-minor"
+          - "version-update:semver-patch"
     # Commit message configuration
     commit-message:
       prefix: "chore"

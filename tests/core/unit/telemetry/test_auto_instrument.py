@@ -41,31 +41,16 @@ class TestAutoInstrument:
             assert call_kwargs['should_enrich_metrics'] is True
             assert call_kwargs['disable_batch'] is True
 
-    def test_auto_instrument_appends_v1_traces_to_endpoint(self, mock_traceloop_components):
-        """Test that auto_instrument appends /v1/traces to endpoint if not present."""
+    def test_auto_instrument_uses_grpc_exporter_by_default(self, mock_traceloop_components):
+        """Test that auto_instrument uses gRPC exporter by default, letting it read endpoint from env."""
         mock_traceloop_components['get_app_name'].return_value = 'test-app'
         mock_traceloop_components['create_resource'].return_value = {}
 
         with patch.dict('os.environ', {'OTEL_EXPORTER_OTLP_ENDPOINT': 'http://localhost:4317'}, clear=True):
             auto_instrument()
 
-            # Verify exporter was called with /v1/traces appended (grpc by default)
-            mock_traceloop_components['grpc_exporter'].assert_called_once_with(
-                endpoint='http://localhost:4317/v1/traces'
-            )
-
-    def test_auto_instrument_preserves_existing_v1_traces(self, mock_traceloop_components):
-        """Test that auto_instrument doesn't duplicate /v1/traces if already present."""
-        mock_traceloop_components['get_app_name'].return_value = 'test-app'
-        mock_traceloop_components['create_resource'].return_value = {}
-
-        with patch.dict('os.environ', {'OTEL_EXPORTER_OTLP_ENDPOINT': 'http://localhost:4317/v1/traces'}, clear=True):
-            auto_instrument()
-
-            # Verify exporter was called with original endpoint (grpc by default)
-            mock_traceloop_components['grpc_exporter'].assert_called_once_with(
-                endpoint='http://localhost:4317/v1/traces'
-            )
+            mock_traceloop_components['grpc_exporter'].assert_called_once_with()
+            mock_traceloop_components['http_exporter'].assert_not_called()
 
     def test_auto_instrument_creates_resource_with_attributes(self, mock_traceloop_components):
         """Test that auto_instrument creates resource with correct attributes."""
@@ -104,17 +89,14 @@ class TestAutoInstrument:
                 assert any('initialized successfully' in msg.lower() for msg in info_calls)
 
     def test_auto_instrument_with_trailing_slash(self, mock_traceloop_components):
-        """Test that auto_instrument handles endpoint with trailing slash."""
+        """Test that auto_instrument works with a trailing slash endpoint (exporter reads from env)."""
         mock_traceloop_components['get_app_name'].return_value = 'test-app'
         mock_traceloop_components['create_resource'].return_value = {}
 
         with patch.dict('os.environ', {'OTEL_EXPORTER_OTLP_ENDPOINT': 'http://localhost:4317/'}, clear=True):
             auto_instrument()
 
-            # Verify trailing slash is removed before appending /v1/traces (grpc by default)
-            mock_traceloop_components['grpc_exporter'].assert_called_once_with(
-                endpoint='http://localhost:4317/v1/traces'
-            )
+            mock_traceloop_components['grpc_exporter'].assert_called_once_with()
 
     def test_auto_instrument_with_http_protobuf_protocol(self, mock_traceloop_components):
         """Test that auto_instrument uses HTTP exporter when OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf."""
@@ -127,11 +109,7 @@ class TestAutoInstrument:
         }, clear=True):
             auto_instrument()
 
-            # Verify HTTP exporter was called with /v1/traces appended
-            mock_traceloop_components['http_exporter'].assert_called_once_with(
-                endpoint='http://localhost:4318/v1/traces'
-            )
-            # Verify gRPC exporter was not called
+            mock_traceloop_components['http_exporter'].assert_called_once_with()
             mock_traceloop_components['grpc_exporter'].assert_not_called()
 
     def test_auto_instrument_passes_transformer_to_traceloop(self, mock_traceloop_components):

@@ -44,8 +44,6 @@ def auto_instrument():
         logger.info("Initializing auto instrumentation with console exporter")
         base_exporter = ConsoleSpanExporter()
     else:
-        if "v1/traces" not in otel_endpoint:
-            otel_endpoint = otel_endpoint.rstrip("/") + "/v1/traces"
         protocol = os.getenv("OTEL_EXPORTER_OTLP_PROTOCOL", "grpc").lower()
         exporters = {"grpc": GRPCSpanExporter, "http/protobuf": HTTPSpanExporter}
         if protocol not in exporters:
@@ -58,7 +56,7 @@ def auto_instrument():
             f"Initializing auto instrumentation with endpoint: {otel_endpoint} "
             f"(protocol: {protocol})"
         )
-        base_exporter = exporters[protocol](endpoint=otel_endpoint)
+        base_exporter = exporters[protocol]()
 
     exporter = GenAIAttributeTransformer(base_exporter)
 

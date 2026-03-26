@@ -7,6 +7,9 @@ from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import (
 from opentelemetry.exporter.otlp.proto.http.trace_exporter import (
     OTLPSpanExporter as HTTPSpanExporter,
 )
+from opentelemetry import trace
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.processor.baggage import ALLOW_ALL_BAGGAGE_KEYS, BaggageSpanProcessor
 from opentelemetry.sdk.trace.export import ConsoleSpanExporter
 from traceloop.sdk import Traceloop
 
@@ -69,4 +72,16 @@ def auto_instrument():
         disable_batch=True,
     )
 
+    _set_baggage_processor()
+
     logger.info("Cloud auto instrumentation initialized successfully")
+
+
+def _set_baggage_processor():
+    provider = trace.get_tracer_provider()
+    if not isinstance(provider, TracerProvider):
+        logger.warning("Unknown TracerProvider type. Skipping BaggageSpanProcessor")
+        return
+
+    provider.add_span_processor(BaggageSpanProcessor(ALLOW_ALL_BAGGAGE_KEYS))
+    logger.info("Registered BaggageSpanProcessor for extension attribute propagation")

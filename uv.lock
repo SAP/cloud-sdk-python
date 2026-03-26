@@ -1859,6 +1859,20 @@ wheels = [
 ]
 
 [[package]]
+name = "opentelemetry-processor-baggage"
+version = "0.61b0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "opentelemetry-api" },
+    { name = "opentelemetry-sdk" },
+    { name = "wrapt" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/a3/0d/4afee20490ef53a449b1781b0671d84858742a2ccfb01c08de398a5d1ccd/opentelemetry_processor_baggage-0.61b0.tar.gz", hash = "sha256:4d1d2a624e3aa9a8b6c6d1f560ba2951f97acf875f57502a274c5078043a69d5", size = 7573, upload-time = "2026-03-04T14:20:54.941Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/ac/24/0ef2cf49e6ac9b2b422400abbf528230a409c9e174572f2d13e2dff7ec7c/opentelemetry_processor_baggage-0.61b0-py3-none-any.whl", hash = "sha256:f6b5937e93bda8f380d8f5f667355c7d127e9296b38dfacf39fd328ab410262c", size = 8881, upload-time = "2026-03-04T14:20:05.25Z" },
+]
+
+[[package]]
 name = "opentelemetry-proto"
 version = "1.38.0"
 source = { registry = "https://pypi.org/simple" }
@@ -2408,6 +2422,7 @@ dependencies = [
     { name = "minio" },
     { name = "opentelemetry-exporter-otlp-proto-grpc" },
     { name = "opentelemetry-exporter-otlp-proto-http" },
+    { name = "opentelemetry-processor-baggage" },
     { name = "pydantic" },
     { name = "requests" },
     { name = "requests-oauthlib" },
@@ -2432,6 +2447,7 @@ requires-dist = [
     { name = "minio", specifier = "~=7.2.16" },
     { name = "opentelemetry-exporter-otlp-proto-grpc", specifier = "~=1.38.0" },
     { name = "opentelemetry-exporter-otlp-proto-http", specifier = "~=1.38.0" },
+    { name = "opentelemetry-processor-baggage", specifier = ">=0.4" },
     { name = "pydantic", specifier = "~=2.12.3" },
     { name = "requests", specifier = "~=2.31.0" },
     { name = "requests-oauthlib", specifier = "~=2.0.0" },

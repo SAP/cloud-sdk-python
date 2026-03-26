@@ -1,8 +1,10 @@
 """Tests for auto-instrumentation functionality."""
 
 import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch, MagicMock, create_autospec
 from contextlib import ExitStack
+
+from opentelemetry.sdk.trace import TracerProvider as SDKTracerProvider
 
 from sap_cloud_sdk.core.telemetry.auto_instrument import auto_instrument
 
@@ -17,6 +19,8 @@ def mock_traceloop_components():
             'http_exporter': stack.enter_context(patch('sap_cloud_sdk.core.telemetry.auto_instrument.HTTPSpanExporter')),
             'console_exporter': stack.enter_context(patch('sap_cloud_sdk.core.telemetry.auto_instrument.ConsoleSpanExporter')),
             'transformer': stack.enter_context(patch('sap_cloud_sdk.core.telemetry.auto_instrument.GenAIAttributeTransformer')),
+            'baggage_processor': stack.enter_context(patch('sap_cloud_sdk.core.telemetry.auto_instrument.BaggageSpanProcessor')),
+            'get_tracer_provider': stack.enter_context(patch('sap_cloud_sdk.core.telemetry.auto_instrument.trace.get_tracer_provider', return_value=create_autospec(SDKTracerProvider))),
             'create_resource': stack.enter_context(patch('sap_cloud_sdk.core.telemetry.auto_instrument.create_resource_attributes_from_env')),
             'get_app_name': stack.enter_context(patch('sap_cloud_sdk.core.telemetry.auto_instrument._get_app_name')),
         }
@@ -204,3 +208,16 @@ class TestAutoInstrument:
                 mock_logger.warning.assert_called_once()
                 warning_message = mock_logger.warning.call_args[0][0]
                 assert "OTEL_EXPORTER_OTLP_ENDPOINT not set" in warning_message
+
+    def test_auto_instrument_passes_baggage_span_processor(self, mock_traceloop_components):
+        """Test that auto_instrument registers a BaggageSpanProcessor on the tracer provider."""
+        mock_traceloop_components['get_app_name'].return_value = 'test-app'
+        mock_traceloop_components['create_resource'].return_value = {}
+        mock_processor_instance = MagicMock()
+        mock_traceloop_components['baggage_processor'].return_value = mock_processor_instance
+
+        with patch.dict('os.environ', {'OTEL_EXPORTER_OTLP_ENDPOINT': 'http://localhost:4317'}, clear=True):
+            auto_instrument()
+
+            mock_traceloop_components['baggage_processor'].assert_called_once()
+            mock_traceloop_components['get_tracer_provider'].return_value.add_span_processor.assert_called_once_with(mock_processor_instance)

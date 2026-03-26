@@ -29,6 +29,9 @@ jobs:
           INTERNAL_REPO="https://oauth2:${INTERNAL_TOKEN}@${INTERNAL_REPO#https://}"
           git remote add internal "$INTERNAL_REPO"
 
+          echo "Fetching internal remote to establish lease baseline..."
+          git fetch internal main
+
           echo "Pushing main branch to internal repository..."
           git push internal main:main --force-with-lease
 

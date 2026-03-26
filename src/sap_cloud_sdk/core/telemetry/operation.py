@@ -52,5 +52,17 @@ class Operation(str, Enum):
     AICORE_SET_CONFIG = "set_aicore_config"
     AICORE_AUTO_INSTRUMENT = "auto_instrument"
 
+
+    # DMS Operations
+    DMS_ONBOARD_REPOSITORY = "onboard_repository"
+    DMS_GET_REPOSITORY = "get_repository"
+    DMS_GET_ALL_REPOSITORIES = "get_all_repositories"
+    DMS_UPDATE_REPOSITORY = "update_repository"
+    DMS_DELETE_REPOSITORY = "delete_repository"
+    DMS_CREATE_CONFIG = "create_config"
+    DMS_GET_CONFIGS = "get_configs"
+    DMS_UPDATE_CONFIG = "update_config"
+    DMS_DELETE_CONFIG = "delete_config"
+
     def __str__(self) -> str:
         return self.value

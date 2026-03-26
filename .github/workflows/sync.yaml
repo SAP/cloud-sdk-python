@@ -18,7 +18,7 @@ jobs:
       - name: Mirror main branch
         env:
           EXTERNAL_REPO: https://github.com/SAP/cloud-sdk-python.git
-          INTERNAL_REPO: ${{ format('https://{0}/{1}.git', github.server_url, github.repository) }}
+          INTERNAL_REPO: ${{ format('{0}/{1}.git', github.server_url, github.repository) }}
           INTERNAL_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           echo "Cloning external repository main branch..."

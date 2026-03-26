@@ -526,11 +526,14 @@ class TestSetAICoreConfig:
 
             set_aicore_config(instance_name=instance_name)
 
-            # Verify instance_name was passed to _get_secret calls
-            # The _get_secret function is called without instance_name parameter
-            # because set_aicore_config doesn't pass it (it uses default)
-            # So we just verify _get_base_url received the instance_name
+            # Verify instance_name was passed to _get_aicore_base_url
             mock_get_base_url.assert_called_with(instance_name)
+
+            # Verify instance_name was passed to all _get_secret calls
+            for call in mock_get_secret.call_args_list:
+                assert call[1].get("instance_name") == instance_name, (
+                    f"_get_secret call for {call[0][0]} missing instance_name={instance_name}"
+                )
 
     def test_set_config_calls_get_secret_with_correct_parameters(self):
         """Test that _get_secret is called with correct parameters for each secret."""
@@ -542,21 +545,31 @@ class TestSetAICoreConfig:
 
             set_aicore_config()
 
-            # Verify _get_secret was called with correct parameters
+            default_instance = "aicore-instance"
+            # Verify _get_secret was called with correct parameters including instance_name
             calls = mock_get_secret.call_args_list
             assert any(
-                call[0][0] == "AICORE_CLIENT_ID" and call[0][1] == "clientid"
+                call[0][0] == "AICORE_CLIENT_ID"
+                and call[0][1] == "clientid"
+                and call[1].get("instance_name") == default_instance
                 for call in calls
             )
             assert any(
-                call[0][0] == "AICORE_CLIENT_SECRET" and call[0][1] == "clientsecret"
+                call[0][0] == "AICORE_CLIENT_SECRET"
+                and call[0][1] == "clientsecret"
+                and call[1].get("instance_name") == default_instance
                 for call in calls
             )
             assert any(
-                call[0][0] == "AICORE_AUTH_URL" and call[0][1] == "url" for call in calls
+                call[0][0] == "AICORE_AUTH_URL"
+                and call[0][1] == "url"
+                and call[1].get("instance_name") == default_instance
+                for call in calls
             )
             assert any(
-                call[0][0] == "AICORE_RESOURCE_GROUP" and call[1].get("default") == "default"
+                call[0][0] == "AICORE_RESOURCE_GROUP"
+                and call[1].get("default") == "default"
+                and call[1].get("instance_name") == default_instance
                 for call in calls
             )
 

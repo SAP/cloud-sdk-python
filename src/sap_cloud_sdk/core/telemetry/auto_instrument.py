@@ -1,6 +1,12 @@
 import logging
 import os
 
+from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import (
+    OTLPSpanExporter as GRPCSpanExporter,
+)
+from opentelemetry.exporter.otlp.proto.http.trace_exporter import (
+    OTLPSpanExporter as HTTPSpanExporter,
+)
 from opentelemetry.sdk.trace.export import ConsoleSpanExporter
 from traceloop.sdk import Traceloop
 
@@ -41,15 +47,8 @@ def auto_instrument():
         if "v1/traces" not in otel_endpoint:
             otel_endpoint = otel_endpoint.rstrip("/") + "/v1/traces"
         protocol = os.getenv("OTEL_EXPORTER_OTLP_PROTOCOL", "grpc").lower()
-        if protocol == "grpc":
-            from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import (
-                OTLPSpanExporter,
-            )
-        elif protocol == "http/protobuf":
-            from opentelemetry.exporter.otlp.proto.http.trace_exporter import (
-                OTLPSpanExporter,
-            )
-        else:
+        exporters = {"grpc": GRPCSpanExporter, "http/protobuf": HTTPSpanExporter}
+        if protocol not in exporters:
             raise ValueError(
                 f"Unsupported OTEL_EXPORTER_OTLP_PROTOCOL: '{protocol}'. "
                 "Supported values are 'grpc' and 'http/protobuf'."
@@ -59,7 +58,7 @@ def auto_instrument():
             f"Initializing auto instrumentation with endpoint: {otel_endpoint} "
             f"(protocol: {protocol})"
         )
-        base_exporter = OTLPSpanExporter(endpoint=otel_endpoint)
+        base_exporter = exporters[protocol](endpoint=otel_endpoint)
 
     exporter = GenAIAttributeTransformer(base_exporter)
 

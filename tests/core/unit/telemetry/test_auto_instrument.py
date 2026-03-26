@@ -13,8 +13,8 @@ def mock_traceloop_components():
     with ExitStack() as stack:
         mocks = {
             'traceloop': stack.enter_context(patch('sap_cloud_sdk.core.telemetry.auto_instrument.Traceloop')),
-            'grpc_exporter': stack.enter_context(patch('opentelemetry.exporter.otlp.proto.grpc.trace_exporter.OTLPSpanExporter')),
-            'http_exporter': stack.enter_context(patch('opentelemetry.exporter.otlp.proto.http.trace_exporter.OTLPSpanExporter')),
+            'grpc_exporter': stack.enter_context(patch('sap_cloud_sdk.core.telemetry.auto_instrument.GRPCSpanExporter')),
+            'http_exporter': stack.enter_context(patch('sap_cloud_sdk.core.telemetry.auto_instrument.HTTPSpanExporter')),
             'console_exporter': stack.enter_context(patch('sap_cloud_sdk.core.telemetry.auto_instrument.ConsoleSpanExporter')),
             'transformer': stack.enter_context(patch('sap_cloud_sdk.core.telemetry.auto_instrument.GenAIAttributeTransformer')),
             'create_resource': stack.enter_context(patch('sap_cloud_sdk.core.telemetry.auto_instrument.create_resource_attributes_from_env')),

@@ -37,6 +37,68 @@ Tip:
 uv run ty check .
 ```
 
+## Code Quality Checks
+
+Run all quality checks before committing:
+
+```bash
+# Lint
+uv run ruff check .
+
+# Format check
+uv run ruff format --check .
+
+# Type check
+uv run ty check .
+```
+
+## Pre-commit Hooks (Recommended)
+
+Automatically run quality checks before each commit using pre-commit hooks.
+
+### Setup
+
+1. **Install pre-commit:**
+   ```bash
+   uv pip install pre-commit
+   ```
+
+2. **Install the git hooks:**
+   ```bash
+   pre-commit install
+   ```
+
+3. **Run on all files (one-time init):**
+   ```bash
+   pre-commit run --all-files
+   ```
+
+### What It Does
+
+The `.pre-commit-config.yaml` file configures hooks to:
+- Check YAML files
+- Fix end-of-file issues
+- Remove trailing whitespace
+- Run `ruff format --check` (code formatting)
+- Run `ruff check --fix` (linting with auto-fix)
+- Run `ty check` (type checking)
+
+Hooks run automatically on `git commit`. If checks fail, the commit is blocked until issues are fixed.
+
+### Manual Hook Execution
+
+Run hooks manually without committing:
+```bash
+# Run on all files
+pre-commit run --all-files
+
+# Run on staged files only
+pre-commit run
+
+# Run specific hook
+pre-commit run ruff-check
+```
+
 ## Build Project
 
 ```bash

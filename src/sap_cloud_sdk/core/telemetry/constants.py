@@ -19,9 +19,9 @@ ATTR_CLOUD_REGION = "cloud.region"
 ATTR_SAP_SUBACCOUNT_ID = "sap.cld.subaccount_id"
 ATTR_SAP_TENANT_ID = "sap.tenancy.tenant_id"
 ATTR_SAP_SYSTEM_ROLE = "sap.cld.system_role"
-ATTR_SAP_SDK_NAME = "sap.telemetry.sdk.name"
-ATTR_SAP_SDK_LANGUAGE = "sap.telemetry.sdk.language"
-ATTR_SAP_SDK_VERSION = "sap.telemetry.sdk.version"
+ATTR_SAP_SDK_NAME = "sap.cloud_sdk.name"
+ATTR_SAP_SDK_LANGUAGE = "sap.cloud_sdk.language"
+ATTR_SAP_SDK_VERSION = "sap.cloud_sdk.version"
 
 # Attribute keys - SAP App Foundation specific
 ATTR_CAPABILITY = "sap.cloud_sdk.capability"

@@ -18,14 +18,15 @@ on:
 
 jobs:
   integration-tests:
-    runs-on: ${{ vars.RUNNER && fromJSON(vars.RUNNER) || 'ubuntu-latest' }}
-
+    runs-on: ${{ contains(github.server_url, 'github.com') && 'ubuntu-latest' || fromJSON('["self-hosted"]') }}
+    permissions:
+      contents: read
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: '3.11'
 
@@ -38,21 +39,21 @@ jobs:
       - name: Set up integration test environment
         run: |
           echo "Setting up environment variables for integration tests..."
-          
+
           # Process GitHub secrets (all configuration stored as secrets)
           echo '${{ toJSON(secrets) }}' | jq -r 'to_entries[] | select(.key | startswith("CLOUD_SDK_CFG_")) | "\(.key)=\(.value)"' | while read line; do
             echo "$line" >> $GITHUB_ENV
             var_name=$(echo "$line" | cut -d= -f1)
             echo "Set secret: $var_name"
           done
-          
+
           # Process GitHub variables (all configuration stored as variables)
           echo '${{ toJSON(vars) }}' | jq -r 'to_entries[] | select(.key | startswith("CLOUD_SDK_CFG_")) | "\(.key)=\(.value)"' | while read line; do
             echo "$line" >> $GITHUB_ENV
             var_name=$(echo "$line" | cut -d= -f1)
             echo "Set variable: $var_name"
           done
-          
+
           echo "Environment setup complete - automatically configured all CLOUD_SDK_CFG_* environment variables and secrets"
 
       - name: Run integration tests

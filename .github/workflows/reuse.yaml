@@ -2,15 +2,15 @@ name: REUSE Compliance Check
 
 on:
   push:
-    branches: 
+    branches:
       - "main"
   pull_request:
-    branches: 
+    branches:
       - "main"
 
 jobs:
   check-reuse-compliance:
-    runs-on: ${{ vars.RUNNER && fromJSON(vars.RUNNER) || 'ubuntu-latest' }}
+    runs-on: ${{ contains(github.server_url, 'github.com') && 'ubuntu-latest' || fromJSON('["self-hosted"]') }}
     steps:
     - uses: actions/checkout@v6
 

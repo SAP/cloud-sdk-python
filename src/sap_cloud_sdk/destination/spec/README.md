@@ -40,7 +40,7 @@ Destination Service uses OAuth 2.0 with client credentials grant type. The crede
 
 Destination objects can be declared at the service instance level or the sub-account level. They can originate from either the provider or the subscriber/consumer sub-account.
 
-To manage this, we use `Level` and `AccessStrategy` parameters. 
+To manage this, we use `Level` and `AccessStrategy` parameters.
 
 ### Level
 
@@ -77,7 +77,7 @@ It defines how token is generated, if it should use provider or tenant sub-domai
     "proxyType": "Internet",
     "authentication": "authentication_type",
     "properties": [
-        { 
+        {
             "key": "String",
             "value": "String"
         }
@@ -105,7 +105,7 @@ It defines how token is generated, if it should use provider or tenant sub-domai
     "content": "LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0t...",
     "type": "PEM",
     "properties": [
-      { 
+      {
         "key": "String",
         "value": "String"
       }
@@ -115,7 +115,7 @@ It defines how token is generated, if it should use provider or tenant sub-domai
 
 **Note:** Certificate `Content` should be base64-encoded. Supported types include PEM, JKS, P12, and other certificate formats supported by the Destination Service.
 
-### Properties 
+### Properties
 
 List of destination properties depends on destination type and authentication type. We could have an interface for DestinationProperties with multiple implementations for each type. We should also consider custom properties. So anyway it can include unmapped attributes.
 

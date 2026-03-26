@@ -72,7 +72,7 @@ class TestBaseAuditEvent:
             custom_details={"test": "data"}
         )
         result = event.to_dict()
-        
+
         assert result["user"] == "test_user"
         assert result["tenant"] == "$SUBSCRIBER"
         assert result["customDetails"] == {"test": "data"}
@@ -82,7 +82,7 @@ class TestBaseAuditEvent:
     def test_to_dict_no_custom_details(self):
         event = _BaseAuditEvent(user="test_user")
         result = event.to_dict()
-        
+
         assert result["customDetails"] is None
         assert result["user"] == "test_user"
 
@@ -259,7 +259,7 @@ class TestSecurityEvent:
             attributes=attributes
         )
         result = event.to_dict()
-        
+
         assert result["data"] == "Login"
         assert result["identityProvider"] == "SAP ID"
         assert result["ip"] == "192.168.1.1"
@@ -363,7 +363,7 @@ class TestDataAccessEvent:
             identity_provider="OAuth2"
         )
         result = event.to_dict()
-        
+
         assert result["object"] == {"type": "database", "id": {"table": "users"}}
         assert result["data_subject"] == {
             "type": "user",
@@ -383,7 +383,7 @@ class TestDataAccessEvent:
             attributes=attributes
         )
         result = event.to_dict()
-        
+
         assert result["identityProvider"] is None
         assert result["attributes"] == [{"name": "email", "successful": None}]
 
@@ -421,7 +421,7 @@ class TestDataModificationEvent:
             attributes=attributes
         )
         result = event.to_dict()
-        
+
         assert result["attributes"] == [{
             "name": "email",
             "new": "new@example.com",
@@ -457,7 +457,7 @@ class TestConfigurationChangeEvent:
             id="config-change-001"
         )
         result = event.to_dict()
-        
+
         assert result["id"] == "config-change-001"
         assert result["object"] == {"type": "config", "id": {"setting": "timeout"}}
 
@@ -469,7 +469,7 @@ class TestConfigurationChangeEvent:
             attributes=attributes
         )
         result = event.to_dict()
-        
+
         assert result["id"] is None
         assert result["object"] == {"type": "config", "id": {"setting": "timeout"}}
 
@@ -480,7 +480,7 @@ class TestDataDeletionEvent:
         event = DataDeletionEvent(
             object_type="profile",
             object_id={"id": "123"},
-            subject_type="user", 
+            subject_type="user",
             subject_id={"id": "456"},
             attributes=[DeletedAttribute("email", "deleted@example.com")]
         )
@@ -507,7 +507,7 @@ class TestDataDeletionEvent:
             attributes=attributes
         )
         result = event.to_dict()
-        
+
         assert result["attributes"] == [{
             "name": "email",
             "old": "deleted@example.com",
@@ -543,7 +543,7 @@ class TestConfigurationDeletionEvent:
             id="config-deletion-001"
         )
         result = event.to_dict()
-        
+
         assert result["id"] == "config-deletion-001"
         assert result["attributes"] == [{
             "name": "timeout",
@@ -559,7 +559,7 @@ class TestConfigurationDeletionEvent:
             attributes=attributes
         )
         result = event.to_dict()
-        
+
         assert result["id"] is None
         assert result["attributes"] == [{
             "name": "timeout",

@@ -202,7 +202,7 @@ class TestLoadTransparentProxy:
     def test_load_from_env_var(self):
         """Test loading from environment variable."""
         result = load_transparent_proxy()
-        
+
         assert result is not None
         assert result.proxy_name == "env-proxy"
         assert result.namespace == "env-namespace"
@@ -235,7 +235,7 @@ class TestLoadTransparentProxy:
     def test_load_env_var_with_multiple_dots(self):
         """Test loading with environment variable containing multiple dots uses first two parts."""
         result = load_transparent_proxy()
-        
+
         assert result is not None
         assert result.proxy_name == "proxy"
         assert result.namespace == "namespace"

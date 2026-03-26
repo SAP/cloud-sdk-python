@@ -490,17 +490,17 @@ class TestDestinationClientWithTransparentProxy:
         """Test get_instance_destination with proxy_enabled=True returns TransparentProxyDestination."""
         proxy = TransparentProxy(proxy_name="test-proxy", namespace="test-ns")
         mock_load_proxy.return_value = proxy
-        
+
         mock_http = MagicMock()
         client = DestinationClient(mock_http, use_default_proxy=True)
-        
+
         result = client.get_instance_destination("my-dest", proxy_enabled=True)
-        
+
         assert isinstance(result, TransparentProxyDestination)
         assert result.name == "my-dest"
         assert result.url == "http://test-proxy.test-ns"
         assert result.headers == {"X-destination-name": "my-dest"}
-        
+
         # Verify HTTP was NOT called (bypassed by proxy)
         mock_http.get.assert_not_called()
 
@@ -509,19 +509,19 @@ class TestDestinationClientWithTransparentProxy:
         """Test get_instance_destination with proxy_enabled=False uses normal HTTP flow."""
         proxy = TransparentProxy(proxy_name="test-proxy", namespace="test-ns")
         mock_load_proxy.return_value = proxy
-        
+
         mock_http = MagicMock()
         resp = MagicMock(spec=Response)
         resp.status_code = 200
         resp.json.return_value = {"name": "my-dest", "type": "HTTP"}
         mock_http.get.return_value = resp
-        
+
         client = DestinationClient(mock_http, use_default_proxy=True)
         result = client.get_instance_destination("my-dest", proxy_enabled=False)
-        
+
         assert isinstance(result, Destination)
         assert result.name == "my-dest"
-        
+
         # Verify HTTP was called (normal flow)
         mock_http.get.assert_called_once()
 
@@ -530,21 +530,21 @@ class TestDestinationClientWithTransparentProxy:
         """Test get_subaccount_destination with proxy_enabled=True returns TransparentProxyDestination."""
         proxy = TransparentProxy(proxy_name="test-proxy", namespace="test-ns")
         mock_load_proxy.return_value = proxy
-        
+
         mock_http = MagicMock()
         client = DestinationClient(mock_http, use_default_proxy=True)
-        
+
         result = client.get_subaccount_destination(
             "my-dest",
             access_strategy=AccessStrategy.PROVIDER_ONLY,
             proxy_enabled=True
         )
-        
+
         assert isinstance(result, TransparentProxyDestination)
         assert result.name == "my-dest"
         assert result.url == "http://test-proxy.test-ns"
         assert result.headers == {"X-destination-name": "my-dest"}
-        
+
         # Verify HTTP was NOT called (bypassed by proxy)
         mock_http.get.assert_not_called()
 
@@ -553,10 +553,10 @@ class TestDestinationClientWithTransparentProxy:
         """Test get_subaccount_destination with proxy_enabled=False uses normal HTTP flow."""
         proxy = TransparentProxy(proxy_name="test-proxy", namespace="test-ns")
         mock_load_proxy.return_value = proxy
-        
+
         mock_http = MagicMock()
         client = DestinationClient(mock_http, use_default_proxy=True)
-        
+
         dest = Destination(name="my-dest", type="HTTP")
         with patch.object(client, "_get_destination", return_value=dest) as mock_get:
             result = client.get_subaccount_destination(
@@ -564,10 +564,10 @@ class TestDestinationClientWithTransparentProxy:
                 access_strategy=AccessStrategy.PROVIDER_ONLY,
                 proxy_enabled=False
             )
-            
+
             assert isinstance(result, Destination)
             assert result.name == "my-dest"
-            
+
             # Verify _get_destination was called (normal flow)
             mock_get.assert_called_once()
 
@@ -575,7 +575,7 @@ class TestDestinationClientWithTransparentProxy:
         """Test get_subaccount_destination with proxy_enabled=True but no proxy uses normal flow."""
         mock_http = MagicMock()
         client = DestinationClient(mock_http, use_default_proxy=False)
-        
+
         dest = Destination(name="my-dest", type="HTTP")
         with patch.object(client, "_get_destination", return_value=dest) as mock_get:
             result = client.get_subaccount_destination(
@@ -583,7 +583,7 @@ class TestDestinationClientWithTransparentProxy:
                 access_strategy=AccessStrategy.PROVIDER_ONLY,
                 proxy_enabled=True
             )
-            
+
             # Should fall back to normal flow when proxy is not configured
             assert isinstance(result, Destination)
             mock_get.assert_called_once()
@@ -593,20 +593,20 @@ class TestDestinationClientWithTransparentProxy:
         """Test get_subaccount_destination with proxy_enabled and SUBSCRIBER_FIRST strategy."""
         proxy = TransparentProxy(proxy_name="test-proxy", namespace="test-ns")
         mock_load_proxy.return_value = proxy
-        
+
         mock_http = MagicMock()
         client = DestinationClient(mock_http, use_default_proxy=True)
-        
+
         result = client.get_subaccount_destination(
             "my-dest",
             access_strategy=AccessStrategy.SUBSCRIBER_FIRST,
             tenant="test-tenant",
             proxy_enabled=True
         )
-        
+
         assert isinstance(result, TransparentProxyDestination)
         assert result.name == "my-dest"
-        
+
         # Even with tenant specified, proxy bypasses HTTP call
         mock_http.get.assert_not_called()
 
@@ -615,10 +615,10 @@ class TestDestinationClientWithTransparentProxy:
         """Test that DestinationClient initialization calls load_transparent_proxy."""
         proxy = TransparentProxy(proxy_name="test-proxy", namespace="test-ns")
         mock_load_proxy.return_value = proxy
-        
+
         mock_http = MagicMock()
         client = DestinationClient(mock_http, use_default_proxy=True)
-        
+
         # Verify load_transparent_proxy was called during initialization
         mock_load_proxy.assert_called_once()
         assert client._transparent_proxy == proxy
@@ -627,7 +627,7 @@ class TestDestinationClientWithTransparentProxy:
         """Test that DestinationClient initialization handles no proxy configuration."""
         mock_http = MagicMock()
         client = DestinationClient(mock_http, use_default_proxy=False)
-        
+
         assert client._transparent_proxy is None
 
     @patch("sap_cloud_sdk.destination.client.load_transparent_proxy")
@@ -635,10 +635,10 @@ class TestDestinationClientWithTransparentProxy:
         """Test that TransparentProxyDestination generates correct URL format."""
         proxy = TransparentProxy(proxy_name="my-proxy", namespace="my-namespace")
         mock_load_proxy.return_value = proxy
-        
+
         mock_http = MagicMock()
         client = DestinationClient(mock_http, use_default_proxy=True)
-        
+
         result = client.get_instance_destination("test-destination", proxy_enabled=True)
 
         assert isinstance(result, TransparentProxyDestination)
@@ -650,10 +650,10 @@ class TestDestinationClientWithTransparentProxy:
         """Test that TransparentProxyDestination generates correct headers."""
         proxy = TransparentProxy(proxy_name="test-proxy", namespace="test-ns")
         mock_load_proxy.return_value = proxy
-        
+
         mock_http = MagicMock()
         client = DestinationClient(mock_http, use_default_proxy=True)
-        
+
         destination_name = "complex-destination-name-123"
         result = client.get_instance_destination(destination_name, proxy_enabled=True)
 
@@ -665,18 +665,18 @@ class TestDestinationClientWithTransparentProxy:
         """Test that proxy_enabled defaults to client's use_default_proxy for get_instance_destination."""
         proxy = TransparentProxy(proxy_name="test-proxy", namespace="test-ns")
         mock_load_proxy.return_value = proxy
-        
+
         mock_http = MagicMock()
         resp = MagicMock(spec=Response)
         resp.status_code = 200
         resp.json.return_value = {"name": "my-dest", "type": "HTTP"}
         mock_http.get.return_value = resp
-        
+
         client = DestinationClient(mock_http, use_default_proxy=False)
-        
+
         # Call without proxy_enabled parameter (should use client's default: False)
         result = client.get_instance_destination("my-dest")
-        
+
         assert isinstance(result, Destination)
         # HTTP should be called since proxy is disabled by default
         mock_http.get.assert_called_once()
@@ -686,10 +686,10 @@ class TestDestinationClientWithTransparentProxy:
         """Test that proxy_enabled defaults to client's use_default_proxy for get_subaccount_destination."""
         proxy = TransparentProxy(proxy_name="test-proxy", namespace="test-ns")
         mock_load_proxy.return_value = proxy
-        
+
         mock_http = MagicMock()
         client = DestinationClient(mock_http, use_default_proxy=False)
-        
+
         dest = Destination(name="my-dest", type="HTTP")
         with patch.object(client, "_get_destination", return_value=dest) as mock_get:
             # Call without proxy_enabled parameter (should use client's default: False)
@@ -697,7 +697,7 @@ class TestDestinationClientWithTransparentProxy:
                 "my-dest",
                 access_strategy=AccessStrategy.PROVIDER_ONLY
             )
-            
+
             assert isinstance(result, Destination)
             # _get_destination should be called since proxy is disabled by default
             mock_get.assert_called_once()
@@ -707,17 +707,17 @@ class TestDestinationClientWithTransparentProxy:
         """Test get_destination (v2 API) with proxy_enabled=True returns TransparentProxyDestination."""
         proxy = TransparentProxy(proxy_name="test-proxy", namespace="test-ns")
         mock_load_proxy.return_value = proxy
-        
+
         mock_http = MagicMock()
         client = DestinationClient(mock_http, use_default_proxy=True)
-        
+
         result = client.get_destination("my-api", proxy_enabled=True)
-        
+
         assert isinstance(result, TransparentProxyDestination)
         assert result.name == "my-api"
         assert result.url == "http://test-proxy.test-ns"
         assert result.headers == {"X-destination-name": "my-api"}
-        
+
         # Verify HTTP was NOT called (bypassed by proxy)
         mock_http.get.assert_not_called()
 
@@ -726,7 +726,7 @@ class TestDestinationClientWithTransparentProxy:
         """Test get_destination (v2 API) with proxy_enabled=False uses normal HTTP flow."""
         proxy = TransparentProxy(proxy_name="test-proxy", namespace="test-ns")
         mock_load_proxy.return_value = proxy
-        
+
         mock_http = MagicMock()
         resp = MagicMock(spec=Response)
         resp.status_code = 200
@@ -740,14 +740,14 @@ class TestDestinationClientWithTransparentProxy:
             "certificates": []
         }
         mock_http.get.return_value = resp
-        
+
         client = DestinationClient(mock_http, use_default_proxy=True)
         result = client.get_destination("my-api", proxy_enabled=False)
-        
+
         assert isinstance(result, Destination)
         assert result.name == "my-api"
         assert result.url == "https://api.example.com"
-        
+
         # Verify HTTP was called (normal flow)
         mock_http.get.assert_called_once()
 
@@ -756,7 +756,7 @@ class TestDestinationClientWithTransparentProxy:
         """Test get_destination with ConsumptionOptions and proxy disabled."""
         proxy = TransparentProxy(proxy_name="test-proxy", namespace="test-ns")
         mock_load_proxy.return_value = proxy
-        
+
         mock_http = MagicMock()
         resp = MagicMock(spec=Response)
         resp.status_code = 200
@@ -770,13 +770,13 @@ class TestDestinationClientWithTransparentProxy:
             "certificates": []
         }
         mock_http.get.return_value = resp
-        
+
         client = DestinationClient(mock_http, use_default_proxy=False)
         options = ConsumptionOptions(fragment_name="prod", tenant="tenant-1")
         result = client.get_destination("my-api", options=options, proxy_enabled=False)
-        
+
         assert isinstance(result, Destination)
-        
+
         # Verify options were passed correctly
         args, kwargs = mock_http.get.call_args
         assert kwargs["headers"]["X-fragment-name"] == "prod"
@@ -787,13 +787,13 @@ class TestDestinationClientWithTransparentProxy:
         """Test that proxy_enabled defaults to client's use_default_proxy for get_destination."""
         proxy = TransparentProxy(proxy_name="test-proxy", namespace="test-ns")
         mock_load_proxy.return_value = proxy
-        
+
         mock_http = MagicMock()
         client = DestinationClient(mock_http, use_default_proxy=True)
-        
+
         # Call without proxy_enabled parameter (should use client's default: True)
         result = client.get_destination("my-api")
-        
+
         assert isinstance(result, TransparentProxyDestination)
         # HTTP should NOT be called since proxy is enabled by default
         mock_http.get.assert_not_called()
@@ -803,7 +803,7 @@ class TestDestinationClientWithTransparentProxy:
         """Test that get_destination uses normal flow when proxy is disabled by default."""
         proxy = TransparentProxy(proxy_name="test-proxy", namespace="test-ns")
         mock_load_proxy.return_value = proxy
-        
+
         mock_http = MagicMock()
         resp = MagicMock(spec=Response)
         resp.status_code = 200
@@ -817,12 +817,12 @@ class TestDestinationClientWithTransparentProxy:
             "certificates": []
         }
         mock_http.get.return_value = resp
-        
+
         client = DestinationClient(mock_http, use_default_proxy=False)
-        
+
         # Call without proxy_enabled parameter (should use client's default: False)
         result = client.get_destination("my-api")
-        
+
         assert isinstance(result, Destination)
         # HTTP should be called since proxy is disabled by default
         mock_http.get.assert_called_once()
@@ -959,7 +959,7 @@ class TestDestinationClientListOperations:
 
         client = DestinationClient(mock_http)
         result = client.list_instance_destinations()
-        
+
         assert isinstance(result, PagedResult)
         assert len(result.items) == 2
         assert all(isinstance(d, Destination) for d in result.items)
@@ -983,7 +983,7 @@ class TestDestinationClientListOperations:
 
         client = DestinationClient(mock_http)
         result = client.list_instance_destinations()
-        
+
         assert isinstance(result, PagedResult)
         assert len(result.items) == 0
         assert result.pagination is None
@@ -999,10 +999,10 @@ class TestDestinationClientListOperations:
         client = DestinationClient(mock_http)
         filter_obj = ListOptions(filter_names=["dest1", "dest2"])
         result = client.list_instance_destinations(filter=filter_obj)
-        
+
         assert isinstance(result, PagedResult)
         assert len(result.items) == 1
-        
+
         # Verify params were passed
         args, kwargs = mock_http.get.call_args
         assert "params" in kwargs
@@ -1153,39 +1153,39 @@ class TestDestinationClientAccessStrategy:
     def test_apply_access_strategy_subscriber_only(self):
         client = DestinationClient(MagicMock())
         mock_fetch = MagicMock(return_value="result")
-        
+
         result = client._apply_access_strategy(
             access_strategy=AccessStrategy.SUBSCRIBER_ONLY,
             tenant="tenant-1",
             fetch_func=mock_fetch
         )
-        
+
         assert result == "result"
         mock_fetch.assert_called_once_with("tenant-1")
 
     def test_apply_access_strategy_provider_only(self):
         client = DestinationClient(MagicMock())
         mock_fetch = MagicMock(return_value="result")
-        
+
         result = client._apply_access_strategy(
             access_strategy=AccessStrategy.PROVIDER_ONLY,
             tenant=None,
             fetch_func=mock_fetch
         )
-        
+
         assert result == "result"
         mock_fetch.assert_called_once_with(None)
 
     def test_apply_access_strategy_subscriber_first_no_fallback(self):
         client = DestinationClient(MagicMock())
         mock_fetch = MagicMock(return_value="result")
-        
+
         result = client._apply_access_strategy(
             access_strategy=AccessStrategy.SUBSCRIBER_FIRST,
             tenant="tenant-1",
             fetch_func=mock_fetch
         )
-        
+
         assert result == "result"
         # Called once, found result in subscriber
         mock_fetch.assert_called_once_with("tenant-1")
@@ -1193,13 +1193,13 @@ class TestDestinationClientAccessStrategy:
     def test_apply_access_strategy_subscriber_first_with_fallback(self):
         client = DestinationClient(MagicMock())
         mock_fetch = MagicMock(side_effect=[None, "provider-result"])
-        
+
         result = client._apply_access_strategy(
             access_strategy=AccessStrategy.SUBSCRIBER_FIRST,
             tenant="tenant-1",
             fetch_func=mock_fetch
         )
-        
+
         assert result == "provider-result"
         # Called twice: subscriber returned None, then provider
         assert mock_fetch.call_count == 2
@@ -1209,13 +1209,13 @@ class TestDestinationClientAccessStrategy:
     def test_apply_access_strategy_provider_first_no_fallback(self):
         client = DestinationClient(MagicMock())
         mock_fetch = MagicMock(return_value="result")
-        
+
         result = client._apply_access_strategy(
             access_strategy=AccessStrategy.PROVIDER_FIRST,
             tenant="tenant-1",
             fetch_func=mock_fetch
         )
-        
+
         assert result == "result"
         # Called once, found result in provider
         mock_fetch.assert_called_once_with(None)
@@ -1223,13 +1223,13 @@ class TestDestinationClientAccessStrategy:
     def test_apply_access_strategy_provider_first_with_fallback(self):
         client = DestinationClient(MagicMock())
         mock_fetch = MagicMock(side_effect=[None, "subscriber-result"])
-        
+
         result = client._apply_access_strategy(
             access_strategy=AccessStrategy.PROVIDER_FIRST,
             tenant="tenant-1",
             fetch_func=mock_fetch
         )
-        
+
         assert result == "subscriber-result"
         # Called twice: provider returned None, then subscriber
         assert mock_fetch.call_count == 2
@@ -1239,7 +1239,7 @@ class TestDestinationClientAccessStrategy:
     def test_apply_access_strategy_requires_tenant_for_subscriber_strategies(self):
         client = DestinationClient(MagicMock())
         mock_fetch = MagicMock()
-        
+
         for strat in [AccessStrategy.SUBSCRIBER_ONLY, AccessStrategy.SUBSCRIBER_FIRST, AccessStrategy.PROVIDER_FIRST]:
             with pytest.raises(DestinationOperationError, match="tenant subdomain must be provided"):
                 client._apply_access_strategy(
@@ -1254,13 +1254,13 @@ class TestDestinationClientAccessStrategy:
         empty_result = PagedResult(items=[])
         filled_result = PagedResult(items=[Destination(name="d1", type="HTTP")])
         mock_fetch = MagicMock(side_effect=[empty_result, filled_result])
-        
+
         result = client._apply_access_strategy(
             access_strategy=AccessStrategy.SUBSCRIBER_FIRST,
             tenant="tenant-1",
             fetch_func=mock_fetch
         )
-        
+
         assert result == filled_result
         # Empty PagedResult triggered fallback
         assert mock_fetch.call_count == 2
@@ -1272,11 +1272,11 @@ class TestDestinationClientEdgeCases:
     def test_get_subaccount_destination_unknown_access_strategy(self):
         """Test that unknown access strategy raises appropriate error."""
         from unittest.mock import Mock as MockStrategy
-        
+
         client = DestinationClient(MagicMock())
         unknown_strategy = MockStrategy()
         unknown_strategy.value = "UNKNOWN_STRATEGY"
-        
+
         with pytest.raises(DestinationOperationError) as exc_info:
             client.get_subaccount_destination(
                 "test-dest",
@@ -1298,7 +1298,7 @@ class TestDestinationClientEdgeCases:
         client = DestinationClient(mock_http)
         with pytest.raises(DestinationOperationError) as exc_info:
             client.list_instance_destinations()
-        
+
         assert "expected list in response" in str(exc_info.value)
 
     def test_list_subaccount_destinations_both_empty_subscriber_first(self):
@@ -1342,7 +1342,7 @@ class TestDestinationClientEdgeCases:
         client = DestinationClient(mock_http)
         with pytest.raises(DestinationOperationError) as exc_info:
             client.get_instance_destination("test-dest")
-        
+
         assert "invalid JSON in get destination response" in str(exc_info.value)
 
     def test_list_destinations_invalid_destination_in_array(self):
@@ -1369,13 +1369,13 @@ class TestDestinationClientEdgeCases:
     def test_apply_access_strategy_unknown_strategy(self):
         """Test _apply_access_strategy with unknown strategy."""
         from unittest.mock import Mock as MockStrategy
-        
+
         client = DestinationClient(MagicMock())
         unknown_strategy = MockStrategy()
         unknown_strategy.value = "UNKNOWN"
-        
+
         mock_fetch = MagicMock(return_value="result")
-        
+
         with pytest.raises(DestinationOperationError) as exc_info:
             client._apply_access_strategy(
                 access_strategy=unknown_strategy,  # ty: ignore[invalid-argument-type]
@@ -1422,7 +1422,7 @@ class TestDestinationClientEdgeCases:
         client = DestinationClient(mock_http)
         with pytest.raises(DestinationOperationError) as exc_info:
             client.list_instance_destinations()
-        
+
         assert "failed to list instance destinations" in str(exc_info.value)
 
     def test_get_destination_with_http_401_error(self):
@@ -1434,7 +1434,7 @@ class TestDestinationClientEdgeCases:
         client = DestinationClient(mock_http)
         with pytest.raises(DestinationOperationError) as exc_info:
             client.get_instance_destination("test-dest")
-        
+
         assert "failed to get destination 'test-dest'" in str(exc_info.value)
 
     def test_list_destinations_json_parsing_error(self):
@@ -1449,24 +1449,24 @@ class TestDestinationClientEdgeCases:
         client = DestinationClient(mock_http)
         with pytest.raises(DestinationOperationError) as exc_info:
             client.list_instance_destinations()
-        
+
         assert "invalid JSON in list destinations response" in str(exc_info.value)
 
     def test_apply_access_strategy_with_paged_result_empty_value(self):
         """Test _apply_access_strategy properly handles empty PagedResult objects."""
         client = DestinationClient(MagicMock())
-        
+
         empty_paged = PagedResult(items=[])
         filled_paged = PagedResult(items=[Destination(name="d1", type="HTTP")])
-        
+
         mock_fetch = MagicMock(side_effect=[empty_paged, filled_paged])
-        
+
         result = client._apply_access_strategy(
             access_strategy=AccessStrategy.SUBSCRIBER_FIRST,
             tenant="test-tenant",
             fetch_func=mock_fetch
         )
-        
+
         assert result is not None
         assert result == filled_paged
         assert len(result.items) == 1
@@ -1476,11 +1476,11 @@ class TestDestinationClientEdgeCases:
         """Test create destination with connection error."""
         mock_http = MagicMock()
         mock_http.post.side_effect = ConnectionError("Network unreachable")
-        
+
         client = DestinationClient(mock_http)
         with pytest.raises(DestinationOperationError) as exc_info:
             client.create_destination(Destination(name="test-dest", type="HTTP"))
-        
+
         assert "failed to create destination 'test-dest'" in str(exc_info.value)
         assert "Network unreachable" in str(exc_info.value)
 
@@ -1488,22 +1488,22 @@ class TestDestinationClientEdgeCases:
         """Test update destination with timeout error."""
         mock_http = MagicMock()
         mock_http.put.side_effect = TimeoutError("Request timeout")
-        
+
         client = DestinationClient(mock_http)
         with pytest.raises(DestinationOperationError) as exc_info:
             client.update_destination(Destination(name="test-dest", type="HTTP"))
-        
+
         assert "failed to update destination 'test-dest'" in str(exc_info.value)
 
     def test_delete_destination_with_runtime_error(self):
         """Test delete destination with runtime error."""
         mock_http = MagicMock()
         mock_http.delete.side_effect = RuntimeError("Unexpected runtime error")
-        
+
         client = DestinationClient(mock_http)
         with pytest.raises(DestinationOperationError) as exc_info:
             client.delete_destination("test-dest")
-        
+
         assert "failed to delete destination 'test-dest'" in str(exc_info.value)
 
     def test_get_destination_with_non_404_http_error_propagates(self):
@@ -1516,7 +1516,7 @@ class TestDestinationClientEdgeCases:
         # _get_destination propagates non-404 HttpErrors directly
         with pytest.raises(HttpError) as exc_info:
             client._get_destination(name="test-dest", tenant_subdomain=None, level=Level.SUB_ACCOUNT)
-        
+
         # The error should not return None (which is reserved for 404)
         # It should raise HttpError directly
         assert exc_info.value.status_code == 502
@@ -1537,7 +1537,7 @@ class TestDestinationClientEdgeCases:
 
         client = DestinationClient(mock_http)
         result = client.list_instance_destinations()
-        
+
         # Should return only the valid destination, skipping the malformed one
         assert isinstance(result, PagedResult)
         assert len(result.items) == 1
@@ -1567,12 +1567,12 @@ class TestDestinationClientEdgeCases:
         """Test _apply_access_strategy when fetch_func raises an exception."""
         client = DestinationClient(MagicMock())
         mock_fetch = MagicMock(side_effect=ValueError("Fetch failed"))
-        
+
         with pytest.raises(ValueError) as exc_info:
             client._apply_access_strategy(
                 access_strategy=AccessStrategy.SUBSCRIBER_ONLY,
                 tenant="test-tenant",
                 fetch_func=mock_fetch
             )
-        
+
         assert "Fetch failed" in str(exc_info.value)

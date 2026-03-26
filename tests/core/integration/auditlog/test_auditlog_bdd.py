@@ -89,7 +89,7 @@ def set_tenant_provider(context):
 def setup_multiple_users(context):
     context.multiple_users = [
         "concurrent-user-1",
-        "concurrent-user-2", 
+        "concurrent-user-2",
         "concurrent-user-3",
         "concurrent-user-4",
         "concurrent-user-5",
@@ -152,7 +152,7 @@ def create_security_event(context, message: str):
         context.last_error = e
 
 
-@when('I create a security event with message ""')  
+@when('I create a security event with message ""')
 def create_security_event_empty(context):
     try:
         context.current_event = SecurityEvent(
@@ -203,10 +203,10 @@ def log_security_event(context):
     try:
         if context.attributes and hasattr(context.current_event, 'attributes'):
             context.current_event.attributes = context.attributes
-        
+
         if context.ip_address and hasattr(context.current_event, 'ip'):
             context.current_event.ip = context.ip_address
-            
+
         context.client.log(context.current_event)
         context.last_error = None
     except Exception as e:
@@ -237,11 +237,11 @@ def create_data_access_event(context):
 @when(parsers.parse('I add data object "{object_type}" with properties:'))
 def add_data_object_with_table(context, object_type: str, datatable):
     context.data_object = {"type": object_type}
-    
+
     for row in datatable:
         if len(row) >= 2:
             context.data_object[row[0]] = row[1]
-    
+
     if hasattr(context.current_event, 'object_type'):
         context.current_event.object_type = object_type
         context.current_event.object_id = {k: v for k, v in context.data_object.items() if k != "type"}
@@ -250,11 +250,11 @@ def add_data_object_with_table(context, object_type: str, datatable):
 @when(parsers.parse('I add data subject "{subject_type}" with properties:'))
 def add_data_subject_with_table(context, subject_type: str, datatable):
     context.data_subject = {"type": subject_type}
-    
+
     for row in datatable:
         if len(row) >= 2:
             context.data_subject[row[0]] = row[1]
-    
+
     if hasattr(context.current_event, 'subject_type'):
         context.current_event.subject_type = subject_type
         context.current_event.subject_id = {k: v for k, v in context.data_subject.items() if k != "type"}
@@ -265,7 +265,7 @@ def log_data_access_event(context):
     try:
         if context.attributes and hasattr(context.current_event, 'attributes'):
             context.current_event.attributes = context.attributes
-            
+
         context.client.log(context.current_event)
         context.last_error = None
     except Exception as e:
@@ -305,8 +305,8 @@ def log_data_modification_event(context):
     try:
         if context.attributes and hasattr(context.current_event, 'attributes'):
             context.current_event.attributes = context.attributes
-            
-        context.client.log(context.current_event)  
+
+        context.client.log(context.current_event)
         context.last_error = None
     except Exception as e:
         context.last_error = e
@@ -339,7 +339,7 @@ def log_configuration_change_event(context):
     try:
         if context.attributes and hasattr(context.current_event, 'attributes'):
             context.current_event.attributes = context.attributes
-            
+
         context.client.log(context.current_event)
         context.last_error = None
     except Exception as e:
@@ -373,7 +373,7 @@ def log_data_deletion_event(context):
     try:
         if context.attributes and hasattr(context.current_event, 'attributes'):
             context.current_event.attributes = context.attributes
-            
+
         context.client.log(context.current_event)
         context.last_error = None
     except Exception as e:
@@ -408,7 +408,7 @@ def log_configuration_deletion_event(context):
     try:
         if context.attributes and hasattr(context.current_event, 'attributes'):
             context.current_event.attributes = context.attributes
-            
+
         context.client.log(context.current_event)
         context.last_error = None
     except Exception as e:
@@ -440,7 +440,7 @@ def add_complex_custom_details(context):
         "simple_string": "test_value",
         "numeric_value": 42
     }
-    
+
     if hasattr(context.current_event, 'custom_details'):
         context.current_event.custom_details = context.custom_details
 
@@ -464,7 +464,7 @@ def attempt_log_security_event_with_message(context, message: str):
         create_security_event(context, message)
         if context.current_event and not context.last_error:
             attempt_log_security_event(context)
-    
+
     result = {
         "event_type": "security",
         "message": message,
@@ -502,7 +502,7 @@ def attempt_log_data_access_for_object(context, object_name: str):
             context.current_event.subject_id = {"username": context.user}
             context.current_event.attributes = [DataAccessAttribute("data", successful=True)]
             attempt_log_data_access_event(context)
-    
+
     result = {
         "event_type": "data_access",
         "object_name": object_name,
@@ -540,7 +540,7 @@ def attempt_log_data_modification_for_object(context, object_name: str):
             context.current_event.subject_id = {"username": context.user}
             context.current_event.attributes = [ChangeAttribute("status", "new", "old")]
             log_data_modification_event(context)
-    
+
     result = {
         "event_type": "data_modification",
         "object_name": object_name,
@@ -576,7 +576,7 @@ def attempt_log_config_change_with_id(context, config_id: str):
             context.current_event.attributes = [ChangeAttribute("setting", "new", "old")]
             context.current_event.id = config_id
             log_configuration_change_event(context)
-    
+
     result = {
         "event_type": "configuration_change",
         "config_id": config_id,
@@ -592,7 +592,7 @@ def attempt_log_config_change_with_id(context, config_id: str):
 def log_events_simultaneously(context):
     context.concurrent_errors = []
     context.concurrent_results = []
-    
+
     def log_event(user_index):
         try:
             user = context.multiple_users[user_index] if user_index < len(context.multiple_users) else f"user-{user_index}"
@@ -601,21 +601,21 @@ def log_events_simultaneously(context):
                 user=user,
                 tenant=context.tenant
             )
-            
+
             # Use failure simulator if available (like individual attempts do)
             if hasattr(context, 'failure_simulation'):
                 intermittent_client = context.failure_simulation.get_intermittent_client()
                 intermittent_client.log(event)
             else:
                 context.client.log(event)
-                
+
             return {"success": True, "user": user}
         except Exception as e:
             return {"success": False, "user": user, "error": e}
-    
+
     with ThreadPoolExecutor(max_workers=3) as executor:
         futures = [executor.submit(log_event, i) for i in range(6)]
-        
+
         for future in as_completed(futures):
             result = future.result()
             context.concurrent_results.append(result)
@@ -632,11 +632,11 @@ def attempt_log_events_simultaneously(context):
 def attempt_log_mixed_events_simultaneously(context):
     context.concurrent_errors = []
     context.concurrent_results = []
-    
+
     def log_mixed_event(user_index):
         try:
             user = context.multiple_users[user_index] if user_index < len(context.multiple_users) else f"user-{user_index}"
-            
+
             if user_index % 3 == 2:
                 event = SecurityEvent(
                     data="",
@@ -649,15 +649,15 @@ def attempt_log_mixed_events_simultaneously(context):
                     user=user,
                     tenant=context.tenant
                 )
-            
+
             context.client.log(event)
             return {"success": True, "user": user, "valid": user_index % 3 != 2}
         except Exception as e:
             return {"success": False, "user": user, "error": e, "valid": user_index % 3 != 2}
-    
+
     with ThreadPoolExecutor(max_workers=3) as executor:
         futures = [executor.submit(log_mixed_event, i) for i in range(6)]
-        
+
         for future in as_completed(futures):
             result = future.result()
             context.concurrent_results.append(result)
@@ -705,10 +705,10 @@ def no_concurrent_errors(context):
 @then("the logging should fail with a network error")
 def logging_fails_network_error(context):
     assert context.last_error is not None, "Expected network error but logging succeeded"
-    
+
     if isinstance(context.last_error, (ClientCreationError, AttributeError)):
         return
-    
+
     error_msg = str(context.last_error).lower()
     network_terms = ["network", "connection", "unreachable", "timeout", "refused", "500", "503", "502", "504", "internal server error"]
     assert any(term in error_msg for term in network_terms), \
@@ -725,7 +725,7 @@ def logging_fails_transport_error(context):
 @then("the operation should fail with the following errors:")
 def operation_fails_with_errors(context):
     assert context.last_error is not None, "Expected validation errors but operation succeeded"
-    
+
     assert isinstance(context.last_error, ValueError), \
         f"Expected ValueError but got: {type(context.last_error).__name__}: {context.last_error}"
 
@@ -737,18 +737,18 @@ def some_events_succeed_some_fail(context):
     if len(context.concurrent_results) == 0 and len(context.individual_attempts) > 0:
         successful_count = sum(1 for r in context.individual_attempts if r.get("success", False))
         failed_count = len(context.individual_attempts) - successful_count
-        
+
         assert len(context.individual_attempts) > 0, "No individual attempts found"
         assert successful_count > 0, f"Expected some events to succeed, but all {len(context.individual_attempts)} failed"
         assert failed_count > 0, f"Expected some events to fail, but all {successful_count} succeeded"
         return
-    
+
     if len(context.concurrent_results) == 0 and len(context.individual_attempts) == 0:
         pytest.fail("Expected mixed success and failures, but no failures were simulated. Check intermittent connectivity setup.")  # ty: ignore[invalid-argument-type]
-    
+
     successful_count = sum(1 for r in context.concurrent_results if r.get("success", False))
     failed_count = len(context.concurrent_results) - successful_count
-    
+
     assert successful_count > 0, f"Expected some events to succeed, but all {len(context.concurrent_results)} failed"
     assert failed_count > 0, f"Expected some events to fail, but all {successful_count} succeeded"
 
@@ -758,15 +758,15 @@ def failed_events_have_error_messages(context):
     if len(context.concurrent_results) == 0 and len(context.individual_attempts) > 0:
         failed_events = [r for r in context.individual_attempts if not r.get("success", False)]
         assert len(failed_events) > 0, "No failed individual attempts found to verify"
-        
+
         for result in failed_events:
             assert "error" in result, f"Failed event should have an error: {result}"
             assert result["error"] is not None, f"Failed event should have a non-None error: {result}"
         return
-    
+
     failed_events = [r for r in context.concurrent_results if not r.get("success", False)]
     assert len(failed_events) > 0, "No failed events found to verify"
-    
+
     for result in failed_events:
         assert "error" in result, f"Failed event for {result.get('user', 'unknown')} should have an error"
         assert result["error"] is not None, f"Failed event for {result.get('user', 'unknown')} should have a non-None error"
@@ -775,14 +775,14 @@ def failed_events_have_error_messages(context):
 @then("some concurrent events should fail with network errors")
 def some_concurrent_network_errors(context):
     assert len(context.concurrent_errors) > 0, "Expected some network errors but all events succeeded"
-    
+
     network_errors = []
     network_terms = ["network", "connection", "unreachable", "timeout", "refused", "500", "503", "502", "504", "internal server error"]
     for error in context.concurrent_errors:
         error_msg = str(error).lower()
         if any(term in error_msg for term in network_terms):
             network_errors.append(error)
-    
+
     assert len(network_errors) > 0, f"Expected network errors but got: {context.concurrent_errors}"
 
 
@@ -802,11 +802,11 @@ def no_data_corruption(context):
 @then("the valid events should be logged successfully")
 def valid_events_logged_successfully(context):
     valid_successful_events = [
-        r for r in context.concurrent_results 
+        r for r in context.concurrent_results
         if r.get("success", False) and r.get("valid", True)
     ]
     valid_total_events = [r for r in context.concurrent_results if r.get("valid", True)]
-    
+
     assert len(valid_successful_events) == len(valid_total_events), \
         f"Expected all {len(valid_total_events)} valid events to succeed, but only {len(valid_successful_events)} did"
 
@@ -814,14 +814,14 @@ def valid_events_logged_successfully(context):
 @then("the invalid events should fail with validation errors")
 def invalid_events_fail_validation(context):
     invalid_failed_events = [
-        r for r in context.concurrent_results 
+        r for r in context.concurrent_results
         if not r.get("success", False) and not r.get("valid", True)
     ]
     invalid_total_events = [r for r in context.concurrent_results if not r.get("valid", True)]
-    
+
     assert len(invalid_failed_events) == len(invalid_total_events), \
         f"Expected all {len(invalid_total_events)} invalid events to fail, but only {len(invalid_failed_events)} did"
-    
+
     for result in invalid_failed_events:
         error = result.get("error")
         assert error is not None, f"Invalid event should have an error: {result}"
@@ -836,7 +836,7 @@ def no_validation_inconsistencies(context):
         assert "success" in result, f"Result missing success field: {result}"
         assert "user" in result, f"Result missing user field: {result}"
         assert isinstance(result["success"], bool), f"Success field should be boolean: {result}"
-        
+
         # If the event failed, it should have an error
         if not result["success"]:
             assert "error" in result, f"Failed result should have error field: {result}"

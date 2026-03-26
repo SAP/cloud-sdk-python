@@ -1,0 +1,62 @@
+name: Tests & Coverage
+
+# This workflow runs unit tests and coverage reports
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+env:
+  PYTHON_VERSION: "3.11"
+  COVERAGE_THRESHOLD: "80"
+
+jobs:
+  test:
+    name: Unit Tests with Coverage
+    runs-on: ${{ contains(github.server_url, 'github.com') && 'ubuntu-latest' || fromJSON('["self-hosted"]') }}
+    steps:
+      - name: "Checkout Repository"
+        uses: actions/checkout@v4
+
+      - name: "Install uv"
+        uses: astral-sh/setup-uv@v3
+        with:
+          version: "latest"
+          enable-cache: true
+
+      - name: "Set up Python"
+        uses: actions/setup-python@v6
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: "Run Unit Tests with Coverage"
+        run: uv run pytest -m "not integration" --cov=src/sap_cloud_sdk --cov-report=xml --cov-report=html --cov-report=term-missing
+
+      - name: "Upload Coverage Report"
+        uses: actions/upload-artifact@v4
+        if: contains(github.server_url, 'github.com')
+        with:
+          name: coverage-report
+          path: |
+            coverage.xml
+            htmlcov/
+          retention-days: 30
+
+      - name: "Coverage Report Summary"
+        run: |
+          echo "## 📊 Coverage Report" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          uv run coverage report --format=markdown --skip-empty >> $GITHUB_STEP_SUMMARY
+
+      - name: "Verify Coverage Threshold"
+        run: |
+          if ! uv run coverage report --fail-under=${{ env.COVERAGE_THRESHOLD }}; then
+            echo "❌ Coverage is below ${{ env.COVERAGE_THRESHOLD }}%"
+            exit 1
+          fi
+          echo "✅ Coverage meets ${{ env.COVERAGE_THRESHOLD }}% threshold"

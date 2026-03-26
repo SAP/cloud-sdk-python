@@ -21,12 +21,12 @@ class TestCreateClient:
             service_url="https://service.example.com"
         )
         mock_load_config.return_value = mock_config
-        
+
         mock_transport = MagicMock()
         mock_http_transport.return_value = mock_transport
-        
+
         client = create_client()
-        
+
         assert isinstance(client, AuditLogClient)
         mock_load_config.assert_called_once()
         mock_http_transport.assert_called_once_with(mock_config)
@@ -40,12 +40,12 @@ class TestCreateClient:
             oauth_url="https://custom-oauth.example.com",
             service_url="https://custom-service.example.com"
         )
-        
+
         mock_transport = MagicMock()
         mock_http_transport.return_value = mock_transport
-        
+
         client = create_client(config=custom_config)
-        
+
         assert isinstance(client, AuditLogClient)
         mock_http_transport.assert_called_once_with(custom_config)
         assert client._transport == mock_transport
@@ -53,7 +53,7 @@ class TestCreateClient:
     @patch('sap_cloud_sdk.core.auditlog._load_config_from_env')
     def test_create_client_config_loading_exception(self, mock_load_config):
         mock_load_config.side_effect = Exception("Config loading failed")
-        
+
         with pytest.raises(ClientCreationError, match="Failed to create audit log client"):
             create_client()
 
@@ -67,9 +67,9 @@ class TestCreateClient:
             service_url="https://service.example.com"
         )
         mock_load_config.return_value = mock_config
-        
+
         mock_http_transport.side_effect = Exception("HTTP transport failed")
-        
+
         with pytest.raises(ClientCreationError, match="Failed to create audit log client"):
             create_client()
 
@@ -81,9 +81,9 @@ class TestCreateClient:
             oauth_url="https://custom-oauth.example.com",
             service_url="https://custom-service.example.com"
         )
-        
+
         mock_http_transport.side_effect = Exception("Custom transport failed")
-        
+
         with pytest.raises(ClientCreationError, match="Failed to create audit log client"):
             create_client(config=custom_config)
 
@@ -98,12 +98,12 @@ class TestCreateClient:
             service_url="https://service.example.com"
         )
         mock_load_config.return_value = mock_config
-        
+
         mock_transport = MagicMock()
         mock_http_transport.return_value = mock_transport
-        
+
         mock_client_class.side_effect = Exception("Client creation failed")
-        
+
         with pytest.raises(ClientCreationError, match="Failed to create audit log client"):
             create_client()
 
@@ -114,7 +114,7 @@ class TestCreateClient:
             oauth_url="https://oauth.example.com",
             service_url="https://service.example.com"
         )
-        
+
         with patch('sap_cloud_sdk.core.auditlog.HttpTransport'):
             with pytest.raises(TypeError):
                 create_client(config)  # ty: ignore[too-many-positional-arguments]

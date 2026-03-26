@@ -80,9 +80,9 @@ def create_resource_attributes_from_env() -> dict:
         - cloud.region (from APPFND_CONHOS_REGION, defaults to "unknown")
         - sap.cld.subaccount_id (from APPFND_CONHOS_SUBACCOUNTID, defaults to "unknown")
         - sap.cld.system_role (from APPFND_CONHOS_SYSTEM_ROLE, defaults to "ZAFT")
-        - sap.telemetry.sdk.name (constant: "SAP Cloud SDK for Python")
-        - sap.telemetry.sdk.language (constant: "python")
-        - sap.telemetry.sdk.version (from package version)
+        - sap.cloud_sdk.name (constant: "SAP Cloud SDK for Python")
+        - sap.cloud_sdk.language (constant: "python")
+        - sap.cloud_sdk.version (from package version)
     """
 
     attributes = {

@@ -99,7 +99,7 @@ class TestFragmentClientRead:
         # Execute & Verify
         with pytest.raises(DestinationOperationError) as exc_info:
             fragment_client.get_instance_fragment("test-fragment")
-        
+
         assert "failed to get fragment 'test-fragment'" in str(exc_info.value)
 
     def test_get_fragment_invalid_json(self, fragment_client, mock_http):
@@ -112,7 +112,7 @@ class TestFragmentClientRead:
         # Execute & Verify
         with pytest.raises(DestinationOperationError) as exc_info:
             fragment_client.get_instance_fragment("test-fragment")
-        
+
         assert "invalid JSON in get fragment response" in str(exc_info.value)
 
     def test_get_subaccount_fragment_access_strategies(self, fragment_client, mock_http):
@@ -163,21 +163,21 @@ class TestFragmentClientRead:
             "FragmentName": "test-fragment",
             "ProxyType": "Internet"
         }
-        
+
         # Test SUBSCRIBER_FIRST fallback (subscriber fails, provider succeeds)
         mock_http.get.side_effect = [
             HttpError("Not Found", status_code=404),  # Subscriber call fails
             mock_response  # Provider call succeeds
         ]
-        
+
         fragment = fragment_client.get_subaccount_fragment(
-            "test-fragment", 
-            access_strategy=AccessStrategy.SUBSCRIBER_FIRST, 
+            "test-fragment",
+            access_strategy=AccessStrategy.SUBSCRIBER_FIRST,
             tenant="test-tenant"
         )
         assert fragment is not None
         assert mock_http.get.call_count == 2
-        
+
         # Verify calls were made in correct order
         calls = mock_http.get.call_args_list
         assert calls[0] == (("v1/subaccountDestinationFragments/test-fragment",), {"tenant_subdomain": "test-tenant"})
@@ -344,7 +344,7 @@ class TestFragmentClientListOperations:
         # Execute & Verify
         with pytest.raises(DestinationOperationError) as exc_info:
             fragment_client.list_instance_fragments()
-        
+
         assert "failed to list instance fragments" in str(exc_info.value)
 
     def test_list_instance_fragments_invalid_json(self, fragment_client, mock_http):
@@ -357,7 +357,7 @@ class TestFragmentClientListOperations:
         # Execute & Verify
         with pytest.raises(DestinationOperationError) as exc_info:
             fragment_client.list_instance_fragments()
-        
+
         assert "expected list in response" in str(exc_info.value)
 
     def test_list_subaccount_fragments_provider_only(self, fragment_client, mock_http):
@@ -418,12 +418,12 @@ class TestFragmentClientListOperations:
         # Setup mock: subscriber returns empty, provider returns data
         mock_response_empty = Mock(spec=Response)
         mock_response_empty.json.return_value = []
-        
+
         mock_response_data = Mock(spec=Response)
         mock_response_data.json.return_value = [
             {"FragmentName": "frag1", "URL": "https://api1.example.com"}
         ]
-        
+
         mock_http.get.side_effect = [mock_response_empty, mock_response_data]
 
         # Execute
@@ -436,7 +436,7 @@ class TestFragmentClientListOperations:
         assert len(fragments) == 1
         assert fragments[0].name == "frag1"
         assert mock_http.get.call_count == 2
-        
+
         # Verify calls were made in correct order
         calls = mock_http.get.call_args_list
         assert calls[0] == (("v1/subaccountDestinationFragments",), {"tenant_subdomain": "test-tenant"})
@@ -447,12 +447,12 @@ class TestFragmentClientListOperations:
         # Setup mock: provider returns empty, subscriber returns data
         mock_response_empty = Mock(spec=Response)
         mock_response_empty.json.return_value = []
-        
+
         mock_response_data = Mock(spec=Response)
         mock_response_data.json.return_value = [
             {"FragmentName": "frag1", "URL": "https://api1.example.com"}
         ]
-        
+
         mock_http.get.side_effect = [mock_response_empty, mock_response_data]
 
         # Execute
@@ -464,7 +464,7 @@ class TestFragmentClientListOperations:
         # Verify
         assert len(fragments) == 1
         assert mock_http.get.call_count == 2
-        
+
         # Verify calls were made in correct order
         calls = mock_http.get.call_args_list
         assert calls[0] == (("v1/subaccountDestinationFragments",), {"tenant_subdomain": None})
@@ -478,7 +478,7 @@ class TestFragmentClientListOperations:
         # Execute & Verify
         with pytest.raises(DestinationOperationError) as exc_info:
             fragment_client.list_subaccount_fragments(access_strategy=AccessStrategy.PROVIDER_ONLY)
-        
+
         assert "failed to list subaccount fragments" in str(exc_info.value)
 
 
@@ -508,10 +508,10 @@ class TestFragmentClientAccessStrategy:
         # Setup mock: subscriber returns 404 (None), provider returns fragment
         http_error = HttpError("Not Found")
         http_error.status_code = 404
-        
+
         mock_response = Mock(spec=Response)
         mock_response.json.return_value = {"FragmentName": "test-frag", "URL": "https://api.example.com"}
-        
+
         mock_http.get.side_effect = [http_error, mock_response]
 
         # Execute
@@ -537,7 +537,7 @@ class TestFragmentClientEdgeCases:
 
         with pytest.raises(DestinationOperationError) as exc_info:
             fragment_client.create_fragment(fragment)
-        
+
         assert "failed to create fragment 'test-fragment'" in str(exc_info.value)
         assert "Unexpected error" in str(exc_info.value)
 
@@ -548,7 +548,7 @@ class TestFragmentClientEdgeCases:
 
         with pytest.raises(DestinationOperationError) as exc_info:
             fragment_client.update_fragment(fragment)
-        
+
         assert "failed to update fragment 'test-fragment'" in str(exc_info.value)
 
     def test_delete_fragment_unexpected_exception(self, fragment_client, mock_http):
@@ -557,19 +557,19 @@ class TestFragmentClientEdgeCases:
 
         with pytest.raises(DestinationOperationError) as exc_info:
             fragment_client.delete_fragment("test-fragment")
-        
+
         assert "failed to delete fragment 'test-fragment'" in str(exc_info.value)
 
     def test_apply_access_strategy_unknown_strategy(self, fragment_client, mock_http):
         """Test _apply_access_strategy with unknown strategy."""
         from unittest.mock import Mock as MockStrategy
-        
+
         unknown_strategy = MockStrategy()
         unknown_strategy.value = "UNKNOWN"
-        
+
         def fetch_func(tenant):
             return None
-        
+
         with pytest.raises(DestinationOperationError) as exc_info:
             fragment_client._apply_access_strategy(
                 access_strategy=unknown_strategy,
@@ -577,7 +577,7 @@ class TestFragmentClientEdgeCases:
                 fetch_func=fetch_func,
                 empty_value=None
             )
-        
+
         assert "unknown access strategy" in str(exc_info.value).lower()
 
     def test_list_fragments_non_list_response_raises_specific_error(self, fragment_client, mock_http):
@@ -588,7 +588,7 @@ class TestFragmentClientEdgeCases:
 
         with pytest.raises(DestinationOperationError) as exc_info:
             fragment_client.list_instance_fragments()
-        
+
         assert "expected list in response" in str(exc_info.value)
 
     def test_list_fragments_json_parsing_error(self, fragment_client, mock_http):
@@ -599,7 +599,7 @@ class TestFragmentClientEdgeCases:
 
         with pytest.raises(DestinationOperationError) as exc_info:
             fragment_client.list_instance_fragments()
-        
+
         assert "invalid JSON in list fragments response" in str(exc_info.value)
 
     def test_get_fragment_malformed_fragment_data(self, fragment_client, mock_http):
@@ -611,7 +611,7 @@ class TestFragmentClientEdgeCases:
 
         with pytest.raises(DestinationOperationError) as exc_info:
             fragment_client.get_instance_fragment("test-fragment")
-        
+
         assert "invalid JSON in get fragment response" in str(exc_info.value)
 
     def test_list_subaccount_fragments_both_empty_subscriber_first(self, fragment_client, mock_http):
@@ -680,7 +680,7 @@ class TestFragmentClientEdgeCases:
 
         with pytest.raises(DestinationOperationError) as exc_info:
             fragment_client.list_instance_fragments()
-        
+
         assert "failed to list instance fragments" in str(exc_info.value)
 
     def test_get_fragment_with_http_401_error(self, fragment_client, mock_http):
@@ -691,7 +691,7 @@ class TestFragmentClientEdgeCases:
 
         with pytest.raises(DestinationOperationError) as exc_info:
             fragment_client.get_instance_fragment("test-fragment")
-        
+
         assert "failed to get fragment 'test-fragment'" in str(exc_info.value)
 
     def test_list_fragments_invalid_fragment_in_array(self, fragment_client, mock_http):
@@ -706,7 +706,7 @@ class TestFragmentClientEdgeCases:
 
         with pytest.raises(DestinationOperationError) as exc_info:
             fragment_client.list_instance_fragments()
-        
+
         # The error bubbles up from Fragment.from_dict but gets caught and wrapped
         assert "fragment is missing required field" in str(exc_info.value) or "invalid JSON in list fragments response" in str(exc_info.value)
 
@@ -742,10 +742,10 @@ class TestFragmentClientEdgeCases:
         """Test that None empty_value works correctly in access strategy."""
         http_error = HttpError("Not Found")
         http_error.status_code = 404
-        
+
         mock_response = Mock(spec=Response)
         mock_response.json.return_value = {"FragmentName": "test-frag", "URL": "https://api.example.com"}
-        
+
         # First call returns None (404), second returns fragment
         mock_http.get.side_effect = [http_error, mock_response]
 

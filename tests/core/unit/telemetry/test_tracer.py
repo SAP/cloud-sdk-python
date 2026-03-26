@@ -24,13 +24,13 @@ class TestContextOverlay:
         """Test basic context overlay usage."""
         mock_tracer = MagicMock()
         mock_span = MagicMock()
-        
+
         @contextmanager
         def mock_start_as_current_span(name, kind=None, attributes=None):
             yield mock_span
-        
+
         mock_tracer.start_as_current_span = mock_start_as_current_span
-        
+
         with patch('opentelemetry.trace.get_tracer', return_value=mock_tracer):
             with context_overlay(GenAIOperation.CHAT) as span:
                 assert span is mock_span
@@ -40,40 +40,42 @@ class TestContextOverlay:
         mock_tracer = MagicMock()
         mock_span = MagicMock()
         captured_attributes = {}
-        
+
         @contextmanager
         def mock_start_as_current_span(name, kind=None, attributes=None):
             captured_attributes.update(attributes or {})
             yield mock_span
-        
+
         mock_tracer.start_as_current_span = mock_start_as_current_span
-        
+
         custom_attrs = {"user.id": "123", "session.id": "abc"}
-        
+
         with patch('opentelemetry.trace.get_tracer', return_value=mock_tracer):
             with context_overlay(GenAIOperation.CHAT, attributes=custom_attrs):
                 pass
-        
-        assert captured_attributes == custom_attrs
+
+        assert captured_attributes["user.id"] == "123"
+        assert captured_attributes["session.id"] == "abc"
+        assert captured_attributes["gen_ai.operation.name"] == "chat"
 
     def test_context_overlay_with_different_span_kinds(self):
         """Test context overlay with different span kinds."""
         mock_tracer = MagicMock()
         mock_span = MagicMock()
         captured_kind = None
-        
+
         @contextmanager
         def mock_start_as_current_span(name, kind=None, attributes=None):
             nonlocal captured_kind
             captured_kind = kind
             yield mock_span
-        
+
         mock_tracer.start_as_current_span = mock_start_as_current_span
-        
+
         with patch('opentelemetry.trace.get_tracer', return_value=mock_tracer):
             with context_overlay(GenAIOperation.EMBEDDINGS, kind=SpanKind.CLIENT):
                 pass
-        
+
         assert captured_kind == SpanKind.CLIENT
 
     def test_context_overlay_converts_enum_to_string(self):
@@ -81,45 +83,45 @@ class TestContextOverlay:
         mock_tracer = MagicMock()
         mock_span = MagicMock()
         captured_name = None
-        
+
         @contextmanager
         def mock_start_as_current_span(name, kind=None, attributes=None):
             nonlocal captured_name
             captured_name = name
             yield mock_span
-        
+
         mock_tracer.start_as_current_span = mock_start_as_current_span
-        
+
         with patch('opentelemetry.trace.get_tracer', return_value=mock_tracer):
             with context_overlay(GenAIOperation.RETRIEVAL):
                 pass
-        
+
         assert captured_name == "retrieval"
 
     def test_context_overlay_handles_exception(self):
         """Test that context overlay handles exceptions and records them."""
         mock_tracer = MagicMock()
         mock_span = MagicMock()
-        
+
         @contextmanager
         def mock_start_as_current_span(name, kind=None, attributes=None):
             yield mock_span
-        
+
         mock_tracer.start_as_current_span = mock_start_as_current_span
-        
+
         test_exception = ValueError("Test error")
-        
+
         with patch('opentelemetry.trace.get_tracer', return_value=mock_tracer):
             with pytest.raises(ValueError, match="Test error"):
                 with context_overlay(GenAIOperation.CHAT):
                     raise test_exception
-        
+
         # Verify span status was set to error
         mock_span.set_status.assert_called_once()
         status_call = mock_span.set_status.call_args[0][0]
         assert status_call.status_code == StatusCode.ERROR
         assert "Test error" in str(status_call.description)
-        
+
         # Verify exception was recorded
         mock_span.record_exception.assert_called_once_with(test_exception)
 
@@ -127,13 +129,13 @@ class TestContextOverlay:
         """Test that context overlay propagates exceptions."""
         mock_tracer = MagicMock()
         mock_span = MagicMock()
-        
+
         @contextmanager
         def mock_start_as_current_span(name, kind=None, attributes=None):
             yield mock_span
-        
+
         mock_tracer.start_as_current_span = mock_start_as_current_span
-        
+
         with patch('opentelemetry.trace.get_tracer', return_value=mock_tracer):
             with pytest.raises(RuntimeError, match="Test"):
                 with context_overlay(GenAIOperation.CHAT):
@@ -143,13 +145,13 @@ class TestContextOverlay:
         """Test context overlay with various GenAI operations."""
         mock_tracer = MagicMock()
         mock_span = MagicMock()
-        
+
         @contextmanager
         def mock_start_as_current_span(name, kind=None, attributes=None):
             yield mock_span
-        
+
         mock_tracer.start_as_current_span = mock_start_as_current_span
-        
+
         operations = [
             GenAIOperation.CHAT,
             GenAIOperation.EMBEDDINGS,
@@ -157,7 +159,7 @@ class TestContextOverlay:
             GenAIOperation.CREATE_AGENT,
             GenAIOperation.INVOKE_AGENT,
         ]
-        
+
         with patch('opentelemetry.trace.get_tracer', return_value=mock_tracer):
             for operation in operations:
                 with context_overlay(operation):
@@ -168,38 +170,38 @@ class TestContextOverlay:
         mock_tracer = MagicMock()
         mock_span = MagicMock()
         captured_kind = None
-        
+
         @contextmanager
         def mock_start_as_current_span(name, kind=None, attributes=None):
             nonlocal captured_kind
             captured_kind = kind
             yield mock_span
-        
+
         mock_tracer.start_as_current_span = mock_start_as_current_span
-        
+
         with patch('opentelemetry.trace.get_tracer', return_value=mock_tracer):
             with context_overlay(GenAIOperation.CHAT):
                 pass
-        
+
         assert captured_kind == SpanKind.INTERNAL
 
     def test_context_overlay_yields_span(self):
         """Test that context overlay yields the span for advanced usage."""
         mock_tracer = MagicMock()
         mock_span = MagicMock()
-        
+
         @contextmanager
         def mock_start_as_current_span(name, kind=None, attributes=None):
             yield mock_span
-        
+
         mock_tracer.start_as_current_span = mock_start_as_current_span
-        
+
         with patch('opentelemetry.trace.get_tracer', return_value=mock_tracer):
             with context_overlay(GenAIOperation.CHAT) as span:
                 assert span is mock_span
                 # Span methods should be available
                 span.add_event("test_event")
-        
+
         mock_span.add_event.assert_called_once_with("test_event")
 
 
@@ -209,7 +211,7 @@ class TestGetCurrentSpan:
     def test_get_current_span_returns_span(self):
         """Test that get_current_span returns the current span."""
         mock_span = MagicMock()
-        
+
         with patch('opentelemetry.trace.get_current_span', return_value=mock_span):
             span = get_current_span()
             assert span is mock_span
@@ -218,7 +220,7 @@ class TestGetCurrentSpan:
         """Test get_current_span when no span is active."""
         mock_non_recording_span = MagicMock()
         mock_non_recording_span.is_recording.return_value = False
-        
+
         with patch('opentelemetry.trace.get_current_span', return_value=mock_non_recording_span):
             span = get_current_span()
             assert span is mock_non_recording_span
@@ -227,7 +229,7 @@ class TestGetCurrentSpan:
         """Test that get_current_span can return a recording span."""
         mock_span = MagicMock()
         mock_span.is_recording.return_value = True
-        
+
         with patch('opentelemetry.trace.get_current_span', return_value=mock_span):
             span = get_current_span()
             assert span.is_recording()
@@ -240,7 +242,7 @@ class TestAddSpanAttribute:
         """Test adding attribute to a recording span."""
         mock_span = MagicMock()
         mock_span.is_recording.return_value = True
-        
+
         with patch('opentelemetry.trace.get_current_span', return_value=mock_span):
             add_span_attribute("test.key", "test_value")
             mock_span.set_attribute.assert_called_once_with("test.key", "test_value")
@@ -249,7 +251,7 @@ class TestAddSpanAttribute:
         """Test adding attribute to a non-recording span does nothing."""
         mock_span = MagicMock()
         mock_span.is_recording.return_value = False
-        
+
         with patch('opentelemetry.trace.get_current_span', return_value=mock_span):
             add_span_attribute("test.key", "test_value")
             mock_span.set_attribute.assert_not_called()
@@ -258,7 +260,7 @@ class TestAddSpanAttribute:
         """Test adding attributes of different types."""
         mock_span = MagicMock()
         mock_span.is_recording.return_value = True
-        
+
         test_cases = [
             ("str.key", "string_value"),
             ("int.key", 42),
@@ -266,11 +268,11 @@ class TestAddSpanAttribute:
             ("bool.key", True),
             ("list.key", ["a", "b", "c"]),
         ]
-        
+
         with patch('opentelemetry.trace.get_current_span', return_value=mock_span):
             for key, value in test_cases:
                 add_span_attribute(key, value)
-        
+
         # Verify all attributes were set
         assert mock_span.set_attribute.call_count == len(test_cases)
         for (key, value), call_obj in zip(test_cases, mock_span.set_attribute.call_args_list):
@@ -281,19 +283,19 @@ class TestAddSpanAttribute:
         """Test adding attributes with namespaced keys."""
         mock_span = MagicMock()
         mock_span.is_recording.return_value = True
-        
+
         with patch('opentelemetry.trace.get_current_span', return_value=mock_span):
             add_span_attribute("app.user.id", "123")
             add_span_attribute("app.request.path", "/api/v1")
             add_span_attribute("custom.feature.enabled", True)
-        
+
         assert mock_span.set_attribute.call_count == 3
 
     def test_add_span_attribute_safe_when_no_active_span(self):
         """Test that add_span_attribute is safe when no span is active."""
         mock_span = MagicMock()
         mock_span.is_recording.return_value = False
-        
+
         with patch('opentelemetry.trace.get_current_span', return_value=mock_span):
             # Should not raise exception
             add_span_attribute("test.key", "value")
@@ -870,3 +872,112 @@ class TestInvokeAgentSpan:
                 span.add_event("agent_step")
 
         mock_span.add_event.assert_called_once_with("agent_step")
+
+
+class TestPropagate:
+    """Test suite for propagate=True attribute propagation across nested spans."""
+
+    def _make_tracer(self, mock_span, capture_list):
+        """Helper: return a mock tracer that records (name, attributes) into capture_list."""
+        mock_tracer = MagicMock()
+
+        @contextmanager
+        def mock_start_as_current_span(name, kind=None, attributes=None):
+            capture_list.append({"name": name, "attributes": dict(attributes or {})})
+            yield mock_span
+
+        mock_tracer.start_as_current_span = mock_start_as_current_span
+        return mock_tracer
+
+    def test_context_overlay_propagate_passes_attributes_to_child_span(self):
+        """Parent context_overlay(propagate=True) attrs appear on nested context_overlay."""
+        mock_span = MagicMock()
+        captures = []
+        mock_tracer = self._make_tracer(mock_span, captures)
+
+        with patch('opentelemetry.trace.get_tracer', return_value=mock_tracer):
+            with context_overlay(GenAIOperation.CHAT, attributes={"x": 1}, propagate=True):
+                with context_overlay(GenAIOperation.EMBEDDINGS):
+                    pass
+
+        child_attrs = captures[1]["attributes"]
+        assert child_attrs.get("x") == 1
+
+    def test_chat_span_propagate_passes_attributes_to_child_span(self):
+        """chat_span(propagate=True) attrs appear on a nested context_overlay."""
+        mock_span = MagicMock()
+        captures = []
+        mock_tracer = self._make_tracer(mock_span, captures)
+
+        with patch('opentelemetry.trace.get_tracer', return_value=mock_tracer):
+            with chat_span("gpt-4", "openai", attributes={"agent.name": "bot"}, propagate=True):
+                with context_overlay(GenAIOperation.CHAT):
+                    pass
+
+        child_attrs = captures[1]["attributes"]
+        assert child_attrs.get("agent.name") == "bot"
+
+    def test_propagate_does_not_override_child_base_attrs(self):
+        """Propagated gen_ai.operation.name from parent does not override child's own value."""
+        mock_span = MagicMock()
+        captures = []
+        mock_tracer = self._make_tracer(mock_span, captures)
+
+        with patch('opentelemetry.trace.get_tracer', return_value=mock_tracer):
+            with context_overlay(GenAIOperation.CHAT, propagate=True):
+                # parent sets gen_ai.operation.name="chat"; child should keep its own
+                with chat_span("gpt-4", "openai"):
+                    pass
+
+        child_attrs = captures[1]["attributes"]
+        assert child_attrs["gen_ai.operation.name"] == "chat"
+        assert child_attrs["gen_ai.request.model"] == "gpt-4"
+
+    def test_propagate_false_does_not_pollute_sibling_spans(self):
+        """After a propagate=True span exits, its attrs don't appear on a sibling span."""
+        mock_span = MagicMock()
+        captures = []
+        mock_tracer = self._make_tracer(mock_span, captures)
+
+        with patch('opentelemetry.trace.get_tracer', return_value=mock_tracer):
+            with context_overlay(GenAIOperation.CHAT, attributes={"secret": "yes"}, propagate=True):
+                pass
+            # sibling — propagation should be reset after the first span exits
+            with context_overlay(GenAIOperation.EMBEDDINGS):
+                pass
+
+        sibling_attrs = captures[1]["attributes"]
+        assert "secret" not in sibling_attrs
+
+    def test_propagate_accumulates_across_nested_levels(self):
+        """Three levels deep, each with propagate=True; deepest gets attrs from all parents."""
+        mock_span = MagicMock()
+        captures = []
+        mock_tracer = self._make_tracer(mock_span, captures)
+
+        with patch('opentelemetry.trace.get_tracer', return_value=mock_tracer):
+            with context_overlay(GenAIOperation.CHAT, attributes={"level": "1", "from_l1": "yes"}, propagate=True):
+                with context_overlay(GenAIOperation.EMBEDDINGS, attributes={"level": "2", "from_l2": "yes"}, propagate=True):
+                    with context_overlay(GenAIOperation.RETRIEVAL):
+                        pass
+
+        deepest_attrs = captures[2]["attributes"]
+        # from_l1 comes from level 1, from_l2 comes from level 2
+        assert deepest_attrs.get("from_l1") == "yes"
+        assert deepest_attrs.get("from_l2") == "yes"
+        # level was set by both; level 2 overwrites level 1 in propagation stack
+        assert deepest_attrs.get("level") == "2"
+
+    def test_propagate_default_is_false(self):
+        """Without propagate param, child spans do not receive parent custom attrs."""
+        mock_span = MagicMock()
+        captures = []
+        mock_tracer = self._make_tracer(mock_span, captures)
+
+        with patch('opentelemetry.trace.get_tracer', return_value=mock_tracer):
+            with context_overlay(GenAIOperation.CHAT, attributes={"custom": "val"}):
+                with context_overlay(GenAIOperation.EMBEDDINGS):
+                    pass
+
+        child_attrs = captures[1]["attributes"]
+        assert "custom" not in child_attrs

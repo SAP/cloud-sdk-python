@@ -3,7 +3,7 @@
 ## Project Structure
 - `src/`: Source code following the src-layout pattern
 - `src/sap_cloud_sdk/`: Main package namespace
-- `tests/`: Test code mirroring the source structure  
+- `tests/`: Test code mirroring the source structure
 - Private implementation modules use underscore prefix (e.g., `_s3.py`, `_models.py`)
 - Keep internal packages organized with clear separation of concerns
 - Create shared utilities in `core/` for reusable patterns across modules
@@ -70,7 +70,7 @@
 - Use structured logging with consistent formatting
 - Log important state changes and error conditions
 
-## Performance Considerations  
+## Performance Considerations
 - Use generators and iterators for memory efficiency with large datasets
 - Use appropriate data structures for the use case
 
@@ -84,7 +84,7 @@
 3. Apply decorator to client methods:ß
    ```python
    from sap_cloud_sdk.core.telemetry import Module, Operation, record_metrics
-   
+
    @record_metrics(Module.MY_MODULE, Operation.MY_OPERATION)
    def my_operation(self):
        # implementation

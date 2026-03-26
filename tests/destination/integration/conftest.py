@@ -62,7 +62,7 @@ def certificate_client():
 @pytest.fixture
 def sample_pem_certificate() -> str:
     """Generate a sample PEM certificate programmatically for testing.
-    
+
     Returns:
         Base64 encoded PEM certificate content as a string (not double-encoded).
     """
@@ -102,7 +102,7 @@ def sample_pem_certificate() -> str:
 
     # Serialize certificate to PEM format (this is text, not bytes)
     pem_cert_bytes = cert.public_bytes(serialization.Encoding.PEM)
-    
+
     # The API expects the PEM certificate content as base64-encoded string
     # We need to encode the PEM text itself (which is already base64-ish but in PEM format)
     # to a single base64 string for transmission
@@ -112,7 +112,7 @@ def sample_pem_certificate() -> str:
 @pytest.fixture
 def failure_simulation():
     """Utilities for simulating various failure conditions using explicit configuration."""
-    
+
     class FailureSimulator:
         def create_client_with_network_failure(self):
             """Create a client configured with an unreachable endpoint."""
@@ -166,13 +166,13 @@ def _setup_cloud_mode():
     env_file = Path(__file__).parents[3] / ".env_integration_tests"
     if env_file.exists():
         load_dotenv(env_file)
-    
+
 
 # Configure pytest markers for integration tests
 def pytest_configure(config):
     """Configure pytest markers."""
     config.addinivalue_line(
-        "markers", 
+        "markers",
         "integration: mark test as integration test"
     )
 

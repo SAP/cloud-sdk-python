@@ -15,7 +15,7 @@ class SampleConfig:
     endpoint: str = "default"
 
 
-@dataclass 
+@dataclass
 class NonStringConfig:
     count: int = 0
 
@@ -50,10 +50,10 @@ class TestSecretResolver:
             mock_open(read_data="test_pass").return_value,
             mock_open(read_data="test_endpoint").return_value
         ]
-        
+
         config = SampleConfig()
         read_from_mount_and_fallback_to_env_var("/secrets", "VAR", "module", "instance", config)
-        
+
         assert config.username == "test_user"
         assert config.password == "test_pass"
         assert config.endpoint == "test_endpoint"
@@ -81,7 +81,7 @@ class TestSecretResolver:
 
     @patch.dict(os.environ, {
         "VAR_MODULE_INSTANCE_USER": "env_user",
-        "VAR_MODULE_INSTANCE_PASSWORD": "env_pass", 
+        "VAR_MODULE_INSTANCE_PASSWORD": "env_pass",
         "VAR_MODULE_INSTANCE_ENDPOINT": "env_endpoint"
     })
     def test_load_from_env_success(self):
@@ -89,7 +89,7 @@ class TestSecretResolver:
         with patch('os.path.isdir', return_value=False), \
              patch('os.stat', side_effect=FileNotFoundError()):
             read_from_mount_and_fallback_to_env_var("/nonexistent", "VAR", "module", "instance", config)
-        
+
         assert config.username == "env_user"
         assert config.password == "env_pass"
         assert config.endpoint == "env_endpoint"
@@ -111,10 +111,10 @@ class TestSecretResolver:
             mock_open(read_data="mount_pass").return_value,
             mock_open(read_data="mount_endpoint").return_value
         ]
-        
+
         config = SampleConfig()
         read_from_mount_and_fallback_to_env_var("/secrets", "VAR", "module", "instance", config)
-        
+
         assert config.username == "mount_user"
 
     @patch.dict(os.environ, {}, clear=True)
@@ -134,10 +134,10 @@ class TestSecretResolver:
             mock_open(read_data="pass").return_value,
             mock_open(read_data="endpoint").return_value
         ]
-        
+
         config = SampleConfig()
         read_from_mount_and_fallback_to_env_var("/secrets", "VAR", "module", "instance", config)
-        
+
         assert config.username == "user\nwith\nnewlines"
 
     @patch.dict(os.environ, {"VAR_MODULE_INSTANCE_TESTFIELD": "test_value"})
@@ -145,12 +145,12 @@ class TestSecretResolver:
         @dataclass
         class CaseConfig:
             testfield: str = ""
-        
+
         config = CaseConfig()
         with patch('os.path.isdir', return_value=False), \
              patch('os.stat', side_effect=FileNotFoundError()):
             read_from_mount_and_fallback_to_env_var("/nonexistent", "VAR", "module", "instance", config)
-        
+
         assert config.testfield == "test_value"
 
     @patch('os.path.isdir', return_value=True)
@@ -162,10 +162,10 @@ class TestSecretResolver:
             mock_open(read_data="field_pass").return_value,
             mock_open(read_data="field_endpoint").return_value
         ]
-        
+
         config = SampleConfig()
         read_from_mount_and_fallback_to_env_var("/secrets", "VAR", "module", "instance", config)
-        
+
         assert config.username == "metadata_user"
 
     @patch.dict(os.environ, {

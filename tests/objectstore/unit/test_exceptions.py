@@ -49,7 +49,7 @@ class TestExceptions:
 
     def test_exceptions_with_chained_causes(self):
         original_error = ValueError("Original cause")
-        
+
         try:
             raise ClientCreationError("Client failed") from original_error
         except ClientCreationError as e:
@@ -59,6 +59,6 @@ class TestExceptions:
     def test_exceptions_inherit_standard_behavior(self):
         error = ObjectNotFoundError()
         assert str(error) == ""
-        
+
         error_with_args = ObjectOperationError("arg1", "arg2")
         assert error_with_args.args == ("arg1", "arg2")

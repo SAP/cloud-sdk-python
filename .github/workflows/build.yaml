@@ -1,5 +1,7 @@
-name: Build
+name: Build & Package
 
+# This workflow builds and packages the SDK
+# Requires approval for fork PRs (uses same approval as tests)
 on:
   pull_request:
     branches:
@@ -11,15 +13,13 @@ on:
 env:
   PYTHON_VERSION: "3.11"
   SDK_DIST_NAME: "sap_cloud_sdk"
-  COVERAGE_THRESHOLD: "80"
 
 jobs:
   build:
     name: Build SDK
-    runs-on: ${{ vars.RUNNER && fromJSON(vars.RUNNER) || 'ubuntu-latest' }}
+    runs-on: ${{ contains(github.server_url, 'github.com') && 'ubuntu-latest' || fromJSON('["self-hosted"]') }}
     permissions:
       contents: read
-      pull-requests: write
     steps:
       - name: "Checkout Repository"
         uses: actions/checkout@v4
@@ -34,97 +34,9 @@ jobs:
           enable-cache: true
 
       - name: "Set up Python"
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v6
         with:
           python-version: ${{ env.PYTHON_VERSION }}
-
-      - name: "Run Ruff Linter"
-        run: uv run ruff check --output-format=github .
-
-      - name: "Run Ruff Formatter Check"
-        run: uv run ruff format --check --diff .
-
-      - name: "Run ty Type Check"
-        run: uv run ty check --output-format github --python-version ${{ env.PYTHON_VERSION }} .
-
-      - name: "Run Unit Tests with Coverage"
-        run: uv run pytest -m "not integration" --cov=src/sap_cloud_sdk --cov-report=xml --cov-report=html --cov-report=term-missing
-
-      - name: "Upload Coverage Report"
-        uses: actions/upload-artifact@v4
-        if: contains(github.server_url, 'github.com')
-        with:
-          name: coverage-report
-          path: |
-            coverage.xml
-            htmlcov/
-          retention-days: 30
-
-      - name: "Coverage Report Summary"
-        run: |
-          echo "## 📊 Coverage Report" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          uv run coverage report --format=markdown --skip-empty >> $GITHUB_STEP_SUMMARY
-
-      - name: "Post Coverage Comment on PR"
-        if: github.event_name == 'pull_request'
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          # Extract unique module paths from changed files
-          MODULE_PATHS=$(git diff --name-only "${{ github.event.pull_request.base.sha }}" "${{ github.event.pull_request.head.sha }}" \
-            | grep -E '^src/sap_cloud_sdk/[^/]+/.*\.py$' \
-            | grep -vE '__pycache__' \
-            | sed -E -e 's|^(src/sap_cloud_sdk/core)/.*|\1|' -e 't' -e 's|^(src/sap_cloud_sdk/[^/]+)/.*|\1|' \
-            | sort -u)
-          
-          if [ -z "$MODULE_PATHS" ]; then
-            echo "No module-level Python files changed, skipping coverage report"
-            exit 0
-          fi
-          
-          # Initialize tracking
-          FAILED_MODULES=()
-          COMMENT_BODY="## 📊 Coverage Report by Module"$'\n\n'
-          
-          # Process each module
-          while IFS= read -r module_path; do
-            echo "Checking coverage for $module_path..."
-            
-            # Generate coverage report
-            MODULE_COVERAGE=$(uv run coverage report \
-              --include="$module_path/*.py,$module_path/**/*.py" \
-              --format=markdown \
-              --skip-empty \
-              --skip-covered 2>/dev/null || echo "No coverage data for $module_path")
-            
-            # Check if coverage meets threshold
-            if uv run coverage report \
-              --include="$module_path/*.py,$module_path/**/*.py" \
-              --skip-empty \
-              --fail-under=${{ env.COVERAGE_THRESHOLD }} >/dev/null 2>&1; then
-              COMMENT_BODY+="### \`$module_path\` ✅"$'\n\n'"$MODULE_COVERAGE"$'\n\n'
-            else
-              COMMENT_BODY+="### \`$module_path\` ❌"$'\n\n'"$MODULE_COVERAGE"$'\n\n'
-              FAILED_MODULES+=("$module_path")
-            fi
-          done <<< "$MODULE_PATHS"
-          
-          # Add overall status
-          COMMENT_BODY+="---"$'\n\n'
-          if [ ${#FAILED_MODULES[@]} -eq 0 ]; then
-            COMMENT_BODY+="✅ **All changed modules meet the ${{ env.COVERAGE_THRESHOLD }}% coverage threshold!**"
-          else
-            COMMENT_BODY+="❌ **Coverage check failed!** The following modules are below ${{ env.COVERAGE_THRESHOLD }}% coverage: \`$(IFS=', '; echo "${FAILED_MODULES[*]}")\`"
-          fi
-          
-          COMMENT_BODY+=$'\n\n'"---"$'\n'"*Coverage report from commit [\`${GITHUB_SHA:0:7}\`](${{ github.event.pull_request.head.repo.html_url }}/commit/${{ github.event.pull_request.head.sha }})*"
-          
-          # Post comment on PR
-          echo "$COMMENT_BODY" | gh pr comment ${{ github.event.pull_request.number }} --body-file -
-          
-          # Exit with failure if any module failed
-          [ ${#FAILED_MODULES[@]} -eq 0 ] || exit 1
 
       - name: "Build Packages"
         run: uv build
@@ -139,17 +51,17 @@ jobs:
           # Check that both wheel and source distribution were created
           wheel_count=$(ls -1 dist/*.whl 2>/dev/null | wc -l)
           tar_count=$(ls -1 dist/*.tar.gz 2>/dev/null | wc -l)
-          
+
           if [ "$wheel_count" -eq 0 ]; then
             echo "ERROR: No wheel file found"
             exit 1
           fi
-          
+
           if [ "$tar_count" -eq 0 ]; then
             echo "ERROR: No source distribution found"
             exit 1
           fi
-          
+
           echo "✓ Build artifacts verified: $wheel_count wheel(s), $tar_count source distribution(s)"
 
       - name: "Upload Build Artifacts"

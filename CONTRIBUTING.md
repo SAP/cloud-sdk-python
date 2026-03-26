@@ -4,7 +4,7 @@
 
 All members of the project community must abide by the [SAP Open Source Code of Conduct](https://github.com/SAP/.github/blob/main/CODE_OF_CONDUCT.md).
 Only by respecting each other can we develop a productive, collaborative community.
-Instances of abusive, harassing, or otherwise unacceptable behavior may be reported by contacting [a project maintainer](mailto:).
+Instances of abusive, harassing, or otherwise unacceptable behavior may be reported by contacting [a project maintainer](.github/CODEOWNERS) or by opening an issue.
 
 ## Engaging in Our Project
 
@@ -48,11 +48,11 @@ We use GitHub issues to track bugs, feature requests, and questions. When creati
 1. **Bug Report** - For reporting issues with released features
    - Use the [Bug Report template](https://github.com/SAP/cloud-sdk-python/issues/new?template=bug-report.yml)
    - Provide version information, reproduction steps, and expected behavior
-   
+
 2. **Feature Request** - For proposing new features or enhancements
    - Use the [Feature Request template](https://github.com/SAP/cloud-sdk-python/issues/new?template=feature-request.yml)
    - Describe the problem, proposed solution, and impact
-   
+
 3. **Question** - For asking questions about the SDK
    - Use the [Question template](https://github.com/SAP/cloud-sdk-python/issues/new?template=question.yml)
    - Provide clear and concise questions
@@ -192,4 +192,4 @@ Please consult our [documentation](docs/) to understand the project structure an
 
 ## Current Maintainers
 
-- TODO: to be defined
+See [CODEOWNERS](.github/CODEOWNERS) for the current list of maintainers.

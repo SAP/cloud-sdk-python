@@ -22,7 +22,7 @@ scenarios("objectstore.feature")
 
 class ObjectStoreTestContext:
     """Test context to maintain state between BDD steps."""
-    
+
     def __init__(self):
         self.client = None
         self.last_error: Optional[Exception] = None
@@ -61,11 +61,11 @@ def service_is_available(integration_env, objectstore_client):
             import logging
             logger = logging.getLogger(__name__)
             logger.info(f"Found {len(objects)} leftover test objects from previous runs, cleaning up...")
-            
+
             # Clean up leftover objects with timeout
             from tests.objectstore.integration.conftest import cleanup_by_prefix
             cleanup_by_prefix(objectstore_client, "sdk-python-integration-tests/", timeout=15.0)
-            
+
             logger.info("Proactive cleanup completed")
     except Exception as e:
         import logging
@@ -111,13 +111,13 @@ def non_existent_file(context, filepath: str):
 def multiple_test_objects(context, test_prefix: str, request):
     context.test_prefix = test_prefix
     context.test_objects = {}
-    
+
     table_data = None
     if hasattr(request, 'node') and hasattr(request.node, 'table'):
         table_data = request.node.table
     elif hasattr(context, 'table'):
         table_data = context.table
-    
+
     if table_data:
         for row in table_data[1:]:
             if isinstance(row, dict):
@@ -142,7 +142,7 @@ def multiple_test_objects(context, test_prefix: str, request):
 def multiple_objects_simultaneous(context, test_prefix: str):
     context.test_prefix = test_prefix
     context.test_objects = {}
-    
+
     for i in range(6):
         name = f"{test_prefix}concurrent-object-{i}.txt"
         content = f"Content for concurrent object {i}".encode('utf-8')
@@ -376,7 +376,7 @@ def attempt_delete_object(context):
 def concurrent_upload_operations(context):
     context.concurrent_errors = []
     context.concurrent_results = []
-    
+
     def upload_object(name_content_pair):
         name, content = name_content_pair
         try:
@@ -384,10 +384,10 @@ def concurrent_upload_operations(context):
             return {"success": True, "name": name}
         except Exception as e:
             return {"success": False, "name": name, "error": e}
-    
+
     with ThreadPoolExecutor(max_workers=3) as executor:
         futures = [executor.submit(upload_object, item) for item in context.test_objects.items()]
-        
+
         for future in as_completed(futures):
             result = future.result()
             context.concurrent_results.append(result)
@@ -400,10 +400,10 @@ def concurrent_mixed_operations(context, failure_simulation):
     """Counter-based mixed success/failure: every 3rd upload fails (indices 2, 5)."""
     context.concurrent_errors = []
     context.concurrent_results = []
-    
+
     valid_client = context.client
     invalid_client = failure_simulation.create_client_with_permission_denied()
-    
+
     def upload_object_with_mixed_conditions(name_content_pair, index):
         name, content = name_content_pair
         try:
@@ -414,13 +414,13 @@ def concurrent_mixed_operations(context, failure_simulation):
             return {"success": True, "name": name}
         except Exception as e:
             return {"success": False, "name": name, "error": e}
-    
+
     with ThreadPoolExecutor(max_workers=3) as executor:
         futures = [
-            executor.submit(upload_object_with_mixed_conditions, item, index) 
+            executor.submit(upload_object_with_mixed_conditions, item, index)
             for index, item in enumerate(context.test_objects.items())
         ]
-        
+
         for future in as_completed(futures):
             result = future.result()
             context.concurrent_results.append(result)
@@ -593,17 +593,17 @@ def deletion_permission_error(context):
 @then(parsers.parse('the operation should fail with "{expected_error}"'))
 def operation_fails_with(context, expected_error: str):
     assert context.last_error is not None, f"Expected operation to fail with '{expected_error}' but it succeeded"
-    
+
     error_msg = str(context.last_error).lower()
     expected_lower = expected_error.lower()
-    
+
     error_patterns = {
         "invalid object name": ["invalid", "object", "name"],
         "authentication failed": ["auth", "credential", "permission", "access"],
         "invalid object path": ["invalid", "path", "object"],
         "empty object name": ["empty", "object", "name"],
     }
-    
+
     if expected_lower in error_patterns:
         patterns = error_patterns[expected_lower]
         assert any(pattern in error_msg for pattern in patterns), \
@@ -689,10 +689,10 @@ def expected_objects_created(context):
 @then("some concurrent uploads should succeed and some should fail")
 def mixed_concurrent_results(context):
     assert len(context.concurrent_results) > 0, "No concurrent results found"
-    
+
     successful_count = sum(1 for r in context.concurrent_results if r.get("success", False))
     failed_count = len(context.concurrent_results) - successful_count
-    
+
     assert successful_count > 0, f"Expected some uploads to succeed, but all {len(context.concurrent_results)} failed"
     assert failed_count > 0, f"Expected some uploads to fail, but all {successful_count} succeeded"
 
@@ -701,7 +701,7 @@ def mixed_concurrent_results(context):
 def successful_uploads_stored(context):
     successful_uploads = [r for r in context.concurrent_results if r.get("success", False)]
     assert len(successful_uploads) > 0, "No successful uploads found to verify"
-    
+
     for result in successful_uploads:
         object_name = result["name"]
         exists = context.client.object_exists(object_name)
@@ -712,7 +712,7 @@ def successful_uploads_stored(context):
 def failed_uploads_have_errors(context):
     failed_uploads = [r for r in context.concurrent_results if not r.get("success", False)]
     assert len(failed_uploads) > 0, "No failed uploads found to verify"
-    
+
     for result in failed_uploads:
         assert "error" in result, f"Failed upload for {result['name']} should have an error"
         assert result["error"] is not None, f"Failed upload for {result['name']} should have a non-None error"
@@ -750,28 +750,28 @@ def cleanup_successful_objects(context):
     """Clean up only successful test objects with timeout and eventual consistency."""
     if context.concurrent_results and context.client:
         successful_uploads = [r for r in context.concurrent_results if r.get("success", False)]
-        
+
         if successful_uploads:
             start_time = time.time()
             cleaned_count = 0
-            
+
             for result in successful_uploads:
                 try:
                     context.client.delete_object(result["name"])
                     cleaned_count += 1
-                    
+
                     # Respect timeout
                     if time.time() - start_time > 15.0:
                         import logging
                         logger = logging.getLogger(__name__)
                         logger.warning(f"Successful objects cleanup timeout reached, cleaned {cleaned_count}/{len(successful_uploads)} objects")
                         break
-                        
+
                 except Exception as e:
                     import logging
                     logger = logging.getLogger(__name__)
                     logger.warning(f"Failed to cleanup successful object {result['name']}: {e}")
-            
+
             if cleaned_count > 0:
                 # Eventual consistency delay
                 time.sleep(0.1)

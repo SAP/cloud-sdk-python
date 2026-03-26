@@ -31,9 +31,9 @@ class TestObjectStoreClient:
         mock_minio = Mock()
         mock_minio_class.return_value = mock_minio
         mock_audit_client.return_value = Mock()
-        
+
         client = ObjectStoreClient(self.creds, disable_ssl=False)
-        
+
         mock_minio_class.assert_called_once_with(
             endpoint="s3.amazonaws.com",
             access_key="test_key",
@@ -47,9 +47,9 @@ class TestObjectStoreClient:
         mock_minio = Mock()
         mock_minio_class.return_value = mock_minio
         mock_audit_client.return_value = Mock()
-        
+
         client = ObjectStoreClient(self.creds, disable_ssl=True)
-        
+
         mock_minio_class.assert_called_once_with(
             endpoint="s3.amazonaws.com",
             access_key="test_key",
@@ -61,7 +61,7 @@ class TestObjectStoreClient:
     def test_client_creation_failure(self, mock_minio_class, mock_audit_client):
         mock_minio_class.side_effect = Exception("Connection failed")
         mock_audit_client.return_value = Mock()
-        
+
         with pytest.raises(ClientCreationError, match="Failed to create MinIO client"):
             ObjectStoreClient(self.creds)
 
@@ -70,12 +70,12 @@ class TestObjectStoreClient:
         mock_minio = Mock()
         mock_minio_class.return_value = mock_minio
         mock_audit_client.return_value = Mock()
-        
+
         client = ObjectStoreClient(self.creds)
         test_data = b"Hello, World!"
-        
+
         client.put_object_from_bytes("test.txt", test_data, "text/plain")
-        
+
         mock_minio.put_object.assert_called_once()
         call_args = mock_minio.put_object.call_args
         assert call_args.kwargs['bucket_name'] == 'test-bucket'
@@ -89,13 +89,13 @@ class TestObjectStoreClient:
         mock_minio_class.return_value = Mock()
         mock_audit_client.return_value = Mock()
         client = ObjectStoreClient(self.creds)
-        
+
         with pytest.raises(ValueError, match="name must be a non-empty string"):
             client.put_object_from_bytes("", b"data", "text/plain")
-        
+
         with pytest.raises(ValueError, match="data must be bytes"):
             client.put_object_from_bytes("test.txt", "not bytes", "text/plain")  # ty: ignore[invalid-argument-type]
-        
+
         with pytest.raises(ValueError, match="content_type must be a non-empty string"):
             client.put_object_from_bytes("test.txt", b"data", "")
 
@@ -106,9 +106,9 @@ class TestObjectStoreClient:
         mock_minio.put_object.side_effect = s3_error
         mock_minio_class.return_value = mock_minio
         mock_audit_client.return_value = Mock()
-        
+
         client = ObjectStoreClient(self.creds)
-        
+
         with pytest.raises(ObjectOperationError, match="Failed to upload object"):
             client.put_object_from_bytes("test.txt", b"data", "text/plain")
 
@@ -117,12 +117,12 @@ class TestObjectStoreClient:
         mock_minio = Mock()
         mock_minio_class.return_value = mock_minio
         mock_audit_client.return_value = Mock()
-        
+
         client = ObjectStoreClient(self.creds)
         stream = io.BytesIO(b"stream data")
-        
+
         client.put_object("test.txt", stream, 11, "text/plain")
-        
+
         # Note: The implementation reads the stream and creates a new BytesIO
         mock_minio.put_object.assert_called_once()
         call_args = mock_minio.put_object.call_args
@@ -136,7 +136,7 @@ class TestObjectStoreClient:
         mock_minio_class.return_value = Mock()
         mock_audit_client.return_value = Mock()
         client = ObjectStoreClient(self.creds)
-        
+
         with pytest.raises(ValueError, match="size must be non-negative"):
             client.put_object("test.txt", io.BytesIO(b"data"), -1, "text/plain")
 
@@ -148,10 +148,10 @@ class TestObjectStoreClient:
         mock_minio = Mock()
         mock_minio_class.return_value = mock_minio
         mock_audit_client.return_value = Mock()
-        
+
         client = ObjectStoreClient(self.creds)
         client.put_object_from_file("test.txt", "/path/to/file.txt", "text/plain")
-        
+
         mock_isfile.assert_called_once_with("/path/to/file.txt")
         mock_getsize.assert_called_once_with("/path/to/file.txt")
         mock_minio.put_object.assert_called_once()
@@ -163,7 +163,7 @@ class TestObjectStoreClient:
         mock_minio_class.return_value = Mock()
         mock_audit_client.return_value = Mock()
         client = ObjectStoreClient(self.creds)
-        
+
         with pytest.raises(ObjectOperationError, match="File not found"):
             client.put_object_from_file("test.txt", "/nonexistent.txt", "text/plain")
 
@@ -174,10 +174,10 @@ class TestObjectStoreClient:
         mock_minio.get_object.return_value = mock_response
         mock_minio_class.return_value = mock_minio
         mock_audit_client.return_value = Mock()
-        
+
         client = ObjectStoreClient(self.creds)
         result = client.get_object("test.txt")
-        
+
         mock_minio.get_object.assert_called_once_with(
             bucket_name='test-bucket',
             object_name='test.txt'
@@ -191,9 +191,9 @@ class TestObjectStoreClient:
         mock_minio.get_object.side_effect = s3_error
         mock_minio_class.return_value = mock_minio
         mock_audit_client.return_value = Mock()
-        
+
         client = ObjectStoreClient(self.creds)
-        
+
         with pytest.raises(ObjectNotFoundError, match="Object 'test.txt' not found"):
             client.get_object("test.txt")
 
@@ -202,10 +202,10 @@ class TestObjectStoreClient:
         mock_minio = Mock()
         mock_minio_class.return_value = mock_minio
         mock_audit_client.return_value = Mock()
-        
+
         client = ObjectStoreClient(self.creds)
         client.delete_object("test.txt")
-        
+
         mock_minio.remove_object.assert_called_once_with(
             bucket_name='test-bucket',
             object_name='test.txt'
@@ -218,14 +218,14 @@ class TestObjectStoreClient:
         mock_minio.remove_object.side_effect = s3_error
         mock_minio_class.return_value = mock_minio
         mock_audit_client.return_value = Mock()
-        
+
         client = ObjectStoreClient(self.creds)
         client.delete_object("test.txt")
 
     @patch('sap_cloud_sdk.objectstore._s3.Minio')
     def test_list_objects_success(self, mock_minio_class, mock_audit_client):
         mock_minio = Mock()
-        
+
         mock_obj1 = Mock()
         mock_obj1.object_name = "prefix/file1.txt"
         mock_obj1.last_modified = datetime(2023, 1, 1, 12, 0, 0)
@@ -233,19 +233,19 @@ class TestObjectStoreClient:
         mock_obj1.size = 100
         mock_obj1.storage_class = "STANDARD"
         mock_obj1.owner_name = "owner1"
-        
+
         mock_minio.list_objects.return_value = [mock_obj1]
         mock_minio_class.return_value = mock_minio
         mock_audit_client.return_value = Mock()
-        
+
         client = ObjectStoreClient(self.creds)
         result = client.list_objects("prefix/")
-        
+
         mock_minio.list_objects.assert_called_once_with(
             bucket_name='test-bucket',
             prefix='prefix/'
         )
-        
+
         assert len(result) == 1
         assert result[0].key == "prefix/file1.txt"
         assert result[0].etag == '"abc123"'
@@ -257,33 +257,33 @@ class TestObjectStoreClient:
         mock_minio.list_objects.side_effect = s3_error
         mock_minio_class.return_value = mock_minio
         mock_audit_client.return_value = Mock()
-        
+
         client = ObjectStoreClient(self.creds)
-        
+
         with pytest.raises(ListObjectsError, match="Failed to list objects"):
             client.list_objects("prefix/")
 
     @patch('sap_cloud_sdk.objectstore._s3.Minio')
     def test_head_object_success(self, mock_minio_class, mock_audit_client):
         mock_minio = Mock()
-        
+
         mock_stat = Mock()
         mock_stat.last_modified = datetime(2023, 1, 1, 12, 0, 0)
         mock_stat.etag = '"abc123"'
         mock_stat.size = 100
-        
+
         mock_minio.stat_object.return_value = mock_stat
         mock_minio_class.return_value = mock_minio
         mock_audit_client.return_value = Mock()
-        
+
         client = ObjectStoreClient(self.creds)
         result = client.head_object("test.txt")
-        
+
         mock_minio.stat_object.assert_called_once_with(
             bucket_name='test-bucket',
             object_name='test.txt'
         )
-        
+
         assert result.key == "test.txt"
         assert result.etag == "abc123"
         assert result.size == 100
@@ -295,9 +295,9 @@ class TestObjectStoreClient:
         mock_minio.stat_object.side_effect = s3_error
         mock_minio_class.return_value = mock_minio
         mock_audit_client.return_value = Mock()
-        
+
         client = ObjectStoreClient(self.creds)
-        
+
         with pytest.raises(ObjectNotFoundError, match="Object 'test.txt' not found"):
             client.head_object("test.txt")
 
@@ -307,10 +307,10 @@ class TestObjectStoreClient:
         mock_minio.stat_object.return_value = Mock()
         mock_minio_class.return_value = mock_minio
         mock_audit_client.return_value = Mock()
-        
+
         client = ObjectStoreClient(self.creds)
         result = client.object_exists("test.txt")
-        
+
         assert result is True
 
     @patch('sap_cloud_sdk.objectstore._s3.Minio')
@@ -320,10 +320,10 @@ class TestObjectStoreClient:
         mock_minio.stat_object.side_effect = s3_error
         mock_minio_class.return_value = mock_minio
         mock_audit_client.return_value = Mock()
-        
+
         client = ObjectStoreClient(self.creds)
         result = client.object_exists("test.txt")
-        
+
         assert result is False
 
     @patch('sap_cloud_sdk.objectstore._s3.Minio')
@@ -331,7 +331,7 @@ class TestObjectStoreClient:
         mock_minio_class.return_value = Mock()
         mock_audit_client.return_value = Mock()
         client = ObjectStoreClient(self.creds)
-        
+
         with pytest.raises(ValueError, match="name must be a non-empty string"):
             client.get_object("")
 
@@ -340,7 +340,7 @@ class TestObjectStoreClient:
         mock_minio_class.return_value = Mock()
         mock_audit_client.return_value = Mock()
         client = ObjectStoreClient(self.creds)
-        
+
         with pytest.raises(ValueError, match="name must be a non-empty string"):
             client.delete_object("")
 
@@ -349,7 +349,7 @@ class TestObjectStoreClient:
         mock_minio_class.return_value = Mock()
         mock_audit_client.return_value = Mock()
         client = ObjectStoreClient(self.creds)
-        
+
         with pytest.raises(ValueError, match="name must be a non-empty string"):
             client.head_object("")
 
@@ -358,7 +358,7 @@ class TestObjectStoreClient:
         mock_minio_class.return_value = Mock()
         mock_audit_client.return_value = Mock()
         client = ObjectStoreClient(self.creds)
-        
+
         with pytest.raises(ValueError, match="name must be a non-empty string"):
             client.object_exists("")
 
@@ -367,6 +367,6 @@ class TestObjectStoreClient:
         mock_minio_class.return_value = Mock()
         mock_audit_client.return_value = Mock()
         client = ObjectStoreClient(self.creds)
-        
+
         with pytest.raises(ValueError, match="prefix must be a string"):
             client.list_objects(123)  # ty: ignore[invalid-argument-type]

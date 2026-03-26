@@ -6,7 +6,7 @@ The module handles configuration, message construction, formatting, and transpor
 
 ## Installation
 
-The audit log module is part of the Cloud SDK for Python and is automatically available when the SDK is installed.
+The audit log module is part of the SAP Cloud SDK for Python and is automatically available when the SDK is installed.
 
 ## Import
 
@@ -348,7 +348,7 @@ try:
 except AuditLogError as e:
     # Handle the error appropriately
     print(f"Failed to log security event: {e}")
-    
+
     # Consider whether to fail the operation or continue
     # Audit logging failures should generally not break business logic
 ```

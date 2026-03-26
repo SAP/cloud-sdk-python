@@ -1,6 +1,6 @@
 [project]
 name = "sap-cloud-sdk"
-version = "0.1.0"
+version = "0.2.0"
 description = "SAP Cloud SDK for Python"
 readme = "README.md"
 license = "Apache-2.0"
@@ -9,14 +9,14 @@ authors = [
 ]
 requires-python = ">=3.11"
 dependencies = [
-    "minio>=7.2.16",
-    "setuptools>=80.9.0",
-    "requests>=2.31.0",
-    "requests-oauthlib>=1.4.0",
-    "pydantic>=2.12.3",
-    "hatchling>=1.27.0",
-    "opentelemetry-exporter-otlp-proto-grpc>=1.20.0",
-    "traceloop-sdk"
+    "minio~=7.2.16",
+    "setuptools~=80.9.0",
+    "requests~=2.31.0",
+    "requests-oauthlib~=2.0.0",
+    "pydantic~=2.12.3",
+    "hatchling~=1.27.0",
+    "opentelemetry-exporter-otlp-proto-grpc~=1.38.0",
+    "traceloop-sdk~=0.52.0"
 ]
 
 [build-system]

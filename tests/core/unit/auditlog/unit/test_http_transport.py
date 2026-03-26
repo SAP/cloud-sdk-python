@@ -29,16 +29,16 @@ class TestHttpTransport:
         mock_session = MagicMock()
         mock_oauth_session.return_value = mock_session
         mock_session.fetch_token.return_value = {"access_token": "test_token"}
-        
+
         config = AuditLogConfig(
             client_id="test_client",
             client_secret="test_secret",
             oauth_url="https://oauth.example.com",
             service_url="https://service.example.com"
         )
-        
+
         transport = HttpTransport(config)
-        
+
         assert transport.config == config
         mock_session.fetch_token.assert_called_once_with(
             token_url="https://oauth.example.com/oauth/token",
@@ -51,16 +51,16 @@ class TestHttpTransport:
         mock_session = MagicMock()
         mock_oauth_session.return_value = mock_session
         mock_session.fetch_token.return_value = {"access_token": "test_token"}
-        
+
         config = AuditLogConfig(
             client_id="test_client",
             client_secret="test_secret",
             oauth_url="https://oauth.example.com/",
             service_url="https://service.example.com"
         )
-        
+
         transport = HttpTransport(config)
-        
+
         mock_session.fetch_token.assert_called_once_with(
             token_url="https://oauth.example.com/oauth/token",
             client_id="test_client",
@@ -72,14 +72,14 @@ class TestHttpTransport:
         mock_session = MagicMock()
         mock_oauth_session.return_value = mock_session
         mock_session.fetch_token.side_effect = Exception("Auth failed")
-        
+
         config = AuditLogConfig(
             client_id="test_client",
             client_secret="test_secret",
             oauth_url="https://oauth.example.com",
             service_url="https://service.example.com"
         )
-        
+
         with pytest.raises(AuthenticationError, match="Failed to obtain OAuth2 token"):
             HttpTransport(config)
 
@@ -88,17 +88,17 @@ class TestHttpTransport:
             mock_session = MagicMock()
             mock_oauth.return_value = mock_session
             mock_session.fetch_token.return_value = {"access_token": "test_token"}
-            
+
             config = AuditLogConfig(
                 client_id="test_client",
                 client_secret="test_secret",
                 oauth_url="https://oauth.example.com",
                 service_url="https://service.example.com"
             )
-            
+
             transport = HttpTransport(config)
             event = SecurityEvent(data="test")
-            
+
             endpoint = transport._get_endpoint(event)
             assert endpoint == "/security-events"
 
@@ -107,14 +107,14 @@ class TestHttpTransport:
             mock_session = MagicMock()
             mock_oauth.return_value = mock_session
             mock_session.fetch_token.return_value = {"access_token": "test_token"}
-            
+
             config = AuditLogConfig(
                 client_id="test_client",
                 client_secret="test_secret",
                 oauth_url="https://oauth.example.com",
                 service_url="https://service.example.com"
             )
-            
+
             transport = HttpTransport(config)
             event = DataAccessEvent(
                 object_type="database",
@@ -123,7 +123,7 @@ class TestHttpTransport:
                 subject_id={"id": "123"},
                 attributes=[DataAccessAttribute("email")]
             )
-            
+
             endpoint = transport._get_endpoint(event)
             assert endpoint == "/data-accesses"
 
@@ -132,14 +132,14 @@ class TestHttpTransport:
             mock_session = MagicMock()
             mock_oauth.return_value = mock_session
             mock_session.fetch_token.return_value = {"access_token": "test_token"}
-            
+
             config = AuditLogConfig(
                 client_id="test_client",
                 client_secret="test_secret",
                 oauth_url="https://oauth.example.com",
                 service_url="https://service.example.com"
             )
-            
+
             transport = HttpTransport(config)
             event = DataModificationEvent(
                 object_type="profile",
@@ -148,7 +148,7 @@ class TestHttpTransport:
                 subject_id={"id": "456"},
                 attributes=[]
             )
-            
+
             endpoint = transport._get_endpoint(event)
             assert endpoint == "/data-modifications"
 
@@ -157,14 +157,14 @@ class TestHttpTransport:
             mock_session = MagicMock()
             mock_oauth.return_value = mock_session
             mock_session.fetch_token.return_value = {"access_token": "test_token"}
-            
+
             config = AuditLogConfig(
                 client_id="test_client",
                 client_secret="test_secret",
                 oauth_url="https://oauth.example.com",
                 service_url="https://service.example.com"
             )
-            
+
             transport = HttpTransport(config)
             event = DataDeletionEvent(
                 object_type="profile",
@@ -173,7 +173,7 @@ class TestHttpTransport:
                 subject_id={"id": "456"},
                 attributes=[]
             )
-            
+
             endpoint = transport._get_endpoint(event)
             assert endpoint == "/data-modifications"
 
@@ -182,21 +182,21 @@ class TestHttpTransport:
             mock_session = MagicMock()
             mock_oauth.return_value = mock_session
             mock_session.fetch_token.return_value = {"access_token": "test_token"}
-            
+
             config = AuditLogConfig(
                 client_id="test_client",
                 client_secret="test_secret",
                 oauth_url="https://oauth.example.com",
                 service_url="https://service.example.com"
             )
-            
+
             transport = HttpTransport(config)
             event = ConfigurationChangeEvent(
                 object_type="config",
                 object_id={"setting": "timeout"},
                 attributes=[]
             )
-            
+
             endpoint = transport._get_endpoint(event)
             assert endpoint == "/configuration-changes"
 
@@ -205,21 +205,21 @@ class TestHttpTransport:
             mock_session = MagicMock()
             mock_oauth.return_value = mock_session
             mock_session.fetch_token.return_value = {"access_token": "test_token"}
-            
+
             config = AuditLogConfig(
                 client_id="test_client",
                 client_secret="test_secret",
                 oauth_url="https://oauth.example.com",
                 service_url="https://service.example.com"
             )
-            
+
             transport = HttpTransport(config)
             event = ConfigurationDeletionEvent(
                 object_type="config",
                 object_id={"setting": "timeout"},
                 attributes=[]
             )
-            
+
             endpoint = transport._get_endpoint(event)
             assert endpoint == "/configuration-changes"
 
@@ -228,19 +228,19 @@ class TestHttpTransport:
             mock_session = MagicMock()
             mock_oauth.return_value = mock_session
             mock_session.fetch_token.return_value = {"access_token": "test_token"}
-            
+
             config = AuditLogConfig(
                 client_id="test_client",
                 client_secret="test_secret",
                 oauth_url="https://oauth.example.com",
                 service_url="https://service.example.com"
             )
-            
+
             transport = HttpTransport(config)
-            
+
             class UnknownEvent:
                 pass
-            
+
             with pytest.raises(TransportError, match="Unknown event type"):
                 transport._get_endpoint(UnknownEvent())  # ty: ignore[invalid-argument-type]
 
@@ -249,23 +249,23 @@ class TestHttpTransport:
         mock_session = MagicMock()
         mock_oauth_session.return_value = mock_session
         mock_session.fetch_token.return_value = {"access_token": "test_token"}
-        
+
         mock_response = MagicMock()
         mock_response.status_code = 201
         mock_session.post.return_value = mock_response
-        
+
         config = AuditLogConfig(
             client_id="test_client",
             client_secret="test_secret",
             oauth_url="https://oauth.example.com",
             service_url="https://service.example.com"
         )
-        
+
         transport = HttpTransport(config)
         event = SecurityEvent(data="Test event")
-        
+
         transport.send(event)
-        
+
         mock_session.post.assert_called_once_with(
             "https://service.example.com/audit-log/oauth2/v2/security-events",
             json=event.to_dict(),
@@ -278,23 +278,23 @@ class TestHttpTransport:
         mock_session = MagicMock()
         mock_oauth_session.return_value = mock_session
         mock_session.fetch_token.return_value = {"access_token": "test_token"}
-        
+
         mock_response = MagicMock()
         mock_response.status_code = 201
         mock_session.post.return_value = mock_response
-        
+
         config = AuditLogConfig(
             client_id="test_client",
             client_secret="test_secret",
             oauth_url="https://oauth.example.com",
             service_url="https://service.example.com/"
         )
-        
+
         transport = HttpTransport(config)
         event = SecurityEvent(data="Test event")
-        
+
         transport.send(event)
-        
+
         expected_url = "https://service.example.com/audit-log/oauth2/v2/security-events"
         mock_session.post.assert_called_once_with(
             expected_url,
@@ -308,22 +308,22 @@ class TestHttpTransport:
         mock_session = MagicMock()
         mock_oauth_session.return_value = mock_session
         mock_session.fetch_token.return_value = {"access_token": "test_token"}
-        
+
         mock_response = MagicMock()
         mock_response.status_code = 400
         mock_response.text = "Bad Request"
         mock_session.post.return_value = mock_response
-        
+
         config = AuditLogConfig(
             client_id="test_client",
             client_secret="test_secret",
             oauth_url="https://oauth.example.com",
             service_url="https://service.example.com"
         )
-        
+
         transport = HttpTransport(config)
         event = SecurityEvent(data="Test event")
-        
+
         with pytest.raises(TransportError, match="POST request .* completed with status 400"):
             transport.send(event)
 
@@ -332,19 +332,19 @@ class TestHttpTransport:
         mock_session = MagicMock()
         mock_oauth_session.return_value = mock_session
         mock_session.fetch_token.return_value = {"access_token": "test_token"}
-        
+
         mock_session.post.side_effect = requests.exceptions.ConnectionError("Network error")
-        
+
         config = AuditLogConfig(
             client_id="test_client",
             client_secret="test_secret",
             oauth_url="https://oauth.example.com",
             service_url="https://service.example.com"
         )
-        
+
         transport = HttpTransport(config)
         event = SecurityEvent(data="Test event")
-        
+
         with pytest.raises(TransportError, match="Network error"):
             transport.send(event)
 
@@ -353,18 +353,18 @@ class TestHttpTransport:
         mock_session = MagicMock()
         mock_oauth_session.return_value = mock_session
         mock_session.fetch_token.return_value = {"access_token": "test_token"}
-        
+
         mock_session.post.side_effect = Exception("Unexpected error")
-        
+
         config = AuditLogConfig(
             client_id="test_client",
             client_secret="test_secret",
             oauth_url="https://oauth.example.com",
             service_url="https://service.example.com"
         )
-        
+
         transport = HttpTransport(config)
         event = SecurityEvent(data="Test event")
-        
+
         with pytest.raises(TransportError, match="Unexpected error sending audit event"):
             transport.send(event)

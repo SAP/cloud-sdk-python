@@ -10,7 +10,7 @@ from opentelemetry.exporter.otlp.proto.http.trace_exporter import (
 from opentelemetry import trace
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.processor.baggage import ALLOW_ALL_BAGGAGE_KEYS, BaggageSpanProcessor
-from opentelemetry.sdk.trace.export import ConsoleSpanExporter
+from opentelemetry.sdk.trace.export import ConsoleSpanExporter, SpanExporter
 from traceloop.sdk import Traceloop
 
 from sap_cloud_sdk.core.telemetry import Module, Operation
@@ -43,25 +43,7 @@ def auto_instrument():
         )
         return
 
-    if console_traces:
-        logger.info("Initializing auto instrumentation with console exporter")
-        base_exporter = ConsoleSpanExporter()
-    else:
-        protocol = os.getenv("OTEL_EXPORTER_OTLP_PROTOCOL", "grpc").lower()
-        exporters = {"grpc": GRPCSpanExporter, "http/protobuf": HTTPSpanExporter}
-        if protocol not in exporters:
-            raise ValueError(
-                f"Unsupported OTEL_EXPORTER_OTLP_PROTOCOL: '{protocol}'. "
-                "Supported values are 'grpc' and 'http/protobuf'."
-            )
-
-        logger.info(
-            f"Initializing auto instrumentation with endpoint: {otel_endpoint} "
-            f"(protocol: {protocol})"
-        )
-        base_exporter = exporters[protocol]()
-
-    exporter = GenAIAttributeTransformer(base_exporter)
+    exporter = GenAIAttributeTransformer(_create_exporter())
 
     resource = create_resource_attributes_from_env()
     Traceloop.init(
@@ -75,6 +57,27 @@ def auto_instrument():
     _set_baggage_processor()
 
     logger.info("Cloud auto instrumentation initialized successfully")
+
+
+def _create_exporter() -> SpanExporter:
+    if os.getenv("OTEL_TRACES_EXPORTER", "").lower() == "console":
+        logger.info("Initializing auto instrumentation with console exporter")
+        return ConsoleSpanExporter()
+
+    endpoint = os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT", "")
+    protocol = os.getenv("OTEL_EXPORTER_OTLP_PROTOCOL", "grpc").lower()
+    exporters = {"grpc": GRPCSpanExporter, "http/protobuf": HTTPSpanExporter}
+    if protocol not in exporters:
+        raise ValueError(
+            f"Unsupported OTEL_EXPORTER_OTLP_PROTOCOL: '{protocol}'. "
+            "Supported values are 'grpc' and 'http/protobuf'."
+        )
+
+    logger.info(
+        f"Initializing auto instrumentation with endpoint: {endpoint} "
+        f"(protocol: {protocol})"
+    )
+    return exporters[protocol]()
 
 
 def _set_baggage_processor():

@@ -16,7 +16,10 @@ from traceloop.sdk import Traceloop
 from sap_cloud_sdk.core.telemetry import Module, Operation
 from sap_cloud_sdk.core.telemetry.config import (
     create_resource_attributes_from_env,
-    _get_app_name, ENV_OTLP_ENDPOINT, ENV_TRACES_EXPORTER, ENV_OTLP_PROTOCOL,
+    _get_app_name,
+    ENV_OTLP_ENDPOINT,
+    ENV_TRACES_EXPORTER,
+    ENV_OTLP_PROTOCOL,
 )
 from sap_cloud_sdk.core.telemetry.genai_attribute_transformer import (
     GenAIAttributeTransformer,

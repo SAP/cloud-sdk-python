@@ -530,9 +530,9 @@ class TestSetAICoreConfig:
             mock_get_base_url.assert_called_with(instance_name)
 
             # Verify instance_name was passed to all _get_secret calls
-            for call in mock_get_secret.call_args_list:
-                assert call[1].get("instance_name") == instance_name, (
-                    f"_get_secret call for {call[0][0]} missing instance_name={instance_name}"
+            for c in mock_get_secret.call_args_list:
+                assert c.kwargs.get("instance_name") == instance_name, (
+                    f"_get_secret call for {c.args[0]} missing instance_name={instance_name}"
                 )
 
     def test_set_config_calls_get_secret_with_correct_parameters(self):
@@ -547,30 +547,19 @@ class TestSetAICoreConfig:
 
             default_instance = "aicore-instance"
             # Verify _get_secret was called with correct parameters including instance_name
-            calls = mock_get_secret.call_args_list
-            assert any(
-                call[0][0] == "AICORE_CLIENT_ID"
-                and call[0][1] == "clientid"
-                and call[1].get("instance_name") == default_instance
-                for call in calls
+            mock_get_secret.assert_any_call(
+                "AICORE_CLIENT_ID", "clientid", instance_name=default_instance
             )
-            assert any(
-                call[0][0] == "AICORE_CLIENT_SECRET"
-                and call[0][1] == "clientsecret"
-                and call[1].get("instance_name") == default_instance
-                for call in calls
+            mock_get_secret.assert_any_call(
+                "AICORE_CLIENT_SECRET", "clientsecret", instance_name=default_instance
             )
-            assert any(
-                call[0][0] == "AICORE_AUTH_URL"
-                and call[0][1] == "url"
-                and call[1].get("instance_name") == default_instance
-                for call in calls
+            mock_get_secret.assert_any_call(
+                "AICORE_AUTH_URL", "url", instance_name=default_instance
             )
-            assert any(
-                call[0][0] == "AICORE_RESOURCE_GROUP"
-                and call[1].get("default") == "default"
-                and call[1].get("instance_name") == default_instance
-                for call in calls
+            mock_get_secret.assert_any_call(
+                "AICORE_RESOURCE_GROUP",
+                default="default",
+                instance_name=default_instance,
             )
 
     def test_set_config_logs_configuration(self):

@@ -2415,7 +2415,7 @@ wheels = [
 
 [[package]]
 name = "sap-cloud-sdk"
-version = "0.2.0"
+version = "0.3.0"
 source = { editable = "." }
 dependencies = [
     { name = "hatchling" },
@@ -2447,7 +2447,7 @@ requires-dist = [
     { name = "minio", specifier = "~=7.2.16" },
     { name = "opentelemetry-exporter-otlp-proto-grpc", specifier = "~=1.38.0" },
     { name = "opentelemetry-exporter-otlp-proto-http", specifier = "~=1.38.0" },
-    { name = "opentelemetry-processor-baggage", specifier = ">=0.4" },
+    { name = "opentelemetry-processor-baggage", specifier = "~=0.61b0" },
     { name = "pydantic", specifier = "~=2.12.3" },
     { name = "requests", specifier = "~=2.31.0" },
     { name = "requests-oauthlib", specifier = "~=2.0.0" },

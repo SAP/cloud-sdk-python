@@ -16,7 +16,7 @@ from traceloop.sdk import Traceloop
 from sap_cloud_sdk.core.telemetry import Module, Operation
 from sap_cloud_sdk.core.telemetry.config import (
     create_resource_attributes_from_env,
-    _get_app_name,
+    _get_app_name, ENV_OTLP_ENDPOINT, ENV_TRACES_EXPORTER, ENV_OTLP_PROTOCOL,
 )
 from sap_cloud_sdk.core.telemetry.genai_attribute_transformer import (
     GenAIAttributeTransformer,
@@ -34,8 +34,8 @@ def auto_instrument():
     Traces are exported to the OTEL collector endpoint configured in environment with
     OTEL_EXPORTER_OTLP_ENDPOINT, or printed to console when OTEL_TRACES_EXPORTER=console.
     """
-    otel_endpoint = os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT", "")
-    console_traces = os.getenv("OTEL_TRACES_EXPORTER", "").lower() == "console"
+    otel_endpoint = os.getenv(ENV_OTLP_ENDPOINT, "")
+    console_traces = os.getenv(ENV_TRACES_EXPORTER, "").lower() == "console"
 
     if not otel_endpoint and not console_traces:
         logger.warning(
@@ -60,12 +60,12 @@ def auto_instrument():
 
 
 def _create_exporter() -> SpanExporter:
-    if os.getenv("OTEL_TRACES_EXPORTER", "").lower() == "console":
+    if os.getenv(ENV_TRACES_EXPORTER, "").lower() == "console":
         logger.info("Initializing auto instrumentation with console exporter")
         return ConsoleSpanExporter()
 
-    endpoint = os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT", "")
-    protocol = os.getenv("OTEL_EXPORTER_OTLP_PROTOCOL", "grpc").lower()
+    endpoint = os.getenv(ENV_OTLP_ENDPOINT, "")
+    protocol = os.getenv(ENV_OTLP_PROTOCOL, "grpc").lower()
     exporters = {"grpc": GRPCSpanExporter, "http/protobuf": HTTPSpanExporter}
     if protocol not in exporters:
         raise ValueError(

@@ -10,6 +10,7 @@ The Python SDK offers a clean, type-safe API following Python best practices whi
 
 ### Key Features
 
+- **Agent Decorators**
 - **AI Core Integration**
 - **Audit Log Service**
 - **Destination Service**
@@ -58,6 +59,7 @@ The SDK automatically resolves configuration from multiple sources with the foll
 
 Each module has comprehensive usage guides:
 
+- [Agent Decorators](src/sap_cloud_sdk/agent_decorators/user-guide.md)
 - [AuditLog](src/sap_cloud_sdk/core/auditlog/user-guide.md)
 - [Destination](src/sap_cloud_sdk/destination/user-guide.md)
 - [DMS](src/sap_cloud_sdk/dms/user-guide.md)

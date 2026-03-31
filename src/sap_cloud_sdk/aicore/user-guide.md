@@ -235,9 +235,9 @@ try:
         temperature=0.7,
         max_tokens=100
     )
-    
+
     print(f"Response: {response.choices[0].message.content}")
-    
+
 except Exception as e:
     print(f"AI Core request failed: {e}")
 ```

@@ -15,7 +15,6 @@ from sap_cloud_sdk.objectstore.exceptions import (
 )
 
 
-@patch('sap_cloud_sdk.objectstore._s3.create_auditlog_client')
 class TestObjectStoreClient:
 
     def setup_method(self):
@@ -27,10 +26,9 @@ class TestObjectStoreClient:
         )
 
     @patch('sap_cloud_sdk.objectstore._s3.Minio')
-    def test_client_creation_ssl_enabled(self, mock_minio_class, mock_audit_client):
+    def test_client_creation_ssl_enabled(self, mock_minio_class):
         mock_minio = Mock()
         mock_minio_class.return_value = mock_minio
-        mock_audit_client.return_value = Mock()
 
         client = ObjectStoreClient(self.creds, disable_ssl=False)
 
@@ -43,10 +41,9 @@ class TestObjectStoreClient:
         assert client._minio_client == mock_minio
 
     @patch('sap_cloud_sdk.objectstore._s3.Minio')
-    def test_client_creation_ssl_disabled(self, mock_minio_class, mock_audit_client):
+    def test_client_creation_ssl_disabled(self, mock_minio_class):
         mock_minio = Mock()
         mock_minio_class.return_value = mock_minio
-        mock_audit_client.return_value = Mock()
 
         client = ObjectStoreClient(self.creds, disable_ssl=True)
 
@@ -58,18 +55,16 @@ class TestObjectStoreClient:
         )
 
     @patch('sap_cloud_sdk.objectstore._s3.Minio')
-    def test_client_creation_failure(self, mock_minio_class, mock_audit_client):
+    def test_client_creation_failure(self, mock_minio_class):
         mock_minio_class.side_effect = Exception("Connection failed")
-        mock_audit_client.return_value = Mock()
 
         with pytest.raises(ClientCreationError, match="Failed to create MinIO client"):
             ObjectStoreClient(self.creds)
 
     @patch('sap_cloud_sdk.objectstore._s3.Minio')
-    def test_put_object_from_bytes_success(self, mock_minio_class, mock_audit_client):
+    def test_put_object_from_bytes_success(self, mock_minio_class):
         mock_minio = Mock()
         mock_minio_class.return_value = mock_minio
-        mock_audit_client.return_value = Mock()
 
         client = ObjectStoreClient(self.creds)
         test_data = b"Hello, World!"
@@ -85,9 +80,8 @@ class TestObjectStoreClient:
         assert isinstance(call_args.kwargs['data'], io.BytesIO)
 
     @patch('sap_cloud_sdk.objectstore._s3.Minio')
-    def test_put_object_from_bytes_validation(self, mock_minio_class, mock_audit_client):
+    def test_put_object_from_bytes_validation(self, mock_minio_class):
         mock_minio_class.return_value = Mock()
-        mock_audit_client.return_value = Mock()
         client = ObjectStoreClient(self.creds)
 
         with pytest.raises(ValueError, match="name must be a non-empty string"):
@@ -100,12 +94,11 @@ class TestObjectStoreClient:
             client.put_object_from_bytes("test.txt", b"data", "")
 
     @patch('sap_cloud_sdk.objectstore._s3.Minio')
-    def test_put_object_from_bytes_s3_error(self, mock_minio_class, mock_audit_client):
+    def test_put_object_from_bytes_s3_error(self, mock_minio_class):
         mock_minio = Mock()
         s3_error = S3Error("AccessDenied", "Access denied", "test.txt", "123", "456", Mock())
         mock_minio.put_object.side_effect = s3_error
         mock_minio_class.return_value = mock_minio
-        mock_audit_client.return_value = Mock()
 
         client = ObjectStoreClient(self.creds)
 
@@ -113,10 +106,9 @@ class TestObjectStoreClient:
             client.put_object_from_bytes("test.txt", b"data", "text/plain")
 
     @patch('sap_cloud_sdk.objectstore._s3.Minio')
-    def test_put_object_from_stream_success(self, mock_minio_class, mock_audit_client):
+    def test_put_object_from_stream_success(self, mock_minio_class):
         mock_minio = Mock()
         mock_minio_class.return_value = mock_minio
-        mock_audit_client.return_value = Mock()
 
         client = ObjectStoreClient(self.creds)
         stream = io.BytesIO(b"stream data")
@@ -132,9 +124,8 @@ class TestObjectStoreClient:
         assert call_args.kwargs['content_type'] == 'text/plain'
 
     @patch('sap_cloud_sdk.objectstore._s3.Minio')
-    def test_put_object_validation(self, mock_minio_class, mock_audit_client):
+    def test_put_object_validation(self, mock_minio_class):
         mock_minio_class.return_value = Mock()
-        mock_audit_client.return_value = Mock()
         client = ObjectStoreClient(self.creds)
 
         with pytest.raises(ValueError, match="size must be non-negative"):
@@ -144,10 +135,9 @@ class TestObjectStoreClient:
     @patch('builtins.open', new_callable=mock_open, read_data=b"file content")
     @patch('os.path.isfile', return_value=True)
     @patch('os.path.getsize', return_value=12)
-    def test_put_object_from_file_success(self, mock_getsize, mock_isfile, mock_file, mock_minio_class, mock_audit_client):
+    def test_put_object_from_file_success(self, mock_getsize, mock_isfile, mock_file, mock_minio_class):
         mock_minio = Mock()
         mock_minio_class.return_value = mock_minio
-        mock_audit_client.return_value = Mock()
 
         client = ObjectStoreClient(self.creds)
         client.put_object_from_file("test.txt", "/path/to/file.txt", "text/plain")
@@ -159,21 +149,19 @@ class TestObjectStoreClient:
     @patch('sap_cloud_sdk.objectstore._s3.Minio')
     @patch('builtins.open', new_callable=mock_open, read_data=b"file content")
     @patch('os.path.isfile', return_value=False)
-    def test_put_object_from_file_not_found(self, mock_isfile, mock_file, mock_minio_class, mock_audit_client):
+    def test_put_object_from_file_not_found(self, mock_isfile, mock_file, mock_minio_class):
         mock_minio_class.return_value = Mock()
-        mock_audit_client.return_value = Mock()
         client = ObjectStoreClient(self.creds)
 
         with pytest.raises(ObjectOperationError, match="File not found"):
             client.put_object_from_file("test.txt", "/nonexistent.txt", "text/plain")
 
     @patch('sap_cloud_sdk.objectstore._s3.Minio')
-    def test_get_object_success(self, mock_minio_class, mock_audit_client):
+    def test_get_object_success(self, mock_minio_class):
         mock_minio = Mock()
         mock_response = Mock(spec=HTTPResponse)
         mock_minio.get_object.return_value = mock_response
         mock_minio_class.return_value = mock_minio
-        mock_audit_client.return_value = Mock()
 
         client = ObjectStoreClient(self.creds)
         result = client.get_object("test.txt")
@@ -185,12 +173,11 @@ class TestObjectStoreClient:
         assert result == mock_response
 
     @patch('sap_cloud_sdk.objectstore._s3.Minio')
-    def test_get_object_not_found(self, mock_minio_class, mock_audit_client):
+    def test_get_object_not_found(self, mock_minio_class):
         mock_minio = Mock()
         s3_error = S3Error("NoSuchKey", "Key not found", "test.txt", "123", "456", Mock())
         mock_minio.get_object.side_effect = s3_error
         mock_minio_class.return_value = mock_minio
-        mock_audit_client.return_value = Mock()
 
         client = ObjectStoreClient(self.creds)
 
@@ -198,10 +185,9 @@ class TestObjectStoreClient:
             client.get_object("test.txt")
 
     @patch('sap_cloud_sdk.objectstore._s3.Minio')
-    def test_delete_object_success(self, mock_minio_class, mock_audit_client):
+    def test_delete_object_success(self, mock_minio_class):
         mock_minio = Mock()
         mock_minio_class.return_value = mock_minio
-        mock_audit_client.return_value = Mock()
 
         client = ObjectStoreClient(self.creds)
         client.delete_object("test.txt")
@@ -212,18 +198,17 @@ class TestObjectStoreClient:
         )
 
     @patch('sap_cloud_sdk.objectstore._s3.Minio')
-    def test_delete_object_not_found_ignored(self, mock_minio_class, mock_audit_client):
+    def test_delete_object_not_found_ignored(self, mock_minio_class):
         mock_minio = Mock()
         s3_error = S3Error("NoSuchKey", "Key not found", "test.txt", "123", "456", Mock())
         mock_minio.remove_object.side_effect = s3_error
         mock_minio_class.return_value = mock_minio
-        mock_audit_client.return_value = Mock()
 
         client = ObjectStoreClient(self.creds)
         client.delete_object("test.txt")
 
     @patch('sap_cloud_sdk.objectstore._s3.Minio')
-    def test_list_objects_success(self, mock_minio_class, mock_audit_client):
+    def test_list_objects_success(self, mock_minio_class):
         mock_minio = Mock()
 
         mock_obj1 = Mock()
@@ -236,7 +221,6 @@ class TestObjectStoreClient:
 
         mock_minio.list_objects.return_value = [mock_obj1]
         mock_minio_class.return_value = mock_minio
-        mock_audit_client.return_value = Mock()
 
         client = ObjectStoreClient(self.creds)
         result = client.list_objects("prefix/")
@@ -251,12 +235,11 @@ class TestObjectStoreClient:
         assert result[0].etag == '"abc123"'
 
     @patch('sap_cloud_sdk.objectstore._s3.Minio')
-    def test_list_objects_s3_error(self, mock_minio_class, mock_audit_client):
+    def test_list_objects_s3_error(self, mock_minio_class):
         mock_minio = Mock()
         s3_error = S3Error("AccessDenied", "Access denied", "", "123", "456", Mock())
         mock_minio.list_objects.side_effect = s3_error
         mock_minio_class.return_value = mock_minio
-        mock_audit_client.return_value = Mock()
 
         client = ObjectStoreClient(self.creds)
 
@@ -264,7 +247,7 @@ class TestObjectStoreClient:
             client.list_objects("prefix/")
 
     @patch('sap_cloud_sdk.objectstore._s3.Minio')
-    def test_head_object_success(self, mock_minio_class, mock_audit_client):
+    def test_head_object_success(self, mock_minio_class):
         mock_minio = Mock()
 
         mock_stat = Mock()
@@ -274,7 +257,6 @@ class TestObjectStoreClient:
 
         mock_minio.stat_object.return_value = mock_stat
         mock_minio_class.return_value = mock_minio
-        mock_audit_client.return_value = Mock()
 
         client = ObjectStoreClient(self.creds)
         result = client.head_object("test.txt")
@@ -289,12 +271,11 @@ class TestObjectStoreClient:
         assert result.size == 100
 
     @patch('sap_cloud_sdk.objectstore._s3.Minio')
-    def test_head_object_not_found(self, mock_minio_class, mock_audit_client):
+    def test_head_object_not_found(self, mock_minio_class):
         mock_minio = Mock()
         s3_error = S3Error("NoSuchKey", "Key not found", "test.txt", "123", "456", Mock())
         mock_minio.stat_object.side_effect = s3_error
         mock_minio_class.return_value = mock_minio
-        mock_audit_client.return_value = Mock()
 
         client = ObjectStoreClient(self.creds)
 
@@ -302,11 +283,10 @@ class TestObjectStoreClient:
             client.head_object("test.txt")
 
     @patch('sap_cloud_sdk.objectstore._s3.Minio')
-    def test_object_exists_true(self, mock_minio_class, mock_audit_client):
+    def test_object_exists_true(self, mock_minio_class):
         mock_minio = Mock()
         mock_minio.stat_object.return_value = Mock()
         mock_minio_class.return_value = mock_minio
-        mock_audit_client.return_value = Mock()
 
         client = ObjectStoreClient(self.creds)
         result = client.object_exists("test.txt")
@@ -314,12 +294,11 @@ class TestObjectStoreClient:
         assert result is True
 
     @patch('sap_cloud_sdk.objectstore._s3.Minio')
-    def test_object_exists_false(self, mock_minio_class, mock_audit_client):
+    def test_object_exists_false(self, mock_minio_class):
         mock_minio = Mock()
         s3_error = S3Error("NoSuchKey", "Key not found", "test.txt", "123", "456", Mock())
         mock_minio.stat_object.side_effect = s3_error
         mock_minio_class.return_value = mock_minio
-        mock_audit_client.return_value = Mock()
 
         client = ObjectStoreClient(self.creds)
         result = client.object_exists("test.txt")
@@ -327,45 +306,40 @@ class TestObjectStoreClient:
         assert result is False
 
     @patch('sap_cloud_sdk.objectstore._s3.Minio')
-    def test_get_object_empty_name_validation(self, mock_minio_class, mock_audit_client):
+    def test_get_object_empty_name_validation(self, mock_minio_class):
         mock_minio_class.return_value = Mock()
-        mock_audit_client.return_value = Mock()
         client = ObjectStoreClient(self.creds)
 
         with pytest.raises(ValueError, match="name must be a non-empty string"):
             client.get_object("")
 
     @patch('sap_cloud_sdk.objectstore._s3.Minio')
-    def test_delete_object_empty_name_validation(self, mock_minio_class, mock_audit_client):
+    def test_delete_object_empty_name_validation(self, mock_minio_class):
         mock_minio_class.return_value = Mock()
-        mock_audit_client.return_value = Mock()
         client = ObjectStoreClient(self.creds)
 
         with pytest.raises(ValueError, match="name must be a non-empty string"):
             client.delete_object("")
 
     @patch('sap_cloud_sdk.objectstore._s3.Minio')
-    def test_head_object_empty_name_validation(self, mock_minio_class, mock_audit_client):
+    def test_head_object_empty_name_validation(self, mock_minio_class):
         mock_minio_class.return_value = Mock()
-        mock_audit_client.return_value = Mock()
         client = ObjectStoreClient(self.creds)
 
         with pytest.raises(ValueError, match="name must be a non-empty string"):
             client.head_object("")
 
     @patch('sap_cloud_sdk.objectstore._s3.Minio')
-    def test_object_exists_empty_name_validation(self, mock_minio_class, mock_audit_client):
+    def test_object_exists_empty_name_validation(self, mock_minio_class):
         mock_minio_class.return_value = Mock()
-        mock_audit_client.return_value = Mock()
         client = ObjectStoreClient(self.creds)
 
         with pytest.raises(ValueError, match="name must be a non-empty string"):
             client.object_exists("")
 
     @patch('sap_cloud_sdk.objectstore._s3.Minio')
-    def test_list_objects_prefix_validation(self, mock_minio_class, mock_audit_client):
+    def test_list_objects_prefix_validation(self, mock_minio_class):
         mock_minio_class.return_value = Mock()
-        mock_audit_client.return_value = Mock()
         client = ObjectStoreClient(self.creds)
 
         with pytest.raises(ValueError, match="prefix must be a string"):

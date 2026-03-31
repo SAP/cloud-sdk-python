@@ -1,6 +1,6 @@
 [project]
 name = "sap-cloud-sdk"
-version = "0.3.2"
+version = "0.4.0"
 description = "SAP Cloud SDK for Python"
 readme = "README.md"
 license = "Apache-2.0"

@@ -6,15 +6,16 @@ from enum import Enum
 from typing import Any, Dict, List, Optional, TypedDict, cast
 from urllib.parse import urlparse
 
+
 def _serialize(v: Any) -> Any:
     """Recursively serialize values — converts Enums to their values, handles nested dicts/lists."""
     if isinstance(v, Enum):
         return v.value
     if isinstance(v, dict):
-        d: dict[str, Any] = cast(dict[str, Any],v)
+        d: dict[str, Any] = cast(dict[str, Any], v)
         return {str(k): _serialize(val) for k, val in d.items()}
     if isinstance(v, list):
-        lst: list[Any] = cast(list[Any],v)
+        lst: list[Any] = cast(list[Any], v)
         return [_serialize(i) for i in lst]
     return v
 
@@ -25,10 +26,10 @@ def _to_dict_drop_none(obj: Any) -> dict[str, Any]:
     return {k: _serialize(v) for k, v in raw.items() if v is not None}
 
 
-
 @dataclass
 class DMSCredentials:
     """Credentials for authenticating with the DMS service."""
+
     instance_name: str
     uri: str
     client_id: str
@@ -41,7 +42,8 @@ class DMSCredentials:
 
     def _validate(self) -> None:
         placeholders = {
-            k: v for k, v in {
+            k: v
+            for k, v in {
                 "uri": self.uri,
                 "token_url": self.token_url,
                 "client_id": self.client_id,
@@ -58,7 +60,9 @@ class DMSCredentials:
         for fname, value in {"uri": self.uri, "token_url": self.token_url}.items():
             parsed = urlparse(value)
             if not parsed.scheme or not parsed.netloc:
-                raise ValueError(f"DMSCredentials.{fname} is not a valid URL: '{value}'")
+                raise ValueError(
+                    f"DMSCredentials.{fname} is not a valid URL: '{value}'"
+                )
 
 
 class RepositoryType(str, Enum):
@@ -88,8 +92,9 @@ class UserClaim:
             - Groups: prefix with ``~`` (e.g. ``~group1``)
             - Extra users: plain username or email
     """
+
     x_ecm_user_enc: Optional[str] = None
-    x_ecm_add_principals: Optional[List[str]] = field(default_factory=lambda:[])
+    x_ecm_add_principals: Optional[List[str]] = field(default_factory=lambda: [])
 
 
 @dataclass
@@ -112,13 +117,13 @@ class InternalRepoRequest:
     isVersionEnabled: Optional[bool] = None
     isVirusScanEnabled: Optional[bool] = None
     skipVirusScanForLargeFile: Optional[bool] = None
-    hashAlgorithms: Optional[str] = None # TODO provide enum
+    hashAlgorithms: Optional[str] = None  # TODO provide enum
     isThumbnailEnabled: Optional[bool] = None
     isEncryptionEnabled: Optional[bool] = None
     externalId: Optional[str] = None
     isContentBridgeEnabled: Optional[bool] = None
     isAIEnabled: Optional[bool] = None
-    repositoryParams: List[RepositoryParam] = field(default_factory=lambda:[])
+    repositoryParams: List[RepositoryParam] = field(default_factory=lambda: [])
 
     def to_dict(self) -> dict[str, Any]:
         return _to_dict_drop_none(self)
@@ -134,7 +139,7 @@ class UpdateRepoRequest:
     isThumbnailEnabled: Optional[bool] = None
     isClientCacheEnabled: Optional[bool] = None
     isAIEnabled: Optional[bool] = None
-    repositoryParams: List[RepositoryParam] = field(default_factory=lambda:[])
+    repositoryParams: List[RepositoryParam] = field(default_factory=lambda: [])
 
     def to_dict(self) -> dict[str, Any]:
         return {"repository": _to_dict_drop_none(self)}
@@ -146,6 +151,7 @@ class RepositoryParams(TypedDict, total=False):
     All keys are optional since the API may not always return every param.
     Unknown params can still be accessed via get_param() on the Repository object.
     """
+
     changeLogDuration: int
     isVersionEnabled: bool
     isThumbnailEnabled: bool
@@ -173,6 +179,7 @@ class Repository:
         repository_sub_type: Repository sub-type (e.g. "SAP Document Management Service").
         repository_type: Repository type (e.g. "internal").
     """
+
     cmis_repository_id: str
     created_time: datetime
     id: str
@@ -213,9 +220,13 @@ class Repository:
         """
         return cls(
             cmis_repository_id=data["cmisRepositoryId"],
-            created_time=datetime.fromisoformat(data["createdTime"].replace("Z", "+00:00")),
+            created_time=datetime.fromisoformat(
+                data["createdTime"].replace("Z", "+00:00")
+            ),
             id=data["id"],
-            last_updated_time=datetime.fromisoformat(data["lastUpdatedTime"].replace("Z", "+00:00")),
+            last_updated_time=datetime.fromisoformat(
+                data["lastUpdatedTime"].replace("Z", "+00:00")
+            ),
             name=data["name"],
             repository_category=data["repositoryCategory"],
             repository_params=cls._parse_repo_params(data.get("repositoryParams")),
@@ -233,7 +244,9 @@ class Repository:
             "cmisRepositoryId": self.cmis_repository_id,
             "createdTime": self.created_time.isoformat().replace("+00:00", "Z"),
             "id": self.id,
-            "lastUpdatedTime": self.last_updated_time.isoformat().replace("+00:00", "Z"),
+            "lastUpdatedTime": self.last_updated_time.isoformat().replace(
+                "+00:00", "Z"
+            ),
             "name": self.name,
             "repositoryCategory": self.repository_category,
             "repositoryParams": [
@@ -271,6 +284,7 @@ class CreateConfigRequest:
         CreateConfigRequest(ConfigName.BLOCKED_FILE_EXTENSIONS, "bat,dmg,txt")
         CreateConfigRequest("someCustomConfig", "value")
     """
+
     config_name: ConfigName | str
     config_value: str
 
@@ -291,6 +305,7 @@ class UpdateConfigRequest:
         config_value: Value for the given config name.
         service_instance_id: Optional service instance id.
     """
+
     id: str
     config_name: ConfigName | str
     config_value: str
@@ -310,6 +325,7 @@ class UpdateConfigRequest:
 @dataclass
 class RepositoryConfig:
     """Represents a repository configuration entry."""
+
     id: str
     config_name: str
     config_value: str
@@ -323,8 +339,12 @@ class RepositoryConfig:
             id=data["id"],
             config_name=data["configName"],
             config_value=data["configValue"],
-            created_time=datetime.fromisoformat(data["createdTime"].replace("Z", "+00:00")),
-            last_updated_time=datetime.fromisoformat(data["lastUpdatedTime"].replace("Z", "+00:00")),
+            created_time=datetime.fromisoformat(
+                data["createdTime"].replace("Z", "+00:00")
+            ),
+            last_updated_time=datetime.fromisoformat(
+                data["lastUpdatedTime"].replace("Z", "+00:00")
+            ),
             service_instance_id=data["serviceInstanceId"],
         )
 
@@ -332,6 +352,7 @@ class RepositoryConfig:
 # ---------------------------------------------------------------------------
 # CMIS browser-binding response models
 # ---------------------------------------------------------------------------
+
 
 def _parse_datetime(val: Any) -> Optional[datetime]:
     """Parse a CMIS timestamp (epoch millis or ISO string) into a datetime."""
@@ -382,7 +403,9 @@ class CmisObject:
             created_by=_prop_val(props, "cmis:createdBy"),
             creation_date=_parse_datetime(_prop_val(props, "cmis:creationDate")),
             last_modified_by=_prop_val(props, "cmis:lastModifiedBy"),
-            last_modification_date=_parse_datetime(_prop_val(props, "cmis:lastModificationDate")),
+            last_modification_date=_parse_datetime(
+                _prop_val(props, "cmis:lastModificationDate")
+            ),
             change_token=_prop_val(props, "cmis:changeToken"),
             parent_ids=_prop_val(props, "sap:parentIds"),
             description=_prop_val(props, "cmis:description"),
@@ -397,7 +420,9 @@ class Folder(CmisObject):
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "Folder":
         base = CmisObject.from_dict(data)
-        return cls(**{k: v for k, v in base.__dict__.items() if k in cls.__dataclass_fields__})
+        return cls(
+            **{k: v for k, v in base.__dict__.items() if k in cls.__dataclass_fields__}
+        )
 
 
 @dataclass
@@ -422,7 +447,11 @@ class Document(CmisObject):
         base = CmisObject.from_dict(data)
         props = base.properties
         return cls(
-            **{k: v for k, v in base.__dict__.items() if k in CmisObject.__dataclass_fields__},
+            **{
+                k: v
+                for k, v in base.__dict__.items()
+                if k in CmisObject.__dataclass_fields__
+            },
             content_stream_length=_prop_val(props, "cmis:contentStreamLength"),
             content_stream_mime_type=_prop_val(props, "cmis:contentStreamMimeType"),
             content_stream_file_name=_prop_val(props, "cmis:contentStreamFileName"),
@@ -433,8 +462,12 @@ class Document(CmisObject):
             is_latest_major_version=_prop_val(props, "cmis:isLatestMajorVersion"),
             is_private_working_copy=_prop_val(props, "cmis:isPrivateWorkingCopy"),
             checkin_comment=_prop_val(props, "cmis:checkinComment"),
-            is_version_series_checked_out=_prop_val(props, "cmis:isVersionSeriesCheckedOut"),
-            version_series_checked_out_id=_prop_val(props, "cmis:versionSeriesCheckedOutId"),
+            is_version_series_checked_out=_prop_val(
+                props, "cmis:isVersionSeriesCheckedOut"
+            ),
+            version_series_checked_out_id=_prop_val(
+                props, "cmis:versionSeriesCheckedOutId"
+            ),
         )
 
 
@@ -486,8 +519,9 @@ class ChildrenPage:
         parsed: List[CmisObject] = []
         for entry in raw_objects:
             obj_data = entry.get("object") or entry
-            props = (obj_data.get("succinctProperties")
-                     or obj_data.get("properties") or {})
+            props = (
+                obj_data.get("succinctProperties") or obj_data.get("properties") or {}
+            )
             base_type = _prop_val(props, "cmis:baseTypeId") or ""
             if base_type == "cmis:document":
                 parsed.append(Document.from_dict(obj_data))

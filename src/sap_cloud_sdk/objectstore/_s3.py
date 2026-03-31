@@ -2,7 +2,6 @@
 
 import io
 import os
-import logging
 from datetime import datetime
 from http.client import HTTPResponse
 from typing import BinaryIO, List, cast
@@ -19,16 +18,6 @@ from sap_cloud_sdk.objectstore.exceptions import (
     ListObjectsError,
 )
 from sap_cloud_sdk.objectstore._models import ObjectStoreBindingData, ObjectMetadata
-from sap_cloud_sdk.core.auditlog import (
-    create_client as create_auditlog_client,
-    DataAccessEvent,
-    DataModificationEvent,
-    DataDeletionEvent,
-    DataAccessAttribute,
-    ChangeAttribute,
-    DeletedAttribute,
-    Tenant,
-)
 from sap_cloud_sdk.objectstore.utils import _normalize_host
 
 # Validation error message constants
@@ -64,10 +53,6 @@ class ObjectStoreClient:
         self._creds_config = creds_config
         self._disable_ssl = disable_ssl
         self._minio_client = self._create_minio_client()
-        # Pass Module.OBJECTSTORE as source when creating auditlog client
-        self._audit_client = create_auditlog_client(
-            _telemetry_source=Module.OBJECTSTORE
-        )
 
     def _create_minio_client(self) -> Minio:
         """Create MinIO client with proper configuration."""
@@ -81,46 +66,6 @@ class ObjectStoreClient:
 
         except Exception as e:
             raise ClientCreationError(f"Failed to create MinIO client: {e}") from e
-
-    def _build_data_access_event(
-        self, object_name: str, success: bool
-    ) -> DataAccessEvent:
-        """Build a data access audit event for read operations."""
-        return DataAccessEvent(
-            object_type="s3-object",
-            object_id={"bucket": self._creds_config.bucket, "key": object_name},
-            subject_type="application",
-            subject_id={"type": "automation"},
-            subject_role="app-foundation-sdk-python",
-            attributes=[DataAccessAttribute(name=object_name, successful=success)],
-            user="app-foundation-sdk-python",
-            tenant=Tenant.PROVIDER,
-        )
-
-    def _build_data_modification_event(self, object_name: str) -> DataModificationEvent:
-        return DataModificationEvent(
-            object_type="s3-object",
-            object_id={"bucket": self._creds_config.bucket, "key": object_name},
-            subject_type="application",
-            subject_id={"type": "automation"},
-            subject_role="app-foundation-sdk-python",
-            attributes=[ChangeAttribute(name=object_name, new="", old="")],
-            user="app-foundation-sdk-python",
-            tenant=Tenant.PROVIDER,
-        )
-
-    def _build_data_deletion_event(self, object_name: str) -> DataDeletionEvent:
-        """Build a data deletion audit event for delete operations."""
-        return DataDeletionEvent(
-            object_type="s3-object",
-            object_id={"bucket": self._creds_config.bucket, "key": object_name},
-            subject_type="application",
-            subject_id={"type": "automation"},
-            subject_role="app-foundation-sdk-python",
-            attributes=[DeletedAttribute(name=object_name, old="")],
-            user="app-foundation-sdk-python",
-            tenant=Tenant.PROVIDER,
-        )
 
     @record_metrics(Module.OBJECTSTORE, Operation.OBJECTSTORE_PUT_OBJECT_FROM_BYTES)
     def put_object_from_bytes(self, name: str, data: bytes, content_type: str) -> None:
@@ -150,12 +95,6 @@ class ObjectStoreClient:
                 length=len(data),
                 content_type=content_type,
             )
-
-            try:
-                self._audit_client.log(self._build_data_modification_event(name))
-            except Exception as e:
-                logging.error(f"audit log failed for PutObjectFromBytes operation: {e}")
-
         except S3Error as e:
             raise ObjectOperationError(
                 f"Failed to upload object '{name}': {e.code} - {e.message}"
@@ -196,12 +135,6 @@ class ObjectStoreClient:
                 length=size,
                 content_type=content_type,
             )
-
-            try:
-                self._audit_client.log(self._build_data_modification_event(name))
-            except Exception as e:
-                logging.error(f"audit log failed for PutObject operation: {e}")
-
         except S3Error as e:
             raise ObjectOperationError(
                 f"Failed to upload object '{name}': {e.code} - {e.message}"
@@ -238,7 +171,6 @@ class ObjectStoreClient:
 
             file_size = os.path.getsize(file_path)
 
-            # Single file operation - no content reading for audit
             with open(file_path, "rb") as file_stream:
                 self._minio_client.put_object(
                     bucket_name=self._creds_config.bucket,
@@ -247,12 +179,6 @@ class ObjectStoreClient:
                     length=file_size,
                     content_type=content_type,
                 )
-
-            try:
-                self._audit_client.log(self._build_data_modification_event(name))
-            except Exception as e:
-                logging.error(f"audit log failed for PutObjectFromFile operation: {e}")
-
         except S3Error as e:
             raise ObjectOperationError(
                 f"Failed to upload object '{name}': {e.code} - {e.message}"
@@ -278,7 +204,6 @@ class ObjectStoreClient:
         if not name:
             raise ValueError(EMPTY_NAME_ERROR)
 
-        get_err = None
         try:
             response = cast(
                 HTTPResponse,
@@ -288,25 +213,15 @@ class ObjectStoreClient:
             )
             return response
         except S3Error as e:
-            get_err = e
             if e.code == "NoSuchKey":
                 raise ObjectNotFoundError(f"Object '{name}' not found") from e
             raise ObjectOperationError(
                 f"Failed to download object '{name}': {e.code} - {e.message}"
             ) from e
         except Exception as e:
-            get_err = e
             raise ObjectOperationError(
                 f"Failed to download object '{name}': {e}"
             ) from e
-        finally:
-            # Log audit event
-            try:
-                self._audit_client.log(
-                    self._build_data_access_event(name, get_err is None)
-                )
-            except Exception as e:
-                logging.error(f"audit log failed for GetObject operation: {e}")
 
     @record_metrics(Module.OBJECTSTORE, Operation.OBJECTSTORE_DELETE_OBJECT)
     def delete_object(self, name: str) -> None:
@@ -326,22 +241,12 @@ class ObjectStoreClient:
             self._minio_client.remove_object(
                 bucket_name=self._creds_config.bucket, object_name=name
             )
-
-            try:
-                self._audit_client.log(self._build_data_deletion_event(name))
-            except Exception as e:
-                logging.error(f"audit log failed for DeleteObject operation: {e}")
-
         except S3Error as e:
             if e.code != "NoSuchKey":
                 raise ObjectOperationError(
                     f"Failed to delete object '{name}': {e.code} - {e.message}"
                 ) from e
             # For NoSuchKey, we still consider it successful (idempotent delete)
-            try:
-                self._audit_client.log(self._build_data_deletion_event(name))
-            except Exception as audit_e:
-                logging.error(f"audit log failed for DeleteObject operation: {audit_e}")
         except Exception as e:
             raise ObjectOperationError(f"Failed to delete object '{name}': {e}") from e
 
@@ -362,7 +267,6 @@ class ObjectStoreClient:
         if not isinstance(prefix, str):
             raise ValueError(INVALID_PREFIX_TYPE_ERROR)
 
-        list_err = None
         result = []
         try:
             objects = self._minio_client.list_objects(
@@ -382,25 +286,13 @@ class ObjectStoreClient:
 
             return result
         except S3Error as e:
-            list_err = e
             raise ListObjectsError(
                 f"Failed to list objects with prefix '{prefix}': {e.code} - {e.message}"
             ) from e
         except Exception as e:
-            list_err = e
             raise ListObjectsError(
                 f"Failed to list objects with prefix '{prefix}': {e}"
             ) from e
-        finally:
-            if prefix is None or prefix.strip() == "":
-                # Audit log name can't be empty
-                prefix = "/"
-            try:
-                self._audit_client.log(
-                    self._build_data_access_event(prefix, list_err is None)
-                )
-            except Exception as e:
-                logging.error(f"audit log failed for ListObjects operation: {e}")
 
     @record_metrics(Module.OBJECTSTORE, Operation.OBJECTSTORE_HEAD_OBJECT)
     def head_object(self, name: str) -> ObjectMetadata:
@@ -420,7 +312,6 @@ class ObjectStoreClient:
         if not name:
             raise ValueError(EMPTY_NAME_ERROR)
 
-        head_err = None
         try:
             stat: minio.datatypes.Object = self._minio_client.stat_object(
                 bucket_name=self._creds_config.bucket, object_name=name
@@ -435,24 +326,15 @@ class ObjectStoreClient:
                 owner=None,  # stat_object doesn't provide owner
             )
         except S3Error as e:
-            head_err = e
             if e.code == "NoSuchKey":
                 raise ObjectNotFoundError(f"Object '{name}' not found") from e
             raise ObjectOperationError(
                 f"Failed to get metadata for object '{name}': {e.code} - {e.message}"
             ) from e
         except Exception as e:
-            head_err = e
             raise ObjectOperationError(
                 f"Failed to get metadata for object '{name}': {e}"
             ) from e
-        finally:
-            try:
-                self._audit_client.log(
-                    self._build_data_access_event(name, head_err is None)
-                )
-            except Exception as e:
-                logging.error(f"audit log failed for HeadObject operation: {e}")
 
     @record_metrics(Module.OBJECTSTORE, Operation.OBJECTSTORE_OBJECT_EXISTS)
     def object_exists(self, name: str) -> bool:

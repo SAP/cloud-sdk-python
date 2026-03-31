@@ -3,9 +3,12 @@ from dataclasses import dataclass
 from typing import Any, Dict, Optional
 from urllib.parse import urlparse
 
-from sap_cloud_sdk.core.secret_resolver.resolver import read_from_mount_and_fallback_to_env_var
+from sap_cloud_sdk.core.secret_resolver.resolver import (
+    read_from_mount_and_fallback_to_env_var,
+)
 from sap_cloud_sdk.destination.exceptions import ConfigError
 from sap_cloud_sdk.dms.model import DMSCredentials
+
 
 @dataclass
 class BindingData:
@@ -15,6 +18,7 @@ class BindingData:
         uri: The URI endpoint for the DMS service
         uaa: JSON string containing XSUAA authentication credentials
     """
+
     instance_name: str
     uri: str
     uaa: str
@@ -57,12 +61,7 @@ class BindingData:
             json.JSONDecodeError: If uaa is not valid JSON
             ValueError: If required fields are missing from UAA credentials
         """
-        required_fields = {
-            "clientid",
-            "clientsecret",
-            "url",
-            "identityzone"
-        }
+        required_fields = {"clientid", "clientsecret", "url", "identityzone"}
 
         try:
             uaa_data: Dict[str, Any] = json.loads(self.uaa)
@@ -97,7 +96,7 @@ class BindingData:
             client_id=uaa_data["clientid"],
             client_secret=uaa_data["clientsecret"],
             token_url=token_url,
-            identityzone=uaa_data["identityzone"]
+            identityzone=uaa_data["identityzone"],
         )
 
 
@@ -114,7 +113,9 @@ def load_sdm_config_from_env_or_mount(instance: Optional[str] = None) -> DMSCred
         ConfigError: If loading or validation fails.
     """
     inst = instance or "default"
-    binding = BindingData(uri="", uaa="", instance_name="")  # Initialize with empty values; will be populated by resolver
+    binding = BindingData(
+        uri="", uaa="", instance_name=""
+    )  # Initialize with empty values; will be populated by resolver
 
     try:
         # 1) Try mount at /etc/secrets/appfnd/destination/{instance}/...
@@ -122,7 +123,7 @@ def load_sdm_config_from_env_or_mount(instance: Optional[str] = None) -> DMSCred
         read_from_mount_and_fallback_to_env_var(
             base_volume_mount="/etc/secrets/appfnd",
             base_var_name="CLOUD_SDK_CFG",
-            module="sdm", #TODO check if this should be "dms" or "sdm"
+            module="sdm",  # TODO check if this should be "dms" or "sdm"
             instance=inst,
             target=binding,
         )

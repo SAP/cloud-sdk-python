@@ -3,7 +3,11 @@ import time
 import requests
 from requests.exceptions import RequestException
 from typing import Optional, TypedDict
-from sap_cloud_sdk.dms.exceptions import DMSError, DMSConnectionError, DMSPermissionDeniedException
+from sap_cloud_sdk.dms.exceptions import (
+    DMSError,
+    DMSConnectionError,
+    DMSPermissionDeniedException,
+)
 from sap_cloud_sdk.dms.model import DMSCredentials
 
 logger = logging.getLogger(__name__)
@@ -12,6 +16,7 @@ logger = logging.getLogger(__name__)
 class _TokenResponse(TypedDict):
     access_token: str
     expires_in: int
+
 
 # TODO: limit number of access tokens in cache to 10
 class _CachedToken:
@@ -74,12 +79,16 @@ class Auth:
             response.raise_for_status()
         except requests.exceptions.ConnectionError as e:
             logger.error("Failed to connect to token endpoint")
-            raise DMSConnectionError("Failed to connect to the authentication server") from e
+            raise DMSConnectionError(
+                "Failed to connect to the authentication server"
+            ) from e
         except requests.exceptions.HTTPError as e:
             status = e.response.status_code if e.response is not None else None
             logger.error("Token request failed with status %s", status)
             if status in (401, 403):
-                raise DMSPermissionDeniedException("Authentication failed — invalid client credentials", status) from e
+                raise DMSPermissionDeniedException(
+                    "Authentication failed — invalid client credentials", status
+                ) from e
             raise DMSError("Failed to obtain access token", status) from e
         except RequestException as e:
             logger.error("Unexpected error during token fetch")

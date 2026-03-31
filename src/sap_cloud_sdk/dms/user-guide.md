@@ -1,6 +1,6 @@
-# Document Management Service draft user guide
+# DMS (Document Management Service) User Guide
 
-This module provides a Python client for the SAP Document Management Service (DMS). It covers both the **Admin API** (repository and configuration management) and the **CMIS Browser Binding API** (folders, documents, versioning, ACLs).
+This module provides a Python SDK for interacting with the SAP Document Management Service (DMS). It supports repository management, document and folder operations via the CMIS Browser Binding protocol, versioning, and access control management.
 
 ## Installation
 
@@ -23,7 +23,8 @@ from sap_cloud_sdk.dms.model import (
 )
 from sap_cloud_sdk.dms.exceptions import (
     DMSError, DMSObjectNotFoundException, DMSPermissionDeniedException,
-    DMSInvalidArgumentException, DMSConnectionError, DMSRuntimeException,
+    DMSInvalidArgumentException, DMSConflictException,
+    DMSConnectionError, DMSRuntimeException,
 )
 ```
 
@@ -203,21 +204,6 @@ folder = client.create_folder(
 )
 
 print(f"Created folder: {folder.name} (objectId={folder.object_id})")
-```
-
-### Create a Folder with ACLs
-
-```python
-from sap_cloud_sdk.dms.model import Ace
-
-folder = client.create_folder(
-    repository_id="cmis-repo-id",
-    parent_folder_id="root-folder-object-id",
-    folder_name="Secured Folder",
-    add_aces=[
-        Ace(principal_id="user@example.com", permissions=["cmis:read", "cmis:write"]),
-    ],
-)
 ```
 
 ---
@@ -480,3 +466,127 @@ while True:
 ```
 
 ---
+
+## Multi-Tenancy
+
+All operations support an optional `tenant` parameter for subscriber-scoped requests. The SDK resolves the token URL by replacing the provider's identity zone with the tenant subdomain:
+
+```python
+# Provider context (default)
+repos = client.get_all_repositories()
+
+# Subscriber context
+repos = client.get_all_repositories(tenant="subscriber-subdomain")
+```
+
+---
+
+## Error Handling
+
+The DMS module provides specific exceptions for different error scenarios:
+
+```python
+from sap_cloud_sdk.dms.exceptions import (
+    DMSError,
+    DMSObjectNotFoundException,
+    DMSPermissionDeniedException,
+    DMSInvalidArgumentException,
+    DMSConflictException,
+    DMSConnectionError,
+    DMSRuntimeException,
+)
+
+try:
+    obj = client.get_object("repo-uuid", "missing-id")
+except DMSObjectNotFoundException as e:
+    print(f"Not found ({e.status_code}): {e}")
+except DMSConflictException as e:
+    print(f"Conflict ({e.status_code}): {e}")
+except DMSPermissionDeniedException as e:
+    print(f"Access denied ({e.status_code}): {e}")
+except DMSInvalidArgumentException as e:
+    print(f"Bad request ({e.status_code}): {e}")
+except DMSConnectionError as e:
+    print(f"Network error: {e}")
+except DMSRuntimeException as e:
+    print(f"Server error ({e.status_code}): {e}")
+```
+
+### Exception Hierarchy
+
+| Exception | HTTP Status | Description |
+|---|---|---|
+| `DMSError` | any | Base exception for all DMS errors |
+| `DMSObjectNotFoundException` | 404 | Repository, document, or folder not found |
+| `DMSPermissionDeniedException` | 401, 403 | Invalid or expired access token |
+| `DMSInvalidArgumentException` | 400 | Invalid request payload or parameters |
+| `DMSConflictException` | 409 | Resource state conflict (e.g. duplicate name in versioned repo) |
+| `DMSConnectionError` | — | Network failure, timeout, or connection refused |
+| `DMSRuntimeException` | 500 | Server-side internal error |
+
+All exceptions carry:
+- `status_code`: HTTP status code (when applicable)
+- `error_content`: Raw response body for debugging
+
+The SDK extracts the server's error message from JSON responses (the `"message"` field) when available, providing specific error descriptions rather than generic messages.
+
+---
+
+## Models
+
+### Repository Models
+
+- **`InternalRepoRequest`**: Create a new repository — `displayName` (required), `description`, `isVersionEnabled`, `isVirusScanEnabled`, `repositoryCategory`, etc.
+- **`UpdateRepoRequest`**: Update repository metadata — `description`, `isVirusScanEnabled`, `isThumbnailEnabled`, `isAIEnabled`, etc.
+- **`Repository`**: Repository entity — `id`, `name`, `cmis_repository_id`, `repository_type`, `repository_category`, `repository_params`. Use `repo.get_param("paramName")` for dynamic parameter access.
+
+### Configuration Models
+
+- **`CreateConfigRequest`**: `config_name` (use `ConfigName` enum), `config_value`
+- **`UpdateConfigRequest`**: `id`, `config_name`, `config_value`
+- **`RepositoryConfig`**: `id`, `config_name`, `config_value`, timestamps
+- **`ConfigName`** enum: `BLOCKED_FILE_EXTENSIONS`, `TEMPSPACE_MAX_CONTENT_SIZE`, `IS_CROSS_DOMAIN_MAPPING_ALLOWED`
+
+### CMIS Object Models
+
+- **`CmisObject`**: Base model — `object_id`, `name`, `base_type_id`, `object_type_id`, `created_by`, `creation_date`, `last_modified_by`, `last_modification_date`, `change_token`, `parent_ids`, `description`, `properties` (full raw dict)
+- **`Folder`**: Extends `CmisObject` (no additional fields)
+- **`Document`**: Extends `CmisObject` — content fields (`content_stream_length`, `content_stream_mime_type`, `content_stream_file_name`) and versioning fields (`version_label`, `version_series_id`, `is_latest_version`, `is_major_version`, `is_private_working_copy`, `checkin_comment`, `is_version_series_checked_out`, etc.)
+
+### ACL Models
+
+- **`Ace`**: Access control entry — `principal_id`, `permissions` (list of strings), `is_direct`
+- **`Acl`**: Access control list — `aces` (list of `Ace`), `is_exact`
+
+### Other Models
+
+- **`ChildrenPage`**: Paginated result — `objects` (list), `has_more_items`, `num_items`
+- **`UserClaim`**: User identity — `x_ecm_user_enc`, `x_ecm_add_principals`
+- **`DMSCredentials`**: Service credentials — `instance_name`, `uri`, `client_id`, `client_secret`, `token_url`, `identityzone`
+
+---
+
+## Configuration
+
+The DMS module automatically resolves credentials from the environment.
+
+### Cloud Mode
+
+Reads secrets from mounted files or environment variables:
+- **Kubernetes-mounted secret** at `/etc/secrets/appfnd/sdm/<instance>/`
+- **Fallback** to environment variables with pattern `CLOUD_SDK_CFG_SDM_<INSTANCE>_<FIELD>`
+
+The binding provides:
+- `uri`: DMS API base URL
+- `uaa`: JSON string with XSUAA credentials (`clientid`, `clientsecret`, `url`, `identityzone`)
+
+### Service Binding (UAA JSON)
+
+```json
+{
+  "clientid": "sb-xxx!bxxx|sdm-di-xxx!bxxx",
+  "clientsecret": "xxx",
+  "url": "https://subdomain.authentication.region.hana.ondemand.com",
+  "identityzone": "subdomain"
+}
+```

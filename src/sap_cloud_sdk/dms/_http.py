@@ -6,6 +6,7 @@ from requests.exceptions import RequestException
 from sap_cloud_sdk.dms._auth import Auth
 from sap_cloud_sdk.dms.exceptions import (
     DMSError,
+    DMSConflictException,
     DMSConnectionError,
     DMSInvalidArgumentException,
     DMSObjectNotFoundException,
@@ -214,24 +215,35 @@ class HttpInvoker:
         error_content = response.text
         logger.warning("Request failed with status %s", response.status_code)
 
+        # Try to extract the server's error message from the JSON body
+        try:
+            body = response.json()
+            server_message = body.get("message", "") if isinstance(body, dict) else ""
+        except Exception:
+            server_message = ""
+
         match response.status_code:
             case 400:
                 raise DMSInvalidArgumentException(
-                    "Request contains invalid or disallowed parameters", 400, error_content
+                    server_message or "Request contains invalid or disallowed parameters", 400, error_content
                 )
             case 401 | 403:
                 raise DMSPermissionDeniedException(
-                    "Access denied — invalid or expired token", response.status_code, error_content
+                    server_message or "Access denied — invalid or expired token", response.status_code, error_content
                 )
             case 404:
                 raise DMSObjectNotFoundException(
-                    "The requested resource was not found", 404, error_content
+                    server_message or "The requested resource was not found", 404, error_content
+                )
+            case 409:
+                raise DMSConflictException(
+                    server_message or "The request conflicts with the current state of the resource", 409, error_content
                 )
             case 500:
                 raise DMSRuntimeException(
-                    "The DMS service encountered an internal error", 500, error_content
+                    server_message or "The DMS service encountered an internal error", 500, error_content
                 )
             case _:
                 raise DMSError(
-                    f"Unexpected response from DMS service : "+error_content, response.status_code, error_content
+                    f"Unexpected response from DMS service: {error_content}", response.status_code, error_content
                 )

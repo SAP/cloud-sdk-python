@@ -26,3 +26,6 @@ class DMSConnectionError(DMSError):
 
 class DMSRuntimeException(DMSError):
     """Unexpected server-side error."""
+
+class DMSConflictException(DMSError):
+    """The request conflicts with the current state of the resource."""

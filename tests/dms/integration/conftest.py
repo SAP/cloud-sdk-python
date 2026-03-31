@@ -13,10 +13,10 @@ def dms_client():
 
     try:
         # Secret resolver handles configuration automatically from /etc/secrets/appfnd or CLOUD_SDK_CFG
-        client = create_client()
+        client = create_client(instance="default")
         return client
     except Exception as e:
-        pytest.fail(f"Failed to create DMS client for cloud integration tests: {e}")  # ty: ignore[invalid-argument-type]
+        pytest.skip(f"DMS integration tests require credentials: {e}")  # ty: ignore[invalid-argument-type]
 
 
 

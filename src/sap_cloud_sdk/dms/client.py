@@ -376,8 +376,6 @@ class DMSClient:
         folder_name: str,
         *,
         description: Optional[str] = None,
-        add_aces: Optional[List[Ace]] = None,
-        remove_aces: Optional[List[Ace]] = None,
         path: Optional[str] = None,
         tenant: Optional[str] = None,
         user_claim: Optional[UserClaim] = None,
@@ -389,8 +387,6 @@ class DMSClient:
             parent_folder_id: CMIS objectId of the parent folder.
             folder_name: Name for the new folder.
             description: Optional folder description.
-            add_aces: Optional ACE entries to grant on the new folder.
-            remove_aces: Optional ACE entries to revoke on the new folder.
             path: Optional directory path (appended to /browser/{repo_id}/root/).
             tenant: Optional subscriber subdomain.
             user_claim: Optional user identity claims forwarded to DMS.
@@ -417,10 +413,6 @@ class DMSClient:
             "_charset_": "UTF-8",
         }
         form_data.update(_build_properties(cmis_props))
-        if add_aces:
-            form_data.update(_build_aces(add_aces, prefix="addACEPrincipal"))
-        if remove_aces:
-            form_data.update(_build_aces(remove_aces, prefix="removeACEPrincipal"))
 
         logger.info("Creating folder '%s' in repo '%s'", folder_name, repository_id)
         response = self._http.post_form(
@@ -442,11 +434,9 @@ class DMSClient:
         parent_folder_id: str,
         document_name: str,
         file: BinaryIO,
-        mime_type: str,
         *,
+        mime_type: Optional[str] = None,
         description: Optional[str] = None,
-        add_aces: Optional[List[Ace]] = None,
-        remove_aces: Optional[List[Ace]] = None,
         path: Optional[str] = None,
         tenant: Optional[str] = None,
         user_claim: Optional[UserClaim] = None,
@@ -458,10 +448,9 @@ class DMSClient:
             parent_folder_id: Parent folder CMIS objectId.
             document_name: File name for the document.
             file: Readable binary stream with the content.
-            mime_type: MIME type (e.g. ``application/pdf``).
+            mime_type: MIME type (e.g. ``application/pdf``). Defaults to
+                ``application/octet-stream`` when not provided.
             description: Optional document description.
-            add_aces: Optional ACE entries to grant on the new document.
-            remove_aces: Optional ACE entries to revoke on the new document.
             path: Optional directory path.
             tenant: Optional subscriber subdomain.
             user_claim: Optional user identity claims forwarded to DMS.
@@ -488,16 +477,12 @@ class DMSClient:
             "_charset_": "UTF-8",
         }
         form_data.update(_build_properties(cmis_props))
-        if add_aces:
-            form_data.update(_build_aces(add_aces, prefix="addACEPrincipal"))
-        if remove_aces:
-            form_data.update(_build_aces(remove_aces, prefix="removeACEPrincipal"))
 
         logger.info("Creating document '%s' in repo '%s'", document_name, repository_id)
         response = self._http.post_form(
             self._browser_url(repository_id, path),
             data=form_data,
-            files={"media": (document_name, file, mime_type)},
+            files={"media": (document_name, file, mime_type or "application/octet-stream")},
             tenant_subdomain=tenant,
             user_claim=user_claim,
         )
@@ -966,4 +951,3 @@ class DMSClient:
             user_claim=user_claim,
         )
         return ChildrenPage.from_dict(response.json())
-        logger.info("Config '%s' deleted successfully", config_id)

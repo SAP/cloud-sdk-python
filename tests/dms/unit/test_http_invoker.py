@@ -7,6 +7,7 @@ import requests
 
 from sap_cloud_sdk.dms._http import HttpInvoker
 from sap_cloud_sdk.dms.exceptions import (
+    DMSConflictException,
     DMSConnectionError,
     DMSInvalidArgumentException,
     DMSObjectNotFoundException,
@@ -125,6 +126,7 @@ class TestGet:
         mock_resp = Mock()
         mock_resp.status_code = 404
         mock_resp.text = "Not Found"
+        mock_resp.json.side_effect = ValueError("No JSON")
         mock_get.return_value = mock_resp
 
         with pytest.raises(DMSObjectNotFoundException) as exc_info:
@@ -136,6 +138,7 @@ class TestGet:
         mock_resp = Mock()
         mock_resp.status_code = 400
         mock_resp.text = "Bad Request"
+        mock_resp.json.side_effect = ValueError("No JSON")
         mock_get.return_value = mock_resp
 
         with pytest.raises(DMSInvalidArgumentException) as exc_info:
@@ -147,6 +150,7 @@ class TestGet:
         mock_resp = Mock()
         mock_resp.status_code = 401
         mock_resp.text = "Unauthorized"
+        mock_resp.json.side_effect = ValueError("No JSON")
         mock_get.return_value = mock_resp
 
         with pytest.raises(DMSPermissionDeniedException) as exc_info:
@@ -158,6 +162,7 @@ class TestGet:
         mock_resp = Mock()
         mock_resp.status_code = 500
         mock_resp.text = "Internal Server Error"
+        mock_resp.json.side_effect = ValueError("No JSON")
         mock_get.return_value = mock_resp
 
         with pytest.raises(DMSRuntimeException) as exc_info:
@@ -177,6 +182,79 @@ class TestGet:
 
         with pytest.raises(DMSConnectionError):
             invoker.get("/slow")
+
+
+# ---------------------------------------------------------------
+# Error message extraction
+# ---------------------------------------------------------------
+
+class TestErrorMessageExtraction:
+    @patch("sap_cloud_sdk.dms._http.requests.get")
+    def test_400_extracts_json_message(self, mock_get, invoker):
+        mock_resp = Mock()
+        mock_resp.status_code = 400
+        mock_resp.text = '{"exception": "versioning", "message": "The object is not the latest version"}'
+        mock_resp.json.return_value = {
+            "exception": "versioning",
+            "message": "The object is not the latest version",
+        }
+        mock_get.return_value = mock_resp
+
+        with pytest.raises(DMSInvalidArgumentException) as exc_info:
+            invoker.get("/bad")
+        assert "The object is not the latest version" in str(exc_info.value)
+
+    @patch("sap_cloud_sdk.dms._http.requests.get")
+    def test_400_fallback_when_no_json(self, mock_get, invoker):
+        mock_resp = Mock()
+        mock_resp.status_code = 400
+        mock_resp.text = "Bad Request"
+        mock_resp.json.side_effect = ValueError("No JSON")
+        mock_get.return_value = mock_resp
+
+        with pytest.raises(DMSInvalidArgumentException) as exc_info:
+            invoker.get("/bad")
+        assert "Request contains invalid or disallowed parameters" in str(exc_info.value)
+
+    @patch("sap_cloud_sdk.dms._http.requests.get")
+    def test_404_extracts_json_message(self, mock_get, invoker):
+        mock_resp = Mock()
+        mock_resp.status_code = 404
+        mock_resp.text = '{"message": "Document abc-123 not found"}'
+        mock_resp.json.return_value = {"message": "Document abc-123 not found"}
+        mock_get.return_value = mock_resp
+
+        with pytest.raises(DMSObjectNotFoundException) as exc_info:
+            invoker.get("/missing")
+        assert "Document abc-123 not found" in str(exc_info.value)
+
+    @patch("sap_cloud_sdk.dms._http.requests.get")
+    def test_409_raises_conflict(self, mock_get, invoker):
+        mock_resp = Mock()
+        mock_resp.status_code = 409
+        mock_resp.text = '{"exception": "versioning", "message": "Object already exists with name test.txt"}'
+        mock_resp.json.return_value = {
+            "exception": "versioning",
+            "message": "Object already exists with name test.txt",
+        }
+        mock_get.return_value = mock_resp
+
+        with pytest.raises(DMSConflictException) as exc_info:
+            invoker.get("/conflict")
+        assert exc_info.value.status_code == 409
+        assert "Object already exists with name test.txt" in str(exc_info.value)
+
+    @patch("sap_cloud_sdk.dms._http.requests.get")
+    def test_409_fallback_when_no_json(self, mock_get, invoker):
+        mock_resp = Mock()
+        mock_resp.status_code = 409
+        mock_resp.text = "Conflict"
+        mock_resp.json.side_effect = ValueError("No JSON")
+        mock_get.return_value = mock_resp
+
+        with pytest.raises(DMSConflictException) as exc_info:
+            invoker.get("/conflict")
+        assert "conflicts with the current state" in str(exc_info.value)
 
 
 # ---------------------------------------------------------------
@@ -244,6 +322,7 @@ class TestPostForm:
         mock_resp = Mock()
         mock_resp.status_code = 500
         mock_resp.text = "Internal Server Error"
+        mock_resp.json.side_effect = ValueError("No JSON")
         mock_post.return_value = mock_resp
 
         with pytest.raises(DMSRuntimeException) as exc_info:
@@ -299,6 +378,7 @@ class TestGetStream:
         mock_resp = Mock()
         mock_resp.status_code = 404
         mock_resp.text = "Not found"
+        mock_resp.json.side_effect = ValueError("No JSON")
         mock_get.return_value = mock_resp
 
         with pytest.raises(DMSObjectNotFoundException) as exc_info:

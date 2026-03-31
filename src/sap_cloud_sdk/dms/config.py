@@ -102,7 +102,7 @@ class BindingData:
 
 
 def load_sdm_config_from_env_or_mount(instance: Optional[str] = None) -> DMSCredentials:
-    """Load Destination configuration from mount with env fallback and normalize.
+    """Load DMS configuration from mount with env fallback and normalize.
 
     Args:
         instance: Logical instance name; defaults to "default" if not provided.

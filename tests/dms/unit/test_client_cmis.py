@@ -238,27 +238,6 @@ class TestCreateFolder:
 
         assert client._mock_http.post_form.call_args[1]["user_claim"] is claim
 
-    def test_with_inline_aces(self, client):
-        client._mock_http.post_form.return_value = _mock_response(_FOLDER_RESPONSE)
-        add = [Ace(principal_id="u1", permissions=["cmis:read", "cmis:write"])]
-        remove = [Ace(principal_id="u2", permissions=["cmis:all"])]
-
-        client.create_folder("repo1", "parent-id", "F", add_aces=add, remove_aces=remove)
-
-        data = client._mock_http.post_form.call_args[1]["data"]
-        assert data["addACEPrincipal[0]"] == "u1"
-        assert data["addACEPermission[0][0]"] == "cmis:read"
-        assert data["addACEPermission[0][1]"] == "cmis:write"
-        assert data["removeACEPrincipal[0]"] == "u2"
-        assert data["removeACEPermission[0][0]"] == "cmis:all"
-
-    def test_no_aces_by_default(self, client):
-        client._mock_http.post_form.return_value = _mock_response(_FOLDER_RESPONSE)
-
-        client.create_folder("repo1", "parent-id", "F")
-
-        data = client._mock_http.post_form.call_args[1]["data"]
-        assert not any(k.startswith("addACE") or k.startswith("removeACE") for k in data)
 
 
 # ---------------------------------------------------------------
@@ -270,7 +249,7 @@ class TestCreateDocument:
         client._mock_http.post_form.return_value = _mock_response(_DOCUMENT_RESPONSE)
         stream = BytesIO(b"hello world")
 
-        doc = client.create_document("repo1", "folder-id", "report.pdf", stream, "application/pdf")
+        doc = client.create_document("repo1", "folder-id", "report.pdf", stream, mime_type="application/pdf")
 
         assert isinstance(doc, Document)
         assert doc.object_id == "doc-xyz"
@@ -294,7 +273,7 @@ class TestCreateDocument:
     def test_with_description(self, client):
         client._mock_http.post_form.return_value = _mock_response(_DOCUMENT_RESPONSE)
 
-        client.create_document("repo1", "folder-id", "f.txt", BytesIO(b""), "text/plain", description="D")
+        client.create_document("repo1", "folder-id", "f.txt", BytesIO(b""), mime_type="text/plain", description="D")
 
         data = client._mock_http.post_form.call_args[1]["data"]
         assert data["propertyId[2]"] == "cmis:description"
@@ -303,7 +282,7 @@ class TestCreateDocument:
     def test_with_tenant(self, client):
         client._mock_http.post_form.return_value = _mock_response(_DOCUMENT_RESPONSE)
 
-        client.create_document("repo1", "fid", "f.txt", BytesIO(b""), "text/plain", tenant="sub1")
+        client.create_document("repo1", "fid", "f.txt", BytesIO(b""), mime_type="text/plain", tenant="sub1")
 
         assert client._mock_http.post_form.call_args[1]["tenant_subdomain"] == "sub1"
 
@@ -311,20 +290,18 @@ class TestCreateDocument:
         client._mock_http.post_form.return_value = _mock_response(_DOCUMENT_RESPONSE)
         claim = UserClaim(x_ecm_user_enc="bob@sap.com")
 
-        client.create_document("repo1", "fid", "f.txt", BytesIO(b""), "text/plain", user_claim=claim)
+        client.create_document("repo1", "fid", "f.txt", BytesIO(b""), mime_type="text/plain", user_claim=claim)
 
         assert client._mock_http.post_form.call_args[1]["user_claim"] is claim
 
-    def test_with_inline_aces(self, client):
+    def test_without_mime_type_uses_default(self, client):
         client._mock_http.post_form.return_value = _mock_response(_DOCUMENT_RESPONSE)
-        add = [Ace(principal_id="reader@sap.com", permissions=["cmis:read"])]
+        stream = BytesIO(b"binary data")
 
-        client.create_document("repo1", "fid", "f.txt", BytesIO(b""), "text/plain", add_aces=add)
+        client.create_document("repo1", "fid", "data.bin", stream)
 
-        data = client._mock_http.post_form.call_args[1]["data"]
-        assert data["addACEPrincipal[0]"] == "reader@sap.com"
-        assert data["addACEPermission[0][0]"] == "cmis:read"
-        assert not any(k.startswith("removeACE") for k in data)
+        files_arg = client._mock_http.post_form.call_args[1]["files"]
+        assert files_arg["media"][2] == "application/octet-stream"
 
 
 # ---------------------------------------------------------------

@@ -2,7 +2,10 @@ from __future__ import annotations
 
 from typing import Any, Dict, Optional
 
-from sap_cloud_sdk.destination._local_client_base import LocalDevClientBase, CERTIFICATE_MOCK_FILE
+from sap_cloud_sdk.destination._local_client_base import (
+    LocalDevClientBase,
+    CERTIFICATE_MOCK_FILE,
+)
 from sap_cloud_sdk.destination._models import AccessStrategy, Certificate, Level
 from sap_cloud_sdk.destination.utils._pagination import PagedResult
 from sap_cloud_sdk.destination.exceptions import HttpError, DestinationOperationError
@@ -89,10 +92,10 @@ class LocalDevCertificateClient(LocalDevClientBase[Certificate]):
         return self._get_entity("instance", name)
 
     def get_subaccount_certificate(
-            self,
-            name: str,
-            access_strategy: AccessStrategy = AccessStrategy.SUBSCRIBER_FIRST,
-            tenant: Optional[str] = None,
+        self,
+        name: str,
+        access_strategy: AccessStrategy = AccessStrategy.SUBSCRIBER_FIRST,
+        tenant: Optional[str] = None,
     ) -> Optional[Certificate]:
         """Get a certificate from the subaccount scope with an access strategy.
 
@@ -118,7 +121,9 @@ class LocalDevCertificateClient(LocalDevClientBase[Certificate]):
         try:
             data = self._read()
             sub_list = data.get("subaccount", [])
-            return self._resolve_subaccount_entity(name, access_strategy, tenant, sub_list)
+            return self._resolve_subaccount_entity(
+                name, access_strategy, tenant, sub_list
+            )
         except HttpError:
             raise
         except DestinationOperationError:
@@ -126,7 +131,9 @@ class LocalDevCertificateClient(LocalDevClientBase[Certificate]):
         except Exception as e:
             raise DestinationOperationError(f"failed to get certificate '{name}': {e}")
 
-    def create_certificate(self, certificate: Certificate, level: Optional[Level] = Level.SUB_ACCOUNT) -> None:
+    def create_certificate(
+        self, certificate: Certificate, level: Optional[Level] = Level.SUB_ACCOUNT
+    ) -> None:
         """Create a certificate.
 
         Args:
@@ -140,7 +147,9 @@ class LocalDevCertificateClient(LocalDevClientBase[Certificate]):
         collection = "instance" if level == Level.SERVICE_INSTANCE else "subaccount"
         self._create_entity(collection, certificate, certificate.name)
 
-    def update_certificate(self, certificate: Certificate, level: Optional[Level] = Level.SUB_ACCOUNT) -> None:
+    def update_certificate(
+        self, certificate: Certificate, level: Optional[Level] = Level.SUB_ACCOUNT
+    ) -> None:
         """Update a certificate.
 
         Args:
@@ -154,7 +163,9 @@ class LocalDevCertificateClient(LocalDevClientBase[Certificate]):
         collection = "instance" if level == Level.SERVICE_INSTANCE else "subaccount"
         self._update_entity(collection, certificate, certificate.name)
 
-    def delete_certificate(self, name: str, level: Optional[Level] = Level.SUB_ACCOUNT) -> None:
+    def delete_certificate(
+        self, name: str, level: Optional[Level] = Level.SUB_ACCOUNT
+    ) -> None:
         """Delete a certificate.
 
         Args:
@@ -169,8 +180,7 @@ class LocalDevCertificateClient(LocalDevClientBase[Certificate]):
         self._delete_entity(collection, name)
 
     def list_instance_certificates(
-            self,
-            _filter: Optional[Any] = None
+        self, _filter: Optional[Any] = None
     ) -> PagedResult[Certificate]:
         """List all certificates from the service instance scope.
 
@@ -192,13 +202,15 @@ class LocalDevCertificateClient(LocalDevClientBase[Certificate]):
         except DestinationOperationError:
             raise
         except Exception as e:
-            raise DestinationOperationError(f"failed to list instance certificates: {e}")
+            raise DestinationOperationError(
+                f"failed to list instance certificates: {e}"
+            )
 
     def list_subaccount_certificates(
-            self,
-            access_strategy: AccessStrategy = AccessStrategy.SUBSCRIBER_FIRST,
-            tenant: Optional[str] = None,
-            _filter: Optional[Any] = None
+        self,
+        access_strategy: AccessStrategy = AccessStrategy.SUBSCRIBER_FIRST,
+        tenant: Optional[str] = None,
+        _filter: Optional[Any] = None,
     ) -> PagedResult[Certificate]:
         """List certificates from the subaccount scope with an access strategy.
 
@@ -230,4 +242,6 @@ class LocalDevCertificateClient(LocalDevClientBase[Certificate]):
         except DestinationOperationError:
             raise
         except Exception as e:
-            raise DestinationOperationError(f"failed to list subaccount certificates: {e}")
+            raise DestinationOperationError(
+                f"failed to list subaccount certificates: {e}"
+            )

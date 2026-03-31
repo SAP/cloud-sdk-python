@@ -2,7 +2,10 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
 
-from sap_cloud_sdk.destination._local_client_base import LocalDevClientBase, FRAGMENT_MOCK_FILE
+from sap_cloud_sdk.destination._local_client_base import (
+    LocalDevClientBase,
+    FRAGMENT_MOCK_FILE,
+)
 from sap_cloud_sdk.destination._models import AccessStrategy, Fragment, Level
 from sap_cloud_sdk.destination.exceptions import HttpError, DestinationOperationError
 
@@ -119,7 +122,9 @@ class LocalDevFragmentClient(LocalDevClientBase[Fragment]):
         try:
             data = self._read()
             sub_list = data.get("subaccount", [])
-            return self._resolve_subaccount_entity(name, access_strategy, tenant, sub_list)
+            return self._resolve_subaccount_entity(
+                name, access_strategy, tenant, sub_list
+            )
         except HttpError:
             raise
         except DestinationOperationError:
@@ -180,7 +185,9 @@ class LocalDevFragmentClient(LocalDevClientBase[Fragment]):
 
     # ---------- Write operations ----------
 
-    def create_fragment(self, fragment: Fragment, level: Optional[Level] = Level.SUB_ACCOUNT) -> None:
+    def create_fragment(
+        self, fragment: Fragment, level: Optional[Level] = Level.SUB_ACCOUNT
+    ) -> None:
         """Create a fragment.
 
         Args:
@@ -194,7 +201,9 @@ class LocalDevFragmentClient(LocalDevClientBase[Fragment]):
         collection = "instance" if level == Level.SERVICE_INSTANCE else "subaccount"
         self._create_entity(collection, fragment, fragment.name)
 
-    def update_fragment(self, fragment: Fragment, level: Optional[Level] = Level.SUB_ACCOUNT) -> None:
+    def update_fragment(
+        self, fragment: Fragment, level: Optional[Level] = Level.SUB_ACCOUNT
+    ) -> None:
         """Update a fragment.
 
         Args:
@@ -208,7 +217,9 @@ class LocalDevFragmentClient(LocalDevClientBase[Fragment]):
         collection = "instance" if level == Level.SERVICE_INSTANCE else "subaccount"
         self._update_entity(collection, fragment, fragment.name)
 
-    def delete_fragment(self, name: str, level: Optional[Level] = Level.SUB_ACCOUNT) -> None:
+    def delete_fragment(
+        self, name: str, level: Optional[Level] = Level.SUB_ACCOUNT
+    ) -> None:
         """Delete a fragment.
 
         Args:

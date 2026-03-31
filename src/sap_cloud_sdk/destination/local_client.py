@@ -2,10 +2,14 @@ from __future__ import annotations
 
 from typing import Any, Dict, Optional
 
-from sap_cloud_sdk.destination._local_client_base import LocalDevClientBase, DESTINATION_MOCK_FILE
+from sap_cloud_sdk.destination._local_client_base import (
+    LocalDevClientBase,
+    DESTINATION_MOCK_FILE,
+)
 from sap_cloud_sdk.destination._models import AccessStrategy, Destination, Level
 from sap_cloud_sdk.destination.utils._pagination import PagedResult
 from sap_cloud_sdk.destination.exceptions import DestinationOperationError, HttpError
+
 
 class LocalDevDestinationClient(LocalDevClientBase[Destination]):
     """
@@ -97,10 +101,10 @@ class LocalDevDestinationClient(LocalDevClientBase[Destination]):
         return self._get_entity("instance", name)
 
     def get_subaccount_destination(
-            self,
-            name: str,
-            access_strategy: AccessStrategy = AccessStrategy.SUBSCRIBER_FIRST,
-            tenant: Optional[str] = None,
+        self,
+        name: str,
+        access_strategy: AccessStrategy = AccessStrategy.SUBSCRIBER_FIRST,
+        tenant: Optional[str] = None,
     ) -> Optional[Destination]:
         """Get a destination from the subaccount scope with an access strategy.
 
@@ -120,7 +124,9 @@ class LocalDevDestinationClient(LocalDevClientBase[Destination]):
         try:
             data = self._read()
             sub_list = data.get("subaccount", [])
-            return self._resolve_subaccount_entity(name, access_strategy, tenant, sub_list)
+            return self._resolve_subaccount_entity(
+                name, access_strategy, tenant, sub_list
+            )
         except HttpError:
             raise
         except DestinationOperationError:
@@ -130,7 +136,9 @@ class LocalDevDestinationClient(LocalDevClientBase[Destination]):
 
     # ---------- Write operations ----------
 
-    def create_destination(self, dest: Destination, level: Optional[Level] = Level.SUB_ACCOUNT) -> None:
+    def create_destination(
+        self, dest: Destination, level: Optional[Level] = Level.SUB_ACCOUNT
+    ) -> None:
         """Create a destination.
 
         Args:
@@ -153,16 +161,23 @@ class LocalDevDestinationClient(LocalDevClientBase[Destination]):
                     data = self._read()
                     lst = data.setdefault(collection, [])
                     if self._find_by_name_and_no_tenant(lst, dest.name) is not None:
-                        raise HttpError(f"destination '{dest.name}' already exists", status_code=409,
-                                        response_text="Conflict")
+                        raise HttpError(
+                            f"destination '{dest.name}' already exists",
+                            status_code=409,
+                            response_text="Conflict",
+                        )
                     lst.append(entry)
                     self._write(data)
             except HttpError:
                 raise
             except Exception as e:
-                raise DestinationOperationError(f"failed to create destination '{dest.name}': {e}")
+                raise DestinationOperationError(
+                    f"failed to create destination '{dest.name}': {e}"
+                )
 
-    def update_destination(self, dest: Destination, level: Optional[Level] = Level.SUB_ACCOUNT) -> None:
+    def update_destination(
+        self, dest: Destination, level: Optional[Level] = Level.SUB_ACCOUNT
+    ) -> None:
         """Update a destination.
 
         Args:
@@ -180,7 +195,9 @@ class LocalDevDestinationClient(LocalDevClientBase[Destination]):
             # Preserve tenant field for subaccount-level entries
             self._update_entity(collection, dest, dest.name, preserve_fields=["tenant"])
 
-    def delete_destination(self, name: str, level: Optional[Level] = Level.SUB_ACCOUNT) -> None:
+    def delete_destination(
+        self, name: str, level: Optional[Level] = Level.SUB_ACCOUNT
+    ) -> None:
         """Delete a destination.
 
         Args:
@@ -203,17 +220,22 @@ class LocalDevDestinationClient(LocalDevClientBase[Destination]):
                     lst = data.setdefault(collection, [])
                     idx = self._index_by_name_and_no_tenant(lst, name)
                     if idx < 0:
-                        raise HttpError(f"destination '{name}' not found", status_code=404, response_text="Not Found")
+                        raise HttpError(
+                            f"destination '{name}' not found",
+                            status_code=404,
+                            response_text="Not Found",
+                        )
                     lst.pop(idx)
                     self._write(data)
             except HttpError:
                 raise
             except Exception as e:
-                raise DestinationOperationError(f"failed to delete destination '{name}': {e}")
+                raise DestinationOperationError(
+                    f"failed to delete destination '{name}': {e}"
+                )
 
     def list_instance_destinations(
-            self,
-            _filter: Optional[Any] = None
+        self, _filter: Optional[Any] = None
     ) -> PagedResult[Destination]:
         """List all destinations from the service instance scope.
 
@@ -235,13 +257,15 @@ class LocalDevDestinationClient(LocalDevClientBase[Destination]):
         except DestinationOperationError:
             raise
         except Exception as e:
-            raise DestinationOperationError(f"failed to list instance destinations: {e}")
+            raise DestinationOperationError(
+                f"failed to list instance destinations: {e}"
+            )
 
     def list_subaccount_destinations(
-            self,
-            access_strategy: AccessStrategy = AccessStrategy.SUBSCRIBER_FIRST,
-            tenant: Optional[str] = None,
-            _filter: Optional[Any] = None
+        self,
+        access_strategy: AccessStrategy = AccessStrategy.SUBSCRIBER_FIRST,
+        tenant: Optional[str] = None,
+        _filter: Optional[Any] = None,
     ) -> PagedResult[Destination]:
         """List destinations from the subaccount scope with an access strategy.
 
@@ -273,4 +297,6 @@ class LocalDevDestinationClient(LocalDevClientBase[Destination]):
         except DestinationOperationError:
             raise
         except Exception as e:
-            raise DestinationOperationError(f"failed to list subaccount destinations: {e}")
+            raise DestinationOperationError(
+                f"failed to list subaccount destinations: {e}"
+            )

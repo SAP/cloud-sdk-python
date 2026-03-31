@@ -11,7 +11,7 @@ from typing import Any, Callable, Dict, List, Optional, TypeVar, Generic
 from sap_cloud_sdk.destination._models import AccessStrategy
 from sap_cloud_sdk.destination.exceptions import DestinationOperationError, HttpError
 
-T = TypeVar('T')
+T = TypeVar("T")
 
 DESTINATION_MOCK_FILE = "destination.json"
 FRAGMENT_MOCK_FILE = "fragments.json"
@@ -22,6 +22,7 @@ _SUBSCRIBER_ACCESS_STRATEGIES = {
     AccessStrategy.SUBSCRIBER_FIRST,
     AccessStrategy.PROVIDER_FIRST,
 }
+
 
 class LocalDevClientBase(ABC, Generic[T]):
     """
@@ -43,7 +44,9 @@ class LocalDevClientBase(ABC, Generic[T]):
 
     def __init__(self) -> None:
         # Resolve to repo root and mocks path
-        repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
+        repo_root = os.path.abspath(
+            os.path.join(os.path.dirname(__file__), "..", "..", "..")
+        )
         self._file_path = os.path.join(repo_root, "mocks", self.file_name)
         self._lock = threading.Lock()
         self._ensure_file()
@@ -127,7 +130,9 @@ class LocalDevClientBase(ABC, Generic[T]):
             name = item.get(self.alt_name_field)
         return name
 
-    def _find_by_name(self, lst: List[Dict[str, Any]], name: str) -> Optional[Dict[str, Any]]:
+    def _find_by_name(
+        self, lst: List[Dict[str, Any]], name: str
+    ) -> Optional[Dict[str, Any]]:
         """Find an item by name in a list."""
         for item in lst:
             if self._resolve_name(item) == name:
@@ -141,14 +146,18 @@ class LocalDevClientBase(ABC, Generic[T]):
                 return i
         return -1
 
-    def _find_by_name_and_no_tenant(self, lst: List[Dict[str, Any]], name: str) -> Optional[Dict[str, Any]]:
+    def _find_by_name_and_no_tenant(
+        self, lst: List[Dict[str, Any]], name: str
+    ) -> Optional[Dict[str, Any]]:
         """Find an item by name that has no tenant field (provider context)."""
         for item in lst:
             if self._resolve_name(item) == name and not item.get("tenant"):
                 return item
         return None
 
-    def _find_by_name_and_tenant(self, lst: List[Dict[str, Any]], name: str, tenant: str) -> Optional[Dict[str, Any]]:
+    def _find_by_name_and_tenant(
+        self, lst: List[Dict[str, Any]], name: str, tenant: str
+    ) -> Optional[Dict[str, Any]]:
         """Find an item by name and tenant (subscriber context)."""
         for item in lst:
             if self._resolve_name(item) == name and item.get("tenant") == tenant:
@@ -164,7 +173,9 @@ class LocalDevClientBase(ABC, Generic[T]):
 
     # ---------- Access-strategy resolution ----------
 
-    def _validate_subscriber_access(self, access_strategy: AccessStrategy, tenant: Optional[str], entity_kind: str) -> None:
+    def _validate_subscriber_access(
+        self, access_strategy: AccessStrategy, tenant: Optional[str], entity_kind: str
+    ) -> None:
         """Raise DestinationOperationError when tenant is required but missing."""
         if access_strategy in _SUBSCRIBER_ACCESS_STRATEGIES and tenant is None:
             raise DestinationOperationError(
@@ -173,13 +184,14 @@ class LocalDevClientBase(ABC, Generic[T]):
             )
 
     def _resolve_subaccount_entity(
-            self,
-            name: str,
-            access_strategy: AccessStrategy,
-            tenant: Optional[str],
-            sub_list: List[Dict[str, Any]],
+        self,
+        name: str,
+        access_strategy: AccessStrategy,
+        tenant: Optional[str],
+        sub_list: List[Dict[str, Any]],
     ) -> Optional[T]:
         """Resolve a single entity from the subaccount list using the given access strategy."""
+
         def find_subscriber() -> Optional[T]:
             if tenant is None:
                 return None
@@ -199,7 +211,9 @@ class LocalDevClientBase(ABC, Generic[T]):
 
         funcs = order_map.get(access_strategy)
         if not funcs:
-            raise DestinationOperationError(f"unknown access strategy: {access_strategy}")
+            raise DestinationOperationError(
+                f"unknown access strategy: {access_strategy}"
+            )
 
         for fn in funcs:
             result = fn()
@@ -208,19 +222,26 @@ class LocalDevClientBase(ABC, Generic[T]):
         return None
 
     def _resolve_subaccount_list(
-            self,
-            access_strategy: AccessStrategy,
-            tenant: Optional[str],
-            sub_list: List[Dict[str, Any]],
+        self,
+        access_strategy: AccessStrategy,
+        tenant: Optional[str],
+        sub_list: List[Dict[str, Any]],
     ) -> List[T]:
         """Resolve a list of entities from the subaccount list using the given access strategy."""
+
         def list_subscriber() -> List[T]:
             if tenant is None:
                 return []
-            return [self.from_dict(entry) for entry in sub_list if entry.get("tenant") == tenant]
+            return [
+                self.from_dict(entry)
+                for entry in sub_list
+                if entry.get("tenant") == tenant
+            ]
 
         def list_provider() -> List[T]:
-            return [self.from_dict(entry) for entry in sub_list if not entry.get("tenant")]
+            return [
+                self.from_dict(entry) for entry in sub_list if not entry.get("tenant")
+            ]
 
         order_map: Dict[AccessStrategy, tuple[Callable[[], List[T]], ...]] = {
             AccessStrategy.SUBSCRIBER_ONLY: (list_subscriber,),
@@ -231,7 +252,9 @@ class LocalDevClientBase(ABC, Generic[T]):
 
         funcs = order_map.get(access_strategy)
         if not funcs:
-            raise DestinationOperationError(f"unknown access strategy: {access_strategy}")
+            raise DestinationOperationError(
+                f"unknown access strategy: {access_strategy}"
+            )
 
         results = funcs[0]()
         if not results and len(funcs) > 1:
@@ -259,16 +282,28 @@ class LocalDevClientBase(ABC, Generic[T]):
                 data = self._read()
                 lst = data.setdefault(collection, [])
                 if self._find_by_name(lst, entity_name) is not None:
-                    raise HttpError(f"entity '{entity_name}' already exists", status_code=409, response_text="Conflict")
+                    raise HttpError(
+                        f"entity '{entity_name}' already exists",
+                        status_code=409,
+                        response_text="Conflict",
+                    )
 
                 lst.append(entry)
                 self._write(data)
         except HttpError:
             raise
         except Exception as e:
-            raise DestinationOperationError(f"failed to create entity '{entity_name}': {e}")
+            raise DestinationOperationError(
+                f"failed to create entity '{entity_name}': {e}"
+            )
 
-    def _update_entity(self, collection: str, entity: T, entity_name: str, preserve_fields: Optional[List[str]] = None) -> None:
+    def _update_entity(
+        self,
+        collection: str,
+        entity: T,
+        entity_name: str,
+        preserve_fields: Optional[List[str]] = None,
+    ) -> None:
         """Update an entity in a collection."""
         updated = self.to_dict(entity)
         try:
@@ -277,7 +312,11 @@ class LocalDevClientBase(ABC, Generic[T]):
                 lst = data.setdefault(collection, [])
                 idx = self._index_by_name(lst, entity_name)
                 if idx < 0:
-                    raise HttpError(f"entity '{entity_name}' not found", status_code=404, response_text="Not Found")
+                    raise HttpError(
+                        f"entity '{entity_name}' not found",
+                        status_code=404,
+                        response_text="Not Found",
+                    )
 
                 if preserve_fields:
                     existing = lst[idx]
@@ -290,7 +329,9 @@ class LocalDevClientBase(ABC, Generic[T]):
         except HttpError:
             raise
         except Exception as e:
-            raise DestinationOperationError(f"failed to update entity '{entity_name}': {e}")
+            raise DestinationOperationError(
+                f"failed to update entity '{entity_name}': {e}"
+            )
 
     def _delete_entity(self, collection: str, entity_name: str) -> None:
         """Delete an entity from a collection."""
@@ -300,11 +341,17 @@ class LocalDevClientBase(ABC, Generic[T]):
                 lst = data.setdefault(collection, [])
                 idx = self._index_by_name(lst, entity_name)
                 if idx < 0:
-                    raise HttpError(f"entity '{entity_name}' not found", status_code=404, response_text="Not Found")
+                    raise HttpError(
+                        f"entity '{entity_name}' not found",
+                        status_code=404,
+                        response_text="Not Found",
+                    )
 
                 lst.pop(idx)
                 self._write(data)
         except HttpError:
             raise
         except Exception as e:
-            raise DestinationOperationError(f"failed to delete entity '{entity_name}': {e}")
+            raise DestinationOperationError(
+                f"failed to delete entity '{entity_name}': {e}"
+            )

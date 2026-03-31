@@ -10,22 +10,22 @@ from sap_cloud_sdk.dms.model import DMSCredentials
 @dataclass
 class BindingData:
     """Dataclass for DMS binding data with URI and UAA credentials.
-    
+
     Attributes:
         uri: The URI endpoint for the DMS service
         uaa: JSON string containing XSUAA authentication credentials
     """
-    instance_name: str 
+    instance_name: str
     uri: str
     uaa: str
 
     def validate(self) -> None:
         """Validate the binding data.
-        
+
         Validates that:
         - uri is a valid URI
         - uaa is valid JSON and contains required credential fields
-        
+
         Raises:
             ValueError: If uri is not a valid URI
             json.JSONDecodeError: If uaa is not valid JSON
@@ -36,7 +36,7 @@ class BindingData:
 
     def _validate_uri(self) -> None:
         """Validate that uri is a valid URI.
-        
+
         Raises:
             ValueError: If uri is not a valid URI
         """
@@ -52,7 +52,7 @@ class BindingData:
 
     def _validate_uaa(self) -> None:
         """Validate that uaa is valid JSON with required credential fields.
-        
+
         Raises:
             json.JSONDecodeError: If uaa is not valid JSON
             ValueError: If required fields are missing from UAA credentials
@@ -78,13 +78,13 @@ class BindingData:
             raise ValueError(
                 f"UAA credentials missing required fields: {', '.join(sorted(missing_fields))}"
             )
-    
+
     def to_credentials(self) -> DMSCredentials:
         """Convert the binding data to DMSCredentials.
-        
+
         Parses the UAA JSON and constructs a DMSCredentials object with the necessary information
         for authenticating and connecting to the DMS service.
-        
+
         Returns:
             DMSCredentials: The credentials extracted from the binding data
         """

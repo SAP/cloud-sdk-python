@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, Optional
 
-from sap_cloud_sdk.destination._local_client_base import LocalDevClientBase
+from sap_cloud_sdk.destination._local_client_base import LocalDevClientBase, CERTIFICATE_MOCK_FILE
 from sap_cloud_sdk.destination._models import AccessStrategy, Certificate, Level
 from sap_cloud_sdk.destination.utils._pagination import PagedResult
 from sap_cloud_sdk.destination.exceptions import HttpError, DestinationOperationError
@@ -52,7 +52,7 @@ class LocalDevCertificateClient(LocalDevClientBase[Certificate]):
     @property
     def file_name(self) -> str:
         """Return the JSON file name."""
-        return "certificates.json"
+        return CERTIFICATE_MOCK_FILE
 
     @property
     def name_field(self) -> str:

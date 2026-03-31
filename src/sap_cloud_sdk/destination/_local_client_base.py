@@ -13,6 +13,10 @@ from sap_cloud_sdk.destination.exceptions import DestinationOperationError, Http
 
 T = TypeVar('T')
 
+DESTINATION_MOCK_FILE = "destination.json"
+FRAGMENT_MOCK_FILE = "fragments.json"
+CERTIFICATE_MOCK_FILE = "certificates.json"
+
 _SUBSCRIBER_ACCESS_STRATEGIES = {
     AccessStrategy.SUBSCRIBER_ONLY,
     AccessStrategy.SUBSCRIBER_FIRST,

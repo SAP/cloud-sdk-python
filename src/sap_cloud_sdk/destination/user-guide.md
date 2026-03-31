@@ -333,6 +333,92 @@ This ensures only valid headers are used with transparent proxy destinations.
   - `get_subaccount_destination()` - V1 API for subaccount-level destinations with access strategies
   - `get_destination()` - V2 API for runtime consumption with automatic token retrieval
 
+## Local Development Mode
+
+When a `mocks/<resource>.json` file is present at the repository root, the factory functions automatically return a local in-memory client backed by that file instead of connecting to the SAP BTP Destination Service. No credentials or network access are required.
+
+| Factory | Mock file |
+|---|---|
+| `create_client()` | `mocks/destination.json` |
+| `create_fragment_client()` | `mocks/fragments.json` |
+| `create_certificate_client()` | `mocks/certificates.json` |
+
+> **WARNING: Local mode is for local development only.**
+> Local clients perform no authentication and store data in plain JSON files on disk. Never use local mode in a deployed or production environment. A warning is logged at `WARNING` level every time a local client is returned by a factory.
+
+### Recommended: add mock files to `.gitignore`
+
+Mock files may contain sensitive data (URLs, credentials, certificates). Add them to `.gitignore` to prevent accidental commits:
+
+```
+mocks/destination.json
+mocks/fragments.json
+mocks/certificates.json
+```
+
+### Mock file format
+
+**`mocks/destination.json`**
+
+```json
+{
+  "subaccount": [
+    {
+      "name": "my-destination",
+      "type": "HTTP",
+      "url": "https://example.com",
+      "authentication": "NoAuthentication"
+    },
+    {
+      "tenant": "my-tenant",
+      "name": "subscriber-destination",
+      "type": "HTTP",
+      "url": "https://subscriber.example.com",
+      "authentication": "NoAuthentication"
+    }
+  ],
+  "instance": [
+    {
+      "name": "instance-destination",
+      "type": "HTTP",
+      "url": "https://instance.example.com"
+    }
+  ]
+}
+```
+
+**`mocks/fragments.json`**
+
+```json
+{
+  "subaccount": [
+    {
+      "FragmentName": "my-fragment",
+      "URL": "https://example.com",
+      "Authentication": "NoAuthentication"
+    }
+  ],
+  "instance": []
+}
+```
+
+**`mocks/certificates.json`**
+
+```json
+{
+  "subaccount": [
+    {
+      "Name": "my-cert.pem",
+      "Content": "LS0tLS1CRUdJTi...",
+      "Type": "PEM"
+    }
+  ],
+  "instance": []
+}
+```
+
+Entries with a `"tenant"` field are treated as subscriber-specific. Entries without `"tenant"` are provider entries.
+
 ## Secret Resolution
 
 ### Service Binding

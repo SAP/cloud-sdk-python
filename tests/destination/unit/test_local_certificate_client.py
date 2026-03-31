@@ -5,6 +5,7 @@ import json
 import pytest
 
 from sap_cloud_sdk.destination.local_certificate_client import LocalDevCertificateClient
+from sap_cloud_sdk.destination._local_client_base import CERTIFICATE_MOCK_FILE
 from sap_cloud_sdk.destination._models import AccessStrategy, Certificate, Level
 from sap_cloud_sdk.destination.utils._pagination import PagedResult
 from sap_cloud_sdk.destination.exceptions import DestinationOperationError, HttpError
@@ -21,7 +22,7 @@ def client(tmp_path, monkeypatch):
 
 
 def _store_path(tmp_path):
-    return tmp_path / "mocks" / "certificates.json"
+    return tmp_path / "mocks" / CERTIFICATE_MOCK_FILE
 
 
 def _write_store(client, data):

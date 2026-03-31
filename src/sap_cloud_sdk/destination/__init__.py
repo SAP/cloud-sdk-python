@@ -22,6 +22,8 @@ Usage:
 
 from __future__ import annotations
 
+import logging
+import os
 from typing import Optional
 
 from sap_cloud_sdk.destination._models import (
@@ -46,6 +48,14 @@ from sap_cloud_sdk.destination._http import TokenProvider, DestinationHttp
 from sap_cloud_sdk.destination.client import DestinationClient
 from sap_cloud_sdk.destination.fragment_client import FragmentClient
 from sap_cloud_sdk.destination.certificate_client import CertificateClient
+from sap_cloud_sdk.destination.local_client import LocalDevDestinationClient
+from sap_cloud_sdk.destination.local_fragment_client import LocalDevFragmentClient
+from sap_cloud_sdk.destination.local_certificate_client import LocalDevCertificateClient
+from sap_cloud_sdk.destination._local_client_base import (
+    DESTINATION_MOCK_FILE,
+    FRAGMENT_MOCK_FILE,
+    CERTIFICATE_MOCK_FILE,
+)
 from sap_cloud_sdk.destination.exceptions import (
     DestinationError,
     ClientCreationError,
@@ -54,6 +64,15 @@ from sap_cloud_sdk.destination.exceptions import (
     DestinationOperationError,
     DestinationNotFoundError,
 )
+
+
+logger = logging.getLogger(__name__)
+
+
+def _mock_file(name: str) -> str:
+    """Return the absolute path to a mocks/<name> file relative to the repo root."""
+    repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
+    return os.path.join(repo_root, "mocks", name)
 
 
 def create_client(
@@ -78,12 +97,19 @@ def create_client(
                           Defaults to False.
 
     Returns:
-        DestinationClient or LocalDevDestinationProvider: Client implementing the Destination interface.
+        DestinationClient or LocalDevDestinationClient: Client implementing the Destination interface.
 
     Raises:
         ClientCreationError: If client creation fails due to configuration or initialization issues.
     """
     try:
+        if os.path.isfile(_mock_file(DESTINATION_MOCK_FILE)):
+            logger.warning(
+                "Local mock mode active: using LocalDevDestinationClient backed by mocks/destination.json. "
+                "This is intended for local development only and must not be used in production."
+            )
+            return LocalDevDestinationClient()
+
         # Cloud mode via secret resolver or explicit config
         binding = config or load_from_env_or_mount(instance)
         tp = TokenProvider(binding)
@@ -118,6 +144,13 @@ def create_fragment_client(
         ClientCreationError: If client creation fails due to configuration or initialization issues.
     """
     try:
+        if os.path.isfile(_mock_file(FRAGMENT_MOCK_FILE)):
+            logger.warning(
+                "Local mock mode active: using LocalDevFragmentClient backed by mocks/fragments.json. "
+                "This is intended for local development only and must not be used in production."
+            )
+            return LocalDevFragmentClient()
+
         # Use provided config or load from environment/mount (cloud mode)
         binding = config or load_from_env_or_mount(instance)
         tp = TokenProvider(binding)
@@ -152,6 +185,13 @@ def create_certificate_client(
         ClientCreationError: If client creation fails due to configuration or initialization issues.
     """
     try:
+        if os.path.isfile(_mock_file(CERTIFICATE_MOCK_FILE)):
+            logger.warning(
+                "Local mock mode active: using LocalDevCertificateClient backed by mocks/certificates.json. "
+                "This is intended for local development only and must not be used in production."
+            )
+            return LocalDevCertificateClient()
+
         # Use provided config or load from environment/mount (cloud mode)
         binding = config or load_from_env_or_mount(instance)
         tp = TokenProvider(binding)

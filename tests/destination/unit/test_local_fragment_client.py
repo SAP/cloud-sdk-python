@@ -5,6 +5,7 @@ import json
 import pytest
 
 from sap_cloud_sdk.destination.local_fragment_client import LocalDevFragmentClient
+from sap_cloud_sdk.destination._local_client_base import FRAGMENT_MOCK_FILE
 from sap_cloud_sdk.destination._models import AccessStrategy, Fragment, Level
 from sap_cloud_sdk.destination.exceptions import DestinationOperationError, HttpError
 
@@ -20,7 +21,7 @@ def client(tmp_path, monkeypatch):
 
 
 def _store_path(tmp_path):
-    return tmp_path / "mocks" / "fragments.json"
+    return tmp_path / "mocks" / FRAGMENT_MOCK_FILE
 
 
 def _write_store(client, data):

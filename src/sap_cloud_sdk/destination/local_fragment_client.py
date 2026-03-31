@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
 
-from sap_cloud_sdk.destination._local_client_base import LocalDevClientBase
+from sap_cloud_sdk.destination._local_client_base import LocalDevClientBase, FRAGMENT_MOCK_FILE
 from sap_cloud_sdk.destination._models import AccessStrategy, Fragment, Level
 from sap_cloud_sdk.destination.exceptions import HttpError, DestinationOperationError
 
@@ -53,7 +53,7 @@ class LocalDevFragmentClient(LocalDevClientBase[Fragment]):
     @property
     def file_name(self) -> str:
         """Return the JSON file name."""
-        return "fragments.json"
+        return FRAGMENT_MOCK_FILE
 
     @property
     def name_field(self) -> str:

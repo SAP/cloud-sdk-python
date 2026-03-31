@@ -11,7 +11,7 @@ def _serialize(v: Any) -> Any:
     if isinstance(v, Enum):
         return v.value
     if isinstance(v, dict):
-        d: dict[str, Any] = cast(dict[str, Any],v) 
+        d: dict[str, Any] = cast(dict[str, Any],v)
         return {str(k): _serialize(val) for k, val in d.items()}
     if isinstance(v, list):
         lst: list[Any] = cast(list[Any],v)

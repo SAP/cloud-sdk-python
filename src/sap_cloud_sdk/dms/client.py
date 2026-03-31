@@ -1,5 +1,5 @@
 import logging
-from typing import Any, BinaryIO, Dict, List, Optional, Union
+from typing import BinaryIO, Dict, List, Optional, Union
 from requests import Response
 from sap_cloud_sdk.dms.model import (
     DMSCredentials, InternalRepoRequest, Repository, UserClaim,
@@ -126,7 +126,7 @@ class DMSClient:
         repos = [Repository.from_dict(item["repository"]) for item in infos]
         logger.info("Fetched %d repositories", len(repos))
         return repos
-    
+
 
     @record_metrics(Module.DMS, Operation.DMS_GET_REPOSITORY)
     def get_repository(
@@ -196,7 +196,7 @@ class DMSClient:
         repo = Repository.from_dict(response.json())
         logger.info("Repository '%s' updated successfully", repo_id)
         return repo
-    
+
 
     @record_metrics(Module.DMS, Operation.DMS_DELETE_REPOSITORY)
     def delete_repository(
@@ -211,7 +211,7 @@ class DMSClient:
             repo_id: The repository UUID.
             tenant: Optional tenant subdomain.
             user_claim: Optional user identity claims.
-        
+
         Raises:
             DMSObjectNotFoundException: If the repository does not exist.
             DMSInvalidArgumentException: If the request payload is invalid.

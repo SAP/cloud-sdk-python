@@ -1,5 +1,4 @@
 from sap_cloud_sdk.dms import create_client
-from tests.destination.integration.conftest import _setup_cloud_mode
 import pytest
 from pathlib import Path
 from dotenv import load_dotenv

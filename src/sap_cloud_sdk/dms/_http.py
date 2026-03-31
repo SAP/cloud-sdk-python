@@ -42,14 +42,16 @@ class HttpInvoker:
         params: Optional[dict[str, str]] = None,
     ) -> Response:
         logger.debug("GET %s", path)
-        return self._handle(self._execute(
-            lambda: requests.get(
-                f"{self._base_url}{path}",
-                headers=self._merged_headers(tenant_subdomain, headers, user_claim),
-                params=params,
-                timeout=(self._connect_timeout, self._read_timeout),
+        return self._handle(
+            self._execute(
+                lambda: requests.get(
+                    f"{self._base_url}{path}",
+                    headers=self._merged_headers(tenant_subdomain, headers, user_claim),
+                    params=params,
+                    timeout=(self._connect_timeout, self._read_timeout),
+                )
             )
-        ))
+        )
 
     def post(
         self,
@@ -60,14 +62,16 @@ class HttpInvoker:
         user_claim: Optional[UserClaim] = None,
     ) -> Response:
         logger.debug("POST %s", path)
-        return self._handle(self._execute(
-            lambda: requests.post(
-                f"{self._base_url}{path}",
-                headers=self._merged_headers(tenant_subdomain, headers, user_claim),
-                json=payload,
-                timeout=(self._connect_timeout, self._read_timeout),
+        return self._handle(
+            self._execute(
+                lambda: requests.post(
+                    f"{self._base_url}{path}",
+                    headers=self._merged_headers(tenant_subdomain, headers, user_claim),
+                    json=payload,
+                    timeout=(self._connect_timeout, self._read_timeout),
+                )
             )
-        ))
+        )
 
     def put(
         self,
@@ -78,14 +82,16 @@ class HttpInvoker:
         user_claim: Optional[UserClaim] = None,
     ) -> Response:
         logger.debug("PUT %s", path)
-        return self._handle(self._execute(
-            lambda: requests.put(
-                f"{self._base_url}{path}",
-                headers=self._merged_headers(tenant_subdomain, headers, user_claim),
-                json=payload,
-                timeout=(self._connect_timeout, self._read_timeout),
+        return self._handle(
+            self._execute(
+                lambda: requests.put(
+                    f"{self._base_url}{path}",
+                    headers=self._merged_headers(tenant_subdomain, headers, user_claim),
+                    json=payload,
+                    timeout=(self._connect_timeout, self._read_timeout),
+                )
             )
-        ))
+        )
 
     def delete(
         self,
@@ -95,13 +101,15 @@ class HttpInvoker:
         user_claim: Optional[UserClaim] = None,
     ) -> Response:
         logger.debug("DELETE %s", path)
-        return self._handle(self._execute(
-            lambda: requests.delete(
-                f"{self._base_url}{path}",
-                headers=self._merged_headers(tenant_subdomain, headers, user_claim),
-                timeout=(self._connect_timeout, self._read_timeout),
+        return self._handle(
+            self._execute(
+                lambda: requests.delete(
+                    f"{self._base_url}{path}",
+                    headers=self._merged_headers(tenant_subdomain, headers, user_claim),
+                    timeout=(self._connect_timeout, self._read_timeout),
+                )
             )
-        ))
+        )
 
     def post_form(
         self,
@@ -118,15 +126,17 @@ class HttpInvoker:
         to ``application/x-www-form-urlencoded`` or ``multipart/form-data``.
         """
         logger.debug("POST_FORM %s", path)
-        return self._handle(self._execute(
-            lambda: requests.post(
-                f"{self._base_url}{path}",
-                headers=self._auth_header(tenant_subdomain, user_claim),
-                data=data,
-                files=files,
-                timeout=(self._connect_timeout, self._read_timeout),
+        return self._handle(
+            self._execute(
+                lambda: requests.post(
+                    f"{self._base_url}{path}",
+                    headers=self._auth_header(tenant_subdomain, user_claim),
+                    data=data,
+                    files=files,
+                    timeout=(self._connect_timeout, self._read_timeout),
+                )
             )
-        ))
+        )
 
     def get_stream(
         self,
@@ -142,15 +152,17 @@ class HttpInvoker:
         On non-2xx status the usual typed exception is raised.
         """
         logger.debug("GET_STREAM %s", path)
-        return self._handle(self._execute(
-            lambda: requests.get(
-                f"{self._base_url}{path}",
-                headers=self._merged_headers(tenant_subdomain, None, user_claim),
-                params=params,
-                stream=True,
-                timeout=(self._connect_timeout, self._read_timeout),
+        return self._handle(
+            self._execute(
+                lambda: requests.get(
+                    f"{self._base_url}{path}",
+                    headers=self._merged_headers(tenant_subdomain, None, user_claim),
+                    params=params,
+                    stream=True,
+                    timeout=(self._connect_timeout, self._read_timeout),
+                )
             )
-        ))
+        )
 
     def _execute(self, fn: Any) -> Response:
         """Execute an HTTP call, wrapping network errors into DMSConnectionError."""
@@ -177,7 +189,9 @@ class HttpInvoker:
             **self._user_claim_headers(user_claim),
         }
 
-    def _default_headers(self, tenant_subdomain: Optional[str] = None) -> dict[str, str]:
+    def _default_headers(
+        self, tenant_subdomain: Optional[str] = None
+    ) -> dict[str, str]:
         return {
             "Authorization": f"Bearer {self._auth.get_token(tenant_subdomain)}",
             "Content-Type": "application/json",
@@ -225,25 +239,39 @@ class HttpInvoker:
         match response.status_code:
             case 400:
                 raise DMSInvalidArgumentException(
-                    server_message or "Request contains invalid or disallowed parameters", 400, error_content
+                    server_message
+                    or "Request contains invalid or disallowed parameters",
+                    400,
+                    error_content,
                 )
             case 401 | 403:
                 raise DMSPermissionDeniedException(
-                    server_message or "Access denied — invalid or expired token", response.status_code, error_content
+                    server_message or "Access denied — invalid or expired token",
+                    response.status_code,
+                    error_content,
                 )
             case 404:
                 raise DMSObjectNotFoundException(
-                    server_message or "The requested resource was not found", 404, error_content
+                    server_message or "The requested resource was not found",
+                    404,
+                    error_content,
                 )
             case 409:
                 raise DMSConflictException(
-                    server_message or "The request conflicts with the current state of the resource", 409, error_content
+                    server_message
+                    or "The request conflicts with the current state of the resource",
+                    409,
+                    error_content,
                 )
             case 500:
                 raise DMSRuntimeException(
-                    server_message or "The DMS service encountered an internal error", 500, error_content
+                    server_message or "The DMS service encountered an internal error",
+                    500,
+                    error_content,
                 )
             case _:
                 raise DMSError(
-                    f"Unexpected response from DMS service: {error_content}", response.status_code, error_content
+                    f"Unexpected response from DMS service: {error_content}",
+                    response.status_code,
+                    error_content,
                 )

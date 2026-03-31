@@ -68,7 +68,6 @@ class Operation(str, Enum):
     AICORE_SET_CONFIG = "set_aicore_config"
     AICORE_AUTO_INSTRUMENT = "auto_instrument"
 
-
     # DMS Operations
     DMS_ONBOARD_REPOSITORY = "onboard_repository"
     DMS_GET_REPOSITORY = "get_repository"

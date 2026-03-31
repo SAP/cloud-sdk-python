@@ -2,9 +2,21 @@ import logging
 from typing import BinaryIO, Dict, List, Optional, Union
 from requests import Response
 from sap_cloud_sdk.dms.model import (
-    DMSCredentials, InternalRepoRequest, Repository, UserClaim,
-    UpdateRepoRequest, CreateConfigRequest, RepositoryConfig, UpdateConfigRequest,
-    Ace, Acl, ChildrenPage, CmisObject, Document, Folder, _prop_val,
+    DMSCredentials,
+    InternalRepoRequest,
+    Repository,
+    UserClaim,
+    UpdateRepoRequest,
+    CreateConfigRequest,
+    RepositoryConfig,
+    UpdateConfigRequest,
+    Ace,
+    Acl,
+    ChildrenPage,
+    CmisObject,
+    Document,
+    Folder,
+    _prop_val,
 )
 from sap_cloud_sdk.dms._auth import Auth
 from sap_cloud_sdk.dms._http import HttpInvoker
@@ -17,6 +29,7 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 # CMIS property helpers
 # ---------------------------------------------------------------------------
+
 
 def _build_properties(props: Dict[str, str]) -> Dict[str, str]:
     """Encode CMIS properties into indexed form fields.
@@ -60,7 +73,9 @@ class DMSClient:
             connect_timeout=connect_timeout,
             read_timeout=read_timeout,
         )
-        logger.debug("DMSClient initialized for instance '%s'", credentials.instance_name)
+        logger.debug(
+            "DMSClient initialized for instance '%s'", credentials.instance_name
+        )
 
     @record_metrics(Module.DMS, Operation.DMS_ONBOARD_REPOSITORY)
     def onboard_repository(
@@ -127,7 +142,6 @@ class DMSClient:
         logger.info("Fetched %d repositories", len(repos))
         return repos
 
-
     @record_metrics(Module.DMS, Operation.DMS_GET_REPOSITORY)
     def get_repository(
         self,
@@ -157,7 +171,6 @@ class DMSClient:
             user_claim=user_claim,
         )
         return Repository.from_dict(response.json()["repository"])
-
 
     @record_metrics(Module.DMS, Operation.DMS_UPDATE_REPOSITORY)
     def update_repository(
@@ -197,7 +210,6 @@ class DMSClient:
         logger.info("Repository '%s' updated successfully", repo_id)
         return repo
 
-
     @record_metrics(Module.DMS, Operation.DMS_DELETE_REPOSITORY)
     def delete_repository(
         self,
@@ -223,7 +235,6 @@ class DMSClient:
             tenant_subdomain=tenant,
             user_claim=user_claim,
         )
-
 
     @record_metrics(Module.DMS, Operation.DMS_CREATE_CONFIG)
     def create_config(
@@ -257,7 +268,6 @@ class DMSClient:
         config = RepositoryConfig.from_dict(response.json())
         logger.info("Config created successfully with id '%s'", config.id)
         return config
-
 
     @record_metrics(Module.DMS, Operation.DMS_GET_CONFIGS)
     def get_configs(
@@ -482,7 +492,9 @@ class DMSClient:
         response = self._http.post_form(
             self._browser_url(repository_id, path),
             data=form_data,
-            files={"media": (document_name, file, mime_type or "application/octet-stream")},
+            files={
+                "media": (document_name, file, mime_type or "application/octet-stream")
+            },
             tenant_subdomain=tenant,
             user_claim=user_claim,
         )
@@ -522,7 +534,9 @@ class DMSClient:
             "objectId": document_id,
             "_charset_": "UTF-8",
         }
-        logger.info("Checking out document '%s' in repo '%s'", document_id, repository_id)
+        logger.info(
+            "Checking out document '%s' in repo '%s'", document_id, repository_id
+        )
         response = self._http.post_form(
             self._browser_url(repository_id),
             data=form_data,
@@ -577,9 +591,17 @@ class DMSClient:
 
         files = None
         if file is not None:
-            files = {"content": (file_name or "content", file, mime_type or "application/octet-stream")}
+            files = {
+                "content": (
+                    file_name or "content",
+                    file,
+                    mime_type or "application/octet-stream",
+                )
+            }
 
-        logger.info("Checking in document '%s' in repo '%s'", document_id, repository_id)
+        logger.info(
+            "Checking in document '%s' in repo '%s'", document_id, repository_id
+        )
         response = self._http.post_form(
             self._browser_url(repository_id),
             data=form_data,
@@ -616,7 +638,9 @@ class DMSClient:
             "objectId": document_id,
             "_charset_": "UTF-8",
         }
-        logger.info("Cancelling check-out for '%s' in repo '%s'", document_id, repository_id)
+        logger.info(
+            "Cancelling check-out for '%s' in repo '%s'", document_id, repository_id
+        )
         self._http.post_form(
             self._browser_url(repository_id),
             data=form_data,
@@ -666,7 +690,9 @@ class DMSClient:
         """
         if not add_aces and not remove_aces:
             # Read-only: fetch current ACL
-            logger.info("Fetching ACL for object '%s' in repo '%s'", object_id, repository_id)
+            logger.info(
+                "Fetching ACL for object '%s' in repo '%s'", object_id, repository_id
+            )
             response = self._http.get(
                 self._browser_url(repository_id),
                 params={"objectId": object_id, "cmisselector": "acl"},
@@ -686,7 +712,9 @@ class DMSClient:
         if remove_aces:
             form_data.update(_build_aces(remove_aces, prefix="removeACEPrincipal"))
 
-        logger.info("Applying ACL to object '%s' in repo '%s'", object_id, repository_id)
+        logger.info(
+            "Applying ACL to object '%s' in repo '%s'", object_id, repository_id
+        )
         response = self._http.post_form(
             self._browser_url(repository_id),
             data=form_data,
@@ -821,7 +849,11 @@ class DMSClient:
         if filename:
             params["filename"] = filename
 
-        logger.info("Getting content for document '%s' from repo '%s'", document_id, repository_id)
+        logger.info(
+            "Getting content for document '%s' from repo '%s'",
+            document_id,
+            repository_id,
+        )
         return self._http.get_stream(
             self._browser_url(repository_id),
             params=params,
@@ -868,7 +900,9 @@ class DMSClient:
             form_data["changeToken"] = change_token
         form_data.update(_build_properties(properties))
 
-        logger.info("Updating properties for object '%s' in repo '%s'", object_id, repository_id)
+        logger.info(
+            "Updating properties for object '%s' in repo '%s'", object_id, repository_id
+        )
         response = self._http.post_form(
             self._browser_url(repository_id),
             data=form_data,
@@ -943,7 +977,9 @@ class DMSClient:
         if succinct:
             params["succinct"] = "true"
 
-        logger.info("Getting children of folder '%s' in repo '%s'", folder_id, repository_id)
+        logger.info(
+            "Getting children of folder '%s' in repo '%s'", folder_id, repository_id
+        )
         response = self._http.get(
             self._browser_url(repository_id),
             params=params,

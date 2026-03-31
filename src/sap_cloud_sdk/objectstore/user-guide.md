@@ -4,30 +4,6 @@ This module provides a simple API for interacting with S3-compatible object stor
 
 Provides a simple and unified way to connect to Object Store services. It abstracts configuration, authentication, and transport, making it easy to upload and download files without dealing with provider-specific details.
 
-> **Breaking Change Notice**
->
-> **Implicit audit logging has been removed** from the ObjectStore module. Previously, all object store operations (upload, download, delete, list, etc.) automatically logged audit events. This implicit behavior has been removed to provide a cleaner, more focused API.
->
-> **Migration Required:** If your application requires audit logging for object store operations, you must now implement it explicitly in your application code using the `sap_cloud_sdk.core.auditlog` module. This gives you full control over what, when, and how audit events are logged.
->
-> Example of explicit audit logging:
-> ```python
-> from sap_cloud_sdk.objectstore import create_client
-> from sap_cloud_sdk.core.auditlog import create_client as create_audit_client, DataModificationEvent
->
-> # Create clients
-> store_client = create_client("my-instance")
-> audit_client = create_audit_client()
->
-> # Upload with explicit audit logging
-> store_client.put_object_from_bytes("file.txt", b"data", "text/plain")
-> audit_client.log(DataModificationEvent(
->     object_type="s3-object",
->     object_id={"bucket": "my-bucket", "key": "file.txt"},
->     # ... other audit event details
-> ))
-> ```
-
 ## Installation
 
 ```bash

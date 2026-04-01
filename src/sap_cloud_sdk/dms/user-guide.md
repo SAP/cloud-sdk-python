@@ -198,7 +198,7 @@ All CMIS operations require a `repository_id` (the CMIS repository ID from `repo
 ```python
 folder = client.create_folder(
     repository_id="cmis-repo-id",
-    parent_folder_id="root-folder-object-id",
+    parent_folder_id="parent-folder-object-id",
     folder_name="My Folder",
     description="Optional description",
 )

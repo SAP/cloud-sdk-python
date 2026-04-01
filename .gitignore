@@ -32,3 +32,6 @@ test-results.*
 
 # SonarQube Reports
 .sonar*
+
+# Local Mode
+mocks/

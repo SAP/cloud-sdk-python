@@ -1,8 +1,10 @@
 """Tests for auto-instrumentation functionality."""
 
 import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch, MagicMock, create_autospec
 from contextlib import ExitStack
+
+from opentelemetry.sdk.trace import TracerProvider as SDKTracerProvider
 
 from sap_cloud_sdk.core.telemetry.auto_instrument import auto_instrument
 
@@ -13,9 +15,12 @@ def mock_traceloop_components():
     with ExitStack() as stack:
         mocks = {
             'traceloop': stack.enter_context(patch('sap_cloud_sdk.core.telemetry.auto_instrument.Traceloop')),
-            'exporter': stack.enter_context(patch('sap_cloud_sdk.core.telemetry.auto_instrument.OTLPSpanExporter')),
+            'grpc_exporter': stack.enter_context(patch('sap_cloud_sdk.core.telemetry.auto_instrument.GRPCSpanExporter')),
+            'http_exporter': stack.enter_context(patch('sap_cloud_sdk.core.telemetry.auto_instrument.HTTPSpanExporter')),
             'console_exporter': stack.enter_context(patch('sap_cloud_sdk.core.telemetry.auto_instrument.ConsoleSpanExporter')),
             'transformer': stack.enter_context(patch('sap_cloud_sdk.core.telemetry.auto_instrument.GenAIAttributeTransformer')),
+            'baggage_processor': stack.enter_context(patch('sap_cloud_sdk.core.telemetry.auto_instrument.BaggageSpanProcessor')),
+            'get_tracer_provider': stack.enter_context(patch('sap_cloud_sdk.core.telemetry.auto_instrument.trace.get_tracer_provider', return_value=create_autospec(SDKTracerProvider))),
             'create_resource': stack.enter_context(patch('sap_cloud_sdk.core.telemetry.auto_instrument.create_resource_attributes_from_env')),
             'get_app_name': stack.enter_context(patch('sap_cloud_sdk.core.telemetry.auto_instrument._get_app_name')),
         }
@@ -40,31 +45,16 @@ class TestAutoInstrument:
             assert call_kwargs['should_enrich_metrics'] is True
             assert call_kwargs['disable_batch'] is True
 
-    def test_auto_instrument_appends_v1_traces_to_endpoint(self, mock_traceloop_components):
-        """Test that auto_instrument appends /v1/traces to endpoint if not present."""
+    def test_auto_instrument_uses_grpc_exporter_by_default(self, mock_traceloop_components):
+        """Test that auto_instrument uses gRPC exporter by default, letting it read endpoint from env."""
         mock_traceloop_components['get_app_name'].return_value = 'test-app'
         mock_traceloop_components['create_resource'].return_value = {}
 
         with patch.dict('os.environ', {'OTEL_EXPORTER_OTLP_ENDPOINT': 'http://localhost:4317'}, clear=True):
             auto_instrument()
 
-            # Verify exporter was called with /v1/traces appended
-            mock_traceloop_components['exporter'].assert_called_once_with(
-                endpoint='http://localhost:4317/v1/traces'
-            )
-
-    def test_auto_instrument_preserves_existing_v1_traces(self, mock_traceloop_components):
-        """Test that auto_instrument doesn't duplicate /v1/traces if already present."""
-        mock_traceloop_components['get_app_name'].return_value = 'test-app'
-        mock_traceloop_components['create_resource'].return_value = {}
-
-        with patch.dict('os.environ', {'OTEL_EXPORTER_OTLP_ENDPOINT': 'http://localhost:4317/v1/traces'}, clear=True):
-            auto_instrument()
-
-            # Verify exporter was called with original endpoint
-            mock_traceloop_components['exporter'].assert_called_once_with(
-                endpoint='http://localhost:4317/v1/traces'
-            )
+            mock_traceloop_components['grpc_exporter'].assert_called_once_with()
+            mock_traceloop_components['http_exporter'].assert_not_called()
 
     def test_auto_instrument_creates_resource_with_attributes(self, mock_traceloop_components):
         """Test that auto_instrument creates resource with correct attributes."""
@@ -103,17 +93,28 @@ class TestAutoInstrument:
                 assert any('initialized successfully' in msg.lower() for msg in info_calls)
 
     def test_auto_instrument_with_trailing_slash(self, mock_traceloop_components):
-        """Test that auto_instrument handles endpoint with trailing slash."""
+        """Test that auto_instrument works with a trailing slash endpoint (exporter reads from env)."""
         mock_traceloop_components['get_app_name'].return_value = 'test-app'
         mock_traceloop_components['create_resource'].return_value = {}
 
         with patch.dict('os.environ', {'OTEL_EXPORTER_OTLP_ENDPOINT': 'http://localhost:4317/'}, clear=True):
             auto_instrument()
 
-            # Verify trailing slash is removed before appending /v1/traces
-            mock_traceloop_components['exporter'].assert_called_once_with(
-                endpoint='http://localhost:4317/v1/traces'
-            )
+            mock_traceloop_components['grpc_exporter'].assert_called_once_with()
+
+    def test_auto_instrument_with_http_protobuf_protocol(self, mock_traceloop_components):
+        """Test that auto_instrument uses HTTP exporter when OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf."""
+        mock_traceloop_components['get_app_name'].return_value = 'test-app'
+        mock_traceloop_components['create_resource'].return_value = {}
+
+        with patch.dict('os.environ', {
+            'OTEL_EXPORTER_OTLP_ENDPOINT': 'http://localhost:4318',
+            'OTEL_EXPORTER_OTLP_PROTOCOL': 'http/protobuf'
+        }, clear=True):
+            auto_instrument()
+
+            mock_traceloop_components['http_exporter'].assert_called_once_with()
+            mock_traceloop_components['grpc_exporter'].assert_not_called()
 
     def test_auto_instrument_passes_transformer_to_traceloop(self, mock_traceloop_components):
         """Test that auto_instrument passes the GenAIAttributeTransformer as exporter to Traceloop."""
@@ -155,7 +156,8 @@ class TestAutoInstrument:
             auto_instrument()
 
             mock_traceloop_components['console_exporter'].assert_called_once_with()
-            mock_traceloop_components['exporter'].assert_not_called()
+            mock_traceloop_components['grpc_exporter'].assert_not_called()
+            mock_traceloop_components['http_exporter'].assert_not_called()
             mock_traceloop_components['traceloop'].init.assert_called_once()
 
     def test_auto_instrument_console_exporter_case_insensitive(self, mock_traceloop_components):
@@ -182,7 +184,8 @@ class TestAutoInstrument:
             auto_instrument()
 
             mock_traceloop_components['console_exporter'].assert_called_once_with()
-            mock_traceloop_components['exporter'].assert_not_called()
+            mock_traceloop_components['grpc_exporter'].assert_not_called()
+            mock_traceloop_components['http_exporter'].assert_not_called()
 
     def test_auto_instrument_console_wraps_with_transformer(self, mock_traceloop_components):
         """Test that ConsoleSpanExporter is wrapped with GenAIAttributeTransformer."""
@@ -205,3 +208,16 @@ class TestAutoInstrument:
                 mock_logger.warning.assert_called_once()
                 warning_message = mock_logger.warning.call_args[0][0]
                 assert "OTEL_EXPORTER_OTLP_ENDPOINT not set" in warning_message
+
+    def test_auto_instrument_passes_baggage_span_processor(self, mock_traceloop_components):
+        """Test that auto_instrument registers a BaggageSpanProcessor on the tracer provider."""
+        mock_traceloop_components['get_app_name'].return_value = 'test-app'
+        mock_traceloop_components['create_resource'].return_value = {}
+        mock_processor_instance = MagicMock()
+        mock_traceloop_components['baggage_processor'].return_value = mock_processor_instance
+
+        with patch.dict('os.environ', {'OTEL_EXPORTER_OTLP_ENDPOINT': 'http://localhost:4317'}, clear=True):
+            auto_instrument()
+
+            mock_traceloop_components['baggage_processor'].assert_called_once()
+            mock_traceloop_components['get_tracer_provider'].return_value.add_span_processor.assert_called_once_with(mock_processor_instance)

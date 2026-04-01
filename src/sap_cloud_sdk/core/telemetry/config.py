@@ -29,6 +29,12 @@ ENV_APP_NAME = "APPFND_CONHOS_APP_NAME"
 ENV_HOSTNAME = "HOSTNAME"
 ENV_SYSTEM_ROLE = "APPFND_CONHOS_SYSTEM_ROLE"
 
+# OTEL environment variable keys
+ENV_OTLP_ENDPOINT = "OTEL_EXPORTER_OTLP_ENDPOINT"
+ENV_TRACES_EXPORTER = "OTEL_TRACES_EXPORTER"
+ENV_OTLP_PROTOCOL = "OTEL_EXPORTER_OTLP_PROTOCOL"
+ENV_OTEL_DISABLED = "CLOUD_SDK_OTEL_DISABLED"
+
 
 def _get_region() -> str:
     """Get region from environment or return default."""
@@ -134,13 +140,13 @@ class InstrumentationConfig:
             InstrumentationConfig instance with values from environment or defaults.
         """
         # Get OTLP endpoint - if not set, telemetry is disabled
-        otlp_endpoint = os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT", "")
+        otlp_endpoint = os.getenv(ENV_OTLP_ENDPOINT, "")
 
         # Enable telemetry only if endpoint is configured
         # Can be explicitly disabled with CLOUD_SDK_OTEL_DISABLED=true
         enabled = (
             bool(otlp_endpoint)
-            and os.getenv("CLOUD_SDK_OTEL_DISABLED", "false").lower() != "true"
+            and os.getenv(ENV_OTEL_DISABLED, "false").lower() != "true"
         )
 
         return cls(

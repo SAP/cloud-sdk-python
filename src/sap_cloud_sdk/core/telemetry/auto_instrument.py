@@ -1,14 +1,25 @@
 import logging
 import os
 
-from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
-from opentelemetry.sdk.trace.export import ConsoleSpanExporter
+from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import (
+    OTLPSpanExporter as GRPCSpanExporter,
+)
+from opentelemetry.exporter.otlp.proto.http.trace_exporter import (
+    OTLPSpanExporter as HTTPSpanExporter,
+)
+from opentelemetry import trace
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.processor.baggage import ALLOW_ALL_BAGGAGE_KEYS, BaggageSpanProcessor
+from opentelemetry.sdk.trace.export import ConsoleSpanExporter, SpanExporter
 from traceloop.sdk import Traceloop
 
 from sap_cloud_sdk.core.telemetry import Module, Operation
 from sap_cloud_sdk.core.telemetry.config import (
     create_resource_attributes_from_env,
     _get_app_name,
+    ENV_OTLP_ENDPOINT,
+    ENV_TRACES_EXPORTER,
+    ENV_OTLP_PROTOCOL,
 )
 from sap_cloud_sdk.core.telemetry.genai_attribute_transformer import (
     GenAIAttributeTransformer,
@@ -26,8 +37,8 @@ def auto_instrument():
     Traces are exported to the OTEL collector endpoint configured in environment with
     OTEL_EXPORTER_OTLP_ENDPOINT, or printed to console when OTEL_TRACES_EXPORTER=console.
     """
-    otel_endpoint = os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT", "")
-    console_traces = os.getenv("OTEL_TRACES_EXPORTER", "").lower() == "console"
+    otel_endpoint = os.getenv(ENV_OTLP_ENDPOINT, "")
+    console_traces = os.getenv(ENV_TRACES_EXPORTER, "").lower() == "console"
 
     if not otel_endpoint and not console_traces:
         logger.warning(
@@ -35,16 +46,7 @@ def auto_instrument():
         )
         return
 
-    if console_traces:
-        logger.info("Initializing auto instrumentation with console exporter")
-        base_exporter = ConsoleSpanExporter()
-    else:
-        if "v1/traces" not in otel_endpoint:
-            otel_endpoint = otel_endpoint.rstrip("/") + "/v1/traces"
-        logger.info(f"Initializing auto instrumentation with endpoint: {otel_endpoint}")
-        base_exporter = OTLPSpanExporter(endpoint=otel_endpoint)
-
-    exporter = GenAIAttributeTransformer(base_exporter)
+    exporter = GenAIAttributeTransformer(_create_exporter())
 
     resource = create_resource_attributes_from_env()
     Traceloop.init(
@@ -55,4 +57,37 @@ def auto_instrument():
         disable_batch=True,
     )
 
+    _set_baggage_processor()
+
     logger.info("Cloud auto instrumentation initialized successfully")
+
+
+def _create_exporter() -> SpanExporter:
+    if os.getenv(ENV_TRACES_EXPORTER, "").lower() == "console":
+        logger.info("Initializing auto instrumentation with console exporter")
+        return ConsoleSpanExporter()
+
+    endpoint = os.getenv(ENV_OTLP_ENDPOINT, "")
+    protocol = os.getenv(ENV_OTLP_PROTOCOL, "grpc").lower()
+    exporters = {"grpc": GRPCSpanExporter, "http/protobuf": HTTPSpanExporter}
+    if protocol not in exporters:
+        raise ValueError(
+            f"Unsupported OTEL_EXPORTER_OTLP_PROTOCOL: '{protocol}'. "
+            "Supported values are 'grpc' and 'http/protobuf'."
+        )
+
+    logger.info(
+        f"Initializing auto instrumentation with endpoint: {endpoint} "
+        f"(protocol: {protocol})"
+    )
+    return exporters[protocol]()
+
+
+def _set_baggage_processor():
+    provider = trace.get_tracer_provider()
+    if not isinstance(provider, TracerProvider):
+        logger.warning("Unknown TracerProvider type. Skipping BaggageSpanProcessor")
+        return
+
+    provider.add_span_processor(BaggageSpanProcessor(ALLOW_ALL_BAGGAGE_KEYS))
+    logger.info("Registered BaggageSpanProcessor for extension attribute propagation")

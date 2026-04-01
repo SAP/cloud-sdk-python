@@ -5,8 +5,19 @@ from typing import Optional
 
 from opentelemetry import metrics
 from opentelemetry.exporter.otlp.proto.grpc.metric_exporter import OTLPMetricExporter
-from opentelemetry.sdk.metrics import MeterProvider
-from opentelemetry.sdk.metrics.export import PeriodicExportingMetricReader
+from opentelemetry.sdk.metrics import (
+    MeterProvider,
+    Counter,
+    Histogram,
+    ObservableCounter,
+    ObservableGauge,
+    ObservableUpDownCounter,
+    UpDownCounter,
+)
+from opentelemetry.sdk.metrics.export import (
+    AggregationTemporality,
+    PeriodicExportingMetricReader,
+)
 from opentelemetry.sdk.resources import Resource
 
 from sap_cloud_sdk.core.telemetry.config import (
@@ -73,9 +84,16 @@ def _setup_meter_provider() -> Optional[MeterProvider]:
     try:
         resource = Resource.create(create_resource_attributes_from_env())
 
-        # Create OTLP exporter
         exporter = OTLPMetricExporter(
             endpoint=config.otlp_endpoint,
+            preferred_temporality={
+                Counter: AggregationTemporality.DELTA,
+                Histogram: AggregationTemporality.DELTA,
+                ObservableCounter: AggregationTemporality.DELTA,
+                ObservableGauge: AggregationTemporality.DELTA,
+                ObservableUpDownCounter: AggregationTemporality.DELTA,
+                UpDownCounter: AggregationTemporality.DELTA,
+            },
         )
 
         # Create metric reader with periodic export

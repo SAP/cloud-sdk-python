@@ -1,6 +1,6 @@
 [project]
 name = "sap-cloud-sdk"
-version = "0.2.0"
+version = "0.4.0"
 description = "SAP Cloud SDK for Python"
 readme = "README.md"
 license = "Apache-2.0"
@@ -16,6 +16,8 @@ dependencies = [
     "pydantic~=2.12.3",
     "hatchling~=1.27.0",
     "opentelemetry-exporter-otlp-proto-grpc~=1.38.0",
+    "opentelemetry-exporter-otlp-proto-http~=1.38.0",
+    "opentelemetry-processor-baggage~=0.61b0",
     "traceloop-sdk~=0.52.0"
 ]
 

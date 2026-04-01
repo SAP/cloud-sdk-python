@@ -110,11 +110,15 @@ def set_aicore_config(instance_name: str = "aicore-instance") -> None:
     - serviceurls (JSON with AI_API_URL) -> AICORE_BASE_URL
     """
     # Load secrets
-    client_id = _get_secret("AICORE_CLIENT_ID", "clientid")
-    client_secret = _get_secret("AICORE_CLIENT_SECRET", "clientsecret")
-    auth_url = _get_secret("AICORE_AUTH_URL", "url")
+    client_id = _get_secret("AICORE_CLIENT_ID", "clientid", instance_name=instance_name)
+    client_secret = _get_secret(
+        "AICORE_CLIENT_SECRET", "clientsecret", instance_name=instance_name
+    )
+    auth_url = _get_secret("AICORE_AUTH_URL", "url", instance_name=instance_name)
     base_url = _get_aicore_base_url(instance_name)
-    resource_group = _get_secret("AICORE_RESOURCE_GROUP", default="default")
+    resource_group = _get_secret(
+        "AICORE_RESOURCE_GROUP", default="default", instance_name=instance_name
+    )
 
     # Ensure AICORE_AUTH_URL has /oauth/token suffix
     if auth_url and not auth_url.endswith("/oauth/token"):

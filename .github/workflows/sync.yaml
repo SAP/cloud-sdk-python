@@ -18,8 +18,8 @@ jobs:
       - name: Mirror main branch
         env:
           EXTERNAL_REPO: https://github.com/SAP/cloud-sdk-python.git
-          INTERNAL_REPO: ${{ format('https://{0}/{1}.git', github.server_url, github.repository) }}
-          INTERNAL_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          INTERNAL_REPO: ${{ format('{0}/{1}.git', github.server_url, github.repository) }}
+          INTERNAL_TOKEN: ${{ secrets.SYNC_TOKEN || secrets.GITHUB_TOKEN }}
         run: |
           echo "Cloning external repository main branch..."
           git clone --single-branch --branch main "$EXTERNAL_REPO" repo-clone
@@ -28,6 +28,9 @@ jobs:
           echo "Adding internal remote..."
           INTERNAL_REPO="https://oauth2:${INTERNAL_TOKEN}@${INTERNAL_REPO#https://}"
           git remote add internal "$INTERNAL_REPO"
+
+          echo "Fetching internal remote to establish lease baseline..."
+          git fetch internal main
 
           echo "Pushing main branch to internal repository..."
           git push internal main:main --force-with-lease

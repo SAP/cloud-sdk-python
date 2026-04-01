@@ -1,4 +1,4 @@
-![Build status](https://github.com/SAP/cloud-sdk-python/workflows/Build/badge.svg) [![REUSE status](https://api.reuse.software/badge/github.com/SAP/cloud-sdk-python)](https://api.reuse.software/info/github.com/SAP/cloud-sdk-python)
+[![Build & Package](https://github.com/SAP/cloud-sdk-python/actions/workflows/build.yaml/badge.svg)](https://github.com/SAP/cloud-sdk-python/actions/workflows/build.yaml) [![REUSE status](https://api.reuse.software/badge/github.com/SAP/cloud-sdk-python)](https://api.reuse.software/info/github.com/SAP/cloud-sdk-python)
 
 # SAP Cloud SDK for Python
 

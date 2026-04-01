@@ -3,6 +3,9 @@
 import pytest
 from unittest.mock import patch, MagicMock
 
+from opentelemetry.sdk.metrics import Counter, Histogram, ObservableCounter, ObservableGauge, ObservableUpDownCounter, UpDownCounter
+from opentelemetry.sdk.metrics.export import AggregationTemporality
+
 from sap_cloud_sdk.core.telemetry._provider import (
     get_meter,
     shutdown,
@@ -182,9 +185,17 @@ class TestSetupMeterProvider:
 
                                 assert result is mock_provider
 
-                                # Verify exporter was created with endpoint
+                                # Verify exporter was created with endpoint and delta temporality
                                 mock_exporter_class.assert_called_once_with(
-                                    endpoint="http://localhost:4317"
+                                    endpoint="http://localhost:4317",
+                                    preferred_temporality={
+                                        Counter: AggregationTemporality.DELTA,
+                                        Histogram: AggregationTemporality.DELTA,
+                                        ObservableCounter: AggregationTemporality.DELTA,
+                                        ObservableGauge: AggregationTemporality.DELTA,
+                                        ObservableUpDownCounter: AggregationTemporality.DELTA,
+                                        UpDownCounter: AggregationTemporality.DELTA,
+                                    },
                                 )
 
                                 # Verify reader was created with exporter
@@ -224,5 +235,15 @@ class TestSetupMeterProvider:
                                     result = _setup_meter_provider()
 
                                     assert result is mock_provider
-                                    # Verify exporter was created with correct endpoint
-                                    mock_exporter.assert_called_with(endpoint=config.otlp_endpoint)
+                                    # Verify exporter was created with correct endpoint and delta temporality
+                                    mock_exporter.assert_called_with(
+                                        endpoint=config.otlp_endpoint,
+                                        preferred_temporality={
+                                            Counter: AggregationTemporality.DELTA,
+                                            Histogram: AggregationTemporality.DELTA,
+                                            ObservableCounter: AggregationTemporality.DELTA,
+                                            ObservableGauge: AggregationTemporality.DELTA,
+                                            ObservableUpDownCounter: AggregationTemporality.DELTA,
+                                            UpDownCounter: AggregationTemporality.DELTA,
+                                        },
+                                    )

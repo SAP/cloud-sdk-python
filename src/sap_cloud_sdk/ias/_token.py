@@ -6,19 +6,28 @@ all standard IAS claims to a typed dataclass.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import List, Optional, Union
+from dataclasses import dataclass, field
+from typing import Any, Dict, List, Optional, Union
 
 import jwt
 
 from sap_cloud_sdk.ias.exceptions import IASTokenError
+
+_KNOWN_CLAIMS = {
+    "app_tid", "at_hash", "aud", "auth_time", "azp", "email",
+    "email_verified", "exp", "family_name", "given_name", "groups",
+    "ias_apis", "ias_iss", "iat", "iss", "jti", "middle_name", "name",
+    "nonce", "preferred_username", "sap_id_type", "scim_id", "sid",
+    "sub", "user_uuid",
+}
 
 
 @dataclass
 class IASClaims:
     """Typed representation of SAP IAS JWT token claims.
 
-    All fields are optional — a claim absent from the token is None.
+    All standard fields are optional — a claim absent from the token is None.
+    Any claims not in the standard set are collected in ``custom_attributes``.
 
     Attributes:
         app_tid: SAP claim identifying the tenant of the application.
@@ -62,6 +71,9 @@ class IASClaims:
         sid: Session ID used to track a user session across applications and
             logout scenarios.
         sub: Subject — unique identifier for the user, scoped to the issuer.
+        user_uuid: SAP claim identifying the global user ID.
+        custom_attributes: Any claims present in the token that are not part
+            of the standard IAS claim set.
     """
 
     app_tid: Optional[str] = None
@@ -88,6 +100,8 @@ class IASClaims:
     scim_id: Optional[str] = None
     sid: Optional[str] = None
     sub: Optional[str] = None
+    user_uuid: Optional[str] = None
+    custom_attributes: Dict[str, Any] = field(default_factory=dict)
 
 
 def parse_token(token: str) -> IASClaims:
@@ -102,8 +116,9 @@ def parse_token(token: str) -> IASClaims:
         token: A JWT string, optionally prefixed with ``"Bearer "`` or ``"bearer "``.
 
     Returns:
-        IASClaims with all present token claims populated. Absent claims
-        are None.
+        IASClaims with all present token claims populated. Absent standard
+        claims are None. Unrecognised claims are collected in
+        ``custom_attributes``.
 
     Raises:
         IASTokenError: If the token is malformed and cannot be decoded.
@@ -113,9 +128,8 @@ def parse_token(token: str) -> IASClaims:
         from sap_cloud_sdk.ias import parse_token
 
         claims = parse_token(request.headers["Authorization"])
-        print(claims.app_tid)    # tenant ID
-        print(claims.scim_id)    # SCIM-based user ID
-        print(claims.sub)        # OIDC subject identifier
+        print(claims.user_uuid)  # global user ID
+        print(claims.custom_attributes)  # any non-standard claims
         ```
     """
     raw = token.removeprefix("Bearer ").removeprefix("bearer ").strip()
@@ -154,4 +168,6 @@ def parse_token(token: str) -> IASClaims:
         scim_id=payload.get("scim_id"),
         sid=payload.get("sid"),
         sub=payload.get("sub"),
+        user_uuid=payload.get("user_uuid"),
+        custom_attributes={k: v for k, v in payload.items() if k not in _KNOWN_CLAIMS},
     )

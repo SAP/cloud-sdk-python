@@ -38,6 +38,7 @@ class TestParseToken:
             "scim_id": "scim-user-id-xyz",
             "sid": "session-id-123",
             "sub": "subject-unique-id",
+            "user_uuid": "global-user-id-xyz",
         }
         claims = parse_token(_make_token(payload))
 
@@ -65,6 +66,8 @@ class TestParseToken:
         assert claims.scim_id == "scim-user-id-xyz"
         assert claims.sid == "session-id-123"
         assert claims.sub == "subject-unique-id"
+        assert claims.user_uuid == "global-user-id-xyz"
+        assert claims.custom_attributes == {}
 
     def test_missing_optional_claims_are_none(self):
         claims = parse_token(_make_token({"sub": "only-sub"}))
@@ -74,12 +77,17 @@ class TestParseToken:
         assert claims.email is None
         assert claims.scim_id is None
         assert claims.groups is None
+        assert claims.user_uuid is None
+        assert claims.custom_attributes == {}
 
     def test_empty_payload_returns_all_none(self):
         claims = parse_token(_make_token({}))
         assert isinstance(claims, IASClaims)
-        for field in IASClaims.__dataclass_fields__:
-            assert getattr(claims, field) is None
+        for f in IASClaims.__dataclass_fields__:
+            if f == "custom_attributes":
+                assert getattr(claims, f) == {}
+            else:
+                assert getattr(claims, f) is None
 
     def test_bearer_prefix_stripped(self):
         token = _make_token({"sub": "user-1", "app_tid": "tid-1"})
@@ -122,3 +130,25 @@ class TestParseToken:
     def test_returns_ias_claims_instance(self):
         claims = parse_token(_make_token({"sub": "x"}))
         assert isinstance(claims, IASClaims)
+
+    def test_user_uuid_mapped(self):
+        claims = parse_token(_make_token({"user_uuid": "global-user-id"}))
+        assert claims.user_uuid == "global-user-id"
+
+    def test_custom_attributes_captures_unknown_claims(self):
+        payload = {"sub": "x", "my_app_claim": "value", "another_custom": 42}
+        claims = parse_token(_make_token(payload))
+
+        assert claims.custom_attributes == {"my_app_claim": "value", "another_custom": 42}
+
+    def test_custom_attributes_empty_when_no_unknown_claims(self):
+        claims = parse_token(_make_token({"sub": "x", "email": "a@b.com"}))
+        assert claims.custom_attributes == {}
+
+    def test_known_claims_not_duplicated_in_custom_attributes(self):
+        payload = {"sub": "x", "user_uuid": "uid", "unknown_claim": "yes"}
+        claims = parse_token(_make_token(payload))
+
+        assert "sub" not in claims.custom_attributes
+        assert "user_uuid" not in claims.custom_attributes
+        assert claims.custom_attributes == {"unknown_claim": "yes"}

@@ -57,8 +57,17 @@ All fields on `IASClaims` are `Optional` — claims absent from the token are `N
 | `scim_id`            | `scim_id`            | User's SCIM ID in SAP Cloud Identity Services.                                                |
 | `sid`                | `sid`                | Session ID for tracking a user session across applications.                                   |
 | `sub`                | `sub`                | Subject — unique identifier for the user, scoped to the issuer.                               |
+| `user_uuid`          | `user_uuid`          | SAP claim identifying the global user ID.                                                     |
+| `custom_attributes`  | *(any)*              | Claims not in the standard IAS set. Always a `dict`, empty if no custom claims are present.   |
 
-> Claims are only present if the corresponding scope was requested during authentication. For example, `email` and `email_verified` require the `email` scope, and `given_name`/`family_name`/`jti` require the `profile` scope.
+### Custom Attributes
+
+Any claim not in the standard IAS set lands in `custom_attributes` as a plain dict, so nothing is silently dropped:
+
+```python
+claims = parse_token(token)
+print(claims.custom_attributes)  # {"my_app_claim": "value", ...}
+```
 
 
 #### With Telemetry

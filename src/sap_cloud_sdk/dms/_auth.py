@@ -43,7 +43,7 @@ class Auth:
 
         cached = self._cache.get(cache_key)
         if cached and cached.is_valid():
-            self._cache.move_to_end(cache_key) # Mark as recently used by moving to end
+            self._cache.move_to_end(cache_key)  # Mark as recently used by moving to end
             logger.debug("Using cached token for key '%s'", cache_key)
             return cached.token
 

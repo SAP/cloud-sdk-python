@@ -123,7 +123,7 @@ def load_sdm_config_from_env_or_mount(instance: Optional[str] = None) -> DMSCred
         read_from_mount_and_fallback_to_env_var(
             base_volume_mount="/etc/secrets/appfnd",
             base_var_name="CLOUD_SDK_CFG",
-            module="sdm",  # TODO check if this should be "dms" or "sdm"
+            module="sdm",
             instance=inst,
             target=binding,
         )

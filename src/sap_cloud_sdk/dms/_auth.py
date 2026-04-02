@@ -1,6 +1,7 @@
 import logging
 import time
 import requests
+from collections import OrderedDict
 from requests.exceptions import RequestException
 from typing import Optional, TypedDict
 from sap_cloud_sdk.dms.exceptions import (
@@ -18,7 +19,6 @@ class _TokenResponse(TypedDict):
     expires_in: int
 
 
-# TODO: limit number of access tokens in cache to 10
 class _CachedToken:
     def __init__(self, token: str, expires_at: float) -> None:
         self.token = token
@@ -28,25 +28,32 @@ class _CachedToken:
         return time.monotonic() < self.expires_at - 30
 
 
-# TODO: limit number of access tokens in cache to 10
+_MAX_CACHE_SIZE = 10
+
+
 class Auth:
     """Fetches and caches OAuth2 access tokens for DMS service requests."""
 
     def __init__(self, credentials: DMSCredentials) -> None:
         self._credentials = credentials
-        self._cache: dict[str, _CachedToken] = {}
+        self._cache: OrderedDict[str, _CachedToken] = OrderedDict()
 
     def get_token(self, tenant_subdomain: Optional[str] = None) -> str:
         cache_key = tenant_subdomain or "technical"
 
         cached = self._cache.get(cache_key)
         if cached and cached.is_valid():
+            self._cache.move_to_end(cache_key) # Mark as recently used by moving to end
             logger.debug("Using cached token for key '%s'", cache_key)
             return cached.token
 
         logger.debug("Fetching new token for key '%s'", cache_key)
         token_url = self._resolve_token_url(tenant_subdomain)
         token = self._fetch_token(token_url)
+
+        if len(self._cache) >= _MAX_CACHE_SIZE:
+            evicted, _ = self._cache.popitem(last=False)
+            logger.debug("Cache full — evicted token for key '%s'", evicted)
 
         self._cache[cache_key] = _CachedToken(
             token=token["access_token"],

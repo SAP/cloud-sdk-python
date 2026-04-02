@@ -82,6 +82,12 @@ class ConfigName(str, Enum):
     IS_CROSS_DOMAIN_MAPPING_ALLOWED = "isCrossDomainMappingAllowed"
 
 
+class HashAlgorithm(str, Enum):
+    MD5 = "MD5"
+    SHA1 = "SHA-1"
+    SHA256 = "SHA-256"
+
+
 @dataclass
 class UserClaim:
     """User identity claims forwarded to the DMS service.
@@ -117,7 +123,7 @@ class InternalRepoRequest:
     isVersionEnabled: Optional[bool] = None
     isVirusScanEnabled: Optional[bool] = None
     skipVirusScanForLargeFile: Optional[bool] = None
-    hashAlgorithms: Optional[str] = None  # TODO provide enum
+    hashAlgorithms: Optional[HashAlgorithm] = None
     isThumbnailEnabled: Optional[bool] = None
     isEncryptionEnabled: Optional[bool] = None
     externalId: Optional[str] = None

@@ -162,5 +162,7 @@ def parse_token(token: str) -> IASClaims:
         sid=payload.get(_IASClaim.SID),
         sub=payload.get(_IASClaim.SUB),
         user_uuid=payload.get(_IASClaim.USER_UUID),
-        custom_attributes={k: v for k, v in payload.items() if k not in _KNOWN_CLAIM_VALUES},
+        custom_attributes={
+            k: v for k, v in payload.items() if k not in _KNOWN_CLAIM_VALUES
+        },
     )

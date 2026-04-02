@@ -19,8 +19,6 @@ class IASClaims:
     """Typed representation of SAP IAS JWT token claims.
 
     All fields are optional — a claim absent from the token is None.
-    No interpretation of which field represents a "global user ID" is
-    made by the SDK; use whichever claim fits your use case.
 
     Attributes:
         app_tid: SAP claim identifying the tenant of the application.

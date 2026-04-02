@@ -14,11 +14,31 @@ import jwt
 from sap_cloud_sdk.ias.exceptions import IASTokenError
 
 _KNOWN_CLAIMS = {
-    "app_tid", "at_hash", "aud", "auth_time", "azp", "email",
-    "email_verified", "exp", "family_name", "given_name", "groups",
-    "ias_apis", "ias_iss", "iat", "iss", "jti", "middle_name", "name",
-    "nonce", "preferred_username", "sap_id_type", "scim_id", "sid",
-    "sub", "user_uuid",
+    "app_tid",
+    "at_hash",
+    "aud",
+    "auth_time",
+    "azp",
+    "email",
+    "email_verified",
+    "exp",
+    "family_name",
+    "given_name",
+    "groups",
+    "ias_apis",
+    "ias_iss",
+    "iat",
+    "iss",
+    "jti",
+    "middle_name",
+    "name",
+    "nonce",
+    "preferred_username",
+    "sap_id_type",
+    "scim_id",
+    "sid",
+    "sub",
+    "user_uuid",
 }
 
 

@@ -378,8 +378,8 @@ def get_object_with_acl(context: DMSTestContext, dms_client: DMSClient):
     try:
         context.retrieved_object = dms_client.get_object(
             context.repo_id,
-            context.document.object_id,
-            include_acl=True,  # ty: ignore[unresolved-attribute]
+            context.document.object_id,  # ty: ignore[unresolved-attribute]
+            include_acl=True,
         )
         context.operation_success = True
     except Exception as e:
@@ -392,8 +392,8 @@ def download_content(context: DMSTestContext, dms_client: DMSClient):
     try:
         context.content_response = dms_client.get_content(
             context.repo_id,
-            context.document.object_id,
-            download="attachment",  # ty: ignore[unresolved-attribute]
+            context.document.object_id,  # ty: ignore[unresolved-attribute]
+            download="attachment",
         )
         context.operation_success = True
     except Exception as e:

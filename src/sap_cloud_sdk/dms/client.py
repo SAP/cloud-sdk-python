@@ -89,6 +89,11 @@ class DMSClient:
     ) -> None:
         """Initialise a DMSClient.
 
+        Note:
+            Do not call this constructor directly. Use create_client() from
+            sap_cloud_sdk.dms instead, which properly configures
+            authentication and handles environment detection.
+
         Args:
             credentials: OAuth2 credentials and service URI for the DMS instance.
             connect_timeout: TCP connection timeout in seconds. Defaults to 10.

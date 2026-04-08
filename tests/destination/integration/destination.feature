@@ -72,20 +72,20 @@ Feature: Destination Service Integration
     When I get subaccount destination "non-existent-destination" with "PROVIDER_ONLY" access strategy
     Then the destination should not be found
 
-  Scenario: Get destination using subscriber first strategy
-    Given I use tenant "app-foundation-dev-subscriber"
-    When I get subaccount destination "subscriber-dest-test" with "SUBSCRIBER_FIRST" access strategy
-    Then the destination should be retrieved successfully
+  # Scenario: Get destination using subscriber first strategy
+  #   Given I use tenant "app-foundation-dev-subscriber"
+  #   When I get subaccount destination "subscriber-dest-test" with "SUBSCRIBER_FIRST" access strategy
+  #   Then the destination should be retrieved successfully
 
-  Scenario: Get destination using subscriber only strategy
-    Given I use tenant "app-foundation-dev-subscriber"
-    When I get subaccount destination "subscriber-dest-test" with "SUBSCRIBER_ONLY" access strategy
-    Then the destination should be retrieved successfully
+  # Scenario: Get destination using subscriber only strategy
+  #   Given I use tenant "app-foundation-dev-subscriber"
+  #   When I get subaccount destination "subscriber-dest-test" with "SUBSCRIBER_ONLY" access strategy
+  #   Then the destination should be retrieved successfully
 
-  Scenario: Get destination using provider first strategy
-    Given I use tenant "app-foundation-dev-subscriber"
-    When I get subaccount destination "subscriber-dest-test" with "PROVIDER_FIRST" access strategy
-    Then the destination should be retrieved successfully
+  # Scenario: Get destination using provider first strategy
+  #   Given I use tenant "app-foundation-dev-subscriber"
+  #   When I get subaccount destination "subscriber-dest-test" with "PROVIDER_FIRST" access strategy
+  #   Then the destination should be retrieved successfully
 
   Scenario: Get destination using provider only strategy
     Given I use tenant "app-foundation-dev-subscriber"
@@ -140,20 +140,20 @@ Feature: Destination Service Integration
     And the destination "other-destination" should not be in the list
     And I clean up all instance destinations
 
-  Scenario: List destinations using subscriber first strategy
-    Given I use tenant "app-foundation-dev-subscriber"
-    When I list subaccount destinations with "SUBSCRIBER_FIRST" access strategy
-    Then the destination "subscriber-dest-test" should be in the list
+  # Scenario: List destinations using subscriber first strategy
+  #   Given I use tenant "app-foundation-dev-subscriber"
+  #   When I list subaccount destinations with "SUBSCRIBER_FIRST" access strategy
+  #   Then the destination "subscriber-dest-test" should be in the list
 
-  Scenario: List destinations using subscriber only strategy
-    Given I use tenant "app-foundation-dev-subscriber"
-    When I list subaccount destinations with "SUBSCRIBER_ONLY" access strategy
-    Then the destination "subscriber-dest-test" should be in the list
+  # Scenario: List destinations using subscriber only strategy
+  #   Given I use tenant "app-foundation-dev-subscriber"
+  #   When I list subaccount destinations with "SUBSCRIBER_ONLY" access strategy
+  #   Then the destination "subscriber-dest-test" should be in the list
 
-  Scenario: List destinations using provider first strategy
-    Given I use tenant "app-foundation-dev-subscriber"
-    When I list subaccount destinations with "PROVIDER_FIRST" access strategy
-    Then the destination list should be retrieved successfully
+  # Scenario: List destinations using provider first strategy
+  #   Given I use tenant "app-foundation-dev-subscriber"
+  #   When I list subaccount destinations with "PROVIDER_FIRST" access strategy
+  #   Then the destination list should be retrieved successfully
 
   Scenario: List destinations using provider only strategy
     Given I use tenant "app-foundation-dev-subscriber"

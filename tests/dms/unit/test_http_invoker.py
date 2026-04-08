@@ -37,6 +37,7 @@ def invoker(mock_auth):
 # Header helpers
 # ---------------------------------------------------------------
 
+
 class TestHeaders:
     def test_auth_header(self, invoker):
         headers = invoker._auth_header()
@@ -61,6 +62,7 @@ class TestHeaders:
 # ---------------------------------------------------------------
 # GET
 # ---------------------------------------------------------------
+
 
 class TestGet:
     @patch("sap_cloud_sdk.dms._http.requests.get")
@@ -188,6 +190,7 @@ class TestGet:
 # Error message extraction
 # ---------------------------------------------------------------
 
+
 class TestErrorMessageExtraction:
     @patch("sap_cloud_sdk.dms._http.requests.get")
     def test_400_extracts_json_message(self, mock_get, invoker):
@@ -214,7 +217,9 @@ class TestErrorMessageExtraction:
 
         with pytest.raises(DMSInvalidArgumentException) as exc_info:
             invoker.get("/bad")
-        assert "Request contains invalid or disallowed parameters" in str(exc_info.value)
+        assert "Request contains invalid or disallowed parameters" in str(
+            exc_info.value
+        )
 
     @patch("sap_cloud_sdk.dms._http.requests.get")
     def test_404_extracts_json_message(self, mock_get, invoker):
@@ -260,6 +265,7 @@ class TestErrorMessageExtraction:
 # ---------------------------------------------------------------
 # POST (form-encoded)
 # ---------------------------------------------------------------
+
 
 class TestPostForm:
     @patch("sap_cloud_sdk.dms._http.requests.post")
@@ -344,6 +350,7 @@ class TestPostForm:
 # Base URL stripping
 # ---------------------------------------------------------------
 
+
 class TestBaseUrl:
     def test_trailing_slash_stripped(self, mock_auth):
         inv = HttpInvoker(
@@ -357,6 +364,7 @@ class TestBaseUrl:
 # get_stream
 # ---------------------------------------------------------------
 
+
 class TestGetStream:
     @patch("sap_cloud_sdk.dms._http.requests.get")
     def test_returns_raw_response(self, mock_get, invoker):
@@ -365,7 +373,9 @@ class TestGetStream:
         mock_resp.content = b"binary content"
         mock_get.return_value = mock_resp
 
-        result = invoker.get_stream("/browser/repo1/root", params={"objectId": "d1", "cmisselector": "content"})
+        result = invoker.get_stream(
+            "/browser/repo1/root", params={"objectId": "d1", "cmisselector": "content"}
+        )
 
         assert result is mock_resp
         mock_get.assert_called_once()
@@ -382,7 +392,10 @@ class TestGetStream:
         mock_get.return_value = mock_resp
 
         with pytest.raises(DMSObjectNotFoundException) as exc_info:
-            invoker.get_stream("/browser/repo1/root", params={"objectId": "d1", "cmisselector": "content"})
+            invoker.get_stream(
+                "/browser/repo1/root",
+                params={"objectId": "d1", "cmisselector": "content"},
+            )
         assert exc_info.value.status_code == 404
 
     @patch("sap_cloud_sdk.dms._http.requests.get")

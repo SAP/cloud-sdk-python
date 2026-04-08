@@ -55,8 +55,8 @@ source = ["src"]
 omit = [
     "*/tests/*",
     "*/test_*",
-    "sap_cloud_sdk/core/auditlog_ng/gen",
-    "buf"
+    "sap_cloud_sdk/core/auditlog_ng/gen/*",
+    "buf/*"
 ]
 skip_empty = true
 

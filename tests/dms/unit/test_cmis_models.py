@@ -2,7 +2,6 @@
 
 from datetime import datetime, timezone
 
-import pytest
 
 from sap_cloud_sdk.dms.model import (
     Ace,
@@ -19,6 +18,7 @@ from sap_cloud_sdk.dms.model import (
 # ---------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------
+
 
 class TestParseCmisDatetime:
     def test_none_returns_none(self):
@@ -157,6 +157,7 @@ class TestCmisObject:
 # Folder
 # ---------------------------------------------------------------
 
+
 class TestFolder:
     def test_from_dict(self):
         folder = Folder.from_dict(_SUCCINCT_FOLDER)
@@ -173,6 +174,7 @@ class TestFolder:
 # ---------------------------------------------------------------
 # Document
 # ---------------------------------------------------------------
+
 
 class TestDocument:
     def test_from_dict_full(self):
@@ -219,6 +221,7 @@ class TestDocument:
 # Ace
 # ---------------------------------------------------------------
 
+
 class TestAce:
     def test_from_dict(self):
         data = {
@@ -255,6 +258,7 @@ class TestAce:
 # ---------------------------------------------------------------
 # Acl
 # ---------------------------------------------------------------
+
 
 class TestAcl:
     def test_from_dict(self):

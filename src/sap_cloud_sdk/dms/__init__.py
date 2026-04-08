@@ -38,6 +38,8 @@ def create_client(
     *,
     instance: Optional[str] = None,
     dms_cred: Optional[DMSCredentials] = None,
+    connect_timeout: Optional[int] = None,
+    read_timeout: Optional[int] = None,
     _telemetry_source: Optional[Module] = None,
 ):
     """Create a DMS client with automatic credential resolution.
@@ -45,6 +47,8 @@ def create_client(
     Args:
         instance: Logical instance name for secret resolution. Defaults to ``"default"``.
         dms_cred: Explicit credentials. If provided, skips secret resolution.
+        connect_timeout: TCP connection timeout in seconds. Defaults to 10.
+        read_timeout: Response read timeout in seconds. Defaults to 30.
         _telemetry_source: Internal telemetry source identifier. Not intended for external use.
 
     Returns:
@@ -55,7 +59,11 @@ def create_client(
     """
     try:
         credentials = dms_cred or load_sdm_config_from_env_or_mount(instance)
-        client = DMSClient(credentials)
+        client = DMSClient(
+            credentials,
+            connect_timeout=connect_timeout,
+            read_timeout=read_timeout,
+        )
         client._telemetry_source = _telemetry_source
         return client
     except Exception as e:

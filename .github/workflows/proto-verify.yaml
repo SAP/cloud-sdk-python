@@ -8,7 +8,7 @@ on:
 jobs:
   make-proto:
     name: Run make proto
-    runs-on: ${{ contains(github.server_url, 'github.com') && 'ubuntu-latest' || fromJSON('["self-hosted"]') }}
+    runs-on: ubuntu-latest
 
     steps:
       - name: Check out repository

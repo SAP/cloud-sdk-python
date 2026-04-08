@@ -134,6 +134,10 @@ class AuditClient:
             RuntimeError: If the client has already been closed.
             ValueError: If *format* is not a supported value.
             ValidationError: If the protobuf event fails validation.
+
+        Note:
+            A successful return does not guarantee delivery.
+            The OTLP exporter operates asynchronously. Always use flush() before shutdown to maximize delivery probability.
         """
         if self._closed:
             raise RuntimeError("Client is closed")

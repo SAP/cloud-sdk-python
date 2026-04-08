@@ -13,12 +13,6 @@ class ClientCreationError(AuditLogNGError):
     pass
 
 
-class TransportError(AuditLogNGError):
-    """Raised when gRPC transport operations fail."""
-
-    pass
-
-
 class ValidationError(AuditLogNGError):
     """Raised when audit event validation fails."""
 

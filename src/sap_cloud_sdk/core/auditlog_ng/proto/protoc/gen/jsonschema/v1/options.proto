@@ -1,0 +1,32 @@
+// Custom options for protoc-gen-jsonschema
+// Allocated range is 1125-1129
+// See https://github.com/protocolbuffers/protobuf/blob/master/docs/options.md
+
+syntax = "proto3";
+package protoc.gen.jsonschema.v1;
+
+import "google/protobuf/descriptor.proto";
+
+option go_package = "github.com/chrusty/protoc-gen-jsonschema";
+
+// Custom FieldOptions
+message FieldOptions {
+  // Fields tagged with this will be omitted from generated schemas
+  bool ignore = 1;
+
+  // Fields tagged with this will be marked as "required" in generated schemas
+  bool required = 2;
+
+  // Fields tagged with this will constrain strings using the "minLength" keyword in generated schemas
+  int32 min_length = 3;
+
+  // Fields tagged with this will constrain strings using the "maxLength" keyword in generated schemas
+  int32 max_length = 4;
+
+  // Fields tagged with this will constrain strings using the "pattern" keyword in generated schemas
+  string pattern = 5;
+}
+
+extend google.protobuf.FieldOptions {
+  FieldOptions field_options = 1125;
+}

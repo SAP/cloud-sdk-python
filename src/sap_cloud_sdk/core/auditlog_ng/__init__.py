@@ -29,7 +29,6 @@ from sap_cloud_sdk.core.auditlog_ng.client import AuditClient
 from sap_cloud_sdk.core.auditlog_ng.config import (
     AuditLogNGConfig,
     SCHEMA_URL,
-    validate_source_arg,
 )
 from sap_cloud_sdk.core.auditlog_ng.exceptions import (
     AuditLogNGError,
@@ -37,6 +36,8 @@ from sap_cloud_sdk.core.auditlog_ng.exceptions import (
     TransportError,
     ValidationError,
 )
+
+from sap_cloud_sdk.core.telemetry import Module
 
 
 def create_client(
@@ -53,6 +54,7 @@ def create_client(
     batch: bool = False,
     compression: bool = True,
     schema_url: str = SCHEMA_URL,
+    _telemetry_source: Optional[Module] = None
 ) -> AuditClient:
     """Create an AuditClient for sending audit events over OTLP/gRPC.
 
@@ -102,7 +104,7 @@ def create_client(
                 schema_url=schema_url,
             )
 
-        return AuditClient(config)
+        return AuditClient(config, _telemetry_source=_telemetry_source)
 
     except (ValueError, ValidationError) as e:
         raise e
@@ -117,7 +119,6 @@ __all__ = [
     "AuditClient",
     # Configuration
     "AuditLogNGConfig",
-    "SCHEMA_URL",
     # Exceptions
     "AuditLogNGError",
     "ClientCreationError",

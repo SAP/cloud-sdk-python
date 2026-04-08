@@ -12,25 +12,25 @@ from sap_cloud_sdk.core.auditlog_ng.config import (
 class TestValidateSourceArg:
 
     def test_valid_alphanumeric(self):
-        validate_source_arg("abc123", "test")
+        _validate_source_arg("abc123", "test")
 
     def test_valid_with_dots_dashes_underscores(self):
-        validate_source_arg("my-deployment_v1.0", "test")
+        _validate_source_arg("my-deployment_v1.0", "test")
 
     def test_valid_with_slashes_and_tildes(self):
-        validate_source_arg("sap/als~v2", "test")
+        _validate_source_arg("sap/als~v2", "test")
 
     def test_rejects_spaces(self):
         with pytest.raises(ValueError, match="test"):
-            validate_source_arg("bad value", "test")
+            _validate_source_arg("bad value", "test")
 
     def test_rejects_empty_string(self):
         with pytest.raises(ValueError, match="test"):
-            validate_source_arg("", "test")
+            _validate_source_arg("", "test")
 
     def test_rejects_special_characters(self):
         with pytest.raises(ValueError, match="test"):
-            validate_source_arg("value@#!", "test")
+            _validate_source_arg("value@#!", "test")
 
 
 class TestAuditLogNGConfig:

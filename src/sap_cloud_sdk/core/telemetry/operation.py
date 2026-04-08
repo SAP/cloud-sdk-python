@@ -9,6 +9,7 @@ class Operation(str, Enum):
     # Audit Log Operations
     AUDITLOG_LOG = "log"
     AUDITLOG_LOG_BATCH = "log_batch"
+    AUDITLOG_CREATE_CLIENT = "create_client"
 
     # Destination Operations
     DESTINATION_GET_INSTANCE_DESTINATION = "get_instance_destination"

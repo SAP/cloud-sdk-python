@@ -36,9 +36,13 @@ from sap_cloud_sdk.core.auditlog_ng.exceptions import (
     ValidationError,
 )
 
-from sap_cloud_sdk.core.telemetry import Module
+from sap_cloud_sdk.core.telemetry import (
+    Module,
+    Operation,
+    record_metrics
+)
 
-
+@record_metrics(Module.AUDITLOG_NG, Operation.AUDITLOG_CREATE_CLIENT)
 def create_client(
     *,
     config: Optional[AuditLogNGConfig] = None,

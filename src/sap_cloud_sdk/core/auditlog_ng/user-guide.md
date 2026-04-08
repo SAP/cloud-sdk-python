@@ -1,12 +1,12 @@
 # Using the `auditlog_ng` Client in an Agent
 
-This guide explains how to integrate the SAP Audit Log NG OTLP client [`client.py`](client.py) into a Python-based agent.
+This guide explains how to integrate the SAP Audit Log NG OTLP client into a Python-based agent.
 
 ---
 
 ## Overview
 
-The [`client.py`](client.py) client sends audit log events as OpenTelemetry (OTLP) LogRecords over gRPC to the SAP Audit Log Service. It supports:
+The Auditlog NG client sends audit log events as OpenTelemetry (OTLP) LogRecords over gRPC to the SAP Audit Log Service. It supports:
 
 - **mTLS** (mutual TLS with client certificates)
 - **Insecure** mode (local testing / no-auth)

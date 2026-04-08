@@ -512,6 +512,67 @@ class Acl:
 
 
 @dataclass
+class ChildrenOptions:
+    """Pagination and query options for :meth:`DMSClient.get_children`.
+
+    Encapsulates all pagination and filter parameters for listing folder
+    children, following the same pattern as the Destination module's
+    ``ListOptions``.
+
+    Example:
+        ```python
+        from sap_cloud_sdk.dms import create_client, ChildrenOptions
+
+        client = create_client()
+        options = ChildrenOptions(max_items=50, skip_count=100, order_by="cmis:creationDate ASC")
+        page = client.get_children(repo_id, folder_id, options=options)
+        while page.has_more_items:
+            options.skip_count += options.max_items
+            page = client.get_children(repo_id, folder_id, options=options)
+        ```
+
+    Attributes:
+        max_items: Maximum number of items to return per page (default 100).
+        skip_count: Number of items to skip (pagination offset, default 0).
+        order_by: Sort order (e.g. ``"cmis:creationDate ASC"``).
+        filter: Comma-separated CMIS property filter list.
+        include_allowable_actions: Include allowable actions per child.
+        include_path_segment: Include the path segment per child.
+        succinct: Use succinct property format (default True).
+    """
+
+    max_items: int = 100
+    skip_count: int = 0
+    order_by: Optional[str] = None
+    filter: Optional[str] = None
+    include_allowable_actions: bool = False
+    include_path_segment: bool = False
+    succinct: bool = True
+
+    def to_query_params(self) -> Dict[str, str]:
+        """Convert options to CMIS query parameters.
+
+        Returns:
+            Dict[str, str]: Query parameters for the HTTP request.
+        """
+        params: Dict[str, str] = {
+            "maxItems": str(self.max_items),
+            "skipCount": str(self.skip_count),
+        }
+        if self.order_by:
+            params["orderBy"] = self.order_by
+        if self.filter:
+            params["filter"] = self.filter
+        if self.include_allowable_actions:
+            params["includeAllowableActions"] = "true"
+        if self.include_path_segment:
+            params["includePathSegment"] = "true"
+        if self.succinct:
+            params["succinct"] = "true"
+        return params
+
+
+@dataclass
 class ChildrenPage:
     """Paginated result from a CMIS ``getChildren`` request."""
 

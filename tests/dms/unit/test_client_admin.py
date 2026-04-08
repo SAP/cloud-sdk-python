@@ -29,6 +29,7 @@ from sap_cloud_sdk.dms.model import (
 # Helper
 # ---------------------------------------------------------------
 
+
 def _mock_response(data, status_code=200):
     resp = Mock()
     resp.json.return_value = data
@@ -87,6 +88,7 @@ def client():
 # onboard_repository
 # ---------------------------------------------------------------
 
+
 class TestOnboardRepository:
     def test_basic(self, client):
         client._mock_http.post.return_value = _mock_response(_REPO_RESPONSE)
@@ -119,7 +121,7 @@ class TestOnboardRepository:
         client._mock_http.post.return_value = _mock_response(_REPO_RESPONSE)
         request = InternalRepoRequest(displayName="VersRepo", isVersionEnabled=True)
 
-        repo = client.onboard_repository(request)
+        client.onboard_repository(request)
 
         payload = client._mock_http.post.call_args[1]["payload"]
         assert payload["repository"]["isVersionEnabled"] is True
@@ -129,13 +131,16 @@ class TestOnboardRepository:
 # get_all_repositories
 # ---------------------------------------------------------------
 
+
 class TestGetAllRepositories:
     def test_basic(self, client):
-        client._mock_http.get.return_value = _mock_response({
-            "repoAndConnectionInfos": [
-                {"repository": _REPO_RESPONSE},
-            ]
-        })
+        client._mock_http.get.return_value = _mock_response(
+            {
+                "repoAndConnectionInfos": [
+                    {"repository": _REPO_RESPONSE},
+                ]
+            }
+        )
 
         repos = client.get_all_repositories()
 
@@ -145,12 +150,15 @@ class TestGetAllRepositories:
 
         call_args = client._mock_http.get.call_args
         assert call_args[1]["path"] == "/rest/v2/repositories"
-        assert call_args[1]["headers"]["Accept"] == "application/vnd.sap.sdm.repositories+json;version=3"
+        assert (
+            call_args[1]["headers"]["Accept"]
+            == "application/vnd.sap.sdm.repositories+json;version=3"
+        )
 
     def test_empty_list(self, client):
-        client._mock_http.get.return_value = _mock_response({
-            "repoAndConnectionInfos": []
-        })
+        client._mock_http.get.return_value = _mock_response(
+            {"repoAndConnectionInfos": []}
+        )
 
         repos = client.get_all_repositories()
 
@@ -158,12 +166,14 @@ class TestGetAllRepositories:
 
     def test_multiple_repos(self, client):
         repo2 = {**_REPO_RESPONSE, "id": "repo-uuid-2", "name": "Repo2"}
-        client._mock_http.get.return_value = _mock_response({
-            "repoAndConnectionInfos": [
-                {"repository": _REPO_RESPONSE},
-                {"repository": repo2},
-            ]
-        })
+        client._mock_http.get.return_value = _mock_response(
+            {
+                "repoAndConnectionInfos": [
+                    {"repository": _REPO_RESPONSE},
+                    {"repository": repo2},
+                ]
+            }
+        )
 
         repos = client.get_all_repositories()
 
@@ -171,9 +181,9 @@ class TestGetAllRepositories:
         assert repos[1].id == "repo-uuid-2"
 
     def test_with_tenant(self, client):
-        client._mock_http.get.return_value = _mock_response({
-            "repoAndConnectionInfos": []
-        })
+        client._mock_http.get.return_value = _mock_response(
+            {"repoAndConnectionInfos": []}
+        )
 
         client.get_all_repositories(tenant="sub1")
 
@@ -184,22 +194,26 @@ class TestGetAllRepositories:
 # get_repository
 # ---------------------------------------------------------------
 
+
 class TestGetRepository:
     def test_basic(self, client):
-        client._mock_http.get.return_value = _mock_response({
-            "repository": _REPO_RESPONSE
-        })
+        client._mock_http.get.return_value = _mock_response(
+            {"repository": _REPO_RESPONSE}
+        )
 
         repo = client.get_repository("repo-uuid-1")
 
         assert isinstance(repo, Repository)
         assert repo.name == "TestRepo"
-        assert client._mock_http.get.call_args[1]["path"] == "/rest/v2/repositories/repo-uuid-1"
+        assert (
+            client._mock_http.get.call_args[1]["path"]
+            == "/rest/v2/repositories/repo-uuid-1"
+        )
 
     def test_with_tenant_and_user_claim(self, client):
-        client._mock_http.get.return_value = _mock_response({
-            "repository": _REPO_RESPONSE
-        })
+        client._mock_http.get.return_value = _mock_response(
+            {"repository": _REPO_RESPONSE}
+        )
         claim = UserClaim(x_ecm_user_enc="bob@sap.com")
 
         client.get_repository("repo-uuid-1", tenant="t1", user_claim=claim)
@@ -212,6 +226,7 @@ class TestGetRepository:
 # ---------------------------------------------------------------
 # update_repository
 # ---------------------------------------------------------------
+
 
 class TestUpdateRepository:
     def test_basic(self, client):
@@ -252,6 +267,7 @@ class TestUpdateRepository:
 # delete_repository
 # ---------------------------------------------------------------
 
+
 class TestDeleteRepository:
     def test_basic(self, client):
         client._mock_http.delete.return_value = _mock_response(None, status_code=204)
@@ -275,6 +291,7 @@ class TestDeleteRepository:
 # ---------------------------------------------------------------
 # create_config
 # ---------------------------------------------------------------
+
 
 class TestCreateConfig:
     def test_basic(self, client):
@@ -300,7 +317,8 @@ class TestCreateConfig:
     def test_with_tenant(self, client):
         client._mock_http.post.return_value = _mock_response(_CONFIG_RESPONSE)
         request = CreateConfigRequest(
-            config_name="blockedFileExtensions", config_value="exe",
+            config_name="blockedFileExtensions",
+            config_value="exe",
         )
 
         client.create_config(request, tenant="sub1")
@@ -311,6 +329,7 @@ class TestCreateConfig:
 # ---------------------------------------------------------------
 # get_configs
 # ---------------------------------------------------------------
+
 
 class TestGetConfigs:
     def test_basic(self, client):
@@ -331,7 +350,11 @@ class TestGetConfigs:
         assert configs == []
 
     def test_multiple_configs(self, client):
-        cfg2 = {**_CONFIG_RESPONSE, "id": "cfg-uuid-2", "configName": "tempspaceMaxContentSize"}
+        cfg2 = {
+            **_CONFIG_RESPONSE,
+            "id": "cfg-uuid-2",
+            "configName": "tempspaceMaxContentSize",
+        }
         client._mock_http.get.return_value = _mock_response([_CONFIG_RESPONSE, cfg2])
 
         configs = client.get_configs()
@@ -351,6 +374,7 @@ class TestGetConfigs:
 # ---------------------------------------------------------------
 # update_config
 # ---------------------------------------------------------------
+
 
 class TestUpdateConfig:
     def test_basic(self, client):
@@ -372,7 +396,9 @@ class TestUpdateConfig:
 
     def test_empty_config_id_raises_value_error(self, client):
         request = UpdateConfigRequest(
-            id="x", config_name="n", config_value="v",
+            id="x",
+            config_name="n",
+            config_value="v",
         )
 
         with pytest.raises(ValueError, match="config_id must not be empty"):
@@ -381,7 +407,9 @@ class TestUpdateConfig:
     def test_with_tenant(self, client):
         client._mock_http.put.return_value = _mock_response(_CONFIG_RESPONSE)
         request = UpdateConfigRequest(
-            id="cfg-uuid-1", config_name="n", config_value="v",
+            id="cfg-uuid-1",
+            config_name="n",
+            config_value="v",
         )
 
         client.update_config("cfg-uuid-1", request, tenant="t1")
@@ -392,6 +420,7 @@ class TestUpdateConfig:
 # ---------------------------------------------------------------
 # delete_config
 # ---------------------------------------------------------------
+
 
 class TestDeleteConfig:
     def test_basic(self, client):

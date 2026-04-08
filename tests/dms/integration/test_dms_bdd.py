@@ -11,17 +11,15 @@ from requests import Response
 
 from sap_cloud_sdk.dms.client import DMSClient
 from sap_cloud_sdk.dms.model import (
-    Ace,
     Acl,
+    ChildrenOptions,
     ChildrenPage,
     CmisObject,
     CreateConfigRequest,
     Document,
     Folder,
-    InternalRepoRequest,
     Repository,
     RepositoryConfig,
-    UpdateConfigRequest,
 )
 from sap_cloud_sdk.dms.exceptions import (
     DMSError,
@@ -159,7 +157,9 @@ def have_document_content(context: DMSTestContext, content: str):
 
 
 @given(parsers.parse('I upload a document named "{name}" with mime type "{mime_type}"'))
-def given_upload_document(context: DMSTestContext, dms_client: DMSClient, name: str, mime_type: str):
+def given_upload_document(
+    context: DMSTestContext, dms_client: DMSClient, name: str, mime_type: str
+):
     """Upload a document as a prerequisite step."""
     unique_name = f"{uuid.uuid4().hex[:8]}-{name}"
     doc = dms_client.create_document(
@@ -282,7 +282,9 @@ def when_create_folder(context: DMSTestContext, dms_client: DMSClient, name: str
 
 
 @when(parsers.parse('I create a folder named "{name}" with description "{desc}"'))
-def create_folder_with_desc(context: DMSTestContext, dms_client: DMSClient, name: str, desc: str):
+def create_folder_with_desc(
+    context: DMSTestContext, dms_client: DMSClient, name: str, desc: str
+):
     """Create a folder with a description."""
     try:
         unique_name = f"{uuid.uuid4().hex[:8]}-{name}"
@@ -303,7 +305,9 @@ def create_folder_with_desc(context: DMSTestContext, dms_client: DMSClient, name
 
 
 @when(parsers.parse('I upload a document named "{name}" with mime type "{mime_type}"'))
-def upload_document(context: DMSTestContext, dms_client: DMSClient, name: str, mime_type: str):
+def upload_document(
+    context: DMSTestContext, dms_client: DMSClient, name: str, mime_type: str
+):
     """Upload a document with specified mime type."""
     try:
         unique_name = f"{uuid.uuid4().hex[:8]}-{name}"
@@ -347,7 +351,8 @@ def get_object_by_id(context: DMSTestContext, dms_client: DMSClient):
     """Get an object by its ID (document context)."""
     try:
         context.retrieved_object = dms_client.get_object(
-            context.repo_id, context.document.object_id  # ty: ignore[unresolved-attribute]
+            context.repo_id,
+            context.document.object_id,  # ty: ignore[unresolved-attribute]
         )
         context.operation_success = True
     except Exception as e:
@@ -359,7 +364,8 @@ def get_folder_by_id(context: DMSTestContext, dms_client: DMSClient):
     """Get a folder by its ID."""
     try:
         context.retrieved_object = dms_client.get_object(
-            context.repo_id, context.folder.object_id  # ty: ignore[unresolved-attribute]
+            context.repo_id,
+            context.folder.object_id,  # ty: ignore[unresolved-attribute]
         )
         context.operation_success = True
     except Exception as e:
@@ -371,7 +377,9 @@ def get_object_with_acl(context: DMSTestContext, dms_client: DMSClient):
     """Get an object with ACL data included."""
     try:
         context.retrieved_object = dms_client.get_object(
-            context.repo_id, context.document.object_id, include_acl=True  # ty: ignore[unresolved-attribute]
+            context.repo_id,
+            context.document.object_id,
+            include_acl=True,  # ty: ignore[unresolved-attribute]
         )
         context.operation_success = True
     except Exception as e:
@@ -383,7 +391,9 @@ def download_content(context: DMSTestContext, dms_client: DMSClient):
     """Download the content of a document."""
     try:
         context.content_response = dms_client.get_content(
-            context.repo_id, context.document.object_id, download="attachment"  # ty: ignore[unresolved-attribute]
+            context.repo_id,
+            context.document.object_id,
+            download="attachment",  # ty: ignore[unresolved-attribute]
         )
         context.operation_success = True
     except Exception as e:
@@ -395,7 +405,8 @@ def list_children(context: DMSTestContext, dms_client: DMSClient):
     """List children of the created folder."""
     try:
         context.children_page = dms_client.get_children(
-            context.repo_id, context.folder.object_id  # ty: ignore[unresolved-attribute]
+            context.repo_id,
+            context.folder.object_id,  # ty: ignore[unresolved-attribute]
         )
         context.operation_success = True
     except Exception as e:
@@ -403,11 +414,14 @@ def list_children(context: DMSTestContext, dms_client: DMSClient):
 
 
 @when(parsers.parse("I list children of the root folder with max items {max_items:d}"))
-def list_children_paginated(context: DMSTestContext, dms_client: DMSClient, max_items: int):
+def list_children_paginated(
+    context: DMSTestContext, dms_client: DMSClient, max_items: int
+):
     """List children with pagination."""
     try:
+        opts = ChildrenOptions(max_items=max_items)
         context.children_page = dms_client.get_children(
-            context.repo_id, context.root_folder_id, max_items=max_items
+            context.repo_id, context.root_folder_id, options=opts
         )
         context.operation_success = True
     except Exception as e:
@@ -441,7 +455,8 @@ def check_out_document(context: DMSTestContext, dms_client: DMSClient):
     """Check out a document."""
     try:
         context.pwc = dms_client.check_out(
-            context.repo_id, context.document.object_id  # ty: ignore[unresolved-attribute]
+            context.repo_id,
+            context.document.object_id,  # ty: ignore[unresolved-attribute]
         )
         context.operation_success = True
     except Exception as e:
@@ -453,7 +468,8 @@ def cancel_check_out(context: DMSTestContext, dms_client: DMSClient):
     """Cancel a check out."""
     try:
         dms_client.cancel_check_out(
-            context.repo_id, context.pwc.object_id  # ty: ignore[unresolved-attribute]
+            context.repo_id,
+            context.pwc.object_id,  # ty: ignore[unresolved-attribute]
         )
         context.pwc = None
         context.operation_success = True
@@ -462,7 +478,9 @@ def cancel_check_out(context: DMSTestContext, dms_client: DMSClient):
 
 
 @when(parsers.parse('I check in with content "{content}" and comment "{comment}"'))
-def check_in_document(context: DMSTestContext, dms_client: DMSClient, content: str, comment: str):
+def check_in_document(
+    context: DMSTestContext, dms_client: DMSClient, content: str, comment: str
+):
     """Check in the PWC with new content."""
     try:
         context.checked_in_doc = dms_client.check_in(
@@ -488,7 +506,8 @@ def get_acl(context: DMSTestContext, dms_client: DMSClient):
     """Get ACL for a document."""
     try:
         context.acl = dms_client.apply_acl(
-            context.repo_id, context.document.object_id  # ty: ignore[unresolved-attribute]
+            context.repo_id,
+            context.document.object_id,  # ty: ignore[unresolved-attribute]
         )
         context.operation_success = True
     except Exception as e:
@@ -748,7 +767,9 @@ def cleanup_folder(context: DMSTestContext, dms_client: DMSClient):
             _delete_cmis_object(dms_client, context.repo_id, context.folder.object_id)
             _remove_from_cleanup(context, context.folder.object_id)
         except Exception as e:
-            logger.warning("Cleanup failed for folder %s: %s", context.folder.object_id, e)
+            logger.warning(
+                "Cleanup failed for folder %s: %s", context.folder.object_id, e
+            )
 
 
 @then("I clean up the created document")
@@ -759,14 +780,18 @@ def cleanup_document(context: DMSTestContext, dms_client: DMSClient):
             _delete_cmis_object(dms_client, context.repo_id, context.document.object_id)
             _remove_from_cleanup(context, context.document.object_id)
         except Exception as e:
-            logger.warning("Cleanup failed for document %s: %s", context.document.object_id, e)
+            logger.warning(
+                "Cleanup failed for document %s: %s", context.document.object_id, e
+            )
 
 
 @then("I clean up the updated document")
 def cleanup_updated_document(context: DMSTestContext, dms_client: DMSClient):
     """Delete the updated document."""
-    obj_id = context.updated_object.object_id if context.updated_object else (
-        context.document.object_id if context.document else None
+    obj_id = (
+        context.updated_object.object_id
+        if context.updated_object
+        else (context.document.object_id if context.document else None)
     )
     if obj_id:
         try:
@@ -784,14 +809,18 @@ def cleanup_children_folder(context: DMSTestContext, dms_client: DMSClient):
         try:
             _delete_cmis_object(dms_client, context.repo_id, context.child_doc_id)
         except Exception as e:
-            logger.warning("Cleanup failed for child doc %s: %s", context.child_doc_id, e)
+            logger.warning(
+                "Cleanup failed for child doc %s: %s", context.child_doc_id, e
+            )
     # Then delete the parent folder
     if context.folder:
         try:
             _delete_cmis_object(dms_client, context.repo_id, context.folder.object_id)
             _remove_from_cleanup(context, context.folder.object_id)
         except Exception as e:
-            logger.warning("Cleanup failed for folder %s: %s", context.folder.object_id, e)
+            logger.warning(
+                "Cleanup failed for folder %s: %s", context.folder.object_id, e
+            )
 
 
 # ==================== HELPERS ====================

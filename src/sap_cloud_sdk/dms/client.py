@@ -12,6 +12,7 @@ from sap_cloud_sdk.dms.model import (
     UpdateConfigRequest,
     Ace,
     Acl,
+    ChildrenOptions,
     ChildrenPage,
     CmisObject,
     Document,
@@ -20,14 +21,15 @@ from sap_cloud_sdk.dms.model import (
 )
 from sap_cloud_sdk.dms._auth import Auth
 from sap_cloud_sdk.dms._http import HttpInvoker
-from sap_cloud_sdk.dms import _endpoints as endpoints
 from sap_cloud_sdk.core.telemetry import Module, Operation, record_metrics
 
 logger = logging.getLogger(__name__)
 
-
 # ---------------------------------------------------------------------------
-# CMIS property helpers
+# Admin API endpoint paths
+# ---------------------------------------------------------------------------
+_REPOSITORIES = "/rest/v2/repositories"
+_CONFIGS = "/rest/v2/configs"
 # ---------------------------------------------------------------------------
 
 
@@ -58,7 +60,26 @@ def _build_aces(aces: List[Ace], prefix: str) -> Dict[str, str]:
 
 
 class DMSClient:
-    """Client for interacting with the SAP Document Management Service Admin API."""
+    """Client for the SAP Document Management Service (DMS).
+
+    Provides methods for:
+    - **Admin API**: Onboard, list, update, and delete repositories;
+      manage repository configurations.
+    - **CMIS Browser Binding**: Create folders and documents, manage
+      versions (check-out / check-in), apply ACLs, browse folder
+      contents, and download document content.
+
+    Use :func:`sap_cloud_sdk.dms.create_client` to obtain an instance
+    with automatic credential resolution, or construct directly with
+    explicit :class:`DMSCredentials`.
+
+    Example::
+
+        from sap_cloud_sdk.dms import create_client
+
+        client = create_client()  # resolves from env / mounted secrets
+        repos = client.get_all_repositories()
+    """
 
     def __init__(
         self,
@@ -73,6 +94,7 @@ class DMSClient:
             connect_timeout=connect_timeout,
             read_timeout=read_timeout,
         )
+        self._telemetry_source: Optional[Module] = None
         logger.debug(
             "DMSClient initialized for instance '%s'", credentials.instance_name
         )
@@ -101,7 +123,7 @@ class DMSClient:
         """
         logger.info("Onboarding repository '%s'", request.to_dict())
         response = self._http.post(
-            path=endpoints.REPOSITORIES,
+            path=_REPOSITORIES,
             payload={"repository": request.to_dict()},
             tenant_subdomain=tenant,
             user_claim=user_claim,
@@ -131,7 +153,7 @@ class DMSClient:
         """
         logger.info("Fetching all repositories")
         response = self._http.get(
-            path=endpoints.REPOSITORIES,
+            path=_REPOSITORIES,
             tenant_subdomain=tenant,
             user_claim=user_claim,
             headers={"Accept": "application/vnd.sap.sdm.repositories+json;version=3"},
@@ -166,7 +188,7 @@ class DMSClient:
         """
         logger.info("Fetching repository '%s'", repo_id)
         response = self._http.get(
-            path=f"{endpoints.REPOSITORIES}/{repo_id}",
+            path=f"{_REPOSITORIES}/{repo_id}",
             tenant_subdomain=tenant,
             user_claim=user_claim,
         )
@@ -201,7 +223,7 @@ class DMSClient:
             raise ValueError("repo_id must not be empty")
         logger.info("Updating repository '%s'", repo_id)
         response = self._http.put(
-            path=f"{endpoints.REPOSITORIES}/{repo_id}",
+            path=f"{_REPOSITORIES}/{repo_id}",
             payload=request.to_dict(),
             tenant_subdomain=tenant,
             user_claim=user_claim,
@@ -231,7 +253,7 @@ class DMSClient:
             DMSRuntimeException: If the server encounters an internal error.
         """
         self._http.delete(
-            path=f"{endpoints.REPOSITORIES}/{repo_id}",
+            path=f"{_REPOSITORIES}/{repo_id}",
             tenant_subdomain=tenant,
             user_claim=user_claim,
         )
@@ -260,7 +282,7 @@ class DMSClient:
         """
         logger.info("Creating config '%s'", request.config_name)
         response = self._http.post(
-            path=endpoints.CONFIGS,
+            path=_CONFIGS,
             payload=request.to_dict(),
             tenant_subdomain=tenant,
             user_claim=user_claim,
@@ -290,7 +312,7 @@ class DMSClient:
         """
         logger.info("Fetching all configs")
         response = self._http.get(
-            path=endpoints.CONFIGS,
+            path=_CONFIGS,
             tenant_subdomain=tenant,
             user_claim=user_claim,
         )
@@ -325,7 +347,7 @@ class DMSClient:
             raise ValueError("config_id must not be empty")
         logger.info("Updating config '%s'", config_id)
         response = self._http.put(
-            path=f"{endpoints.CONFIGS}/{config_id}",
+            path=f"{_CONFIGS}/{config_id}",
             payload=request.to_dict(),
             tenant_subdomain=tenant,
             user_claim=user_claim,
@@ -358,7 +380,7 @@ class DMSClient:
             raise ValueError("config_id must not be empty")
         logger.info("Deleting config '%s'", config_id)
         self._http.delete(
-            path=f"{endpoints.CONFIGS}/{config_id}",
+            path=f"{_CONFIGS}/{config_id}",
             tenant_subdomain=tenant,
             user_claim=user_claim,
         )
@@ -924,31 +946,21 @@ class DMSClient:
         repository_id: str,
         folder_id: str,
         *,
-        max_items: int = 100,
-        skip_count: int = 0,
-        order_by: Optional[str] = None,
-        filter: Optional[str] = None,
-        include_allowable_actions: bool = False,
-        include_path_segment: bool = False,
-        succinct: bool = True,
+        options: Optional[ChildrenOptions] = None,
         tenant: Optional[str] = None,
         user_claim: Optional[UserClaim] = None,
     ) -> ChildrenPage:
         """List children of a folder (one page).
 
-        Use *skip_count* and *max_items* for pagination.  The returned
-        :class:`ChildrenPage` has a ``has_more_items`` flag.
+        Use :class:`ChildrenOptions` to control pagination, sorting, and
+        filtering.  The returned :class:`ChildrenPage` has a
+        ``has_more_items`` flag and ``num_items`` count.
 
         Args:
             repository_id: Target repository ID.
             folder_id: Parent folder CMIS objectId.
-            max_items: Maximum number of items to return (default 100).
-            skip_count: Number of items to skip (pagination offset).
-            order_by: Sort order (e.g. ``"cmis:creationDate ASC"``).
-            filter: Comma-separated property list.
-            include_allowable_actions: Include allowable actions per child.
-            include_path_segment: Include the path segment per child.
-            succinct: Use succinct property format.
+            options: Pagination and query options. Defaults to
+                ``ChildrenOptions()`` (max 100 items, no skip).
             tenant: Optional subscriber subdomain.
             user_claim: Optional user identity claims.
 
@@ -959,23 +971,18 @@ class DMSClient:
             DMSObjectNotFoundException: If the folder is not found.
             DMSPermissionDeniedException: If the access token is invalid.
             DMSRuntimeException: If the server encounters an internal error.
+
+        Example::
+
+            from sap_cloud_sdk.dms import create_client, ChildrenOptions
+
+            client = create_client()
+            opts = ChildrenOptions(max_items=50, order_by="cmis:creationDate ASC")
+            page = client.get_children(repo_id, folder_id, options=opts)
         """
-        params: Dict[str, str] = {
-            "objectId": folder_id,
-            "cmisselector": "children",
-            "maxItems": str(max_items),
-            "skipCount": str(skip_count),
-        }
-        if order_by:
-            params["orderBy"] = order_by
-        if filter:
-            params["filter"] = filter
-        if include_allowable_actions:
-            params["includeAllowableActions"] = "true"
-        if include_path_segment:
-            params["includePathSegment"] = "true"
-        if succinct:
-            params["succinct"] = "true"
+        opts = options or ChildrenOptions()
+        params: Dict[str, str] = {"objectId": folder_id, "cmisselector": "children"}
+        params.update(opts.to_query_params())
 
         logger.info(
             "Getting children of folder '%s' in repo '%s'", folder_id, repository_id

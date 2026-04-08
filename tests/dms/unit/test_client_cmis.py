@@ -14,13 +14,22 @@ import pytest
 
 from sap_cloud_sdk.dms.client import DMSClient, _build_properties, _build_aces
 from sap_cloud_sdk.dms.model import (
-    Ace, Acl, ChildrenPage, CmisObject, DMSCredentials, Document, Folder, UserClaim,
+    Ace,
+    Acl,
+    ChildrenPage,
+    ChildrenOptions,
+    CmisObject,
+    DMSCredentials,
+    Document,
+    Folder,
+    UserClaim,
 )
 
 
 # ---------------------------------------------------------------
 # Helper to wrap a dict in a mock Response with .json()
 # ---------------------------------------------------------------
+
 
 def _mock_response(data):
     """Create a Mock that behaves like requests.Response with .json() returning *data*."""
@@ -96,8 +105,10 @@ def client():
         token_url="https://auth.example.com/oauth/token",
         identityzone="test-zone",
     )
-    with patch("sap_cloud_sdk.dms.client.Auth"), \
-         patch("sap_cloud_sdk.dms.client.HttpInvoker") as mock_http_cls:
+    with (
+        patch("sap_cloud_sdk.dms.client.Auth"),
+        patch("sap_cloud_sdk.dms.client.HttpInvoker") as mock_http_cls,
+    ):
         mock_http = Mock()
         mock_http_cls.return_value = mock_http
         c = DMSClient(creds)
@@ -110,6 +121,7 @@ def client():
 # Helpers
 # ---------------------------------------------------------------
 
+
 class TestBuildProperties:
     def test_single_property(self):
         result = _build_properties({"cmis:name": "Doc"})
@@ -119,11 +131,13 @@ class TestBuildProperties:
         }
 
     def test_multiple_properties(self):
-        result = _build_properties({
-            "cmis:name": "Doc",
-            "cmis:objectTypeId": "cmis:document",
-            "cmis:description": "A doc",
-        })
+        result = _build_properties(
+            {
+                "cmis:name": "Doc",
+                "cmis:objectTypeId": "cmis:document",
+                "cmis:description": "A doc",
+            }
+        )
         assert result["propertyId[0]"] == "cmis:name"
         assert result["propertyValue[0]"] == "Doc"
         assert result["propertyId[1]"] == "cmis:objectTypeId"
@@ -177,7 +191,10 @@ class TestBrowserUrl:
         assert DMSClient._browser_url("repo1") == "/browser/repo1/root"
 
     def test_with_path(self):
-        assert DMSClient._browser_url("repo1", "sub/folder") == "/browser/repo1/root/sub/folder"
+        assert (
+            DMSClient._browser_url("repo1", "sub/folder")
+            == "/browser/repo1/root/sub/folder"
+        )
 
     def test_strips_leading_slash(self):
         assert DMSClient._browser_url("repo1", "/sub") == "/browser/repo1/root/sub"
@@ -189,6 +206,7 @@ class TestBrowserUrl:
 # ---------------------------------------------------------------
 # create_folder
 # ---------------------------------------------------------------
+
 
 class TestCreateFolder:
     def test_basic(self, client):
@@ -232,24 +250,28 @@ class TestCreateFolder:
 
     def test_with_user_claim(self, client):
         client._mock_http.post_form.return_value = _mock_response(_FOLDER_RESPONSE)
-        claim = UserClaim(x_ecm_user_enc="alice@sap.com", x_ecm_add_principals=["~editors"])
+        claim = UserClaim(
+            x_ecm_user_enc="alice@sap.com", x_ecm_add_principals=["~editors"]
+        )
 
         client.create_folder("repo1", "parent-id", "F", user_claim=claim)
 
         assert client._mock_http.post_form.call_args[1]["user_claim"] is claim
 
 
-
 # ---------------------------------------------------------------
 # create_document
 # ---------------------------------------------------------------
+
 
 class TestCreateDocument:
     def test_basic(self, client):
         client._mock_http.post_form.return_value = _mock_response(_DOCUMENT_RESPONSE)
         stream = BytesIO(b"hello world")
 
-        doc = client.create_document("repo1", "folder-id", "report.pdf", stream, mime_type="application/pdf")
+        doc = client.create_document(
+            "repo1", "folder-id", "report.pdf", stream, mime_type="application/pdf"
+        )
 
         assert isinstance(doc, Document)
         assert doc.object_id == "doc-xyz"
@@ -273,7 +295,14 @@ class TestCreateDocument:
     def test_with_description(self, client):
         client._mock_http.post_form.return_value = _mock_response(_DOCUMENT_RESPONSE)
 
-        client.create_document("repo1", "folder-id", "f.txt", BytesIO(b""), mime_type="text/plain", description="D")
+        client.create_document(
+            "repo1",
+            "folder-id",
+            "f.txt",
+            BytesIO(b""),
+            mime_type="text/plain",
+            description="D",
+        )
 
         data = client._mock_http.post_form.call_args[1]["data"]
         assert data["propertyId[2]"] == "cmis:description"
@@ -282,7 +311,9 @@ class TestCreateDocument:
     def test_with_tenant(self, client):
         client._mock_http.post_form.return_value = _mock_response(_DOCUMENT_RESPONSE)
 
-        client.create_document("repo1", "fid", "f.txt", BytesIO(b""), mime_type="text/plain", tenant="sub1")
+        client.create_document(
+            "repo1", "fid", "f.txt", BytesIO(b""), mime_type="text/plain", tenant="sub1"
+        )
 
         assert client._mock_http.post_form.call_args[1]["tenant_subdomain"] == "sub1"
 
@@ -290,7 +321,14 @@ class TestCreateDocument:
         client._mock_http.post_form.return_value = _mock_response(_DOCUMENT_RESPONSE)
         claim = UserClaim(x_ecm_user_enc="bob@sap.com")
 
-        client.create_document("repo1", "fid", "f.txt", BytesIO(b""), mime_type="text/plain", user_claim=claim)
+        client.create_document(
+            "repo1",
+            "fid",
+            "f.txt",
+            BytesIO(b""),
+            mime_type="text/plain",
+            user_claim=claim,
+        )
 
         assert client._mock_http.post_form.call_args[1]["user_claim"] is claim
 
@@ -307,6 +345,7 @@ class TestCreateDocument:
 # ---------------------------------------------------------------
 # check_out
 # ---------------------------------------------------------------
+
 
 class TestCheckOut:
     def test_basic(self, client):
@@ -342,6 +381,7 @@ class TestCheckOut:
 # check_in
 # ---------------------------------------------------------------
 
+
 class TestCheckIn:
     def test_major_version_no_file(self, client):
         client._mock_http.post_form.return_value = _mock_response(_DOCUMENT_RESPONSE)
@@ -368,7 +408,8 @@ class TestCheckIn:
         stream = BytesIO(b"updated content")
 
         client.check_in(
-            "repo1", "pwc-001",
+            "repo1",
+            "pwc-001",
             file=stream,
             file_name="report_v2.pdf",
             mime_type="application/pdf",
@@ -395,7 +436,9 @@ class TestCheckIn:
 
     def test_with_user_claim(self, client):
         client._mock_http.post_form.return_value = _mock_response(_DOCUMENT_RESPONSE)
-        claim = UserClaim(x_ecm_user_enc="eve@sap.com", x_ecm_add_principals=["~reviewers"])
+        claim = UserClaim(
+            x_ecm_user_enc="eve@sap.com", x_ecm_add_principals=["~reviewers"]
+        )
 
         client.check_in("repo1", "pwc-001", user_claim=claim)
 
@@ -405,6 +448,7 @@ class TestCheckIn:
 # ---------------------------------------------------------------
 # cancel_check_out
 # ---------------------------------------------------------------
+
 
 class TestCancelCheckOut:
     def test_basic(self, client):
@@ -436,6 +480,7 @@ class TestCancelCheckOut:
 # ---------------------------------------------------------------
 # apply_acl
 # ---------------------------------------------------------------
+
 
 class TestApplyAcl:
     def test_get_acl_when_no_aces(self, client):
@@ -554,6 +599,7 @@ class TestApplyAcl:
 # get_object
 # ---------------------------------------------------------------
 
+
 class TestGetObject:
     def test_returns_folder_for_folder_type(self, client):
         client._mock_http.get.return_value = _mock_response(_FOLDER_RESPONSE)
@@ -581,14 +627,16 @@ class TestGetObject:
         assert obj.content_stream_mime_type == "application/pdf"
 
     def test_returns_cmis_object_for_unknown_type(self, client):
-        client._mock_http.get.return_value = _mock_response({
-            "succinctProperties": {
-                "cmis:objectId": "item-1",
-                "cmis:name": "Item",
-                "cmis:baseTypeId": "cmis:item",
-                "cmis:objectTypeId": "cmis:item",
+        client._mock_http.get.return_value = _mock_response(
+            {
+                "succinctProperties": {
+                    "cmis:objectId": "item-1",
+                    "cmis:name": "Item",
+                    "cmis:baseTypeId": "cmis:item",
+                    "cmis:objectTypeId": "cmis:item",
+                }
             }
-        })
+        )
 
         obj = client.get_object("repo1", "item-1")
 
@@ -644,6 +692,7 @@ class TestGetObject:
 # ---------------------------------------------------------------
 # get_content
 # ---------------------------------------------------------------
+
 
 class TestGetContent:
     def test_basic(self, client):
@@ -729,6 +778,7 @@ class TestGetContent:
 # update_properties
 # ---------------------------------------------------------------
 
+
 class TestUpdateProperties:
     def test_basic_rename(self, client):
         resp = {
@@ -760,14 +810,18 @@ class TestUpdateProperties:
     def test_returns_folder_for_folder_type(self, client):
         client._mock_http.post_form.return_value = _mock_response(_FOLDER_RESPONSE)
 
-        obj = client.update_properties("repo1", "folder-abc", {"cmis:description": "Updated"})
+        obj = client.update_properties(
+            "repo1", "folder-abc", {"cmis:description": "Updated"}
+        )
 
         assert isinstance(obj, Folder)
 
     def test_with_change_token(self, client):
         client._mock_http.post_form.return_value = _mock_response(_DOCUMENT_RESPONSE)
 
-        client.update_properties("repo1", "doc-xyz", {"cmis:name": "X"}, change_token="tok-123")
+        client.update_properties(
+            "repo1", "doc-xyz", {"cmis:name": "X"}, change_token="tok-123"
+        )
 
         data = client._mock_http.post_form.call_args[1]["data"]
         assert data["changeToken"] == "tok-123"
@@ -783,10 +837,14 @@ class TestUpdateProperties:
     def test_multiple_properties(self, client):
         client._mock_http.post_form.return_value = _mock_response(_DOCUMENT_RESPONSE)
 
-        client.update_properties("repo1", "doc-xyz", {
-            "cmis:name": "New",
-            "cmis:description": "Desc",
-        })
+        client.update_properties(
+            "repo1",
+            "doc-xyz",
+            {
+                "cmis:name": "New",
+                "cmis:description": "Desc",
+            },
+        )
 
         data = client._mock_http.post_form.call_args[1]["data"]
         assert data["propertyId[0]"] == "cmis:name"
@@ -798,7 +856,9 @@ class TestUpdateProperties:
         client._mock_http.post_form.return_value = _mock_response(_DOCUMENT_RESPONSE)
         claim = UserClaim(x_ecm_user_enc="charlie@sap.com")
 
-        client.update_properties("repo1", "doc-xyz", {"cmis:name": "X"}, tenant="t1", user_claim=claim)
+        client.update_properties(
+            "repo1", "doc-xyz", {"cmis:name": "X"}, tenant="t1", user_claim=claim
+        )
 
         call_args = client._mock_http.post_form.call_args
         assert call_args[1]["tenant_subdomain"] == "t1"
@@ -867,42 +927,58 @@ class TestGetChildren:
         assert params["skipCount"] == "0"
         assert params["succinct"] == "true"
 
-    def test_pagination_params(self, client):
-        client._mock_http.get.return_value = _mock_response({"objects": [], "hasMoreItems": False})
+    def test_pagination_params_via_options(self, client):
+        client._mock_http.get.return_value = _mock_response(
+            {"objects": [], "hasMoreItems": False}
+        )
 
-        client.get_children("repo1", "fid", max_items=50, skip_count=200)
+        opts = ChildrenOptions(max_items=50, skip_count=200)
+        client.get_children("repo1", "fid", options=opts)
 
         params = client._mock_http.get.call_args[1]["params"]
         assert params["maxItems"] == "50"
         assert params["skipCount"] == "200"
 
     def test_with_order_by(self, client):
-        client._mock_http.get.return_value = _mock_response({"objects": [], "hasMoreItems": False})
+        client._mock_http.get.return_value = _mock_response(
+            {"objects": [], "hasMoreItems": False}
+        )
 
-        client.get_children("repo1", "fid", order_by="cmis:creationDate ASC")
+        opts = ChildrenOptions(order_by="cmis:creationDate ASC")
+        client.get_children("repo1", "fid", options=opts)
 
         params = client._mock_http.get.call_args[1]["params"]
         assert params["orderBy"] == "cmis:creationDate ASC"
 
     def test_with_filter(self, client):
-        client._mock_http.get.return_value = _mock_response({"objects": [], "hasMoreItems": False})
+        client._mock_http.get.return_value = _mock_response(
+            {"objects": [], "hasMoreItems": False}
+        )
 
-        client.get_children("repo1", "fid", filter="cmis:name,cmis:objectId")
+        opts = ChildrenOptions(filter="cmis:name,cmis:objectId")
+        client.get_children("repo1", "fid", options=opts)
 
         params = client._mock_http.get.call_args[1]["params"]
         assert params["filter"] == "cmis:name,cmis:objectId"
 
     def test_with_include_allowable_and_path_segment(self, client):
-        client._mock_http.get.return_value = _mock_response({"objects": [], "hasMoreItems": False})
+        client._mock_http.get.return_value = _mock_response(
+            {"objects": [], "hasMoreItems": False}
+        )
 
-        client.get_children("repo1", "fid", include_allowable_actions=True, include_path_segment=True)
+        opts = ChildrenOptions(
+            include_allowable_actions=True, include_path_segment=True
+        )
+        client.get_children("repo1", "fid", options=opts)
 
         params = client._mock_http.get.call_args[1]["params"]
         assert params["includeAllowableActions"] == "true"
         assert params["includePathSegment"] == "true"
 
     def test_no_optional_params_omitted(self, client):
-        client._mock_http.get.return_value = _mock_response({"objects": [], "hasMoreItems": False})
+        client._mock_http.get.return_value = _mock_response(
+            {"objects": [], "hasMoreItems": False}
+        )
 
         client.get_children("repo1", "fid")
 
@@ -913,7 +989,9 @@ class TestGetChildren:
         assert "includePathSegment" not in params
 
     def test_empty_children(self, client):
-        client._mock_http.get.return_value = _mock_response({"objects": [], "hasMoreItems": False, "numItems": 0})
+        client._mock_http.get.return_value = _mock_response(
+            {"objects": [], "hasMoreItems": False, "numItems": 0}
+        )
 
         page = client.get_children("repo1", "fid")
 
@@ -922,7 +1000,9 @@ class TestGetChildren:
         assert page.num_items == 0
 
     def test_with_tenant_and_user_claim(self, client):
-        client._mock_http.get.return_value = _mock_response({"objects": [], "hasMoreItems": False})
+        client._mock_http.get.return_value = _mock_response(
+            {"objects": [], "hasMoreItems": False}
+        )
         claim = UserClaim(x_ecm_user_enc="dana@sap.com")
 
         client.get_children("repo1", "fid", tenant="t1", user_claim=claim)

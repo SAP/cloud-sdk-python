@@ -1,7 +1,8 @@
 # Using the `auditlog_ng` Client in an Agent
 
-This guide explains how to integrate the SAP Audit Log NG OTLP client into a Python-based agent.
-
+This module provides an OTLP/gRPC client for sending structured audit log events
+ to the SAP Audit Log Service (v3/NG). It supports mTLS, insecure mode for local
+ testing, and both binary protobuf and JSON serialization formats.
 ---
 
 ## Overview

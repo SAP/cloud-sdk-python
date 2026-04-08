@@ -69,7 +69,9 @@ exclude = [
     "build",
     "dist",
     "venv",
-    "tests/"
+    "tests/",
+    "src/sap_cloud_sdk/core/auditlog_ng/gen",
+    "src/buf"
 ]
 
 # Same as Black.

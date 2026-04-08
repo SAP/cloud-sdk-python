@@ -40,6 +40,19 @@ def create_client(
     dms_cred: Optional[DMSCredentials] = None,
     _telemetry_source: Optional[Module] = None,
 ):
+    """Create a DMS client with automatic credential resolution.
+
+    Args:
+        instance: Logical instance name for secret resolution. Defaults to ``"default"``.
+        dms_cred: Explicit credentials. If provided, skips secret resolution.
+        _telemetry_source: Internal telemetry source identifier. Not intended for external use.
+
+    Returns:
+        DMSClient: Configured client ready to use.
+
+    Raises:
+        DMSError: If client creation fails due to configuration or initialization issues.
+    """
     try:
         credentials = dms_cred or load_sdm_config_from_env_or_mount(instance)
         client = DMSClient(credentials)

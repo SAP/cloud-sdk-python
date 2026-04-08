@@ -87,6 +87,13 @@ class DMSClient:
         connect_timeout: Optional[int] = None,
         read_timeout: Optional[int] = None,
     ) -> None:
+        """Initialise a DMSClient.
+
+        Args:
+            credentials: OAuth2 credentials and service URI for the DMS instance.
+            connect_timeout: TCP connection timeout in seconds. Defaults to 10.
+            read_timeout: Response read timeout in seconds. Defaults to 30.
+        """
         auth = Auth(credentials)
         self._http: HttpInvoker = HttpInvoker(
             auth=auth,

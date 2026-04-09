@@ -36,11 +36,8 @@ from sap_cloud_sdk.core.auditlog_ng.exceptions import (
     ValidationError,
 )
 
-from sap_cloud_sdk.core.telemetry import (
-    Module,
-    Operation,
-    record_metrics
-)
+from sap_cloud_sdk.core.telemetry import Module, Operation, record_metrics
+
 
 @record_metrics(Module.AUDITLOG_NG, Operation.AUDITLOG_CREATE_CLIENT)
 def create_client(
@@ -57,7 +54,7 @@ def create_client(
     batch: bool = False,
     compression: bool = True,
     schema_url: str = SCHEMA_URL,
-    _telemetry_source: Optional[Module] = None
+    _telemetry_source: Optional[Module] = None,
 ) -> AuditClient:
     """Create an AuditClient for sending audit events over OTLP/gRPC.
 
@@ -65,6 +62,7 @@ def create_client(
     When ``config`` is provided the remaining keyword arguments are ignored.
 
     Args:
+        _telemetry_source: Internal parameter for telemetry. Not for external use.
         config: Optional explicit configuration. If provided, all other
                 keyword arguments are ignored.
         endpoint: OTLP gRPC endpoint (``host:port``).

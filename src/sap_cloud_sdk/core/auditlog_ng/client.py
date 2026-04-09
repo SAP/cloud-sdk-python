@@ -58,7 +58,9 @@ class AuditClient:
         client.close()
     """
 
-    def __init__(self, config: AuditLogNGConfig, _telemetry_source: Optional[Module] = None) -> None:
+    def __init__(
+        self, config: AuditLogNGConfig, _telemetry_source: Optional[Module] = None
+    ) -> None:
         """Initialize the audit client from a config object.
 
         Args:

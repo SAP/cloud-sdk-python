@@ -95,5 +95,14 @@ indent-style = "space"
 skip-magic-trailing-comma = false
 line-ending = "auto"
 
+[tool.ty]
+
 [tool.ty.environment]
 python-version = "3.11"
+
+[tool.ty.src]
+include = ["src", "tests"]
+exclude = [
+    "src/sap_cloud_sdk/core/auditlog_ng/gen",
+    "src/buf",
+]

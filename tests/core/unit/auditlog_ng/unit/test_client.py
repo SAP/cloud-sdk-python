@@ -1,21 +1,38 @@
 """Tests for AuditClient."""
+from __future__ import annotations
 
 import json
+from typing import TypedDict
+from unittest.mock import MagicMock, Mock, patch
+
 import pytest
-from unittest.mock import patch, MagicMock, Mock
 
 from sap_cloud_sdk.core.auditlog_ng.client import AuditClient
 from sap_cloud_sdk.core.auditlog_ng.config import AuditLogNGConfig, SCHEMA_URL
 from sap_cloud_sdk.core.auditlog_ng.exceptions import ValidationError
 
 
-def _make_config(**overrides):
-    defaults = dict(
-        endpoint="localhost:4317",
-        deployment_id="deployment-123",
-        namespace="namespace-123",
-        insecure=True,
-    )
+class ConfigKwargs(TypedDict, total=False):
+    endpoint: str
+    deployment_id: str
+    namespace: str
+    insecure: bool
+    service_name: str
+    cert_file: str | None
+    key_file: str | None
+    ca_file: str | None
+    batch: bool
+    compression: bool
+    schema_url: str
+
+
+def _make_config(**overrides: ConfigKwargs) -> AuditLogNGConfig:
+    defaults: ConfigKwargs = {
+        "endpoint": "localhost:4317",
+        "deployment_id": "deployment-123",
+        "namespace": "namespace-123",
+        "insecure": True,
+    }
     defaults.update(overrides)
     return AuditLogNGConfig(**defaults)
 

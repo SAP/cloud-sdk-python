@@ -149,14 +149,20 @@ class AuditClient:
         except ProtoValidationError as e:
             raise ValidationError(f"Audit event validation failed: {e}") from e
 
-        tenant_id = event.common.tenant_id
+        common = getattr(event, "common", None)
+        tenant_id = getattr(common, "tenant_id", None)
+        if not isinstance(tenant_id, str):
+            raise ValueError("Event must contain common.tenant_id as a string")
         _validate_source_arg(tenant_id, "tenant_id")
 
         event_id = str(uuid.uuid4())
 
-        # Determine event type from message descriptor if not provided
         if event_type is None:
-            event_type = event.DESCRIPTOR.name
+            descriptor = getattr(event, "DESCRIPTOR", None)
+            descriptor_name = getattr(descriptor, "name", None)
+            if not isinstance(descriptor_name, str) or not descriptor_name:
+                raise ValueError("Could not determine event type from message descriptor")
+            event_type = descriptor_name
 
         event_type = f"sap.als.AuditEvent.{event_type}.v2"
 

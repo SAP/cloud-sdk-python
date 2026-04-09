@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import json
-from typing import TypedDict
+from typing import TypedDict, Unpack
 from unittest.mock import MagicMock, Mock, patch
 
 import pytest
@@ -26,7 +26,7 @@ class ConfigKwargs(TypedDict, total=False):
     schema_url: str
 
 
-def _make_config(**overrides: ConfigKwargs) -> AuditLogNGConfig:
+def _make_config(**overrides: Unpack[ConfigKwargs]) -> AuditLogNGConfig:
     defaults: ConfigKwargs = {
         "endpoint": "localhost:4317",
         "deployment_id": "deployment-123",

@@ -210,6 +210,14 @@ Use an OTLP collector:
 export OTEL_EXPORTER_OTLP_ENDPOINT="https://otel-collector.example.com"
 ```
 
+### Span processor
+
+By default, `auto_instrument` uses `BatchSpanProcessor`, which exports spans asynchronously in a background thread and is recommended for production workloads. If you need synchronous span processing (e.g. in short-lived scripts or tests where the process may exit before the batch is flushed), pass `disable_batch=True`:
+
+```python
+auto_instrument(disable_batch=True)
+```
+
 ### System role
 
 ```bash

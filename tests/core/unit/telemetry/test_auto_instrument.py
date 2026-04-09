@@ -43,7 +43,7 @@ class TestAutoInstrument:
             call_kwargs = mock_traceloop_components['traceloop'].init.call_args[1]
             assert call_kwargs['app_name'] == 'test-app'
             assert call_kwargs['should_enrich_metrics'] is True
-            assert call_kwargs['disable_batch'] is True
+            assert call_kwargs['disable_batch'] is False
 
     def test_auto_instrument_uses_grpc_exporter_by_default(self, mock_traceloop_components):
         """Test that auto_instrument uses gRPC exporter by default, letting it read endpoint from env."""
@@ -208,6 +208,17 @@ class TestAutoInstrument:
                 mock_logger.warning.assert_called_once()
                 warning_message = mock_logger.warning.call_args[0][0]
                 assert "OTEL_EXPORTER_OTLP_ENDPOINT not set" in warning_message
+
+    def test_auto_instrument_disable_batch_can_be_set_to_true(self, mock_traceloop_components):
+        """Test that disable_batch=True can be explicitly passed to use SimpleSpanProcessor."""
+        mock_traceloop_components['get_app_name'].return_value = 'test-app'
+        mock_traceloop_components['create_resource'].return_value = {}
+
+        with patch.dict('os.environ', {'OTEL_EXPORTER_OTLP_ENDPOINT': 'http://localhost:4317'}, clear=True):
+            auto_instrument(disable_batch=True)
+
+            call_kwargs = mock_traceloop_components['traceloop'].init.call_args[1]
+            assert call_kwargs['disable_batch'] is True
 
     def test_auto_instrument_passes_baggage_span_processor(self, mock_traceloop_components):
         """Test that auto_instrument registers a BaggageSpanProcessor on the tracer provider."""

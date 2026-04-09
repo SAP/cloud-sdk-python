@@ -30,12 +30,17 @@ logger = logging.getLogger(__name__)
 
 
 @record_metrics(Module.AICORE, Operation.AICORE_AUTO_INSTRUMENT)
-def auto_instrument():
+def auto_instrument(disable_batch: bool = False):
     """
     Initialize meta-instrumentation for GenAI tracing. Should be initialized before any AI frameworks.
 
     Traces are exported to the OTEL collector endpoint configured in environment with
     OTEL_EXPORTER_OTLP_ENDPOINT, or printed to console when OTEL_TRACES_EXPORTER=console.
+
+    Args:
+        disable_batch: If True, uses SimpleSpanProcessor (synchronous, lower throughput).
+                       Defaults to False, which uses BatchSpanProcessor (asynchronous,
+                       recommended for production workloads).
     """
     otel_endpoint = os.getenv(ENV_OTLP_ENDPOINT, "")
     console_traces = os.getenv(ENV_TRACES_EXPORTER, "").lower() == "console"
@@ -54,7 +59,7 @@ def auto_instrument():
         exporter=exporter,
         resource_attributes=resource,
         should_enrich_metrics=True,
-        disable_batch=True,
+        disable_batch=disable_batch,
     )
 
     _set_baggage_processor()

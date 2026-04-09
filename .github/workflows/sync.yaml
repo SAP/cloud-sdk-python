@@ -8,7 +8,7 @@ on:
 jobs:
   sync:
     runs-on: ["self-hosted"]
-    if: ${{ !contains(github.server_url, 'github.com') }}
+    if: ${{ !contains(github.server_url, 'github.com') && contains(github.repository, 'application-foundation') }}
     steps:
       - name: Configure Git
         run: |

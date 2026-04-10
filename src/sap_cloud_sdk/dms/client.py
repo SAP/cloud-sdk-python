@@ -1045,9 +1045,7 @@ class DMSClient:
             "allVersions": str(all_versions).lower(),
             "_charset_": "UTF-8",
         }
-        logger.info(
-            "Deleting object '%s' from repo '%s'", object_id, repository_id
-        )
+        logger.info("Deleting object '%s' from repo '%s'", object_id, repository_id)
         self._http.post_form(
             self._browser_url(repository_id),
             data=form_data,
@@ -1081,9 +1079,7 @@ class DMSClient:
             DMSRuntimeException: If the server encounters an internal error.
         """
         path = f"{_REPOSITORIES}/{repository_id}/deleted/objects/{object_id}/restore"
-        logger.info(
-            "Restoring object '%s' in repo '%s'", object_id, repository_id
-        )
+        logger.info("Restoring object '%s' in repo '%s'", object_id, repository_id)
         response = self._http.post(
             path=path,
             payload={},

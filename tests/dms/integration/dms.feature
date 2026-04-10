@@ -191,3 +191,64 @@ Feature: Document Management Service Integration
     Given I select the first available repository
     When I attempt to download a non-existent document
     Then the operation should fail with a not found error
+
+  # ==================== Delete & Restore Operations ====================
+
+  Scenario: Delete a document
+    Given I select the first available repository
+    And I use the root folder as parent
+    And I have document content "Delete me!"
+    And I upload a document named "sdk-delete-test.txt" with mime type "text/plain"
+    When I delete the document
+    Then the delete should be successful
+    When I attempt to get the deleted document
+    Then the operation should fail with a not found error
+
+  Scenario: Delete and restore a document
+    Given I select the first available repository
+    And I use the root folder as parent
+    And I have document content "Delete and restore me!"
+    And I upload a document named "sdk-restore-test.txt" with mime type "text/plain"
+    When I delete the document
+    Then the delete should be successful
+    When I restore the deleted document
+    Then the restore should be successful
+    And I clean up the created document
+
+  # ==================== Append Content Stream ====================
+
+  Scenario: Append content to a document
+    Given I select the first available repository
+    And I use the root folder as parent
+    And I have document content "Initial content"
+    And I upload a document named "sdk-append-test.txt" with mime type "text/plain"
+    When I append content "Additional content" to the document
+    Then the append should be successful
+    And the appended document should be a Document
+    And I clean up the created document
+
+  Scenario: Append content as last chunk
+    Given I select the first available repository
+    And I use the root folder as parent
+    And I have document content "Base content"
+    And I upload a document named "sdk-append-last-test.txt" with mime type "text/plain"
+    When I append content "Final chunk" as the last chunk
+    Then the append should be successful
+    And I clean up the created document
+
+  # ==================== CMIS Query ====================
+
+  Scenario: Execute a simple CMIS query
+    Given I select the first available repository
+    And I use the root folder as parent
+    And I have document content "Query test content"
+    And I upload a document named "sdk-query-test.txt" with mime type "text/plain"
+    When I execute a CMIS query for documents named "sdk-query-test"
+    Then the query should be successful
+    And the query results should contain at least 1 item
+    And I clean up the created document
+
+  Scenario: Execute a CMIS query with pagination
+    Given I select the first available repository
+    When I execute a CMIS query for all documents with max items 5
+    Then the query should be successful

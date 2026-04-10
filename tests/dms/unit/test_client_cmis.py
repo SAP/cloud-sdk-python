@@ -22,6 +22,8 @@ from sap_cloud_sdk.dms.model import (
     DMSCredentials,
     Document,
     Folder,
+    QueryOptions,
+    QueryResultPage,
     UserClaim,
 )
 
@@ -1010,3 +1012,269 @@ class TestGetChildren:
         call_args = client._mock_http.get.call_args
         assert call_args[1]["tenant_subdomain"] == "t1"
         assert call_args[1]["user_claim"] is claim
+
+
+# ---------------------------------------------------------------
+# delete_object
+# ---------------------------------------------------------------
+
+
+class TestDeleteObject:
+    def test_basic(self, client):
+        client._mock_http.post_form.return_value = _mock_response({})
+
+        result = client.delete_object("repo1", "doc-xyz")
+
+        assert result is None
+        call_args = client._mock_http.post_form.call_args
+        assert call_args[0][0] == "/browser/repo1/root"
+        data = call_args[1]["data"]
+        assert data["cmisaction"] == "delete"
+        assert data["objectId"] == "doc-xyz"
+        assert data["allVersions"] == "true"
+        assert data["_charset_"] == "UTF-8"
+
+    def test_all_versions_false(self, client):
+        client._mock_http.post_form.return_value = _mock_response({})
+
+        client.delete_object("repo1", "doc-xyz", all_versions=False)
+
+        data = client._mock_http.post_form.call_args[1]["data"]
+        assert data["allVersions"] == "false"
+
+    def test_with_tenant(self, client):
+        client._mock_http.post_form.return_value = _mock_response({})
+
+        client.delete_object("repo1", "doc-xyz", tenant="sub1")
+
+        assert client._mock_http.post_form.call_args[1]["tenant_subdomain"] == "sub1"
+
+    def test_with_user_claim(self, client):
+        client._mock_http.post_form.return_value = _mock_response({})
+        claim = UserClaim(x_ecm_user_enc="alice@sap.com")
+
+        client.delete_object("repo1", "doc-xyz", user_claim=claim)
+
+        assert client._mock_http.post_form.call_args[1]["user_claim"] is claim
+
+
+# ---------------------------------------------------------------
+# restore_object
+# ---------------------------------------------------------------
+
+_RESTORE_RESPONSE = {"message": "Object restored successfully"}
+
+
+class TestRestoreObject:
+    def test_basic(self, client):
+        client._mock_http.post.return_value = _mock_response(_RESTORE_RESPONSE)
+
+        msg = client.restore_object("repo1", "doc-xyz")
+
+        assert msg == "Object restored successfully"
+        call_args = client._mock_http.post.call_args
+        assert (
+            call_args[1]["path"]
+            == "/rest/v2/repositories/repo1/deleted/objects/doc-xyz/restore"
+        )
+        assert call_args[1]["payload"] == {}
+
+    def test_with_tenant(self, client):
+        client._mock_http.post.return_value = _mock_response(_RESTORE_RESPONSE)
+
+        client.restore_object("repo1", "doc-xyz", tenant="sub1")
+
+        assert client._mock_http.post.call_args[1]["tenant_subdomain"] == "sub1"
+
+    def test_with_user_claim(self, client):
+        client._mock_http.post.return_value = _mock_response(_RESTORE_RESPONSE)
+        claim = UserClaim(x_ecm_user_enc="bob@sap.com")
+
+        client.restore_object("repo1", "doc-xyz", user_claim=claim)
+
+        assert client._mock_http.post.call_args[1]["user_claim"] is claim
+
+    def test_empty_message(self, client):
+        client._mock_http.post.return_value = _mock_response({})
+
+        msg = client.restore_object("repo1", "doc-xyz")
+
+        assert msg == ""
+
+
+# ---------------------------------------------------------------
+# append_content_stream
+# ---------------------------------------------------------------
+
+
+class TestAppendContentStream:
+    def test_basic(self, client):
+        client._mock_http.post_form.return_value = _mock_response(_DOCUMENT_RESPONSE)
+        stream = BytesIO(b"additional content")
+
+        doc = client.append_content_stream("repo1", "doc-xyz", stream)
+
+        assert isinstance(doc, Document)
+        assert doc.object_id == "doc-xyz"
+
+        call_args = client._mock_http.post_form.call_args
+        assert call_args[0][0] == "/browser/repo1/root"
+        data = call_args[1]["data"]
+        assert data["cmisaction"] == "appendContent"
+        assert data["objectId"] == "doc-xyz"
+        assert data["succinct"] == "true"
+        assert data["isLastChunk"] == "false"
+        assert data["_charset_"] == "UTF-8"
+
+        files_arg = call_args[1]["files"]
+        assert "media" in files_arg
+        assert files_arg["media"][0] == "content"
+        assert files_arg["media"][2] == "application/octet-stream"
+
+    def test_is_last_chunk_true(self, client):
+        client._mock_http.post_form.return_value = _mock_response(_DOCUMENT_RESPONSE)
+
+        client.append_content_stream(
+            "repo1", "doc-xyz", BytesIO(b"final"), is_last_chunk=True
+        )
+
+        data = client._mock_http.post_form.call_args[1]["data"]
+        assert data["isLastChunk"] == "true"
+
+    def test_with_filename(self, client):
+        client._mock_http.post_form.return_value = _mock_response(_DOCUMENT_RESPONSE)
+
+        client.append_content_stream(
+            "repo1", "doc-xyz", BytesIO(b"data"), filename="chunk.bin"
+        )
+
+        files_arg = client._mock_http.post_form.call_args[1]["files"]
+        assert files_arg["media"][0] == "chunk.bin"
+
+    def test_with_tenant(self, client):
+        client._mock_http.post_form.return_value = _mock_response(_DOCUMENT_RESPONSE)
+
+        client.append_content_stream(
+            "repo1", "doc-xyz", BytesIO(b"data"), tenant="sub1"
+        )
+
+        assert client._mock_http.post_form.call_args[1]["tenant_subdomain"] == "sub1"
+
+    def test_with_user_claim(self, client):
+        client._mock_http.post_form.return_value = _mock_response(_DOCUMENT_RESPONSE)
+        claim = UserClaim(x_ecm_user_enc="carol@sap.com")
+
+        client.append_content_stream(
+            "repo1", "doc-xyz", BytesIO(b"data"), user_claim=claim
+        )
+
+        assert client._mock_http.post_form.call_args[1]["user_claim"] is claim
+
+
+# ---------------------------------------------------------------
+# cmis_query
+# ---------------------------------------------------------------
+
+_QUERY_RESPONSE = {
+    "results": [
+        {
+            "properties": {
+                "cmis:objectId": {"value": "doc-1"},
+                "cmis:name": {"value": "Report.pdf"},
+                "cmis:baseTypeId": {"value": "cmis:document"},
+                "cmis:objectTypeId": {"value": "cmis:document"},
+                "cmis:contentStreamLength": {"value": 4096},
+            }
+        },
+        {
+            "properties": {
+                "cmis:objectId": {"value": "folder-1"},
+                "cmis:name": {"value": "Archive"},
+                "cmis:baseTypeId": {"value": "cmis:folder"},
+                "cmis:objectTypeId": {"value": "cmis:folder"},
+            }
+        },
+    ],
+    "hasMoreItems": True,
+    "numItems": 200,
+}
+
+
+class TestCmisQuery:
+    def test_basic(self, client):
+        client._mock_http.get.return_value = _mock_response(_QUERY_RESPONSE)
+
+        page = client.cmis_query("repo1", "SELECT * FROM cmis:document")
+
+        assert isinstance(page, QueryResultPage)
+        assert len(page.results) == 2
+        assert page.has_more_items is True
+        assert page.num_items == 200
+
+        assert isinstance(page.results[0], Document)
+        assert page.results[0].object_id == "doc-1"
+        assert isinstance(page.results[1], Folder)
+        assert page.results[1].object_id == "folder-1"
+
+        call_args = client._mock_http.get.call_args
+        assert call_args[0][0] == "/browser/repo1"
+        params = call_args[1]["params"]
+        assert params["cmisselector"] == "query"
+        assert params["q"] == "SELECT * FROM cmis:document"
+        assert params["maxItems"] == "100"
+        assert params["skipCount"] == "0"
+
+    def test_with_options(self, client):
+        client._mock_http.get.return_value = _mock_response(
+            {"results": [], "hasMoreItems": False}
+        )
+
+        opts = QueryOptions(max_items=25, skip_count=50, search_all_versions=True)
+        client.cmis_query("repo1", "SELECT * FROM cmis:document", options=opts)
+
+        params = client._mock_http.get.call_args[1]["params"]
+        assert params["maxItems"] == "25"
+        assert params["skipCount"] == "50"
+        assert params["searchAllVersions"] == "true"
+
+    def test_search_all_versions_default_not_in_params(self, client):
+        client._mock_http.get.return_value = _mock_response(
+            {"results": [], "hasMoreItems": False}
+        )
+
+        client.cmis_query("repo1", "SELECT * FROM cmis:document")
+
+        params = client._mock_http.get.call_args[1]["params"]
+        assert "searchAllVersions" not in params
+
+    def test_empty_results(self, client):
+        client._mock_http.get.return_value = _mock_response(
+            {"results": [], "hasMoreItems": False, "numItems": 0}
+        )
+
+        page = client.cmis_query("repo1", "SELECT * FROM cmis:document")
+
+        assert page.results == []
+        assert page.has_more_items is False
+        assert page.num_items == 0
+
+    def test_with_tenant(self, client):
+        client._mock_http.get.return_value = _mock_response(
+            {"results": [], "hasMoreItems": False}
+        )
+
+        client.cmis_query("repo1", "SELECT * FROM cmis:document", tenant="sub1")
+
+        assert client._mock_http.get.call_args[1]["tenant_subdomain"] == "sub1"
+
+    def test_with_user_claim(self, client):
+        client._mock_http.get.return_value = _mock_response(
+            {"results": [], "hasMoreItems": False}
+        )
+        claim = UserClaim(x_ecm_user_enc="eve@sap.com")
+
+        client.cmis_query(
+            "repo1", "SELECT * FROM cmis:document", user_claim=claim
+        )
+
+        assert client._mock_http.get.call_args[1]["user_claim"] is claim

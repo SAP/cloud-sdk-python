@@ -59,6 +59,32 @@ class TestOperation:
         assert Operation.AICORE_SET_CONFIG.value == "set_aicore_config"
         assert Operation.AICORE_AUTO_INSTRUMENT.value == "auto_instrument"
 
+    def test_dms_operations(self):
+        """Test DMS operation values."""
+        assert Operation.DMS_ONBOARD_REPOSITORY.value == "onboard_repository"
+        assert Operation.DMS_GET_REPOSITORY.value == "get_repository"
+        assert Operation.DMS_GET_ALL_REPOSITORIES.value == "get_all_repositories"
+        assert Operation.DMS_UPDATE_REPOSITORY.value == "update_repository"
+        assert Operation.DMS_DELETE_REPOSITORY.value == "delete_repository"
+        assert Operation.DMS_CREATE_CONFIG.value == "create_config"
+        assert Operation.DMS_GET_CONFIGS.value == "get_configs"
+        assert Operation.DMS_UPDATE_CONFIG.value == "update_config"
+        assert Operation.DMS_DELETE_CONFIG.value == "delete_config"
+        assert Operation.DMS_CREATE_FOLDER.value == "create_folder"
+        assert Operation.DMS_CREATE_DOCUMENT.value == "create_document"
+        assert Operation.DMS_CHECK_OUT.value == "check_out"
+        assert Operation.DMS_CHECK_IN.value == "check_in"
+        assert Operation.DMS_CANCEL_CHECK_OUT.value == "cancel_check_out"
+        assert Operation.DMS_APPLY_ACL.value == "apply_acl"
+        assert Operation.DMS_GET_OBJECT.value == "get_object"
+        assert Operation.DMS_GET_CONTENT.value == "get_content"
+        assert Operation.DMS_UPDATE_PROPERTIES.value == "update_properties"
+        assert Operation.DMS_GET_CHILDREN.value == "get_children"
+        assert Operation.DMS_DELETE_OBJECT.value == "delete_cmis_object"
+        assert Operation.DMS_RESTORE_OBJECT.value == "restore_object"
+        assert Operation.DMS_APPEND_CONTENT_STREAM.value == "append_content_stream"
+        assert Operation.DMS_CMIS_QUERY.value == "cmis_query"
+
     def test_operation_str_representation(self):
         """Test that Operation enum converts to string correctly."""
         assert str(Operation.AUDITLOG_LOG) == "log"
@@ -105,5 +131,5 @@ class TestOperation:
     def test_operation_count(self):
         """Test that we have the expected number of operations."""
         all_operations = list(Operation)
-        # 2 auditlog + 8 destination + 7 certificate + 7 fragment + 8 objectstore + 2 aicore + 18 dms = 52
-        assert len(all_operations) == 52
+        # 2 auditlog + 8 destination + 7 certificate + 7 fragment + 8 objectstore + 2 aicore + 22 dms = 56
+        assert len(all_operations) == 56

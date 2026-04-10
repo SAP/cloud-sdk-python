@@ -74,6 +74,12 @@ class Operation(str, Enum):
     DMS_GET_CONTENT = "get_content"
     DMS_UPDATE_PROPERTIES = "update_properties"
     DMS_GET_CHILDREN = "get_children"
+    # Value is "delete_cmis_object" (not "delete_object") to avoid collision
+    # with OBJECTSTORE_DELETE_OBJECT which already uses "delete_object".
+    DMS_DELETE_OBJECT = "delete_cmis_object"
+    DMS_RESTORE_OBJECT = "restore_object"
+    DMS_APPEND_CONTENT_STREAM = "append_content_stream"
+    DMS_CMIS_QUERY = "cmis_query"
 
     def __str__(self) -> str:
         return self.value

@@ -10,6 +10,8 @@ from sap_cloud_sdk.dms.model import (
     CmisObject,
     Document,
     Folder,
+    QueryOptions,
+    QueryResultPage,
     _parse_datetime as _parse_cmis_datetime,
     _prop_val,
 )
@@ -361,5 +363,124 @@ class TestChildrenPage:
 
     def test_from_dict_no_num_items(self):
         page = ChildrenPage.from_dict({"objects": [], "hasMoreItems": True})
+        assert page.has_more_items is True
+        assert page.num_items is None
+
+
+# ---------------------------------------------------------------
+# QueryOptions
+# ---------------------------------------------------------------
+
+
+class TestQueryOptions:
+    def test_defaults(self):
+        opts = QueryOptions()
+        assert opts.max_items == 100
+        assert opts.skip_count == 0
+        assert opts.search_all_versions is False
+
+    def test_to_query_params_defaults(self):
+        params = QueryOptions().to_query_params()
+        assert params == {"maxItems": "100", "skipCount": "0"}
+        assert "searchAllVersions" not in params
+
+    def test_to_query_params_custom(self):
+        opts = QueryOptions(max_items=25, skip_count=50, search_all_versions=True)
+        params = opts.to_query_params()
+        assert params["maxItems"] == "25"
+        assert params["skipCount"] == "50"
+        assert params["searchAllVersions"] == "true"
+
+    def test_search_all_versions_false_omitted(self):
+        opts = QueryOptions(search_all_versions=False)
+        params = opts.to_query_params()
+        assert "searchAllVersions" not in params
+
+
+# ---------------------------------------------------------------
+# QueryResultPage
+# ---------------------------------------------------------------
+
+
+class TestQueryResultPage:
+    def test_from_dict_verbose_properties(self):
+        data = {
+            "results": [
+                {
+                    "properties": {
+                        "cmis:objectId": {"value": "doc-1"},
+                        "cmis:name": {"value": "Report.pdf"},
+                        "cmis:baseTypeId": {"value": "cmis:document"},
+                        "cmis:objectTypeId": {"value": "cmis:document"},
+                        "cmis:contentStreamLength": {"value": 4096},
+                    }
+                },
+            ],
+            "hasMoreItems": True,
+            "numItems": 100,
+        }
+        page = QueryResultPage.from_dict(data)
+        assert len(page.results) == 1
+        assert isinstance(page.results[0], Document)
+        assert page.results[0].object_id == "doc-1"
+        assert page.results[0].name == "Report.pdf"
+        assert page.has_more_items is True
+        assert page.num_items == 100
+
+    def test_from_dict_mixed_types(self):
+        data = {
+            "results": [
+                {
+                    "properties": {
+                        "cmis:objectId": {"value": "doc-1"},
+                        "cmis:name": {"value": "Doc"},
+                        "cmis:baseTypeId": {"value": "cmis:document"},
+                        "cmis:objectTypeId": {"value": "cmis:document"},
+                    }
+                },
+                {
+                    "properties": {
+                        "cmis:objectId": {"value": "folder-1"},
+                        "cmis:name": {"value": "Folder"},
+                        "cmis:baseTypeId": {"value": "cmis:folder"},
+                        "cmis:objectTypeId": {"value": "cmis:folder"},
+                    }
+                },
+            ],
+            "hasMoreItems": False,
+            "numItems": 2,
+        }
+        page = QueryResultPage.from_dict(data)
+        assert len(page.results) == 2
+        assert isinstance(page.results[0], Document)
+        assert isinstance(page.results[1], Folder)
+
+    def test_from_dict_empty(self):
+        page = QueryResultPage.from_dict({"results": [], "hasMoreItems": False})
+        assert page.results == []
+        assert page.has_more_items is False
+        assert page.num_items is None
+
+    def test_from_dict_unknown_type(self):
+        data = {
+            "results": [
+                {
+                    "properties": {
+                        "cmis:objectId": {"value": "item-1"},
+                        "cmis:name": {"value": "Item"},
+                        "cmis:baseTypeId": {"value": "cmis:item"},
+                        "cmis:objectTypeId": {"value": "cmis:item"},
+                    }
+                },
+            ],
+            "hasMoreItems": False,
+        }
+        page = QueryResultPage.from_dict(data)
+        assert len(page.results) == 1
+        assert isinstance(page.results[0], CmisObject)
+        assert not isinstance(page.results[0], (Folder, Document))
+
+    def test_from_dict_no_num_items(self):
+        page = QueryResultPage.from_dict({"results": [], "hasMoreItems": True})
         assert page.has_more_items is True
         assert page.num_items is None

@@ -601,3 +601,76 @@ class ChildrenPage:
             has_more_items=data.get("hasMoreItems", False),
             num_items=data.get("numItems"),
         )
+
+
+@dataclass
+class QueryOptions:
+    """Pagination and search options for :meth:`DMSClient.cmis_query`.
+
+    Example:
+        ```python
+        from sap_cloud_sdk.dms import create_client, QueryOptions
+
+        client = create_client()
+        opts = QueryOptions(max_items=50, search_all_versions=True)
+        page = client.cmis_query(repo_id, "SELECT * FROM cmis:document", options=opts)
+        while page.has_more_items:
+            opts.skip_count += opts.max_items
+            page = client.cmis_query(repo_id, "SELECT * FROM cmis:document", options=opts)
+        ```
+
+    Attributes:
+        max_items: Maximum number of results to return per page (default 100).
+        skip_count: Number of results to skip (pagination offset, default 0).
+        search_all_versions: Search all versions, not just latest (default False).
+    """
+
+    max_items: int = 100
+    skip_count: int = 0
+    search_all_versions: bool = False
+
+    def to_query_params(self) -> Dict[str, str]:
+        """Convert options to CMIS query parameters.
+
+        Returns:
+            Dict[str, str]: Query parameters for the HTTP request.
+        """
+        params: Dict[str, str] = {
+            "maxItems": str(self.max_items),
+            "skipCount": str(self.skip_count),
+        }
+        if self.search_all_versions:
+            params["searchAllVersions"] = "true"
+        return params
+
+
+@dataclass
+class QueryResultPage:
+    """Paginated result from a CMIS query request.
+
+    Query results use verbose property format where each property is
+    ``{"cmis:name": {"value": "MyDoc"}}`` rather than succinct format.
+    """
+
+    results: List[CmisObject] = field(default_factory=list)
+    has_more_items: bool = False
+    num_items: Optional[int] = None
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "QueryResultPage":
+        raw_results = data.get("results") or []
+        parsed: List[CmisObject] = []
+        for entry in raw_results:
+            props = entry.get("properties") or entry.get("succinctProperties") or {}
+            base_type = _prop_val(props, "cmis:baseTypeId") or ""
+            if base_type == "cmis:document":
+                parsed.append(Document.from_dict(entry))
+            elif base_type == "cmis:folder":
+                parsed.append(Folder.from_dict(entry))
+            else:
+                parsed.append(CmisObject.from_dict(entry))
+        return cls(
+            results=parsed,
+            has_more_items=data.get("hasMoreItems", False),
+            num_items=data.get("numItems"),
+        )

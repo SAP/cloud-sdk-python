@@ -17,6 +17,8 @@ from sap_cloud_sdk.dms.model import (
     CmisObject,
     Document,
     Folder,
+    QueryOptions,
+    QueryResultPage,
     _prop_val,
 )
 from sap_cloud_sdk.dms._auth import Auth
@@ -67,7 +69,8 @@ class DMSClient:
       manage repository configurations.
     - **CMIS Browser Binding**: Create folders and documents, manage
       versions (check-out / check-in), apply ACLs, browse folder
-      contents, and download document content.
+      contents, download document content, delete and restore objects,
+      append content streams, and execute CMIS queries.
 
     Use :func:`sap_cloud_sdk.dms.create_client` to obtain an instance
     with automatic credential resolution, or construct directly with
@@ -1006,3 +1009,208 @@ class DMSClient:
             user_claim=user_claim,
         )
         return ChildrenPage.from_dict(response.json())
+
+    # ==================================================================
+    # CMIS — delete / restore operations
+    # ==================================================================
+
+    @record_metrics(Module.DMS, Operation.DMS_DELETE_OBJECT)
+    def delete_object(
+        self,
+        repository_id: str,
+        object_id: str,
+        *,
+        all_versions: bool = True,
+        tenant: Optional[str] = None,
+        user_claim: Optional[UserClaim] = None,
+    ) -> None:
+        """Delete a CMIS object (document or folder).
+
+        Args:
+            repository_id: Target repository ID.
+            object_id: CMIS objectId of the object to delete.
+            all_versions: If True, delete all versions of the document.
+                Defaults to True.
+            tenant: Optional subscriber subdomain.
+            user_claim: Optional user identity claims forwarded to DMS.
+
+        Raises:
+            DMSObjectNotFoundException: If the object is not found.
+            DMSPermissionDeniedException: If the access token is invalid.
+            DMSRuntimeException: If the server encounters an internal error.
+        """
+        form_data: Dict[str, str] = {
+            "cmisaction": "delete",
+            "objectId": object_id,
+            "allVersions": str(all_versions).lower(),
+            "_charset_": "UTF-8",
+        }
+        logger.info(
+            "Deleting object '%s' from repo '%s'", object_id, repository_id
+        )
+        self._http.post_form(
+            self._browser_url(repository_id),
+            data=form_data,
+            tenant_subdomain=tenant,
+            user_claim=user_claim,
+        )
+
+    @record_metrics(Module.DMS, Operation.DMS_RESTORE_OBJECT)
+    def restore_object(
+        self,
+        repository_id: str,
+        object_id: str,
+        *,
+        tenant: Optional[str] = None,
+        user_claim: Optional[UserClaim] = None,
+    ) -> str:
+        """Restore a previously deleted object.
+
+        Args:
+            repository_id: Target repository ID.
+            object_id: CMIS objectId of the deleted object.
+            tenant: Optional subscriber subdomain.
+            user_claim: Optional user identity claims forwarded to DMS.
+
+        Returns:
+            str: The server message confirming the restore.
+
+        Raises:
+            DMSObjectNotFoundException: If the object is not found.
+            DMSPermissionDeniedException: If the access token is invalid.
+            DMSRuntimeException: If the server encounters an internal error.
+        """
+        path = f"{_REPOSITORIES}/{repository_id}/deleted/objects/{object_id}/restore"
+        logger.info(
+            "Restoring object '%s' in repo '%s'", object_id, repository_id
+        )
+        response = self._http.post(
+            path=path,
+            payload={},
+            tenant_subdomain=tenant,
+            user_claim=user_claim,
+        )
+        return response.json().get("message", "")
+
+    # ==================================================================
+    # CMIS — content stream operations
+    # ==================================================================
+
+    @record_metrics(Module.DMS, Operation.DMS_APPEND_CONTENT_STREAM)
+    def append_content_stream(
+        self,
+        repository_id: str,
+        document_id: str,
+        file: BinaryIO,
+        *,
+        is_last_chunk: bool = False,
+        filename: Optional[str] = None,
+        tenant: Optional[str] = None,
+        user_claim: Optional[UserClaim] = None,
+    ) -> Document:
+        """Append content to an existing document's content stream.
+
+        Args:
+            repository_id: Target repository ID.
+            document_id: Document CMIS objectId.
+            file: Readable binary stream with the content to append.
+            is_last_chunk: True if this is the final chunk of a
+                multi-part upload. Defaults to False.
+            filename: Optional file name for the content part.
+            tenant: Optional subscriber subdomain.
+            user_claim: Optional user identity claims forwarded to DMS.
+
+        Returns:
+            Document: The updated document.
+
+        Raises:
+            DMSObjectNotFoundException: If the document is not found.
+            DMSPermissionDeniedException: If the access token is invalid.
+            DMSRuntimeException: If the server encounters an internal error.
+        """
+        form_data: Dict[str, str] = {
+            "cmisaction": "appendContent",
+            "objectId": document_id,
+            "succinct": "true",
+            "isLastChunk": str(is_last_chunk).lower(),
+            "_charset_": "UTF-8",
+        }
+        logger.info(
+            "Appending content to document '%s' in repo '%s'",
+            document_id,
+            repository_id,
+        )
+        response = self._http.post_form(
+            self._browser_url(repository_id),
+            data=form_data,
+            files={
+                "media": (
+                    filename or "content",
+                    file,
+                    "application/octet-stream",
+                )
+            },
+            tenant_subdomain=tenant,
+            user_claim=user_claim,
+        )
+        return Document.from_dict(response.json())
+
+    # ==================================================================
+    # CMIS — query operations
+    # ==================================================================
+
+    @record_metrics(Module.DMS, Operation.DMS_CMIS_QUERY)
+    def cmis_query(
+        self,
+        repository_id: str,
+        statement: str,
+        *,
+        options: Optional[QueryOptions] = None,
+        tenant: Optional[str] = None,
+        user_claim: Optional[UserClaim] = None,
+    ) -> QueryResultPage:
+        """Execute a CMIS SQL query against a repository.
+
+        Args:
+            repository_id: Target repository ID.
+            statement: CMIS-QL query string (e.g.
+                ``"SELECT * FROM cmis:document WHERE cmis:name = 'test.pdf'"``).
+            options: Pagination options. Defaults to ``QueryOptions()``
+                (max 100 items, no skip).
+            tenant: Optional subscriber subdomain.
+            user_claim: Optional user identity claims forwarded to DMS.
+
+        Returns:
+            QueryResultPage: Paginated query results.
+
+        Raises:
+            DMSInvalidArgumentException: If the query is malformed.
+            DMSPermissionDeniedException: If the access token is invalid.
+            DMSRuntimeException: If the server encounters an internal error.
+
+        Example::
+
+            from sap_cloud_sdk.dms import create_client, QueryOptions
+
+            client = create_client()
+            page = client.cmis_query(
+                repo_id,
+                "SELECT * FROM cmis:document WHERE cmis:name LIKE 'report%'",
+                options=QueryOptions(max_items=50),
+            )
+        """
+        opts = options or QueryOptions()
+        params: Dict[str, str] = {
+            "cmisselector": "query",
+            "q": statement,
+        }
+        params.update(opts.to_query_params())
+
+        logger.info("Executing CMIS query in repo '%s'", repository_id)
+        response = self._http.get(
+            f"/browser/{repository_id}",
+            params=params,
+            tenant_subdomain=tenant,
+            user_claim=user_claim,
+        )
+        return QueryResultPage.from_dict(response.json())

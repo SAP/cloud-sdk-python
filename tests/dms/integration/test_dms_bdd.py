@@ -18,6 +18,8 @@ from sap_cloud_sdk.dms.model import (
     CreateConfigRequest,
     Document,
     Folder,
+    QueryOptions,
+    QueryResultPage,
     Repository,
     RepositoryConfig,
 )
@@ -62,6 +64,10 @@ class DMSTestContext:
         self.child_doc_id: Optional[str] = None
         self._config_request: Optional[CreateConfigRequest] = None
         self._expected_updated_name: str = ""
+        self.restore_message: Optional[str] = None
+        self.appended_document: Optional[Document] = None
+        self.query_result: Optional[QueryResultPage] = None
+        self._deleted_doc_id: Optional[str] = None
 
 
 @pytest.fixture
@@ -827,17 +833,8 @@ def cleanup_children_folder(context: DMSTestContext, dms_client: DMSClient):
 
 
 def _delete_cmis_object(client: DMSClient, repo_id: str, object_id: str):
-    """Delete a CMIS object using the update properties endpoint (CMIS delete action)."""
-    # Use the HTTP invoker directly to perform a CMIS delete
-    form_data = {
-        "cmisaction": "delete",
-        "objectId": object_id,
-        "_charset_": "UTF-8",
-    }
-    client._http.post_form(
-        client._browser_url(repo_id),
-        data=form_data,
-    )
+    """Delete a CMIS object via the SDK's delete_object method."""
+    client.delete_object(repo_id, object_id)
 
 
 def _remove_from_cleanup(context: DMSTestContext, object_id: str):
@@ -845,3 +842,158 @@ def _remove_from_cleanup(context: DMSTestContext, object_id: str):
     context.cleanup_objects = [
         (r, o) for r, o in context.cleanup_objects if o != object_id
     ]
+
+
+# ==================== DELETE / RESTORE: WHEN ====================
+
+
+@when("I delete the document")
+def delete_document(context: DMSTestContext, dms_client: DMSClient):
+    """Delete the uploaded document."""
+    try:
+        dms_client.delete_object(
+            context.repo_id,
+            context.document.object_id,  # ty: ignore[unresolved-attribute]
+        )
+        context._deleted_doc_id = context.document.object_id  # ty: ignore[unresolved-attribute]
+        _remove_from_cleanup(context, context.document.object_id)  # ty: ignore[unresolved-attribute]
+        context.operation_success = True
+    except Exception as e:
+        context.operation_error = e
+
+
+@when("I attempt to get the deleted document")
+def get_deleted_document(context: DMSTestContext, dms_client: DMSClient):
+    """Try to get the previously deleted document."""
+    context.operation_error = None
+    try:
+        dms_client.get_object(context.repo_id, context._deleted_doc_id)  # ty: ignore[invalid-argument-type]
+        context.operation_success = True
+    except DMSObjectNotFoundException as e:
+        context.operation_error = e
+    except DMSError as e:
+        context.operation_error = e
+
+
+@when("I restore the deleted document")
+def restore_document(context: DMSTestContext, dms_client: DMSClient):
+    """Restore the previously deleted document."""
+    context.operation_error = None
+    try:
+        context.restore_message = dms_client.restore_object(
+            context.repo_id,
+            context._deleted_doc_id,  # ty: ignore[invalid-argument-type]
+        )
+        # Re-add to cleanup since it's restored
+        context.cleanup_objects.append((context.repo_id, context._deleted_doc_id))  # ty: ignore[invalid-argument-type]
+        context.operation_success = True
+    except Exception as e:
+        context.operation_error = e
+
+
+# ==================== APPEND CONTENT: WHEN ====================
+
+
+@when(parsers.parse('I append content "{content}" to the document'))
+def append_content(context: DMSTestContext, dms_client: DMSClient, content: str):
+    """Append content to the uploaded document."""
+    try:
+        context.appended_document = dms_client.append_content_stream(
+            context.repo_id,
+            context.document.object_id,  # ty: ignore[unresolved-attribute]
+            io.BytesIO(content.encode("utf-8")),
+        )
+        context.operation_success = True
+    except Exception as e:
+        context.operation_error = e
+
+
+@when(parsers.parse('I append content "{content}" as the last chunk'))
+def append_last_chunk(context: DMSTestContext, dms_client: DMSClient, content: str):
+    """Append content as the last chunk."""
+    try:
+        context.appended_document = dms_client.append_content_stream(
+            context.repo_id,
+            context.document.object_id,  # ty: ignore[unresolved-attribute]
+            io.BytesIO(content.encode("utf-8")),
+            is_last_chunk=True,
+        )
+        context.operation_success = True
+    except Exception as e:
+        context.operation_error = e
+
+
+# ==================== CMIS QUERY: WHEN ====================
+
+
+@when(parsers.parse('I execute a CMIS query for documents named "{name_prefix}"'))
+def cmis_query_by_name(context: DMSTestContext, dms_client: DMSClient, name_prefix: str):
+    """Execute a CMIS query filtering by document name."""
+    try:
+        statement = f"SELECT * FROM cmis:document WHERE cmis:name LIKE '{name_prefix}%'"
+        context.query_result = dms_client.cmis_query(
+            context.repo_id,
+            statement,
+        )
+        context.operation_success = True
+    except Exception as e:
+        context.operation_error = e
+
+
+@when(parsers.parse("I execute a CMIS query for all documents with max items {max_items:d}"))
+def cmis_query_paginated(context: DMSTestContext, dms_client: DMSClient, max_items: int):
+    """Execute a CMIS query with pagination."""
+    try:
+        opts = QueryOptions(max_items=max_items)
+        context.query_result = dms_client.cmis_query(
+            context.repo_id,
+            "SELECT * FROM cmis:document",
+            options=opts,
+        )
+        context.operation_success = True
+    except Exception as e:
+        context.operation_error = e
+
+
+# ==================== DELETE / RESTORE: THEN ====================
+
+
+@then("the delete should be successful")
+def delete_success(context: DMSTestContext):
+    assert context.operation_error is None, f"Failed: {context.operation_error}"
+    assert context.operation_success is True
+
+
+@then("the restore should be successful")
+def restore_success(context: DMSTestContext):
+    assert context.operation_error is None, f"Failed: {context.operation_error}"
+    assert context.restore_message is not None
+
+
+# ==================== APPEND: THEN ====================
+
+
+@then("the append should be successful")
+def append_success(context: DMSTestContext):
+    assert context.operation_error is None, f"Failed: {context.operation_error}"
+    assert context.appended_document is not None
+
+
+@then("the appended document should be a Document")
+def appended_is_document(context: DMSTestContext):
+    assert isinstance(context.appended_document, Document)
+
+
+# ==================== QUERY: THEN ====================
+
+
+@then("the query should be successful")
+def query_success(context: DMSTestContext):
+    assert context.operation_error is None, f"Failed: {context.operation_error}"
+    assert context.query_result is not None
+    assert isinstance(context.query_result, QueryResultPage)
+
+
+@then(parsers.parse("the query results should contain at least {count:d} item"))
+def query_results_count(context: DMSTestContext, count: int):
+    assert len(context.query_result.results) >= count  # ty: ignore[unresolved-attribute]

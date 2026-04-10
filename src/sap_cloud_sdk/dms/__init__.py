@@ -28,7 +28,19 @@ Usage:
 from typing import Optional
 
 from sap_cloud_sdk.core.telemetry import Module
-from sap_cloud_sdk.dms.model import DMSCredentials
+from sap_cloud_sdk.dms.model import (
+    Ace,
+    Acl,
+    ChildrenOptions,
+    ChildrenPage,
+    CmisObject,
+    DMSCredentials,
+    Document,
+    Folder,
+    QueryOptions,
+    QueryResultPage,
+    UserClaim,
+)
 from sap_cloud_sdk.dms.client import DMSClient
 from sap_cloud_sdk.dms.config import load_sdm_config_from_env_or_mount
 from sap_cloud_sdk.dms.exceptions import DMSError
@@ -70,4 +82,19 @@ def create_client(
         raise DMSError(f"Failed to create DMS client: {e}") from e
 
 
-__all__ = ["create_client"]
+__all__ = [
+    "create_client",
+    "Ace",
+    "Acl",
+    "ChildrenOptions",
+    "ChildrenPage",
+    "CmisObject",
+    "DMSClient",
+    "DMSCredentials",
+    "DMSError",
+    "Document",
+    "Folder",
+    "QueryOptions",
+    "QueryResultPage",
+    "UserClaim",
+]

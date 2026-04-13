@@ -884,8 +884,7 @@ def restore_document(context: DMSTestContext, dms_client: DMSClient):
             context.repo_id,
             context._deleted_doc_id,  # ty: ignore[invalid-argument-type]
         )
-        # Re-add to cleanup since it's restored
-        context.cleanup_objects.append((context.repo_id, context._deleted_doc_id))  # ty: ignore[invalid-argument-type]
+        context.cleanup_objects.append((context.repo_id, context._deleted_doc_id))
         context.operation_success = True
     except Exception as e:
         context.operation_error = e

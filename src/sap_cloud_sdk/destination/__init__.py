@@ -70,11 +70,8 @@ logger = logging.getLogger(__name__)
 
 
 def _mock_file(name: str) -> str:
-    """Return the absolute path to a mocks/<name> file relative to the repo root."""
-    repo_root = os.path.abspath(
-        os.path.join(os.path.dirname(__file__), "..", "..", "..")
-    )
-    return os.path.join(repo_root, "mocks", name)
+    """Return the absolute path to a mocks/<name> file relative to the working directory."""
+    return os.path.join(os.getcwd(), "mocks", name)
 
 
 def create_client(

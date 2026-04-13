@@ -43,11 +43,7 @@ class LocalDevClientBase(ABC, Generic[T]):
     """
 
     def __init__(self) -> None:
-        # Resolve to repo root and mocks path
-        repo_root = os.path.abspath(
-            os.path.join(os.path.dirname(__file__), "..", "..", "..")
-        )
-        self._file_path = os.path.join(repo_root, "mocks", self.file_name)
+        self._file_path = os.path.join(os.getcwd(), "mocks", self.file_name)
         self._lock = threading.Lock()
         self._ensure_file()
 

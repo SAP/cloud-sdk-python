@@ -14,8 +14,8 @@ from sap_cloud_sdk.destination.exceptions import DestinationOperationError, Http
 def client(tmp_path, monkeypatch):
     """Create a LocalDevFragmentClient backed by a temp directory."""
     monkeypatch.setattr(
-        "sap_cloud_sdk.destination._local_client_base.os.path.abspath",
-        lambda _: str(tmp_path),
+        "sap_cloud_sdk.destination._local_client_base.os.getcwd",
+        lambda: str(tmp_path),
     )
     return LocalDevFragmentClient()
 

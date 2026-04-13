@@ -20,6 +20,11 @@ dependencies = [
     "opentelemetry-processor-baggage~=0.61b0",
     "traceloop-sdk~=0.52.0",
     "PyJWT~=2.10.1",
+    "protobuf>=4.25.0",
+    "protovalidate>=0.13.0",
+    "grpcio>=1.60.0",
+    "opentelemetry-api>=1.28.0",
+    "opentelemetry-sdk>=1.28.0",
 ]
 
 [build-system]
@@ -27,7 +32,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/sap_cloud_sdk"]
+packages = ["src/sap_cloud_sdk", "src/buf"]
 
 [dependency-groups]
 dev = [
@@ -50,6 +55,8 @@ source = ["src"]
 omit = [
     "*/tests/*",
     "*/test_*",
+    "*/sap_cloud_sdk/core/auditlog_ng/gen/*",
+    "*/buf/*"
 ]
 skip_empty = true
 
@@ -64,7 +71,9 @@ exclude = [
     "build",
     "dist",
     "venv",
-    "tests/"
+    "tests/",
+    "src/sap_cloud_sdk/core/auditlog_ng/gen",
+    "src/buf"
 ]
 
 # Same as Black.
@@ -86,5 +95,14 @@ indent-style = "space"
 skip-magic-trailing-comma = false
 line-ending = "auto"
 
+[tool.ty]
+
 [tool.ty.environment]
 python-version = "3.11"
+
+[tool.ty.src]
+include = ["src", "tests"]
+exclude = [
+    "src/sap_cloud_sdk/core/auditlog_ng/gen",
+    "src/buf",
+]

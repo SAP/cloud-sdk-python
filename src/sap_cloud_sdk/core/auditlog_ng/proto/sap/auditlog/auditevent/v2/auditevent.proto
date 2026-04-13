@@ -1,0 +1,1766 @@
+syntax = "proto3";
+package sap.auditlog.auditevent.v2;
+
+import "buf/validate/validate.proto";
+import "google/protobuf/struct.proto";
+import "google/protobuf/timestamp.proto";
+
+option go_package = "sap.com/auditlog/auditevent";
+
+// Common Fields
+// contains information that are attached to all events.
+message Common {
+  //timestamp of the event
+  google.protobuf.Timestamp timestamp = 1; // Required format: 2023-10-23T10:00:00.000Z
+  //IP Adress of the source in IPv4 or IPv6
+  repeated string source_ip = 2; // IPv4 or IPv6
+  //contains the local user ID, which is used in case of impersonation
+  string user_impersonated_id = 3;
+  //contains the local user ID, who caused the audit log event
+  string user_initiator_id = 4;
+  string app_id = 5;
+  //tenant ID of the source
+  string tenant_id = 6;
+  string user_session_context_id = 7;
+  map<string, string> app_context = 8;
+}
+
+/* AuditlogClear
+ *   @EventShortText: "Audit Log has been deleted"
+ *   @EventCode: "AE-0001"
+ *   @EventCategoryCode: "EVENT_CATEGORY_CODE_CFG"
+ *   @EventMessageText: "Audit Log has been deleted (event count: ${number_of_events})"
+ *   @EventDocumentation: "The Audit log has been deleted and is no longer available. The number of events has been deleted."
+ */
+message AuditlogClear {
+  Common common = 1;
+  int32 number_of_events = 2;
+}
+
+/* AuditlogDisable
+ *   @EventShortText: "Audit Log has been disabled"
+ *   @EventCode: "AE-0002"
+ *   @EventCategoryCode: "EVENT_CATEGORY_CODE_CFG"
+ *   @EventMessageText: "Audit Log has been disabled"
+ *   @EventDocumentation: "The Audit log has been disabled"
+ */
+message AuditlogDisable {
+  Common common = 1;
+}
+
+/* AuditlogEnable
+ *   @EventShortText: "Audit Log has been enabled"
+ *   @EventCode: "AE-0003"
+ *   @EventCategoryCode: "EVENT_CATEGORY_CODE_CFG"
+ *   @EventMessageText: "Audit Log has been enabled"
+ *   @EventDocumentation: "The Audit log has been enabled"
+ */
+message AuditlogEnable {
+  Common common = 1;
+}
+
+/* AuthnPrivilegeToGroupAdd
+ *   @EventShortText: "An additional privilege has been added to a group"
+ *   @EventCode: "AE-0004"
+ *   @EventCategoryCode: "EVENT_CATEGORY_CODE_IAM"
+ *   @EventMessageText: "Privilege ${privilege} (Type: ${object_type}, ID: ${object_id}) has been added to group ${group}"
+ *   @EventDocumentation: "A new privilege has been added to a user group. This privilege grants members of that group access to objects and the ability to perform operations that they are otherwise not permitted to do."
+ */
+message AuthnPrivilegeToGroupAdd {
+  Common common = 1;
+  string group = 2 [
+    (buf.validate.field).string.min_len = 1
+  ];
+  string privilege = 3 [
+    (buf.validate.field).string.min_len = 1
+  ];
+  string object_type = 4;
+  string object_id = 5;
+}
+
+/* AuthnPrivilegeToGroupDelete
+ *   @EventShortText: "An privilege has been deleted from a group"
+ *   @EventCode: "AE-0005"
+ *   @EventCategoryCode: "EVENT_CATEGORY_CODE_IAM"
+ *   @EventMessageText: "Privilege ${privilege} (Type: ${object_type}, ID: ${object_id}) has been deleted from group ${group}"
+ *   @EventDocumentation: "A new privilege has been deleted from the specified user group. Deleting privileges from a group disallows its members from accessing objects and performing actions they were previously permitted to do."
+ */
+message AuthnPrivilegeToGroupDelete {
+  Common common = 1;
+  string group = 2 [
+    (buf.validate.field).string.min_len = 1
+  ];
+  string privilege = 3 [
+    (buf.validate.field).string.min_len = 1
+  ];
+  string object_type = 4;
+  string object_id = 5;
+}
+
+/* AuthnPrivilegeToRoleAdd
+ *   @EventShortText: "An privilege has been added to a role"
+ *   @EventCode: "AE-0006"
+ *   @EventCategoryCode: "EVENT_CATEGORY_CODE_IAM"
+ *   @EventMessageText: "Privilege ${privilege} (Type: ${object_type}, ID: ${object_id}) has been added to role ${role}"
+ *   @EventDocumentation: "A new privilege has been added to the role. This privilege grants users assigned to that role access objects and the ability to perform operations."
+ */
+message AuthnPrivilegeToRoleAdd {
+  Common common = 1;
+  string privilege = 2 [
+    (buf.validate.field).string.min_len = 1
+  ];
+  string role = 3 [
+    (buf.validate.field).string.min_len = 1
+  ];
+  string object_type = 4;
+  string object_id = 5;
+}
+
+/* AuthnPrivilegeToRoleDelete
+ *   @EventShortText: "An privilege has been deleted from a role"
+ *   @EventCode: "AE-0007"
+ *   @EventCategoryCode: "EVENT_CATEGORY_CODE_IAM"
+ *   @EventMessageText: "Privilege ${privilege} (Type: ${object_type}, ID: ${object_id}) has been deleted from role ${role}"
+ *   @EventDocumentation: "A privilege has been deleted from the role. As a result, users assigned to that role no longer have access to the privileges and cannot perform the associated operations."
+ */
+message AuthnPrivilegeToRoleDelete {
+  Common common = 1 ;
+  string privilege = 2 [
+    (buf.validate.field).string.min_len = 1
+  ];
+  string role = 3 [
+    (buf.validate.field).string.min_len = 1
+  ];
+  string object_type = 4;
+  string object_id = 5;
+}
+
+/* AuthnPrivilegeToUserAdd
+ *   @EventShortText: "A privilege has been added to a user"
+ *   @EventCode: "AE-0008"
+ *   @EventCategoryCode: "EVENT_CATEGORY_CODE_IAM"
+ *   @EventMessageText: "Privilege ${privilege} (Type: ${object_type}, ID: ${object_id}) has been added to user ${user} (User Type: ${user_type}) "
+ *   @EventDocumentation: "A user has been added access to specific objects and operations by a privilege."
+ */
+message AuthnPrivilegeToUserAdd {
+  Common common = 1 ;
+  string privilege = 2 [
+    (buf.validate.field).string.min_len = 1
+  ];
+  string user = 3 [
+    (buf.validate.field).string.min_len = 1
+  ];
+  string object_type = 4;
+  string object_id = 5;
+  UserType user_type = 6;
+}
+
+/* AuthnPrivilegeToUserDelete
+ *   @EventShortText: "An privilege has been removed from a user"
+ *   @EventCode: "AE-0009"
+ *   @EventCategoryCode: "EVENT_CATEGORY_CODE_IAM"
+ *   @EventMessageText: "Privilege ${privilege} (Type: ${object_type}, ID: ${object_id}) has been deleted from user ${user} (User Type: ${user_type})"
+ *   @EventDocumentation: "A user’s privileges have been deleted, preventing them from accessing the assigned objects and performing the corresponding operations."
+ */
+message AuthnPrivilegeToUserDelete {
+  Common common = 1 ;
+  string privilege = 2 [
+    (buf.validate.field).string.min_len = 1
+  ];
+  string user = 3 [
+    (buf.validate.field).string.min_len = 1
+  ];
+  string object_type = 4;
+  string object_id = 5;
+  UserType user_type = 6;
+}
+
+/* AuthnRoleToGroupAdd
+ *   @EventShortText: "A user group has been added to a new role."
+ *   @EventCode: "AE-0010"
+ *   @EventCategoryCode: "EVENT_CATEGORY_CODE_IAM"
+ *   @EventMessageText: "Role ${role} has been added to group ${group}"
+ *   @EventDocumentation: "A new role has been added to a user group. Now, members of the group can access the assigned objects and perform the corresponding operations."
+ */
+message AuthnRoleToGroupAdd {
+  Common common = 1;
+  string group = 2 [
+    (buf.validate.field).string.min_len = 1
+  ];
+  string role = 3 [
+    (buf.validate.field).string.min_len = 1
+  ];
+}
+
+/* AuthnRoleToGroupDelete
+ *   @EventShortText: "A user group role has been deleted"
+ *   @EventCode: "AE-0011"
+ *   @EventCategoryCode: "EVENT_CATEGORY_CODE_IAM"
+ *   @EventMessageText: "Role ${role} has been deleted from group ${group}"
+ *   @EventDocumentation: "A user group has been stripped of a new role, resulting in members losing access to the assigned objects and the ability to perform the associated operations."
+ */
+message AuthnRoleToGroupDelete {
+  Common common = 1;
+  string group = 2 [
+    (buf.validate.field).string.min_len = 1
+  ];
+  string role = 3 [
+    (buf.validate.field).string.min_len = 1
+  ];
+}
+
+/* AuthnRoleToUserAdd
+ *   @EventShortText: "A user has been added a role."
+ *   @EventCode: "AE-0012"
+ *   @EventCategoryCode: "EVENT_CATEGORY_CODE_IAM"
+ *   @EventMessageText: "Role ${role} has been added to user ${user} (User Type: ${user_type})"
+ *   @EventDocumentation: "A new role has been added to a user. Now, the user can access the assigned objects and perform the corresponding operations."
+ */
+message AuthnRoleToUserAdd {
+  Common common = 1;
+  string role = 2 [
+    (buf.validate.field).string.min_len = 1
+  ];
+  string user = 3 [
+    (buf.validate.field).string.min_len = 1
+  ];
+  UserType user_type = 4;
+}
+
+/* AuthnRoleToUserDelete
+ *   @EventShortText: "A user’s role has been deleted"
+ *   @EventCode: "AE-0013"
+ *   @EventCategoryCode: "EVENT_CATEGORY_CODE_IAM"
+ *   @EventMessageText: "Role ${role} has been deleted from user ${user} (User Type: ${user_type})"
+ *   @EventDocumentation: "A user has been stripped of a role, resulting in user losing access to the assigned objects and the ability to perform the associated operations."
+ */
+message AuthnRoleToUserDelete {
+  Common common = 1;
+  string role = 2 [
+    (buf.validate.field).string.min_len = 1
+  ];
+  string user = 3 [
+    (buf.validate.field).string.min_len = 1
+  ];
+  UserType user_type = 4;
+}
+
+/* AuthnUserToGroupAdd
+ *   @EventShortText: "The user has been added to a group."
+ *   @EventCode: "AE-0014"
+ *   @EventCategoryCode: "EVENT_CATEGORY_CODE_IAM"
+ *   @EventMessageText: "User ${user} (User Type: ${user_type}) has been added to group ${group}"
+ *   @EventDocumentation: "A user has been assigned to a user group."
+ */
+message AuthnUserToGroupAdd {
+  Common common = 1 ;
+  string group = 2 [
+    (buf.validate.field).string.min_len = 1
+  ];
+  string user = 3 [
+    (buf.validate.field).string.min_len = 1
+  ];
+  UserType user_type = 4;
+}
+
+/* AuthnUserToGroupDelete
+ *   @EventShortText: "The user has been deleted from the user group."
+ *   @EventCode: "AE-0015"
+ *   @EventCategoryCode: "EVENT_CATEGORY_CODE_IAM"
+ *   @EventMessageText: "User ${user} (User Type: ${user_type}) has been deleted from group ${group}"
+ *   @EventDocumentation: "A user has been deleted from mentioned user group."
+ */
+message AuthnUserToGroupDelete {
+  Common common = 1 ;
+  string group = 2 [
+    (buf.validate.field).string.min_len = 1
+    
+  ];
+  string user = 3 [
+    (buf.validate.field).string.min_len = 1
+    
+  ];
+  UserType user_type = 4;
+}
+
+/* ConfigurationAdd
+ *   @EventShortText: "A new configuration has been added"
+ *   @EventCode: "AE-0016"
+ *   @EventCategoryCode: "EVENT_CATEGORY_CODE_CFG"
+ *   @EventMessageText: "A new configuration has been created for the property named ${property_name} (Type: ${object_type}, ID: ${object_id}). The value associated with this property is ${value}"
+ *   @EventDocumentation: "A new configuration has been created for a named property that belongs to an object type with an identifier. This event type of log is being used to record any configuration changes that may be relevant for security or compliance reasons."
+ */
+message ConfigurationAdd {
+  Common common = 1 ;
+  google.protobuf.Value value = 2 ;
+  string property_name = 3 [
+    (buf.validate.field).string.min_len = 1
+    
+  ];
+  string object_type = 4 [(buf.validate.field).string.max_len = 20];
+  string object_id = 5;
+}
+
+/* ConfigurationChange
+ *   @EventShortText: "An existing configuration has been changed"
+ *   @EventCode: "AE-0017"
+ *   @EventCategoryCode: "EVENT_CATEGORY_CODE_CFG"
+ *   @EventMessageText: "An existing configuration has been modified for the property named ${property_name} (Type: ${object_type}, ID: ${object_id}). The value associated with this property has been changed from ${old_value} to ${new_value}"
+ *   @EventDocumentation: "An existing configuration has been changed for a named property that belongs to an object type with an identifier. This event type of log is being used to record any configuration changes that may be relevant for security or compliance reasons."
+ */
+message ConfigurationChange {
+  Common common = 1 ;
+  google.protobuf.Value new_value = 2 ;
+  google.protobuf.Value old_value = 3 ;
+  string property_name = 4 [
+    (buf.validate.field).string.min_len = 1
+    
+  ];
+  string object_type = 5 [(buf.validate.field).string.max_len = 20];
+  string object_id = 6;
+}
+
+/* ConfigurationDelete
+ *   @EventShortText: "A configuration has been deleted"
+ *   @EventCode: "AE-0018"
+ *   @EventCategoryCode: "EVENT_CATEGORY_CODE_CFG"
+ *   @EventMessageText: "A configuration has been deleted for the property named ${property_name} (Type: ${object_type}, ID: ${object_id}). The value associated with this property was ${value}"
+ *   @EventDocumentation: "A configuration has been deleted for a named property that belongs to an object type with an identifier. This event type of log is being used to record any configuration changes that may be relevant for security or compliance reasons."
+ */
+message ConfigurationDelete {
+  Common common = 1 ;
+  google.protobuf.Value value = 2 ;
+  string property_name = 3 [
+    (buf.validate.field).string.min_len = 1
+    
+  ];
+  string object_type = 4 [(buf.validate.field).string.max_len = 20];
+  string object_id = 5;
+}
+
+/* CredentialCreate
+ *   @EventShortText: "A credential has been created"
+ *   @EventCode: "AE-0019"
+ *   @EventCategoryCode: "EVENT_CATEGORY_CODE_SEC_UNSPECIFIED"
+ *   @EventMessageText: "A credential with ID ${credential_id} of type ${credential_type} has been successfully created"
+ *   @EventDocumentation: "A credential of a specific type has been successfully created."
+ */
+message CredentialCreate {
+  Common common = 1 ;
+  string credential_id = 2 [
+    (buf.validate.field).string.min_len = 1
+    
+  ];
+  CredentialType credential_type = 3 ;
+}
+
+/* CredentialDelete
+ *   @EventShortText: "A credential has been deleted"
+ *   @EventCode: "AE-0020"
+ *   @EventCategoryCode: "EVENT_CATEGORY_CODE_SEC_UNSPECIFIED"
+ *   @EventMessageText: "A credential with ID ${credential_id} of type ${credential_type} has been deleted"
+ *   @EventDocumentation: "A credential of a specific type has been deleted."
+ */
+message CredentialDelete {
+  Common common = 1 ;
+  string credential_id = 2 [
+    (buf.validate.field).string.min_len = 1
+    
+  ];
+  CredentialType credential_type = 3 ;
+}
+
+/* CredentialExpiration
+ *   @EventShortText: "A credential has been expired"
+ *   @EventCode: "AE-0021"
+ *   @EventCategoryCode: "EVENT_CATEGORY_CODE_SEC_UNSPECIFIED"
+ *   @EventMessageText: "A credential with ID ${credential_id} of type ${credential_type} has been expired (Expiration date: ${expiration_date})"
+ *   @EventDocumentation: "A credential of a specific type has been expired at a specific time."
+ */
+message CredentialExpiration {
+  Common common = 1 ;
+  string credential_id = 2 [
+    (buf.validate.field).string.min_len = 1
+    
+  ];
+  CredentialType credential_type = 3 ;
+  google.protobuf.Timestamp expiration_date = 4;
+}
+
+/* CredentialRevokation
+ *   @EventShortText: "A credential has been revoked"
+ *   @EventCode: "AE-0022"
+ *   @EventCategoryCode: "EVENT_CATEGORY_CODE_SEC_UNSPECIFIED"
+ *   @EventMessageText: "A credential with ID ${credential_id} of type ${credential_type} has been revoked (Revokation date: ${revokation_date})"
+ *   @EventDocumentation: "A credential of a specific type has been invalidated at a specific time."
+ */
+message CredentialRevokation {
+  Common common = 1 ;
+  string credential_id = 2 [
+    (buf.validate.field).string.min_len = 1
+    
+  ];
+  CredentialType credential_type = 3 ;
+  google.protobuf.Timestamp revokation_date = 4;
+}
+
+/* DataModelChange
+ *   @EventShortText: "Data Model has been changed"
+ *   @EventCode: "AE-0023"
+ *   @EventCategoryCode: "EVENT_CATEGORY_CODE_SEC_UNSPECIFIED"
+ *   @EventMessageText: "Property named ${property_name} of data Model with ID ${model_id} changed. The value associated with this property has been changed from ${old_value} to ${new_value}"
+ *   @EventDocumentation: "A security-relevant DataModel has been modified. A DataModel is a representation of a real-world scenario about which data is to be collected and stored in a database. It depicts the data flow and logical relationships between various data elements."
+ */
+message DataModelChange {
+  Common common = 1 ;
+  string model_id = 2 [
+    (buf.validate.field).string.min_len = 1
+    
+  ];
+  google.protobuf.Value new_value = 3 ;
+  google.protobuf.Value old_value = 4 ;
+  string property_name = 5 [
+    (buf.validate.field).string.min_len = 1
+    
+  ];
+}
+
+/* DataModelCreate
+ *   @EventShortText: "Data Model has been created"
+ *   @EventCode: "AE-0024"
+ *   @EventCategoryCode: "EVENT_CATEGORY_CODE_SEC_UNSPECIFIED"
+ *   @EventMessageText: "Data Model with ID ${model_id} has been created"
+ *   @EventDocumentation: "A security-relevant DataModel has been created. A DataModel is a representation of a real-world scenario about which data is to be collected and stored in a database. It depicts the data flow and logical relationships between various data elements."
+ */
+message DataModelCreate {
+  Common common = 1 ;
+  string model_id = 2 [
+    (buf.validate.field).string.min_len = 1
+    
+  ];
+}
+
+/* DataModelDelete
+ *   @EventShortText: "Data Model has been deleted"
+ *   @EventCode: "AE-0025"
+ *   @EventCategoryCode: "EVENT_CATEGORY_CODE_SEC_UNSPECIFIED"
+ *   @EventMessageText: "Data Model with ID ${model_id} has been deleted"
+ *   @EventDocumentation: "A security-relevant DataModel has been deleted. A DataModel is a representation of a real-world scenario about which data is to be collected and stored in a database. It depicts the data flow and logical relationships between various data elements."
+ */
+message DataModelDelete {
+  Common common = 1 ;
+  string model_id = 2 [
+    (buf.validate.field).string.min_len = 1
+    
+  ];
+}
+
+/* DataAccess
+ *   @EventShortText: "Security-relevant data has been accessed"
+ *   @EventCode: "AE-0026"
+ *   @EventCategoryCode: "EVENT_CATEGORY_CODE_RAL"
+ *   @EventMessageText: "The attribute ${attribute} of Object Type ${object_type} with Object ID ${object_id} has been accessed via Channel ID ${channel_id} (Channel Type ${channel_type}). The read value is ${value}"
+ *   @EventDocumentation: "A security-relevant property has been read through the designated channel."
+ */
+message DataAccess {
+  Common common = 1 ;
+  string channel_type = 2 [
+    (buf.validate.field).string.min_len = 1
+    
+  ];
+  string channel_id = 3 [
+    (buf.validate.field).string.min_len = 1
+
+  ];
+  string object_type = 4 [
+    (buf.validate.field).string.min_len = 1
+    
+  ];
+  string object_id = 5 [
+    (buf.validate.field).string.min_len = 1
+    
+  ];
+  string attribute = 6 [
+    (buf.validate.field).string.min_len = 1
+    
+  ];
+  google.protobuf.Value value = 7;
+  string attachment_type = 8 [deprecated = true];
+  string attachment_id = 9 [deprecated = true];
+}
+
+/* DataCreate
+ *   @EventShortText: "Security-relevant data has been created"
+ *   @EventCode: "AE-0027"
+ *   @EventCategoryCode: "EVENT_CATEGORY_CODE_RAL"
+ *   @EventMessageText: "The attribute ${attribute} with Object ID ${object_id} of Object Type ${object_type} with value ${value} has been created"
+ *   @EventDocumentation: "A security-relevant property has been created."
+ */
+message DataCreate {
+  Common common = 1 ;
+  string object_type = 2 [
+    (buf.validate.field).string.min_len = 1
+    
+  ];
+  string object_id = 3 [
+    (buf.validate.field).string.min_len = 1
+    
+  ];
+  string attribute = 4 [
+    (buf.validate.field).string.min_len = 1
+    
+  ];
+  google.protobuf.Value value = 5;
+}
+
+/* DataDelete
+ *   @EventShortText: "Security-relevant data has been deleted"
+ *   @EventCode: "AE-0028"
+ *   @EventCategoryCode: "EVENT_CATEGORY_CODE_RAL"
+ *   @EventMessageText: "The attribute ${attribute} of Object ID ${object_id} (Object Type ${object_type}) with value ${value} has been deleted"
+ *   @EventDocumentation: "A security-relevant property has been deleted."
+ */
+message DataDelete {
+  Common common = 1 ;
+  string object_type = 2 [
+    (buf.validate.field).string.min_len = 1
+    
+  ];
+  string object_id = 3 [
+    (buf.validate.field).string.min_len = 1
+    
+  ];
+  string attribute = 4 [
+    (buf.validate.field).string.min_len = 1
+    
+  ];
+  google.protobuf.Value value = 5;
+}
+
+/* DataModification
+ *   @EventShortText: "Security-relevant data has been modified"
+ *   @EventCode: "AE-0029"
+ *   @EventCategoryCode: "EVENT_CATEGORY_CODE_RAL"
+ *   @EventMessageText: "The attribute ${attribute} of Object ID ${object_id} (Object Type ${object_type}) has been changed from value ${old_value} to new value ${new_value}"
+ *   @EventDocumentation: "A security-relevant property has been changed."
+ */
+message DataModification {
+  Common common = 1 ;
+  string object_type = 2 [
+    (buf.validate.field).string.min_len = 1
+    
+  ];
+  string object_id = 3 [
+    (buf.validate.field).string.min_len = 1
+    
+  ];
+  string attribute = 4 [
+    (buf.validate.field).string.min_len = 1
+    
+  ];
+  google.protobuf.Value new_value = 5;
+  google.protobuf.Value old_value = 6;
+}
+
+/* DataExport
+ *   @EventShortText: "Security-relevant data has been exported"
+ *   @EventCode: "AE-0030"
+ *   @EventCategoryCode: "EVENT_CATEGORY_CODE_RAL"
+ *   @EventMessageText: "Object ID ${object_id} (Object Type ${object_type}) has been exported via Channel ID ${channel_id}. Destination URI: ${destination_uri}"
+ *   @EventDocumentation: "A security-relevant data has been exported to a designated URI"
+ */
+message DataExport {
+  Common common = 1 ;
+  DataExportChannelType channel_type = 2 ;
+  string channel_id = 3 [
+    (buf.validate.field).string.min_len = 1
+    
+  ];
+  string object_type = 4 [
+    (buf.validate.field).string.min_len = 1
+    
+  ];
+  string object_id = 5 [
+    (buf.validate.field).string.min_len = 1
+    
+  ];
+  string destination_uri = 6 [
+    (buf.validate.field).string.min_len = 1
+    
+  ];
+}
+
+/* DppDataAccess
+ *   @EventShortText: "DPP relevant data has been accessed"
+ *   @EventCode: "AE-0031"
+ *   @EventCategoryCode: "EVENT_CATEGORY_CODE_DPP"
+ *   @EventMessageText: "Data Subject ${data_subject_id} of Data Subject Type ${data_subject_type} has been accessed. Object ID ${object_id} (Object Type ${object_type}) has been accessed via Channel ID ${channel_id}. The value associated with attribute ${attribute} was ${value}"
+ *   @EventDocumentation: "Data relevant to the Data Protection and Privacy guidelines or similar purposes has been accessed. Data protection is closely linked to numerous legal requirements and privacy concerns."
+ */
+message DppDataAccess {
+  Common common = 1 ;
+  string channel_type = 2 [
+    (buf.validate.field).string.min_len = 1
+    
+  ];
+  string channel_id = 3 [
+    (buf.validate.field).string.min_len = 1
+    
+  ];
+  string data_subject_type = 4 [
+    (buf.validate.field).string.min_len = 1
+    
+  ];
+  string data_subject_id = 5 [
+    (buf.validate.field).string.min_len = 1
+    
+  ];
+  string object_type = 6 [
+    (buf.validate.field).string.min_len = 1
+    
+  ];
+  string object_id = 7 [
+    (buf.validate.field).string.min_len = 1
+    
+  ];
+  string attribute = 8 [
+    (buf.validate.field).string.min_len = 1
+    
+  ];
+  google.protobuf.Value value = 9;
+  string attachment_type = 10 [deprecated = true];
+  string attachment_id = 11 [deprecated = true];
+}
+
+/* DppDataCreate
+ *   @EventShortText: "DPP relevant data has been created"
+ *   @EventCode: "AE-0032"
+ *   @EventCategoryCode: "EVENT_CATEGORY_CODE_DPP"
+ *   @EventMessageText: "Data Subject ${data_subject_id} of Data Subject Type ${data_subject_type} has been created. Object ID ${object_id} (Object Type ${object_type}) has been created. The value associated with attribute ${attribute} was ${value}"
+ *   @EventDocumentation: "Data relevant to the Data Protection and Privacy guidelines or similar purposes has been created. Data protection is closely linked to numerous legal requirements and privacy concerns."
+ */
+message DppDataCreate {
+  Common common = 1 ;
+  string data_subject_type = 2 [
+    (buf.validate.field).string.min_len = 1
+    
+  ];
+  string data_subject_id = 3 [
+    (buf.validate.field).string.min_len = 1
+    
+  ];
+  string object_type = 4 [
+    (buf.validate.field).string.min_len = 1
+    
+  ];
+  string object_id = 5 [
+    (buf.validate.field).string.min_len = 1
+    
+  ];
+  string attribute = 6 [
+    (buf.validate.field).string.min_len = 1
+    
+  ];
+  google.protobuf.Value value = 7;
+}
+
+/* DppDataDelete
+ *   @EventShortText: "DPP relevant data has been deleted"
+ *   @EventCode: "AE-0033"
+ *   @EventCategoryCode: "EVENT_CATEGORY_CODE_DPP"
+ *   @EventMessageText: "Data Subject ${data_subject_id} of Data Subject Type ${data_subject_type} has been deleted. Object ID ${object_id} (Object Type ${object_type}) has been deleted. The value associated with attribute ${attribute} was ${value}"
+ *   @EventDocumentation: "Data relevant to the Data Protection and Privacy guidelines or similar purposes has been deleted. Data protection is closely linked to numerous legal requirements and privacy concerns."
+ */
+message DppDataDelete {
+  Common common = 1 ;
+  string data_subject_type = 2 [
+    (buf.validate.field).string.min_len = 1
+    
+  ];
+  string data_subject_id = 3 [
+    (buf.validate.field).string.min_len = 1
+    
+  ];
+  string object_type = 4 [
+    (buf.validate.field).string.min_len = 1
+    
+  ];
+  string object_id = 5 [
+    (buf.validate.field).string.min_len = 1
+    
+  ];
+  string attribute = 6 [
+    (buf.validate.field).string.min_len = 1
+    
+  ];
+  google.protobuf.Value value = 7;
+}
+
+/* DppDataModification
+ *   @EventShortText: "DPP relevant data has been modified"
+ *   @EventCode: "AE-0034"
+ *   @EventCategoryCode: "EVENT_CATEGORY_CODE_DPP"
+ *   @EventMessageText: "Data Subject ${data_subject_id} of Data Subject Type ${data_subject_type} has been modified. Object ID ${object_id} (Object Type ${object_type}) has been modified. The value associated with attribute ${attribute} was changed from ${old_value} to ${new_value}"
+ *   @EventDocumentation: "Data relevant to the Data Protection and Privacy guidelines or similar purposes has been modified. Data protection is closely linked to numerous legal requirements and privacy concerns."
+ */
+message DppDataModification {
+  Common common = 1 ;
+  string data_subject_type = 2 [
+    (buf.validate.field).string.min_len = 1
+    
+  ];
+  string data_subject_id = 3 [
+    (buf.validate.field).string.min_len = 1
+    
+  ];
+  string object_type = 4 [
+    (buf.validate.field).string.min_len = 1
+    
+  ];
+  string object_id = 5 [
+    (buf.validate.field).string.min_len = 1
+    
+  ];
+  string attribute = 6 [
+    (buf.validate.field).string.min_len = 1
+    
+  ];
+  google.protobuf.Value new_value = 7;
+  google.protobuf.Value old_value = 8;
+}
+
+/* JobChange
+ *   @EventShortText: "A property of job has been changed"
+ *   @EventCode: "AE-0035"
+ *   @EventCategoryCode: "EVENT_CATEGORY_CODE_CFG"
+ *   @EventMessageText: "The property named ${property_name} of Job ${job_id} has been updated from its previous value of ${old_value} to ${new_value}"
+ *   @EventDocumentation: "A named property of a job definition has been updated. Background jobs are automated tasks that run in the background without any user interaction. They are scheduled to run at specific times and are useful for executing time-consuming and repetitive tasks such as data archiving, batch processing, and report generation."
+ */
+message JobChange {
+  Common common = 1 ;
+  string job_id = 2 [
+    (buf.validate.field).string.min_len = 1
+    
+  ];
+  google.protobuf.Value new_value = 3 ;
+  google.protobuf.Value old_value = 4 ;
+  string property_name = 5 [
+    (buf.validate.field).string.min_len = 1
+    
+  ];
+}
+
+/* JobCreate
+ *   @EventShortText: "A job has been created"
+ *   @EventCode: "AE-0036"
+ *   @EventCategoryCode: "EVENT_CATEGORY_CODE_CFG"
+ *   @EventMessageText: "Job with ID ${job_id} has been created"
+ *   @EventDocumentation: "A job with the specified ID has been created. Background jobs are automated tasks that run in the background without any user interaction. They are scheduled to run at specific times and are useful for executing time-consuming and repetitive tasks such as data archiving, batch processing, and report generation."
+ */
+message JobCreate {
+  Common common = 1 ;
+  string job_id = 2 [
+    (buf.validate.field).string.min_len = 1
+    
+  ];
+}
+
+/* JobDelete
+ *   @EventShortText: "A job has been deleted"
+ *   @EventCode: "AE-0037"
+ *   @EventCategoryCode: "EVENT_CATEGORY_CODE_CFG"
+ *   @EventMessageText: "Job with ID ${job_id} has been deleted"
+ *   @EventDocumentation: "A job with the specified ID has been deleted. Background jobs are automated tasks that run in the background without any user interaction. They are scheduled to run at specific times and are useful for executing time-consuming and repetitive tasks such as data archiving, batch processing, and report generation."
+ */
+message JobDelete {
+  Common common = 1 ;
+  string job_id = 2 [
+    (buf.validate.field).string.min_len = 1
+    
+  ];
+}
+
+/* JobStatusChange
+ *   @EventShortText: "A job status has been changed"
+ *   @EventCode: "AE-0038"
+ *   @EventCategoryCode: "EVENT_CATEGORY_CODE_CFG"
+ *   @EventMessageText: "The job status of Job ${job_id} has modified the property named ${property_name}. Its previous value was ${old_value}, and it has now been updated to ${new_value}"
+ *   @EventDocumentation: "A job status has changed by changing a named property. Background jobs are automated tasks that run in the background without any user interaction. They are scheduled to run at specific times and are useful for executing time-consuming and repetitive tasks such as data archiving, batch processing, and report generation."
+ */
+message JobStatusChange {
+  Common common = 1 ;
+  string job_id = 2 [
+    (buf.validate.field).string.min_len = 1
+    
+  ];
+  google.protobuf.Value new_value = 3 ;
+  google.protobuf.Value old_value = 4 ;
+  string property_name = 5 [
+    (buf.validate.field).string.min_len = 1
+    
+  ];
+}
+
+/* MaliciousRequestDetected
+ *   @EventShortText: "The server has received a request that it seems malicious"
+ *   @EventCode: "AE-0039"
+ *   @EventCategoryCode: "EVENT_CATEGORY_CODE_SEC_UNSPECIFIED"
+ *   @EventMessageText: "Malicious behavior ${behavior} for parameter ${parameter} detected. The received value was ${received_value}, but the expected value was ${expected_value}"
+ *   @EventDocumentation: "A Malicious Request is a well-crafted and harmful request sent by a hacker to an authenticated user. This request contains the necessary parameters to execute valid actions on a web application without the user’s knowledge."
+ */
+message MaliciousRequestDetected {
+  Common common = 1 ;
+  string parameter = 2 [
+    (buf.validate.field).string.min_len = 1
+    
+  ];
+  string expected_value = 3;
+  string received_value = 4;
+  MaliciousBehavior behavior = 5 ;
+}
+
+/* PasswordChange
+ *   @EventShortText: "The password of a user has been changed"
+ *   @EventCode: "AE-0040"
+ *   @EventCategoryCode: "EVENT_CATEGORY_CODE_IAM"
+ *   @EventMessageText: "The password of user ${user_id} has been changed"
+ *   @EventDocumentation: "Password of the mentioned user has been changed."
+ */
+message PasswordChange {
+  Common common = 1 ;
+  string user_id = 2 [
+    (buf.validate.field).string.min_len = 1
+    
+  ];
+}
+
+/* PasswordExpiration
+ *   @EventShortText: "The password of a user has expired"
+ *   @EventCode: "AE-0041"
+ *   @EventCategoryCode: "EVENT_CATEGORY_CODE_IAM"
+ *   @EventMessageText: "The password of user ${user_id} has expired"
+ *   @EventDocumentation: "Password of the mentioned user has expired."
+ */
+message PasswordExpiration {
+  Common common = 1 ;
+  string user_id = 2 [
+    (buf.validate.field).string.min_len = 1
+    
+  ];
+}
+
+/* PasswordReset
+ *   @EventShortText: "The user’s password has been reset"
+ *   @EventCode: "AE-0042"
+ *   @EventCategoryCode: "EVENT_CATEGORY_CODE_IAM"
+ *   @EventMessageText: "The password of user ${user_id} has been reset"
+ *   @EventDocumentation: "Password of the mentioned user has been reset."
+ */
+message PasswordReset {
+  Common common = 1 ;
+  string user_id = 2 [
+    (buf.validate.field).string.min_len = 1
+    
+  ];
+}
+
+/*  TenantModification
+ *   @EventShortText: "A property of a tenant was modified"
+ *   @EventCode: "AE-0043"
+ *   @EventCategoryCode: "EVENT_CATEGORY_CODE_CFG"
+ *   @EventMessageText: "The property named ${property_name} has been updated for the tenant with ID ${tenant_id}. The value has been changed from ${old_value} to ${new_value}"
+ *   @EventDocumentation: "A property of a tenant was changed."
+ */
+message TenantModification {
+  Common common = 1 ;
+  google.protobuf.Value new_value = 2 ;
+  google.protobuf.Value old_value = 3 ;
+  string property_name = 4 [
+    (buf.validate.field).string.min_len = 1
+    
+  ];
+  string tenant_id = 5 [
+    (buf.validate.field).string.min_len = 1
+    
+  ];
+}
+
+/*  TenantOffboarding
+ *   @EventShortText: "A tenant was offboarded"
+ *   @EventCode: "AE-0044"
+ *   @EventCategoryCode: "EVENT_CATEGORY_CODE_CFG"
+ *   @EventMessageText: "The tenant with ID ${tenant_id} has been terminated"
+ *   @EventDocumentation: "The tenant has been terminated from the service."
+ */
+message TenantOffboarding {
+  Common common = 1 ;
+  string tenant_id = 2 [
+    (buf.validate.field).string.min_len = 1
+    
+  ];
+}
+
+/*  TenantOnboarding
+ *   @EventShortText: "A tenant was onboarded"
+ *   @EventCode: "AE-0045"
+ *   @EventCategoryCode: "EVENT_CATEGORY_CODE_CFG"
+ *   @EventMessageText: "The tenant with ID ${tenant_id} has been created"
+ *   @EventDocumentation: "The tenant has been created"
+ */
+message TenantOnboarding {
+  Common common = 1 ;
+  string tenant_id = 2 [
+    (buf.validate.field).string.min_len = 1
+    
+  ];
+}
+
+/* UnauthenticatedRequest
+ *   @EventShortText: "Unauthenticated request has been performed"
+ *   @EventCode: "AE-0046"
+ *   @EventCategoryCode: "EVENT_CATEGORY_CODE_SEC_UNSPECIFIED"
+ *   @EventMessageText: "An unauthenticated request has been performed"
+ *   @EventDocumentation: "An unauthenticated request (in the sense of an HTTP status code 401) has been performed"
+ */
+message UnauthenticatedRequest {
+  Common common = 1 ;
+}
+
+/* UnauthorizedRequest
+ *   @EventShortText: "Unauthenticated request has been performed"
+ *   @EventCode: "AE-0047"
+ *   @EventCategoryCode: "EVENT_CATEGORY_CODE_SEC_UNSPECIFIED"
+ *   @EventMessageText: "An unauthorized request of type ${unauthorized_type} has been performed"
+ *   @EventDocumentation: "An unauthenticated request (in the sense of an HTTP status code 401) has been performed"
+ */
+message UnauthorizedRequest {
+  Common common = 1 ;
+  string unauthorized_type = 2;
+}
+
+/* UserActivate
+ *   @EventShortText: "User has been activated"
+ *   @EventCode: "AE-0048"
+ *   @EventCategoryCode: "EVENT_CATEGORY_CODE_IAM"
+ *   @EventMessageText: "User with ID ${user_id} (User Type: ${user_type}) has been activated"
+ *   @EventDocumentation: "A specific user has been activated"
+ */
+message UserActivate {
+  Common common = 1 ;
+  string user_id = 2 [
+    (buf.validate.field).string.min_len = 1
+    
+  ];
+  UserType user_type = 3;
+}
+
+/* UserBlock
+ *   @EventShortText: "User has been blocked"
+ *   @EventCode: "AE-0049"
+ *   @EventCategoryCode: "EVENT_CATEGORY_CODE_IAM"
+ *   @EventMessageText: "User with ID ${user_id} (User Type: ${user_type}) has been blocked"
+ *   @EventDocumentation: "A specific user has been blocked"
+ */
+message UserBlock {
+  Common common = 1 ;
+  string user_id = 2 [
+    (buf.validate.field).string.min_len = 1
+    
+  ];
+  UserType user_type = 3;
+}
+
+/* UserCreate
+ *   @EventShortText: "User has been created"
+ *   @EventCode: "AE-0050"
+ *   @EventCategoryCode: "EVENT_CATEGORY_CODE_IAM"
+ *   @EventMessageText: "User with ID ${user_id} (User Type: ${user_type}) has been created"
+ *   @EventDocumentation: "A specific user has been created"
+ */
+message UserCreate {
+  Common common = 1 ;
+  string user_id = 2 [
+    (buf.validate.field).string.min_len = 1
+    
+  ];
+  UserType user_type = 3;
+}
+
+/* UserDataModification
+ *   @EventShortText: "User's master data has been modified"
+ *   @EventCode: "AE-0051"
+ *   @EventCategoryCode: "EVENT_CATEGORY_CODE_IAM"
+ *   @EventMessageText: "The property named ${property_name} of user with ID ${user_id} (User Type: ${user_type}) has been updated from its previous value of ${old_value} to ${new_value}"
+ *   @EventDocumentation: "User's master data has been modified. A specific property of user has been changed"
+ */
+message UserDataModification {
+  Common common = 1 ;
+  google.protobuf.Value new_value = 2 ;
+  google.protobuf.Value old_value = 3 ;
+  string property_name = 4 [
+    (buf.validate.field).string.min_len = 1
+    
+  ];
+  string user_id = 5 [
+    (buf.validate.field).string.min_len = 1
+    
+  ];
+  UserType user_type = 6;
+}
+
+/* UserDelete
+ *   @EventShortText: "User has been deleted"
+ *   @EventCode: "AE-0052"
+ *   @EventCategoryCode: "EVENT_CATEGORY_CODE_IAM"
+ *   @EventMessageText: "User with ID ${user_id} (User Type: ${user_type}) has been deleted"
+ *   @EventDocumentation: "A specific user has been deleted"
+ */
+message UserDelete {
+  Common common = 1 ;
+  string user_id = 2 [
+    (buf.validate.field).string.min_len = 1
+    
+  ];
+  UserType user_type = 3;
+}
+
+/* UserImpersonationStart
+ *   @EventShortText: "User impersonation started"
+ *   @EventCode: "AE-0053"
+ *   @EventCategoryCode: "EVENT_CATEGORY_CODE_SEC_UNSPECIFIED"
+ *   @EventMessageText: "User with ID ${user_initiator_id} (User Type:${user_initiator_type}) started impersonation for user with ID ${user_impersonated_id} (User Type:${user_impersonated_type}). Context ID: ${context}"
+ *   @EventDocumentation: "Impersonation session has been started. User impersonation enables initiating user to access and operate as if they were logged in as that impersonated user. User A receives the authorizations of user B, user A is the Initiator and user B the Impersonated"
+ */
+message UserImpersonationStart {
+  Common common = 1 ;
+  string user_initiator_id = 2 [
+    (buf.validate.field).string.min_len = 1
+    
+  ];
+  UserType user_initiator_type = 3;
+  string user_impersonated_id = 4 [
+    (buf.validate.field).string.min_len = 1
+    
+  ];
+  UserType user_impersonated_type = 5;
+  string context = 6 [(buf.validate.field).string.min_len = 1];
+}
+
+/* UserImpersonationFinish
+ *   @EventShortText: "User impersonation finished"
+ *   @EventCode: "AE-0054"
+ *   @EventCategoryCode: "EVENT_CATEGORY_CODE_SEC_UNSPECIFIED"
+ *   @EventMessageText: "User with ID ${user_initiator_id} (User Type:${user_initiator_type}) finished impersonation for user with ID ${user_impersonated_id} (User Type:${user_impersonated_type}).Context ID: ${context}"
+ *   @EventDocumentation: "Impersonation session has been finished. User impersonation enables initiating user to access and operate as if they were logged in as that impersonated user. User A receives the authorizations of user B, user A is the Initiator and user B the Impersonated."
+ */
+message UserImpersonationFinish {
+  Common common = 1 ;
+  string user_initiator_id = 2 [
+    (buf.validate.field).string.min_len = 1
+    
+  ];
+  UserType user_initiator_type = 3;
+  string user_impersonated_id = 4 [
+    (buf.validate.field).string.min_len = 1
+    
+  ];
+  UserType user_impersonated_type = 5;
+  string context = 6 [(buf.validate.field).string.min_len = 1];
+}
+
+/* UserLock
+ *   @EventShortText: "User has been locked"
+ *   @EventCode: "AE-0055"
+ *   @EventCategoryCode: "EVENT_CATEGORY_CODE_IAM"
+ *   @EventMessageText: "User with ID ${user_id} (User Type: ${user_type}) has been locked"
+ *   @EventDocumentation: "A specific user has been locked"
+ */
+message UserLock {
+  Common common = 1 ;
+  string user_id = 2 [
+    (buf.validate.field).string.min_len = 1
+    
+  ];
+  UserType user_type = 3;
+}
+
+/* UserUnlock
+ *   @EventShortText: "User has been unlocked"
+ *   @EventCode: "AE-0056"
+ *   @EventCategoryCode: "EVENT_CATEGORY_CODE_IAM"
+ *   @EventMessageText: "User with ID ${user_id} (User Type: ${user_type}) has been unlocked"
+ *   @EventDocumentation: "A specific user has been unlocked"
+ */
+message UserUnlock {
+  Common common = 1 ;
+  string user_id = 2 [
+    (buf.validate.field).string.min_len = 1
+    
+  ];
+  UserType user_type = 3;
+}
+
+/* UserVerify
+ *   @EventShortText: "User has been verified"
+ *   @EventCode: "AE-0057"
+ *   @EventCategoryCode: "EVENT_CATEGORY_CODE_SEC_UNSPECIFIED"
+ *   @EventMessageText: "User with ID ${user_id} (User Type: ${user_type}) has been verified"
+ *   @EventDocumentation: "A specific user has been verified."
+ */
+message UserVerify {
+  Common common = 1 ;
+  string user_id = 2 [
+    (buf.validate.field).string.min_len = 1
+    
+  ];
+  UserType user_type = 3;
+}
+
+/* UserLoginFailure
+ *   @EventShortText: "User login failed"
+ *   @EventCode: "AE-0058"
+ *   @EventCategoryCode: "EVENT_CATEGORY_CODE_SEC_UNSPECIFIED"
+ *   @EventMessageText: "User failed (reason: ${failure_reason}) to login via ${method} (User Type: ${user_type}, Protocol: ${login_protocol}, Admin: ${is_admin}, Multi-Factor Type: ${mfa_type}"
+ *   @EventDocumentation: "The user could not be logged on to the system"
+ */
+message UserLoginFailure {
+  Common common = 1 ;
+  FailureReason failure_reason = 2 ;
+  LoginMethod method = 3 ;
+  bool is_admin = 4;
+  MfaType mfa_type = 5;
+  UserType user_type = 6;
+  LoginProtocol login_protocol = 7;
+}
+
+/* UserLoginSuccess
+ *   @EventShortText: "User login was successful"
+ *   @EventCode: "AE-0059"
+ *   @EventCategoryCode: "EVENT_CATEGORY_CODE_SEC_UNSPECIFIED"
+ *   @EventMessageText: "User logged on successfully (User Type: ${user_type}, Method: ${method}, Protocol: ${login_protocol}, Admin: ${is_admin}, Multi-Factor Type: ${mfa_type} "
+ *   @EventDocumentation: "The user has logged onto the system successfully."
+ */
+message UserLoginSuccess {
+  Common common = 1 ;
+  bool is_admin = 2;
+  LoginMethod method = 3 ;
+  MfaType mfa_type = 4 ;
+  UserType user_type = 5 ;
+  LoginProtocol login_protocol = 6;
+}
+
+/* UserLogoff
+ *   @EventShortText: "User logged off"
+ *   @EventCode: "AE-0060"
+ *   @EventCategoryCode: "EVENT_CATEGORY_CODE_SEC_UNSPECIFIED"
+ *   @EventMessageText: "User logged off (Type: ${logoff_type}, Protocol: ${login_protocol})"
+ *   @EventDocumentation: "The logged off."
+ */
+message UserLogoff {
+  Common common = 1 ;
+  LogoffType logoff_type = 2 ;
+  LoginProtocol login_protocol = 3;
+}
+
+/* ZzzCustomEvent
+ *   @EventShortText: "Custom Event"
+ *   @EventCode: "AE-0061"
+ *   @EventCategoryCode: "EVENT_CATEGORY_CODE_SEC_UNSPECIFIED"
+ *   @EventMessageText: "${custom}"
+ *   @EventDocumentation: "Custom event-type used for security related events that are not part of the Audit Log Event Catalog."
+ */
+message ZzzCustomEvent {
+  Common common = 1 ;
+  google.protobuf.Value custom = 2 ;
+}
+
+/* CMKOnboarding
+ *   @EventShortText: "System has been onboarded to CMK"
+ *   @EventCode: "AE-0062"
+ *   @EventCategoryCode: "EVENT_CATEGORY_CODE_SEC_UNSPECIFIED"
+ *   @EventMessageText: "System ${system_id} has been onboarded to Customer Managed Key ${cmk_id} in KMS Tenant ${tenant_id}"
+ *   @EventDocumentation: "A System has been onboarded to a Customer Managed Key within an SAP Key Management Service Tenant."
+ */
+message CMKOnboarding {
+  Common common = 1 ;
+  string system_id = 2 ;
+  string cmk_id = 3 ;
+}
+
+/* CMKOffboarding
+ *   @EventShortText: "System has been offboarded from CMK"
+ *   @EventCode: "AE-0063"
+ *   @EventCategoryCode: "EVENT_CATEGORY_CODE_SEC_UNSPECIFIED"
+ *   @EventMessageText: "System ${system_id} has been offboarded from Customer Managed Key ${cmk_id} in KMS Tenant ${tenant_id}"
+ *   @EventDocumentation: "A System has been offboarded from a Customer Managed Key within as SAP Key Management Service Tenant."
+ */
+message CMKOffboarding {
+  Common common = 1 ;
+  string system_id = 2 ;
+  string cmk_id = 3 ;
+}
+
+/* CMKSwitch
+ *   @EventShortText: "System has switched CMKs within SAP KMS"
+ *   @EventCode: "AE-0064"
+ *   @EventCategoryCode: "EVENT_CATEGORY_CODE_SEC_UNSPECIFIED"
+ *   @EventMessageText: "System ${system_id} has been switched from Customer Managed Key ${cmk_id_old} to Customer Managed Key ${cmk_id_new} in KMS Tenant ${tenant_id}"
+ *   @EventDocumentation: "A System has been switched from a Customer Managed Key within as SAP Key Management Service Tenant."
+ */
+message CMKSwitch {
+  Common common = 1 ;
+  string system_id = 2 ;
+  string cmk_id_old = 3 ;
+  string cmk_id_new = 4 ;
+}
+
+/* CMKTenantModification
+ *   @EventShortText: "CMK Tenant modification"
+ *   @EventCode: "AE-0065"
+ *   @EventCategoryCode: "EVENT_CATEGORY_CODE_SEC_UNSPECIFIED"
+ *   @EventMessageText: "Tenant with ID ${tenant_id} (Customer Tenant Context ID: ${system_id}) has been modified. Action = ${cmk_action} for Customer Managed Key ${cmk_id}"
+ *   @EventDocumentation: "A Tenant has been modified as a result of a customer action within the SAP Key Management Service (e.g. System Onboarding, System Offboarding or Key Revocation)"
+ */
+message CMKTenantModification {
+  Common common = 1 ;
+  string system_id = 2 ;
+  string cmk_id = 3 ;
+  CMKAction cmk_action = 4 ;
+}
+
+/* CMKCreate
+ *   @EventShortText: "CMK has been created"
+ *   @EventCode: "AE-0066"
+ *   @EventCategoryCode: "EVENT_CATEGORY_CODE_SEC_UNSPECIFIED"
+ *   @EventMessageText: "Customer Managed Key ${cmk_id} in KMS System ${kms_system_id} has been created"
+ *   @EventDocumentation: "Customer Managed Key has been created in SAP KMS. SAP Key Management Service is a kernel service that provides key management infrastructure for SAP cloud applications and services to support encryption with customer-specific encryption keys (CSEK) or with customer-managed keys (CMK)."
+ */
+message CMKCreate {
+  Common common = 1 ;
+  string cmk_id = 2 ;
+  string kms_system_id = 3 ;
+}
+
+/* CMKDelete
+ *   @EventShortText: "CMK has been deleted"
+ *   @EventCode: "AE-0067"
+ *   @EventCategoryCode: "EVENT_CATEGORY_CODE_SEC_UNSPECIFIED"
+ *   @EventMessageText: "Customer Managed Key ${cmk_id} in KMS System ${kms_system_id} has been deleted"
+ *   @EventDocumentation: "Customer Managed Key has been deleted in SAP KMS. SAP Key Management Service is a kernel service that provides key management infrastructure for SAP cloud applications and services to support encryption with customer-specific encryption keys (CSEK) or with customer-managed keys (CMK)."
+ */
+message CMKDelete {
+  Common common = 1 ;
+  string cmk_id = 2 ;
+  string kms_system_id = 3 ;
+}
+
+/* CMKRestore
+ *   @EventShortText: "CMK has been restored"
+ *   @EventCode: "AE-0068"
+ *   @EventCategoryCode: "EVENT_CATEGORY_CODE_SEC_UNSPECIFIED"
+ *   @EventMessageText: "Customer Managed Key ${cmk_id} in KMS System ${kms_system_id} has been restored"
+ *   @EventDocumentation: "Customer Managed Key has been restored in SAP KMS. SAP Key Management Service is a kernel service that provides key management infrastructure for SAP cloud applications and services to support encryption with customer-specific encryption keys (CSEK) or with customer-managed keys (CMK)."
+ */
+message CMKRestore {
+  Common common = 1 ;
+  string cmk_id = 2 ;
+  string kms_system_id = 3 ;
+}
+
+/* CMKDisable
+ *   @EventShortText: "CMK has been disabled"
+ *   @EventCode: "AE-0069"
+ *   @EventCategoryCode: "EVENT_CATEGORY_CODE_SEC_UNSPECIFIED"
+ *   @EventMessageText: "Customer Managed Key ${cmk_id} in KMS System ${kms_system_id} has been disabled"
+ *   @EventDocumentation: "Customer Managed Key has been disabled in SAP KMS. SAP Key Management Service is a kernel service that provides key management infrastructure for SAP cloud applications and services to support encryption with customer-specific encryption keys (CSEK) or with customer-managed keys (CMK)."
+ */
+message CMKDisable {
+  Common common = 1 ;
+  string cmk_id = 2 ;
+  string kms_system_id = 3 ;
+}
+
+/* CMKEnable
+ *   @EventShortText: "CMK has been enabled"
+ *   @EventCode: "AE-0070"
+ *   @EventCategoryCode: "EVENT_CATEGORY_CODE_SEC_UNSPECIFIED"
+ *   @EventMessageText: "Customer Managed Key ${cmk_id} in KMS System ${kms_system_id} has been enabled"
+ *   @EventDocumentation: "Customer Managed Key has been enabled in SAP KMS. SAP Key Management Service is a kernel service that provides key management infrastructure for SAP cloud applications and services to support encryption with customer-specific encryption keys (CSEK) or with customer-managed keys (CMK)."
+ */
+message CMKEnable {
+  Common common = 1 ;
+  string cmk_id = 2 ;
+  string kms_system_id = 3 ;
+}
+
+/* CMKRotate
+ *   @EventShortText: "CMK has been rotated"
+ *   @EventCode: "AE-0071"
+ *   @EventCategoryCode: "EVENT_CATEGORY_CODE_SEC_UNSPECIFIED"
+ *   @EventMessageText: "Customer Managed Key ${cmk_id} has been rotated"
+ *   @EventDocumentation: "Customer Managed Key has rotated in SAP KMS. SAP Key Management Service is a kernel service that provides key management infrastructure for SAP cloud applications and services to support encryption with customer-specific encryption keys (CSEK) or with customer-managed keys (CMK)."
+ */
+message CMKRotate {
+  Common common = 1 ;
+  string cmk_id = 2 ;
+}
+
+/* KeyCreate
+ *   @EventShortText: "Key has been created"
+ *   @EventCode: "AE-0072"
+ *   @EventCategoryCode: "EVENT_CATEGORY_CODE_SEC_UNSPECIFIED"
+ *   @EventMessageText: "${key_type} Key ${key_id} has been created (System: ${system_id}, Customer Managed Key: ${cmk_id})"
+ *   @EventDocumentation: "A key identified by its Key ID has been created. The key was assigned to a system referenced by a Customer Managed Key."
+ */
+message KeyCreate {
+  Common common = 1 ;
+  KeyType key_type = 2 ;
+  string key_id = 3 ;
+  string system_id = 4 ;
+  string cmk_id = 5 ;
+}
+
+/* KeyDelete
+ *   @EventShortText: "Key has been deleted"
+ *   @EventCode: "AE-0073"
+ *   @EventCategoryCode: "EVENT_CATEGORY_CODE_SEC_UNSPECIFIED"
+ *   @EventMessageText: "${key_type} Key ${key_id} has been deleted (System: ${system_id}, Customer Managed Key: ${cmk_id})"
+ *   @EventDocumentation: "A key identified by its Key ID has been deleted. The key was assigned to a system referenced by a Customer Managed Key. Reasons for deleting  a key are: consumer-controlled key termination"
+ */
+message KeyDelete {
+  Common common = 1 ;
+  KeyType key_type = 2 ;
+  string key_id = 3 ;
+  string system_id = 4 ;
+  string cmk_id = 5 ;
+}
+
+/* KeyRestore
+ *   @EventShortText: "Key has been restored"
+ *   @EventCode: "AE-0074"
+ *   @EventCategoryCode: "EVENT_CATEGORY_CODE_SEC_UNSPECIFIED"
+ *   @EventMessageText: "${key_type} Key ${key_id} has been restored (System: ${system_id}, Customer Managed Key: ${cmk_id})"
+ *   @EventDocumentation: "A key identified by its Key ID has been restored. The key was assigned to a system referenced by a Customer Managed Key. Reasons for restoring are e.g. restore from backup"
+ */
+message KeyRestore {
+  Common common = 1 ;
+  KeyType key_type = 2 ;
+  string key_id = 3 ;
+  string system_id = 4 ;
+  string cmk_id = 5 ;
+}
+
+/* KeyPurge
+ *   @EventShortText: "Key has been purged"
+ *   @EventCode: "AE-0075"
+ *   @EventCategoryCode: "EVENT_CATEGORY_CODE_SEC_UNSPECIFIED"
+ *   @EventMessageText: "${key_type} Key ${key_id} has been purged (System: ${system_id}, Customer Managed Key: ${cmk_id})"
+ *   @EventDocumentation: "A key identified by its Key ID has been purged. The key was assigned to a system referenced by a Customer Managed Key. Reasons for purging a key from memory are: mainly Customer Managed Key revocation"
+ */
+message KeyPurge {
+  Common common = 1 ;
+  KeyType key_type = 2 ;
+  string key_id = 3 ;
+  string system_id = 4 ;
+  string cmk_id = 5 ;
+}
+
+/* KeyRotate
+ *   @EventShortText: "Key has been rotated"
+ *   @EventCode: "AE-0076"
+ *   @EventCategoryCode: "EVENT_CATEGORY_CODE_SEC_UNSPECIFIED"
+ *   @EventMessageText: "${key_type} Key ${key_id} has been rotated (System: ${system_id}, Customer Managed Key: ${cmk_id})"
+ *   @EventDocumentation: "A key identified by its Key ID has been rotated. The key was assigned to a system referenced by a Customer Managed Key. Reasons for rotating a key are: scheduled internal key rotation, Customer Managed Key rotation"
+ */
+message KeyRotate {
+  Common common = 1 ;
+  KeyType key_type = 2 ;
+  string key_id = 3 ;
+  string system_id = 4 ;
+  string cmk_id = 5 ;
+}
+
+/* KeyEnable
+ *   @EventShortText: "Key has been enabled"
+ *   @EventCode: "AE-0077"
+ *   @EventCategoryCode: "EVENT_CATEGORY_CODE_SEC_UNSPECIFIED"
+ *   @EventMessageText: "${key_type} Key ${key_id} has been enabled (System: ${system_id}, Customer Managed Key: ${cmk_id})"
+ *   @EventDocumentation: "A key identified by its Key ID has been enabled. The key was assigned to a system referenced by a Customer Managed Key. Reasons for enabling a key are: Customer Managed Key restore, consumer-side key management"
+ */
+message KeyEnable {
+  Common common = 1 ;
+  KeyType key_type = 2 ;
+  string key_id = 3 ;
+  string system_id = 4 ;
+  string cmk_id = 5 ;
+}
+
+/* KeyDisable
+ *   @EventShortText: "Key has been disabled"
+ *   @EventCode: "AE-0078"
+ *   @EventCategoryCode: "EVENT_CATEGORY_CODE_SEC_UNSPECIFIED"
+ *   @EventMessageText: "${key_type} Key ${key_id} has been disabled (System: ${system_id}, Customer Managed Key: ${cmk_id})"
+ *   @EventDocumentation: "A key identified by its Key ID has been disabled. The key was assigned to a system referenced by a Customer Managed Key. Reasons for disabling a key are: Customer Managed Key restore, consumer-side key management"
+ */
+message KeyDisable {
+  Common common = 1 ;
+  KeyType key_type = 2 ;
+  string key_id = 3 ;
+  string system_id = 4 ;
+  string cmk_id = 5 ;
+}
+
+/* KeySuspend
+ *   @EventShortText: "Key has been suspended"
+ *   @EventCode: "AE-0079"
+ *   @EventCategoryCode: "EVENT_CATEGORY_CODE_SEC_UNSPECIFIED"
+ *   @EventMessageText: "${key_type} Key ${key_id} has been suspended (System: ${system_id}, Customer Managed Key: ${cmk_id})"
+ *   @EventDocumentation: "A key identified by its Key ID has been suspended. The key was assigned to a system referenced by a Customer Managed Key. Reasons for suspending of a key are: Customer Managed Key restore, consumer-side key management"
+ */
+message KeySuspend {
+  Common common = 1 ;
+  KeyType key_type = 2 ;
+  string key_id = 3 ;
+  string system_id = 4 ;
+  string cmk_id = 5 ;
+}
+
+/* KeyOnboardKeyChain
+ *   @EventShortText: "Key has been onboarded to keychain"
+ *   @EventCode: "AE-0080"
+ *   @EventCategoryCode: "EVENT_CATEGORY_CODE_SEC_UNSPECIFIED"
+ *   @EventMessageText: "${key_type} Key ${key_id} onboarded to keychain (System: ${system_id}, Customer Managed Key: ${cmk_id})"
+ *   @EventDocumentation: "A key identified by its Key ID has been onboarded to keychain. The key was assigned to a system referenced by a Customer Managed Key. Reasons for onboarding a key are: Customer Managed Key restore, consumer-side key management"
+ */
+message KeyOnboardKeyChain {
+  Common common = 1 ;
+  KeyType key_type = 2 ;
+  string key_id = 3 ;
+  string system_id = 4 ;
+  string cmk_id = 5 ;
+}
+
+/* CMKDrop
+ *   @EventShortText: "CMK has been dropped"
+ *   @EventCode: "AE-0081"
+ *   @EventCategoryCode: "EVENT_CATEGORY_CODE_SEC_UNSPECIFIED"
+ *   @EventMessageText: "Metadata of Customer Managed Key ${cmk_id} in KMS System ${kms_system_id} have been dropped"
+ *   @EventDocumentation: "Metadata of Customer Managed Key have been dropped in SAP KMS. SAP Key Management Service is a kernel service that provides key management infrastructure for SAP cloud applications and services to support encryption with customer-specific encryption keys (CSEK) or with customer-managed keys (CMK)."
+ */
+message CMKDrop {
+  Common common = 1 ;
+  string cmk_id = 2 ;
+  string kms_system_id = 3 ;
+}
+
+/* CMKSuspend
+ *   @EventShortText: "CMK has been suspended"
+ *   @EventCode: "AE-0082"
+ *   @EventCategoryCode: "EVENT_CATEGORY_CODE_SEC_UNSPECIFIED"
+ *   @EventMessageText: "Customer Managed Key ${cmk_id} in KMS System ${kms_system_id} has been suspended"
+ *   @EventDocumentation: "Customer Managed Key has been suspended in SAP KMS. SAP Key Management Service is a kernel service that provides key management infrastructure for SAP cloud applications and services to support encryption with customer-specific encryption keys (CSEK) or with customer-managed keys (CMK)."
+ */
+message CMKSuspend {
+  Common common = 1 ;
+  string cmk_id = 2 ;
+  string kms_system_id = 3 ;
+}
+
+/* VirusFinding
+ *   @EventShortText: "Virus detected"
+ *   @EventCode: "AE-0083"
+ *   @EventCategoryCode: "EVENT_CATEGORY_CODE_SEC_UNSPECIFIED"
+ *   @EventMessageText: "Virus (${virus_name}) detected in file ${file_name} (Channel:${virus_channel})"
+ *   @EventDocumentation: "During a scan of the aforementioned file, a virus was detected. The channel provides insights into the manner in which the virus was identified, particularly during upload processes and routine scans."
+ */
+message VirusFinding {
+  Common common = 1 ;
+  string virus_name = 2 ;
+  string file_name = 3 ;
+  VirusChannel virus_channel = 4 ;
+}
+
+/* CMKUnavailable
+ *   @EventShortText: "CMK has become unavailable"
+ *   @EventCode: "AE-0084"
+ *   @EventCategoryCode: "EVENT_CATEGORY_CODE_SEC_UNSPECIFIED"
+ *   @EventMessageText: "Customer Managed Key ${cmk_id} in KMS System ${kms_system_id} has become unavailable"
+ *   @EventDocumentation: "Customer Managed Key has become unavailable for SAP Key Management Service. SAP Key Management Service is a kernel service that provides key management infrastructure for SAP cloud applications and services to support encryption with customer-specific encryption keys (CSEK) or with customer-managed keys (CMK)."
+ */
+message CMKUnavailable {
+  Common common = 1 ;
+  string cmk_id = 2 ;
+  string kms_system_id = 3 ;
+}
+
+/* CMKAvailable
+ *   @EventShortText: "CMK has become available"
+ *   @EventCode: "AE-0085"
+ *   @EventCategoryCode: "EVENT_CATEGORY_CODE_SEC_UNSPECIFIED"
+ *   @EventMessageText: "Customer Managed Key ${cmk_id} in KMS System ${kms_system_id} has become available"
+ *   @EventDocumentation: "Customer Managed Key has become available for SAP Key Management Service. SAP Key Management Service is a kernel service that provides key management infrastructure for SAP cloud applications and services to support encryption with customer-specific encryption keys (CSEK) or with customer-managed keys (CMK)."
+ */
+message CMKAvailable {
+  Common common = 1 ;
+  string cmk_id = 2 ;
+  string kms_system_id = 3 ;
+}
+
+/* CMKDetach
+ *   @EventShortText: "CMK has been detached"
+ *   @EventCode: "AE-0086"
+ *   @EventCategoryCode: "EVENT_CATEGORY_CODE_SEC_UNSPECIFIED"
+ *   @EventMessageText: "Customer Managed Key ${cmk_id} in KMS System ${kms_system_id} has been detached from System ${system_id}"
+ *   @EventDocumentation: "Customer Managed Key has been detached from System in SAP Key Management Service. SAP Key Management Service is a kernel service that provides key management infrastructure for SAP cloud applications and services to support encryption with customer-specific encryption keys (CSEK) or with customer-managed keys (CMK)."
+ */
+message CMKDetach {
+  Common common = 1 ;
+  string cmk_id = 2 ;
+  string kms_system_id = 3 ;
+  string system_id = 4 ;
+}
+
+enum CredentialType {
+  //@ShortText: "Unspecified"
+  CREDENTIAL_TYPE_UNSPECIFIED = 0;
+  //@ShortText: "X.509"
+  CREDENTIAL_TYPE_X509_CERTIFICATE = 1;
+  //@ShortText: "Key"
+  CREDENTIAL_TYPE_KEY = 2;
+  //@ShortText: "Secret"
+  CREDENTIAL_TYPE_SECRET = 3;
+}
+
+// FailureReason
+enum FailureReason {
+  //@ShortText: "Unspecified Reason"
+  FAILURE_REASON_UNSPECIFIED = 0;
+  //@ShortText: "Wrong Password"
+  FAILURE_REASON_PASSWORD = 1;
+  //@ShortText: "Multi-Factor Authentication failed"
+  FAILURE_REASON_MFA_FAILED = 2;
+  //@ShortText: "User not found"
+  FAILURE_REASON_USER_NOT_FOUND = 3;
+  //@ShortText: "User locked"
+  FAILURE_REASON_USER_LOCKED = 4;
+  //@ShortText: "User blocked"
+  FAILURE_REASON_USER_BLOCKED = 5;
+  //@ShortText: "User not verified
+  FAILURE_REASON_USER_UNVERIFIED = 6;
+  //@ShortText: "User expired"
+  FAILURE_REASON_USER_EXPIRED = 7;
+  //@ShortText: "User invalid"
+  FAILURE_REASON_USER_INVALID = 8;
+  //@ShortText: "Insecure connection"
+  FAILURE_REASON_INSECURE_CONNECTION = 9;
+  //@ShortText: "Login method disabled"
+  FAILURE_REASON_LOGIN_METHOD_DISABLED = 10;
+  //@ShortText: "Token expired"
+  FAILURE_REASON_TOKEN_EXPIRED = 11;
+  //@ShortText: "Token revoked"
+  FAILURE_REASON_TOKEN_REVOKED = 12;
+  //@ShortText: "Token invalid"
+  FAILURE_REASON_TOKEN_INVALID = 13;
+  //@ShortText: "Session expired"
+  FAILURE_REASON_SESSION_EXPIRED = 14;
+  //@ShortText: "Session revoked"
+  FAILURE_REASON_SESSION_REVOKED = 15;
+  //@ShortText: "Certificate expired"
+  FAILURE_REASON_CERTIFICATE_EXPIRED = 16;
+  //@ShortText: "Certificate revoked"
+  FAILURE_REASON_CERTIFICATE_REVOKED = 17;
+  //@ShortText: "Certificate invalid"
+  FAILURE_REASON_CERTIFICATE_INVALID = 18;
+  //@ShortText: "User geo blocked"
+  FAILURE_REASON_GEOBLOCK = 19;
+  //@ShortText: "Multi-Factor-Authentication requested"
+  FAILURE_REASON_MFA_REQUESTED = 20;
+  //@ShortText: "Credential requested"
+  FAILURE_REASON_CRED_REQUESTED = 21;
+}
+
+// LoginMethod
+enum LoginMethod {
+  //@ShortText: "Unspecified"
+  LOGIN_METHOD_UNSPECIFIED = 0;
+  //@ShortText: "OIDC"
+  LOGIN_METHOD_OPEN_ID_CONNECT = 1;
+  //@ShortText: "SAML"
+  LOGIN_METHOD_SAML = 2;
+  //@ShortText: "SAML2"
+  LOGIN_METHOD_SAML2 = 3;
+  //@ShortText: "External"
+  LOGIN_METHOD_EXTERNAL = 4;
+  //@ShortText: "SPNego"
+  LOGIN_METHOD_SPNEGO = 5;
+  //@ShortText: "Password"
+  LOGIN_METHOD_PASSWORD = 6;
+  //@ShortText: "RFC Ticket"
+  LOGIN_METHOD_RFC_TICKET = 7;
+  //@ShortText: "SNC"
+  LOGIN_METHOD_SNC = 8;
+  //@ShortText: "Logon Ticket"
+  LOGIN_METHOD_LOGON_TICKET = 9;
+  //@ShortText: "User switch"
+  LOGIN_METHOD_USER_SWITCH = 10;
+  //@ShortText: "X.509"
+  LOGIN_METHOD_X509_CERTIFICATE = 11;
+  //@ShortText: "APC Session"
+  LOGIN_METHOD_APC_SESSION = 12;
+  //@ShortText: "Internal"
+  LOGIN_METHOD_INTERNAL = 13;
+  //@ShortText: "OAuth 2.0"
+  LOGIN_METHOD_OAUTH2 = 14;
+  //@ShortText: "Reentrance Ticket"
+  LOGIN_METHOD_REENTRANCE_TICKET = 15;
+  //@ShortText: Http security session"
+  LOGIN_METHOD_HTTP_SESSION = 16;
+  //@ShortText: "Assertion Ticket"
+  LOGIN_METHOD_ASSERTION_TICKET = 17;
+  //@ShortText: "Remember me cookie"
+  LOGIN_METHOD_REMCOOKIE = 18;
+  //@ShortText: "Biometric Authentication"
+  LOGIN_METHOD_BIOMETRIC = 19;
+  //@ShortText: "Passcode Values"
+  LOGIN_METHOD_PASSCODE = 20;
+  //@ShortText: "Mobile SSO Passcode"
+  LOGIN_METHOD_MOBSSO = 21;
+  //@ShortText: "Email Token"
+  LOGIN_METHOD_EMAIL_TOKEN = 22;
+  //@ShortText: "Bearer Token"
+  LOGIN_METHOD_BEARER_TOKEN = 23;
+}
+
+// LogoffType
+enum LogoffType {
+  //@ShortText: "Unspecified"
+  LOGOFF_TYPE_UNSPECIFIED = 0;
+  //@ShortText: "Regular"
+  LOGOFF_TYPE_REGULAR = 1;
+  //@ShortText: "Forced"
+  LOGOFF_TYPE_FORCED = 2;
+}
+
+// MaliciousBehavior
+enum MaliciousBehavior {
+  //@ShortText: "Unspecified"
+  MALICIOUS_BEHAVIOR_UNSPECIFIED = 0;
+  //@ShortText: "Malicious parameter"
+  MALICIOUS_BEHAVIOR_PARAMETER_SEEN = 1;
+  //@ShortText: "Parameter not found"
+  MALICIOUS_BEHAVIOR_PARAMETER_NOT_FOUND = 2;
+  //@ShortText: "Malicious parameter value"
+  MALICIOUS_BEHAVIOR_PARAMETER_VALUE_SEEN = 3;
+  //@ShortText: "Parameter value modified"
+  MALICIOUS_BEHAVIOR_PARAMETER_VALUE_MODIFIED = 4;
+}
+
+// MfaType
+enum MfaType {
+  //@ShortText: "Unspecified"
+  MFA_TYPE_UNSPECIFIED = 0;
+  //@ShortText: "None"
+  MFA_TYPE_NONE = 1;
+  //@ShortText: "RSA"
+  MFA_TYPE_RSA = 2;
+  //@ShortText: "TOTP"
+  MFA_TYPE_TOTP = 3;
+  //@ShortText: "WebAuthn"
+  MFA_TYPE_WEB_AUTHN = 4;
+  //@ShortText: "SMS"
+  MFA_TYPE_SMS = 5;
+  //@ShortText: "E-Mail"
+  MFA_TYPE_EMAIL = 6;
+}
+
+// UserType
+enum UserType {
+  //@ShortText: "Unspecified"
+  USER_TYPE_UNSPECIFIED = 0;
+  //@ShortText: "Business User"
+  USER_TYPE_BUSINESS_USER = 1;
+  //@ShortText: "Technical User"
+  USER_TYPE_TECHNICAL_USER = 2;
+}
+
+// DataExportChannelType
+enum DataExportChannelType {
+  //@ShortText: "Unspecified"
+  DATA_EXPORT_CHANNEL_TYPE_UNSPECIFIED = 0;
+  //@ShortText: "Download"
+  DATA_EXPORT_CHANNEL_TYPE_DOWNLOAD = 1;
+  //@ShortText: "API"
+  DATA_EXPORT_CHANNEL_TYPE_API_ACCESS = 2;
+  //@ShortText: "Printer"
+  DATA_EXPORT_CHANNEL_TYPE_PRINTER = 3;
+}
+
+//Categories for grouping Events
+enum EventCategoryCode {
+  //@ShortText: "Security related events"
+  EVENT_CATEGORY_CODE_SEC_UNSPECIFIED = 0;
+  //@ShortText: "Identity Management & Access Management"
+  EVENT_CATEGORY_CODE_IAM = 1;
+  //@ShortText: "Configuration Changes"
+  EVENT_CATEGORY_CODE_CFG = 2;
+  //@ShortText: "Sensitive Personal Data Logging"
+  EVENT_CATEGORY_CODE_DPP = 3;
+  //@ShortText: "Read Access Logging"
+  EVENT_CATEGORY_CODE_RAL = 4;
+}
+
+// CMK Actions
+enum CMKAction {
+  //@ShortText: "Unspecified"
+  CMK_ACTION_UNSPECIFIED = 0;
+  //@ShortText: "Customer Managed Key Onboarding"
+  CMK_ACTION_ONBOARD = 1;
+  //@ShortText: "Tenant blocked"
+  CMK_ACTION_BLOCK = 2;
+  //@ShortText: "Tenant shutdown"
+  CMK_ACTION_SHUTDOWN = 3;
+  //@ShortText: "Fallback to SAP Managed Key"
+  CMK_ACTION_CSEKFALLBACK = 4;
+  //@ShortText: "Tenant restored"
+  CMK_ACTION_RESTORE = 5;
+  //@ShortText: "KMS System onboarded"
+  CMK_ACTION_KMS_ONBOARD = 6;
+  //@ShortText: "KMS System offboarded"
+  CMK_ACTION_KMS_OFFBOARD = 7;
+}
+
+// Key Types within key operations
+enum KeyType {
+  //@ShortText: "Unspecified"
+  KEY_TYPE_UNSPECIFIED = 0;
+  //@ShortText: "System Key"
+  KEY_TYPE_SYSTEM = 1;
+  //@ShortText: "Service Key"
+  KEY_TYPE_SERVICE = 2;
+  //@ShortText: "Data Encryption Key"
+  KEY_TYPE_DATA = 3;
+  //@ShortText: "Key Encryption Key"
+  KEY_TYPE_KEK = 4;
+}
+
+// Virus channels
+enum VirusChannel {
+  //@ShortText: "Unknown Channel"
+  VIRUS_CHANNEL_UNSPECIFIED = 0;
+  //@ShortText: "File has been uploaded"
+  VIRUS_CHANNEL_UPLOAD = 1;
+  //@ShortText: "Directory/Table scan"
+  VIRUS_CHANNEL_SCAN = 2;
+}
+
+//Login Protocol
+enum LoginProtocol {
+  //@ShortText: "Unspecified"
+  LOGIN_PROTOCOL_UNSPECIFIED = 0;
+  //@ShortText: "SAML 2.0"
+  LOGIN_PROTOCOL_SAML2 = 1;
+  //@ShortText: "Open ID Connect"
+  LOGIN_PROTOCOL_OIDC = 2;
+  //@ShortText: "HTTP"
+  LOGIN_PROTOCOL_HTTP = 3;
+}

@@ -8,6 +8,7 @@ class Module(str, Enum):
 
     AICORE = "aicore"
     AUDITLOG = "auditlog"
+    AUDITLOG_NG = "auditlog_ng"
     DESTINATION = "destination"
     OBJECTSTORE = "objectstore"
 

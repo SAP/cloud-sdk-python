@@ -12,6 +12,7 @@ class TestModule:
         """Test that Module enum has expected values."""
         assert Module.AICORE.value == "aicore"
         assert Module.AUDITLOG.value == "auditlog"
+        assert Module.AUDITLOG_NG.value == "auditlog_ng"
         assert Module.DESTINATION.value == "destination"
         assert Module.OBJECTSTORE.value == "objectstore"
 
@@ -19,6 +20,7 @@ class TestModule:
         """Test that Module enum converts to string correctly."""
         assert str(Module.AICORE) == "aicore"
         assert str(Module.AUDITLOG) == "auditlog"
+        assert str(Module.AUDITLOG_NG) == "auditlog_ng"
         assert str(Module.DESTINATION) == "destination"
         assert str(Module.OBJECTSTORE) == "objectstore"
 
@@ -26,6 +28,7 @@ class TestModule:
         """Test that Module enum inherits from str."""
         assert isinstance(Module.AICORE, str)
         assert isinstance(Module.AUDITLOG, str)
+        assert isinstance(Module.AUDITLOG_NG, str)
         assert isinstance(Module.DESTINATION, str)
 
     def test_module_equality(self):
@@ -44,7 +47,7 @@ class TestModule:
     def test_all_modules_present(self):
         """Test that all expected modules are present."""
         all_modules = list(Module)
-        assert len(all_modules) == 4
+        assert len(all_modules) == 5
         assert Module.AICORE in all_modules
         assert Module.AUDITLOG in all_modules
         assert Module.DESTINATION in all_modules
@@ -55,5 +58,6 @@ class TestModule:
         module_values = [str(m) for m in Module]
         assert "aicore" in module_values
         assert "auditlog" in module_values
+        assert "auditlog_ng" in module_values
         assert "destination" in module_values
         assert "objectstore" in module_values

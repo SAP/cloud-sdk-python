@@ -12,6 +12,7 @@ class TestOperation:
         """Test Audit Log operation values."""
         assert Operation.AUDITLOG_LOG.value == "log"
         assert Operation.AUDITLOG_LOG_BATCH.value == "log_batch"
+        assert Operation.AUDITLOG_CREATE_CLIENT.value == "create_client"
 
     def test_destination_operations(self):
         """Test Destination operation values."""
@@ -105,5 +106,5 @@ class TestOperation:
     def test_operation_count(self):
         """Test that we have the expected number of operations."""
         all_operations = list(Operation)
-        # 2 auditlog + 8 destination + 7 certificate + 7 fragment + 8 objectstore + 2 aicore = 34
-        assert len(all_operations) == 34
+        # 3 auditlog + 8 destination + 7 certificate + 7 fragment + 8 objectstore + 2 aicore = 34
+        assert len(all_operations) == 35

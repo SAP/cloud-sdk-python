@@ -10,6 +10,7 @@ class Module(str, Enum):
     AUDITLOG = "auditlog"
     DESTINATION = "destination"
     OBJECTSTORE = "objectstore"
+    DMS = "dms"
 
     def __str__(self) -> str:
         return self.value

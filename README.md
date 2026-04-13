@@ -13,6 +13,7 @@ The Python SDK offers a clean, type-safe API following Python best practices whi
 - **AI Core Integration**
 - **Audit Log Service**
 - **Destination Service**
+- **Document Management Service**
 - **ObjectStore Service**
 - **Secret Resolver**
 - **Telemetry & Observability**
@@ -49,6 +50,7 @@ Each module has comprehensive usage guides:
 
 - [AuditLog](src/sap_cloud_sdk/core/auditlog/user-guide.md)
 - [Destination](src/sap_cloud_sdk/destination/user-guide.md)
+- [DMS](src/sap_cloud_sdk/dms/user-guide.md)
 - [ObjectStore](src/sap_cloud_sdk/objectstore/user-guide.md)
 - [Secret Resolver](src/sap_cloud_sdk/core/secret_resolver/user-guide.md)
 - [Telemetry](src/sap_cloud_sdk/core/telemetry/user-guide.md)

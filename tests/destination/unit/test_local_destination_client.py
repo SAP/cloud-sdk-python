@@ -354,7 +354,7 @@ class TestLocalDestinationClientLabels:
     """Tests for LocalDevDestinationClient label operations."""
 
     def test_get_labels_returns_empty_when_no_labels(self, client):
-        client.create_destination(Destination(name="destA", type=None), Level.SERVICE_INSTANCE)
+        client.create_destination(Destination(name="destA", type="HTTP"), Level.SERVICE_INSTANCE)
         labels = client.get_destination_labels("destA", Level.SERVICE_INSTANCE)
         assert labels == []
 
@@ -374,14 +374,14 @@ class TestLocalDestinationClientLabels:
         assert exc_info.value.status_code == 404
 
     def test_put_labels_replaces_labels(self, client):
-        client.create_destination(Destination(name="destA", type=None), Level.SERVICE_INSTANCE)
+        client.create_destination(Destination(name="destA", type="HTTP"), Level.SERVICE_INSTANCE)
         client.update_destination_labels("destA", [Label(key="env", values=["prod"])], Level.SERVICE_INSTANCE)
         labels = client.get_destination_labels("destA", Level.SERVICE_INSTANCE)
         assert len(labels) == 1
         assert labels[0].key == "env"
 
     def test_put_labels_overwrites_existing_labels(self, client):
-        client.create_destination(Destination(name="destA", type=None), Level.SERVICE_INSTANCE)
+        client.create_destination(Destination(name="destA", type="HTTP"), Level.SERVICE_INSTANCE)
         client.update_destination_labels("destA", [Label(key="env", values=["prod"])], Level.SERVICE_INSTANCE)
         client.update_destination_labels("destA", [Label(key="team", values=["platform"])], Level.SERVICE_INSTANCE)
         labels = client.get_destination_labels("destA", Level.SERVICE_INSTANCE)
@@ -394,14 +394,14 @@ class TestLocalDestinationClientLabels:
         assert exc_info.value.status_code == 404
 
     def test_patch_labels_add_new_label(self, client):
-        client.create_destination(Destination(name="destA", type=None), Level.SERVICE_INSTANCE)
+        client.create_destination(Destination(name="destA", type="HTTP"), Level.SERVICE_INSTANCE)
         patch = PatchLabels(action="ADD", labels=[Label(key="env", values=["prod"])])
         client.patch_destination_labels("destA", patch, Level.SERVICE_INSTANCE)
         labels = client.get_destination_labels("destA", Level.SERVICE_INSTANCE)
         assert any(lbl.key == "env" for lbl in labels)
 
     def test_patch_labels_add_upserts_existing_key(self, client):
-        client.create_destination(Destination(name="destA", type=None), Level.SERVICE_INSTANCE)
+        client.create_destination(Destination(name="destA", type="HTTP"), Level.SERVICE_INSTANCE)
         client.update_destination_labels("destA", [Label(key="env", values=["dev"])], Level.SERVICE_INSTANCE)
         patch = PatchLabels(action="ADD", labels=[Label(key="env", values=["prod"])])
         client.patch_destination_labels("destA", patch, Level.SERVICE_INSTANCE)
@@ -411,7 +411,7 @@ class TestLocalDestinationClientLabels:
         assert env_labels[0].values == ["prod"]
 
     def test_patch_labels_delete_removes_key(self, client):
-        client.create_destination(Destination(name="destA", type=None), Level.SERVICE_INSTANCE)
+        client.create_destination(Destination(name="destA", type="HTTP"), Level.SERVICE_INSTANCE)
         client.update_destination_labels("destA", [
             Label(key="env", values=["prod"]),
             Label(key="team", values=["platform"]),
@@ -423,13 +423,13 @@ class TestLocalDestinationClientLabels:
         assert any(lbl.key == "team" for lbl in labels)
 
     def test_patch_labels_delete_missing_key_is_idempotent(self, client):
-        client.create_destination(Destination(name="destA", type=None), Level.SERVICE_INSTANCE)
+        client.create_destination(Destination(name="destA", type="HTTP"), Level.SERVICE_INSTANCE)
         patch = PatchLabels(action="DELETE", labels=[Label(key="nonexistent", values=[])])
         client.patch_destination_labels("destA", patch, Level.SERVICE_INSTANCE)
         assert client.get_destination_labels("destA", Level.SERVICE_INSTANCE) == []
 
     def test_patch_labels_unknown_action_raises(self, client):
-        client.create_destination(Destination(name="destA", type=None), Level.SERVICE_INSTANCE)
+        client.create_destination(Destination(name="destA", type="HTTP"), Level.SERVICE_INSTANCE)
         patch = PatchLabels(action="INVALID", labels=[])
         with pytest.raises(DestinationOperationError):
             client.patch_destination_labels("destA", patch, Level.SERVICE_INSTANCE)
@@ -441,16 +441,16 @@ class TestLocalDestinationClientLabels:
         assert exc_info.value.status_code == 404
 
     def test_labels_subaccount_scope(self, client):
-        client.create_destination(Destination(name="destA", type=None), Level.SUB_ACCOUNT)
+        client.create_destination(Destination(name="destA", type="HTTP"), Level.SUB_ACCOUNT)
         client.update_destination_labels("destA", [Label(key="env", values=["prod"])], Level.SUB_ACCOUNT)
         labels = client.get_destination_labels("destA", Level.SUB_ACCOUNT)
         assert len(labels) == 1
         assert labels[0].key == "env"
 
     def test_update_destination_preserves_labels(self, client):
-        client.create_destination(Destination(name="destA", type=None, url="https://old.example.com"), Level.SERVICE_INSTANCE)
+        client.create_destination(Destination(name="destA", type="HTTP", url="https://old.example.com"), Level.SERVICE_INSTANCE)
         client.update_destination_labels("destA", [Label(key="env", values=["prod"])], Level.SERVICE_INSTANCE)
-        client.update_destination(Destination(name="destA", type=None, url="https://new.example.com"), Level.SERVICE_INSTANCE)
+        client.update_destination(Destination(name="destA", type="HTTP", url="https://new.example.com"), Level.SERVICE_INSTANCE)
         labels = client.get_destination_labels("destA", Level.SERVICE_INSTANCE)
         assert len(labels) == 1
         assert labels[0].key == "env"

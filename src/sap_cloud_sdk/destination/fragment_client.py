@@ -290,11 +290,22 @@ class FragmentClient:
             DestinationOperationError: If an HTTP error occurs or response parsing fails.
         """
         try:
-            return self._get_labels(name=name, level=level)
+            path = self._sub_path_for_level(level)
+            resp = self._http.get(f"{API_V1}/{path}/{name}/labels")
+            data = resp.json()
+            if not isinstance(data, list):
+                raise DestinationOperationError(
+                    f"expected list in labels response, got {type(data)}"
+                )
+            return [Label.from_dict(item) for item in data]
         except HttpError as e:
             raise DestinationOperationError(
                 f"failed to get labels for fragment '{name}': {e}"
             )
+        except DestinationOperationError:
+            raise
+        except Exception as e:
+            raise DestinationOperationError(f"invalid JSON in get labels response: {e}")
 
     @record_metrics(Module.DESTINATION, Operation.FRAGMENT_UPDATE_LABELS)
     def update_fragment_labels(
@@ -311,8 +322,13 @@ class FragmentClient:
             HttpError: Propagated for HTTP errors.
             DestinationOperationError: For unexpected errors.
         """
+        resolved_level = level or Level.SUB_ACCOUNT
         try:
-            self._update_labels(name=name, labels=labels, level=level)
+            path = self._sub_path_for_level(resolved_level)
+            self._http.put(
+                f"{API_V1}/{path}/{name}/labels",
+                body=[lbl.to_dict() for lbl in labels],
+            )
         except HttpError:
             raise
         except Exception as e:
@@ -335,8 +351,13 @@ class FragmentClient:
             HttpError: Propagated for HTTP errors.
             DestinationOperationError: For unexpected errors.
         """
+        resolved_level = level or Level.SUB_ACCOUNT
         try:
-            self._patch_labels(name=name, patch=patch, level=level)
+            path = self._sub_path_for_level(resolved_level)
+            self._http.patch(
+                f"{API_V1}/{path}/{name}/labels",
+                body=patch.to_dict(),
+            )
         except HttpError:
             raise
         except Exception as e:
@@ -345,72 +366,6 @@ class FragmentClient:
             )
 
     # ---------- Internal helpers ----------
-
-    def _get_labels(self, name: str, level: Level) -> List[Label]:
-        """Internal helper to fetch labels for a fragment.
-
-        Args:
-            name: Fragment name.
-            level: Scope to query.
-
-        Returns:
-            List of labels. Returns empty list if none assigned.
-
-        Raises:
-            HttpError: Propagated for HTTP errors.
-            DestinationOperationError: If response JSON is invalid.
-        """
-        try:
-            path = self._sub_path_for_level(level)
-            resp = self._http.get(f"{API_V1}/{path}/{name}/labels")
-            data = resp.json()
-            if not isinstance(data, list):
-                raise DestinationOperationError(
-                    f"expected list in labels response, got {type(data)}"
-                )
-            return [Label.from_dict(item) for item in data]
-        except HttpError:
-            raise
-        except DestinationOperationError:
-            raise
-        except Exception as e:
-            raise DestinationOperationError(f"invalid JSON in get labels response: {e}")
-
-    def _update_labels(self, name: str, labels: List[Label], level: Level) -> None:
-        """Internal helper to replace labels for a fragment.
-
-        Args:
-            name: Fragment name.
-            labels: Labels to set.
-            level: Scope to target.
-
-        Raises:
-            HttpError: Propagated for HTTP errors.
-            DestinationOperationError: For unexpected errors.
-        """
-        path = self._sub_path_for_level(level)
-        self._http.put(
-            f"{API_V1}/{path}/{name}/labels",
-            body=[lbl.to_dict() for lbl in labels],
-        )
-
-    def _patch_labels(self, name: str, patch: PatchLabels, level: Level) -> None:
-        """Internal helper to add or remove labels for a fragment.
-
-        Args:
-            name: Fragment name.
-            patch: PatchLabels with action and labels.
-            level: Scope to target.
-
-        Raises:
-            HttpError: Propagated for HTTP errors.
-            DestinationOperationError: For unexpected errors.
-        """
-        path = self._sub_path_for_level(level)
-        self._http.patch(
-            f"{API_V1}/{path}/{name}/labels",
-            body=patch.to_dict(),
-        )
 
     def _get_fragment(
         self,

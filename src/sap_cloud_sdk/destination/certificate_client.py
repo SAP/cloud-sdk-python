@@ -206,13 +206,18 @@ class CertificateClient:
 
     @record_metrics(Module.DESTINATION, Operation.CERTIFICATE_CREATE_CERTIFICATE)
     def create_certificate(
-        self, certificate: Certificate, level: Optional[Level] = Level.SUB_ACCOUNT
+        self,
+        certificate: Certificate,
+        level: Optional[Level] = Level.SUB_ACCOUNT,
+        tenant: Optional[str] = None,
     ) -> None:
         """Create a certificate.
 
         Args:
             certificate: Certificate entity to create.
             level: Scope where the certificate should be created (subaccount by default).
+            tenant: Subscriber tenant subdomain. When provided, the certificate is created in the
+                subscriber context; otherwise the provider context is used.
 
         Returns:
             None. Success responses from the Destination Service return an empty body.
@@ -225,7 +230,7 @@ class CertificateClient:
         body = certificate.to_dict()
 
         try:
-            self._http.post(f"{API_V1}/{coll}", body=body)
+            self._http.post(f"{API_V1}/{coll}", body=body, tenant_subdomain=tenant)
         except HttpError:
             raise
         except Exception as e:
@@ -235,13 +240,18 @@ class CertificateClient:
 
     @record_metrics(Module.DESTINATION, Operation.CERTIFICATE_UPDATE_CERTIFICATE)
     def update_certificate(
-        self, certificate: Certificate, level: Optional[Level] = Level.SUB_ACCOUNT
+        self,
+        certificate: Certificate,
+        level: Optional[Level] = Level.SUB_ACCOUNT,
+        tenant: Optional[str] = None,
     ) -> None:
         """Update a certificate.
 
         Args:
             certificate: Certificate entity with updated fields.
             level: Scope where the certificate exists (subaccount by default).
+            tenant: Subscriber tenant subdomain. When provided, the certificate is updated in the
+                subscriber context; otherwise the provider context is used.
 
         Returns:
             None. Success responses from the Destination Service return an Update object (e.g., {"Count": 1}),
@@ -255,7 +265,7 @@ class CertificateClient:
         body = certificate.to_dict()
 
         try:
-            self._http.put(f"{API_V1}/{coll}", body=body)
+            self._http.put(f"{API_V1}/{coll}", body=body, tenant_subdomain=tenant)
         except HttpError:
             raise
         except Exception as e:
@@ -265,13 +275,18 @@ class CertificateClient:
 
     @record_metrics(Module.DESTINATION, Operation.CERTIFICATE_DELETE_CERTIFICATE)
     def delete_certificate(
-        self, name: str, level: Optional[Level] = Level.SUB_ACCOUNT
+        self,
+        name: str,
+        level: Optional[Level] = Level.SUB_ACCOUNT,
+        tenant: Optional[str] = None,
     ) -> None:
         """Delete a certificate.
 
         Args:
             name: Certificate name.
             level: Scope where the certificate exists (subaccount by default).
+            tenant: Subscriber tenant subdomain. When provided, the certificate is deleted in the
+                subscriber context; otherwise the provider context is used.
 
         Raises:
             HttpError: Propagated for HTTP errors.
@@ -280,7 +295,7 @@ class CertificateClient:
         coll = self._sub_path_for_level(level)
 
         try:
-            self._http.delete(f"{API_V1}/{coll}/{name}")
+            self._http.delete(f"{API_V1}/{coll}/{name}", tenant_subdomain=tenant)
         except HttpError:
             raise
         except Exception as e:

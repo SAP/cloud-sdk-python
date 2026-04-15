@@ -235,6 +235,24 @@ class TestCertificateClientWrite:
         call_args = mock_http.post.call_args
         assert call_args[0][0] == "v1/instanceCertificates"
 
+    def test_create_certificate_with_tenant(self, certificate_client, mock_http):
+        """Test creating a certificate with a subscriber tenant."""
+        certificate = Certificate(name="new-cert.pem", content="base64-encoded-content", type="PEM")
+
+        certificate_client.create_certificate(certificate, level=Level.SUB_ACCOUNT, tenant="test-tenant")
+
+        call_args = mock_http.post.call_args
+        assert call_args[1]["tenant_subdomain"] == "test-tenant"
+
+    def test_create_certificate_without_tenant_uses_provider_context(self, certificate_client, mock_http):
+        """Test creating a certificate without tenant uses provider context (tenant_subdomain=None)."""
+        certificate = Certificate(name="new-cert.pem", content="base64-encoded-content")
+
+        certificate_client.create_certificate(certificate)
+
+        call_args = mock_http.post.call_args
+        assert call_args[1]["tenant_subdomain"] is None
+
     def test_create_certificate_http_error(self, certificate_client, mock_http):
         """Test create certificate with HTTP error."""
         # Setup
@@ -263,6 +281,24 @@ class TestCertificateClientWrite:
         assert call_args[0][0] == "v1/subaccountCertificates"
         assert call_args[1]["body"]["Name"] == "existing-cert.pem"
 
+    def test_update_certificate_with_tenant(self, certificate_client, mock_http):
+        """Test updating a certificate with a subscriber tenant."""
+        certificate = Certificate(name="existing-cert.pem", content="updated-content", type="PEM")
+
+        certificate_client.update_certificate(certificate, level=Level.SUB_ACCOUNT, tenant="test-tenant")
+
+        call_args = mock_http.put.call_args
+        assert call_args[1]["tenant_subdomain"] == "test-tenant"
+
+    def test_update_certificate_without_tenant_uses_provider_context(self, certificate_client, mock_http):
+        """Test updating a certificate without tenant uses provider context (tenant_subdomain=None)."""
+        certificate = Certificate(name="existing-cert.pem", content="content")
+
+        certificate_client.update_certificate(certificate)
+
+        call_args = mock_http.put.call_args
+        assert call_args[1]["tenant_subdomain"] is None
+
     def test_update_certificate_http_error(self, certificate_client, mock_http):
         """Test update certificate with HTTP error."""
         # Setup
@@ -273,13 +309,29 @@ class TestCertificateClientWrite:
         with pytest.raises(HttpError):
             certificate_client.update_certificate(certificate)
 
+    def test_delete_certificate_with_tenant(self, certificate_client, mock_http):
+        """Test deleting a certificate with a subscriber tenant."""
+        certificate_client.delete_certificate("test-cert.pem", level=Level.SUB_ACCOUNT, tenant="test-tenant")
+
+        mock_http.delete.assert_called_once_with(
+            "v1/subaccountCertificates/test-cert.pem", tenant_subdomain="test-tenant"
+        )
+
+    def test_delete_certificate_without_tenant_uses_provider_context(self, certificate_client, mock_http):
+        """Test deleting a certificate without tenant uses provider context (tenant_subdomain=None)."""
+        certificate_client.delete_certificate("test-cert.pem")
+
+        mock_http.delete.assert_called_once_with(
+            "v1/subaccountCertificates/test-cert.pem", tenant_subdomain=None
+        )
+
     def test_delete_certificate_success(self, certificate_client, mock_http):
         """Test deleting a certificate."""
-        # Execute
         certificate_client.delete_certificate("test-cert.pem", level=Level.SUB_ACCOUNT)
 
-        # Verify
-        mock_http.delete.assert_called_once_with("v1/subaccountCertificates/test-cert.pem")
+        mock_http.delete.assert_called_once_with(
+            "v1/subaccountCertificates/test-cert.pem", tenant_subdomain=None
+        )
 
     def test_delete_certificate_instance_level(self, certificate_client, mock_http):
         """Test deleting a certificate at instance level."""
@@ -287,7 +339,9 @@ class TestCertificateClientWrite:
         certificate_client.delete_certificate("test-cert.pem", level=Level.SERVICE_INSTANCE)
 
         # Verify
-        mock_http.delete.assert_called_once_with("v1/instanceCertificates/test-cert.pem")
+        mock_http.delete.assert_called_once_with(
+            "v1/instanceCertificates/test-cert.pem", tenant_subdomain=None
+        )
 
     def test_delete_certificate_http_error(self, certificate_client, mock_http):
         """Test delete certificate with HTTP error."""

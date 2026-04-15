@@ -191,13 +191,18 @@ class FragmentClient:
 
     @record_metrics(Module.DESTINATION, Operation.FRAGMENT_CREATE_FRAGMENT)
     def create_fragment(
-        self, fragment: Fragment, level: Optional[Level] = Level.SUB_ACCOUNT
+        self,
+        fragment: Fragment,
+        level: Optional[Level] = Level.SUB_ACCOUNT,
+        tenant: Optional[str] = None,
     ) -> None:
         """Create a fragment.
 
         Args:
             fragment: Fragment entity to create.
             level: Scope where the fragment should be created (subaccount by default).
+            tenant: Subscriber tenant subdomain. When provided, the fragment is created in the
+                subscriber context; otherwise the provider context is used.
 
         Returns:
             None. Success responses from the Destination Service return an empty body.
@@ -210,7 +215,7 @@ class FragmentClient:
         body = fragment.to_dict()
 
         try:
-            self._http.post(f"{API_V1}/{coll}", body=body)
+            self._http.post(f"{API_V1}/{coll}", body=body, tenant_subdomain=tenant)
         except HttpError:
             raise
         except Exception as e:
@@ -220,13 +225,18 @@ class FragmentClient:
 
     @record_metrics(Module.DESTINATION, Operation.FRAGMENT_UPDATE_FRAGMENT)
     def update_fragment(
-        self, fragment: Fragment, level: Optional[Level] = Level.SUB_ACCOUNT
+        self,
+        fragment: Fragment,
+        level: Optional[Level] = Level.SUB_ACCOUNT,
+        tenant: Optional[str] = None,
     ) -> None:
         """Update a fragment.
 
         Args:
             fragment: Fragment entity with updated fields.
             level: Scope where the fragment exists (subaccount by default).
+            tenant: Subscriber tenant subdomain. When provided, the fragment is updated in the
+                subscriber context; otherwise the provider context is used.
 
         Returns:
             None. Success responses from the Destination Service return an Update object (e.g., {"Count": 1}),
@@ -240,7 +250,7 @@ class FragmentClient:
         body = fragment.to_dict()
 
         try:
-            self._http.put(f"{API_V1}/{coll}", body=body)
+            self._http.put(f"{API_V1}/{coll}", body=body, tenant_subdomain=tenant)
         except HttpError:
             raise
         except Exception as e:
@@ -250,13 +260,18 @@ class FragmentClient:
 
     @record_metrics(Module.DESTINATION, Operation.FRAGMENT_DELETE_FRAGMENT)
     def delete_fragment(
-        self, name: str, level: Optional[Level] = Level.SUB_ACCOUNT
+        self,
+        name: str,
+        level: Optional[Level] = Level.SUB_ACCOUNT,
+        tenant: Optional[str] = None,
     ) -> None:
         """Delete a fragment.
 
         Args:
             name: Fragment name.
             level: Scope where the fragment exists (subaccount by default).
+            tenant: Subscriber tenant subdomain. When provided, the fragment is deleted in the
+                subscriber context; otherwise the provider context is used.
 
         Raises:
             HttpError: Propagated for HTTP errors.
@@ -265,7 +280,7 @@ class FragmentClient:
         coll = self._sub_path_for_level(level)
 
         try:
-            self._http.delete(f"{API_V1}/{coll}/{name}")
+            self._http.delete(f"{API_V1}/{coll}/{name}", tenant_subdomain=tenant)
         except HttpError:
             raise
         except Exception as e:

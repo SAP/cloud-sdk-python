@@ -481,8 +481,227 @@ class TestDestinationClientReadOperations:
         assert len(result.auth_tokens) == 0
         assert len(result.certificates) == 0
 
+    def _make_simple_resp(self, mock_http):
+        """Helper: configure mock_http to return a minimal valid v2 response."""
+        resp = MagicMock(spec=Response)
+        resp.status_code = 200
+        resp.json.return_value = {
+            "destinationConfiguration": {"name": "my-api", "type": "HTTP", "url": "https://api.example.com"},
+            "authTokens": [],
+            "certificates": [],
+        }
+        mock_http.get.return_value = resp
 
-class TestDestinationClientWithTransparentProxy:
+    def test_get_destination_with_fragment_optional_true(self):
+        """X-fragment-optional: true is sent when fragment_optional=True."""
+        mock_http = MagicMock()
+        self._make_simple_resp(mock_http)
+
+        client = DestinationClient(mock_http)
+        client.get_destination("my-api", options=ConsumptionOptions(fragment_name="prod", fragment_optional=True))
+
+        _, kwargs = mock_http.get.call_args
+        assert kwargs["headers"]["X-fragment-optional"] == "true"
+
+    def test_get_destination_with_fragment_optional_false(self):
+        """X-fragment-optional: false is sent when fragment_optional=False."""
+        mock_http = MagicMock()
+        self._make_simple_resp(mock_http)
+
+        client = DestinationClient(mock_http)
+        client.get_destination("my-api", options=ConsumptionOptions(fragment_name="prod", fragment_optional=False))
+
+        _, kwargs = mock_http.get.call_args
+        assert kwargs["headers"]["X-fragment-optional"] == "false"
+
+    def test_get_destination_fragment_optional_not_sent_when_none(self):
+        """X-fragment-optional header is omitted when fragment_optional is not set."""
+        mock_http = MagicMock()
+        self._make_simple_resp(mock_http)
+
+        client = DestinationClient(mock_http)
+        client.get_destination("my-api", options=ConsumptionOptions(fragment_name="prod"))
+
+        _, kwargs = mock_http.get.call_args
+        assert "X-fragment-optional" not in kwargs["headers"]
+
+    def test_get_destination_with_user_token(self):
+        """X-user-token header is sent for OAuth2UserTokenExchange flows."""
+        mock_http = MagicMock()
+        self._make_simple_resp(mock_http)
+
+        client = DestinationClient(mock_http)
+        client.get_destination("my-api", options=ConsumptionOptions(user_token="my.jwt.token"))
+
+        _, kwargs = mock_http.get.call_args
+        assert kwargs["headers"]["X-user-token"] == "my.jwt.token"
+
+    def test_get_destination_with_subject_token_and_type(self):
+        """X-subject-token and X-subject-token-type are sent for OAuth2TokenExchange."""
+        mock_http = MagicMock()
+        self._make_simple_resp(mock_http)
+
+        client = DestinationClient(mock_http)
+        client.get_destination(
+            "my-api",
+            options=ConsumptionOptions(
+                subject_token="subj-token",
+                subject_token_type="urn:ietf:params:oauth:token-type:access_token",
+            ),
+        )
+
+        _, kwargs = mock_http.get.call_args
+        assert kwargs["headers"]["X-subject-token"] == "subj-token"
+        assert kwargs["headers"]["X-subject-token-type"] == "urn:ietf:params:oauth:token-type:access_token"
+
+    def test_get_destination_with_actor_token_and_type(self):
+        """X-actor-token and X-actor-token-type are sent for OAuth2TokenExchange."""
+        mock_http = MagicMock()
+        self._make_simple_resp(mock_http)
+
+        client = DestinationClient(mock_http)
+        client.get_destination(
+            "my-api",
+            options=ConsumptionOptions(
+                actor_token="actor-token",
+                actor_token_type="urn:ietf:params:oauth:token-type:access_token",
+            ),
+        )
+
+        _, kwargs = mock_http.get.call_args
+        assert kwargs["headers"]["X-actor-token"] == "actor-token"
+        assert kwargs["headers"]["X-actor-token-type"] == "urn:ietf:params:oauth:token-type:access_token"
+
+    def test_get_destination_with_saml_assertion(self):
+        """X-samlAssertion is sent for OAuth2SAMLBearerAssertion with ClientProvided."""
+        mock_http = MagicMock()
+        self._make_simple_resp(mock_http)
+
+        client = DestinationClient(mock_http)
+        client.get_destination("my-api", options=ConsumptionOptions(saml_assertion="base64saml=="))
+
+        _, kwargs = mock_http.get.call_args
+        assert kwargs["headers"]["X-samlAssertion"] == "base64saml=="
+
+    def test_get_destination_with_refresh_token(self):
+        """X-refresh-token is sent for OAuth2RefreshToken destinations."""
+        mock_http = MagicMock()
+        self._make_simple_resp(mock_http)
+
+        client = DestinationClient(mock_http)
+        client.get_destination("my-api", options=ConsumptionOptions(refresh_token="my-refresh-token"))
+
+        _, kwargs = mock_http.get.call_args
+        assert kwargs["headers"]["X-refresh-token"] == "my-refresh-token"
+
+    def test_get_destination_with_code(self):
+        """X-code is sent for OAuth2AuthorizationCode destinations."""
+        mock_http = MagicMock()
+        self._make_simple_resp(mock_http)
+
+        client = DestinationClient(mock_http)
+        client.get_destination("my-api", options=ConsumptionOptions(code="auth-code-123"))
+
+        _, kwargs = mock_http.get.call_args
+        assert kwargs["headers"]["X-code"] == "auth-code-123"
+
+    def test_get_destination_with_redirect_uri(self):
+        """X-redirect-uri is sent for OAuth2AuthorizationCode destinations."""
+        mock_http = MagicMock()
+        self._make_simple_resp(mock_http)
+
+        client = DestinationClient(mock_http)
+        client.get_destination(
+            "my-api",
+            options=ConsumptionOptions(code="auth-code-123", redirect_uri="https://app/callback"),
+        )
+
+        _, kwargs = mock_http.get.call_args
+        assert kwargs["headers"]["X-redirect-uri"] == "https://app/callback"
+
+    def test_get_destination_with_code_verifier(self):
+        """X-code-verifier is sent for PKCE-enabled OAuth2AuthorizationCode destinations."""
+        mock_http = MagicMock()
+        self._make_simple_resp(mock_http)
+
+        client = DestinationClient(mock_http)
+        client.get_destination(
+            "my-api",
+            options=ConsumptionOptions(code="auth-code-123", code_verifier="pkce-verifier-abc"),
+        )
+
+        _, kwargs = mock_http.get.call_args
+        assert kwargs["headers"]["X-code-verifier"] == "pkce-verifier-abc"
+
+    def test_get_destination_with_chain_name(self):
+        """X-chain-name is sent when chain_name is provided."""
+        mock_http = MagicMock()
+        self._make_simple_resp(mock_http)
+
+        client = DestinationClient(mock_http)
+        client.get_destination("my-api", options=ConsumptionOptions(chain_name="my-chain"))
+
+        _, kwargs = mock_http.get.call_args
+        assert kwargs["headers"]["X-chain-name"] == "my-chain"
+
+    def test_get_destination_with_chain_vars(self):
+        """X-chain-var-<name> headers are sent for each chain variable."""
+        mock_http = MagicMock()
+        self._make_simple_resp(mock_http)
+
+        client = DestinationClient(mock_http)
+        client.get_destination(
+            "my-api",
+            options=ConsumptionOptions(
+                chain_name="my-chain",
+                chain_vars={"subject_token": "tok123", "subject_token_type": "access_token"},
+            ),
+        )
+
+        _, kwargs = mock_http.get.call_args
+        assert kwargs["headers"]["X-chain-name"] == "my-chain"
+        assert kwargs["headers"]["X-chain-var-subject_token"] == "tok123"
+        assert kwargs["headers"]["X-chain-var-subject_token_type"] == "access_token"
+
+    def test_get_destination_chain_vars_without_chain_name(self):
+        """chain_vars without chain_name: headers are still forwarded (API enforces pairing)."""
+        mock_http = MagicMock()
+        self._make_simple_resp(mock_http)
+
+        client = DestinationClient(mock_http)
+        client.get_destination(
+            "my-api",
+            options=ConsumptionOptions(chain_vars={"subject_token": "tok"}),
+        )
+
+        _, kwargs = mock_http.get.call_args
+        assert kwargs["headers"]["X-chain-var-subject_token"] == "tok"
+        assert "X-chain-name" not in kwargs["headers"]
+
+    def test_get_destination_all_headers_combined(self):
+        """Multiple unrelated headers can be sent simultaneously."""
+        mock_http = MagicMock()
+        self._make_simple_resp(mock_http)
+
+        client = DestinationClient(mock_http)
+        client.get_destination(
+            "my-api",
+            options=ConsumptionOptions(
+                fragment_name="prod",
+                fragment_optional=True,
+                tenant="tenant-1",
+                user_token="user.jwt",
+            ),
+        )
+
+        _, kwargs = mock_http.get.call_args
+        assert kwargs["headers"]["X-fragment-name"] == "prod"
+        assert kwargs["headers"]["X-fragment-optional"] == "true"
+        assert kwargs["headers"]["X-tenant"] == "tenant-1"
+        assert kwargs["headers"]["X-user-token"] == "user.jwt"
+
+
+
     """Test suite for DestinationClient operations with transparent proxy enabled."""
 
     @patch("sap_cloud_sdk.destination.client.load_transparent_proxy")

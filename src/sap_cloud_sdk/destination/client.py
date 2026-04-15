@@ -289,10 +289,13 @@ class DestinationClient:
 
         Args:
             name: Destination name.
-            level: Optional level hint (subaccount or instance) to optimize lookup. If not provided, the API will search on instance level.
-            options: Optional ConsumptionOptions for fragment merging and tenant context.
-            proxy_enabled: Whether to route the request through a transparent proxy (if configured).
-                          If None, uses the client's default proxy_enabled setting.
+            level: Optional level hint (subaccount or instance) to optimize lookup. If not
+                provided, the API will search on instance level.
+            options: Optional ConsumptionOptions controlling request headers sent to the
+                Destination Service. See ConsumptionOptions for the full list of supported
+                headers (fragment merging, token exchange, SAML, OAuth2 flows, chains, etc.).
+            proxy_enabled: Whether to route the request through a transparent proxy (if
+                configured). If None, uses the client's default proxy_enabled setting.
 
         Returns:
             Destination with auth_tokens and certificates populated from v2 API,
@@ -310,23 +313,27 @@ class DestinationClient:
 
             # Simple consumption
             dest = client.get_destination("my-api")
-            print(dest.url)
-            print(dest.auth_tokens)
 
             # With level hint
             dest = client.get_destination("my-api", level=Level.SERVICE_INSTANCE)
 
-            # With options - fragment merging
-            opts = ConsumptionOptions(fragment_name="production")
-            dest = client.get_destination("my-api", options=opts)
+            # Fragment merging
+            dest = client.get_destination("my-api", options=ConsumptionOptions(fragment_name="prod"))
 
-            # With tenant context for user token exchange
-            opts = ConsumptionOptions(tenant="tenant-subdomain")
-            dest = client.get_destination("my-api", options=opts)
+            # Optional fragment (no error if fragment not found)
+            dest = client.get_destination(
+                "my-api",
+                options=ConsumptionOptions(fragment_name="prod", fragment_optional=True),
+            )
 
-            # Both fragment and tenant
-            opts = ConsumptionOptions(fragment_name="prod", tenant="tenant-1")
-            dest = client.get_destination("my-api", options=opts)
+            # Tenant context
+            dest = client.get_destination("my-api", options=ConsumptionOptions(tenant="tenant-1"))
+
+            # User token exchange (OAuth2UserTokenExchange / OAuth2JWTBearer)
+            dest = client.get_destination(
+                "my-api",
+                options=ConsumptionOptions(user_token="<jwt>", tenant="tenant-1"),
+            )
 
             # With transparent proxy enabled
             dest = client.get_destination("my-api", proxy_enabled=True)
@@ -343,8 +350,37 @@ class DestinationClient:
             if options:
                 if options.fragment_name:
                     headers["X-fragment-name"] = options.fragment_name
+                if options.fragment_optional is not None:
+                    headers["X-fragment-optional"] = str(
+                        options.fragment_optional
+                    ).lower()
                 if options.tenant:
                     headers["X-tenant"] = options.tenant
+                if options.user_token:
+                    headers["X-user-token"] = options.user_token
+                if options.subject_token:
+                    headers["X-subject-token"] = options.subject_token
+                if options.subject_token_type:
+                    headers["X-subject-token-type"] = options.subject_token_type
+                if options.actor_token:
+                    headers["X-actor-token"] = options.actor_token
+                if options.actor_token_type:
+                    headers["X-actor-token-type"] = options.actor_token_type
+                if options.saml_assertion:
+                    headers["X-samlAssertion"] = options.saml_assertion
+                if options.refresh_token:
+                    headers["X-refresh-token"] = options.refresh_token
+                if options.code:
+                    headers["X-code"] = options.code
+                if options.redirect_uri:
+                    headers["X-redirect-uri"] = options.redirect_uri
+                if options.code_verifier:
+                    headers["X-code-verifier"] = options.code_verifier
+                if options.chain_name:
+                    headers["X-chain-name"] = options.chain_name
+                if options.chain_vars:
+                    for var_name, var_value in options.chain_vars.items():
+                        headers[f"X-chain-var-{var_name}"] = var_value
 
             # Build path with optional level hint
             if level:

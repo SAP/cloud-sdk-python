@@ -107,7 +107,22 @@ class CertificateClient:
 
 - `Destination(name: str, type: str, url?: str, proxy_type?: str, authentication?: str, description?: str, properties?: dict[str, str], auth_tokens?: list[AuthToken], certificates?: list[Certificate])`
   - `auth_tokens` and `certificates` are populated by the v2 consumption API
-- `ConsumptionOptions(fragment_name?: str, tenant?: str)` - Options for v2 destination consumption
+- `ConsumptionOptions` - Options for v2 destination consumption, controls HTTP headers sent to the Destination Service:
+  - `fragment_name?: str` - Fragment to merge into the destination (`X-fragment-name`)
+  - `fragment_optional?: bool` - If `True`, a missing fragment does not cause an error (`X-fragment-optional`)
+  - `tenant?: str` - Tenant subdomain for token retrieval (`X-tenant`)
+  - `user_token?: str` - User JWT for OAuth2UserTokenExchange / OAuth2JWTBearer / OAuth2SAMLBearerAssertion (`X-user-token`)
+  - `subject_token?: str` - Subject token for OAuth2TokenExchange (`X-subject-token`)
+  - `subject_token_type?: str` - Format of the subject token (`X-subject-token-type`), e.g. `"urn:ietf:params:oauth:token-type:access_token"`
+  - `actor_token?: str` - Actor token for OAuth2TokenExchange (`X-actor-token`)
+  - `actor_token_type?: str` - Format of the actor token (`X-actor-token-type`)
+  - `saml_assertion?: str` - Client-provided SAML assertion for OAuth2SAMLBearerAssertion with `SAMLAssertionProvider=ClientProvided` (`X-samlAssertion`)
+  - `refresh_token?: str` - Refresh token for OAuth2RefreshToken destinations (`X-refresh-token`)
+  - `code?: str` - Authorization code for OAuth2AuthorizationCode destinations (`X-code`)
+  - `redirect_uri?: str` - Redirect URI for OAuth2AuthorizationCode destinations (`X-redirect-uri`)
+  - `code_verifier?: str` - PKCE code verifier for OAuth2AuthorizationCode destinations (`X-code-verifier`)
+  - `chain_name?: str` - Name of a predefined destination chain (`X-chain-name`)
+  - `chain_vars?: dict[str, str]` - Variables for the destination chain; each entry is sent as `X-chain-var-<key>`
 - `AuthToken(type: str, value: str, http_header: dict, expires_in?: str, error?: str, scope?: str, refresh_token?: str)` - Authentication token from v2 API
 - `Fragment(name: str, properties: dict[str, str])`
 - `Certificate(name: str, content: str, type: str)`
@@ -247,6 +262,46 @@ dest = client.get_destination("my-api")
 # Example 9: Combine level with options
 options = ConsumptionOptions(fragment_name="production", tenant="tenant-1")
 dest = client.get_destination("my-api", level=Level.SUB_ACCOUNT, options=options)
+
+# Example 10: Optional fragment (no error if fragment does not exist)
+options = ConsumptionOptions(fragment_name="maybe-exists", fragment_optional=True)
+dest = client.get_destination("my-api", options=options)
+
+# Example 11: User token exchange (OAuth2UserTokenExchange / OAuth2JWTBearer)
+options = ConsumptionOptions(user_token="<encoded-jwt>", tenant="tenant-1")
+dest = client.get_destination("my-api", options=options)
+
+# Example 12: OAuth2TokenExchange with subject and actor tokens
+options = ConsumptionOptions(
+    subject_token="<subject-token>",
+    subject_token_type="urn:ietf:params:oauth:token-type:access_token",
+    actor_token="<actor-token>",
+    actor_token_type="urn:ietf:params:oauth:token-type:access_token",
+)
+dest = client.get_destination("my-api", options=options)
+
+# Example 13: Client-provided SAML assertion (SAMLAssertionProvider=ClientProvided)
+options = ConsumptionOptions(saml_assertion="<base64-encoded-saml>")
+dest = client.get_destination("my-api", options=options)
+
+# Example 14: OAuth2RefreshToken
+options = ConsumptionOptions(refresh_token="<refresh-token>")
+dest = client.get_destination("my-api", options=options)
+
+# Example 15: OAuth2AuthorizationCode with PKCE
+options = ConsumptionOptions(
+    code="<authorization-code>",
+    redirect_uri="https://myapp/callback",
+    code_verifier="<pkce-code-verifier>",
+)
+dest = client.get_destination("my-api", options=options)
+
+# Example 16: Destination chain with chain variables
+options = ConsumptionOptions(
+    chain_name="my-predefined-chain",
+    chain_vars={"subject_token": "<token>", "subject_token_type": "access_token"},
+)
+dest = client.get_destination("my-api", options=options)
 ```
 
 ### Return Type

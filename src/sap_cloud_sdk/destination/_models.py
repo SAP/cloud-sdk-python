@@ -405,11 +405,53 @@ class AuthToken:
 class ConsumptionOptions:
     """Options for consuming a destination via the v2 runtime API.
 
-    This class encapsulates optional parameters for destination consumption.
+    Each field maps directly to an HTTP request header sent to the Destination Service.
 
     Fields:
-        fragment_name: Optional fragment name for property merging via X-fragment-name header
-        tenant: Optional subscriber tenant subdomain for user token exchange
+        fragment_name: Name of the destination fragment used to override/extend destination
+            properties (X-fragment-name). In case of overlapping properties, fragment values
+            take priority.
+        fragment_optional: When True, if the fragment specified by fragment_name does not
+            exist the destination is returned without it. When False (default), a missing
+            fragment causes an error (X-fragment-optional).
+        tenant: Subdomain of the tenant on behalf of which to fetch an access token
+            (X-tenant). Required when tokenServiceURLType is Common. Takes precedence over
+            user_token for tenant determination.
+        user_token: Encoded user JWT token (RFC 7519) for authentication types that require
+            user information: OAuth2UserTokenExchange, OAuth2JWTBearer,
+            OAuth2SAMLBearerAssertion (X-user-token). Takes priority over the Authorization
+            header for token exchange.
+        subject_token: Subject token for OAuth2TokenExchange destinations (X-subject-token).
+            Used as the subject_token parameter in the token exchange request (RFC 8693).
+            Must be used together with subject_token_type.
+        subject_token_type: Format of the subject token as defined by the authorization
+            server (X-subject-token-type), e.g.
+            "urn:ietf:params:oauth:token-type:access_token". Required with subject_token.
+        actor_token: Actor token for OAuth2TokenExchange destinations (X-actor-token).
+            Used as the actor_token parameter in the token exchange request (RFC 8693).
+            Should be used together with actor_token_type.
+        actor_token_type: Format of the actor token as defined by the authorization server
+            (X-actor-token-type), e.g. "urn:ietf:params:oauth:token-type:access_token".
+        saml_assertion: Client-provided SAML assertion for destinations with authentication
+            type OAuth2SAMLBearerAssertion and SAMLAssertionProvider=ClientProvided
+            (X-samlAssertion). If applicable but not provided, token retrieval will fail.
+        refresh_token: Refresh token for OAuth2RefreshToken destinations (X-refresh-token).
+            Mandatory for that authentication type. The service uses it to fetch new access
+            and refresh tokens from the configured tokenServiceURL.
+        code: Authorization code for OAuth2AuthorizationCode destinations (X-code).
+            Mandatory for that authentication type. Exchanged for an access token at the
+            configured tokenServiceURL.
+        redirect_uri: URL-encoded redirect URI for OAuth2AuthorizationCode destinations
+            (X-redirect-uri). Required when the same redirect URI was registered during the
+            authorization code grant; must match the registered value.
+        code_verifier: PKCE code verifier for OAuth2AuthorizationCode destinations
+            (X-code-verifier). Required when a code challenge was provided during the
+            authorization code grant.
+        chain_name: Name of a predefined destination chain, enabling multiple Destination
+            Service interactions in a single request (X-chain-name).
+        chain_vars: Key-value pairs for destination chain variables (X-chain-var-<name>).
+            Each entry is sent as a separate "X-chain-var-<key>" header. Only applicable
+            when chain_name is provided.
 
     Example:
         ```python
@@ -417,23 +459,48 @@ class ConsumptionOptions:
 
         client = create_client()
 
-        # Simple consumption
-        dest = client.get_destination("my-api")
+        # Fragment merging
+        dest = client.get_destination("my-api", options=ConsumptionOptions(fragment_name="prod"))
 
-        # With options
-        options = ConsumptionOptions(fragment_name="production", tenant="tenant-1")
-        dest = client.get_destination("my-api", options=options)
+        # User token exchange
+        opts = ConsumptionOptions(user_token="<jwt>", tenant="tenant-1")
+        dest = client.get_destination("my-api", options=opts)
 
-        # Or inline
-        dest = client.get_destination(
-            "my-api",
-            options=ConsumptionOptions(fragment_name="prod")
+        # OAuth2TokenExchange
+        opts = ConsumptionOptions(
+            subject_token="<token>",
+            subject_token_type="urn:ietf:params:oauth:token-type:access_token",
         )
+        dest = client.get_destination("my-api", options=opts)
+
+        # OAuth2AuthorizationCode
+        opts = ConsumptionOptions(code="<auth-code>", redirect_uri="https://app/callback")
+        dest = client.get_destination("my-api", options=opts)
+
+        # Destination chain
+        opts = ConsumptionOptions(
+            chain_name="my-chain",
+            chain_vars={"subject_token": "<token>", "subject_token_type": "access_token"},
+        )
+        dest = client.get_destination("my-api", options=opts)
         ```
     """
 
     fragment_name: Optional[str] = None
+    fragment_optional: Optional[bool] = None
     tenant: Optional[str] = None
+    user_token: Optional[str] = None
+    subject_token: Optional[str] = None
+    subject_token_type: Optional[str] = None
+    actor_token: Optional[str] = None
+    actor_token_type: Optional[str] = None
+    saml_assertion: Optional[str] = None
+    refresh_token: Optional[str] = None
+    code: Optional[str] = None
+    redirect_uri: Optional[str] = None
+    code_verifier: Optional[str] = None
+    chain_name: Optional[str] = None
+    chain_vars: Optional[dict] = None
 
 
 @dataclass

@@ -46,6 +46,7 @@ from sap_cloud_sdk.destination.utils._params import (
     Params,
     build_pagination_params,
     build_filter_param,
+    build_label_filter_param,
 )
 from sap_cloud_sdk.destination.exceptions import DestinationOperationError
 
@@ -537,6 +538,7 @@ class ListOptions:
 
     # Filter options
     filter_names: Optional[List[str]] = None
+    filter_labels: Optional[List["Label"]] = None
 
     # Pagination options
     page: Optional[int] = None
@@ -555,11 +557,19 @@ class ListOptions:
         """
         params: Dict[str, str] = {}
 
+        if self.filter_names and self.filter_labels:
+            raise DestinationOperationError(
+                "filter_names and filter_labels cannot be used together"
+            )
+
         # Build $filter parameter
         if self.filter_names:
             params[Params.FILTER.value] = build_filter_param("Name", self.filter_names)
 
-        has_filter = self.filter_names is not None
+        if self.filter_labels:
+            params[Params.FILTER.value] = build_label_filter_param(self.filter_labels)
+
+        has_filter = bool(self.filter_names) or bool(self.filter_labels)
 
         # Build pagination parameters using shared utility
         pagination_params = build_pagination_params(
@@ -573,6 +583,92 @@ class ListOptions:
         params.update(pagination_params)
 
         return params
+
+
+@dataclass
+class Label:
+    """Label entity for resource tagging.
+
+    Labels allow attaching key-value metadata to destinations, fragments,
+    and certificates for filtering and organization.
+
+    Fields:
+        key: Label key string (e.g., "env").
+        values: List of string values for this key (e.g., ["prod", "eu"]).
+
+    The class provides:
+      - from_dict: Parses a raw dict into Label
+      - to_dict: Serializes the dataclass back into a payload compatible with the API
+    """
+
+    key: str
+    values: List[str]
+
+    @classmethod
+    def from_dict(cls, obj: Dict[str, Any]) -> "Label":
+        """Parse a raw label dict into a Label dataclass.
+
+        Args:
+            obj: Raw dict returned by the Destination Service.
+
+        Returns:
+            Label: Parsed label dataclass.
+
+        Raises:
+            DestinationOperationError: If required field (key) is missing or values is not a list.
+        """
+        key = obj.get("key") or ""
+        values = obj.get("values") or []
+
+        if not key.strip():
+            raise DestinationOperationError("label is missing required field (key)")
+        if not isinstance(values, list):
+            raise DestinationOperationError("label 'values' must be a list")
+
+        return cls(key=key, values=list(values))
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Serialize Label to API payload.
+
+        Returns:
+            Dict[str, Any]: API payload dictionary representing this label.
+        """
+        return {"key": self.key, "values": list(self.values)}
+
+
+@dataclass
+class PatchLabels:
+    """Payload for PATCH label operations (add or remove labels).
+
+    Fields:
+        action: The action to perform — either "ADD" or "DELETE".
+        labels: List of Label objects to apply the action to.
+
+    Example:
+        ```python
+        from sap_cloud_sdk.destination import Label, PatchLabels
+
+        # Add labels
+        patch = PatchLabels(action="ADD", labels=[Label(key="env", values=["prod"])])
+
+        # Remove labels
+        patch = PatchLabels(action="DELETE", labels=[Label(key="env", values=["prod"])])
+        ```
+    """
+
+    action: str
+    labels: List[Label]
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Serialize PatchLabels to API payload.
+
+        Returns:
+            Dict[str, Any]: API payload dictionary for the PATCH request.
+        """
+        return {
+            "action": self.action,
+            "labels": [lbl.to_dict() for lbl in self.labels],
+        }
 
 
 @dataclass

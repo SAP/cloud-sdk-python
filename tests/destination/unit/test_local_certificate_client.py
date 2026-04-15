@@ -6,7 +6,7 @@ import pytest
 
 from sap_cloud_sdk.destination.local_certificate_client import LocalDevCertificateClient
 from sap_cloud_sdk.destination._local_client_base import CERTIFICATE_MOCK_FILE
-from sap_cloud_sdk.destination._models import AccessStrategy, Certificate, Level
+from sap_cloud_sdk.destination._models import AccessStrategy, Certificate, Label, Level, PatchLabels
 from sap_cloud_sdk.destination.utils._pagination import PagedResult
 from sap_cloud_sdk.destination.exceptions import DestinationOperationError, HttpError
 
@@ -280,3 +280,109 @@ class TestDeleteCertificate:
         with pytest.raises(HttpError) as exc_info:
             client.delete_certificate("ghost.pem", Level.SUB_ACCOUNT)
         assert exc_info.value.status_code == 404
+
+
+class TestLocalCertificateClientLabels:
+    """Tests for LocalDevCertificateClient label operations."""
+
+    def test_get_labels_returns_empty_when_no_labels(self, client):
+        client.create_certificate(Certificate(name="cert.pem", content="abc", type="PEM"), Level.SERVICE_INSTANCE)
+        labels = client.get_certificate_labels("cert.pem", Level.SERVICE_INSTANCE)
+        assert labels == []
+
+    def test_get_labels_returns_stored_labels(self, client):
+        _write_store(client, {
+            "instance": [{"Name": "cert.pem", "Content": "abc", "labels": [{"key": "env", "values": ["prod"]}]}],
+            "subaccount": [],
+        })
+        labels = client.get_certificate_labels("cert.pem", Level.SERVICE_INSTANCE)
+        assert len(labels) == 1
+        assert labels[0].key == "env"
+        assert labels[0].values == ["prod"]
+
+    def test_get_labels_raises_404_for_missing_entity(self, client):
+        with pytest.raises(HttpError) as exc_info:
+            client.get_certificate_labels("ghost.pem", Level.SERVICE_INSTANCE)
+        assert exc_info.value.status_code == 404
+
+    def test_put_labels_replaces_labels(self, client):
+        client.create_certificate(Certificate(name="cert.pem", content="abc", type="PEM"), Level.SERVICE_INSTANCE)
+        client.update_certificate_labels("cert.pem", [Label(key="env", values=["prod"])], Level.SERVICE_INSTANCE)
+        labels = client.get_certificate_labels("cert.pem", Level.SERVICE_INSTANCE)
+        assert len(labels) == 1
+        assert labels[0].key == "env"
+
+    def test_put_labels_overwrites_existing_labels(self, client):
+        client.create_certificate(Certificate(name="cert.pem", content="abc", type="PEM"), Level.SERVICE_INSTANCE)
+        client.update_certificate_labels("cert.pem", [Label(key="env", values=["prod"])], Level.SERVICE_INSTANCE)
+        client.update_certificate_labels("cert.pem", [Label(key="team", values=["platform"])], Level.SERVICE_INSTANCE)
+        labels = client.get_certificate_labels("cert.pem", Level.SERVICE_INSTANCE)
+        assert len(labels) == 1
+        assert labels[0].key == "team"
+
+    def test_put_labels_raises_404_for_missing_entity(self, client):
+        with pytest.raises(HttpError) as exc_info:
+            client.update_certificate_labels("ghost.pem", [Label(key="env", values=["prod"])], Level.SERVICE_INSTANCE)
+        assert exc_info.value.status_code == 404
+
+    def test_patch_labels_add_new_label(self, client):
+        client.create_certificate(Certificate(name="cert.pem", content="abc", type="PEM"), Level.SERVICE_INSTANCE)
+        patch = PatchLabels(action="ADD", labels=[Label(key="env", values=["prod"])])
+        client.patch_certificate_labels("cert.pem", patch, Level.SERVICE_INSTANCE)
+        labels = client.get_certificate_labels("cert.pem", Level.SERVICE_INSTANCE)
+        assert any(lbl.key == "env" for lbl in labels)
+
+    def test_patch_labels_add_upserts_existing_key(self, client):
+        client.create_certificate(Certificate(name="cert.pem", content="abc", type="PEM"), Level.SERVICE_INSTANCE)
+        client.update_certificate_labels("cert.pem", [Label(key="env", values=["dev"])], Level.SERVICE_INSTANCE)
+        patch = PatchLabels(action="ADD", labels=[Label(key="env", values=["prod"])])
+        client.patch_certificate_labels("cert.pem", patch, Level.SERVICE_INSTANCE)
+        labels = client.get_certificate_labels("cert.pem", Level.SERVICE_INSTANCE)
+        env_labels = [lbl for lbl in labels if lbl.key == "env"]
+        assert len(env_labels) == 1
+        assert env_labels[0].values == ["prod"]
+
+    def test_patch_labels_delete_removes_key(self, client):
+        client.create_certificate(Certificate(name="cert.pem", content="abc", type="PEM"), Level.SERVICE_INSTANCE)
+        client.update_certificate_labels("cert.pem", [
+            Label(key="env", values=["prod"]),
+            Label(key="team", values=["platform"]),
+        ], Level.SERVICE_INSTANCE)
+        patch = PatchLabels(action="DELETE", labels=[Label(key="env", values=[])])
+        client.patch_certificate_labels("cert.pem", patch, Level.SERVICE_INSTANCE)
+        labels = client.get_certificate_labels("cert.pem", Level.SERVICE_INSTANCE)
+        assert all(lbl.key != "env" for lbl in labels)
+        assert any(lbl.key == "team" for lbl in labels)
+
+    def test_patch_labels_delete_missing_key_is_idempotent(self, client):
+        client.create_certificate(Certificate(name="cert.pem", content="abc", type="PEM"), Level.SERVICE_INSTANCE)
+        patch = PatchLabels(action="DELETE", labels=[Label(key="nonexistent", values=[])])
+        client.patch_certificate_labels("cert.pem", patch, Level.SERVICE_INSTANCE)
+        assert client.get_certificate_labels("cert.pem", Level.SERVICE_INSTANCE) == []
+
+    def test_patch_labels_unknown_action_raises(self, client):
+        client.create_certificate(Certificate(name="cert.pem", content="abc", type="PEM"), Level.SERVICE_INSTANCE)
+        patch = PatchLabels(action="INVALID", labels=[])
+        with pytest.raises(DestinationOperationError):
+            client.patch_certificate_labels("cert.pem", patch, Level.SERVICE_INSTANCE)
+
+    def test_patch_labels_raises_404_for_missing_entity(self, client):
+        patch = PatchLabels(action="ADD", labels=[])
+        with pytest.raises(HttpError) as exc_info:
+            client.patch_certificate_labels("ghost.pem", patch, Level.SERVICE_INSTANCE)
+        assert exc_info.value.status_code == 404
+
+    def test_labels_subaccount_scope(self, client):
+        client.create_certificate(Certificate(name="cert.pem", content="abc", type="PEM"), Level.SUB_ACCOUNT)
+        client.update_certificate_labels("cert.pem", [Label(key="env", values=["prod"])], Level.SUB_ACCOUNT)
+        labels = client.get_certificate_labels("cert.pem", Level.SUB_ACCOUNT)
+        assert len(labels) == 1
+        assert labels[0].key == "env"
+
+    def test_update_certificate_preserves_labels(self, client):
+        client.create_certificate(Certificate(name="cert.pem", content="abc", type="PEM"), Level.SERVICE_INSTANCE)
+        client.update_certificate_labels("cert.pem", [Label(key="env", values=["prod"])], Level.SERVICE_INSTANCE)
+        client.update_certificate(Certificate(name="cert.pem", content="new", type="PEM"), Level.SERVICE_INSTANCE)
+        labels = client.get_certificate_labels("cert.pem", Level.SERVICE_INSTANCE)
+        assert len(labels) == 1
+        assert labels[0].key == "env"

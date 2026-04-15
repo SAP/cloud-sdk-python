@@ -21,6 +21,11 @@ class Operation(str, Enum):
     DESTINATION_DELETE_DESTINATION = "delete_destination"
     DESTINATION_GET_DESTINATION = "get_destination"
 
+    # Destination Label Operations
+    DESTINATION_GET_LABELS = "get_destination_labels"
+    DESTINATION_UPDATE_LABELS = "update_destination_labels"
+    DESTINATION_PATCH_LABELS = "patch_destination_labels"
+
     # Certificate Operations
     CERTIFICATE_GET_INSTANCE_CERTIFICATE = "get_instance_certificate"
     CERTIFICATE_GET_SUBACCOUNT_CERTIFICATE = "get_subaccount_certificate"
@@ -30,6 +35,11 @@ class Operation(str, Enum):
     CERTIFICATE_UPDATE_CERTIFICATE = "update_certificate"
     CERTIFICATE_DELETE_CERTIFICATE = "delete_certificate"
 
+    # Certificate Label Operations
+    CERTIFICATE_GET_LABELS = "get_certificate_labels"
+    CERTIFICATE_UPDATE_LABELS = "update_certificate_labels"
+    CERTIFICATE_PATCH_LABELS = "patch_certificate_labels"
+
     # Fragment Operations
     FRAGMENT_GET_INSTANCE_FRAGMENT = "get_instance_fragment"
     FRAGMENT_GET_SUBACCOUNT_FRAGMENT = "get_subaccount_fragment"
@@ -38,6 +48,11 @@ class Operation(str, Enum):
     FRAGMENT_CREATE_FRAGMENT = "create_fragment"
     FRAGMENT_UPDATE_FRAGMENT = "update_fragment"
     FRAGMENT_DELETE_FRAGMENT = "delete_fragment"
+
+    # Fragment Label Operations
+    FRAGMENT_GET_LABELS = "get_fragment_labels"
+    FRAGMENT_UPDATE_LABELS = "update_fragment_labels"
+    FRAGMENT_PATCH_LABELS = "patch_fragment_labels"
 
     # Object Store Operations
     OBJECTSTORE_PUT_OBJECT = "put_object"

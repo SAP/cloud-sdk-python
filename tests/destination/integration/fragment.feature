@@ -119,3 +119,30 @@ Feature: Destination Service Integration - Fragments
     Given I use tenant "app-foundation-dev-subscriber"
     When I list subaccount fragments with "PROVIDER_ONLY" access strategy
     Then the fragment "fragment-dest-test" should not be in the list
+
+  Scenario: Manage labels for subaccount fragment
+    Given I have a fragment named "test-fragment-labels"
+    And the fragment has property "URL" with value "https://labels.example.com"
+    When I create the fragment at subaccount level
+    Then the fragment creation should be successful
+    When I update labels on the fragment "test-fragment-labels" at subaccount level: key "env" values "prod"
+    Then the fragment label operation should be successful
+    When I get labels for the fragment "test-fragment-labels" at subaccount level
+    Then the fragment should have label key "env" with value "prod"
+    When I patch labels on the fragment "test-fragment-labels" at subaccount level with action "ADD": key "team" values "platform"
+    Then the fragment label operation should be successful
+    When I get labels for the fragment "test-fragment-labels" at subaccount level
+    Then the fragment should have label key "team" with value "platform"
+    And I clean up the subaccount fragment "test-fragment-labels"
+
+  Scenario: List subaccount fragments after assigning a label
+    Given I have a fragment named "test-fragment-list-by-label"
+    And the fragment has property "URL" with value "https://label-list.example.com"
+    When I create the fragment at subaccount level
+    Then the fragment creation should be successful
+    When I update labels on the fragment "test-fragment-list-by-label" at subaccount level: key "list-filter-env" values "prod"
+    Then the fragment label operation should be successful
+    When I list subaccount fragments with "PROVIDER_ONLY" access strategy and label filter key "list-filter-env" values "prod"
+    Then the fragment list should be retrieved successfully
+    And the fragment "test-fragment-list-by-label" should be in the list
+    And I clean up the subaccount fragment "test-fragment-list-by-label"

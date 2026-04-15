@@ -6,7 +6,7 @@ import pytest
 
 from sap_cloud_sdk.destination.local_fragment_client import LocalDevFragmentClient
 from sap_cloud_sdk.destination._local_client_base import FRAGMENT_MOCK_FILE
-from sap_cloud_sdk.destination._models import AccessStrategy, Fragment, Level
+from sap_cloud_sdk.destination._models import AccessStrategy, Fragment, Label, Level, PatchLabels
 from sap_cloud_sdk.destination.exceptions import DestinationOperationError, HttpError
 
 
@@ -278,3 +278,109 @@ class TestDeleteFragment:
         with pytest.raises(HttpError) as exc_info:
             client.delete_fragment("ghost", Level.SUB_ACCOUNT)
         assert exc_info.value.status_code == 404
+
+
+class TestLocalFragmentClientLabels:
+    """Tests for LocalDevFragmentClient label operations."""
+
+    def test_get_labels_returns_empty_when_no_labels(self, client):
+        client.create_fragment(Fragment(name="frag", properties={}), Level.SERVICE_INSTANCE)
+        labels = client.get_fragment_labels("frag", Level.SERVICE_INSTANCE)
+        assert labels == []
+
+    def test_get_labels_returns_stored_labels(self, client):
+        _write_store(client, {
+            "instance": [{"FragmentName": "frag", "labels": [{"key": "env", "values": ["prod"]}]}],
+            "subaccount": [],
+        })
+        labels = client.get_fragment_labels("frag", Level.SERVICE_INSTANCE)
+        assert len(labels) == 1
+        assert labels[0].key == "env"
+        assert labels[0].values == ["prod"]
+
+    def test_get_labels_raises_404_for_missing_entity(self, client):
+        with pytest.raises(HttpError) as exc_info:
+            client.get_fragment_labels("ghost", Level.SERVICE_INSTANCE)
+        assert exc_info.value.status_code == 404
+
+    def test_put_labels_replaces_labels(self, client):
+        client.create_fragment(Fragment(name="frag", properties={}), Level.SERVICE_INSTANCE)
+        client.update_fragment_labels("frag", [Label(key="env", values=["prod"])], Level.SERVICE_INSTANCE)
+        labels = client.get_fragment_labels("frag", Level.SERVICE_INSTANCE)
+        assert len(labels) == 1
+        assert labels[0].key == "env"
+
+    def test_put_labels_overwrites_existing_labels(self, client):
+        client.create_fragment(Fragment(name="frag", properties={}), Level.SERVICE_INSTANCE)
+        client.update_fragment_labels("frag", [Label(key="env", values=["prod"])], Level.SERVICE_INSTANCE)
+        client.update_fragment_labels("frag", [Label(key="team", values=["platform"])], Level.SERVICE_INSTANCE)
+        labels = client.get_fragment_labels("frag", Level.SERVICE_INSTANCE)
+        assert len(labels) == 1
+        assert labels[0].key == "team"
+
+    def test_put_labels_raises_404_for_missing_entity(self, client):
+        with pytest.raises(HttpError) as exc_info:
+            client.update_fragment_labels("ghost", [Label(key="env", values=["prod"])], Level.SERVICE_INSTANCE)
+        assert exc_info.value.status_code == 404
+
+    def test_patch_labels_add_new_label(self, client):
+        client.create_fragment(Fragment(name="frag", properties={}), Level.SERVICE_INSTANCE)
+        patch = PatchLabels(action="ADD", labels=[Label(key="env", values=["prod"])])
+        client.patch_fragment_labels("frag", patch, Level.SERVICE_INSTANCE)
+        labels = client.get_fragment_labels("frag", Level.SERVICE_INSTANCE)
+        assert any(lbl.key == "env" for lbl in labels)
+
+    def test_patch_labels_add_upserts_existing_key(self, client):
+        client.create_fragment(Fragment(name="frag", properties={}), Level.SERVICE_INSTANCE)
+        client.update_fragment_labels("frag", [Label(key="env", values=["dev"])], Level.SERVICE_INSTANCE)
+        patch = PatchLabels(action="ADD", labels=[Label(key="env", values=["prod"])])
+        client.patch_fragment_labels("frag", patch, Level.SERVICE_INSTANCE)
+        labels = client.get_fragment_labels("frag", Level.SERVICE_INSTANCE)
+        env_labels = [lbl for lbl in labels if lbl.key == "env"]
+        assert len(env_labels) == 1
+        assert env_labels[0].values == ["prod"]
+
+    def test_patch_labels_delete_removes_key(self, client):
+        client.create_fragment(Fragment(name="frag", properties={}), Level.SERVICE_INSTANCE)
+        client.update_fragment_labels("frag", [
+            Label(key="env", values=["prod"]),
+            Label(key="team", values=["platform"]),
+        ], Level.SERVICE_INSTANCE)
+        patch = PatchLabels(action="DELETE", labels=[Label(key="env", values=[])])
+        client.patch_fragment_labels("frag", patch, Level.SERVICE_INSTANCE)
+        labels = client.get_fragment_labels("frag", Level.SERVICE_INSTANCE)
+        assert all(lbl.key != "env" for lbl in labels)
+        assert any(lbl.key == "team" for lbl in labels)
+
+    def test_patch_labels_delete_missing_key_is_idempotent(self, client):
+        client.create_fragment(Fragment(name="frag", properties={}), Level.SERVICE_INSTANCE)
+        patch = PatchLabels(action="DELETE", labels=[Label(key="nonexistent", values=[])])
+        client.patch_fragment_labels("frag", patch, Level.SERVICE_INSTANCE)
+        assert client.get_fragment_labels("frag", Level.SERVICE_INSTANCE) == []
+
+    def test_patch_labels_unknown_action_raises(self, client):
+        client.create_fragment(Fragment(name="frag", properties={}), Level.SERVICE_INSTANCE)
+        patch = PatchLabels(action="INVALID", labels=[])
+        with pytest.raises(DestinationOperationError):
+            client.patch_fragment_labels("frag", patch, Level.SERVICE_INSTANCE)
+
+    def test_patch_labels_raises_404_for_missing_entity(self, client):
+        patch = PatchLabels(action="ADD", labels=[])
+        with pytest.raises(HttpError) as exc_info:
+            client.patch_fragment_labels("ghost", patch, Level.SERVICE_INSTANCE)
+        assert exc_info.value.status_code == 404
+
+    def test_labels_subaccount_scope(self, client):
+        client.create_fragment(Fragment(name="frag", properties={}), Level.SUB_ACCOUNT)
+        client.update_fragment_labels("frag", [Label(key="env", values=["prod"])], Level.SUB_ACCOUNT)
+        labels = client.get_fragment_labels("frag", Level.SUB_ACCOUNT)
+        assert len(labels) == 1
+        assert labels[0].key == "env"
+
+    def test_update_fragment_preserves_labels(self, client):
+        client.create_fragment(Fragment(name="frag", properties={"URL": "https://old.example.com"}), Level.SERVICE_INSTANCE)
+        client.update_fragment_labels("frag", [Label(key="env", values=["prod"])], Level.SERVICE_INSTANCE)
+        client.update_fragment(Fragment(name="frag", properties={"URL": "https://new.example.com"}), Level.SERVICE_INSTANCE)
+        labels = client.get_fragment_labels("frag", Level.SERVICE_INSTANCE)
+        assert len(labels) == 1
+        assert labels[0].key == "env"

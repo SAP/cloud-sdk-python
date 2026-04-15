@@ -10,10 +10,12 @@ from sap_cloud_sdk.destination import (
     Destination,
     Fragment,
     Certificate,
+    Label,
     Level,
     AccessStrategy,
     ListOptions,
     ConsumptionOptions,
+    PatchLabels,
 )
 from sap_cloud_sdk.destination.exceptions import (
     HttpError,
@@ -52,6 +54,7 @@ class ScenarioContext:
         self.use_network_failure_client: bool = False
         self.updated_certificate_content: Optional[str] = None
         self.tenant: Optional[str] = None
+        self.retrieved_labels: List[Label] = []
 
 
 @pytest.fixture
@@ -418,6 +421,23 @@ def list_subaccount_destinations_with_access_strategy(context, destination_clien
         context.operation_error = e
 
 
+@when(parsers.parse('I list subaccount destinations with "{strategy}" access strategy and label filter key "{key}" values "{value}"'))
+def list_subaccount_destinations_with_label_filter(context, destination_client, strategy, key, value):
+    """List subaccount destinations with access strategy and label filter."""
+    try:
+        access_strategy = AccessStrategy[strategy]
+        filter_opts = ListOptions(filter_labels=[Label(key=key, values=[value])])
+        context.retrieved_destinations = destination_client.list_subaccount_destinations(
+            access_strategy=access_strategy,
+            tenant=context.tenant,
+            filter=filter_opts,
+        )
+        context.operation_success = True
+    except Exception as e:
+        context.operation_success = False
+        context.operation_error = e
+
+
 @when(parsers.parse('I list instance destinations filtered by names "{names}"'))
 def list_instance_destinations_filtered(context, destination_client, names):
     """List instance destinations filtered by names."""
@@ -630,6 +650,23 @@ def list_subaccount_fragments_with_access_strategy(context, fragment_client, str
         context.operation_error = e
 
 
+@when(parsers.parse('I list subaccount fragments with "{strategy}" access strategy and label filter key "{key}" values "{value}"'))
+def list_subaccount_fragments_with_label_filter(context, fragment_client, strategy, key, value):
+    """List subaccount fragments with access strategy and label filter."""
+    try:
+        access_strategy = AccessStrategy[strategy]
+        filter_opts = ListOptions(filter_labels=[Label(key=key, values=[value])])
+        context.retrieved_fragments = fragment_client.list_subaccount_fragments(
+            access_strategy=access_strategy,
+            tenant=context.tenant,
+            filter=filter_opts,
+        )
+        context.operation_success = True
+    except Exception as e:
+        context.operation_success = False
+        context.operation_error = e
+
+
 # ==================== CERTIFICATE WHEN STEPS ====================
 
 @when("I create the certificate at subaccount level")
@@ -754,6 +791,23 @@ def list_subaccount_certificates_with_access_strategy(context, certificate_clien
         context.retrieved_certificates = certificate_client.list_subaccount_certificates(
             access_strategy=access_strategy,
             tenant=context.tenant
+        )
+        context.operation_success = True
+    except Exception as e:
+        context.operation_success = False
+        context.operation_error = e
+
+
+@when(parsers.parse('I list subaccount certificates with "{strategy}" access strategy and label filter key "{key}" values "{value}"'))
+def list_subaccount_certificates_with_label_filter(context, certificate_client, strategy, key, value):
+    """List subaccount certificates with access strategy and label filter."""
+    try:
+        access_strategy = AccessStrategy[strategy]
+        filter_opts = ListOptions(filter_labels=[Label(key=key, values=[value])])
+        context.retrieved_certificates = certificate_client.list_subaccount_certificates(
+            access_strategy=access_strategy,
+            tenant=context.tenant,
+            filter=filter_opts,
         )
         context.operation_success = True
     except Exception as e:
@@ -1212,3 +1266,157 @@ def cleanup_after_scenario(context, destination_client, fragment_client, certifi
             certificate_client.delete_certificate(name, level=level)
         except Exception:
             pass
+
+
+# ==================== LABEL WHEN STEPS ====================
+
+@when(parsers.parse('I update labels on the destination "{name}" at subaccount level: key "{key}" values "{value}"'))
+def update_destination_labels(context, destination_client, name, key, value):
+    """Replace labels on a subaccount destination."""
+    try:
+        labels = [Label(key=key, values=[value])]
+        destination_client.update_destination_labels(name, labels, Level.SUB_ACCOUNT)
+        context.operation_success = True
+    except Exception as e:
+        context.operation_success = False
+        context.operation_error = e
+
+
+@when(parsers.parse('I patch labels on the destination "{name}" at subaccount level with action "{action}": key "{key}" values "{value}"'))
+def patch_destination_labels(context, destination_client, name, action, key, value):
+    """Patch labels on a subaccount destination."""
+    try:
+        patch = PatchLabels(action=action, labels=[Label(key=key, values=[value])])
+        destination_client.patch_destination_labels(name, patch, Level.SUB_ACCOUNT)
+        context.operation_success = True
+    except Exception as e:
+        context.operation_success = False
+        context.operation_error = e
+
+
+@when(parsers.parse('I get labels for the destination "{name}" at subaccount level'))
+def get_destination_labels(context, destination_client, name):
+    """Get labels for a subaccount destination."""
+    try:
+        context.retrieved_labels = destination_client.get_destination_labels(name, Level.SUB_ACCOUNT)
+        context.operation_success = True
+    except Exception as e:
+        context.operation_success = False
+        context.operation_error = e
+
+
+@when(parsers.parse('I update labels on the fragment "{name}" at subaccount level: key "{key}" values "{value}"'))
+def update_fragment_labels(context, fragment_client, name, key, value):
+    """Replace labels on a subaccount fragment."""
+    try:
+        labels = [Label(key=key, values=[value])]
+        fragment_client.update_fragment_labels(name, labels, Level.SUB_ACCOUNT)
+        context.operation_success = True
+    except Exception as e:
+        context.operation_success = False
+        context.operation_error = e
+
+
+@when(parsers.parse('I patch labels on the fragment "{name}" at subaccount level with action "{action}": key "{key}" values "{value}"'))
+def patch_fragment_labels(context, fragment_client, name, action, key, value):
+    """Patch labels on a subaccount fragment."""
+    try:
+        patch = PatchLabels(action=action, labels=[Label(key=key, values=[value])])
+        fragment_client.patch_fragment_labels(name, patch, Level.SUB_ACCOUNT)
+        context.operation_success = True
+    except Exception as e:
+        context.operation_success = False
+        context.operation_error = e
+
+
+@when(parsers.parse('I get labels for the fragment "{name}" at subaccount level'))
+def get_fragment_labels(context, fragment_client, name):
+    """Get labels for a subaccount fragment."""
+    try:
+        context.retrieved_labels = fragment_client.get_fragment_labels(name, Level.SUB_ACCOUNT)
+        context.operation_success = True
+    except Exception as e:
+        context.operation_success = False
+        context.operation_error = e
+
+
+@when(parsers.parse('I update labels on the certificate "{name}" at subaccount level: key "{key}" values "{value}"'))
+def update_certificate_labels(context, certificate_client, name, key, value):
+    """Replace labels on a subaccount certificate."""
+    try:
+        labels = [Label(key=key, values=[value])]
+        certificate_client.update_certificate_labels(name, labels, Level.SUB_ACCOUNT)
+        context.operation_success = True
+    except Exception as e:
+        context.operation_success = False
+        context.operation_error = e
+
+
+@when(parsers.parse('I patch labels on the certificate "{name}" at subaccount level with action "{action}": key "{key}" values "{value}"'))
+def patch_certificate_labels(context, certificate_client, name, action, key, value):
+    """Patch labels on a subaccount certificate."""
+    try:
+        patch = PatchLabels(action=action, labels=[Label(key=key, values=[value])])
+        certificate_client.patch_certificate_labels(name, patch, Level.SUB_ACCOUNT)
+        context.operation_success = True
+    except Exception as e:
+        context.operation_success = False
+        context.operation_error = e
+
+
+@when(parsers.parse('I get labels for the certificate "{name}" at subaccount level'))
+def get_certificate_labels(context, certificate_client, name):
+    """Get labels for a subaccount certificate."""
+    try:
+        context.retrieved_labels = certificate_client.get_certificate_labels(name, Level.SUB_ACCOUNT)
+        context.operation_success = True
+    except Exception as e:
+        context.operation_success = False
+        context.operation_error = e
+
+
+# ==================== LABEL THEN STEPS ====================
+
+@then("the destination label operation should be successful")
+def destination_label_operation_successful(context):
+    """Assert label operation succeeded."""
+    assert context.operation_success, f"Expected label operation to succeed, got: {context.operation_error}"
+
+
+@then("the fragment label operation should be successful")
+def fragment_label_operation_successful(context):
+    """Assert label operation succeeded."""
+    assert context.operation_success, f"Expected label operation to succeed, got: {context.operation_error}"
+
+
+@then("the certificate label operation should be successful")
+def certificate_label_operation_successful(context):
+    """Assert label operation succeeded."""
+    assert context.operation_success, f"Expected label operation to succeed, got: {context.operation_error}"
+
+
+@then(parsers.parse('the destination should have label key "{key}" with value "{value}"'))
+def destination_should_have_label(context, key, value):
+    """Assert retrieved labels contain the specified key/value."""
+    assert any(
+        lbl.key == key and value in lbl.values
+        for lbl in context.retrieved_labels
+    ), f"Expected label key='{key}' value='{value}' in {context.retrieved_labels}"
+
+
+@then(parsers.parse('the fragment should have label key "{key}" with value "{value}"'))
+def fragment_should_have_label(context, key, value):
+    """Assert retrieved labels contain the specified key/value."""
+    assert any(
+        lbl.key == key and value in lbl.values
+        for lbl in context.retrieved_labels
+    ), f"Expected label key='{key}' value='{value}' in {context.retrieved_labels}"
+
+
+@then(parsers.parse('the certificate should have label key "{key}" with value "{value}"'))
+def certificate_should_have_label(context, key, value):
+    """Assert retrieved labels contain the specified key/value."""
+    assert any(
+        lbl.key == key and value in lbl.values
+        for lbl in context.retrieved_labels
+    ), f"Expected label key='{key}' value='{value}' in {context.retrieved_labels}"

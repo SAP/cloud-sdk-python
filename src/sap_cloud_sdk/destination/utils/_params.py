@@ -32,6 +32,32 @@ def build_filter_param(property_name: str, values: TypingList[str]) -> str:
     return f"{property_name} in ({', '.join(encoded_names)})"
 
 
+def build_label_filter_param(labels: list) -> str:
+    """Build a label HAS filter expression.
+
+    Each label produces a clause: Label['<key>'] HAS ('<v1>', '<v2>')
+    Multiple clauses are joined with ' AND '.
+
+    Args:
+        labels: List of label objects with .key (str) and .values (List[str]) attributes.
+
+    Returns:
+        str: OData filter expression for label matching.
+
+    Raises:
+        DestinationOperationError: If labels list is empty.
+    """
+    if not labels:
+        raise DestinationOperationError("filter_labels must not be empty")
+
+    clauses = []
+    for label in labels:
+        encoded_values = ", ".join(f"'{quote(v)}'" for v in label.values)
+        clauses.append(f"Label['{quote(label.key)}'] HAS ({encoded_values})")
+
+    return " AND ".join(clauses)
+
+
 def build_pagination_params(
     page: Optional[int],
     page_size: Optional[int],

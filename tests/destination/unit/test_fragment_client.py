@@ -5,7 +5,7 @@ from unittest.mock import Mock, MagicMock
 from requests import Response
 
 from sap_cloud_sdk.destination.fragment_client import FragmentClient
-from sap_cloud_sdk.destination._models import AccessStrategy, Fragment, Level
+from sap_cloud_sdk.destination._models import AccessStrategy, Fragment, Label, Level, PatchLabels
 from sap_cloud_sdk.destination.exceptions import (
     DestinationOperationError,
     HttpError,
@@ -320,7 +320,7 @@ class TestFragmentClientListOperations:
         assert fragments[0].properties["URL"] == "https://api1.example.com"
         assert fragments[1].name == "frag2"
         assert fragments[1].properties["ProxyType"] == "Internet"
-        mock_http.get.assert_called_once_with("v1/instanceDestinationFragments", tenant_subdomain=None)
+        mock_http.get.assert_called_once_with("v1/instanceDestinationFragments", tenant_subdomain=None, params={})
 
     def test_list_instance_fragments_empty(self, fragment_client, mock_http):
         """Test listing instance fragments when none exist."""
@@ -375,7 +375,7 @@ class TestFragmentClientListOperations:
         # Verify
         assert len(fragments) == 1
         assert fragments[0].name == "frag1"
-        mock_http.get.assert_called_once_with("v1/subaccountDestinationFragments", tenant_subdomain=None)
+        mock_http.get.assert_called_once_with("v1/subaccountDestinationFragments", tenant_subdomain=None, params={})
 
     def test_list_subaccount_fragments_subscriber_only(self, fragment_client, mock_http):
         """Test listing subaccount fragments with SUBSCRIBER_ONLY strategy."""
@@ -394,7 +394,7 @@ class TestFragmentClientListOperations:
 
         # Verify
         assert len(fragments) == 1
-        mock_http.get.assert_called_once_with("v1/subaccountDestinationFragments", tenant_subdomain="test-tenant")
+        mock_http.get.assert_called_once_with("v1/subaccountDestinationFragments", tenant_subdomain="test-tenant", params={})
 
     def test_list_subaccount_fragments_requires_tenant(self, fragment_client, mock_http):
         """Test that subscriber access strategies require tenant parameter."""
@@ -439,8 +439,8 @@ class TestFragmentClientListOperations:
 
         # Verify calls were made in correct order
         calls = mock_http.get.call_args_list
-        assert calls[0] == (("v1/subaccountDestinationFragments",), {"tenant_subdomain": "test-tenant"})
-        assert calls[1] == (("v1/subaccountDestinationFragments",), {"tenant_subdomain": None})
+        assert calls[0] == (("v1/subaccountDestinationFragments",), {"tenant_subdomain": "test-tenant", "params": {}})
+        assert calls[1] == (("v1/subaccountDestinationFragments",), {"tenant_subdomain": None, "params": {}})
 
     def test_list_subaccount_fragments_provider_first_fallback(self, fragment_client, mock_http):
         """Test PROVIDER_FIRST strategy with fallback to subscriber."""
@@ -467,8 +467,8 @@ class TestFragmentClientListOperations:
 
         # Verify calls were made in correct order
         calls = mock_http.get.call_args_list
-        assert calls[0] == (("v1/subaccountDestinationFragments",), {"tenant_subdomain": None})
-        assert calls[1] == (("v1/subaccountDestinationFragments",), {"tenant_subdomain": "test-tenant"})
+        assert calls[0] == (("v1/subaccountDestinationFragments",), {"tenant_subdomain": None, "params": {}})
+        assert calls[1] == (("v1/subaccountDestinationFragments",), {"tenant_subdomain": "test-tenant", "params": {}})
 
     def test_list_subaccount_fragments_http_error(self, fragment_client, mock_http):
         """Test listing subaccount fragments with HTTP error."""
@@ -759,3 +759,104 @@ class TestFragmentClientEdgeCases:
         assert fragment.name == "test-frag"
         # Verify fallback occurred
         assert mock_http.get.call_count == 2
+
+
+class TestFragmentClientLabels:
+    """Tests for FragmentClient label operations."""
+
+    def test_get_fragment_labels_instance(self, fragment_client, mock_http):
+        mock_response = Mock(spec=Response)
+        mock_response.json.return_value = [{"key": "env", "values": ["prod"]}]
+        mock_http.get.return_value = mock_response
+
+        labels = fragment_client.get_fragment_labels("fragA", Level.SERVICE_INSTANCE)
+
+        assert len(labels) == 1
+        assert labels[0].key == "env"
+        assert labels[0].values == ["prod"]
+        mock_http.get.assert_called_once_with("v1/instanceDestinationFragments/fragA/labels")
+
+    def test_get_fragment_labels_subaccount(self, fragment_client, mock_http):
+        mock_response = Mock(spec=Response)
+        mock_response.json.return_value = [{"key": "team", "values": ["platform"]}]
+        mock_http.get.return_value = mock_response
+
+        labels = fragment_client.get_fragment_labels("fragA", Level.SUB_ACCOUNT)
+
+        assert labels[0].key == "team"
+        mock_http.get.assert_called_once_with("v1/subaccountDestinationFragments/fragA/labels")
+
+    def test_get_fragment_labels_default_level_is_subaccount(self, fragment_client, mock_http):
+        mock_response = Mock(spec=Response)
+        mock_response.json.return_value = []
+        mock_http.get.return_value = mock_response
+
+        fragment_client.get_fragment_labels("fragA")
+
+        mock_http.get.assert_called_once_with("v1/subaccountDestinationFragments/fragA/labels")
+
+    def test_get_fragment_labels_non_list_response_raises(self, fragment_client, mock_http):
+        mock_response = Mock(spec=Response)
+        mock_response.json.return_value = {"key": "env", "values": ["prod"]}
+        mock_http.get.return_value = mock_response
+
+        with pytest.raises(DestinationOperationError):
+            fragment_client.get_fragment_labels("fragA")
+
+    def test_get_fragment_labels_http_error_raises_operation_error(self, fragment_client, mock_http):
+        mock_http.get.side_effect = HttpError("Not Found", status_code=404, response_text="Not Found")
+
+        with pytest.raises(DestinationOperationError, match="failed to get labels for fragment"):
+            fragment_client.get_fragment_labels("fragA")
+
+    def test_update_fragment_labels_instance(self, fragment_client, mock_http):
+        labels = [Label(key="env", values=["prod"])]
+
+        fragment_client.update_fragment_labels("fragA", labels, Level.SERVICE_INSTANCE)
+
+        mock_http.put.assert_called_once_with(
+            "v1/instanceDestinationFragments/fragA/labels",
+            body=[{"key": "env", "values": ["prod"]}],
+        )
+
+    def test_update_fragment_labels_subaccount(self, fragment_client, mock_http):
+        labels = [Label(key="env", values=["staging"])]
+
+        fragment_client.update_fragment_labels("fragA", labels, Level.SUB_ACCOUNT)
+
+        mock_http.put.assert_called_once_with(
+            "v1/subaccountDestinationFragments/fragA/labels",
+            body=[{"key": "env", "values": ["staging"]}],
+        )
+
+    def test_update_fragment_labels_http_error_propagates(self, fragment_client, mock_http):
+        mock_http.put.side_effect = HttpError("Conflict", status_code=409, response_text="Conflict")
+
+        with pytest.raises(HttpError):
+            fragment_client.update_fragment_labels("fragA", [], Level.SUB_ACCOUNT)
+
+    def test_patch_fragment_labels_instance(self, fragment_client, mock_http):
+        patch = PatchLabels(action="ADD", labels=[Label(key="env", values=["prod"])])
+
+        fragment_client.patch_fragment_labels("fragA", patch, Level.SERVICE_INSTANCE)
+
+        mock_http.patch.assert_called_once_with(
+            "v1/instanceDestinationFragments/fragA/labels",
+            body={"action": "ADD", "labels": [{"key": "env", "values": ["prod"]}]},
+        )
+
+    def test_patch_fragment_labels_subaccount(self, fragment_client, mock_http):
+        patch = PatchLabels(action="DELETE", labels=[Label(key="env", values=[])])
+
+        fragment_client.patch_fragment_labels("fragA", patch, Level.SUB_ACCOUNT)
+
+        mock_http.patch.assert_called_once_with(
+            "v1/subaccountDestinationFragments/fragA/labels",
+            body={"action": "DELETE", "labels": [{"key": "env", "values": []}]},
+        )
+
+    def test_patch_fragment_labels_http_error_propagates(self, fragment_client, mock_http):
+        mock_http.patch.side_effect = HttpError("Not Found", status_code=404, response_text="Not Found")
+
+        with pytest.raises(HttpError):
+            fragment_client.patch_fragment_labels("fragA", PatchLabels(action="ADD", labels=[]), Level.SUB_ACCOUNT)

@@ -6,6 +6,7 @@ import pytest
 
 from sap_cloud_sdk.destination._models import Destination, DestinationType, ProxyType, Authentication
 from sap_cloud_sdk.destination._models import Fragment
+from sap_cloud_sdk.destination._models import Label, PatchLabels
 from sap_cloud_sdk.destination._models import ListOptions
 from sap_cloud_sdk.destination.config import DestinationConfig
 from sap_cloud_sdk.destination.exceptions import DestinationOperationError
@@ -603,6 +604,147 @@ class TestTransparentProxyDestinationModel:
         # Update header value
         dest.set_header(TransparentProxyHeader.AUTHORIZATION, "Bearer newtoken456")
         assert dest.headers["Authorization"] == "Bearer newtoken456"
+
+
+class TestLabelModel:
+    """Tests for Label dataclass."""
+
+    def test_is_dataclass(self):
+        assert is_dataclass(Label)
+
+    def test_from_dict_basic(self):
+        lbl = Label.from_dict({"key": "env", "values": ["prod", "staging"]})
+        assert lbl.key == "env"
+        assert lbl.values == ["prod", "staging"]
+
+    def test_from_dict_single_value(self):
+        lbl = Label.from_dict({"key": "team", "values": ["platform"]})
+        assert lbl.key == "team"
+        assert lbl.values == ["platform"]
+
+    def test_from_dict_empty_values_list(self):
+        lbl = Label.from_dict({"key": "region", "values": []})
+        assert lbl.key == "region"
+        assert lbl.values == []
+
+    def test_from_dict_missing_key_raises(self):
+        with pytest.raises(DestinationOperationError, match="missing required field"):
+            Label.from_dict({"values": ["v1"]})
+
+    def test_from_dict_empty_key_raises(self):
+        with pytest.raises(DestinationOperationError, match="missing required field"):
+            Label.from_dict({"key": "", "values": ["v1"]})
+
+    def test_from_dict_whitespace_only_key_raises(self):
+        with pytest.raises(DestinationOperationError, match="missing required field"):
+            Label.from_dict({"key": "   ", "values": ["v1"]})
+
+    def test_from_dict_non_list_values_raises(self):
+        with pytest.raises(DestinationOperationError, match="'values' must be a list"):
+            Label.from_dict({"key": "env", "values": "prod"})
+
+    def test_to_dict_round_trips(self):
+        original = {"key": "env", "values": ["prod", "staging"]}
+        assert Label.from_dict(original).to_dict() == original
+
+    def test_to_dict_values_is_copy(self):
+        lbl = Label(key="k", values=["v1", "v2"])
+        d = lbl.to_dict()
+        d["values"].append("extra")
+        assert lbl.values == ["v1", "v2"]
+
+    def test_from_dict_missing_values_defaults_to_empty(self):
+        lbl = Label.from_dict({"key": "env"})
+        assert lbl.values == []
+
+
+class TestPatchLabelsModel:
+    """Tests for PatchLabels dataclass."""
+
+    def test_is_dataclass(self):
+        assert is_dataclass(PatchLabels)
+
+    def test_to_dict_add_action(self):
+        patch = PatchLabels(
+            action="ADD",
+            labels=[Label(key="env", values=["prod"])],
+        )
+        result = patch.to_dict()
+        assert result["action"] == "ADD"
+        assert result["labels"] == [{"key": "env", "values": ["prod"]}]
+
+    def test_to_dict_delete_action(self):
+        patch = PatchLabels(
+            action="DELETE",
+            labels=[Label(key="env", values=["staging"])],
+        )
+        result = patch.to_dict()
+        assert result["action"] == "DELETE"
+        assert result["labels"][0]["key"] == "env"
+
+    def test_to_dict_multiple_labels(self):
+        patch = PatchLabels(
+            action="ADD",
+            labels=[
+                Label(key="env", values=["prod"]),
+                Label(key="team", values=["platform", "infra"]),
+            ],
+        )
+        result = patch.to_dict()
+        assert len(result["labels"]) == 2
+
+
+class TestListOptionsLabelFilter:
+    """Tests for ListOptions.filter_labels."""
+
+    def test_single_label_single_value(self):
+        opts = ListOptions(filter_labels=[Label(key="env", values=["prod"])])
+        params = opts.to_query_params()
+        assert params["$filter"] == "Label['env'] HAS ('prod')"
+
+    def test_single_label_multiple_values(self):
+        opts = ListOptions(filter_labels=[Label(key="env", values=["prod", "staging"])])
+        params = opts.to_query_params()
+        assert params["$filter"] == "Label['env'] HAS ('prod', 'staging')"
+
+    def test_multiple_labels_joined_with_and(self):
+        opts = ListOptions(filter_labels=[
+            Label(key="env", values=["prod"]),
+            Label(key="team", values=["platform"]),
+        ])
+        params = opts.to_query_params()
+        assert params["$filter"] == "Label['env'] HAS ('prod') AND Label['team'] HAS ('platform')"
+
+    def test_filter_labels_and_filter_names_raises(self):
+        opts = ListOptions(
+            filter_names=["dest1"],
+            filter_labels=[Label(key="env", values=["prod"])],
+        )
+        with pytest.raises(DestinationOperationError):
+            opts.to_query_params()
+
+    def test_filter_labels_with_page_raises(self):
+        opts = ListOptions(
+            page=1,
+            filter_labels=[Label(key="env", values=["prod"])],
+        )
+        with pytest.raises(DestinationOperationError, match=r"\$page cannot be combined with"):
+            opts.to_query_params()
+
+    def test_special_chars_in_key_are_encoded(self):
+        opts = ListOptions(filter_labels=[Label(key="my key", values=["v1"])])
+        params = opts.to_query_params()
+        assert "my%20key" in params["$filter"]
+
+    def test_special_chars_in_value_are_encoded(self):
+        opts = ListOptions(filter_labels=[Label(key="env", values=["prod qa"])])
+        params = opts.to_query_params()
+        assert "prod%20qa" in params["$filter"]
+
+    def test_empty_filter_labels_list_produces_no_filter(self):
+        opts = ListOptions(filter_labels=[])
+        params = opts.to_query_params()
+        assert "$filter" not in params
 
     def test_transparent_proxy_destination_set_header_with_x_destination_name(self):
         """Test setting X-destination-name header explicitly."""

@@ -6,7 +6,7 @@ from sap_cloud_sdk.destination._local_client_base import (
     LocalDevClientBase,
     FRAGMENT_MOCK_FILE,
 )
-from sap_cloud_sdk.destination._models import AccessStrategy, Fragment, Level
+from sap_cloud_sdk.destination._models import AccessStrategy, Fragment, Label, Level, PatchLabels
 from sap_cloud_sdk.destination.exceptions import HttpError, DestinationOperationError
 
 
@@ -132,7 +132,10 @@ class LocalDevFragmentClient(LocalDevClientBase[Fragment]):
         except Exception as e:
             raise DestinationOperationError(f"failed to get fragment '{name}': {e}")
 
-    def list_instance_fragments(self) -> List[Fragment]:
+    def list_instance_fragments(
+        self,
+        _filter: Optional[Any] = None,
+    ) -> List[Fragment]:
         """List all fragments from the service instance scope.
 
         Returns:
@@ -153,6 +156,7 @@ class LocalDevFragmentClient(LocalDevClientBase[Fragment]):
         self,
         access_strategy: AccessStrategy = AccessStrategy.SUBSCRIBER_FIRST,
         tenant: Optional[str] = None,
+        _filter: Optional[Any] = None,
     ) -> List[Fragment]:
         """List fragments from the subaccount scope with an access strategy.
 
@@ -215,7 +219,7 @@ class LocalDevFragmentClient(LocalDevClientBase[Fragment]):
             DestinationOperationError: On file read/write errors.
         """
         collection = "instance" if level == Level.SERVICE_INSTANCE else "subaccount"
-        self._update_entity(collection, fragment, fragment.name)
+        self._update_entity(collection, fragment, fragment.name, preserve_fields=["labels"])
 
     def delete_fragment(
         self, name: str, level: Optional[Level] = Level.SUB_ACCOUNT
@@ -232,3 +236,61 @@ class LocalDevFragmentClient(LocalDevClientBase[Fragment]):
         """
         collection = "instance" if level == Level.SERVICE_INSTANCE else "subaccount"
         self._delete_entity(collection, name)
+
+    # ---------- Label operations ----------
+
+    def get_fragment_labels(
+        self, name: str, level: Optional[Level] = Level.SUB_ACCOUNT
+    ) -> List[Label]:
+        """Get labels for a fragment.
+
+        Args:
+            name: Fragment name.
+            level: Scope to query (subaccount by default).
+
+        Returns:
+            List of labels. Returns empty list if none assigned.
+
+        Raises:
+            HttpError: If the fragment is not found (404).
+            DestinationOperationError: On file read errors.
+        """
+        collection = "instance" if level == Level.SERVICE_INSTANCE else "subaccount"
+        raw = self._get_labels(collection, name)
+        return [Label.from_dict(item) for item in raw]
+
+    def update_fragment_labels(
+        self, name: str, labels: List[Label], level: Optional[Level] = Level.SUB_ACCOUNT
+    ) -> None:
+        """Replace all labels for a fragment.
+
+        Args:
+            name: Fragment name.
+            labels: List of labels to set (replaces existing labels).
+            level: Scope where the fragment exists (subaccount by default).
+
+        Raises:
+            HttpError: If the fragment is not found (404).
+            DestinationOperationError: On file read/write errors.
+        """
+        collection = "instance" if level == Level.SERVICE_INSTANCE else "subaccount"
+        self._set_labels(collection, name, [lbl.to_dict() for lbl in labels])
+
+    def patch_fragment_labels(
+        self, name: str, patch: PatchLabels, level: Optional[Level] = Level.SUB_ACCOUNT
+    ) -> None:
+        """Add or remove labels for a fragment.
+
+        Args:
+            name: Fragment name.
+            patch: PatchLabels with action ("ADD" or "DELETE") and labels to apply.
+            level: Scope where the fragment exists (subaccount by default).
+
+        Raises:
+            HttpError: If the fragment is not found (404).
+            DestinationOperationError: On unknown action or file read/write errors.
+        """
+        collection = "instance" if level == Level.SERVICE_INSTANCE else "subaccount"
+        self._patch_labels_in_store(
+            collection, name, patch.action, [lbl.to_dict() for lbl in patch.labels]
+        )

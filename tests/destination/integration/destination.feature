@@ -212,3 +212,32 @@ Feature: Destination Service Integration
     Then the destination should be consumed successfully
     And I clean up the instance destination "test-v2-full-options"
     And I clean up the instance fragment "test-v2-full-fragment"
+
+  Scenario: Manage labels for subaccount destination
+    Given I have a destination named "test-dest-labels" of type "HTTP"
+    And the destination has URL "https://labels.example.com"
+    And the destination has authentication "NoAuthentication"
+    When I create the destination at subaccount level
+    Then the destination creation should be successful
+    When I update labels on the destination "test-dest-labels" at subaccount level: key "env" values "prod"
+    Then the destination label operation should be successful
+    When I get labels for the destination "test-dest-labels" at subaccount level
+    Then the destination should have label key "env" with value "prod"
+    When I patch labels on the destination "test-dest-labels" at subaccount level with action "ADD": key "team" values "platform"
+    Then the destination label operation should be successful
+    When I get labels for the destination "test-dest-labels" at subaccount level
+    Then the destination should have label key "team" with value "platform"
+    And I clean up the subaccount destination "test-dest-labels"
+
+  Scenario: List subaccount destinations filtered by label
+    Given I have a destination named "test-dest-list-by-label" of type "HTTP"
+    And the destination has URL "https://label-list.example.com"
+    And the destination has authentication "NoAuthentication"
+    When I create the destination at subaccount level
+    Then the destination creation should be successful
+    When I update labels on the destination "test-dest-list-by-label" at subaccount level: key "list-filter-env" values "prod"
+    Then the destination label operation should be successful
+    When I list subaccount destinations with "PROVIDER_ONLY" access strategy and label filter key "list-filter-env" values "prod"
+    Then the destination list should be retrieved successfully
+    And the destination "test-dest-list-by-label" should be in the list
+    And I clean up the subaccount destination "test-dest-list-by-label"

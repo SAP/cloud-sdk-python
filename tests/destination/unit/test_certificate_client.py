@@ -5,7 +5,7 @@ from unittest.mock import Mock
 from requests import Response
 
 from sap_cloud_sdk.destination.certificate_client import CertificateClient
-from sap_cloud_sdk.destination._models import AccessStrategy, Certificate, Level, ListOptions
+from sap_cloud_sdk.destination._models import AccessStrategy, Certificate, Label, Level, ListOptions, PatchLabels
 from sap_cloud_sdk.destination.utils._pagination import PagedResult
 from sap_cloud_sdk.destination.exceptions import (
     DestinationOperationError,
@@ -916,3 +916,103 @@ class TestCertificateClientEdgeCases:
             certificate_client.get_instance_certificate("test-cert")
 
         assert "failed to get certificate 'test-cert'" in str(exc_info.value)
+
+
+class TestCertificateClientLabels:
+    """Tests for CertificateClient label operations."""
+
+    def test_get_certificate_labels_instance(self, certificate_client, mock_http):
+        mock_response = Mock(spec=Response)
+        mock_response.json.return_value = [{"key": "env", "values": ["prod"]}]
+        mock_http.get.return_value = mock_response
+
+        labels = certificate_client.get_certificate_labels("cert1", Level.SERVICE_INSTANCE)
+
+        assert len(labels) == 1
+        assert labels[0].key == "env"
+        mock_http.get.assert_called_once_with("v1/instanceCertificates/cert1/labels")
+
+    def test_get_certificate_labels_subaccount(self, certificate_client, mock_http):
+        mock_response = Mock(spec=Response)
+        mock_response.json.return_value = [{"key": "team", "values": ["platform"]}]
+        mock_http.get.return_value = mock_response
+
+        labels = certificate_client.get_certificate_labels("cert1", Level.SUB_ACCOUNT)
+
+        assert labels[0].key == "team"
+        mock_http.get.assert_called_once_with("v1/subaccountCertificates/cert1/labels")
+
+    def test_get_certificate_labels_default_level_is_subaccount(self, certificate_client, mock_http):
+        mock_response = Mock(spec=Response)
+        mock_response.json.return_value = []
+        mock_http.get.return_value = mock_response
+
+        certificate_client.get_certificate_labels("cert1")
+
+        mock_http.get.assert_called_once_with("v1/subaccountCertificates/cert1/labels")
+
+    def test_get_certificate_labels_non_list_response_raises(self, certificate_client, mock_http):
+        mock_response = Mock(spec=Response)
+        mock_response.json.return_value = {"key": "env"}
+        mock_http.get.return_value = mock_response
+
+        with pytest.raises(DestinationOperationError):
+            certificate_client.get_certificate_labels("cert1")
+
+    def test_get_certificate_labels_http_error_raises_operation_error(self, certificate_client, mock_http):
+        mock_http.get.side_effect = HttpError("Not Found", status_code=404, response_text="Not Found")
+
+        with pytest.raises(DestinationOperationError, match="failed to get labels for certificate"):
+            certificate_client.get_certificate_labels("cert1")
+
+    def test_update_certificate_labels_instance(self, certificate_client, mock_http):
+        labels = [Label(key="env", values=["prod"])]
+
+        certificate_client.update_certificate_labels("cert1", labels, Level.SERVICE_INSTANCE)
+
+        mock_http.put.assert_called_once_with(
+            "v1/instanceCertificates/cert1/labels",
+            body=[{"key": "env", "values": ["prod"]}],
+        )
+
+    def test_update_certificate_labels_subaccount(self, certificate_client, mock_http):
+        labels = [Label(key="env", values=["staging"])]
+
+        certificate_client.update_certificate_labels("cert1", labels, Level.SUB_ACCOUNT)
+
+        mock_http.put.assert_called_once_with(
+            "v1/subaccountCertificates/cert1/labels",
+            body=[{"key": "env", "values": ["staging"]}],
+        )
+
+    def test_update_certificate_labels_http_error_propagates(self, certificate_client, mock_http):
+        mock_http.put.side_effect = HttpError("Not Found", status_code=404, response_text="Not Found")
+
+        with pytest.raises(HttpError):
+            certificate_client.update_certificate_labels("cert1", [], Level.SUB_ACCOUNT)
+
+    def test_patch_certificate_labels_instance(self, certificate_client, mock_http):
+        patch = PatchLabels(action="ADD", labels=[Label(key="env", values=["prod"])])
+
+        certificate_client.patch_certificate_labels("cert1", patch, Level.SERVICE_INSTANCE)
+
+        mock_http.patch.assert_called_once_with(
+            "v1/instanceCertificates/cert1/labels",
+            body={"action": "ADD", "labels": [{"key": "env", "values": ["prod"]}]},
+        )
+
+    def test_patch_certificate_labels_subaccount(self, certificate_client, mock_http):
+        patch = PatchLabels(action="DELETE", labels=[Label(key="env", values=[])])
+
+        certificate_client.patch_certificate_labels("cert1", patch, Level.SUB_ACCOUNT)
+
+        mock_http.patch.assert_called_once_with(
+            "v1/subaccountCertificates/cert1/labels",
+            body={"action": "DELETE", "labels": [{"key": "env", "values": []}]},
+        )
+
+    def test_patch_certificate_labels_http_error_propagates(self, certificate_client, mock_http):
+        mock_http.patch.side_effect = HttpError("Not Found", status_code=404, response_text="Not Found")
+
+        with pytest.raises(HttpError):
+            certificate_client.patch_certificate_labels("cert1", PatchLabels(action="ADD", labels=[]), Level.SUB_ACCOUNT)

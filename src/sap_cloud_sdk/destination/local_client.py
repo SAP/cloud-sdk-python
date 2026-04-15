@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 from sap_cloud_sdk.destination._local_client_base import (
     LocalDevClientBase,
     DESTINATION_MOCK_FILE,
 )
-from sap_cloud_sdk.destination._models import AccessStrategy, Destination, Level
+from sap_cloud_sdk.destination._models import AccessStrategy, Destination, Label, Level, PatchLabels
 from sap_cloud_sdk.destination.utils._pagination import PagedResult
 from sap_cloud_sdk.destination.exceptions import DestinationOperationError, HttpError
 
@@ -190,10 +190,10 @@ class LocalDevDestinationClient(LocalDevClientBase[Destination]):
         """
         collection = "instance" if level == Level.SERVICE_INSTANCE else "subaccount"
         if collection == "instance":
-            self._update_entity(collection, dest, dest.name)
+            self._update_entity(collection, dest, dest.name, preserve_fields=["labels"])
         else:
-            # Preserve tenant field for subaccount-level entries
-            self._update_entity(collection, dest, dest.name, preserve_fields=["tenant"])
+            # Preserve tenant and labels fields for subaccount-level entries
+            self._update_entity(collection, dest, dest.name, preserve_fields=["tenant", "labels"])
 
     def delete_destination(
         self, name: str, level: Optional[Level] = Level.SUB_ACCOUNT
@@ -300,3 +300,61 @@ class LocalDevDestinationClient(LocalDevClientBase[Destination]):
             raise DestinationOperationError(
                 f"failed to list subaccount destinations: {e}"
             )
+
+    # ---------- Label operations ----------
+
+    def get_destination_labels(
+        self, name: str, level: Optional[Level] = Level.SUB_ACCOUNT
+    ) -> List[Label]:
+        """Get labels for a destination.
+
+        Args:
+            name: Destination name.
+            level: Scope to query (subaccount by default).
+
+        Returns:
+            List of labels. Returns empty list if none assigned.
+
+        Raises:
+            HttpError: If the destination is not found (404).
+            DestinationOperationError: On file read errors.
+        """
+        collection = "instance" if level == Level.SERVICE_INSTANCE else "subaccount"
+        raw = self._get_labels(collection, name)
+        return [Label.from_dict(item) for item in raw]
+
+    def update_destination_labels(
+        self, name: str, labels: List[Label], level: Optional[Level] = Level.SUB_ACCOUNT
+    ) -> None:
+        """Replace all labels for a destination.
+
+        Args:
+            name: Destination name.
+            labels: List of labels to set (replaces existing labels).
+            level: Scope where the destination exists (subaccount by default).
+
+        Raises:
+            HttpError: If the destination is not found (404).
+            DestinationOperationError: On file read/write errors.
+        """
+        collection = "instance" if level == Level.SERVICE_INSTANCE else "subaccount"
+        self._set_labels(collection, name, [lbl.to_dict() for lbl in labels])
+
+    def patch_destination_labels(
+        self, name: str, patch: PatchLabels, level: Optional[Level] = Level.SUB_ACCOUNT
+    ) -> None:
+        """Add or remove labels for a destination.
+
+        Args:
+            name: Destination name.
+            patch: PatchLabels with action ("ADD" or "DELETE") and labels to apply.
+            level: Scope where the destination exists (subaccount by default).
+
+        Raises:
+            HttpError: If the destination is not found (404).
+            DestinationOperationError: On unknown action or file read/write errors.
+        """
+        collection = "instance" if level == Level.SERVICE_INSTANCE else "subaccount"
+        self._patch_labels_in_store(
+            collection, name, patch.action, [lbl.to_dict() for lbl in patch.labels]
+        )

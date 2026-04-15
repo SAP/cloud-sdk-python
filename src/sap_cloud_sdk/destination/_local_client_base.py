@@ -351,3 +351,123 @@ class LocalDevClientBase(ABC, Generic[T]):
             raise DestinationOperationError(
                 f"failed to delete entity '{entity_name}': {e}"
             )
+
+    # ---------- Label operations ----------
+
+    def _get_labels(self, collection: str, name: str) -> List[Dict[str, Any]]:
+        """Return labels for an entity in a collection.
+
+        Args:
+            collection: Collection name ("instance" or "subaccount").
+            name: Entity name.
+
+        Returns:
+            List of raw label dicts. Returns empty list if entity has no labels.
+
+        Raises:
+            HttpError: If entity is not found (404).
+            DestinationOperationError: On file read errors.
+        """
+        try:
+            data = self._read()
+            entry = self._find_by_name(data.get(collection, []), name)
+            if entry is None:
+                raise HttpError(
+                    f"entity '{name}' not found",
+                    status_code=404,
+                    response_text="Not Found",
+                )
+            return list(entry.get("labels", []))
+        except HttpError:
+            raise
+        except Exception as e:
+            raise DestinationOperationError(f"failed to get labels for '{name}': {e}")
+
+    def _set_labels(
+        self, collection: str, name: str, labels: List[Dict[str, Any]]
+    ) -> None:
+        """Replace all labels for an entity in a collection (PUT semantics).
+
+        Args:
+            collection: Collection name ("instance" or "subaccount").
+            name: Entity name.
+            labels: List of raw label dicts to store.
+
+        Raises:
+            HttpError: If entity is not found (404).
+            DestinationOperationError: On file read/write errors.
+        """
+        try:
+            with self._lock:
+                data = self._read()
+                lst = data.setdefault(collection, [])
+                idx = self._index_by_name(lst, name)
+                if idx < 0:
+                    raise HttpError(
+                        f"entity '{name}' not found",
+                        status_code=404,
+                        response_text="Not Found",
+                    )
+                lst[idx]["labels"] = labels
+                self._write(data)
+        except HttpError:
+            raise
+        except Exception as e:
+            raise DestinationOperationError(f"failed to set labels for '{name}': {e}")
+
+    def _patch_labels_in_store(
+        self,
+        collection: str,
+        name: str,
+        action: str,
+        patch_labels: List[Dict[str, Any]],
+    ) -> None:
+        """Add or remove labels for an entity in a collection (PATCH semantics).
+
+        ADD: upsert by key — if the key exists update its values, otherwise append.
+        DELETE: remove entries whose key matches any incoming label key.
+
+        Args:
+            collection: Collection name ("instance" or "subaccount").
+            name: Entity name.
+            action: "ADD" or "DELETE".
+            patch_labels: List of raw label dicts to apply.
+
+        Raises:
+            HttpError: If entity is not found (404).
+            DestinationOperationError: On unknown action or file read/write errors.
+        """
+        try:
+            with self._lock:
+                data = self._read()
+                lst = data.setdefault(collection, [])
+                idx = self._index_by_name(lst, name)
+                if idx < 0:
+                    raise HttpError(
+                        f"entity '{name}' not found",
+                        status_code=404,
+                        response_text="Not Found",
+                    )
+                current: List[Dict[str, Any]] = list(lst[idx].get("labels", []))
+
+                if action == "ADD":
+                    key_map = {lbl["key"]: lbl for lbl in current}
+                    for incoming in patch_labels:
+                        key_map[incoming["key"]] = incoming
+                    current = list(key_map.values())
+                elif action == "DELETE":
+                    keys_to_remove = {lbl["key"] for lbl in patch_labels}
+                    current = [lbl for lbl in current if lbl["key"] not in keys_to_remove]
+                else:
+                    raise DestinationOperationError(
+                        f"unknown patch action: '{action}' — must be 'ADD' or 'DELETE'"
+                    )
+
+                lst[idx]["labels"] = current
+                self._write(data)
+        except (HttpError, DestinationOperationError):
+            raise
+        except Exception as e:
+            raise DestinationOperationError(
+                f"failed to patch labels for '{name}': {e}"
+            )

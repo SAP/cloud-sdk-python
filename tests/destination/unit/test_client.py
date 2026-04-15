@@ -7,10 +7,12 @@ from requests import Response
 from sap_cloud_sdk.destination.client import DestinationClient
 from sap_cloud_sdk.destination._models import (
     Destination,
+    Label,
     Level,
     AccessStrategy,
     DestinationType,
     ListOptions,
+    PatchLabels,
     TransparentProxy,
     TransparentProxyDestination,
     ConsumptionOptions,
@@ -1795,3 +1797,117 @@ class TestDestinationClientEdgeCases:
             )
 
         assert "Fetch failed" in str(exc_info.value)
+
+
+class TestDestinationClientLabels:
+    """Tests for DestinationClient label operations."""
+
+    def test_get_destination_labels_instance(self):
+        mock_http = MagicMock()
+        mock_http.get.return_value.json.return_value = [{"key": "env", "values": ["prod"]}]
+        client = DestinationClient(mock_http)
+
+        labels = client.get_destination_labels("destA", Level.SERVICE_INSTANCE)
+
+        assert len(labels) == 1
+        assert labels[0].key == "env"
+        mock_http.get.assert_called_once_with("v1/instanceDestinations/destA/labels")
+
+    def test_get_destination_labels_subaccount(self):
+        mock_http = MagicMock()
+        mock_http.get.return_value.json.return_value = [{"key": "team", "values": ["platform"]}]
+        client = DestinationClient(mock_http)
+
+        labels = client.get_destination_labels("destA", Level.SUB_ACCOUNT)
+
+        assert labels[0].key == "team"
+        mock_http.get.assert_called_once_with("v1/subaccountDestinations/destA/labels")
+
+    def test_get_destination_labels_default_level_is_subaccount(self):
+        mock_http = MagicMock()
+        mock_http.get.return_value.json.return_value = []
+        client = DestinationClient(mock_http)
+
+        client.get_destination_labels("destA")
+
+        mock_http.get.assert_called_once_with("v1/subaccountDestinations/destA/labels")
+
+    def test_get_destination_labels_non_list_response_raises(self):
+        mock_http = MagicMock()
+        mock_http.get.return_value.json.return_value = {"key": "env"}
+        client = DestinationClient(mock_http)
+
+        with pytest.raises(DestinationOperationError):
+            client.get_destination_labels("destA")
+
+    def test_get_destination_labels_http_error_raises_operation_error(self):
+        mock_http = MagicMock()
+        mock_http.get.side_effect = HttpError("Not Found", status_code=404, response_text="Not Found")
+        client = DestinationClient(mock_http)
+
+        with pytest.raises(DestinationOperationError, match="failed to get labels for destination"):
+            client.get_destination_labels("destA")
+
+    def test_update_destination_labels_instance(self):
+        mock_http = MagicMock()
+        client = DestinationClient(mock_http)
+        labels = [Label(key="env", values=["prod"])]
+
+        client.update_destination_labels("destA", labels, Level.SERVICE_INSTANCE)
+
+        mock_http.put.assert_called_once_with(
+            "v1/instanceDestinations/destA/labels",
+            body=[{"key": "env", "values": ["prod"]}],
+        )
+
+    def test_update_destination_labels_subaccount(self):
+        mock_http = MagicMock()
+        client = DestinationClient(mock_http)
+        labels = [Label(key="env", values=["staging"])]
+
+        client.update_destination_labels("destA", labels, Level.SUB_ACCOUNT)
+
+        mock_http.put.assert_called_once_with(
+            "v1/subaccountDestinations/destA/labels",
+            body=[{"key": "env", "values": ["staging"]}],
+        )
+
+    def test_update_destination_labels_http_error_propagates(self):
+        mock_http = MagicMock()
+        mock_http.put.side_effect = HttpError("Not Found", status_code=404, response_text="Not Found")
+        client = DestinationClient(mock_http)
+
+        with pytest.raises(HttpError):
+            client.update_destination_labels("destA", [], Level.SUB_ACCOUNT)
+
+    def test_patch_destination_labels_instance(self):
+        mock_http = MagicMock()
+        client = DestinationClient(mock_http)
+        patch = PatchLabels(action="ADD", labels=[Label(key="env", values=["prod"])])
+
+        client.patch_destination_labels("destA", patch, Level.SERVICE_INSTANCE)
+
+        mock_http.patch.assert_called_once_with(
+            "v1/instanceDestinations/destA/labels",
+            body={"action": "ADD", "labels": [{"key": "env", "values": ["prod"]}]},
+        )
+
+    def test_patch_destination_labels_subaccount(self):
+        mock_http = MagicMock()
+        client = DestinationClient(mock_http)
+        patch = PatchLabels(action="DELETE", labels=[Label(key="env", values=[])])
+
+        client.patch_destination_labels("destA", patch, Level.SUB_ACCOUNT)
+
+        mock_http.patch.assert_called_once_with(
+            "v1/subaccountDestinations/destA/labels",
+            body={"action": "DELETE", "labels": [{"key": "env", "values": []}]},
+        )
+
+    def test_patch_destination_labels_http_error_propagates(self):
+        mock_http = MagicMock()
+        mock_http.patch.side_effect = HttpError("Not Found", status_code=404, response_text="Not Found")
+        client = DestinationClient(mock_http)
+
+        with pytest.raises(HttpError):
+            client.patch_destination_labels("destA", PatchLabels(action="ADD", labels=[]), Level.SUB_ACCOUNT)

@@ -30,6 +30,7 @@ class HttpMethod(Enum):
     GET = "GET"
     POST = "POST"
     PUT = "PUT"
+    PATCH = "PATCH"
     DELETE = "DELETE"
 
 
@@ -247,6 +248,36 @@ class DestinationHttp:
         """
         return self._request(
             HttpMethod.PUT,
+            path,
+            json=body,
+            extra_headers=headers,
+            tenant_subdomain=tenant_subdomain,
+        )
+
+    def patch(
+        self,
+        path: str,
+        *,
+        body: Any,
+        headers: Optional[Dict[str, str]] = None,
+        tenant_subdomain: Optional[str] = None,
+    ) -> Response:
+        """Send a PATCH request.
+
+        Args:
+            path: Relative API path under destination-configuration/v1.
+            body: JSON-serializable request body.
+            headers: Optional additional request headers.
+            tenant_subdomain: Optional subscriber tenant subdomain for token acquisition.
+
+        Returns:
+            requests.Response if the status code is 2xx.
+
+        Raises:
+            HttpError: If the request fails or returns a non-2xx status.
+        """
+        return self._request(
+            HttpMethod.PATCH,
             path,
             json=body,
             extra_headers=headers,

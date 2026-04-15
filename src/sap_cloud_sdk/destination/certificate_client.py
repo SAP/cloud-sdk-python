@@ -2,15 +2,17 @@
 
 from __future__ import annotations
 
-from typing import Optional, TypeVar, Callable
+from typing import List, Optional, TypeVar, Callable
 
 from sap_cloud_sdk.core.telemetry import Module, Operation, record_metrics
 from sap_cloud_sdk.destination._http import DestinationHttp, API_V1
 from sap_cloud_sdk.destination._models import (
     AccessStrategy,
     Certificate,
+    Label,
     Level,
     ListOptions,
+    PatchLabels,
 )
 from sap_cloud_sdk.destination.exceptions import (
     DestinationOperationError,
@@ -286,7 +288,116 @@ class CertificateClient:
                 f"failed to delete certificate '{name}': {e}"
             )
 
+    # ---------- Label operations ----------
+
+    @record_metrics(Module.DESTINATION, Operation.CERTIFICATE_GET_LABELS)
+    def get_certificate_labels(
+        self, name: str, level: Optional[Level] = Level.SUB_ACCOUNT
+    ) -> List[Label]:
+        """Get labels for a certificate.
+
+        Args:
+            name: Certificate name.
+            level: Scope to query (subaccount by default).
+
+        Returns:
+            List of labels assigned to the certificate. Returns empty list if none assigned.
+
+        Raises:
+            DestinationOperationError: If an HTTP error occurs or response parsing fails.
+        """
+        try:
+            return self._get_labels(name=name, level=level)
+        except HttpError as e:
+            raise DestinationOperationError(
+                f"failed to get labels for certificate '{name}': {e}"
+            )
+
+    @record_metrics(Module.DESTINATION, Operation.CERTIFICATE_UPDATE_LABELS)
+    def update_certificate_labels(
+        self, name: str, labels: List[Label], level: Optional[Level] = Level.SUB_ACCOUNT
+    ) -> None:
+        """Replace all labels for a certificate.
+
+        Args:
+            name: Certificate name.
+            labels: List of labels to set (replaces existing labels).
+            level: Scope where the certificate exists (subaccount by default).
+
+        Raises:
+            HttpError: Propagated for HTTP errors.
+            DestinationOperationError: For unexpected errors.
+        """
+        try:
+            self._update_labels(name=name, labels=labels, level=level)
+        except HttpError:
+            raise
+        except Exception as e:
+            raise DestinationOperationError(
+                f"failed to put labels for certificate '{name}': {e}"
+            )
+
+    @record_metrics(Module.DESTINATION, Operation.CERTIFICATE_PATCH_LABELS)
+    def patch_certificate_labels(
+        self, name: str, patch: PatchLabels, level: Optional[Level] = Level.SUB_ACCOUNT
+    ) -> None:
+        """Add or remove labels for a certificate.
+
+        Args:
+            name: Certificate name.
+            patch: PatchLabels with action ("ADD" or "DELETE") and labels to apply.
+            level: Scope where the certificate exists (subaccount by default).
+
+        Raises:
+            HttpError: Propagated for HTTP errors.
+            DestinationOperationError: For unexpected errors.
+        """
+        try:
+            self._patch_labels(name=name, patch=patch, level=level)
+        except HttpError:
+            raise
+        except Exception as e:
+            raise DestinationOperationError(
+                f"failed to patch labels for certificate '{name}': {e}"
+            )
+
     # ---------- Internal helpers ----------
+
+    def _get_labels(self, name: str, level: Level) -> List[Label]:
+        """Internal helper to fetch labels for a certificate."""
+        try:
+            path = self._sub_path_for_level(level)
+            resp = self._http.get(f"{API_V1}/{path}/{name}/labels")
+            data = resp.json()
+            if not isinstance(data, list):
+                raise DestinationOperationError(
+                    f"expected list in labels response, got {type(data)}"
+                )
+            return [Label.from_dict(item) for item in data]
+        except HttpError:
+            raise
+        except DestinationOperationError:
+            raise
+        except Exception as e:
+            raise DestinationOperationError(
+                f"invalid JSON in get labels response: {e}"
+            )
+
+    def _update_labels(self, name: str, labels: List[Label], level: Level) -> None:
+        """Internal helper to replace labels for a certificate."""
+        path = self._sub_path_for_level(level)
+        self._http.put(
+            f"{API_V1}/{path}/{name}/labels",
+            body=[lbl.to_dict() for lbl in labels],
+        )
+
+    def _patch_labels(self, name: str, patch: PatchLabels, level: Level) -> None:
+        """Internal helper to add or remove labels for a certificate."""
+        path = self._sub_path_for_level(level)
+        self._http.patch(
+            f"{API_V1}/{path}/{name}/labels",
+            body=patch.to_dict(),
+        )
 
     def _get_certificate(
         self,

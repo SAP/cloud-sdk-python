@@ -121,3 +121,32 @@ Feature: Destination Service Integration - Certificates
     Given I use tenant "app-foundation-dev-subscriber"
     When I list subaccount certificates with "PROVIDER_ONLY" access strategy
     Then the certificate "subscriber-dest-test.pem" should not be in the list
+
+  Scenario: Manage labels for subaccount certificate
+    Given I have a certificate named "test-cert-labels.pem"
+    And the certificate has type "PEM"
+    And the certificate has valid PEM content
+    When I create the certificate at subaccount level
+    Then the certificate creation should be successful
+    When I update labels on the certificate "test-cert-labels.pem" at subaccount level: key "env" values "prod"
+    Then the certificate label operation should be successful
+    When I get labels for the certificate "test-cert-labels.pem" at subaccount level
+    Then the certificate should have label key "env" with value "prod"
+    When I patch labels on the certificate "test-cert-labels.pem" at subaccount level with action "ADD": key "team" values "platform"
+    Then the certificate label operation should be successful
+    When I get labels for the certificate "test-cert-labels.pem" at subaccount level
+    Then the certificate should have label key "team" with value "platform"
+    And I clean up the subaccount certificate "test-cert-labels.pem"
+
+  Scenario: List subaccount certificates filtered by label
+    Given I have a certificate named "test-cert-list-by-label.pem"
+    And the certificate has type "PEM"
+    And the certificate has valid PEM content
+    When I create the certificate at subaccount level
+    Then the certificate creation should be successful
+    When I update labels on the certificate "test-cert-list-by-label.pem" at subaccount level: key "list-filter-env" values "prod"
+    Then the certificate label operation should be successful
+    When I list subaccount certificates with "PROVIDER_ONLY" access strategy and label filter key "list-filter-env" values "prod"
+    Then the certificate list should be retrieved successfully
+    And the certificate "test-cert-list-by-label.pem" should be in the list
+    And I clean up the subaccount certificate "test-cert-list-by-label.pem"

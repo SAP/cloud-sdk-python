@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 from sap_cloud_sdk.destination._local_client_base import (
     LocalDevClientBase,
     CERTIFICATE_MOCK_FILE,
 )
-from sap_cloud_sdk.destination._models import AccessStrategy, Certificate, Level
+from sap_cloud_sdk.destination._models import AccessStrategy, Certificate, Label, Level, PatchLabels
 from sap_cloud_sdk.destination.utils._pagination import PagedResult
 from sap_cloud_sdk.destination.exceptions import HttpError, DestinationOperationError
 
@@ -161,7 +161,7 @@ class LocalDevCertificateClient(LocalDevClientBase[Certificate]):
             DestinationOperationError: On file read/write errors.
         """
         collection = "instance" if level == Level.SERVICE_INSTANCE else "subaccount"
-        self._update_entity(collection, certificate, certificate.name)
+        self._update_entity(collection, certificate, certificate.name, preserve_fields=["labels"])
 
     def delete_certificate(
         self, name: str, level: Optional[Level] = Level.SUB_ACCOUNT
@@ -178,6 +178,64 @@ class LocalDevCertificateClient(LocalDevClientBase[Certificate]):
         """
         collection = "instance" if level == Level.SERVICE_INSTANCE else "subaccount"
         self._delete_entity(collection, name)
+
+    # ---------- Label operations ----------
+
+    def get_certificate_labels(
+        self, name: str, level: Optional[Level] = Level.SUB_ACCOUNT
+    ) -> List[Label]:
+        """Get labels for a certificate.
+
+        Args:
+            name: Certificate name.
+            level: Scope to query (subaccount by default).
+
+        Returns:
+            List of labels. Returns empty list if none assigned.
+
+        Raises:
+            HttpError: If the certificate is not found (404).
+            DestinationOperationError: On file read errors.
+        """
+        collection = "instance" if level == Level.SERVICE_INSTANCE else "subaccount"
+        raw = self._get_labels(collection, name)
+        return [Label.from_dict(item) for item in raw]
+
+    def update_certificate_labels(
+        self, name: str, labels: List[Label], level: Optional[Level] = Level.SUB_ACCOUNT
+    ) -> None:
+        """Replace all labels for a certificate.
+
+        Args:
+            name: Certificate name.
+            labels: List of labels to set (replaces existing labels).
+            level: Scope where the certificate exists (subaccount by default).
+
+        Raises:
+            HttpError: If the certificate is not found (404).
+            DestinationOperationError: On file read/write errors.
+        """
+        collection = "instance" if level == Level.SERVICE_INSTANCE else "subaccount"
+        self._set_labels(collection, name, [lbl.to_dict() for lbl in labels])
+
+    def patch_certificate_labels(
+        self, name: str, patch: PatchLabels, level: Optional[Level] = Level.SUB_ACCOUNT
+    ) -> None:
+        """Add or remove labels for a certificate.
+
+        Args:
+            name: Certificate name.
+            patch: PatchLabels with action ("ADD" or "DELETE") and labels to apply.
+            level: Scope where the certificate exists (subaccount by default).
+
+        Raises:
+            HttpError: If the certificate is not found (404).
+            DestinationOperationError: On unknown action or file read/write errors.
+        """
+        collection = "instance" if level == Level.SERVICE_INSTANCE else "subaccount"
+        self._patch_labels_in_store(
+            collection, name, patch.action, [lbl.to_dict() for lbl in patch.labels]
+        )
 
     def list_instance_certificates(
         self, _filter: Optional[Any] = None

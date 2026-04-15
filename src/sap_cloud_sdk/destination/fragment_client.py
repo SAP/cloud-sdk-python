@@ -6,7 +6,7 @@ from typing import Callable, List, Optional, TypeVar
 
 from sap_cloud_sdk.core.telemetry import Module, Operation, record_metrics
 from sap_cloud_sdk.destination._http import DestinationHttp, API_V1
-from sap_cloud_sdk.destination._models import AccessStrategy, Fragment, Level
+from sap_cloud_sdk.destination._models import AccessStrategy, Fragment, Label, Level, ListOptions, PatchLabels
 from sap_cloud_sdk.destination.exceptions import (
     DestinationOperationError,
     HttpError,
@@ -121,8 +121,14 @@ class FragmentClient:
             raise DestinationOperationError(f"failed to get fragment '{name}': {e}")
 
     @record_metrics(Module.DESTINATION, Operation.FRAGMENT_LIST_INSTANCE_FRAGMENTS)
-    def list_instance_fragments(self) -> List[Fragment]:
+    def list_instance_fragments(
+        self,
+        filter: Optional[ListOptions] = None,
+    ) -> List[Fragment]:
         """List all fragments from the service instance scope.
+
+        Args:
+            filter: Optional filter configuration for label filtering.
 
         Returns:
             List of fragments. Returns empty list if no fragments exist.
@@ -131,7 +137,7 @@ class FragmentClient:
             DestinationOperationError: If an HTTP error occurs or response parsing fails.
         """
         try:
-            return self._list_fragments(level=Level.SERVICE_INSTANCE)
+            return self._list_fragments(level=Level.SERVICE_INSTANCE, filter=filter)
         except HttpError as e:
             raise DestinationOperationError(f"failed to list instance fragments: {e}")
 
@@ -140,6 +146,7 @@ class FragmentClient:
         self,
         access_strategy: AccessStrategy = AccessStrategy.SUBSCRIBER_FIRST,
         tenant: Optional[str] = None,
+        filter: Optional[ListOptions] = None,
     ) -> List[Fragment]:
         """List fragments from the subaccount scope with an access strategy.
 
@@ -152,6 +159,7 @@ class FragmentClient:
         Args:
             access_strategy: Strategy controlling precedence between subscriber and provider contexts.
             tenant: Subscriber tenant subdomain, required for subscriber access strategies.
+            filter: Optional filter configuration for label filtering.
 
         Returns:
             List of fragments (after trying configured precedence). Returns empty list if no fragments exist.
@@ -165,7 +173,7 @@ class FragmentClient:
                 access_strategy=access_strategy,
                 tenant=tenant,
                 fetch_func=lambda t: self._list_fragments(
-                    level=Level.SUB_ACCOUNT, tenant_subdomain=t
+                    level=Level.SUB_ACCOUNT, tenant_subdomain=t, filter=filter
                 ),
                 empty_value=[],
             )
@@ -256,7 +264,148 @@ class FragmentClient:
         except Exception as e:
             raise DestinationOperationError(f"failed to delete fragment '{name}': {e}")
 
+    # ---------- Label operations ----------
+
+    @record_metrics(Module.DESTINATION, Operation.FRAGMENT_GET_LABELS)
+    def get_fragment_labels(
+        self, name: str, level: Optional[Level] = Level.SUB_ACCOUNT
+    ) -> List[Label]:
+        """Get labels for a fragment.
+
+        Args:
+            name: Fragment name.
+            level: Scope to query (subaccount by default).
+
+        Returns:
+            List of labels assigned to the fragment. Returns empty list if none assigned.
+
+        Raises:
+            DestinationOperationError: If an HTTP error occurs or response parsing fails.
+        """
+        try:
+            return self._get_labels(name=name, level=level)
+        except HttpError as e:
+            raise DestinationOperationError(
+                f"failed to get labels for fragment '{name}': {e}"
+            )
+
+    @record_metrics(Module.DESTINATION, Operation.FRAGMENT_UPDATE_LABELS)
+    def update_fragment_labels(
+        self, name: str, labels: List[Label], level: Optional[Level] = Level.SUB_ACCOUNT
+    ) -> None:
+        """Replace all labels for a fragment.
+
+        Args:
+            name: Fragment name.
+            labels: List of labels to set (replaces existing labels).
+            level: Scope where the fragment exists (subaccount by default).
+
+        Raises:
+            HttpError: Propagated for HTTP errors.
+            DestinationOperationError: For unexpected errors.
+        """
+        try:
+            self._update_labels(name=name, labels=labels, level=level)
+        except HttpError:
+            raise
+        except Exception as e:
+            raise DestinationOperationError(
+                f"failed to put labels for fragment '{name}': {e}"
+            )
+
+    @record_metrics(Module.DESTINATION, Operation.FRAGMENT_PATCH_LABELS)
+    def patch_fragment_labels(
+        self, name: str, patch: PatchLabels, level: Optional[Level] = Level.SUB_ACCOUNT
+    ) -> None:
+        """Add or remove labels for a fragment.
+
+        Args:
+            name: Fragment name.
+            patch: PatchLabels with action ("ADD" or "DELETE") and labels to apply.
+            level: Scope where the fragment exists (subaccount by default).
+
+        Raises:
+            HttpError: Propagated for HTTP errors.
+            DestinationOperationError: For unexpected errors.
+        """
+        try:
+            self._patch_labels(name=name, patch=patch, level=level)
+        except HttpError:
+            raise
+        except Exception as e:
+            raise DestinationOperationError(
+                f"failed to patch labels for fragment '{name}': {e}"
+            )
+
     # ---------- Internal helpers ----------
+
+    def _get_labels(self, name: str, level: Level) -> List[Label]:
+        """Internal helper to fetch labels for a fragment.
+
+        Args:
+            name: Fragment name.
+            level: Scope to query.
+
+        Returns:
+            List of labels. Returns empty list if none assigned.
+
+        Raises:
+            HttpError: Propagated for HTTP errors.
+            DestinationOperationError: If response JSON is invalid.
+        """
+        try:
+            path = self._sub_path_for_level(level)
+            resp = self._http.get(f"{API_V1}/{path}/{name}/labels")
+            data = resp.json()
+            if not isinstance(data, list):
+                raise DestinationOperationError(
+                    f"expected list in labels response, got {type(data)}"
+                )
+            return [Label.from_dict(item) for item in data]
+        except HttpError:
+            raise
+        except DestinationOperationError:
+            raise
+        except Exception as e:
+            raise DestinationOperationError(
+                f"invalid JSON in get labels response: {e}"
+            )
+
+    def _update_labels(self, name: str, labels: List[Label], level: Level) -> None:
+        """Internal helper to replace labels for a fragment.
+
+        Args:
+            name: Fragment name.
+            labels: Labels to set.
+            level: Scope to target.
+
+        Raises:
+            HttpError: Propagated for HTTP errors.
+            DestinationOperationError: For unexpected errors.
+        """
+        path = self._sub_path_for_level(level)
+        self._http.put(
+            f"{API_V1}/{path}/{name}/labels",
+            body=[lbl.to_dict() for lbl in labels],
+        )
+
+    def _patch_labels(self, name: str, patch: PatchLabels, level: Level) -> None:
+        """Internal helper to add or remove labels for a fragment.
+
+        Args:
+            name: Fragment name.
+            patch: PatchLabels with action and labels.
+            level: Scope to target.
+
+        Raises:
+            HttpError: Propagated for HTTP errors.
+            DestinationOperationError: For unexpected errors.
+        """
+        path = self._sub_path_for_level(level)
+        self._http.patch(
+            f"{API_V1}/{path}/{name}/labels",
+            body=patch.to_dict(),
+        )
 
     def _get_fragment(
         self,
@@ -299,12 +448,14 @@ class FragmentClient:
         self,
         level: Level,
         tenant_subdomain: Optional[str] = None,
+        filter: Optional[ListOptions] = None,
     ) -> List[Fragment]:
-        """Internal helper to list fragments with optional tenant context.
+        """Internal helper to list fragments with optional tenant context and filters.
 
         Args:
             level: Scope to query (service instance or subaccount).
             tenant_subdomain: Subscriber tenant subdomain, if fetching in subscriber context.
+            filter: Optional filter configuration for label filtering.
 
         Returns:
             List of fragments. Returns empty list if no fragments exist.
@@ -315,7 +466,12 @@ class FragmentClient:
         """
         try:
             path = self._sub_path_for_level(level)
-            resp = self._http.get(f"{API_V1}/{path}", tenant_subdomain=tenant_subdomain)
+            query_params = filter.to_query_params() if filter else {}
+            resp = self._http.get(
+                f"{API_V1}/{path}",
+                tenant_subdomain=tenant_subdomain,
+                params=query_params,
+            )
             data = resp.json()
 
             if not isinstance(data, list):

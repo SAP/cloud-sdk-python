@@ -6,7 +6,13 @@ from sap_cloud_sdk.destination._local_client_base import (
     LocalDevClientBase,
     DESTINATION_MOCK_FILE,
 )
-from sap_cloud_sdk.destination._models import AccessStrategy, Destination, Label, Level, PatchLabels
+from sap_cloud_sdk.destination._models import (
+    AccessStrategy,
+    Destination,
+    Label,
+    Level,
+    PatchLabels,
+)
 from sap_cloud_sdk.destination.utils._pagination import PagedResult
 from sap_cloud_sdk.destination.exceptions import DestinationOperationError, HttpError
 
@@ -193,7 +199,9 @@ class LocalDevDestinationClient(LocalDevClientBase[Destination]):
             self._update_entity(collection, dest, dest.name, preserve_fields=["labels"])
         else:
             # Preserve tenant and labels fields for subaccount-level entries
-            self._update_entity(collection, dest, dest.name, preserve_fields=["tenant", "labels"])
+            self._update_entity(
+                collection, dest, dest.name, preserve_fields=["tenant", "labels"]
+            )
 
     def delete_destination(
         self, name: str, level: Optional[Level] = Level.SUB_ACCOUNT

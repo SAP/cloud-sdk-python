@@ -379,9 +379,7 @@ class CertificateClient:
         except DestinationOperationError:
             raise
         except Exception as e:
-            raise DestinationOperationError(
-                f"invalid JSON in get labels response: {e}"
-            )
+            raise DestinationOperationError(f"invalid JSON in get labels response: {e}")
 
     def _update_labels(self, name: str, labels: List[Label], level: Level) -> None:
         """Internal helper to replace labels for a certificate."""

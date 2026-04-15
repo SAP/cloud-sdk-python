@@ -6,7 +6,13 @@ from sap_cloud_sdk.destination._local_client_base import (
     LocalDevClientBase,
     CERTIFICATE_MOCK_FILE,
 )
-from sap_cloud_sdk.destination._models import AccessStrategy, Certificate, Label, Level, PatchLabels
+from sap_cloud_sdk.destination._models import (
+    AccessStrategy,
+    Certificate,
+    Label,
+    Level,
+    PatchLabels,
+)
 from sap_cloud_sdk.destination.utils._pagination import PagedResult
 from sap_cloud_sdk.destination.exceptions import HttpError, DestinationOperationError
 
@@ -161,7 +167,9 @@ class LocalDevCertificateClient(LocalDevClientBase[Certificate]):
             DestinationOperationError: On file read/write errors.
         """
         collection = "instance" if level == Level.SERVICE_INSTANCE else "subaccount"
-        self._update_entity(collection, certificate, certificate.name, preserve_fields=["labels"])
+        self._update_entity(
+            collection, certificate, certificate.name, preserve_fields=["labels"]
+        )
 
     def delete_certificate(
         self, name: str, level: Optional[Level] = Level.SUB_ACCOUNT

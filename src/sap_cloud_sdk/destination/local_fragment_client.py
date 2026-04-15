@@ -6,7 +6,13 @@ from sap_cloud_sdk.destination._local_client_base import (
     LocalDevClientBase,
     FRAGMENT_MOCK_FILE,
 )
-from sap_cloud_sdk.destination._models import AccessStrategy, Fragment, Label, Level, PatchLabels
+from sap_cloud_sdk.destination._models import (
+    AccessStrategy,
+    Fragment,
+    Label,
+    Level,
+    PatchLabels,
+)
 from sap_cloud_sdk.destination.exceptions import HttpError, DestinationOperationError
 
 
@@ -219,7 +225,9 @@ class LocalDevFragmentClient(LocalDevClientBase[Fragment]):
             DestinationOperationError: On file read/write errors.
         """
         collection = "instance" if level == Level.SERVICE_INSTANCE else "subaccount"
-        self._update_entity(collection, fragment, fragment.name, preserve_fields=["labels"])
+        self._update_entity(
+            collection, fragment, fragment.name, preserve_fields=["labels"]
+        )
 
     def delete_fragment(
         self, name: str, level: Optional[Level] = Level.SUB_ACCOUNT

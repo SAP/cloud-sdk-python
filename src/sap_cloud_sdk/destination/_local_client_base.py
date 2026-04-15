@@ -457,7 +457,9 @@ class LocalDevClientBase(ABC, Generic[T]):
                     current = list(key_map.values())
                 elif action == "DELETE":
                     keys_to_remove = {lbl["key"] for lbl in patch_labels}
-                    current = [lbl for lbl in current if lbl["key"] not in keys_to_remove]
+                    current = [
+                        lbl for lbl in current if lbl["key"] not in keys_to_remove
+                    ]
                 else:
                     raise DestinationOperationError(
                         f"unknown patch action: '{action}' — must be 'ADD' or 'DELETE'"
@@ -468,6 +470,4 @@ class LocalDevClientBase(ABC, Generic[T]):
         except (HttpError, DestinationOperationError):
             raise
         except Exception as e:
-            raise DestinationOperationError(
-                f"failed to patch labels for '{name}': {e}"
-            )
+            raise DestinationOperationError(f"failed to patch labels for '{name}': {e}")

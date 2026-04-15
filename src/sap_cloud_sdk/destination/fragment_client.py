@@ -6,7 +6,14 @@ from typing import Callable, List, Optional, TypeVar
 
 from sap_cloud_sdk.core.telemetry import Module, Operation, record_metrics
 from sap_cloud_sdk.destination._http import DestinationHttp, API_V1
-from sap_cloud_sdk.destination._models import AccessStrategy, Fragment, Label, Level, ListOptions, PatchLabels
+from sap_cloud_sdk.destination._models import (
+    AccessStrategy,
+    Fragment,
+    Label,
+    Level,
+    ListOptions,
+    PatchLabels,
+)
 from sap_cloud_sdk.destination.exceptions import (
     DestinationOperationError,
     HttpError,
@@ -367,9 +374,7 @@ class FragmentClient:
         except DestinationOperationError:
             raise
         except Exception as e:
-            raise DestinationOperationError(
-                f"invalid JSON in get labels response: {e}"
-            )
+            raise DestinationOperationError(f"invalid JSON in get labels response: {e}")
 
     def _update_labels(self, name: str, labels: List[Label], level: Level) -> None:
         """Internal helper to replace labels for a fragment.

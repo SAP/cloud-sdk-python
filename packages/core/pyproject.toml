@@ -1,0 +1,104 @@
+[project]
+name = "sap-cloud-sdk"
+version = "0.7.1"
+description = "SAP Cloud SDK for Python - Core Package"
+readme = "README.md"
+license = "Apache-2.0"
+authors = [
+    { name = "SAP SE", email = "ospo@sap.com" }
+]
+requires-python = ">=3.11"
+dependencies = [
+    "minio==7.2.16",
+    "setuptools~=80.9.0",
+    "requests>=2.33.0",
+    "requests-oauthlib~=2.0.0",
+    "pydantic~=2.12.3",
+    "hatchling~=1.27.0",
+    "opentelemetry-exporter-otlp-proto-grpc~=1.41.0",
+    "opentelemetry-exporter-otlp-proto-http~=1.41.0",
+    "opentelemetry-processor-baggage~=0.61b0",
+    "traceloop-sdk~=0.52.0",
+    "PyJWT~=2.10.1",
+    "protobuf>=4.25.0",
+    "protovalidate>=0.13.0",
+    "grpcio>=1.60.0",
+    "opentelemetry-api>=1.28.0",
+    "opentelemetry-sdk>=1.28.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["sap_cloud_sdk", "buf"]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.4.2",
+    "pytest-cov>=7.0.0",
+    "pytest-bdd>=7.2.0",
+    "python-dotenv>=1.0.0",
+    "ty>=0.0.21",
+    "cryptography>=46.0.3",
+    "ruff>=0.8.0",
+]
+
+[tool.pytest.ini_options]
+markers = [
+    "integration: marks tests as integration tests (requires Docker)",
+]
+testpaths = ["tests"]
+
+[tool.coverage.run]
+source = ["sap_cloud_sdk"]
+omit = [
+    "*/tests/*",
+    "*/test_*",
+    "*/sap_cloud_sdk/auditlog_ng/gen/*",
+    "buf/*",
+]
+skip_empty = true
+
+[tool.ruff]
+exclude = [
+    ".github",
+    "__pycache__",
+    ".ruff_cache",
+    ".venv",
+    ".vscode",
+    "__pypackages__",
+    "build",
+    "dist",
+    "venv",
+    "tests/",
+    "sap_cloud_sdk/auditlog_ng/gen",
+    "buf",
+]
+
+line-length = 88
+indent-width = 4
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E9", "F", "W"]
+ignore = []
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "auto"
+
+[tool.ty]
+
+[tool.ty.environment]
+python-version = "3.11"
+
+[tool.ty.src]
+include = ["sap_cloud_sdk", "tests"]
+exclude = [
+    "sap_cloud_sdk/auditlog_ng/gen",
+    "buf",
+]

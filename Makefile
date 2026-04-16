@@ -1,9 +1,9 @@
 # Proto code generation for SAP Cloud SDK for Python
 # Requires: buf CLI (https://buf.build/docs/installation)
 
-AUDITLOG_NG_DIR := src/sap_cloud_sdk/core/auditlog_ng
+AUDITLOG_NG_DIR := packages/core/sap_cloud_sdk/auditlog_ng
 GEN_DIR         := $(AUDITLOG_NG_DIR)/gen
-BUF_DIR         := src/buf
+BUF_DIR         := packages/core/buf
 
 .PHONY: proto
 

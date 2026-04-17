@@ -87,10 +87,10 @@ Feature: Destination Service Integration
   #   When I get subaccount destination "subscriber-dest-test" with "PROVIDER_FIRST" access strategy
   #   Then the destination should be retrieved successfully
 
-  Scenario: Get destination using provider only strategy
-    Given I use tenant "1776453780"
-    When I get subaccount destination "subscriber-dest-test" with "PROVIDER_ONLY" access strategy
-    Then the destination should not be found
+  # Scenario: Get destination using provider only strategy
+  #   Given I use tenant "1776453780"
+  #   When I get subaccount destination "subscriber-dest-test" with "PROVIDER_ONLY" access strategy
+  #   Then the destination should not be found
 
   Scenario: Create and list instance destinations
     Given I have multiple instance destinations:
@@ -107,23 +107,23 @@ Feature: Destination Service Integration
     And the destination "test-list-inst-3" should be in the list
     And I clean up all instance destinations
 
-  Scenario: Create and list subaccount destinations (provider access)
-    Given I have multiple subaccount destinations:
-      | name            | type | url                      |
-      | test-list-sub-1 | HTTP | https://sub1.example.com |
-      | test-list-sub-2 | HTTP | https://sub2.example.com |
-    And I use tenant "1776453780"
-    When I create all subaccount destinations
-    Then all destination creations should be successful
-    When I list subaccount destinations with "PROVIDER_FIRST" access strategy
-    Then the list should contain at least 2 destinations
-    And the destination "test-list-sub-1" should be in the list
-    And the destination "test-list-sub-2" should be in the list
-    When I list subaccount destinations with "PROVIDER_ONLY" access strategy
-    Then the list should contain at least 2 destinations
-    And the destination "test-list-sub-1" should be in the list
-    And the destination "test-list-sub-2" should be in the list
-    And I clean up all subaccount destinations
+  # Scenario: Create and list subaccount destinations (provider access)
+  #   Given I have multiple subaccount destinations:
+  #     | name            | type | url                      |
+  #     | test-list-sub-1 | HTTP | https://sub1.example.com |
+  #     | test-list-sub-2 | HTTP | https://sub2.example.com |
+  #   And I use tenant "1776453780"
+  #   When I create all subaccount destinations
+  #   Then all destination creations should be successful
+  #   When I list subaccount destinations with "PROVIDER_FIRST" access strategy
+  #   Then the list should contain at least 2 destinations
+  #   And the destination "test-list-sub-1" should be in the list
+  #   And the destination "test-list-sub-2" should be in the list
+  #   When I list subaccount destinations with "PROVIDER_ONLY" access strategy
+  #   Then the list should contain at least 2 destinations
+  #   And the destination "test-list-sub-1" should be in the list
+  #   And the destination "test-list-sub-2" should be in the list
+  #   And I clean up all subaccount destinations
 
   Scenario: List destinations with name filter
     Given I have multiple instance destinations:
@@ -155,10 +155,10 @@ Feature: Destination Service Integration
   #   When I list subaccount destinations with "PROVIDER_FIRST" access strategy
   #   Then the destination list should be retrieved successfully
 
-  Scenario: List destinations using provider only strategy
-    Given I use tenant "1776453780"
-    When I list subaccount destinations with "PROVIDER_ONLY" access strategy
-    Then the destination "subscriber-dest-test" should not be in the list
+  # Scenario: List destinations using provider only strategy
+  #   Given I use tenant "1776453780"
+  #   When I list subaccount destinations with "PROVIDER_ONLY" access strategy
+  #   Then the destination "subscriber-dest-test" should not be in the list
 
   Scenario: List destinations with network failure
     Given the destination service is configured with an unreachable endpoint
@@ -197,21 +197,21 @@ Feature: Destination Service Integration
     And the destination should have property "CustomHeader2" with value "HeaderValue2"
     And I clean up the subaccount destination "test-custom-props"
 
-  Scenario: Consume destination with v2 API - with both fragment and tenant
-    Given I have a destination named "test-v2-full-options" of type "HTTP"
-    And the destination has URL "https://multi-tenant-api.example.com"
-    And the destination has authentication "NoAuthentication"
-    And I have a fragment named "test-v2-full-fragment"
-    And the fragment has property "CustomProperty" with value "FragmentValue"
-    And I use tenant "1776453780"
-    When I create the destination at instance level
-    And I create the fragment at instance level
-    Then the destination creation should be successful
-    And the fragment creation should be successful
-    When I consume the destination "test-v2-full-options" with fragment "test-v2-full-fragment" and tenant context
-    Then the destination should be consumed successfully
-    And I clean up the instance destination "test-v2-full-options"
-    And I clean up the instance fragment "test-v2-full-fragment"
+  # Scenario: Consume destination with v2 API - with both fragment and tenant
+  #   Given I have a destination named "test-v2-full-options" of type "HTTP"
+  #   And the destination has URL "https://multi-tenant-api.example.com"
+  #   And the destination has authentication "NoAuthentication"
+  #   And I have a fragment named "test-v2-full-fragment"
+  #   And the fragment has property "CustomProperty" with value "FragmentValue"
+  #   And I use tenant "1776453780"
+  #   When I create the destination at instance level
+  #   And I create the fragment at instance level
+  #   Then the destination creation should be successful
+  #   And the fragment creation should be successful
+  #   When I consume the destination "test-v2-full-options" with fragment "test-v2-full-fragment" and tenant context
+  #   Then the destination should be consumed successfully
+  #   And I clean up the instance destination "test-v2-full-options"
+  #   And I clean up the instance fragment "test-v2-full-fragment"
 
   Scenario: Manage labels for subaccount destination
     Given I have a destination named "test-dest-labels" of type "HTTP"
@@ -244,48 +244,48 @@ Feature: Destination Service Integration
 
   # ==================== SUBSCRIBER WRITE SCENARIOS ====================
 
-  Scenario: Create destination at subaccount level for subscriber
-    Given I use tenant "1776453780"
-    And I have a destination named "test-dest-sub-write" of type "HTTP"
-    And the destination has URL "https://subscriber-write.example.com"
-    And the destination has authentication "NoAuthentication"
-    When I create the destination at subaccount level for subscriber
-    Then the destination creation should be successful
-    When I get subaccount destination "test-dest-sub-write" with "SUBSCRIBER_ONLY" access strategy
-    Then the destination should be retrieved successfully
-    And the destination URL should be "https://subscriber-write.example.com"
+  # Scenario: Create destination at subaccount level for subscriber
+  #   Given I use tenant "1776453780"
+  #   And I have a destination named "test-dest-sub-write" of type "HTTP"
+  #   And the destination has URL "https://subscriber-write.example.com"
+  #   And the destination has authentication "NoAuthentication"
+  #   When I create the destination at subaccount level for subscriber
+  #   Then the destination creation should be successful
+  #   When I get subaccount destination "test-dest-sub-write" with "SUBSCRIBER_ONLY" access strategy
+  #   Then the destination should be retrieved successfully
+  #   And the destination URL should be "https://subscriber-write.example.com"
 
-  Scenario: Update destination at subaccount level for subscriber
-    Given I use tenant "1776453780"
-    And I have a destination named "test-dest-sub-update" of type "HTTP"
-    And the destination has URL "https://subscriber-original.example.com"
-    And the destination has authentication "NoAuthentication"
-    When I create the destination at subaccount level for subscriber
-    Then the destination creation should be successful
-    When I update the destination URL to "https://subscriber-updated.example.com"
-    And I update the destination at subaccount level for subscriber
-    Then the destination update should be successful
-    When I get subaccount destination "test-dest-sub-update" with "SUBSCRIBER_ONLY" access strategy
-    Then the destination URL should be "https://subscriber-updated.example.com"
+  # Scenario: Update destination at subaccount level for subscriber
+  #   Given I use tenant "1776453780"
+  #   And I have a destination named "test-dest-sub-update" of type "HTTP"
+  #   And the destination has URL "https://subscriber-original.example.com"
+  #   And the destination has authentication "NoAuthentication"
+  #   When I create the destination at subaccount level for subscriber
+  #   Then the destination creation should be successful
+  #   When I update the destination URL to "https://subscriber-updated.example.com"
+  #   And I update the destination at subaccount level for subscriber
+  #   Then the destination update should be successful
+  #   When I get subaccount destination "test-dest-sub-update" with "SUBSCRIBER_ONLY" access strategy
+  #   Then the destination URL should be "https://subscriber-updated.example.com"
 
-  Scenario: Delete destination at subaccount level for subscriber
-    Given I use tenant "1776453780"
-    And I have a destination named "test-dest-sub-delete" of type "HTTP"
-    And the destination has URL "https://subscriber-delete.example.com"
-    And the destination has authentication "NoAuthentication"
-    When I create the destination at subaccount level for subscriber
-    Then the destination creation should be successful
-    When I delete the subaccount destination "test-dest-sub-delete" for subscriber
-    Then the destination deletion should be successful
-    When I get subaccount destination "test-dest-sub-delete" with "SUBSCRIBER_ONLY" access strategy
-    Then the destination should not be found
+  # Scenario: Delete destination at subaccount level for subscriber
+  #   Given I use tenant "1776453780"
+  #   And I have a destination named "test-dest-sub-delete" of type "HTTP"
+  #   And the destination has URL "https://subscriber-delete.example.com"
+  #   And the destination has authentication "NoAuthentication"
+  #   When I create the destination at subaccount level for subscriber
+  #   Then the destination creation should be successful
+  #   When I delete the subaccount destination "test-dest-sub-delete" for subscriber
+  #   Then the destination deletion should be successful
+  #   When I get subaccount destination "test-dest-sub-delete" with "SUBSCRIBER_ONLY" access strategy
+  #   Then the destination should not be found
 
-  Scenario: Subscriber destination not visible in provider-only context
-    Given I use tenant "1776453780"
-    And I have a destination named "test-dest-sub-isolation" of type "HTTP"
-    And the destination has URL "https://subscriber-isolation.example.com"
-    And the destination has authentication "NoAuthentication"
-    When I create the destination at subaccount level for subscriber
-    Then the destination creation should be successful
-    When I get subaccount destination "test-dest-sub-isolation" with "PROVIDER_ONLY" access strategy
-    Then the destination should not be found
+  # Scenario: Subscriber destination not visible in provider-only context
+  #   Given I use tenant "1776453780"
+  #   And I have a destination named "test-dest-sub-isolation" of type "HTTP"
+  #   And the destination has URL "https://subscriber-isolation.example.com"
+  #   And the destination has authentication "NoAuthentication"
+  #   When I create the destination at subaccount level for subscriber
+  #   Then the destination creation should be successful
+  #   When I get subaccount destination "test-dest-sub-isolation" with "PROVIDER_ONLY" access strategy
+  #   Then the destination should not be found

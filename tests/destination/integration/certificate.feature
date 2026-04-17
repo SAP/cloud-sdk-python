@@ -51,22 +51,42 @@ Feature: Destination Service Integration - Certificates
     Then the certificate should not be found
 
   Scenario: Get certificate using subscriber first strategy
-    Given I use tenant "0209538787"
+    Given I use tenant "1776453780"
+    And I have a certificate named "subscriber-dest-test.pem"
+    And the certificate has type "PEM"
+    And the certificate has valid PEM content
+    When I create the certificate at subaccount level for subscriber
+    Then the certificate creation should be successful
     When I get subaccount certificate "subscriber-dest-test.pem" with "SUBSCRIBER_FIRST" access strategy
     Then the certificate should be retrieved successfully
 
   Scenario: Get certificate using subscriber only strategy
-    Given I use tenant "0209538787"
+    Given I use tenant "1776453780"
+    And I have a certificate named "subscriber-dest-test.pem"
+    And the certificate has type "PEM"
+    And the certificate has valid PEM content
+    When I create the certificate at subaccount level for subscriber
+    Then the certificate creation should be successful
     When I get subaccount certificate "subscriber-dest-test.pem" with "SUBSCRIBER_ONLY" access strategy
     Then the certificate should be retrieved successfully
 
   Scenario: Get certificate using provider first strategy
-    Given I use tenant "0209538787"
+    Given I use tenant "1776453780"
+    And I have a certificate named "subscriber-dest-test.pem"
+    And the certificate has type "PEM"
+    And the certificate has valid PEM content
+    When I create the certificate at subaccount level for subscriber
+    Then the certificate creation should be successful
     When I get subaccount certificate "subscriber-dest-test.pem" with "PROVIDER_FIRST" access strategy
     Then the certificate should be retrieved successfully
 
   Scenario: Get certificate using provider only strategy
-    Given I use tenant "0209538787"
+    Given I use tenant "1776453780"
+    And I have a certificate named "subscriber-dest-test.pem"
+    And the certificate has type "PEM"
+    And the certificate has valid PEM content
+    When I create the certificate at subaccount level for subscriber
+    Then the certificate creation should be successful
     When I get subaccount certificate "subscriber-dest-test.pem" with "PROVIDER_ONLY" access strategy
     Then the certificate should not be found
 
@@ -75,7 +95,7 @@ Feature: Destination Service Integration - Certificates
       | name                 | type |
       | test-cert-list-1.pem | PEM  |
       | test-cert-list-2.pem | PEM  |
-    And I use tenant "0209538787"
+    And I use tenant "1776453780"
     When I create all instance certificates
     Then all certificate creations should be successful
     When I list instance certificates
@@ -89,7 +109,7 @@ Feature: Destination Service Integration - Certificates
       | name                 | type |
       | test-cert-list-1.pem | PEM  |
       | test-cert-list-2.pem | PEM  |
-    And I use tenant "0209538787"
+    And I use tenant "1776453780"
     When I create all subaccount certificates
     Then all certificate creations should be successful
     When I list subaccount certificates with "PROVIDER_FIRST" access strategy
@@ -103,22 +123,32 @@ Feature: Destination Service Integration - Certificates
     And I clean up all subaccount certificates
 
   Scenario: List certificates using subscriber first strategy
-    Given I use tenant "0209538787"
+    Given I use tenant "1776453780"
+    And I have a certificate named "subscriber-dest-test.pem"
+    And the certificate has type "PEM"
+    And the certificate has valid PEM content
+    When I create the certificate at subaccount level for subscriber
+    Then the certificate creation should be successful
     When I list subaccount certificates with "SUBSCRIBER_FIRST" access strategy
     Then the certificate "subscriber-dest-test.pem" should be in the list
 
   Scenario: List certificates using subscriber only strategy
-    Given I use tenant "0209538787"
+    Given I use tenant "1776453780"
+    And I have a certificate named "subscriber-dest-test.pem"
+    And the certificate has type "PEM"
+    And the certificate has valid PEM content
+    When I create the certificate at subaccount level for subscriber
+    Then the certificate creation should be successful
     When I list subaccount certificates with "SUBSCRIBER_ONLY" access strategy
     Then the certificate "subscriber-dest-test.pem" should be in the list
 
   Scenario: List certificates using provider first strategy
-    Given I use tenant "0209538787"
+    Given I use tenant "1776453780"
     When I list subaccount certificates with "PROVIDER_FIRST" access strategy
     Then the certificate list should be retrieved successfully
 
   Scenario: List certificates using provider only strategy
-    Given I use tenant "0209538787"
+    Given I use tenant "1776453780"
     When I list subaccount certificates with "PROVIDER_ONLY" access strategy
     Then the certificate "subscriber-dest-test.pem" should not be in the list
 
@@ -154,7 +184,7 @@ Feature: Destination Service Integration - Certificates
   # ==================== SUBSCRIBER WRITE SCENARIOS ====================
 
   Scenario: Create certificate at subaccount level for subscriber
-    Given I use tenant "0209538787"
+    Given I use tenant "1776453780"
     And I have a certificate named "test-cert-sub-write.pem"
     And the certificate has type "PEM"
     And the certificate has valid PEM content
@@ -165,7 +195,7 @@ Feature: Destination Service Integration - Certificates
     And the certificate type should be "PEM"
 
   Scenario: Update certificate at subaccount level for subscriber
-    Given I use tenant "0209538787"
+    Given I use tenant "1776453780"
     And I have a certificate named "test-cert-sub-update.pem"
     And the certificate has type "PEM"
     And the certificate has valid PEM content
@@ -178,7 +208,7 @@ Feature: Destination Service Integration - Certificates
     Then the certificate should have updated content
 
   Scenario: Delete certificate at subaccount level for subscriber
-    Given I use tenant "0209538787"
+    Given I use tenant "1776453780"
     And I have a certificate named "test-cert-sub-delete.pem"
     And the certificate has type "PEM"
     And the certificate has valid PEM content
@@ -190,7 +220,7 @@ Feature: Destination Service Integration - Certificates
     Then the certificate should not be found
 
   Scenario: Subscriber certificate not visible in provider-only context
-    Given I use tenant "0209538787"
+    Given I use tenant "1776453780"
     And I have a certificate named "test-cert-sub-isolation.pem"
     And the certificate has type "PEM"
     And the certificate has valid PEM content

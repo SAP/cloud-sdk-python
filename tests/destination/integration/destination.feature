@@ -73,22 +73,22 @@ Feature: Destination Service Integration
     Then the destination should not be found
 
   # Scenario: Get destination using subscriber first strategy
-  #   Given I use tenant "0209538787"
+  #   Given I use tenant "1776453780"
   #   When I get subaccount destination "subscriber-dest-test" with "SUBSCRIBER_FIRST" access strategy
   #   Then the destination should be retrieved successfully
 
   # Scenario: Get destination using subscriber only strategy
-  #   Given I use tenant "0209538787"
+  #   Given I use tenant "1776453780"
   #   When I get subaccount destination "subscriber-dest-test" with "SUBSCRIBER_ONLY" access strategy
   #   Then the destination should be retrieved successfully
 
   # Scenario: Get destination using provider first strategy
-  #   Given I use tenant "0209538787"
+  #   Given I use tenant "1776453780"
   #   When I get subaccount destination "subscriber-dest-test" with "PROVIDER_FIRST" access strategy
   #   Then the destination should be retrieved successfully
 
   Scenario: Get destination using provider only strategy
-    Given I use tenant "0209538787"
+    Given I use tenant "1776453780"
     When I get subaccount destination "subscriber-dest-test" with "PROVIDER_ONLY" access strategy
     Then the destination should not be found
 
@@ -112,7 +112,7 @@ Feature: Destination Service Integration
       | name            | type | url                      |
       | test-list-sub-1 | HTTP | https://sub1.example.com |
       | test-list-sub-2 | HTTP | https://sub2.example.com |
-    And I use tenant "0209538787"
+    And I use tenant "1776453780"
     When I create all subaccount destinations
     Then all destination creations should be successful
     When I list subaccount destinations with "PROVIDER_FIRST" access strategy
@@ -141,22 +141,22 @@ Feature: Destination Service Integration
     And I clean up all instance destinations
 
   # Scenario: List destinations using subscriber first strategy
-  #   Given I use tenant "0209538787"
+  #   Given I use tenant "1776453780"
   #   When I list subaccount destinations with "SUBSCRIBER_FIRST" access strategy
   #   Then the destination "subscriber-dest-test" should be in the list
 
   # Scenario: List destinations using subscriber only strategy
-  #   Given I use tenant "0209538787"
+  #   Given I use tenant "1776453780"
   #   When I list subaccount destinations with "SUBSCRIBER_ONLY" access strategy
   #   Then the destination "subscriber-dest-test" should be in the list
 
   # Scenario: List destinations using provider first strategy
-  #   Given I use tenant "0209538787"
+  #   Given I use tenant "1776453780"
   #   When I list subaccount destinations with "PROVIDER_FIRST" access strategy
   #   Then the destination list should be retrieved successfully
 
   Scenario: List destinations using provider only strategy
-    Given I use tenant "0209538787"
+    Given I use tenant "1776453780"
     When I list subaccount destinations with "PROVIDER_ONLY" access strategy
     Then the destination "subscriber-dest-test" should not be in the list
 
@@ -203,7 +203,7 @@ Feature: Destination Service Integration
     And the destination has authentication "NoAuthentication"
     And I have a fragment named "test-v2-full-fragment"
     And the fragment has property "CustomProperty" with value "FragmentValue"
-    And I use tenant "0209538787"
+    And I use tenant "1776453780"
     When I create the destination at instance level
     And I create the fragment at instance level
     Then the destination creation should be successful
@@ -245,7 +245,7 @@ Feature: Destination Service Integration
   # ==================== SUBSCRIBER WRITE SCENARIOS ====================
 
   Scenario: Create destination at subaccount level for subscriber
-    Given I use tenant "0209538787"
+    Given I use tenant "1776453780"
     And I have a destination named "test-dest-sub-write" of type "HTTP"
     And the destination has URL "https://subscriber-write.example.com"
     And the destination has authentication "NoAuthentication"
@@ -256,7 +256,7 @@ Feature: Destination Service Integration
     And the destination URL should be "https://subscriber-write.example.com"
 
   Scenario: Update destination at subaccount level for subscriber
-    Given I use tenant "0209538787"
+    Given I use tenant "1776453780"
     And I have a destination named "test-dest-sub-update" of type "HTTP"
     And the destination has URL "https://subscriber-original.example.com"
     And the destination has authentication "NoAuthentication"
@@ -269,7 +269,7 @@ Feature: Destination Service Integration
     Then the destination URL should be "https://subscriber-updated.example.com"
 
   Scenario: Delete destination at subaccount level for subscriber
-    Given I use tenant "0209538787"
+    Given I use tenant "1776453780"
     And I have a destination named "test-dest-sub-delete" of type "HTTP"
     And the destination has URL "https://subscriber-delete.example.com"
     And the destination has authentication "NoAuthentication"
@@ -281,7 +281,7 @@ Feature: Destination Service Integration
     Then the destination should not be found
 
   Scenario: Subscriber destination not visible in provider-only context
-    Given I use tenant "0209538787"
+    Given I use tenant "1776453780"
     And I have a destination named "test-dest-sub-isolation" of type "HTTP"
     And the destination has URL "https://subscriber-isolation.example.com"
     And the destination has authentication "NoAuthentication"

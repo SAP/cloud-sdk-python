@@ -679,6 +679,10 @@ def create_all_instance_fragments(context, fragment_client):
     context.concurrent_results = []
     for frag in context.fragments:
         try:
+            fragment_client.delete_fragment(frag.name, level=Level.SERVICE_INSTANCE)
+        except Exception:
+            pass
+        try:
             fragment_client.create_fragment(frag, level=Level.SERVICE_INSTANCE)
             context.concurrent_results.append(True)
             context.cleanup_fragments.append((frag.name, Level.SERVICE_INSTANCE, None))
@@ -691,6 +695,10 @@ def create_all_subaccount_fragments(context, fragment_client):
     """Create all fragments at subaccount level."""
     context.concurrent_results = []
     for frag in context.fragments:
+        try:
+            fragment_client.delete_fragment(frag.name, level=Level.SUB_ACCOUNT)
+        except Exception:
+            pass
         try:
             fragment_client.create_fragment(frag, level=Level.SUB_ACCOUNT)
             context.concurrent_results.append(True)

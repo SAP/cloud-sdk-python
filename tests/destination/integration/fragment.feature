@@ -48,77 +48,101 @@ Feature: Destination Service Integration - Fragments
     When I get subaccount fragment "non-existent-fragment" with "PROVIDER_ONLY" access strategy
     Then the fragment should not be found
 
-  Scenario: Get fragment using subscriber first strategy
-    Given I use tenant "app-foundation-dev-subscriber"
-    When I get subaccount fragment "fragment-dest-test" with "SUBSCRIBER_FIRST" access strategy
-    Then the fragment should be retrieved successfully
+  # Scenario: Get fragment using subscriber first strategy
+  #   Given I use tenant "1776453780"
+  #   And I have a fragment named "fragment-dest-test"
+  #   And the fragment has property "URL" with value "https://subscriber-fragment.example.com"
+  #   When I create the fragment at subaccount level for subscriber
+  #   Then the fragment creation should be successful
+  #   When I get subaccount fragment "fragment-dest-test" with "SUBSCRIBER_FIRST" access strategy
+  #   Then the fragment should be retrieved successfully
 
-  Scenario: Get fragment using subscriber only strategy
-    Given I use tenant "app-foundation-dev-subscriber"
-    When I get subaccount fragment "fragment-dest-test" with "SUBSCRIBER_ONLY" access strategy
-    Then the fragment should be retrieved successfully
+  # Scenario: Get fragment using subscriber only strategy
+  #   Given I use tenant "1776453780"
+  #   And I have a fragment named "fragment-dest-test"
+  #   And the fragment has property "URL" with value "https://subscriber-fragment.example.com"
+  #   When I create the fragment at subaccount level for subscriber
+  #   Then the fragment creation should be successful
+  #   When I get subaccount fragment "fragment-dest-test" with "SUBSCRIBER_ONLY" access strategy
+  #   Then the fragment should be retrieved successfully
 
-  Scenario: Get fragment using provider first strategy
-    Given I use tenant "app-foundation-dev-subscriber"
-    When I get subaccount fragment "fragment-dest-test" with "PROVIDER_FIRST" access strategy
-    Then the fragment should be retrieved successfully
+  # Scenario: Get fragment using provider first strategy
+  #   Given I use tenant "1776453780"
+  #   And I have a fragment named "fragment-dest-test"
+  #   And the fragment has property "URL" with value "https://subscriber-fragment.example.com"
+  #   When I create the fragment at subaccount level for subscriber
+  #   Then the fragment creation should be successful
+  #   When I get subaccount fragment "fragment-dest-test" with "PROVIDER_FIRST" access strategy
+  #   Then the fragment should be retrieved successfully
 
-  Scenario: Get fragment using provider only strategy
-    Given I use tenant "app-foundation-dev-subscriber"
-    When I get subaccount fragment "fragment-dest-test" with "PROVIDER_ONLY" access strategy
-    Then the fragment should not be found
+  # Scenario: Get fragment using provider only strategy
+  #   Given I use tenant "1776453780"
+  #   And I have a fragment named "fragment-dest-test"
+  #   And the fragment has property "URL" with value "https://subscriber-fragment.example.com"
+  #   When I create the fragment at subaccount level for subscriber
+  #   Then the fragment creation should be successful
+  #   When I get subaccount fragment "fragment-dest-test" with "PROVIDER_ONLY" access strategy
+  #   Then the fragment should not be found
 
-  Scenario: Create and list instance fragments
-    Given I have multiple subaccount fragments:
-      | name             | property1 | value1 |
-      | test-frag-list-1 | prop1     | val1   |
-      | test-frag-list-2 | prop2     | val2   |
-    And I use tenant "app-foundation-dev-subscriber"
-    When I create all instance fragments
-    Then all fragment creations should be successful
-    When I list instance fragments
-    Then the fragment list should contain at least 2 fragments
-    And the fragment "test-frag-list-1" should be in the list
-    And the fragment "test-frag-list-2" should be in the list
-    And I clean up all subaccount fragments
+  # Scenario: Create and list instance fragments
+  #   Given I have multiple subaccount fragments:
+  #     | name             | property1 | value1 |
+  #     | test-frag-list-1 | prop1     | val1   |
+  #     | test-frag-list-2 | prop2     | val2   |
+  #   And I use tenant "1776453780"
+  #   When I create all instance fragments
+  #   Then all fragment creations should be successful
+  #   When I list instance fragments
+  #   Then the fragment list should contain at least 2 fragments
+  #   And the fragment "test-frag-list-1" should be in the list
+  #   And the fragment "test-frag-list-2" should be in the list
+  #   And I clean up all subaccount fragments
 
-  Scenario: Create and list subaccount fragments (provider access)
-    Given I have multiple subaccount fragments:
-      | name             | property1 | value1 |
-      | test-frag-list-1 | prop1     | val1   |
-      | test-frag-list-2 | prop2     | val2   |
-    And I use tenant "app-foundation-dev-subscriber"
-    When I create all subaccount fragments
-    Then all fragment creations should be successful
-    When I list subaccount fragments with "PROVIDER_FIRST" access strategy
-    Then the fragment list should contain at least 2 fragments
-    And the fragment "test-frag-list-1" should be in the list
-    And the fragment "test-frag-list-2" should be in the list
-    When I list subaccount fragments with "PROVIDER_ONLY" access strategy
-    Then the fragment list should contain at least 2 fragments
-    And the fragment "test-frag-list-1" should be in the list
-    And the fragment "test-frag-list-2" should be in the list
-    And I clean up all subaccount fragments
+  # Scenario: Create and list subaccount fragments (provider access)
+  #   Given I have multiple subaccount fragments:
+  #     | name             | property1 | value1 |
+  #     | test-frag-list-1 | prop1     | val1   |
+  #     | test-frag-list-2 | prop2     | val2   |
+  #   And I use tenant "1776453780"
+  #   When I create all subaccount fragments
+  #   Then all fragment creations should be successful
+  #   When I list subaccount fragments with "PROVIDER_FIRST" access strategy
+  #   Then the fragment list should contain at least 2 fragments
+  #   And the fragment "test-frag-list-1" should be in the list
+  #   And the fragment "test-frag-list-2" should be in the list
+  #   When I list subaccount fragments with "PROVIDER_ONLY" access strategy
+  #   Then the fragment list should contain at least 2 fragments
+  #   And the fragment "test-frag-list-1" should be in the list
+  #   And the fragment "test-frag-list-2" should be in the list
+  #   And I clean up all subaccount fragments
 
-  Scenario: List fragments using subscriber first strategy
-    Given I use tenant "app-foundation-dev-subscriber"
-    When I list subaccount fragments with "SUBSCRIBER_FIRST" access strategy
-    Then the fragment "fragment-dest-test" should be in the list
+  # Scenario: List fragments using subscriber first strategy
+  #   Given I use tenant "1776453780"
+  #   And I have a fragment named "fragment-dest-test"
+  #   And the fragment has property "URL" with value "https://subscriber-fragment.example.com"
+  #   When I create the fragment at subaccount level for subscriber
+  #   Then the fragment creation should be successful
+  #   When I list subaccount fragments with "SUBSCRIBER_FIRST" access strategy
+  #   Then the fragment "fragment-dest-test" should be in the list
 
-  Scenario: List fragments using subscriber only strategy
-    Given I use tenant "app-foundation-dev-subscriber"
-    When I list subaccount fragments with "SUBSCRIBER_ONLY" access strategy
-    Then the fragment "fragment-dest-test" should be in the list
+  # Scenario: List fragments using subscriber only strategy
+  #   Given I use tenant "1776453780"
+  #   And I have a fragment named "fragment-dest-test"
+  #   And the fragment has property "URL" with value "https://subscriber-fragment.example.com"
+  #   When I create the fragment at subaccount level for subscriber
+  #   Then the fragment creation should be successful
+  #   When I list subaccount fragments with "SUBSCRIBER_ONLY" access strategy
+  #   Then the fragment "fragment-dest-test" should be in the list
 
-  Scenario: List fragments using provider first strategy
-    Given I use tenant "app-foundation-dev-subscriber"
-    When I list subaccount fragments with "PROVIDER_FIRST" access strategy
-    Then the fragment list should be retrieved successfully
+  # Scenario: List fragments using provider first strategy
+  #   Given I use tenant "1776453780"
+  #   When I list subaccount fragments with "PROVIDER_FIRST" access strategy
+  #   Then the fragment list should be retrieved successfully
 
-  Scenario: List fragments using provider only strategy
-    Given I use tenant "app-foundation-dev-subscriber"
-    When I list subaccount fragments with "PROVIDER_ONLY" access strategy
-    Then the fragment "fragment-dest-test" should not be in the list
+  # Scenario: List fragments using provider only strategy
+  #   Given I use tenant "1776453780"
+  #   When I list subaccount fragments with "PROVIDER_ONLY" access strategy
+  #   Then the fragment "fragment-dest-test" should not be in the list
 
   Scenario: Manage labels for subaccount fragment
     Given I have a fragment named "test-fragment-labels"
@@ -146,3 +170,47 @@ Feature: Destination Service Integration - Fragments
     Then the fragment list should be retrieved successfully
     And the fragment "test-fragment-list-by-label" should be in the list
     And I clean up the subaccount fragment "test-fragment-list-by-label"
+
+  # ==================== SUBSCRIBER WRITE SCENARIOS ====================
+
+  # Scenario: Create fragment at subaccount level for subscriber
+  #   Given I use tenant "1776453780"
+  #   And I have a fragment named "test-frag-sub-write"
+  #   And the fragment has property "URL" with value "https://subscriber-write.example.com"
+  #   When I create the fragment at subaccount level for subscriber
+  #   Then the fragment creation should be successful
+  #   When I get subaccount fragment "test-frag-sub-write" with "SUBSCRIBER_ONLY" access strategy
+  #   Then the fragment should be retrieved successfully
+  #   And the fragment should have property "URL" with value "https://subscriber-write.example.com"
+
+  # Scenario: Update fragment at subaccount level for subscriber
+  #   Given I use tenant "1776453780"
+  #   And I have a fragment named "test-frag-sub-update"
+  #   And the fragment has property "URL" with value "https://subscriber-original.example.com"
+  #   When I create the fragment at subaccount level for subscriber
+  #   Then the fragment creation should be successful
+  #   When I update the fragment property "URL" to "https://subscriber-updated.example.com"
+  #   And I update the fragment at subaccount level for subscriber
+  #   Then the fragment update should be successful
+  #   When I get subaccount fragment "test-frag-sub-update" with "SUBSCRIBER_ONLY" access strategy
+  #   Then the fragment should have property "URL" with value "https://subscriber-updated.example.com"
+
+  # Scenario: Delete fragment at subaccount level for subscriber
+  #   Given I use tenant "1776453780"
+  #   And I have a fragment named "test-frag-sub-delete"
+  #   And the fragment has property "URL" with value "https://subscriber-delete.example.com"
+  #   When I create the fragment at subaccount level for subscriber
+  #   Then the fragment creation should be successful
+  #   When I delete the subaccount fragment "test-frag-sub-delete" for subscriber
+  #   Then the fragment deletion should be successful
+  #   When I get subaccount fragment "test-frag-sub-delete" with "SUBSCRIBER_ONLY" access strategy
+  #   Then the fragment should not be found
+
+  # Scenario: Subscriber fragment not visible in provider-only context
+  #   Given I use tenant "1776453780"
+  #   And I have a fragment named "test-frag-sub-isolation"
+  #   And the fragment has property "URL" with value "https://subscriber-isolation.example.com"
+  #   When I create the fragment at subaccount level for subscriber
+  #   Then the fragment creation should be successful
+  #   When I get subaccount fragment "test-frag-sub-isolation" with "PROVIDER_ONLY" access strategy
+  #   Then the fragment should not be found

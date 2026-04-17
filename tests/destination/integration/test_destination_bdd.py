@@ -23,8 +23,10 @@ from sap_cloud_sdk.destination.exceptions import (
 )
 from sap_cloud_sdk.destination.utils._pagination import PagedResult
 
-# Load scenarios from feature file
+# Load scenarios from feature files
 scenarios("destination.feature")
+scenarios("fragment.feature")
+scenarios("certificate.feature")
 
 
 # ==================== CONTEXT CLASS ====================
@@ -47,9 +49,9 @@ class ScenarioContext:
         self.retrieved_certificates: Optional[PagedResult[Certificate]] = None
         self.operation_success: bool = False
         self.operation_error: Optional[Exception] = None
-        self.cleanup_destinations: List[tuple] = []  # (name, level)
-        self.cleanup_fragments: List[tuple] = []  # (name, level)
-        self.cleanup_certificates: List[tuple] = []  # (name, level)
+        self.cleanup_destinations: List[tuple] = []  # (name, level, tenant)
+        self.cleanup_fragments: List[tuple] = []  # (name, level, tenant)
+        self.cleanup_certificates: List[tuple] = []  # (name, level, tenant)
         self.concurrent_results: List[bool] = []
         self.use_network_failure_client: bool = False
         self.updated_certificate_content: Optional[str] = None
@@ -79,6 +81,12 @@ def have_valid_clients(destination_client, fragment_client, certificate_client):
     assert destination_client is not None
     assert fragment_client is not None
     assert certificate_client is not None
+
+
+@given("I have valid fragment clients")
+def have_valid_fragment_clients(fragment_client):
+    """Verify fragment client is properly configured."""
+    assert fragment_client is not None
 
 
 # ==================== DESTINATION GIVEN STEPS ====================
@@ -268,7 +276,7 @@ def create_destination_instance(context, destination_client):
     try:
         destination_client.create_destination(context.destination, level=Level.SERVICE_INSTANCE)
         context.operation_success = True
-        context.cleanup_destinations.append((context.destination.name, Level.SERVICE_INSTANCE))
+        context.cleanup_destinations.append((context.destination.name, Level.SERVICE_INSTANCE, None))
     except Exception as e:
         context.operation_success = False
         context.operation_error = e
@@ -280,7 +288,7 @@ def create_destination_subaccount(context, destination_client):
     try:
         destination_client.create_destination(context.destination, level=Level.SUB_ACCOUNT)
         context.operation_success = True
-        context.cleanup_destinations.append((context.destination.name, Level.SUB_ACCOUNT))
+        context.cleanup_destinations.append((context.destination.name, Level.SUB_ACCOUNT, None))
     except Exception as e:
         context.operation_success = False
         context.operation_error = e
@@ -294,7 +302,7 @@ def create_all_instance_destinations(context, destination_client):
         try:
             destination_client.create_destination(dest, level=Level.SERVICE_INSTANCE)
             context.concurrent_results.append(True)
-            context.cleanup_destinations.append((dest.name, Level.SERVICE_INSTANCE))
+            context.cleanup_destinations.append((dest.name, Level.SERVICE_INSTANCE, None))
         except Exception:
             context.concurrent_results.append(False)
 
@@ -314,7 +322,7 @@ def create_all_subaccount_destinations(context, destination_client):
         try:
             destination_client.create_destination(dest, level=Level.SUB_ACCOUNT)
             context.concurrent_results.append(True)
-            context.cleanup_destinations.append((dest.name, Level.SUB_ACCOUNT))
+            context.cleanup_destinations.append((dest.name, Level.SUB_ACCOUNT, None))
         except Exception:
             context.concurrent_results.append(False)
 
@@ -332,7 +340,7 @@ def attempt_create_destination_subaccount(context, destination_client, failure_s
 
         client.create_destination(context.destination, level=Level.SUB_ACCOUNT)
         context.operation_success = True
-        context.cleanup_destinations.append((context.destination.name, Level.SUB_ACCOUNT))
+        context.cleanup_destinations.append((context.destination.name, Level.SUB_ACCOUNT, None))
     except Exception as e:
         context.operation_success = False
         context.operation_error = e
@@ -362,7 +370,7 @@ def delete_subaccount_destination(context, destination_client, name):
         destination_client.delete_destination(name, level=Level.SUB_ACCOUNT)
         context.operation_success = True
         # Remove from cleanup list if present
-        context.cleanup_destinations = [(n, l) for n, l in context.cleanup_destinations if n != name]
+        context.cleanup_destinations = [(n, l, t) for n, l, t in context.cleanup_destinations if n != name]
     except Exception as e:
         context.operation_success = False
         context.operation_error = e
@@ -475,7 +483,7 @@ def perform_concurrent_destination_creation(context, destination_client):
     def create_dest(dest):
         try:
             destination_client.create_destination(dest, level=Level.SUB_ACCOUNT)
-            context.cleanup_destinations.append((dest.name, Level.SUB_ACCOUNT))
+            context.cleanup_destinations.append((dest.name, Level.SUB_ACCOUNT, None))
             return True
         except Exception:
             return False
@@ -502,6 +510,129 @@ def consume_destination_with_fragment_and_tenant(context, destination_client, na
         context.operation_error = e
 
 
+# ==================== SUBSCRIBER WRITE WHEN STEPS ====================
+
+@when("I create the destination at subaccount level for subscriber")
+def create_destination_subaccount_subscriber(context, destination_client):
+    """Create destination at subaccount level scoped to subscriber tenant."""
+    try:
+        destination_client.delete_destination(context.destination.name, level=Level.SUB_ACCOUNT, tenant=context.tenant)
+    except Exception:
+        pass
+
+    try:
+        destination_client.create_destination(context.destination, level=Level.SUB_ACCOUNT, tenant=context.tenant)
+        context.operation_success = True
+        context.cleanup_destinations.append((context.destination.name, Level.SUB_ACCOUNT, context.tenant))
+    except Exception as e:
+        context.operation_success = False
+        context.operation_error = e
+
+
+@when("I update the destination at subaccount level for subscriber")
+def update_destination_subaccount_subscriber(context, destination_client):
+    """Update destination at subaccount level scoped to subscriber tenant."""
+    try:
+        destination_client.update_destination(context.destination, level=Level.SUB_ACCOUNT, tenant=context.tenant)
+        context.operation_success = True
+    except Exception as e:
+        context.operation_success = False
+        context.operation_error = e
+
+
+@when(parsers.parse('I delete the subaccount destination "{name}" for subscriber'))
+def delete_subaccount_destination_subscriber(context, destination_client, name):
+    """Delete a subaccount destination scoped to subscriber tenant."""
+    try:
+        destination_client.delete_destination(name, level=Level.SUB_ACCOUNT, tenant=context.tenant)
+        context.operation_success = True
+        context.cleanup_destinations = [(n, l, t) for n, l, t in context.cleanup_destinations if n != name]
+    except Exception as e:
+        context.operation_success = False
+        context.operation_error = e
+
+
+@when("I create the fragment at subaccount level for subscriber")
+def create_fragment_subaccount_subscriber(context, fragment_client):
+    """Create fragment at subaccount level scoped to subscriber tenant."""
+    try:
+        fragment_client.delete_fragment(context.fragment.name, level=Level.SUB_ACCOUNT, tenant=context.tenant)
+    except Exception:
+        pass
+
+    try:
+        fragment_client.create_fragment(context.fragment, level=Level.SUB_ACCOUNT, tenant=context.tenant)
+        context.operation_success = True
+        context.cleanup_fragments.append((context.fragment.name, Level.SUB_ACCOUNT, context.tenant))
+    except Exception as e:
+        context.operation_success = False
+        context.operation_error = e
+
+
+@when("I update the fragment at subaccount level for subscriber")
+def update_fragment_subaccount_subscriber(context, fragment_client):
+    """Update fragment at subaccount level scoped to subscriber tenant."""
+    try:
+        fragment_client.update_fragment(context.fragment, level=Level.SUB_ACCOUNT, tenant=context.tenant)
+        context.operation_success = True
+    except Exception as e:
+        context.operation_success = False
+        context.operation_error = e
+
+
+@when(parsers.parse('I delete the subaccount fragment "{name}" for subscriber'))
+def delete_subaccount_fragment_subscriber(context, fragment_client, name):
+    """Delete a subaccount fragment scoped to subscriber tenant."""
+    try:
+        fragment_client.delete_fragment(name, level=Level.SUB_ACCOUNT, tenant=context.tenant)
+        context.operation_success = True
+        context.cleanup_fragments = [(n, l, t) for n, l, t in context.cleanup_fragments if n != name]
+    except Exception as e:
+        context.operation_success = False
+        context.operation_error = e
+
+
+@when("I create the certificate at subaccount level for subscriber")
+def create_certificate_subaccount_subscriber(context, certificate_client):
+    """Create certificate at subaccount level scoped to subscriber tenant."""
+    try:
+        certificate_client.delete_certificate(context.certificate.name, level=Level.SUB_ACCOUNT, tenant=context.tenant)
+    except Exception:
+        pass
+
+    try:
+        certificate_client.create_certificate(context.certificate, level=Level.SUB_ACCOUNT, tenant=context.tenant)
+        context.operation_success = True
+        context.cleanup_certificates.append((context.certificate.name, Level.SUB_ACCOUNT, context.tenant))
+    except Exception as e:
+        context.operation_success = False
+        context.operation_error = e
+        print(f"Subscriber certificate creation failed: {type(e).__name__}: {e}")
+
+
+@when("I update the certificate at subaccount level for subscriber")
+def update_certificate_subaccount_subscriber(context, certificate_client):
+    """Update certificate at subaccount level scoped to subscriber tenant."""
+    try:
+        certificate_client.update_certificate(context.certificate, level=Level.SUB_ACCOUNT, tenant=context.tenant)
+        context.operation_success = True
+    except Exception as e:
+        context.operation_success = False
+        context.operation_error = e
+
+
+@when(parsers.parse('I delete the subaccount certificate "{name}" for subscriber'))
+def delete_subaccount_certificate_subscriber(context, certificate_client, name):
+    """Delete a subaccount certificate scoped to subscriber tenant."""
+    try:
+        certificate_client.delete_certificate(name, level=Level.SUB_ACCOUNT, tenant=context.tenant)
+        context.operation_success = True
+        context.cleanup_certificates = [(n, l, t) for n, l, t in context.cleanup_certificates if n != name]
+    except Exception as e:
+        context.operation_success = False
+        context.operation_error = e
+
+
 # ==================== FRAGMENT WHEN STEPS ====================
 
 @when("I create the fragment at subaccount level")
@@ -517,7 +648,7 @@ def create_fragment_subaccount(context, fragment_client):
     try:
         fragment_client.create_fragment(context.fragment, level=Level.SUB_ACCOUNT)
         context.operation_success = True
-        context.cleanup_fragments.append((context.fragment.name, Level.SUB_ACCOUNT))
+        context.cleanup_fragments.append((context.fragment.name, Level.SUB_ACCOUNT, None))
     except Exception as e:
         context.operation_success = False
         context.operation_error = e
@@ -536,7 +667,7 @@ def create_fragment_instance(context, fragment_client):
     try:
         fragment_client.create_fragment(context.fragment, level=Level.SERVICE_INSTANCE)
         context.operation_success = True
-        context.cleanup_fragments.append((context.fragment.name, Level.SERVICE_INSTANCE))
+        context.cleanup_fragments.append((context.fragment.name, Level.SERVICE_INSTANCE, None))
     except Exception as e:
         context.operation_success = False
         context.operation_error = e
@@ -548,9 +679,13 @@ def create_all_instance_fragments(context, fragment_client):
     context.concurrent_results = []
     for frag in context.fragments:
         try:
+            fragment_client.delete_fragment(frag.name, level=Level.SERVICE_INSTANCE)
+        except Exception:
+            pass
+        try:
             fragment_client.create_fragment(frag, level=Level.SERVICE_INSTANCE)
             context.concurrent_results.append(True)
-            context.cleanup_fragments.append((frag.name, Level.SERVICE_INSTANCE))
+            context.cleanup_fragments.append((frag.name, Level.SERVICE_INSTANCE, None))
         except Exception:
             context.concurrent_results.append(False)
 
@@ -561,9 +696,13 @@ def create_all_subaccount_fragments(context, fragment_client):
     context.concurrent_results = []
     for frag in context.fragments:
         try:
+            fragment_client.delete_fragment(frag.name, level=Level.SUB_ACCOUNT)
+        except Exception:
+            pass
+        try:
             fragment_client.create_fragment(frag, level=Level.SUB_ACCOUNT)
             context.concurrent_results.append(True)
-            context.cleanup_fragments.append((frag.name, Level.SUB_ACCOUNT))
+            context.cleanup_fragments.append((frag.name, Level.SUB_ACCOUNT, None))
         except Exception:
             context.concurrent_results.append(False)
 
@@ -591,7 +730,7 @@ def delete_subaccount_fragment(context, fragment_client, name):
     try:
         fragment_client.delete_fragment(name, level=Level.SUB_ACCOUNT)
         context.operation_success = True
-        context.cleanup_fragments = [(n, l) for n, l in context.cleanup_fragments if n != name]
+        context.cleanup_fragments = [(n, l, t) for n, l, t in context.cleanup_fragments if n != name]
     except Exception as e:
         context.operation_success = False
         context.operation_error = e
@@ -675,7 +814,7 @@ def create_certificate_subaccount(context, certificate_client):
     try:
         certificate_client.create_certificate(context.certificate, level=Level.SUB_ACCOUNT)
         context.operation_success = True
-        context.cleanup_certificates.append((context.certificate.name, Level.SUB_ACCOUNT))
+        context.cleanup_certificates.append((context.certificate.name, Level.SUB_ACCOUNT, None))
     except Exception as e:
         context.operation_success = False
         context.operation_error = e
@@ -693,7 +832,7 @@ def create_all_subaccount_certificates(context, certificate_client, sample_pem_c
         try:
             certificate_client.create_certificate(cert, level=Level.SERVICE_INSTANCE)
             context.concurrent_results.append(True)
-            context.cleanup_certificates.append((cert.name, Level.SERVICE_INSTANCE))
+            context.cleanup_certificates.append((cert.name, Level.SERVICE_INSTANCE, None))
         except Exception:
             context.concurrent_results.append(False)
 
@@ -709,7 +848,7 @@ def create_all_subaccount_certificates(context, certificate_client, sample_pem_c
         try:
             certificate_client.create_certificate(cert, level=Level.SUB_ACCOUNT)
             context.concurrent_results.append(True)
-            context.cleanup_certificates.append((cert.name, Level.SUB_ACCOUNT))
+            context.cleanup_certificates.append((cert.name, Level.SUB_ACCOUNT, None))
         except Exception:
             context.concurrent_results.append(False)
 
@@ -739,7 +878,7 @@ def delete_subaccount_certificate(context, certificate_client, name):
     try:
         certificate_client.delete_certificate(name, level=Level.SUB_ACCOUNT)
         context.operation_success = True
-        context.cleanup_certificates = [(n, l) for n, l in context.cleanup_certificates if n != name]
+        context.cleanup_certificates = [(n, l, t) for n, l, t in context.cleanup_certificates if n != name]
     except Exception as e:
         context.operation_success = False
         context.operation_error = e
@@ -1144,7 +1283,7 @@ def cleanup_instance_destination(context, destination_client, name):
     """Clean up an instance-level destination."""
     try:
         destination_client.delete_destination(name, level=Level.SERVICE_INSTANCE)
-        context.cleanup_destinations = [(n, l) for n, l in context.cleanup_destinations if n != name]
+        context.cleanup_destinations = [(n, l, t) for n, l, t in context.cleanup_destinations if n != name]
     except Exception:
         pass  # Ignore cleanup errors
 
@@ -1154,7 +1293,7 @@ def cleanup_subaccount_destination(context, destination_client, name):
     """Clean up a subaccount destination."""
     try:
         destination_client.delete_destination(name, level=Level.SUB_ACCOUNT)
-        context.cleanup_destinations = [(n, l) for n, l in context.cleanup_destinations if n != name]
+        context.cleanup_destinations = [(n, l, t) for n, l, t in context.cleanup_destinations if n != name]
     except Exception:
         pass  # Ignore cleanup errors
 
@@ -1194,7 +1333,7 @@ def cleanup_subaccount_fragment(context, fragment_client, name):
     """Clean up a subaccount fragment."""
     try:
         fragment_client.delete_fragment(name, level=Level.SUB_ACCOUNT)
-        context.cleanup_fragments = [(n, l) for n, l in context.cleanup_fragments if n != name]
+        context.cleanup_fragments = [(n, l, t) for n, l, t in context.cleanup_fragments if n != name]
     except Exception:
         pass
 
@@ -1204,7 +1343,7 @@ def cleanup_instance_fragment(context, fragment_client, name):
     """Clean up a instance fragment."""
     try:
         fragment_client.delete_fragment(name, level=Level.SERVICE_INSTANCE)
-        context.cleanup_fragments = [(n, l) for n, l in context.cleanup_fragments if n != name]
+        context.cleanup_fragments = [(n, l, t) for n, l, t in context.cleanup_fragments if n != name]
     except Exception:
         pass
 
@@ -1224,7 +1363,7 @@ def cleanup_subaccount_certificate(context, certificate_client, name):
     """Clean up a subaccount certificate."""
     try:
         certificate_client.delete_certificate(name, level=Level.SUB_ACCOUNT)
-        context.cleanup_certificates = [(n, l) for n, l in context.cleanup_certificates if n != name]
+        context.cleanup_certificates = [(n, l, t) for n, l, t in context.cleanup_certificates if n != name]
     except Exception:
         pass
 
@@ -1247,23 +1386,23 @@ def cleanup_after_scenario(context, destination_client, fragment_client, certifi
     yield
 
     # Cleanup destinations
-    for name, level in context.cleanup_destinations:
+    for name, level, tenant in context.cleanup_destinations:
         try:
-            destination_client.delete_destination(name, level=level)
+            destination_client.delete_destination(name, level=level, tenant=tenant)
         except Exception:
             pass
 
     # Cleanup fragments
-    for name, level in context.cleanup_fragments:
+    for name, level, tenant in context.cleanup_fragments:
         try:
-            fragment_client.delete_fragment(name, level=level)
+            fragment_client.delete_fragment(name, level=level, tenant=tenant)
         except Exception:
             pass
 
     # Cleanup certificates
-    for name, level in context.cleanup_certificates:
+    for name, level, tenant in context.cleanup_certificates:
         try:
-            certificate_client.delete_certificate(name, level=level)
+            certificate_client.delete_certificate(name, level=level, tenant=tenant)
         except Exception:
             pass
 

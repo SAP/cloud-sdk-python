@@ -1067,6 +1067,26 @@ class TestDestinationClientWriteOperations:
         assert args[0] == "v1/subaccountDestinations"
         assert kwargs["body"] == dest.to_dict()
 
+    def test_create_destination_with_tenant(self):
+        mock_http = MagicMock()
+        client = DestinationClient(mock_http)
+        dest = Destination(name="new-dest", type="HTTP", url="https://api.example.com")
+
+        client.create_destination(dest, level=Level.SUB_ACCOUNT, tenant="test-tenant")
+
+        _, kwargs = mock_http.post.call_args
+        assert kwargs["tenant_subdomain"] == "test-tenant"
+
+    def test_create_destination_without_tenant_uses_provider_context(self):
+        mock_http = MagicMock()
+        client = DestinationClient(mock_http)
+        dest = Destination(name="new-dest", type="HTTP")
+
+        client.create_destination(dest)
+
+        _, kwargs = mock_http.post.call_args
+        assert kwargs["tenant_subdomain"] is None
+
     def test_create_destination_http_error_propagates(self):
         mock_http = MagicMock()
         mock_http.post.side_effect = HttpError("http fail", status_code=400)
@@ -1100,6 +1120,26 @@ class TestDestinationClientWriteOperations:
         assert args[0] == "v1/subaccountDestinations"
         assert kwargs["body"] == dest.to_dict()
 
+    def test_update_destination_with_tenant(self):
+        mock_http = MagicMock()
+        client = DestinationClient(mock_http)
+        dest = Destination(name="upd-dest", type="HTTP")
+
+        client.update_destination(dest, level=Level.SUB_ACCOUNT, tenant="test-tenant")
+
+        _, kwargs = mock_http.put.call_args
+        assert kwargs["tenant_subdomain"] == "test-tenant"
+
+    def test_update_destination_without_tenant_uses_provider_context(self):
+        mock_http = MagicMock()
+        client = DestinationClient(mock_http)
+        dest = Destination(name="upd-dest", type="HTTP")
+
+        client.update_destination(dest)
+
+        _, kwargs = mock_http.put.call_args
+        assert kwargs["tenant_subdomain"] is None
+
     def test_update_destination_http_error_propagates(self):
         mock_http = MagicMock()
         mock_http.put.side_effect = HttpError("http fail", status_code=500)
@@ -1127,6 +1167,26 @@ class TestDestinationClientWriteOperations:
 
         args, kwargs = mock_http.delete.call_args
         assert args[0] == "v1/subaccountDestinations/to-del"
+        assert kwargs["tenant_subdomain"] is None
+
+    def test_delete_destination_with_tenant(self):
+        mock_http = MagicMock()
+        client = DestinationClient(mock_http)
+
+        client.delete_destination("to-del", level=Level.SUB_ACCOUNT, tenant="test-tenant")
+
+        args, kwargs = mock_http.delete.call_args
+        assert args[0] == "v1/subaccountDestinations/to-del"
+        assert kwargs["tenant_subdomain"] == "test-tenant"
+
+    def test_delete_destination_without_tenant_uses_provider_context(self):
+        mock_http = MagicMock()
+        client = DestinationClient(mock_http)
+
+        client.delete_destination("to-del")
+
+        _, kwargs = mock_http.delete.call_args
+        assert kwargs["tenant_subdomain"] is None
 
     def test_delete_destination_http_error_propagates(self):
         mock_http = MagicMock()

@@ -421,13 +421,18 @@ class DestinationClient:
 
     @record_metrics(Module.DESTINATION, Operation.DESTINATION_CREATE_DESTINATION)
     def create_destination(
-        self, dest: Destination, level: Optional[Level] = Level.SUB_ACCOUNT
+        self,
+        dest: Destination,
+        level: Optional[Level] = Level.SUB_ACCOUNT,
+        tenant: Optional[str] = None,
     ) -> None:
         """Create a destination.
 
         Args:
             dest: Destination entity to create.
             level: Scope where the destination should be created (subaccount by default).
+            tenant: Subscriber tenant subdomain. When provided, the destination is created in the
+                subscriber context; otherwise the provider context is used.
 
         Returns:
             None. Success responses from the Destination Service return an empty body.
@@ -440,7 +445,7 @@ class DestinationClient:
         body = dest.to_dict()
 
         try:
-            self._http.post(f"{API_V1}/{coll}", body=body)
+            self._http.post(f"{API_V1}/{coll}", body=body, tenant_subdomain=tenant)
         except HttpError:
             raise
         except Exception as e:
@@ -450,13 +455,18 @@ class DestinationClient:
 
     @record_metrics(Module.DESTINATION, Operation.DESTINATION_UPDATE_DESTINATION)
     def update_destination(
-        self, dest: Destination, level: Optional[Level] = Level.SUB_ACCOUNT
+        self,
+        dest: Destination,
+        level: Optional[Level] = Level.SUB_ACCOUNT,
+        tenant: Optional[str] = None,
     ) -> None:
         """Update a destination.
 
         Args:
             dest: Destination entity with updated fields.
             level: Scope where the destination exists (subaccount by default).
+            tenant: Subscriber tenant subdomain. When provided, the destination is updated in the
+                subscriber context; otherwise the provider context is used.
 
         Returns:
             None. Success responses from the Destination Service return an Update object (e.g., {"Count": 1}),
@@ -470,7 +480,7 @@ class DestinationClient:
         body = dest.to_dict()
 
         try:
-            self._http.put(f"{API_V1}/{coll}", body=body)
+            self._http.put(f"{API_V1}/{coll}", body=body, tenant_subdomain=tenant)
         except HttpError:
             raise
         except Exception as e:
@@ -480,13 +490,18 @@ class DestinationClient:
 
     @record_metrics(Module.DESTINATION, Operation.DESTINATION_DELETE_DESTINATION)
     def delete_destination(
-        self, name: str, level: Optional[Level] = Level.SUB_ACCOUNT
+        self,
+        name: str,
+        level: Optional[Level] = Level.SUB_ACCOUNT,
+        tenant: Optional[str] = None,
     ) -> None:
         """Delete a destination.
 
         Args:
             name: Destination name.
             level: Scope where the destination exists (subaccount by default).
+            tenant: Subscriber tenant subdomain. When provided, the destination is deleted in the
+                subscriber context; otherwise the provider context is used.
 
         Raises:
             HttpError: Propagated for HTTP errors.
@@ -495,7 +510,7 @@ class DestinationClient:
         coll = self._sub_path_for_level(level)
 
         try:
-            self._http.delete(f"{API_V1}/{coll}/{name}")
+            self._http.delete(f"{API_V1}/{coll}/{name}", tenant_subdomain=tenant)
         except HttpError:
             raise
         except Exception as e:

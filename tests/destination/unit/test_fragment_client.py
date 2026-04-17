@@ -221,6 +221,24 @@ class TestFragmentClientWrite:
         call_args = mock_http.post.call_args
         assert call_args[0][0] == "v1/instanceDestinationFragments"
 
+    def test_create_fragment_with_tenant(self, fragment_client, mock_http):
+        """Test creating a fragment with a subscriber tenant."""
+        fragment = Fragment(name="new-fragment", properties={"URL": "https://api.example.com"})
+
+        fragment_client.create_fragment(fragment, level=Level.SUB_ACCOUNT, tenant="test-tenant")
+
+        call_args = mock_http.post.call_args
+        assert call_args[1]["tenant_subdomain"] == "test-tenant"
+
+    def test_create_fragment_without_tenant_uses_provider_context(self, fragment_client, mock_http):
+        """Test creating a fragment without tenant uses provider context (tenant_subdomain=None)."""
+        fragment = Fragment(name="new-fragment", properties={})
+
+        fragment_client.create_fragment(fragment)
+
+        call_args = mock_http.post.call_args
+        assert call_args[1]["tenant_subdomain"] is None
+
     def test_create_fragment_http_error(self, fragment_client, mock_http):
         """Test create fragment with HTTP error."""
         # Setup
@@ -248,6 +266,24 @@ class TestFragmentClientWrite:
         assert call_args[0][0] == "v1/subaccountDestinationFragments"
         assert call_args[1]["body"]["FragmentName"] == "existing-fragment"
 
+    def test_update_fragment_with_tenant(self, fragment_client, mock_http):
+        """Test updating a fragment with a subscriber tenant."""
+        fragment = Fragment(name="existing-fragment", properties={"URL": "https://updated.example.com"})
+
+        fragment_client.update_fragment(fragment, level=Level.SUB_ACCOUNT, tenant="test-tenant")
+
+        call_args = mock_http.put.call_args
+        assert call_args[1]["tenant_subdomain"] == "test-tenant"
+
+    def test_update_fragment_without_tenant_uses_provider_context(self, fragment_client, mock_http):
+        """Test updating a fragment without tenant uses provider context (tenant_subdomain=None)."""
+        fragment = Fragment(name="existing-fragment", properties={})
+
+        fragment_client.update_fragment(fragment)
+
+        call_args = mock_http.put.call_args
+        assert call_args[1]["tenant_subdomain"] is None
+
     def test_update_fragment_http_error(self, fragment_client, mock_http):
         """Test update fragment with HTTP error."""
         # Setup
@@ -258,13 +294,31 @@ class TestFragmentClientWrite:
         with pytest.raises(HttpError):
             fragment_client.update_fragment(fragment)
 
+    def test_delete_fragment_with_tenant(self, fragment_client, mock_http):
+        """Test deleting a fragment with a subscriber tenant."""
+        fragment_client.delete_fragment("test-fragment", level=Level.SUB_ACCOUNT, tenant="test-tenant")
+
+        mock_http.delete.assert_called_once_with(
+            "v1/subaccountDestinationFragments/test-fragment", tenant_subdomain="test-tenant"
+        )
+
+    def test_delete_fragment_without_tenant_uses_provider_context(self, fragment_client, mock_http):
+        """Test deleting a fragment without tenant uses provider context (tenant_subdomain=None)."""
+        fragment_client.delete_fragment("test-fragment")
+
+        mock_http.delete.assert_called_once_with(
+            "v1/subaccountDestinationFragments/test-fragment", tenant_subdomain=None
+        )
+
     def test_delete_fragment_success(self, fragment_client, mock_http):
         """Test deleting a fragment."""
         # Execute
         fragment_client.delete_fragment("test-fragment", level=Level.SUB_ACCOUNT)
 
         # Verify
-        mock_http.delete.assert_called_once_with("v1/subaccountDestinationFragments/test-fragment")
+        mock_http.delete.assert_called_once_with(
+            "v1/subaccountDestinationFragments/test-fragment", tenant_subdomain=None
+        )
 
     def test_delete_fragment_instance_level(self, fragment_client, mock_http):
         """Test deleting a fragment at instance level."""
@@ -272,7 +326,9 @@ class TestFragmentClientWrite:
         fragment_client.delete_fragment("test-fragment", level=Level.SERVICE_INSTANCE)
 
         # Verify
-        mock_http.delete.assert_called_once_with("v1/instanceDestinationFragments/test-fragment")
+        mock_http.delete.assert_called_once_with(
+            "v1/instanceDestinationFragments/test-fragment", tenant_subdomain=None
+        )
 
     def test_delete_fragment_http_error(self, fragment_client, mock_http):
         """Test delete fragment with HTTP error."""

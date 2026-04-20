@@ -85,7 +85,7 @@ def _create_metric_exporter():
             f"Unsupported OTEL_EXPORTER_OTLP_PROTOCOL: '{protocol}'. "
             "Supported values are 'grpc' and 'http/protobuf'."
         )
-    temporality = {
+    temporality: dict[type, AggregationTemporality] = {
         Counter: AggregationTemporality.DELTA,
         Histogram: AggregationTemporality.DELTA,
         ObservableCounter: AggregationTemporality.DELTA,

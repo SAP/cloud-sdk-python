@@ -56,6 +56,10 @@ class IASClaims:
         nonce: String associated with the client session to mitigate replay
             attacks.
         preferred_username: Human-readable display name / username of the user.
+        sap_gtid: SAP claim carrying the GTID of the application. Included in
+            access tokens when a GTID is configured on the app or app reference,
+            allowing downstream services to identify the originating application
+            tenant without a full SCI lookup.
         sap_id_type: SAP claim identifying the type of token.
             ``"app"`` for application credentials, ``"user"`` for user
             credentials.
@@ -89,6 +93,7 @@ class IASClaims:
     name: Optional[str] = None
     nonce: Optional[str] = None
     preferred_username: Optional[str] = None
+    sap_gtid: Optional[str] = None
     sap_id_type: Optional[str] = None
     scim_id: Optional[str] = None
     sid: Optional[str] = None
@@ -157,6 +162,7 @@ def parse_token(token: str) -> IASClaims:
         name=payload.get(_IASClaim.NAME),
         nonce=payload.get(_IASClaim.NONCE),
         preferred_username=payload.get(_IASClaim.PREFERRED_USERNAME),
+        sap_gtid=payload.get(_IASClaim.SAP_GTID),
         sap_id_type=payload.get(_IASClaim.SAP_ID_TYPE),
         scim_id=payload.get(_IASClaim.SCIM_ID),
         sid=payload.get(_IASClaim.SID),

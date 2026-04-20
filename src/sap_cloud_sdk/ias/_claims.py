@@ -24,6 +24,7 @@ class _IASClaim(str, Enum):
     NAME = "name"
     NONCE = "nonce"
     PREFERRED_USERNAME = "preferred_username"
+    SAP_GTID = "sap_gtid"
     SAP_ID_TYPE = "sap_id_type"
     SCIM_ID = "scim_id"
     SID = "sid"

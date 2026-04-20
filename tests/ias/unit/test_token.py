@@ -34,6 +34,7 @@ class TestParseToken:
             "name": "Jane Marie Doe",
             "nonce": "random-nonce",
             "preferred_username": "jane.doe",
+            "sap_gtid": "app-gtid-value",
             "sap_id_type": "user",
             "scim_id": "scim-user-id-xyz",
             "sid": "session-id-123",
@@ -62,6 +63,7 @@ class TestParseToken:
         assert claims.name == "Jane Marie Doe"
         assert claims.nonce == "random-nonce"
         assert claims.preferred_username == "jane.doe"
+        assert claims.sap_gtid == "app-gtid-value"
         assert claims.sap_id_type == "user"
         assert claims.scim_id == "scim-user-id-xyz"
         assert claims.sid == "session-id-123"
@@ -114,6 +116,10 @@ class TestParseToken:
     def test_ias_apis_as_string(self):
         claims = parse_token(_make_token({"ias_apis": "ALL"}))
         assert claims.ias_apis == "ALL"
+
+    def test_sap_gtid_mapped(self):
+        claims = parse_token(_make_token({"sap_gtid": "gtid-12345"}))
+        assert claims.sap_gtid == "gtid-12345"
 
     def test_sap_id_type_app(self):
         claims = parse_token(_make_token({"sap_id_type": "app"}))

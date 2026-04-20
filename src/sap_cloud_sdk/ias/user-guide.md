@@ -31,34 +31,35 @@ print(claims.email)             # user email (when email scope was requested)
 
 All fields on `IASClaims` are `Optional` — claims absent from the token are `None`.
 
-| Attribute            | Claim                | Description                                                                                   |
-|----------------------|----------------------|-----------------------------------------------------------------------------------------------|
-| `app_tid`            | `app_tid`            | SAP tenant of the application. Present in multitenant scenarios.                              |
-| `at_hash`            | `at_hash`            | Hash of the access token, used to bind the ID token to an access token.                       |
-| `aud`                | `aud`                | Audience — recipient(s) of the token. `str` or `List[str]`.                                   |
-| `auth_time`          | `auth_time`          | Time of user authentication (seconds since Unix epoch).                                       |
-| `azp`                | `azp`                | Authorized party — client ID to which the ID token was issued.                                |
-| `email`              | `email`              | User email address. Requires `email` scope.                                                   |
-| `email_verified`     | `email_verified`     | Whether the email address has been verified. Requires `email` scope.                          |
-| `exp`                | `exp`                | Expiration time (seconds since Unix epoch).                                                   |
-| `family_name`        | `family_name`        | Surname. Requires `profile` scope.                                                            |
-| `given_name`         | `given_name`         | Given name. Requires `profile` scope.                                                         |
-| `groups`             | `groups`             | Groups the user belongs to. Requires `groups` scope.                                          |
-| `ias_apis`           | `ias_apis`           | SAP API permission groups, or a fixed value when all APIs are consumed. `str` or `List[str]`. |
-| `ias_iss`            | `ias_iss`            | SAP tenant identifier — stable even when using a custom domain.                               |
-| `iat`                | `iat`                | Issued-at time (seconds since Unix epoch).                                                    |
-| `iss`                | `iss`                | Issuer URL, e.g. `https://<tenant>.accounts.ondemand.com`.                                    |
-| `jti`                | `jti`                | Unique JWT identifier, used to prevent replay attacks. Requires `profile` scope.              |
-| `middle_name`        | `middle_name`        | Middle name of the user.                                                                      |
-| `name`               | `name`               | Full display name.                                                                            |
-| `nonce`              | `nonce`              | Session nonce to mitigate replay attacks.                                                     |
-| `preferred_username` | `preferred_username` | Human-readable username.                                                                      |
-| `sap_id_type`        | `sap_id_type`        | Token type: `"user"` for user credentials, `"app"` for application credentials.               |
-| `scim_id`            | `scim_id`            | User's SCIM ID in SAP Cloud Identity Services.                                                |
-| `sid`                | `sid`                | Session ID for tracking a user session across applications.                                   |
-| `sub`                | `sub`                | Subject — unique identifier for the user, scoped to the issuer.                               |
-| `user_uuid`          | `user_uuid`          | SAP claim identifying the global user ID.                                                     |
-| `custom_attributes`  | *(any)*              | Claims not in the standard IAS set. Always a `dict`, empty if no custom claims are present.   |
+| Attribute            | Claim                | Description                                                                                                   |
+|----------------------|----------------------|---------------------------------------------------------------------------------------------------------------|
+| `app_tid`            | `app_tid`            | SAP tenant of the application. Present in multitenant scenarios.                                              |
+| `at_hash`            | `at_hash`            | Hash of the access token, used to bind the ID token to an access token.                                       |
+| `aud`                | `aud`                | Audience — recipient(s) of the token. `str` or `List[str]`.                                                   |
+| `auth_time`          | `auth_time`          | Time of user authentication (seconds since Unix epoch).                                                       |
+| `azp`                | `azp`                | Authorized party — client ID to which the ID token was issued.                                                |
+| `email`              | `email`              | User email address. Requires `email` scope.                                                                   |
+| `email_verified`     | `email_verified`     | Whether the email address has been verified. Requires `email` scope.                                          |
+| `exp`                | `exp`                | Expiration time (seconds since Unix epoch).                                                                   |
+| `family_name`        | `family_name`        | Surname. Requires `profile` scope.                                                                            |
+| `given_name`         | `given_name`         | Given name. Requires `profile` scope.                                                                         |
+| `groups`             | `groups`             | Groups the user belongs to. Requires `groups` scope.                                                          |
+| `ias_apis`           | `ias_apis`           | SAP API permission groups, or a fixed value when all APIs are consumed. `str` or `List[str]`.                 |
+| `ias_iss`            | `ias_iss`            | SAP tenant identifier — stable even when using a custom domain.                                               |
+| `iat`                | `iat`                | Issued-at time (seconds since Unix epoch).                                                                    |
+| `iss`                | `iss`                | Issuer URL, e.g. `https://<tenant>.accounts.ondemand.com`.                                                    |
+| `jti`                | `jti`                | Unique JWT identifier, used to prevent replay attacks. Requires `profile` scope.                              |
+| `middle_name`        | `middle_name`        | Middle name of the user.                                                                                      |
+| `name`               | `name`               | Full display name.                                                                                            |
+| `nonce`              | `nonce`              | Session nonce to mitigate replay attacks.                                                                     |
+| `preferred_username` | `preferred_username` | Human-readable username.                                                                                      |
+| `sap_gtid`           | `sap_gtid`           | GTID of the originating application. Present in access tokens when a GTID is set on the app or app reference. |
+| `sap_id_type`        | `sap_id_type`        | Token type: `"user"` for user credentials, `"app"` for application credentials.                               |
+| `scim_id`            | `scim_id`            | User's SCIM ID in SAP Cloud Identity Services.                                                                |
+| `sid`                | `sid`                | Session ID for tracking a user session across applications.                                                   |
+| `sub`                | `sub`                | Subject — unique identifier for the user, scoped to the issuer.                                               |
+| `user_uuid`          | `user_uuid`          | SAP claim identifying the global user ID.                                                                     |
+| `custom_attributes`  | *(any)*              | Claims not in the standard IAS set. Always a `dict`, empty if no custom claims are present.                   |
 
 ### Custom Attributes
 

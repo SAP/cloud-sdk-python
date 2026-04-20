@@ -1,10 +1,16 @@
 """Internal module for setting up OpenTelemetry meter provider."""
 
 import logging
+import os
 from typing import Optional
 
 from opentelemetry import metrics
-from opentelemetry.exporter.otlp.proto.grpc.metric_exporter import OTLPMetricExporter
+from opentelemetry.exporter.otlp.proto.grpc.metric_exporter import (
+    OTLPMetricExporter as GRPCMetricExporter,
+)
+from opentelemetry.exporter.otlp.proto.http.metric_exporter import (
+    OTLPMetricExporter as HTTPMetricExporter,
+)
 from opentelemetry.sdk.metrics import (
     MeterProvider,
     Counter,
@@ -23,6 +29,7 @@ from opentelemetry.sdk.resources import Resource
 from sap_cloud_sdk.core.telemetry.config import (
     get_config,
     create_resource_attributes_from_env,
+    ENV_OTLP_PROTOCOL,
 )
 from sap_cloud_sdk.core._version import get_version
 from sap_cloud_sdk.core.telemetry.constants import SDK_PACKAGE_NAME
@@ -84,16 +91,25 @@ def _setup_meter_provider() -> Optional[MeterProvider]:
     try:
         resource = Resource.create(create_resource_attributes_from_env())
 
-        exporter = OTLPMetricExporter(
+        protocol = os.getenv(ENV_OTLP_PROTOCOL, "grpc").lower()
+        exporter_classes = {"grpc": GRPCMetricExporter, "http/protobuf": HTTPMetricExporter}
+        if protocol not in exporter_classes:
+            raise ValueError(
+                f"Unsupported OTEL_EXPORTER_OTLP_PROTOCOL: '{protocol}'. "
+                "Supported values are 'grpc' and 'http/protobuf'."
+            )
+
+        temporality = {
+            Counter: AggregationTemporality.DELTA,
+            Histogram: AggregationTemporality.DELTA,
+            ObservableCounter: AggregationTemporality.DELTA,
+            ObservableGauge: AggregationTemporality.DELTA,
+            ObservableUpDownCounter: AggregationTemporality.DELTA,
+            UpDownCounter: AggregationTemporality.DELTA,
+        }
+        exporter = exporter_classes[protocol](
             endpoint=config.otlp_endpoint,
-            preferred_temporality={
-                Counter: AggregationTemporality.DELTA,
-                Histogram: AggregationTemporality.DELTA,
-                ObservableCounter: AggregationTemporality.DELTA,
-                ObservableGauge: AggregationTemporality.DELTA,
-                ObservableUpDownCounter: AggregationTemporality.DELTA,
-                UpDownCounter: AggregationTemporality.DELTA,
-            },
+            preferred_temporality=temporality,
         )
 
         # Create metric reader with periodic export
@@ -106,7 +122,8 @@ def _setup_meter_provider() -> Optional[MeterProvider]:
         logger.info(
             f"OpenTelemetry meter provider initialized. "
             f"Service: {config.service_name}, "
-            f"Endpoint: {config.otlp_endpoint}"
+            f"Endpoint: {config.otlp_endpoint}, "
+            f"Protocol: {protocol}"
         )
 
         return provider

@@ -210,6 +210,16 @@ Use an OTLP collector:
 export OTEL_EXPORTER_OTLP_ENDPOINT="https://otel-collector.example.com"
 ```
 
+### Transport protocol
+
+Both traces and metrics use gRPC by default. Switch to HTTP/protobuf by setting:
+
+```bash
+export OTEL_EXPORTER_OTLP_PROTOCOL="http/protobuf"
+```
+
+Supported values: `grpc` (default), `http/protobuf`.
+
 ### Span processor
 
 By default, `auto_instrument` uses `BatchSpanProcessor`, which exports spans asynchronously in a background thread and is recommended for production workloads. If you need synchronous span processing (e.g. in short-lived scripts or tests where the process may exit before the batch is flushed), pass `disable_batch=True`:

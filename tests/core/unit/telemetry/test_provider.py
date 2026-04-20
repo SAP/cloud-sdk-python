@@ -34,7 +34,6 @@ _HTTP_EXPORTER = "sap_cloud_sdk.core.telemetry._provider.HTTPMetricExporter"
 _ENABLED_CONFIG = InstrumentationConfig(
     enabled=True, service_name="test-service", otlp_endpoint="http://localhost:4317"
 )
-_ENDPOINT = "http://localhost:4317"
 
 
 class TestGetMeter:
@@ -127,31 +126,31 @@ class TestCreateMetricExporter:
     def test_grpc_by_default(self):
         with patch(_GRPC_EXPORTER) as mock_grpc:
             with patch(_HTTP_EXPORTER) as mock_http:
-                _create_metric_exporter(_ENDPOINT)
-                mock_grpc.assert_called_once_with(endpoint=_ENDPOINT, preferred_temporality=_DELTA_TEMPORALITY)
+                _create_metric_exporter()
+                mock_grpc.assert_called_once_with(preferred_temporality=_DELTA_TEMPORALITY)
                 mock_http.assert_not_called()
 
     def test_grpc_explicit(self):
         with patch(_GRPC_EXPORTER) as mock_grpc:
             with patch(_HTTP_EXPORTER) as mock_http:
                 with patch.dict("os.environ", {"OTEL_EXPORTER_OTLP_PROTOCOL": "grpc"}):
-                    _create_metric_exporter(_ENDPOINT)
-                mock_grpc.assert_called_once_with(endpoint=_ENDPOINT, preferred_temporality=_DELTA_TEMPORALITY)
+                    _create_metric_exporter()
+                mock_grpc.assert_called_once_with(preferred_temporality=_DELTA_TEMPORALITY)
                 mock_http.assert_not_called()
 
     def test_http_protobuf(self):
         with patch(_GRPC_EXPORTER) as mock_grpc:
             with patch(_HTTP_EXPORTER) as mock_http:
                 with patch.dict("os.environ", {"OTEL_EXPORTER_OTLP_PROTOCOL": "http/protobuf"}):
-                    _create_metric_exporter(_ENDPOINT)
-                mock_http.assert_called_once_with(endpoint=_ENDPOINT, preferred_temporality=_DELTA_TEMPORALITY)
+                    _create_metric_exporter()
+                mock_http.assert_called_once_with(preferred_temporality=_DELTA_TEMPORALITY)
                 mock_grpc.assert_not_called()
 
     def test_unsupported_protocol_raises(self):
         import pytest
         with patch.dict("os.environ", {"OTEL_EXPORTER_OTLP_PROTOCOL": "http/json"}):
             with pytest.raises(ValueError, match="Unsupported OTEL_EXPORTER_OTLP_PROTOCOL"):
-                _create_metric_exporter(_ENDPOINT)
+                _create_metric_exporter()
 
 
 class TestSetupMeterProvider:
@@ -170,7 +169,7 @@ class TestSetupMeterProvider:
                             with patch("opentelemetry.metrics.set_meter_provider"):
                                 _setup_meter_provider()
 
-                        mock_create.assert_called_once_with(_ENABLED_CONFIG.otlp_endpoint)
+                        mock_create.assert_called_once_with()
                         mock_reader.assert_called_once_with(exporter=mock_exporter)
 
     def test_unsupported_protocol_returns_none(self):

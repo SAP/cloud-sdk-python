@@ -76,7 +76,7 @@ def shutdown() -> None:
         _meter_provider = None
 
 
-def _create_metric_exporter(endpoint: str):
+def _create_metric_exporter():
     protocol = os.getenv(ENV_OTLP_PROTOCOL, "grpc").lower()
     exporter_classes = {"grpc": GRPCMetricExporter, "http/protobuf": HTTPMetricExporter}
 
@@ -93,8 +93,7 @@ def _create_metric_exporter(endpoint: str):
         ObservableUpDownCounter: AggregationTemporality.DELTA,
         UpDownCounter: AggregationTemporality.DELTA,
     }
-    logger.debug(f"Creating metric exporter with protocol: {protocol}, endpoint: {endpoint}")
-    return exporter_classes[protocol](endpoint=endpoint, preferred_temporality=temporality)
+    return exporter_classes[protocol](preferred_temporality=temporality)
 
 
 def _setup_meter_provider() -> Optional[MeterProvider]:
@@ -106,7 +105,7 @@ def _setup_meter_provider() -> Optional[MeterProvider]:
 
     try:
         resource = Resource.create(create_resource_attributes_from_env())
-        exporter = _create_metric_exporter(config.otlp_endpoint)
+        exporter = _create_metric_exporter()
         reader = PeriodicExportingMetricReader(exporter=exporter)
         provider = MeterProvider(resource=resource, metric_readers=[reader])
 

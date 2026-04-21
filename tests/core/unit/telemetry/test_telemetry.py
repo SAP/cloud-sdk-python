@@ -70,6 +70,16 @@ class TestEnvironmentHelpers:
         with patch.dict('os.environ', {'APPFND_CONHOS_APP_NAME': 'my-app'}, clear=True):
             assert _get_app_name() == 'my-app'
 
+    def test_get_app_name_falls_back_to_otel_service_name(self):
+        """Test that OTEL_SERVICE_NAME is used when APPFND_CONHOS_APP_NAME is not set."""
+        with patch.dict('os.environ', {'OTEL_SERVICE_NAME': 'my-agent'}, clear=True):
+            assert _get_app_name() == 'my-agent'
+
+    def test_get_app_name_prefers_appfnd_over_otel(self):
+        """Test that APPFND_CONHOS_APP_NAME takes precedence over OTEL_SERVICE_NAME."""
+        with patch.dict('os.environ', {'APPFND_CONHOS_APP_NAME': 'appfnd-name', 'OTEL_SERVICE_NAME': 'otel-name'}, clear=True):
+            assert _get_app_name() == 'appfnd-name'
+
     def test_get_app_name_default(self):
         """Test getting app name default when not set."""
         with patch.dict('os.environ', {}, clear=True):

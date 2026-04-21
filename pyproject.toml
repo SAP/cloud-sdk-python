@@ -27,6 +27,13 @@ dependencies = [
     "opentelemetry-sdk>=1.28.0",
 ]
 
+[project.optional-dependencies]
+temporal = [
+    "temporalio>=1.7.0",
+    "spiffe>=0.2.0",
+    "cryptography>=41.0.0",
+]
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"

@@ -830,7 +830,7 @@ class TestFragmentClientLabels:
         assert len(labels) == 1
         assert labels[0].key == "env"
         assert labels[0].values == ["prod"]
-        mock_http.get.assert_called_once_with("v1/instanceDestinationFragments/fragA/labels")
+        mock_http.get.assert_called_once_with("v1/instanceDestinationFragments/fragA/labels", tenant_subdomain=None)
 
     def test_get_fragment_labels_subaccount(self, fragment_client, mock_http):
         mock_response = Mock(spec=Response)
@@ -840,7 +840,7 @@ class TestFragmentClientLabels:
         labels = fragment_client.get_fragment_labels("fragA", Level.SUB_ACCOUNT)
 
         assert labels[0].key == "team"
-        mock_http.get.assert_called_once_with("v1/subaccountDestinationFragments/fragA/labels")
+        mock_http.get.assert_called_once_with("v1/subaccountDestinationFragments/fragA/labels", tenant_subdomain=None)
 
     def test_get_fragment_labels_default_level_is_subaccount(self, fragment_client, mock_http):
         mock_response = Mock(spec=Response)
@@ -849,7 +849,7 @@ class TestFragmentClientLabels:
 
         fragment_client.get_fragment_labels("fragA")
 
-        mock_http.get.assert_called_once_with("v1/subaccountDestinationFragments/fragA/labels")
+        mock_http.get.assert_called_once_with("v1/subaccountDestinationFragments/fragA/labels", tenant_subdomain=None)
 
     def test_get_fragment_labels_non_list_response_raises(self, fragment_client, mock_http):
         mock_response = Mock(spec=Response)
@@ -873,6 +873,7 @@ class TestFragmentClientLabels:
         mock_http.put.assert_called_once_with(
             "v1/instanceDestinationFragments/fragA/labels",
             body=[{"key": "env", "values": ["prod"]}],
+            tenant_subdomain=None,
         )
 
     def test_update_fragment_labels_subaccount(self, fragment_client, mock_http):
@@ -883,6 +884,7 @@ class TestFragmentClientLabels:
         mock_http.put.assert_called_once_with(
             "v1/subaccountDestinationFragments/fragA/labels",
             body=[{"key": "env", "values": ["staging"]}],
+            tenant_subdomain=None,
         )
 
     def test_update_fragment_labels_http_error_propagates(self, fragment_client, mock_http):
@@ -899,6 +901,7 @@ class TestFragmentClientLabels:
         mock_http.patch.assert_called_once_with(
             "v1/instanceDestinationFragments/fragA/labels",
             body={"action": "ADD", "labels": [{"key": "env", "values": ["prod"]}]},
+            tenant_subdomain=None,
         )
 
     def test_patch_fragment_labels_subaccount(self, fragment_client, mock_http):
@@ -909,6 +912,7 @@ class TestFragmentClientLabels:
         mock_http.patch.assert_called_once_with(
             "v1/subaccountDestinationFragments/fragA/labels",
             body={"action": "DELETE", "labels": [{"key": "env", "values": []}]},
+            tenant_subdomain=None,
         )
 
     def test_patch_fragment_labels_http_error_propagates(self, fragment_client, mock_http):
@@ -916,3 +920,43 @@ class TestFragmentClientLabels:
 
         with pytest.raises(HttpError):
             fragment_client.patch_fragment_labels("fragA", PatchLabels(action="ADD", labels=[]), Level.SUB_ACCOUNT)
+
+    def test_get_fragment_labels_with_tenant(self, fragment_client, mock_http):
+        mock_http.get.return_value.json.return_value = []
+
+        fragment_client.get_fragment_labels("fragA", tenant="test-tenant")
+
+        _, kwargs = mock_http.get.call_args
+        assert kwargs["tenant_subdomain"] == "test-tenant"
+
+    def test_get_fragment_labels_without_tenant_uses_provider_context(self, fragment_client, mock_http):
+        mock_http.get.return_value.json.return_value = []
+
+        fragment_client.get_fragment_labels("fragA")
+
+        _, kwargs = mock_http.get.call_args
+        assert kwargs["tenant_subdomain"] is None
+
+    def test_update_fragment_labels_with_tenant(self, fragment_client, mock_http):
+        fragment_client.update_fragment_labels("fragA", [], tenant="test-tenant")
+
+        _, kwargs = mock_http.put.call_args
+        assert kwargs["tenant_subdomain"] == "test-tenant"
+
+    def test_update_fragment_labels_without_tenant_uses_provider_context(self, fragment_client, mock_http):
+        fragment_client.update_fragment_labels("fragA", [])
+
+        _, kwargs = mock_http.put.call_args
+        assert kwargs["tenant_subdomain"] is None
+
+    def test_patch_fragment_labels_with_tenant(self, fragment_client, mock_http):
+        fragment_client.patch_fragment_labels("fragA", PatchLabels(action="ADD", labels=[]), tenant="test-tenant")
+
+        _, kwargs = mock_http.patch.call_args
+        assert kwargs["tenant_subdomain"] == "test-tenant"
+
+    def test_patch_fragment_labels_without_tenant_uses_provider_context(self, fragment_client, mock_http):
+        fragment_client.patch_fragment_labels("fragA", PatchLabels(action="ADD", labels=[]))
+
+        _, kwargs = mock_http.patch.call_args
+        assert kwargs["tenant_subdomain"] is None

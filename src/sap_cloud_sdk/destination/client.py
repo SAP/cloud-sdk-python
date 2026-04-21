@@ -522,13 +522,17 @@ class DestinationClient:
 
     @record_metrics(Module.DESTINATION, Operation.DESTINATION_GET_LABELS)
     def get_destination_labels(
-        self, name: str, level: Optional[Level] = Level.SUB_ACCOUNT
+        self,
+        name: str,
+        level: Optional[Level] = Level.SUB_ACCOUNT,
+        tenant: Optional[str] = None,
     ) -> List[Label]:
         """Get labels for a destination.
 
         Args:
             name: Destination name.
             level: Scope to query (subaccount by default).
+            tenant: Optional subscriber tenant subdomain. If provided, the request is scoped to that tenant.
 
         Returns:
             List of labels assigned to the destination. Returns empty list if none assigned.
@@ -538,7 +542,7 @@ class DestinationClient:
         """
         try:
             path = self._sub_path_for_level(level)
-            resp = self._http.get(f"{API_V1}/{path}/{name}/labels")
+            resp = self._http.get(f"{API_V1}/{path}/{name}/labels", tenant_subdomain=tenant)
             data = resp.json()
             if not isinstance(data, list):
                 raise DestinationOperationError(
@@ -556,7 +560,11 @@ class DestinationClient:
 
     @record_metrics(Module.DESTINATION, Operation.DESTINATION_UPDATE_LABELS)
     def update_destination_labels(
-        self, name: str, labels: List[Label], level: Optional[Level] = Level.SUB_ACCOUNT
+        self,
+        name: str,
+        labels: List[Label],
+        level: Optional[Level] = Level.SUB_ACCOUNT,
+        tenant: Optional[str] = None,
     ) -> None:
         """Replace all labels for a destination.
 
@@ -564,6 +572,7 @@ class DestinationClient:
             name: Destination name.
             labels: List of labels to set (replaces existing labels).
             level: Scope where the destination exists (subaccount by default).
+            tenant: Optional subscriber tenant subdomain. If provided, the request is scoped to that tenant.
 
         Raises:
             HttpError: Propagated for HTTP errors.
@@ -575,6 +584,7 @@ class DestinationClient:
             self._http.put(
                 f"{API_V1}/{path}/{name}/labels",
                 body=[lbl.to_dict() for lbl in labels],
+                tenant_subdomain=tenant,
             )
         except HttpError:
             raise
@@ -585,7 +595,11 @@ class DestinationClient:
 
     @record_metrics(Module.DESTINATION, Operation.DESTINATION_PATCH_LABELS)
     def patch_destination_labels(
-        self, name: str, patch: PatchLabels, level: Optional[Level] = Level.SUB_ACCOUNT
+        self,
+        name: str,
+        patch: PatchLabels,
+        level: Optional[Level] = Level.SUB_ACCOUNT,
+        tenant: Optional[str] = None,
     ) -> None:
         """Add or remove labels for a destination.
 
@@ -593,6 +607,7 @@ class DestinationClient:
             name: Destination name.
             patch: PatchLabels with action ("ADD" or "DELETE") and labels to apply.
             level: Scope where the destination exists (subaccount by default).
+            tenant: Optional subscriber tenant subdomain. If provided, the request is scoped to that tenant.
 
         Raises:
             HttpError: Propagated for HTTP errors.
@@ -604,6 +619,7 @@ class DestinationClient:
             self._http.patch(
                 f"{API_V1}/{path}/{name}/labels",
                 body=patch.to_dict(),
+                tenant_subdomain=tenant,
             )
         except HttpError:
             raise

@@ -1871,7 +1871,7 @@ class TestDestinationClientLabels:
 
         assert len(labels) == 1
         assert labels[0].key == "env"
-        mock_http.get.assert_called_once_with("v1/instanceDestinations/destA/labels")
+        mock_http.get.assert_called_once_with("v1/instanceDestinations/destA/labels", tenant_subdomain=None)
 
     def test_get_destination_labels_subaccount(self):
         mock_http = MagicMock()
@@ -1881,7 +1881,7 @@ class TestDestinationClientLabels:
         labels = client.get_destination_labels("destA", Level.SUB_ACCOUNT)
 
         assert labels[0].key == "team"
-        mock_http.get.assert_called_once_with("v1/subaccountDestinations/destA/labels")
+        mock_http.get.assert_called_once_with("v1/subaccountDestinations/destA/labels", tenant_subdomain=None)
 
     def test_get_destination_labels_default_level_is_subaccount(self):
         mock_http = MagicMock()
@@ -1890,7 +1890,7 @@ class TestDestinationClientLabels:
 
         client.get_destination_labels("destA")
 
-        mock_http.get.assert_called_once_with("v1/subaccountDestinations/destA/labels")
+        mock_http.get.assert_called_once_with("v1/subaccountDestinations/destA/labels", tenant_subdomain=None)
 
     def test_get_destination_labels_non_list_response_raises(self):
         mock_http = MagicMock()
@@ -1918,6 +1918,7 @@ class TestDestinationClientLabels:
         mock_http.put.assert_called_once_with(
             "v1/instanceDestinations/destA/labels",
             body=[{"key": "env", "values": ["prod"]}],
+            tenant_subdomain=None,
         )
 
     def test_update_destination_labels_subaccount(self):
@@ -1930,6 +1931,7 @@ class TestDestinationClientLabels:
         mock_http.put.assert_called_once_with(
             "v1/subaccountDestinations/destA/labels",
             body=[{"key": "env", "values": ["staging"]}],
+            tenant_subdomain=None,
         )
 
     def test_update_destination_labels_http_error_propagates(self):
@@ -1950,6 +1952,7 @@ class TestDestinationClientLabels:
         mock_http.patch.assert_called_once_with(
             "v1/instanceDestinations/destA/labels",
             body={"action": "ADD", "labels": [{"key": "env", "values": ["prod"]}]},
+            tenant_subdomain=None,
         )
 
     def test_patch_destination_labels_subaccount(self):
@@ -1962,6 +1965,7 @@ class TestDestinationClientLabels:
         mock_http.patch.assert_called_once_with(
             "v1/subaccountDestinations/destA/labels",
             body={"action": "DELETE", "labels": [{"key": "env", "values": []}]},
+            tenant_subdomain=None,
         )
 
     def test_patch_destination_labels_http_error_propagates(self):
@@ -1971,3 +1975,59 @@ class TestDestinationClientLabels:
 
         with pytest.raises(HttpError):
             client.patch_destination_labels("destA", PatchLabels(action="ADD", labels=[]), Level.SUB_ACCOUNT)
+
+    def test_get_destination_labels_with_tenant(self):
+        mock_http = MagicMock()
+        mock_http.get.return_value.json.return_value = []
+        client = DestinationClient(mock_http)
+
+        client.get_destination_labels("destA", tenant="test-tenant")
+
+        _, kwargs = mock_http.get.call_args
+        assert kwargs["tenant_subdomain"] == "test-tenant"
+
+    def test_get_destination_labels_without_tenant_uses_provider_context(self):
+        mock_http = MagicMock()
+        mock_http.get.return_value.json.return_value = []
+        client = DestinationClient(mock_http)
+
+        client.get_destination_labels("destA")
+
+        _, kwargs = mock_http.get.call_args
+        assert kwargs["tenant_subdomain"] is None
+
+    def test_update_destination_labels_with_tenant(self):
+        mock_http = MagicMock()
+        client = DestinationClient(mock_http)
+
+        client.update_destination_labels("destA", [], tenant="test-tenant")
+
+        _, kwargs = mock_http.put.call_args
+        assert kwargs["tenant_subdomain"] == "test-tenant"
+
+    def test_update_destination_labels_without_tenant_uses_provider_context(self):
+        mock_http = MagicMock()
+        client = DestinationClient(mock_http)
+
+        client.update_destination_labels("destA", [])
+
+        _, kwargs = mock_http.put.call_args
+        assert kwargs["tenant_subdomain"] is None
+
+    def test_patch_destination_labels_with_tenant(self):
+        mock_http = MagicMock()
+        client = DestinationClient(mock_http)
+
+        client.patch_destination_labels("destA", PatchLabels(action="ADD", labels=[]), tenant="test-tenant")
+
+        _, kwargs = mock_http.patch.call_args
+        assert kwargs["tenant_subdomain"] == "test-tenant"
+
+    def test_patch_destination_labels_without_tenant_uses_provider_context(self):
+        mock_http = MagicMock()
+        client = DestinationClient(mock_http)
+
+        client.patch_destination_labels("destA", PatchLabels(action="ADD", labels=[]))
+
+        _, kwargs = mock_http.patch.call_args
+        assert kwargs["tenant_subdomain"] is None

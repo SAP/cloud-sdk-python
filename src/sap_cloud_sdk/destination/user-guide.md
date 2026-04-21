@@ -71,6 +71,21 @@ certificate_client.delete_certificate("my-cert.pem", level=Level.SUB_ACCOUNT, te
 certificate_client.create_certificate(new_cert, level=Level.SUB_ACCOUNT)
 certificate_client.update_certificate(new_cert, level=Level.SUB_ACCOUNT)
 certificate_client.delete_certificate("my-cert.pem", level=Level.SUB_ACCOUNT)
+
+# Label management with tenant (subscriber context)
+from sap_cloud_sdk.destination import Label, PatchLabels
+labels = [Label(key="env", values=["prod", "eu"])]
+
+client.update_destination_labels("my-dest", labels, level=Level.SUB_ACCOUNT, tenant="tenant-subdomain")
+client.patch_destination_labels("my-dest", PatchLabels(action="ADD", labels=labels), level=Level.SUB_ACCOUNT, tenant="tenant-subdomain")
+retrieved = client.get_destination_labels("my-dest", level=Level.SUB_ACCOUNT, tenant="tenant-subdomain")
+
+fragment_client.update_fragment_labels("my-fragment", labels, level=Level.SUB_ACCOUNT, tenant="tenant-subdomain")
+certificate_client.get_certificate_labels("my-cert.pem", level=Level.SUB_ACCOUNT, tenant="tenant-subdomain")
+
+# Label management without tenant (provider context)
+client.update_destination_labels("my-dest", labels, level=Level.SUB_ACCOUNT)
+client.patch_destination_labels("my-dest", PatchLabels(action="DELETE", labels=labels), level=Level.SUB_ACCOUNT)
 ```
 
 ## Concepts
@@ -103,6 +118,9 @@ class DestinationClient:
     def create_destination(self, dest: Destination, level: Optional[Level] = Level.SUB_ACCOUNT, tenant: Optional[str] = None) -> None: ...
     def update_destination(self, dest: Destination, level: Optional[Level] = Level.SUB_ACCOUNT, tenant: Optional[str] = None) -> None: ...
     def delete_destination(self, name: str, level: Optional[Level] = Level.SUB_ACCOUNT, tenant: Optional[str] = None) -> None: ...
+    def get_destination_labels(self, name: str, level: Optional[Level] = Level.SUB_ACCOUNT, tenant: Optional[str] = None) -> List[Label]: ...
+    def update_destination_labels(self, name: str, labels: List[Label], level: Optional[Level] = Level.SUB_ACCOUNT, tenant: Optional[str] = None) -> None: ...
+    def patch_destination_labels(self, name: str, patch: PatchLabels, level: Optional[Level] = Level.SUB_ACCOUNT, tenant: Optional[str] = None) -> None: ...
 
     # V2 Runtime API - Destination consumption with automatic token retrieval
     def get_destination(self, name: str, level: Optional[Level] = None, options: Optional[ConsumptionOptions] = None, proxy_enabled: Optional[bool] = None) -> Optional[Destination | TransparentProxyDestination]: ...
@@ -116,11 +134,14 @@ The fragment client produced by `create_fragment_client()` exposes the following
 class FragmentClient:
     def get_instance_fragment(self, name: str) -> Optional[Fragment]: ...
     def get_subaccount_fragment(self, name: str, access_strategy: AccessStrategy = AccessStrategy.SUBSCRIBER_FIRST, tenant: Optional[str] = None) -> Optional[Fragment]: ...
-    def list_instance_fragments(self) -> List[Fragment]: ...
-    def list_subaccount_fragments(self, access_strategy: AccessStrategy = AccessStrategy.SUBSCRIBER_FIRST, tenant: Optional[str] = None) -> List[Fragment]: ...
+    def list_instance_fragments(self, filter: Optional[ListOptions] = None) -> List[Fragment]: ...
+    def list_subaccount_fragments(self, access_strategy: AccessStrategy = AccessStrategy.SUBSCRIBER_FIRST, tenant: Optional[str] = None, filter: Optional[ListOptions] = None) -> List[Fragment]: ...
     def create_fragment(self, fragment: Fragment, level: Optional[Level] = Level.SUB_ACCOUNT, tenant: Optional[str] = None) -> None: ...
     def update_fragment(self, fragment: Fragment, level: Optional[Level] = Level.SUB_ACCOUNT, tenant: Optional[str] = None) -> None: ...
     def delete_fragment(self, name: str, level: Optional[Level] = Level.SUB_ACCOUNT, tenant: Optional[str] = None) -> None: ...
+    def get_fragment_labels(self, name: str, level: Optional[Level] = Level.SUB_ACCOUNT, tenant: Optional[str] = None) -> List[Label]: ...
+    def update_fragment_labels(self, name: str, labels: List[Label], level: Optional[Level] = Level.SUB_ACCOUNT, tenant: Optional[str] = None) -> None: ...
+    def patch_fragment_labels(self, name: str, patch: PatchLabels, level: Optional[Level] = Level.SUB_ACCOUNT, tenant: Optional[str] = None) -> None: ...
 ```
 
 ### Certificate Client
@@ -136,6 +157,9 @@ class CertificateClient:
     def create_certificate(self, certificate: Certificate, level: Optional[Level] = Level.SUB_ACCOUNT, tenant: Optional[str] = None) -> None: ...
     def update_certificate(self, certificate: Certificate, level: Optional[Level] = Level.SUB_ACCOUNT, tenant: Optional[str] = None) -> None: ...
     def delete_certificate(self, name: str, level: Optional[Level] = Level.SUB_ACCOUNT, tenant: Optional[str] = None) -> None: ...
+    def get_certificate_labels(self, name: str, level: Optional[Level] = Level.SUB_ACCOUNT, tenant: Optional[str] = None) -> List[Label]: ...
+    def update_certificate_labels(self, name: str, labels: List[Label], level: Optional[Level] = Level.SUB_ACCOUNT, tenant: Optional[str] = None) -> None: ...
+    def patch_certificate_labels(self, name: str, patch: PatchLabels, level: Optional[Level] = Level.SUB_ACCOUNT, tenant: Optional[str] = None) -> None: ...
 ```
 
 ### Models
@@ -164,7 +188,9 @@ class CertificateClient:
 - `DestinationConfig(url, token_url, client_id, client_secret, identityzone)`
 - `TransparentProxy(proxy_name: str, namespace: str)` - Configuration for transparent proxy routing
 - `TransparentProxyDestination(name: str, url: str, headers: dict[str, str])` - Destination configured for transparent proxy access
-- `ListOptions(name?: str, $skip?: int, $top?: int)` - For pagination and filtering list operations
+- `Label(key: str, values: List[str])` - Key-value metadata tag for filtering and organizing resources
+- `PatchLabels(action: str, labels: List[Label])` - Incremental label update; `action` is `"ADD"` (upsert) or `"DELETE"` (remove)
+- `ListOptions(filter_names?: List[str], filter_labels?: List[Label], page?: int, page_size?: int, page_count?: bool, entity_count?: bool)` - Filtering and pagination for list operations; `filter_labels` uses an OData `Label HAS` expression
 - `PagedResult[T](items: list[T], pagination?: PaginationInfo)` - Contains results and optional pagination metadata
 - `PaginationInfo(next_cursor?: str, total_count?: int)` - Pagination metadata from response headers
 
@@ -423,14 +449,87 @@ This ensures only valid headers are used with transparent proxy destinations.
   - `get_subaccount_destination()` - V1 API for subaccount-level destinations with access strategies
   - `get_destination()` - V2 API for runtime consumption with automatic token retrieval
 
+## Label Management
+
+Labels are key-value metadata tags that can be attached to destinations, fragments, and certificates. They enable filtering resources by label values using `ListOptions.filter_labels`.
+
+### Models
+
+- `Label(key: str, values: List[str])` — a label with one or more string values (e.g., `Label(key="env", values=["prod", "eu"])`)
+- `PatchLabels(action: str, labels: List[Label])` — incremental update; `action="ADD"` upserts label values, `action="DELETE"` removes them
+
+### Operations
+
+Each client (DestinationClient, FragmentClient, CertificateClient) exposes three label methods:
+
+| Method                                         | HTTP  | Description                     |
+| ---------------------------------------------- | ----- | ------------------------------- |
+| `get_*_labels(name, level, tenant)`            | GET   | Returns current labels          |
+| `update_*_labels(name, labels, level, tenant)` | PUT   | Replaces all labels atomically  |
+| `patch_*_labels(name, patch, level, tenant)`   | PATCH | Adds or removes specific labels |
+
+All three accept an optional `tenant` parameter (like the create/update/delete methods) to scope the request to a subscriber context.
+
+### Examples
+
+```python
+from sap_cloud_sdk.destination import (
+    create_client, create_fragment_client, create_certificate_client,
+    Label, PatchLabels, ListOptions, Level
+)
+
+client = create_client(instance="default")
+fragment_client = create_fragment_client(instance="default")
+certificate_client = create_certificate_client(instance="default")
+
+# Get labels for a destination (provider context)
+labels = client.get_destination_labels("my-dest", level=Level.SUB_ACCOUNT)
+
+# Get labels in subscriber context
+labels = client.get_destination_labels("my-dest", level=Level.SUB_ACCOUNT, tenant="tenant-subdomain")
+
+# Replace all labels (PUT)
+new_labels = [Label(key="env", values=["prod"]), Label(key="team", values=["platform"])]
+client.update_destination_labels("my-dest", new_labels, level=Level.SUB_ACCOUNT, tenant="tenant-subdomain")
+
+# Add labels incrementally (PATCH ADD — upserts existing keys)
+client.patch_destination_labels(
+    "my-dest",
+    PatchLabels(action="ADD", labels=[Label(key="region", values=["eu"])]),
+    level=Level.SUB_ACCOUNT,
+    tenant="tenant-subdomain",
+)
+
+# Remove specific labels (PATCH DELETE)
+client.patch_destination_labels(
+    "my-dest",
+    PatchLabels(action="DELETE", labels=[Label(key="region", values=["eu"])]),
+    level=Level.SUB_ACCOUNT,
+)
+
+# Fragment and certificate label operations follow the same pattern
+fragment_client.update_fragment_labels("my-fragment", new_labels, level=Level.SUB_ACCOUNT, tenant="tenant-subdomain")
+certificate_client.patch_certificate_labels(
+    "my-cert.pem",
+    PatchLabels(action="ADD", labels=[Label(key="env", values=["staging"])]),
+    level=Level.SUB_ACCOUNT,
+)
+
+# Filter list results by label
+from sap_cloud_sdk.destination import ListOptions
+filter_opts = ListOptions(filter_labels=[Label(key="env", values=["prod"])])
+result = client.list_subaccount_destinations(filter=filter_opts)
+fragments = fragment_client.list_instance_fragments(filter=filter_opts)
+```
+
 ## Local Development Mode
 
 When a `mocks/<resource>.json` file is present at the repository root, the factory functions automatically return a local in-memory client backed by that file instead of connecting to the SAP BTP Destination Service. No credentials or network access are required.
 
-| Factory | Mock file |
-|---|---|
-| `create_client()` | `mocks/destination.json` |
-| `create_fragment_client()` | `mocks/fragments.json` |
+| Factory                       | Mock file                 |
+| ----------------------------- | ------------------------- |
+| `create_client()`             | `mocks/destination.json`  |
+| `create_fragment_client()`    | `mocks/fragments.json`    |
 | `create_certificate_client()` | `mocks/certificates.json` |
 
 > **WARNING: Local mode is for local development only.**

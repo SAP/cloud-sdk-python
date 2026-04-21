@@ -307,13 +307,17 @@ class CertificateClient:
 
     @record_metrics(Module.DESTINATION, Operation.CERTIFICATE_GET_LABELS)
     def get_certificate_labels(
-        self, name: str, level: Optional[Level] = Level.SUB_ACCOUNT
+        self,
+        name: str,
+        level: Optional[Level] = Level.SUB_ACCOUNT,
+        tenant: Optional[str] = None,
     ) -> List[Label]:
         """Get labels for a certificate.
 
         Args:
             name: Certificate name.
             level: Scope to query (subaccount by default).
+            tenant: Optional subscriber tenant subdomain. If provided, the request is scoped to that tenant.
 
         Returns:
             List of labels assigned to the certificate. Returns empty list if none assigned.
@@ -323,7 +327,7 @@ class CertificateClient:
         """
         try:
             path = self._sub_path_for_level(level)
-            resp = self._http.get(f"{API_V1}/{path}/{name}/labels")
+            resp = self._http.get(f"{API_V1}/{path}/{name}/labels", tenant_subdomain=tenant)
             data = resp.json()
             if not isinstance(data, list):
                 raise DestinationOperationError(
@@ -341,7 +345,11 @@ class CertificateClient:
 
     @record_metrics(Module.DESTINATION, Operation.CERTIFICATE_UPDATE_LABELS)
     def update_certificate_labels(
-        self, name: str, labels: List[Label], level: Optional[Level] = Level.SUB_ACCOUNT
+        self,
+        name: str,
+        labels: List[Label],
+        level: Optional[Level] = Level.SUB_ACCOUNT,
+        tenant: Optional[str] = None,
     ) -> None:
         """Replace all labels for a certificate.
 
@@ -349,6 +357,7 @@ class CertificateClient:
             name: Certificate name.
             labels: List of labels to set (replaces existing labels).
             level: Scope where the certificate exists (subaccount by default).
+            tenant: Optional subscriber tenant subdomain. If provided, the request is scoped to that tenant.
 
         Raises:
             HttpError: Propagated for HTTP errors.
@@ -360,6 +369,7 @@ class CertificateClient:
             self._http.put(
                 f"{API_V1}/{path}/{name}/labels",
                 body=[lbl.to_dict() for lbl in labels],
+                tenant_subdomain=tenant,
             )
         except HttpError:
             raise
@@ -370,7 +380,11 @@ class CertificateClient:
 
     @record_metrics(Module.DESTINATION, Operation.CERTIFICATE_PATCH_LABELS)
     def patch_certificate_labels(
-        self, name: str, patch: PatchLabels, level: Optional[Level] = Level.SUB_ACCOUNT
+        self,
+        name: str,
+        patch: PatchLabels,
+        level: Optional[Level] = Level.SUB_ACCOUNT,
+        tenant: Optional[str] = None,
     ) -> None:
         """Add or remove labels for a certificate.
 
@@ -378,6 +392,7 @@ class CertificateClient:
             name: Certificate name.
             patch: PatchLabels with action ("ADD" or "DELETE") and labels to apply.
             level: Scope where the certificate exists (subaccount by default).
+            tenant: Optional subscriber tenant subdomain. If provided, the request is scoped to that tenant.
 
         Raises:
             HttpError: Propagated for HTTP errors.
@@ -389,6 +404,7 @@ class CertificateClient:
             self._http.patch(
                 f"{API_V1}/{path}/{name}/labels",
                 body=patch.to_dict(),
+                tenant_subdomain=tenant,
             )
         except HttpError:
             raise

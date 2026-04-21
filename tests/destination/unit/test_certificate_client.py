@@ -984,7 +984,7 @@ class TestCertificateClientLabels:
 
         assert len(labels) == 1
         assert labels[0].key == "env"
-        mock_http.get.assert_called_once_with("v1/instanceCertificates/cert1/labels")
+        mock_http.get.assert_called_once_with("v1/instanceCertificates/cert1/labels", tenant_subdomain=None)
 
     def test_get_certificate_labels_subaccount(self, certificate_client, mock_http):
         mock_response = Mock(spec=Response)
@@ -994,7 +994,7 @@ class TestCertificateClientLabels:
         labels = certificate_client.get_certificate_labels("cert1", Level.SUB_ACCOUNT)
 
         assert labels[0].key == "team"
-        mock_http.get.assert_called_once_with("v1/subaccountCertificates/cert1/labels")
+        mock_http.get.assert_called_once_with("v1/subaccountCertificates/cert1/labels", tenant_subdomain=None)
 
     def test_get_certificate_labels_default_level_is_subaccount(self, certificate_client, mock_http):
         mock_response = Mock(spec=Response)
@@ -1003,7 +1003,7 @@ class TestCertificateClientLabels:
 
         certificate_client.get_certificate_labels("cert1")
 
-        mock_http.get.assert_called_once_with("v1/subaccountCertificates/cert1/labels")
+        mock_http.get.assert_called_once_with("v1/subaccountCertificates/cert1/labels", tenant_subdomain=None)
 
     def test_get_certificate_labels_non_list_response_raises(self, certificate_client, mock_http):
         mock_response = Mock(spec=Response)
@@ -1027,6 +1027,7 @@ class TestCertificateClientLabels:
         mock_http.put.assert_called_once_with(
             "v1/instanceCertificates/cert1/labels",
             body=[{"key": "env", "values": ["prod"]}],
+            tenant_subdomain=None,
         )
 
     def test_update_certificate_labels_subaccount(self, certificate_client, mock_http):
@@ -1037,6 +1038,7 @@ class TestCertificateClientLabels:
         mock_http.put.assert_called_once_with(
             "v1/subaccountCertificates/cert1/labels",
             body=[{"key": "env", "values": ["staging"]}],
+            tenant_subdomain=None,
         )
 
     def test_update_certificate_labels_http_error_propagates(self, certificate_client, mock_http):
@@ -1053,6 +1055,7 @@ class TestCertificateClientLabels:
         mock_http.patch.assert_called_once_with(
             "v1/instanceCertificates/cert1/labels",
             body={"action": "ADD", "labels": [{"key": "env", "values": ["prod"]}]},
+            tenant_subdomain=None,
         )
 
     def test_patch_certificate_labels_subaccount(self, certificate_client, mock_http):
@@ -1063,6 +1066,7 @@ class TestCertificateClientLabels:
         mock_http.patch.assert_called_once_with(
             "v1/subaccountCertificates/cert1/labels",
             body={"action": "DELETE", "labels": [{"key": "env", "values": []}]},
+            tenant_subdomain=None,
         )
 
     def test_patch_certificate_labels_http_error_propagates(self, certificate_client, mock_http):
@@ -1070,3 +1074,43 @@ class TestCertificateClientLabels:
 
         with pytest.raises(HttpError):
             certificate_client.patch_certificate_labels("cert1", PatchLabels(action="ADD", labels=[]), Level.SUB_ACCOUNT)
+
+    def test_get_certificate_labels_with_tenant(self, certificate_client, mock_http):
+        mock_http.get.return_value.json.return_value = []
+
+        certificate_client.get_certificate_labels("cert1", tenant="test-tenant")
+
+        _, kwargs = mock_http.get.call_args
+        assert kwargs["tenant_subdomain"] == "test-tenant"
+
+    def test_get_certificate_labels_without_tenant_uses_provider_context(self, certificate_client, mock_http):
+        mock_http.get.return_value.json.return_value = []
+
+        certificate_client.get_certificate_labels("cert1")
+
+        _, kwargs = mock_http.get.call_args
+        assert kwargs["tenant_subdomain"] is None
+
+    def test_update_certificate_labels_with_tenant(self, certificate_client, mock_http):
+        certificate_client.update_certificate_labels("cert1", [], tenant="test-tenant")
+
+        _, kwargs = mock_http.put.call_args
+        assert kwargs["tenant_subdomain"] == "test-tenant"
+
+    def test_update_certificate_labels_without_tenant_uses_provider_context(self, certificate_client, mock_http):
+        certificate_client.update_certificate_labels("cert1", [])
+
+        _, kwargs = mock_http.put.call_args
+        assert kwargs["tenant_subdomain"] is None
+
+    def test_patch_certificate_labels_with_tenant(self, certificate_client, mock_http):
+        certificate_client.patch_certificate_labels("cert1", PatchLabels(action="ADD", labels=[]), tenant="test-tenant")
+
+        _, kwargs = mock_http.patch.call_args
+        assert kwargs["tenant_subdomain"] == "test-tenant"
+
+    def test_patch_certificate_labels_without_tenant_uses_provider_context(self, certificate_client, mock_http):
+        certificate_client.patch_certificate_labels("cert1", PatchLabels(action="ADD", labels=[]))
+
+        _, kwargs = mock_http.patch.call_args
+        assert kwargs["tenant_subdomain"] is None

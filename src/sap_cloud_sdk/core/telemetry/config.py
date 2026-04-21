@@ -26,6 +26,7 @@ ENV_REGION = "APPFND_CONHOS_REGION"
 ENV_ENVIRONMENT = "APPFND_CONHOS_ENVIRONMENT"
 ENV_SUBACCOUNT_ID = "APPFND_CONHOS_SUBACCOUNTID"
 ENV_APP_NAME = "APPFND_CONHOS_APP_NAME"
+ENV_OTEL_SERVICE_NAME = "OTEL_SERVICE_NAME"
 ENV_HOSTNAME = "HOSTNAME"
 ENV_SYSTEM_ROLE = "APPFND_CONHOS_SYSTEM_ROLE"
 
@@ -53,7 +54,7 @@ def _get_subaccount_id() -> str:
 
 def _get_app_name() -> str:
     """Get application name from environment or return default."""
-    return os.getenv(ENV_APP_NAME, DEFAULT_UNKNOWN)
+    return os.getenv(ENV_APP_NAME) or os.getenv(ENV_OTEL_SERVICE_NAME, DEFAULT_UNKNOWN)
 
 
 def _get_hostname() -> str:

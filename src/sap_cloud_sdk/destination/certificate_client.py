@@ -327,7 +327,9 @@ class CertificateClient:
         """
         try:
             path = self._sub_path_for_level(level)
-            resp = self._http.get(f"{API_V1}/{path}/{name}/labels", tenant_subdomain=tenant)
+            resp = self._http.get(
+                f"{API_V1}/{path}/{name}/labels", tenant_subdomain=tenant
+            )
             data = resp.json()
             if not isinstance(data, list):
                 raise DestinationOperationError(

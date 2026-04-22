@@ -20,6 +20,7 @@ def mock_traceloop_components():
             'console_exporter': stack.enter_context(patch('sap_cloud_sdk.core.telemetry.auto_instrument.ConsoleSpanExporter')),
             'transformer': stack.enter_context(patch('sap_cloud_sdk.core.telemetry.auto_instrument.GenAIAttributeTransformer')),
             'baggage_processor': stack.enter_context(patch('sap_cloud_sdk.core.telemetry.auto_instrument.BaggageSpanProcessor')),
+            'propagated_processor': stack.enter_context(patch('sap_cloud_sdk.core.telemetry.auto_instrument.PropagatedAttributesSpanProcessor')),
             'get_tracer_provider': stack.enter_context(patch('sap_cloud_sdk.core.telemetry.auto_instrument.trace.get_tracer_provider', return_value=create_autospec(SDKTracerProvider))),
             'create_resource': stack.enter_context(patch('sap_cloud_sdk.core.telemetry.auto_instrument.create_resource_attributes_from_env')),
             'get_app_name': stack.enter_context(patch('sap_cloud_sdk.core.telemetry.auto_instrument._get_app_name')),
@@ -231,4 +232,17 @@ class TestAutoInstrument:
             auto_instrument()
 
             mock_traceloop_components['baggage_processor'].assert_called_once()
-            mock_traceloop_components['get_tracer_provider'].return_value.add_span_processor.assert_called_once_with(mock_processor_instance)
+            mock_traceloop_components['get_tracer_provider'].return_value.add_span_processor.assert_any_call(mock_processor_instance)
+
+    def test_auto_instrument_registers_propagated_attributes_processor(self, mock_traceloop_components):
+        """Test that auto_instrument registers a PropagatedAttributesSpanProcessor on the tracer provider."""
+        mock_traceloop_components['get_app_name'].return_value = 'test-app'
+        mock_traceloop_components['create_resource'].return_value = {}
+        mock_processor_instance = MagicMock()
+        mock_traceloop_components['propagated_processor'].return_value = mock_processor_instance
+
+        with patch.dict('os.environ', {'OTEL_EXPORTER_OTLP_ENDPOINT': 'http://localhost:4317'}, clear=True):
+            auto_instrument()
+
+            mock_traceloop_components['propagated_processor'].assert_called_once()
+            mock_traceloop_components['get_tracer_provider'].return_value.add_span_processor.assert_any_call(mock_processor_instance)

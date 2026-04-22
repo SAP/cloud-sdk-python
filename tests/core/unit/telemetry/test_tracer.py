@@ -895,6 +895,30 @@ class TestInvokeAgentSpan:
             f"stderr={result.stderr}\nstdout={result.stdout}"
         )
 
+    def test_invoke_agent_propagate_false_skips_baggage_for_external_tracer_span_subprocess(
+        self,
+    ):
+        """Baggage mirroring for agent identity runs only when propagate=True."""
+        import os
+        import subprocess
+        import sys
+        from pathlib import Path
+
+        root = Path(__file__).resolve().parents[4]
+        script = root / "tests/core/unit/telemetry/verify_invoke_agent_baggage.py"
+        env = os.environ.copy()
+        env["PYTHONPATH"] = str(root / "src")
+        result = subprocess.run(
+            [sys.executable, str(script), "--propagate-false"],
+            env=env,
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+        assert result.returncode == 0, (
+            f"stderr={result.stderr}\nstdout={result.stdout}"
+        )
+
 
 class TestPropagate:
     """Test suite for propagate=True attribute propagation across nested spans."""

@@ -1,11 +1,16 @@
 #!/usr/bin/env python3
-"""Subprocess helper: invoke_agent_span(propagate=True) + BaggageSpanProcessor + external tracer.
+"""Subprocess helper: Baggage propagation on invoke_agent_span + external tracer.
 
 Run from repo root with PYTHONPATH=src (see test_tracer.py).
+
+Modes:
+  default           — propagate=True expects gen_ai.agent.* on nested span
+  --propagate-false — propagate=False expects nested span WITHOUT those attrs from Baggage
 """
 
 from __future__ import annotations
 
+import argparse
 import sys
 from pathlib import Path
 
@@ -26,6 +31,15 @@ from sap_cloud_sdk.core.telemetry.tracer import invoke_agent_span
 
 
 def main() -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--propagate-false",
+        action="store_true",
+        help="Verify Baggage is NOT applied to external span when propagate=False",
+    )
+    args = parser.parse_args()
+    propagate = not args.propagate_false
+
     exporter = InMemorySpanExporter()
     provider = TracerProvider()
     provider.add_span_processor(BaggageSpanProcessor(ALLOW_ALL_BAGGAGE_KEYS))
@@ -39,23 +53,38 @@ def main() -> int:
         agent_name="currency-agent-local",
         agent_id="f268d3fd-096f-4ebc-b7ed-6fc03dfb3dde",
         kind=SpanKind.INTERNAL,
-        propagate=True,
+        propagate=propagate,
     ):
         with external_tracer.start_as_current_span("invoke_agent"):
             pass
 
     spans = {s.name: dict(s.attributes or {}) for s in exporter.get_finished_spans()}
-    inner = spans.get("invoke_agent")
-    if not inner:
+    if "invoke_agent" not in spans:
         print("FAIL: no inner invoke_agent span", spans, file=sys.stderr)
         return 1
-    if inner.get("gen_ai.agent.name") != "currency-agent-local":
-        print("FAIL: gen_ai.agent.name", inner, file=sys.stderr)
+    inner = spans["invoke_agent"]
+
+    if propagate:
+        if inner.get("gen_ai.agent.name") != "currency-agent-local":
+            print("FAIL: gen_ai.agent.name", inner, file=sys.stderr)
+            return 1
+        if inner.get("gen_ai.agent.id") != "f268d3fd-096f-4ebc-b7ed-6fc03dfb3dde":
+            print("FAIL: gen_ai.agent.id", inner, file=sys.stderr)
+            return 1
+        print(
+            "OK: external child span carries gen_ai.agent.name and gen_ai.agent.id via baggage"
+        )
+        return 0
+
+    # propagate=False: SDK must not inject agent identity into Baggage for this scope
+    if inner.get("gen_ai.agent.name") is not None or inner.get("gen_ai.agent.id") is not None:
+        print(
+            "FAIL: propagate=False but nested span has gen_ai.agent.* (should not):",
+            inner,
+            file=sys.stderr,
+        )
         return 1
-    if inner.get("gen_ai.agent.id") != "f268d3fd-096f-4ebc-b7ed-6fc03dfb3dde":
-        print("FAIL: gen_ai.agent.id", inner, file=sys.stderr)
-        return 1
-    print("OK: external child span carries gen_ai.agent.name and gen_ai.agent.id via baggage")
+    print("OK: propagate=False — nested span has no gen_ai.agent.* from Baggage injection")
     return 0
 
 

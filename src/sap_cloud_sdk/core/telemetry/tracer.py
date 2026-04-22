@@ -9,6 +9,8 @@ by auto_instrument().
 from contextlib import contextmanager, nullcontext
 from typing import Optional, Dict, Any
 
+from opentelemetry import baggage as otel_baggage
+from opentelemetry import context as otel_context
 from opentelemetry import trace
 from opentelemetry.trace import Status, StatusCode, Span
 
@@ -44,6 +46,32 @@ def _propagate_attributes(attrs: Dict[str, Any]):
         yield
     finally:
         _propagated_attrs_var.reset(token)
+
+
+@contextmanager
+def _otel_baggage_for_invoke_agent(span_attrs: Dict[str, Any]):
+    """Mirror gen_ai.agent.* identity into W3C Baggage for the duration of the context.
+
+    Third-party instrumentations (e.g. LangGraph / Traceloop) create spans without merging
+    :func:`get_propagated_attributes`. :class:`~opentelemetry.processor.baggage.BaggageSpanProcessor`
+    (registered by :func:`sap_cloud_sdk.core.telemetry.auto_instrument.auto_instrument`) copies
+    baggage onto every started span, so agent id/name stay consistent on those spans.
+    """
+    keys = (
+        _ATTR_GEN_AI_AGENT_NAME,
+        _ATTR_GEN_AI_AGENT_ID,
+        _ATTR_GEN_AI_AGENT_DESCRIPTION,
+    )
+    ctx = otel_context.get_current()
+    for key in keys:
+        val = span_attrs.get(key)
+        if val is not None:
+            ctx = otel_baggage.set_baggage(key, str(val), ctx)
+    token = otel_context.attach(ctx)
+    try:
+        yield
+    finally:
+        otel_context.detach(token)
 
 
 @contextmanager
@@ -280,7 +308,10 @@ def invoke_agent_span(
         kind: Span kind; CLIENT for remote agents, INTERNAL for in-process.
         attributes: Optional dict of extra attributes to add or override on the span.
         propagate: If True, this span's attributes are passed to all nested spans
-                   within its scope as the lowest-priority layer.
+                   within its scope as the lowest-priority layer. Additionally,
+                   ``gen_ai.agent.{name,id,description}`` are attached as OpenTelemetry
+                   **Baggage** so spans created by external instrumentations still receive
+                   those attributes when BaggageSpanProcessor is active.
 
     Yields:
         The created Span (e.g. to set usage, response attributes).
@@ -324,19 +355,23 @@ def invoke_agent_span(
     propagated = get_propagated_attributes()
     span_attrs = {**propagated, **(attributes or {}), **base_attrs}
 
-    ctx = _propagate_attributes(span_attrs) if propagate else nullcontext()
-    with ctx:
-        with tracer.start_as_current_span(
-            span_name,
-            kind=kind,
-            attributes=span_attrs,
-        ) as span:
-            try:
-                yield span
-            except Exception as e:
-                span.set_status(Status(StatusCode.ERROR, str(e)))
-                span.record_exception(e)
-                raise
+    ctx_prop = _propagate_attributes(span_attrs) if propagate else nullcontext()
+    ctx_baggage = (
+        _otel_baggage_for_invoke_agent(span_attrs) if propagate else nullcontext()
+    )
+    with ctx_prop:
+        with ctx_baggage:
+            with tracer.start_as_current_span(
+                span_name,
+                kind=kind,
+                attributes=span_attrs,
+            ) as span:
+                try:
+                    yield span
+                except Exception as e:
+                    span.set_status(Status(StatusCode.ERROR, str(e)))
+                    span.record_exception(e)
+                    raise
 
 
 def get_current_span() -> Span:

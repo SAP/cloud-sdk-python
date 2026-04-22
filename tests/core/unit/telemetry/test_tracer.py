@@ -873,6 +873,28 @@ class TestInvokeAgentSpan:
 
         mock_span.add_event.assert_called_once_with("agent_step")
 
+    def test_invoke_agent_propagate_baggage_applies_to_external_tracer_span_subprocess(self):
+        """Regression SAP/cloud-sdk-python#55: third-party spans get gen_ai.agent.* via Baggage."""
+        import os
+        import subprocess
+        import sys
+        from pathlib import Path
+
+        root = Path(__file__).resolve().parents[4]
+        script = root / "tests/core/unit/telemetry/verify_invoke_agent_baggage.py"
+        env = os.environ.copy()
+        env["PYTHONPATH"] = str(root / "src")
+        result = subprocess.run(
+            [sys.executable, str(script)],
+            env=env,
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+        assert result.returncode == 0, (
+            f"stderr={result.stderr}\nstdout={result.stdout}"
+        )
+
 
 class TestPropagate:
     """Test suite for propagate=True attribute propagation across nested spans."""

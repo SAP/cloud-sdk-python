@@ -874,7 +874,7 @@ class TestInvokeAgentSpan:
         mock_span.add_event.assert_called_once_with("agent_step")
 
     def test_invoke_agent_propagate_baggage_applies_to_external_tracer_span_subprocess(self):
-        """Regression SAP/cloud-sdk-python#55: third-party spans get gen_ai.agent.* via Baggage."""
+        """Regression SAP/cloud-sdk-python#55: third-party spans get gen_ai.agent.* via SpanProcessor."""
         import os
         import subprocess
         import sys
@@ -898,7 +898,7 @@ class TestInvokeAgentSpan:
     def test_invoke_agent_propagate_false_skips_baggage_for_external_tracer_span_subprocess(
         self,
     ):
-        """Baggage mirroring for agent identity runs only when propagate=True."""
+        """Invoke-agent identity propagation runs only when propagate=True."""
         import os
         import subprocess
         import sys

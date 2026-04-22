@@ -1,7 +1,7 @@
 """Tests for auto-instrumentation functionality."""
 
 import pytest
-from unittest.mock import patch, MagicMock, create_autospec
+from unittest.mock import patch, MagicMock, create_autospec, call
 from contextlib import ExitStack
 
 from opentelemetry.sdk.trace import TracerProvider as SDKTracerProvider
@@ -20,6 +20,7 @@ def mock_traceloop_components():
             'console_exporter': stack.enter_context(patch('sap_cloud_sdk.core.telemetry.auto_instrument.ConsoleSpanExporter')),
             'transformer': stack.enter_context(patch('sap_cloud_sdk.core.telemetry.auto_instrument.GenAIAttributeTransformer')),
             'baggage_processor': stack.enter_context(patch('sap_cloud_sdk.core.telemetry.auto_instrument.BaggageSpanProcessor')),
+            'identity_processor': stack.enter_context(patch('sap_cloud_sdk.core.telemetry.auto_instrument.InvokeAgentIdentitySpanProcessor')),
             'get_tracer_provider': stack.enter_context(patch('sap_cloud_sdk.core.telemetry.auto_instrument.trace.get_tracer_provider', return_value=create_autospec(SDKTracerProvider))),
             'create_resource': stack.enter_context(patch('sap_cloud_sdk.core.telemetry.auto_instrument.create_resource_attributes_from_env')),
             'get_app_name': stack.enter_context(patch('sap_cloud_sdk.core.telemetry.auto_instrument._get_app_name')),
@@ -220,15 +221,21 @@ class TestAutoInstrument:
             call_kwargs = mock_traceloop_components['traceloop'].init.call_args[1]
             assert call_kwargs['disable_batch'] is True
 
-    def test_auto_instrument_passes_baggage_span_processor(self, mock_traceloop_components):
-        """Test that auto_instrument registers a BaggageSpanProcessor on the tracer provider."""
+    def test_auto_instrument_registers_sdk_span_processors(self, mock_traceloop_components):
+        """Test that auto_instrument registers BaggageSpanProcessor and InvokeAgentIdentitySpanProcessor."""
         mock_traceloop_components['get_app_name'].return_value = 'test-app'
         mock_traceloop_components['create_resource'].return_value = {}
-        mock_processor_instance = MagicMock()
-        mock_traceloop_components['baggage_processor'].return_value = mock_processor_instance
+        mock_baggage_instance = MagicMock()
+        mock_identity_instance = MagicMock()
+        mock_traceloop_components['baggage_processor'].return_value = mock_baggage_instance
+        mock_traceloop_components['identity_processor'].return_value = mock_identity_instance
 
         with patch.dict('os.environ', {'OTEL_EXPORTER_OTLP_ENDPOINT': 'http://localhost:4317'}, clear=True):
             auto_instrument()
 
             mock_traceloop_components['baggage_processor'].assert_called_once()
-            mock_traceloop_components['get_tracer_provider'].return_value.add_span_processor.assert_called_once_with(mock_processor_instance)
+            mock_traceloop_components['identity_processor'].assert_called_once()
+            provider = mock_traceloop_components['get_tracer_provider'].return_value
+            provider.add_span_processor.assert_has_calls(
+                [call(mock_baggage_instance), call(mock_identity_instance)]
+            )

@@ -9,8 +9,6 @@ by auto_instrument().
 from contextlib import contextmanager, nullcontext
 from typing import Optional, Dict, Any
 
-from opentelemetry import baggage as otel_baggage
-from opentelemetry import context as otel_context
 from opentelemetry import trace
 from opentelemetry.trace import Status, StatusCode, Span
 
@@ -19,6 +17,7 @@ from sap_cloud_sdk.core.telemetry.telemetry import (
     get_tenant_id,
     get_propagated_attributes,
     _propagated_attrs_var,
+    _invoke_agent_identity_var,
 )
 from sap_cloud_sdk.core.telemetry.constants import ATTR_SAP_TENANT_ID
 
@@ -49,29 +48,30 @@ def _propagate_attributes(attrs: Dict[str, Any]):
 
 
 @contextmanager
-def _otel_baggage_for_invoke_agent(span_attrs: Dict[str, Any]):
-    """Mirror gen_ai.agent.* identity into W3C Baggage for the duration of the context.
+def _invoke_agent_identity_scope(span_attrs: Dict[str, Any]):
+    """Push gen_ai.agent.{name,id,description} onto a ContextVar for the duration of the context.
 
-    Third-party instrumentations (e.g. LangGraph / Traceloop) create spans without merging
-    :func:`get_propagated_attributes`. :class:`~opentelemetry.processor.baggage.BaggageSpanProcessor`
-    (registered by :func:`sap_cloud_sdk.core.telemetry.auto_instrument.auto_instrument`) copies
-    baggage onto every started span, so agent id/name stay consistent on those spans.
+    Third-party instrumentations create spans without merging :func:`get_propagated_attributes`.
+    :class:`~sap_cloud_sdk.core.telemetry.invoke_agent_identity_processor.InvokeAgentIdentitySpanProcessor`
+    (registered by :func:`sap_cloud_sdk.core.telemetry.auto_instrument.auto_instrument`) copies these
+    values onto every started span while the scope is active, without using W3C Baggage.
     """
     keys = (
         _ATTR_GEN_AI_AGENT_NAME,
         _ATTR_GEN_AI_AGENT_ID,
         _ATTR_GEN_AI_AGENT_DESCRIPTION,
     )
-    ctx = otel_context.get_current()
-    for key in keys:
-        val = span_attrs.get(key)
-        if val is not None:
-            ctx = otel_baggage.set_baggage(key, str(val), ctx)
-    token = otel_context.attach(ctx)
+    patch_dict = {k: str(span_attrs[k]) for k in keys if span_attrs.get(k) is not None}
+    if not patch_dict:
+        yield
+        return
+    prev = _invoke_agent_identity_var.get()
+    merged: Dict[str, str] = {**(prev or {}), **patch_dict}
+    token = _invoke_agent_identity_var.set(merged)
     try:
         yield
     finally:
-        otel_context.detach(token)
+        _invoke_agent_identity_var.reset(token)
 
 
 @contextmanager
@@ -309,9 +309,10 @@ def invoke_agent_span(
         attributes: Optional dict of extra attributes to add or override on the span.
         propagate: If True, this span's attributes are passed to all nested spans
                    within its scope as the lowest-priority layer. Additionally,
-                   ``gen_ai.agent.{name,id,description}`` are attached as OpenTelemetry
-                   **Baggage** so spans created by external instrumentations still receive
-                   those attributes when BaggageSpanProcessor is active.
+                   ``gen_ai.agent.{name,id,description}`` are stored in a ContextVar and
+                   copied onto every nested span by
+                   :class:`~sap_cloud_sdk.core.telemetry.invoke_agent_identity_processor.InvokeAgentIdentitySpanProcessor`
+                   when it is registered (e.g. via :func:`sap_cloud_sdk.core.telemetry.auto_instrument.auto_instrument`).
 
     Yields:
         The created Span (e.g. to set usage, response attributes).
@@ -356,11 +357,11 @@ def invoke_agent_span(
     span_attrs = {**propagated, **(attributes or {}), **base_attrs}
 
     ctx_prop = _propagate_attributes(span_attrs) if propagate else nullcontext()
-    ctx_baggage = (
-        _otel_baggage_for_invoke_agent(span_attrs) if propagate else nullcontext()
+    ctx_identity = (
+        _invoke_agent_identity_scope(span_attrs) if propagate else nullcontext()
     )
     with ctx_prop:
-        with ctx_baggage:
+        with ctx_identity:
             with tracer.start_as_current_span(
                 span_name,
                 kind=kind,

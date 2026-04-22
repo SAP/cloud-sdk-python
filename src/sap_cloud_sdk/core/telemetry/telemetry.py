@@ -36,6 +36,16 @@ _propagated_attrs_var: ContextVar[Dict[str, Any]] = ContextVar(
     "propagated_attrs", default={}
 )
 
+# In-process identity for invoke_agent_span(propagate=True) — injected via SpanProcessor
+_invoke_agent_identity_var: ContextVar[Optional[Dict[str, str]]] = ContextVar(
+    "sap_cloud_sdk_invoke_agent_identity", default=None
+)
+
+
+def get_invoke_agent_identity() -> Optional[Dict[str, str]]:
+    """Return merged ``gen_ai.agent.*`` identity for the current invoke_agent propagation scope."""
+    return _invoke_agent_identity_var.get()
+
 
 def set_tenant_id(tenant_id: str) -> None:
     """Set the tenant ID for the current request context.

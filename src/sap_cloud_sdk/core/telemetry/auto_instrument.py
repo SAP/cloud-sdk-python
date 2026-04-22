@@ -24,6 +24,9 @@ from sap_cloud_sdk.core.telemetry.config import (
 from sap_cloud_sdk.core.telemetry.genai_attribute_transformer import (
     GenAIAttributeTransformer,
 )
+from sap_cloud_sdk.core.telemetry.invoke_agent_identity_processor import (
+    InvokeAgentIdentitySpanProcessor,
+)
 from sap_cloud_sdk.core.telemetry.metrics_decorator import record_metrics
 
 logger = logging.getLogger(__name__)
@@ -62,7 +65,7 @@ def auto_instrument(disable_batch: bool = False):
         disable_batch=disable_batch,
     )
 
-    _set_baggage_processor()
+    _register_sdk_span_processors()
 
     logger.info("Cloud auto instrumentation initialized successfully")
 
@@ -88,11 +91,18 @@ def _create_exporter() -> SpanExporter:
     return exporters[protocol]()
 
 
-def _set_baggage_processor():
+def _register_sdk_span_processors():
     provider = trace.get_tracer_provider()
     if not isinstance(provider, TracerProvider):
-        logger.warning("Unknown TracerProvider type. Skipping BaggageSpanProcessor")
+        logger.warning(
+            "Unknown TracerProvider type. Skipping BaggageSpanProcessor and "
+            "InvokeAgentIdentitySpanProcessor"
+        )
         return
 
     provider.add_span_processor(BaggageSpanProcessor(ALLOW_ALL_BAGGAGE_KEYS))
     logger.info("Registered BaggageSpanProcessor for extension attribute propagation")
+    provider.add_span_processor(InvokeAgentIdentitySpanProcessor())
+    logger.info(
+        "Registered InvokeAgentIdentitySpanProcessor for invoke_agent identity propagation"
+    )

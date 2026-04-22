@@ -78,12 +78,14 @@ def _worker_main() -> int:
     """Single-process OTLP emit + Jaeger assert (import OTEL only here)."""
     from opentelemetry import trace
     from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
-    from opentelemetry.processor.baggage import ALLOW_ALL_BAGGAGE_KEYS, BaggageSpanProcessor
     from opentelemetry.sdk.resources import Resource
     from opentelemetry.sdk.trace import TracerProvider
     from opentelemetry.sdk.trace.export import BatchSpanProcessor
     from opentelemetry.trace import SpanKind
 
+    from sap_cloud_sdk.core.telemetry.invoke_agent_identity_processor import (
+        InvokeAgentIdentitySpanProcessor,
+    )
     from sap_cloud_sdk.core.telemetry.tracer import invoke_agent_span
 
     p = argparse.ArgumentParser()
@@ -102,7 +104,7 @@ def _worker_main() -> int:
     resource = Resource.create({"service.name": svc})
     exporter = OTLPSpanExporter(endpoint=_grpc_host_port(args.otlp_endpoint), insecure=True)
     provider = TracerProvider(resource=resource)
-    provider.add_span_processor(BaggageSpanProcessor(ALLOW_ALL_BAGGAGE_KEYS))
+    provider.add_span_processor(InvokeAgentIdentitySpanProcessor())
     provider.add_span_processor(BatchSpanProcessor(exporter))
     trace.set_tracer_provider(provider)
 

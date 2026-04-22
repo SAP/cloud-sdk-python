@@ -873,7 +873,7 @@ class TestInvokeAgentSpan:
 
         mock_span.add_event.assert_called_once_with("agent_step")
 
-    def test_invoke_agent_propagate_baggage_applies_to_external_tracer_span_subprocess(self):
+    def test_invoke_agent_propagate_identity_subprocess(self):
         """Regression SAP/cloud-sdk-python#55: third-party spans get gen_ai.agent.* via SpanProcessor."""
         import os
         import subprocess
@@ -881,7 +881,7 @@ class TestInvokeAgentSpan:
         from pathlib import Path
 
         root = Path(__file__).resolve().parents[4]
-        script = root / "tests/core/unit/telemetry/verify_invoke_agent_baggage.py"
+        script = root / "tests/core/unit/telemetry/verify_invoke_agent_identity_subprocess.py"
         env = os.environ.copy()
         env["PYTHONPATH"] = str(root / "src")
         result = subprocess.run(
@@ -895,7 +895,7 @@ class TestInvokeAgentSpan:
             f"stderr={result.stderr}\nstdout={result.stdout}"
         )
 
-    def test_invoke_agent_propagate_false_skips_baggage_for_external_tracer_span_subprocess(
+    def test_invoke_agent_propagate_false_skips_identity_subprocess(
         self,
     ):
         """Invoke-agent identity propagation runs only when propagate=True."""
@@ -905,7 +905,7 @@ class TestInvokeAgentSpan:
         from pathlib import Path
 
         root = Path(__file__).resolve().parents[4]
-        script = root / "tests/core/unit/telemetry/verify_invoke_agent_baggage.py"
+        script = root / "tests/core/unit/telemetry/verify_invoke_agent_identity_subprocess.py"
         env = os.environ.copy()
         env["PYTHONPATH"] = str(root / "src")
         result = subprocess.run(

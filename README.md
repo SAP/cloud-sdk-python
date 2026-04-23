@@ -23,14 +23,22 @@ The Python SDK offers a clean, type-safe API following Python best practices whi
 
 ### Installation
 
-```python
-# uv
+
+#### uv
+
+```bash
 uv add sap-cloud-sdk
+```
 
-# Poetry
+#### Poetry
+
+```bash
 poetry add sap-cloud-sdk
+```
 
-# Pip
+#### pip
+
+```bash
 pip install sap-cloud-sdk
 ````
 

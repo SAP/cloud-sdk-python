@@ -22,6 +22,10 @@ ATTR_SAP_SYSTEM_ROLE = "sap.cld.system_role"
 ATTR_SAP_SDK_NAME = "sap.cloud_sdk.name"
 ATTR_SAP_SDK_LANGUAGE = "sap.cloud_sdk.language"
 ATTR_SAP_SDK_VERSION = "sap.cloud_sdk.version"
+ATTR_SAP_SOLUTION_AREA = "sap.solution_area"
+
+# Attribute keys - MLflow
+ATTR_MLFLOW_EXPERIMENT_ID = "mlflow.experiment_id"
 
 # Attribute keys - SAP App Foundation specific
 ATTR_CAPABILITY = "sap.cloud_sdk.capability"

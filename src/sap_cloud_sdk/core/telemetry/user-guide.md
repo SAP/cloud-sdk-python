@@ -233,3 +233,9 @@ auto_instrument(disable_batch=True)
 ```bash
 export APPFND_CONHOS_SYSTEM_ROLE="S4HC"
 ```
+
+### Solution area
+
+```bash
+export SAP_SOLUTION_AREA="AFND"
+```

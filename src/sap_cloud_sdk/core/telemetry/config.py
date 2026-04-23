@@ -15,6 +15,8 @@ from sap_cloud_sdk.core.telemetry.constants import (
     ATTR_SAP_SDK_NAME,
     ATTR_SAP_SDK_LANGUAGE,
     ATTR_SAP_SDK_VERSION,
+    ATTR_SAP_SOLUTION_AREA,
+    ATTR_MLFLOW_EXPERIMENT_ID,
     SDK_NAME,
 )
 
@@ -29,6 +31,8 @@ ENV_APP_NAME = "APPFND_CONHOS_APP_NAME"
 ENV_OTEL_SERVICE_NAME = "OTEL_SERVICE_NAME"
 ENV_HOSTNAME = "HOSTNAME"
 ENV_SYSTEM_ROLE = "APPFND_CONHOS_SYSTEM_ROLE"
+ENV_SOLUTION_AREA = "SAP_SOLUTION_AREA"
+ENV_MLFLOW_EXPERIMENT_ID = "MLFLOW_EXPERIMENT_ID"
 
 # OTEL environment variable keys
 ENV_OTLP_ENDPOINT = "OTEL_EXPORTER_OTLP_ENDPOINT"
@@ -72,6 +76,28 @@ def _get_system_role() -> str:
     return os.getenv(ENV_SYSTEM_ROLE, DEFAULT_UNKNOWN)
 
 
+def _get_solution_area() -> str:
+    """Get SAP Solution Area code from environment or return default.
+
+    Returns:
+        Solution area from SAP_SOLUTION_AREA environment variable,
+        or "unknown" if not set.
+    """
+    return os.getenv(ENV_SOLUTION_AREA, DEFAULT_UNKNOWN)
+
+
+def _get_mlflow_experiment_id() -> Optional[str]:
+    """Get MLflow experiment ID from environment.
+
+    Returns:
+        Value of MLFLOW_EXPERIMENT_ID, or None if the env var is missing
+        or empty. No placeholder default is used so the attribute can be
+        omitted from the resource entirely when unset.
+    """
+    value = os.getenv(ENV_MLFLOW_EXPERIMENT_ID)
+    return value if value else None
+
+
 def create_resource_attributes_from_env() -> dict:
     """Create OpenTelemetry Resource with SDK attributes.
 
@@ -90,6 +116,8 @@ def create_resource_attributes_from_env() -> dict:
         - sap.cloud_sdk.name (constant: "SAP Cloud SDK for Python")
         - sap.cloud_sdk.language (constant: "python")
         - sap.cloud_sdk.version (from package version)
+        - sap.solution_area (from SAP_SOLUTION_AREA, defaults to "unknown")
+        - mlflow.experiment_id (from MLFLOW_EXPERIMENT_ID, omitted when unset or empty)
     """
 
     attributes = {
@@ -103,7 +131,12 @@ def create_resource_attributes_from_env() -> dict:
         ATTR_SAP_SDK_NAME: SDK_NAME,
         ATTR_SAP_SDK_LANGUAGE: "python",
         ATTR_SAP_SDK_VERSION: get_version(),
+        ATTR_SAP_SOLUTION_AREA: _get_solution_area(),
     }
+
+    mlflow_experiment_id = _get_mlflow_experiment_id()
+    if mlflow_experiment_id is not None:
+        attributes[ATTR_MLFLOW_EXPERIMENT_ID] = mlflow_experiment_id
 
     return attributes
 

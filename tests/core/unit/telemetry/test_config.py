@@ -1,13 +1,16 @@
 """Tests for telemetry configuration."""
 
-import pytest
 from unittest.mock import patch
 
 from sap_cloud_sdk.core.telemetry.config import (
     InstrumentationConfig,
+    create_resource_attributes_from_env,
     get_config,
     set_config,
-    _config
+)
+from sap_cloud_sdk.core.telemetry.constants import (
+    ATTR_MLFLOW_EXPERIMENT_ID,
+    ATTR_SAP_SOLUTION_AREA,
 )
 
 
@@ -169,3 +172,64 @@ class TestGlobalConfig:
 
         assert get_config() is config2
         assert get_config() is not config1
+
+
+class TestCreateResourceAttributesFromEnv:
+    """Test suite for create_resource_attributes_from_env."""
+
+    def test_solution_area_defaults_to_unknown(self):
+        """sap.solution_area defaults to 'unknown' when env var is unset."""
+        with patch.dict('os.environ', {}, clear=True):
+            attrs = create_resource_attributes_from_env()
+
+            assert attrs[ATTR_SAP_SOLUTION_AREA] == "unknown"
+
+    def test_mlflow_experiment_id_omitted_when_unset(self):
+        """mlflow.experiment_id is omitted entirely when env var is unset.
+
+        We deliberately do not emit a placeholder value because that would
+        pollute MLflow and mislead downstream routing logic.
+        """
+        with patch.dict('os.environ', {}, clear=True):
+            attrs = create_resource_attributes_from_env()
+
+            assert ATTR_MLFLOW_EXPERIMENT_ID not in attrs
+
+    def test_mlflow_experiment_id_omitted_when_empty(self):
+        """mlflow.experiment_id is omitted when env var is an empty string."""
+        with patch.dict('os.environ', {'MLFLOW_EXPERIMENT_ID': ''}, clear=True):
+            attrs = create_resource_attributes_from_env()
+
+            assert ATTR_MLFLOW_EXPERIMENT_ID not in attrs
+
+    def test_solution_area_read_from_env(self):
+        """sap.solution_area resource attribute is read from SAP_SOLUTION_AREA."""
+        with patch.dict('os.environ', {'SAP_SOLUTION_AREA': 'HCM'}, clear=True):
+            attrs = create_resource_attributes_from_env()
+
+            assert attrs[ATTR_SAP_SOLUTION_AREA] == "HCM"
+
+    def test_mlflow_experiment_id_read_from_env(self):
+        """mlflow.experiment_id resource attribute is read from MLFLOW_EXPERIMENT_ID."""
+        with patch.dict('os.environ', {'MLFLOW_EXPERIMENT_ID': '42'}, clear=True):
+            attrs = create_resource_attributes_from_env()
+
+            assert attrs[ATTR_MLFLOW_EXPERIMENT_ID] == "42"
+
+    def test_both_new_attributes_read_together(self):
+        """Both new attributes are populated independently from their env vars."""
+        with patch.dict('os.environ', {
+            'SAP_SOLUTION_AREA': 'FIN',
+            'MLFLOW_EXPERIMENT_ID': 'exp-123',
+        }, clear=True):
+            attrs = create_resource_attributes_from_env()
+
+            assert attrs[ATTR_SAP_SOLUTION_AREA] == "FIN"
+            assert attrs[ATTR_MLFLOW_EXPERIMENT_ID] == "exp-123"
+
+    def test_solution_area_key_always_present(self):
+        """sap.solution_area is always emitted (defaults to 'unknown')."""
+        with patch.dict('os.environ', {}, clear=True):
+            attrs = create_resource_attributes_from_env()
+
+            assert "sap.solution_area" in attrs

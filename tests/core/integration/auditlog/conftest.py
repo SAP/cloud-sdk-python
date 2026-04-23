@@ -23,7 +23,7 @@ def auditlog_client():
         client = create_client()
         return client
     except Exception as e:
-        pytest.fail(f"Failed to create AuditLog client for cloud integration tests: {e}")  # ty: ignore[invalid-argument-type]
+        pytest.fail(f"Failed to create AuditLog client for cloud integration tests: {e}")
 
 
 @pytest.fixture

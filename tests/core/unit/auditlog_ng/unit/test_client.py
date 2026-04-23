@@ -33,7 +33,7 @@ def _make_config(**overrides: Unpack[ConfigKwargs]) -> AuditLogNGConfig:
         "namespace": "namespace-123",
         "insecure": True,
     }
-    defaults.update(overrides)
+    defaults.update(overrides)  # ty: ignore[invalid-argument-type]
     return AuditLogNGConfig(**defaults)
 
 

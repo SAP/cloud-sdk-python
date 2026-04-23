@@ -141,6 +141,32 @@ class TestListInstanceFragments:
         assert len(result) == 1
         assert result[0].name == "inst"
 
+    def test_without_tenant_excludes_tenant_entries(self, client):
+        _write_store(client, {"instance": [
+            {"FragmentName": "provider", "URL": "https://a.com"},
+            {"FragmentName": "subscriber", "URL": "https://b.com", "tenant": "t1"},
+        ], "subaccount": []})
+        result = client.list_instance_fragments()
+        assert len(result) == 1
+        assert result[0].name == "provider"
+
+    def test_with_tenant_returns_only_matching_entries(self, client):
+        _write_store(client, {"instance": [
+            {"FragmentName": "provider", "URL": "https://a.com"},
+            {"FragmentName": "t1-frag", "URL": "https://b.com", "tenant": "t1"},
+            {"FragmentName": "t2-frag", "URL": "https://c.com", "tenant": "t2"},
+        ], "subaccount": []})
+        result = client.list_instance_fragments(tenant="t1")
+        assert len(result) == 1
+        assert result[0].name == "t1-frag"
+
+    def test_with_tenant_returns_empty_when_no_match(self, client):
+        _write_store(client, {"instance": [
+            {"FragmentName": "provider", "URL": "https://a.com"},
+        ], "subaccount": []})
+        result = client.list_instance_fragments(tenant="unknown")
+        assert result == []
+
 
 class TestListSubaccountFragments:
     def test_returns_list_of_fragments(self, client):

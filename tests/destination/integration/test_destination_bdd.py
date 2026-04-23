@@ -414,6 +414,19 @@ def list_instance_destinations(context, destination_client):
         context.operation_error = e
 
 
+@when("I list instance destinations with tenant")
+def list_instance_destinations_with_tenant(context, destination_client):
+    """List all instance-level destinations using subscriber tenant context."""
+    try:
+        context.retrieved_destinations = destination_client.list_instance_destinations(
+            tenant=context.tenant
+        )
+        context.operation_success = True
+    except Exception as e:
+        context.operation_success = False
+        context.operation_error = e
+
+
 @when(parsers.parse('I list subaccount destinations with "{strategy}" access strategy'))
 def list_subaccount_destinations_with_access_strategy(context, destination_client, strategy):
     """List subaccount destinations with access strategy."""

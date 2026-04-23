@@ -416,6 +416,22 @@ class TestFragmentClientListOperations:
 
         assert "expected list in response" in str(exc_info.value)
 
+    def test_list_instance_fragments_with_tenant(self, fragment_client, mock_http):
+        """Test listing instance fragments with a tenant subdomain."""
+        mock_response = Mock(spec=Response)
+        mock_response.json.return_value = [
+            {"FragmentName": "frag1", "URL": "https://api1.example.com"}
+        ]
+        mock_http.get.return_value = mock_response
+
+        fragments = fragment_client.list_instance_fragments(tenant="my-tenant")
+
+        assert len(fragments) == 1
+        assert fragments[0].name == "frag1"
+        mock_http.get.assert_called_once_with(
+            "v1/instanceDestinationFragments", tenant_subdomain="my-tenant", params={}
+        )
+
     def test_list_subaccount_fragments_provider_only(self, fragment_client, mock_http):
         """Test listing subaccount fragments with PROVIDER_ONLY strategy."""
         # Setup mock response

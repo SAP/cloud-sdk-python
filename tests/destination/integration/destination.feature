@@ -107,6 +107,20 @@ Feature: Destination Service Integration
     And the destination "test-list-inst-3" should be in the list
     And I clean up all instance destinations
 
+  # Scenario: List instance destinations with tenant (subscriber context)
+  #   Given I have multiple instance destinations:
+  #     | name                  | type | url                      |
+  #     | test-list-inst-ten-1  | HTTP | https://api1.example.com |
+  #     | test-list-inst-ten-2  | HTTP | https://api2.example.com |
+  #   And I use tenant "1776453780"
+  #   When I create all instance destinations
+  #   Then all destination creations should be successful
+  #   When I list instance destinations with tenant
+  #   Then the list should contain at least 2 destinations
+  #   And the destination "test-list-inst-ten-1" should be in the list
+  #   And the destination "test-list-inst-ten-2" should be in the list
+  #   And I clean up all instance destinations
+
   # Scenario: Create and list subaccount destinations (provider access)
   #   Given I have multiple subaccount destinations:
   #     | name            | type | url                      |

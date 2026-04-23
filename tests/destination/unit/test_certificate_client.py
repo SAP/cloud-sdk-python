@@ -452,6 +452,23 @@ class TestCertificateClientListOperations:
 
         assert "invalid JSON in list certificates response" in str(exc_info.value)
 
+    def test_list_instance_certificates_with_tenant(self, certificate_client, mock_http):
+        """Test listing instance certificates with a tenant subdomain."""
+        mock_response = Mock(spec=Response)
+        mock_response.headers = {}
+        mock_response.json.return_value = [
+            {"Name": "cert1.pem", "Content": "content1", "Type": "PEM"}
+        ]
+        mock_http.get.return_value = mock_response
+
+        certificates = certificate_client.list_instance_certificates(tenant="my-tenant")
+
+        assert len(certificates.items) == 1
+        assert certificates.items[0].name == "cert1.pem"
+        mock_http.get.assert_called_once_with(
+            "v1/instanceCertificates", tenant_subdomain="my-tenant", params={}
+        )
+
     def test_list_subaccount_certificates_requires_tenant_for_subscriber_access(self, certificate_client, mock_http):
         """Test that subscriber access strategies require tenant parameter."""
         # Test SUBSCRIBER_ONLY

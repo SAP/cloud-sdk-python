@@ -127,11 +127,15 @@ class DestinationClient:
         Module.DESTINATION, Operation.DESTINATION_LIST_INSTANCE_DESTINATIONS
     )
     def list_instance_destinations(
-        self, filter: Optional[ListOptions] = None
+        self,
+        tenant: Optional[str] = None,
+        filter: Optional[ListOptions] = None,
     ) -> PagedResult[Destination]:
         """List all destinations from the service instance scope.
 
         Args:
+            tenant: Optional subscriber tenant subdomain. When provided, the request uses
+                subscriber context; otherwise the provider context is used.
             filter: Optional filter configuration for pagination, filtering, or metadata inclusion.
 
         Returns:
@@ -144,7 +148,7 @@ class DestinationClient:
         """
         try:
             return self._list_destinations(
-                level=Level.SERVICE_INSTANCE, tenant_subdomain=None, filter=filter
+                level=Level.SERVICE_INSTANCE, tenant_subdomain=tenant, filter=filter
             )
         except HttpError as e:
             raise DestinationOperationError(

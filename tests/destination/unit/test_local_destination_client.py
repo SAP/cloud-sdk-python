@@ -164,6 +164,32 @@ class TestListInstanceDestinations:
         assert len(result.items) == 1
         assert result.items[0].name == "inst"
 
+    def test_without_tenant_excludes_tenant_entries(self, client):
+        _write_store(client, {"instance": [
+            {"name": "provider", "type": "HTTP"},
+            {"name": "subscriber", "type": "HTTP", "tenant": "t1"},
+        ], "subaccount": []})
+        result = client.list_instance_destinations()
+        assert len(result.items) == 1
+        assert result.items[0].name == "provider"
+
+    def test_with_tenant_returns_only_matching_entries(self, client):
+        _write_store(client, {"instance": [
+            {"name": "provider", "type": "HTTP"},
+            {"name": "t1-dest", "type": "HTTP", "tenant": "t1"},
+            {"name": "t2-dest", "type": "HTTP", "tenant": "t2"},
+        ], "subaccount": []})
+        result = client.list_instance_destinations(tenant="t1")
+        assert len(result.items) == 1
+        assert result.items[0].name == "t1-dest"
+
+    def test_with_tenant_returns_empty_when_no_match(self, client):
+        _write_store(client, {"instance": [
+            {"name": "provider", "type": "HTTP"},
+        ], "subaccount": []})
+        result = client.list_instance_destinations(tenant="unknown")
+        assert len(result.items) == 0
+
 
 class TestListSubaccountDestinations:
     def test_returns_paged_result(self, client):

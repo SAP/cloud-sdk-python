@@ -130,11 +130,14 @@ class FragmentClient:
     @record_metrics(Module.DESTINATION, Operation.FRAGMENT_LIST_INSTANCE_FRAGMENTS)
     def list_instance_fragments(
         self,
+        tenant: Optional[str] = None,
         filter: Optional[ListOptions] = None,
     ) -> List[Fragment]:
         """List all fragments from the service instance scope.
 
         Args:
+            tenant: Optional subscriber tenant subdomain. When provided, the request uses
+                subscriber context; otherwise the provider context is used.
             filter: Optional filter configuration for label filtering.
 
         Returns:
@@ -144,7 +147,9 @@ class FragmentClient:
             DestinationOperationError: If an HTTP error occurs or response parsing fails.
         """
         try:
-            return self._list_fragments(level=Level.SERVICE_INSTANCE, filter=filter)
+            return self._list_fragments(
+                level=Level.SERVICE_INSTANCE, tenant_subdomain=tenant, filter=filter
+            )
         except HttpError as e:
             raise DestinationOperationError(f"failed to list instance fragments: {e}")
 

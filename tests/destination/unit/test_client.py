@@ -1309,6 +1309,24 @@ class TestDestinationClientListOperations:
         with pytest.raises(DestinationOperationError, match="expected list in response"):
             client.list_instance_destinations()
 
+    def test_list_instance_destinations_with_tenant(self):
+        mock_http = MagicMock()
+        resp = MagicMock(spec=Response)
+        resp.status_code = 200
+        resp.headers = {}
+        resp.json.return_value = [{"name": "dest1", "type": "HTTP"}]
+        mock_http.get.return_value = resp
+
+        client = DestinationClient(mock_http)
+        result = client.list_instance_destinations(tenant="my-tenant")
+
+        assert isinstance(result, PagedResult)
+        assert len(result.items) == 1
+
+        args, kwargs = mock_http.get.call_args
+        assert args[0] == "v1/instanceDestinations"
+        assert kwargs.get("tenant_subdomain") == "my-tenant"
+
     def test_list_subaccount_destinations_requires_tenant_for_subscriber_access(self):
         client = DestinationClient(MagicMock())
 

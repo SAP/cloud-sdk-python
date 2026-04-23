@@ -79,11 +79,14 @@ class CertificateClient:
     )
     def list_instance_certificates(
         self,
+        tenant: Optional[str] = None,
         filter: Optional[ListOptions] = None,
     ) -> PagedResult[Certificate]:
         """List all certificates at the service instance level.
 
         Args:
+            tenant: Optional subscriber tenant subdomain. When provided, the request uses
+                subscriber context; otherwise the provider context is used.
             filter: Optional filter configuration for query parameters.
 
         Returns:
@@ -95,7 +98,9 @@ class CertificateClient:
             DestinationOperationError: If HTTP error occurs or response parsing fails.
         """
         try:
-            return self._list_certificates(level=Level.SERVICE_INSTANCE, filter=filter)
+            return self._list_certificates(
+                level=Level.SERVICE_INSTANCE, tenant_subdomain=tenant, filter=filter
+            )
         except HttpError as e:
             raise DestinationOperationError(
                 f"failed to list instance certificates: {e}"

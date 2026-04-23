@@ -282,6 +282,7 @@ class DestinationClient:
         level: Optional[Level] = None,
         options: Optional[ConsumptionOptions] = None,
         proxy_enabled: Optional[bool] = None,
+        tenant: Optional[str] = None,
     ) -> Optional[Destination | TransparentProxyDestination]:
         """Consume a destination using the v2 runtime API.
 
@@ -302,6 +303,8 @@ class DestinationClient:
                 headers (fragment merging, token exchange, SAML, OAuth2 flows, chains, etc.).
             proxy_enabled: Whether to route the request through a transparent proxy (if
                 configured). If None, uses the client's default proxy_enabled setting.
+            tenant: Optional subscriber tenant subdomain. When provided, sets the X-tenant
+                header. Takes precedence over options.tenant if both are provided.
 
         Returns:
             Destination with auth_tokens and certificates populated from v2 API,
@@ -333,12 +336,13 @@ class DestinationClient:
             )
 
             # Tenant context
-            dest = client.get_destination("my-api", options=ConsumptionOptions(tenant="tenant-1"))
+            dest = client.get_destination("my-api", tenant="tenant-1")
 
             # User token exchange (OAuth2UserTokenExchange / OAuth2JWTBearer)
             dest = client.get_destination(
                 "my-api",
-                options=ConsumptionOptions(user_token="<jwt>", tenant="tenant-1"),
+                options=ConsumptionOptions(user_token="<jwt>"),
+                tenant="tenant-1",
             )
 
             # With transparent proxy enabled
@@ -395,7 +399,7 @@ class DestinationClient:
             else:
                 path = f"{API_V2}/destinations/{name}"
 
-            resp = self._http.get(path, headers=headers)
+            resp = self._http.get(path, headers=headers, tenant_subdomain=tenant)
             data = resp.json()
 
             # Parse v2 response: destinationConfiguration + authTokens + certificates

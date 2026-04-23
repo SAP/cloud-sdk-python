@@ -274,11 +274,11 @@ message AuthnUserToGroupDelete {
   Common common = 1 ;
   string group = 2 [
     (buf.validate.field).string.min_len = 1
-    
+
   ];
   string user = 3 [
     (buf.validate.field).string.min_len = 1
-    
+
   ];
   UserType user_type = 4;
 }
@@ -295,7 +295,7 @@ message ConfigurationAdd {
   google.protobuf.Value value = 2 ;
   string property_name = 3 [
     (buf.validate.field).string.min_len = 1
-    
+
   ];
   string object_type = 4 [(buf.validate.field).string.max_len = 20];
   string object_id = 5;
@@ -314,7 +314,7 @@ message ConfigurationChange {
   google.protobuf.Value old_value = 3 ;
   string property_name = 4 [
     (buf.validate.field).string.min_len = 1
-    
+
   ];
   string object_type = 5 [(buf.validate.field).string.max_len = 20];
   string object_id = 6;
@@ -332,7 +332,7 @@ message ConfigurationDelete {
   google.protobuf.Value value = 2 ;
   string property_name = 3 [
     (buf.validate.field).string.min_len = 1
-    
+
   ];
   string object_type = 4 [(buf.validate.field).string.max_len = 20];
   string object_id = 5;
@@ -349,7 +349,7 @@ message CredentialCreate {
   Common common = 1 ;
   string credential_id = 2 [
     (buf.validate.field).string.min_len = 1
-    
+
   ];
   CredentialType credential_type = 3 ;
 }
@@ -365,7 +365,7 @@ message CredentialDelete {
   Common common = 1 ;
   string credential_id = 2 [
     (buf.validate.field).string.min_len = 1
-    
+
   ];
   CredentialType credential_type = 3 ;
 }
@@ -381,7 +381,7 @@ message CredentialExpiration {
   Common common = 1 ;
   string credential_id = 2 [
     (buf.validate.field).string.min_len = 1
-    
+
   ];
   CredentialType credential_type = 3 ;
   google.protobuf.Timestamp expiration_date = 4;
@@ -398,7 +398,7 @@ message CredentialRevokation {
   Common common = 1 ;
   string credential_id = 2 [
     (buf.validate.field).string.min_len = 1
-    
+
   ];
   CredentialType credential_type = 3 ;
   google.protobuf.Timestamp revokation_date = 4;
@@ -415,13 +415,13 @@ message DataModelChange {
   Common common = 1 ;
   string model_id = 2 [
     (buf.validate.field).string.min_len = 1
-    
+
   ];
   google.protobuf.Value new_value = 3 ;
   google.protobuf.Value old_value = 4 ;
   string property_name = 5 [
     (buf.validate.field).string.min_len = 1
-    
+
   ];
 }
 
@@ -436,7 +436,7 @@ message DataModelCreate {
   Common common = 1 ;
   string model_id = 2 [
     (buf.validate.field).string.min_len = 1
-    
+
   ];
 }
 
@@ -451,7 +451,7 @@ message DataModelDelete {
   Common common = 1 ;
   string model_id = 2 [
     (buf.validate.field).string.min_len = 1
-    
+
   ];
 }
 
@@ -466,7 +466,7 @@ message DataAccess {
   Common common = 1 ;
   string channel_type = 2 [
     (buf.validate.field).string.min_len = 1
-    
+
   ];
   string channel_id = 3 [
     (buf.validate.field).string.min_len = 1
@@ -474,15 +474,15 @@ message DataAccess {
   ];
   string object_type = 4 [
     (buf.validate.field).string.min_len = 1
-    
+
   ];
   string object_id = 5 [
     (buf.validate.field).string.min_len = 1
-    
+
   ];
   string attribute = 6 [
     (buf.validate.field).string.min_len = 1
-    
+
   ];
   google.protobuf.Value value = 7;
   string attachment_type = 8 [deprecated = true];
@@ -500,15 +500,15 @@ message DataCreate {
   Common common = 1 ;
   string object_type = 2 [
     (buf.validate.field).string.min_len = 1
-    
+
   ];
   string object_id = 3 [
     (buf.validate.field).string.min_len = 1
-    
+
   ];
   string attribute = 4 [
     (buf.validate.field).string.min_len = 1
-    
+
   ];
   google.protobuf.Value value = 5;
 }
@@ -524,15 +524,15 @@ message DataDelete {
   Common common = 1 ;
   string object_type = 2 [
     (buf.validate.field).string.min_len = 1
-    
+
   ];
   string object_id = 3 [
     (buf.validate.field).string.min_len = 1
-    
+
   ];
   string attribute = 4 [
     (buf.validate.field).string.min_len = 1
-    
+
   ];
   google.protobuf.Value value = 5;
 }
@@ -548,15 +548,15 @@ message DataModification {
   Common common = 1 ;
   string object_type = 2 [
     (buf.validate.field).string.min_len = 1
-    
+
   ];
   string object_id = 3 [
     (buf.validate.field).string.min_len = 1
-    
+
   ];
   string attribute = 4 [
     (buf.validate.field).string.min_len = 1
-    
+
   ];
   google.protobuf.Value new_value = 5;
   google.protobuf.Value old_value = 6;
@@ -574,19 +574,19 @@ message DataExport {
   DataExportChannelType channel_type = 2 ;
   string channel_id = 3 [
     (buf.validate.field).string.min_len = 1
-    
+
   ];
   string object_type = 4 [
     (buf.validate.field).string.min_len = 1
-    
+
   ];
   string object_id = 5 [
     (buf.validate.field).string.min_len = 1
-    
+
   ];
   string destination_uri = 6 [
     (buf.validate.field).string.min_len = 1
-    
+
   ];
 }
 
@@ -601,31 +601,31 @@ message DppDataAccess {
   Common common = 1 ;
   string channel_type = 2 [
     (buf.validate.field).string.min_len = 1
-    
+
   ];
   string channel_id = 3 [
     (buf.validate.field).string.min_len = 1
-    
+
   ];
   string data_subject_type = 4 [
     (buf.validate.field).string.min_len = 1
-    
+
   ];
   string data_subject_id = 5 [
     (buf.validate.field).string.min_len = 1
-    
+
   ];
   string object_type = 6 [
     (buf.validate.field).string.min_len = 1
-    
+
   ];
   string object_id = 7 [
     (buf.validate.field).string.min_len = 1
-    
+
   ];
   string attribute = 8 [
     (buf.validate.field).string.min_len = 1
-    
+
   ];
   google.protobuf.Value value = 9;
   string attachment_type = 10 [deprecated = true];
@@ -643,23 +643,23 @@ message DppDataCreate {
   Common common = 1 ;
   string data_subject_type = 2 [
     (buf.validate.field).string.min_len = 1
-    
+
   ];
   string data_subject_id = 3 [
     (buf.validate.field).string.min_len = 1
-    
+
   ];
   string object_type = 4 [
     (buf.validate.field).string.min_len = 1
-    
+
   ];
   string object_id = 5 [
     (buf.validate.field).string.min_len = 1
-    
+
   ];
   string attribute = 6 [
     (buf.validate.field).string.min_len = 1
-    
+
   ];
   google.protobuf.Value value = 7;
 }
@@ -675,23 +675,23 @@ message DppDataDelete {
   Common common = 1 ;
   string data_subject_type = 2 [
     (buf.validate.field).string.min_len = 1
-    
+
   ];
   string data_subject_id = 3 [
     (buf.validate.field).string.min_len = 1
-    
+
   ];
   string object_type = 4 [
     (buf.validate.field).string.min_len = 1
-    
+
   ];
   string object_id = 5 [
     (buf.validate.field).string.min_len = 1
-    
+
   ];
   string attribute = 6 [
     (buf.validate.field).string.min_len = 1
-    
+
   ];
   google.protobuf.Value value = 7;
 }
@@ -707,23 +707,23 @@ message DppDataModification {
   Common common = 1 ;
   string data_subject_type = 2 [
     (buf.validate.field).string.min_len = 1
-    
+
   ];
   string data_subject_id = 3 [
     (buf.validate.field).string.min_len = 1
-    
+
   ];
   string object_type = 4 [
     (buf.validate.field).string.min_len = 1
-    
+
   ];
   string object_id = 5 [
     (buf.validate.field).string.min_len = 1
-    
+
   ];
   string attribute = 6 [
     (buf.validate.field).string.min_len = 1
-    
+
   ];
   google.protobuf.Value new_value = 7;
   google.protobuf.Value old_value = 8;
@@ -740,13 +740,13 @@ message JobChange {
   Common common = 1 ;
   string job_id = 2 [
     (buf.validate.field).string.min_len = 1
-    
+
   ];
   google.protobuf.Value new_value = 3 ;
   google.protobuf.Value old_value = 4 ;
   string property_name = 5 [
     (buf.validate.field).string.min_len = 1
-    
+
   ];
 }
 
@@ -761,7 +761,7 @@ message JobCreate {
   Common common = 1 ;
   string job_id = 2 [
     (buf.validate.field).string.min_len = 1
-    
+
   ];
 }
 
@@ -776,7 +776,7 @@ message JobDelete {
   Common common = 1 ;
   string job_id = 2 [
     (buf.validate.field).string.min_len = 1
-    
+
   ];
 }
 
@@ -791,13 +791,13 @@ message JobStatusChange {
   Common common = 1 ;
   string job_id = 2 [
     (buf.validate.field).string.min_len = 1
-    
+
   ];
   google.protobuf.Value new_value = 3 ;
   google.protobuf.Value old_value = 4 ;
   string property_name = 5 [
     (buf.validate.field).string.min_len = 1
-    
+
   ];
 }
 
@@ -812,7 +812,7 @@ message MaliciousRequestDetected {
   Common common = 1 ;
   string parameter = 2 [
     (buf.validate.field).string.min_len = 1
-    
+
   ];
   string expected_value = 3;
   string received_value = 4;
@@ -830,7 +830,7 @@ message PasswordChange {
   Common common = 1 ;
   string user_id = 2 [
     (buf.validate.field).string.min_len = 1
-    
+
   ];
 }
 
@@ -845,7 +845,7 @@ message PasswordExpiration {
   Common common = 1 ;
   string user_id = 2 [
     (buf.validate.field).string.min_len = 1
-    
+
   ];
 }
 
@@ -860,7 +860,7 @@ message PasswordReset {
   Common common = 1 ;
   string user_id = 2 [
     (buf.validate.field).string.min_len = 1
-    
+
   ];
 }
 
@@ -877,11 +877,11 @@ message TenantModification {
   google.protobuf.Value old_value = 3 ;
   string property_name = 4 [
     (buf.validate.field).string.min_len = 1
-    
+
   ];
   string tenant_id = 5 [
     (buf.validate.field).string.min_len = 1
-    
+
   ];
 }
 
@@ -896,7 +896,7 @@ message TenantOffboarding {
   Common common = 1 ;
   string tenant_id = 2 [
     (buf.validate.field).string.min_len = 1
-    
+
   ];
 }
 
@@ -911,7 +911,7 @@ message TenantOnboarding {
   Common common = 1 ;
   string tenant_id = 2 [
     (buf.validate.field).string.min_len = 1
-    
+
   ];
 }
 
@@ -949,7 +949,7 @@ message UserActivate {
   Common common = 1 ;
   string user_id = 2 [
     (buf.validate.field).string.min_len = 1
-    
+
   ];
   UserType user_type = 3;
 }
@@ -965,7 +965,7 @@ message UserBlock {
   Common common = 1 ;
   string user_id = 2 [
     (buf.validate.field).string.min_len = 1
-    
+
   ];
   UserType user_type = 3;
 }
@@ -981,7 +981,7 @@ message UserCreate {
   Common common = 1 ;
   string user_id = 2 [
     (buf.validate.field).string.min_len = 1
-    
+
   ];
   UserType user_type = 3;
 }
@@ -999,11 +999,11 @@ message UserDataModification {
   google.protobuf.Value old_value = 3 ;
   string property_name = 4 [
     (buf.validate.field).string.min_len = 1
-    
+
   ];
   string user_id = 5 [
     (buf.validate.field).string.min_len = 1
-    
+
   ];
   UserType user_type = 6;
 }
@@ -1019,7 +1019,7 @@ message UserDelete {
   Common common = 1 ;
   string user_id = 2 [
     (buf.validate.field).string.min_len = 1
-    
+
   ];
   UserType user_type = 3;
 }
@@ -1035,12 +1035,12 @@ message UserImpersonationStart {
   Common common = 1 ;
   string user_initiator_id = 2 [
     (buf.validate.field).string.min_len = 1
-    
+
   ];
   UserType user_initiator_type = 3;
   string user_impersonated_id = 4 [
     (buf.validate.field).string.min_len = 1
-    
+
   ];
   UserType user_impersonated_type = 5;
   string context = 6 [(buf.validate.field).string.min_len = 1];
@@ -1057,12 +1057,12 @@ message UserImpersonationFinish {
   Common common = 1 ;
   string user_initiator_id = 2 [
     (buf.validate.field).string.min_len = 1
-    
+
   ];
   UserType user_initiator_type = 3;
   string user_impersonated_id = 4 [
     (buf.validate.field).string.min_len = 1
-    
+
   ];
   UserType user_impersonated_type = 5;
   string context = 6 [(buf.validate.field).string.min_len = 1];
@@ -1079,7 +1079,7 @@ message UserLock {
   Common common = 1 ;
   string user_id = 2 [
     (buf.validate.field).string.min_len = 1
-    
+
   ];
   UserType user_type = 3;
 }
@@ -1095,7 +1095,7 @@ message UserUnlock {
   Common common = 1 ;
   string user_id = 2 [
     (buf.validate.field).string.min_len = 1
-    
+
   ];
   UserType user_type = 3;
 }
@@ -1111,7 +1111,7 @@ message UserVerify {
   Common common = 1 ;
   string user_id = 2 [
     (buf.validate.field).string.min_len = 1
-    
+
   ];
   UserType user_type = 3;
 }

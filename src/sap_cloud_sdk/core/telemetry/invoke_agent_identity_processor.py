@@ -11,7 +11,7 @@ from sap_cloud_sdk.core.telemetry.telemetry import get_invoke_agent_identity
 
 
 class InvokeAgentIdentitySpanProcessor(SpanProcessor):
-    """Apply ``gen_ai.agent.{name,id,description}`` stored in context to each started span.
+    """Apply ``gen_ai.agent.*`` attributes stored in context to each started span.
 
     Values come from :func:`~sap_cloud_sdk.core.telemetry.telemetry.get_invoke_agent_identity`,
     set only while ``invoke_agent_span(..., propagate=True)`` is active. This avoids using

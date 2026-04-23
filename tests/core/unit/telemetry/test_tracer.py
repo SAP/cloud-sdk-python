@@ -873,6 +873,49 @@ class TestInvokeAgentSpan:
 
         mock_span.add_event.assert_called_once_with("agent_step")
 
+    def test_invoke_agent_propagate_true_copies_all_gen_ai_agent_keys_to_nested_span(self):
+        """All ``gen_ai.agent.*`` attributes (including extras) reach nested third-party spans."""
+        from opentelemetry import trace as otel_trace
+        from opentelemetry.sdk.trace import TracerProvider
+        from opentelemetry.sdk.trace.export import SimpleSpanProcessor
+        from opentelemetry.sdk.trace.export.in_memory_span_exporter import (
+            InMemorySpanExporter,
+        )
+
+        from sap_cloud_sdk.core.telemetry.invoke_agent_identity_processor import (
+            InvokeAgentIdentitySpanProcessor,
+        )
+
+        exporter = InMemorySpanExporter()
+        provider = TracerProvider()
+        provider.add_span_processor(InvokeAgentIdentitySpanProcessor())
+        provider.add_span_processor(SimpleSpanProcessor(exporter))
+        previous = otel_trace.get_tracer_provider()
+        otel_trace.set_tracer_provider(provider)
+        try:
+            external = otel_trace.get_tracer("langchain")
+            with invoke_agent_span(
+                provider="openai",
+                agent_name="Bot",
+                agent_id="id-1",
+                attributes={"gen_ai.agent.custom_attr": "extra"},
+                kind=SpanKind.INTERNAL,
+                propagate=True,
+            ):
+                with external.start_as_current_span("invoke_agent"):
+                    pass
+        finally:
+            otel_trace.set_tracer_provider(previous)
+
+        spans = {
+            s.name: dict(s.attributes or {}) for s in exporter.get_finished_spans()
+        }
+        inner = spans.get("invoke_agent")
+        assert inner is not None, spans
+        assert inner.get("gen_ai.agent.name") == "Bot"
+        assert inner.get("gen_ai.agent.id") == "id-1"
+        assert inner.get("gen_ai.agent.custom_attr") == "extra"
+
     def test_invoke_agent_propagate_identity_subprocess(self):
         """Regression SAP/cloud-sdk-python#55: third-party spans get gen_ai.agent.* via SpanProcessor."""
         import os

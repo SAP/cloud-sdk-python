@@ -5,7 +5,7 @@ This module provides functions to record telemetry metrics for SDK operations,
 
 import logging
 from contextvars import ContextVar
-from typing import Optional, Dict, Any
+from typing import Any, Dict, Optional
 
 from opentelemetry import metrics
 
@@ -37,13 +37,13 @@ _propagated_attrs_var: ContextVar[Dict[str, Any]] = ContextVar(
 )
 
 # In-process identity for invoke_agent_span(propagate=True) — injected via SpanProcessor
-_invoke_agent_identity_var: ContextVar[Optional[Dict[str, str]]] = ContextVar(
+_invoke_agent_identity_var: ContextVar[Optional[Dict[str, Any]]] = ContextVar(
     "sap_cloud_sdk_invoke_agent_identity", default=None
 )
 
 
-def get_invoke_agent_identity() -> Optional[Dict[str, str]]:
-    """Return merged ``gen_ai.agent.*`` identity for the current invoke_agent propagation scope."""
+def get_invoke_agent_identity() -> Optional[Dict[str, Any]]:
+    """Return merged ``gen_ai.agent.*`` attributes for the current invoke_agent propagation scope."""
     return _invoke_agent_identity_var.get()
 
 

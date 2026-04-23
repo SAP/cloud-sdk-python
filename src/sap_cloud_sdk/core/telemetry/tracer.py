@@ -34,6 +34,9 @@ _ATTR_GEN_AI_AGENT_DESCRIPTION = "gen_ai.agent.description"
 _ATTR_GEN_AI_CONVERSATION_ID = "gen_ai.conversation.id"
 _ATTR_SERVER_ADDRESS = "server.address"
 
+# All keys under this prefix from invoke_agent_span are mirrored to nested spans via SpanProcessor
+_GEN_AI_AGENT_PREFIX = "gen_ai.agent."
+
 
 @contextmanager
 def _propagate_attributes(attrs: Dict[str, Any]):
@@ -49,24 +52,23 @@ def _propagate_attributes(attrs: Dict[str, Any]):
 
 @contextmanager
 def _invoke_agent_identity_scope(span_attrs: Dict[str, Any]):
-    """Push gen_ai.agent.{name,id,description} onto a ContextVar for the duration of the context.
+    """Push every ``gen_ai.agent.*`` attribute onto a ContextVar for the duration of the context.
 
     Third-party instrumentations create spans without merging :func:`get_propagated_attributes`.
     :class:`~sap_cloud_sdk.core.telemetry.invoke_agent_identity_processor.InvokeAgentIdentitySpanProcessor`
     (registered by :func:`sap_cloud_sdk.core.telemetry.auto_instrument.auto_instrument`) copies these
     values onto every started span while the scope is active, without using W3C Baggage.
     """
-    keys = (
-        _ATTR_GEN_AI_AGENT_NAME,
-        _ATTR_GEN_AI_AGENT_ID,
-        _ATTR_GEN_AI_AGENT_DESCRIPTION,
-    )
-    patch_dict = {k: str(span_attrs[k]) for k in keys if span_attrs.get(k) is not None}
+    patch_dict = {
+        k: v
+        for k, v in span_attrs.items()
+        if k.startswith(_GEN_AI_AGENT_PREFIX) and v is not None
+    }
     if not patch_dict:
         yield
         return
     prev = _invoke_agent_identity_var.get()
-    merged: Dict[str, str] = {**(prev or {}), **patch_dict}
+    merged: Dict[str, Any] = {**(prev or {}), **patch_dict}
     token = _invoke_agent_identity_var.set(merged)
     try:
         yield
@@ -309,7 +311,7 @@ def invoke_agent_span(
         attributes: Optional dict of extra attributes to add or override on the span.
         propagate: If True, this span's attributes are passed to all nested spans
                    within its scope as the lowest-priority layer. Additionally,
-                   ``gen_ai.agent.{name,id,description}`` are stored in a ContextVar and
+                   every ``gen_ai.agent.*`` attribute is stored in a ContextVar and
                    copied onto every nested span by
                    :class:`~sap_cloud_sdk.core.telemetry.invoke_agent_identity_processor.InvokeAgentIdentitySpanProcessor`
                    when it is registered (e.g. via :func:`sap_cloud_sdk.core.telemetry.auto_instrument.auto_instrument`).

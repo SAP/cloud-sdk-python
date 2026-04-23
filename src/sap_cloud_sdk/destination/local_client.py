@@ -41,6 +41,7 @@ class LocalDevDestinationClient(LocalDevClientBase[Destination]):
       ],
       "instance": [
         {
+          "tenant": "t1",                # optional: subscriber-specific entry
           "name": "destC",
           "type": "HTTP",
           "url": "https://provider.example.com"
@@ -243,12 +244,17 @@ class LocalDevDestinationClient(LocalDevClientBase[Destination]):
                 )
 
     def list_instance_destinations(
-        self, _filter: Optional[Any] = None
+        self,
+        tenant: Optional[str] = None,
+        _filter: Optional[Any] = None,
     ) -> PagedResult[Destination]:
         """List all destinations from the service instance scope.
 
         Args:
-            filter: Optional ListDestinationsFilter (ignored in local dev mode).
+            tenant: Optional subscriber tenant subdomain. When provided, returns only entries
+                matching that tenant (subscriber context); otherwise returns provider-level
+                entries (no tenant field).
+            _filter: Optional ListDestinationsFilter (ignored in local dev mode).
 
         Returns:
             PagedResult[Destination] containing destinations and pagination info.
@@ -260,7 +266,7 @@ class LocalDevDestinationClient(LocalDevClientBase[Destination]):
         """
         try:
             data = self._read()
-            items = [Destination.from_dict(entry) for entry in data.get("instance", [])]
+            items = self._resolve_instance_list(tenant, data.get("instance", []))
             return PagedResult(items=items)
         except DestinationOperationError:
             raise

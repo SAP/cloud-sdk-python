@@ -143,6 +143,32 @@ class TestListInstanceCertificates:
         assert len(result.items) == 1
         assert result.items[0].name == "inst.pem"
 
+    def test_without_tenant_excludes_tenant_entries(self, client):
+        _write_store(client, {"instance": [
+            {"Name": "provider.pem", "Content": "c1"},
+            {"Name": "subscriber.pem", "Content": "c2", "tenant": "t1"},
+        ], "subaccount": []})
+        result = client.list_instance_certificates()
+        assert len(result.items) == 1
+        assert result.items[0].name == "provider.pem"
+
+    def test_with_tenant_returns_only_matching_entries(self, client):
+        _write_store(client, {"instance": [
+            {"Name": "provider.pem", "Content": "c1"},
+            {"Name": "t1.pem", "Content": "c2", "tenant": "t1"},
+            {"Name": "t2.pem", "Content": "c3", "tenant": "t2"},
+        ], "subaccount": []})
+        result = client.list_instance_certificates(tenant="t1")
+        assert len(result.items) == 1
+        assert result.items[0].name == "t1.pem"
+
+    def test_with_tenant_returns_empty_when_no_match(self, client):
+        _write_store(client, {"instance": [
+            {"Name": "provider.pem", "Content": "c1"},
+        ], "subaccount": []})
+        result = client.list_instance_certificates(tenant="unknown")
+        assert len(result.items) == 0
+
 
 class TestListSubaccountCertificates:
     def test_returns_paged_result(self, client):

@@ -246,12 +246,17 @@ class LocalDevCertificateClient(LocalDevClientBase[Certificate]):
         )
 
     def list_instance_certificates(
-        self, _filter: Optional[Any] = None
+        self,
+        tenant: Optional[str] = None,
+        _filter: Optional[Any] = None,
     ) -> PagedResult[Certificate]:
         """List all certificates from the service instance scope.
 
         Args:
-            filter: Optional ListCertificatesFilter (ignored in local dev mode).
+            tenant: Optional subscriber tenant subdomain. When provided, returns only entries
+                matching that tenant (subscriber context); otherwise returns provider-level
+                entries (no tenant field).
+            _filter: Optional ListCertificatesFilter (ignored in local dev mode).
 
         Returns:
             PagedResult[Certificate] containing certificates and pagination info.
@@ -263,7 +268,7 @@ class LocalDevCertificateClient(LocalDevClientBase[Certificate]):
         """
         try:
             data = self._read()
-            items = [Certificate.from_dict(entry) for entry in data.get("instance", [])]
+            items = self._resolve_instance_list(tenant, data.get("instance", []))
             return PagedResult(items=items)
         except DestinationOperationError:
             raise

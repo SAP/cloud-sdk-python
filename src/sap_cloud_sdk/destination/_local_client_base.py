@@ -217,6 +217,23 @@ class LocalDevClientBase(ABC, Generic[T]):
                 return result
         return None
 
+    def _resolve_instance_list(
+        self,
+        tenant: Optional[str],
+        instance_list: List[Dict[str, Any]],
+    ) -> List[T]:
+        """Resolve entities from the instance list filtered by tenant.
+
+        When tenant is provided, returns entries matching that tenant (subscriber context).
+        When tenant is None, returns entries without a tenant field (provider context).
+        """
+        if tenant is not None:
+            return [
+                self.from_dict(e) for e in instance_list if e.get("tenant") == tenant
+            ]
+
+        return [self.from_dict(e) for e in instance_list if not e.get("tenant")]
+
     def _resolve_subaccount_list(
         self,
         access_strategy: AccessStrategy,

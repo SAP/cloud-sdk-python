@@ -140,9 +140,15 @@ class LocalDevFragmentClient(LocalDevClientBase[Fragment]):
 
     def list_instance_fragments(
         self,
+        tenant: Optional[str] = None,
         _filter: Optional[Any] = None,
     ) -> List[Fragment]:
         """List all fragments from the service instance scope.
+
+        Args:
+            tenant: Optional subscriber tenant subdomain. When provided, returns only entries
+                matching that tenant (subscriber context); otherwise returns provider-level
+                entries (no tenant field).
 
         Returns:
             List of fragments. Returns empty list if no fragments exist.
@@ -152,7 +158,7 @@ class LocalDevFragmentClient(LocalDevClientBase[Fragment]):
         """
         try:
             data = self._read()
-            return [Fragment.from_dict(entry) for entry in data.get("instance", [])]
+            return self._resolve_instance_list(tenant, data.get("instance", []))
         except DestinationOperationError:
             raise
         except Exception as e:

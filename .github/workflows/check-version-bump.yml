@@ -1,0 +1,35 @@
+name: Check Version Bump
+
+on:
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  check-version-bump:
+    name: Enforce version bump when src/ is modified
+    runs-on: ${{ contains(github.server_url, 'github.com') && 'ubuntu-latest' || fromJSON('["self-hosted"]') }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check that version was bumped if src/ was modified
+        run: |
+          BASE_SHA="${{ github.event.pull_request.base.sha }}"
+          HEAD_SHA="${{ github.event.pull_request.head.sha }}"
+
+          CHANGED_FILES=$(git diff --name-only "$BASE_SHA" "$HEAD_SHA")
+
+          if echo "$CHANGED_FILES" | grep -q "^src/"; then
+            VERSION_BUMPED=$(git diff -U0 "$BASE_SHA" "$HEAD_SHA" -- pyproject.toml \
+              | grep "^+version = ")
+
+            if [ -z "$VERSION_BUMPED" ]; then
+              echo "ERROR: Files under src/ were modified but the version in pyproject.toml was not bumped."
+              exit 1
+            else
+              echo "Version bump detected: $VERSION_BUMPED"
+            fi
+          fi

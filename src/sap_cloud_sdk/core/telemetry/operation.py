@@ -68,5 +68,13 @@ class Operation(str, Enum):
     AICORE_SET_CONFIG = "set_aicore_config"
     AICORE_AUTO_INSTRUMENT = "auto_instrument"
 
+    # Temporal Operations
+    TEMPORAL_CREATE_CLIENT = "create_client"
+    TEMPORAL_CREATE_WORKER = "create_worker"
+    TEMPORAL_WORKFLOW_START = "workflow_start"
+    TEMPORAL_WORKFLOW_EXECUTE = "workflow_execute"
+    TEMPORAL_WORKFLOW_COUNT = "workflow_count"
+    TEMPORAL_SCHEDULE_CREATE = "schedule_create"
+
     def __str__(self) -> str:
         return self.value

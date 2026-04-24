@@ -927,9 +927,13 @@ def append_last_chunk(context: DMSTestContext, dms_client: DMSClient, content: s
 
 @when(parsers.parse('I execute a CMIS query for documents named "{name_prefix}"'))
 def cmis_query_by_name(context: DMSTestContext, dms_client: DMSClient, name_prefix: str):
-    """Execute a CMIS query filtering by document name."""
+    """Execute a CMIS query filtering by document name.
+
+    The document upload step prepends a UUID to the name, so we use
+    a leading ``%`` wildcard to match it.
+    """
     try:
-        statement = f"SELECT * FROM cmis:document WHERE cmis:name LIKE '{name_prefix}%'"
+        statement = f"SELECT * FROM cmis:document WHERE cmis:name LIKE '%{name_prefix}%'"
         context.query_result = dms_client.cmis_query(
             context.repo_id,
             statement,

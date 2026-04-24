@@ -32,4 +32,6 @@ jobs:
             else
               echo "Version bump detected: $VERSION_BUMPED"
             fi
+          else
+            echo "No src/ changes. Version bump not required."
           fi

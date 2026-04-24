@@ -11,6 +11,7 @@ class Module(str, Enum):
     AUDITLOG_NG = "auditlog_ng"
     DESTINATION = "destination"
     OBJECTSTORE = "objectstore"
+    DMS = "dms"
 
     def __str__(self) -> str:
         return self.value

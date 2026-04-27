@@ -239,3 +239,9 @@ export APPFND_CONHOS_SYSTEM_ROLE="S4HC"
 ```bash
 export SAP_SOLUTION_AREA="AFND"
 ```
+
+### ORD document ID
+
+```bash
+export ORD_DOCUMENT_ID="sap.foo:ord-doc:v1"
+```

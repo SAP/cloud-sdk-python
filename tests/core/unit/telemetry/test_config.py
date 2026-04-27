@@ -11,6 +11,7 @@ from sap_cloud_sdk.core.telemetry.config import (
 from sap_cloud_sdk.core.telemetry.constants import (
     ATTR_MLFLOW_EXPERIMENT_ID,
     ATTR_SAP_SOLUTION_AREA,
+    ATTR_SAP_ORD_ID,
 )
 
 
@@ -233,3 +234,35 @@ class TestCreateResourceAttributesFromEnv:
             attrs = create_resource_attributes_from_env()
 
             assert "sap.solution_area" in attrs
+
+    def test_ord_id_omitted_when_unset(self):
+        """sap.ord.id is omitted entirely when ORD_DOCUMENT_ID is unset."""
+        with patch.dict('os.environ', {}, clear=True):
+            attrs = create_resource_attributes_from_env()
+
+            assert ATTR_SAP_ORD_ID not in attrs
+
+    def test_ord_id_omitted_when_empty(self):
+        """sap.ord.id is omitted when ORD_DOCUMENT_ID is an empty string."""
+        with patch.dict('os.environ', {'ORD_DOCUMENT_ID': ''}, clear=True):
+            attrs = create_resource_attributes_from_env()
+
+            assert ATTR_SAP_ORD_ID not in attrs
+
+    def test_ord_id_read_from_env(self):
+        """sap.ord.id resource attribute is read from ORD_DOCUMENT_ID."""
+        with patch.dict('os.environ', {'ORD_DOCUMENT_ID': 'sap.foo:ord-doc:v1'}, clear=True):
+            attrs = create_resource_attributes_from_env()
+
+            assert attrs[ATTR_SAP_ORD_ID] == "sap.foo:ord-doc:v1"
+
+    def test_ord_id_independent_of_other_attributes(self):
+        """sap.ord.id is populated independently from other optional attributes."""
+        with patch.dict('os.environ', {
+            'ORD_DOCUMENT_ID': 'my-ord-id',
+            'MLFLOW_EXPERIMENT_ID': 'exp-99',
+        }, clear=True):
+            attrs = create_resource_attributes_from_env()
+
+            assert attrs[ATTR_SAP_ORD_ID] == "my-ord-id"
+            assert attrs[ATTR_MLFLOW_EXPERIMENT_ID] == "exp-99"

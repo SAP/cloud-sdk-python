@@ -17,6 +17,7 @@ from sap_cloud_sdk.core.telemetry.constants import (
     ATTR_SAP_SDK_VERSION,
     ATTR_SAP_SOLUTION_AREA,
     ATTR_MLFLOW_EXPERIMENT_ID,
+    ATTR_SAP_ORD_ID,
     SDK_NAME,
 )
 
@@ -33,6 +34,7 @@ ENV_HOSTNAME = "HOSTNAME"
 ENV_SYSTEM_ROLE = "APPFND_CONHOS_SYSTEM_ROLE"
 ENV_SOLUTION_AREA = "SAP_SOLUTION_AREA"
 ENV_MLFLOW_EXPERIMENT_ID = "MLFLOW_EXPERIMENT_ID"
+ENV_ORD_DOCUMENT_ID = "ORD_DOCUMENT_ID"
 
 # OTEL environment variable keys
 ENV_OTLP_ENDPOINT = "OTEL_EXPORTER_OTLP_ENDPOINT"
@@ -98,6 +100,16 @@ def _get_mlflow_experiment_id() -> Optional[str]:
     return value if value else None
 
 
+def _get_ord_id() -> Optional[str]:
+    """Get ORD document ID from environment.
+
+    Returns:
+        Value of ORD_DOCUMENT_ID, or None if the env var is missing or empty.
+    """
+    value = os.getenv(ENV_ORD_DOCUMENT_ID)
+    return value if value else None
+
+
 def create_resource_attributes_from_env() -> dict:
     """Create OpenTelemetry Resource with SDK attributes.
 
@@ -118,6 +130,7 @@ def create_resource_attributes_from_env() -> dict:
         - sap.cloud_sdk.version (from package version)
         - sap.solution_area (from SAP_SOLUTION_AREA, defaults to "unknown")
         - mlflow.experiment_id (from MLFLOW_EXPERIMENT_ID, omitted when unset or empty)
+        - sap.ord.id (from ORD_DOCUMENT_ID, omitted when unset or empty)
     """
 
     attributes = {
@@ -137,6 +150,10 @@ def create_resource_attributes_from_env() -> dict:
     mlflow_experiment_id = _get_mlflow_experiment_id()
     if mlflow_experiment_id is not None:
         attributes[ATTR_MLFLOW_EXPERIMENT_ID] = mlflow_experiment_id
+
+    ord_id = _get_ord_id()
+    if ord_id is not None:
+        attributes[ATTR_SAP_ORD_ID] = ord_id
 
     return attributes
 

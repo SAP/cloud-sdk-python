@@ -27,6 +27,9 @@ ATTR_SAP_SOLUTION_AREA = "sap.solution_area"
 # Attribute keys - MLflow
 ATTR_MLFLOW_EXPERIMENT_ID = "mlflow.experiment_id"
 
+# Attribute keys - ORD
+ATTR_SAP_ORD_ID = "sap.ord.id"
+
 # Attribute keys - SAP App Foundation specific
 ATTR_CAPABILITY = "sap.cloud_sdk.capability"
 ATTR_FUNCTIONALITY = "sap.cloud_sdk.functionality"

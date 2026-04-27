@@ -4,6 +4,7 @@ import pytest
 from unittest.mock import patch, MagicMock, create_autospec
 from contextlib import ExitStack
 
+from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import TracerProvider as SDKTracerProvider
 
 from sap_cloud_sdk.core.telemetry.auto_instrument import auto_instrument
@@ -232,3 +233,85 @@ class TestAutoInstrument:
 
             mock_traceloop_components['baggage_processor'].assert_called_once()
             mock_traceloop_components['get_tracer_provider'].return_value.add_span_processor.assert_called_once_with(mock_processor_instance)
+
+    def test_auto_instrument_merges_resource_when_wrapper_installed(self, mock_traceloop_components):
+        """When an OTel auto-instrumentation wrapper (e.g. an OpenTelemetry-Operator
+        init-container injection) has pre-installed a TracerProvider whose Resource
+        carries the standard `telemetry.auto.version` marker, auto_instrument merges
+        sap-cloud-sdk attrs onto that provider's existing Resource — preserving the
+        operator-supplied attrs and adding our SAP enrichment on top."""
+        mock_traceloop_components['get_app_name'].return_value = 'cloud-sdk-app'
+        sap_attrs = {
+            'service.name': 'cloud-sdk-app',
+            'sap.cloud_sdk.name': 'SAP Cloud SDK for Python',
+            'sap.cloud_sdk.language': 'python',
+            'sap.solution_area': 'fina',
+            'mlflow.experiment_id': '1635264705567712',
+        }
+        mock_traceloop_components['create_resource'].return_value = sap_attrs
+
+        wrapper_provider = SDKTracerProvider(
+            resource=Resource.create({
+                'telemetry.auto.version': '0.62b1',
+                'k8s.deployment.name': 'cloud-sdk-app-deployment',
+                'service.name': 'cloud-sdk-app-deployment',
+            })
+        )
+        mock_traceloop_components['get_tracer_provider'].return_value = wrapper_provider
+
+        with patch.dict('os.environ', {'OTEL_EXPORTER_OTLP_ENDPOINT': 'http://localhost:4317'}, clear=True):
+            auto_instrument()
+
+            merged_attrs = wrapper_provider.resource.attributes
+            # Operator-supplied attrs are preserved.
+            assert merged_attrs['telemetry.auto.version'] == '0.62b1'
+            assert merged_attrs['k8s.deployment.name'] == 'cloud-sdk-app-deployment'
+            # sap-cloud-sdk attrs are added.
+            assert merged_attrs['sap.cloud_sdk.name'] == 'SAP Cloud SDK for Python'
+            assert merged_attrs['sap.cloud_sdk.language'] == 'python'
+            assert merged_attrs['sap.solution_area'] == 'fina'
+            assert merged_attrs['mlflow.experiment_id'] == '1635264705567712'
+
+    def test_auto_instrument_skips_merge_when_no_wrapper_marker(self, mock_traceloop_components):
+        """When the active TracerProvider's Resource lacks the
+        `telemetry.auto.version` marker (e.g. a self-installed provider, or no
+        wrapper at all), auto_instrument does not mutate the provider's Resource."""
+        mock_traceloop_components['get_app_name'].return_value = 'cloud-sdk-app'
+        mock_traceloop_components['create_resource'].return_value = {
+            'sap.cloud_sdk.name': 'SAP Cloud SDK for Python',
+            'sap.solution_area': 'fina',
+        }
+
+        initial_resource = Resource.create({'service.name': 'self-installed'})
+        plain_provider = SDKTracerProvider(resource=initial_resource)
+        mock_traceloop_components['get_tracer_provider'].return_value = plain_provider
+
+        with patch.dict('os.environ', {'OTEL_EXPORTER_OTLP_ENDPOINT': 'http://localhost:4317'}, clear=True):
+            auto_instrument()
+
+            # Resource is the original instance — no merge took place.
+            assert plain_provider.resource is initial_resource
+            assert 'sap.cloud_sdk.name' not in plain_provider.resource.attributes
+            assert 'sap.solution_area' not in plain_provider.resource.attributes
+
+    def test_auto_instrument_merge_overrides_colliding_service_name(self, mock_traceloop_components):
+        """On a wrapper-installed provider, sap-cloud-sdk attrs override colliding
+        keys: service.name from APPFND_CONHOS_APP_NAME wins over the operator's
+        k8s-deployment-derived service.name."""
+        mock_traceloop_components['get_app_name'].return_value = 'cloud-sdk-app'
+        mock_traceloop_components['create_resource'].return_value = {
+            'service.name': 'cloud-sdk-app',
+        }
+
+        wrapper_provider = SDKTracerProvider(
+            resource=Resource.create({
+                'telemetry.auto.version': '0.62b1',
+                'service.name': 'operator-supplied-name',
+            })
+        )
+        mock_traceloop_components['get_tracer_provider'].return_value = wrapper_provider
+
+        with patch.dict('os.environ', {'OTEL_EXPORTER_OTLP_ENDPOINT': 'http://localhost:4317'}, clear=True):
+            auto_instrument()
+
+            assert wrapper_provider.resource.attributes['service.name'] == 'cloud-sdk-app'

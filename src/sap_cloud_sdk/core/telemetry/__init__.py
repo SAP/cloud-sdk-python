@@ -25,7 +25,7 @@ from sap_cloud_sdk.core.telemetry.tracer import (
     invoke_agent_span,
 )
 from sap_cloud_sdk.core.telemetry.middlewares import (
-    HeaderSpanMiddleware,
+    TelemetryMiddleware,
     A2AStarletteMiddleware,
 )
 
@@ -45,6 +45,6 @@ __all__ = [
     "chat_span",
     "execute_tool_span",
     "invoke_agent_span",
-    "HeaderSpanMiddleware",
+    "TelemetryMiddleware",
     "A2AStarletteMiddleware",
 ]

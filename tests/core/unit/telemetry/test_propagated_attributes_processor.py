@@ -1,8 +1,7 @@
 """Tests for PropagatedAttributesSpanProcessor."""
 
 import threading
-from contextvars import copy_context
-from unittest.mock import MagicMock, call
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -43,7 +42,9 @@ class TestPropagatedAttributesSpanProcessor:
         assert span.set_attribute.call_count == 2
 
     def test_does_not_override_attrs_already_present_on_span(self):
-        _propagated_attrs_var.set({"gen_ai.request.model": "override", "custom.key": "val"})
+        _propagated_attrs_var.set(
+            {"gen_ai.request.model": "override", "custom.key": "val"}
+        )
         span = _make_recording_span(existing_attrs={"gen_ai.request.model": "gpt-4"})
 
         self.processor.on_start(span, None)
@@ -121,4 +122,6 @@ class TestPropagatedAttributesSpanProcessor:
         t.start()
         t.join()
 
-        assert results == [0], "No attrs should be injected in the isolated thread context"
+        assert results == [0], (
+            "No attrs should be injected in the isolated thread context"
+        )

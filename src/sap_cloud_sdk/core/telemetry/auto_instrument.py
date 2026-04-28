@@ -120,7 +120,9 @@ def _set_baggage_processor():
     logger.info("Registered BaggageSpanProcessor for extension attribute propagation")
 
     provider.add_span_processor(PropagatedAttributesSpanProcessor())
-    logger.info("Registered PropagatedAttributesSpanProcessor for ContextVar attribute propagation")
+    logger.info(
+        "Registered PropagatedAttributesSpanProcessor for ContextVar attribute propagation"
+    )
 
 
 def _register_middleware_processors(middlewares: list[TelemetryMiddleware]) -> None:

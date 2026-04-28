@@ -30,7 +30,7 @@ class PropagatedAttributesSpanProcessor(SpanProcessor):
         if not propagated:
             return
         try:
-            existing = span.attributes or {}
+            existing = getattr(span, "attributes", None) or {}
             for key, value in propagated.items():
                 if key not in existing:
                     span.set_attribute(key, value)

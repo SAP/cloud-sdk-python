@@ -1,7 +1,8 @@
 import logging
 import os
 from collections.abc import Mapping
-from typing import Optional
+
+from sap_cloud_sdk.core.telemetry.middleware.base import TelemetryMiddleware
 
 from opentelemetry import trace
 from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import (
@@ -36,7 +37,7 @@ logger = logging.getLogger(__name__)
 @record_metrics(Module.AICORE, Operation.AICORE_AUTO_INSTRUMENT)
 def auto_instrument(
     disable_batch: bool = False,
-    middlewares: Optional[list] = None,
+    middlewares: list[TelemetryMiddleware] | None = None,
 ):
     """
     Initialize meta-instrumentation for GenAI tracing. Should be initialized before any AI frameworks.
@@ -52,6 +53,8 @@ def auto_instrument(
                      each middleware is registered with its application and a
                      MiddlewareSpanProcessor is added so that headers extracted by
                      the middlewares appear as attributes on every span.
+                     Must be called before the ASGI application begins serving
+                     requests so that register() runs before the first request.
     """
     otel_endpoint = os.getenv(ENV_OTLP_ENDPOINT, "")
     console_traces = os.getenv(ENV_TRACES_EXPORTER, "").lower() == "console"
@@ -114,7 +117,7 @@ def _set_baggage_processor():
     logger.info("Registered BaggageSpanProcessor for extension attribute propagation")
 
 
-def _register_middleware_processors(middlewares: list) -> None:
+def _register_middleware_processors(middlewares: list[TelemetryMiddleware]) -> None:
     from sap_cloud_sdk.core.telemetry.middleware.span_processor import (
         MiddlewareSpanProcessor,
     )

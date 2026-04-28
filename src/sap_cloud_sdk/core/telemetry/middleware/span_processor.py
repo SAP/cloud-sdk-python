@@ -1,7 +1,5 @@
 """MiddlewareSpanProcessor: stamps middleware-extracted attributes onto every span."""
 
-from __future__ import annotations
-
 import logging
 from typing import List, Optional
 

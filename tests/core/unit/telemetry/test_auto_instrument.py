@@ -360,7 +360,7 @@ class TestAutoInstrumentMiddlewares:
         with patch('sap_cloud_sdk.core.telemetry.auto_instrument.trace.get_tracer_provider', return_value=provider):
             _register_middleware_processors([middleware])
 
-        middleware.register.assert_called_once_with(None)
+        middleware.register.assert_called_once_with()
         provider.add_span_processor.assert_called_once()
         call_arg = provider.add_span_processor.call_args[0][0]
         assert isinstance(call_arg, MiddlewareSpanProcessor)

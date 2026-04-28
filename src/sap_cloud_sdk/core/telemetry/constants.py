@@ -14,6 +14,7 @@ ATTR_SERVICE_INSTANCE_ID = "service.instance.id"
 ATTR_SERVICE_NAME = "service.name"
 ATTR_DEPLOYMENT_ENVIRONMENT = "deployment.environment.name"
 ATTR_CLOUD_REGION = "cloud.region"
+ATTR_USER_ID = "user.id"
 
 # Attribute keys - SAP standard
 ATTR_SAP_SUBACCOUNT_ID = "sap.cld.subaccount_id"

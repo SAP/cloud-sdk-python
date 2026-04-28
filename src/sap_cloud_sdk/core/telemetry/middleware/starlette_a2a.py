@@ -1,11 +1,10 @@
 """Starlette/FastAPI middleware for IAS JWT telemetry attribute extraction."""
 
-from __future__ import annotations
-
 import logging
 from contextvars import ContextVar
 from typing import Any, Dict
 
+from sap_cloud_sdk.core.telemetry.constants import ATTR_SAP_TENANT_ID, ATTR_USER_ID
 from sap_cloud_sdk.core.telemetry.middleware.base import TelemetryMiddleware
 
 try:
@@ -21,8 +20,18 @@ except ImportError as exc:
 
 logger = logging.getLogger(__name__)
 
-_ATTR_TENANT_ID = "sap.tenancy.tenant_id"
-_ATTR_USER_ID = "user.id"
+
+class _IASMiddleware(BaseHTTPMiddleware):
+    def __init__(self, app: Any, attrs_var: ContextVar[Dict[str, Any]]) -> None:
+        super().__init__(app)
+        self._attrs_var = attrs_var
+
+    async def dispatch(self, request: Request, call_next: Any) -> Response:
+        token = self._attrs_var.set(_extract_ias_attrs(request))
+        try:
+            return await call_next(request)
+        finally:
+            self._attrs_var.reset(token)
 
 
 class StarletteIASTelemetryMiddleware(TelemetryMiddleware):
@@ -30,14 +39,14 @@ class StarletteIASTelemetryMiddleware(TelemetryMiddleware):
 
     Reads the ``Authorization: Bearer <token>`` header on each request,
     parses it as an IAS JWT, and exposes the following as span attributes:
-      - ``sap.tenancy.tenant_id`` from the ``app_tid`` claim
+      - ``sap.tenancy.tenant_id`` from the ``sap_gtid`` claim
       - ``user.id``               from the ``user_uuid`` claim
 
     If the header is absent or the token cannot be parsed, no attributes are set
     and the request continues normally.
 
-    Each instance owns its own ContextVar so multiple instances on the same app
-    do not interfere with each other.
+    Each instance owns its own ContextVar to prevent cross-talk when multiple
+    middleware instances are registered on the same app.
 
     Usage::
 
@@ -50,37 +59,15 @@ class StarletteIASTelemetryMiddleware(TelemetryMiddleware):
     """
 
     def __init__(self, app: Any) -> None:
-        """
-        Args:
-            app: The Starlette application instance.
-        """
         self.app = app
         self._attrs_var: ContextVar[Dict[str, Any]] = ContextVar(
             f"ias_attrs_{id(self)}", default={}
         )
 
-    def register(self, app: Any) -> None:
-        """Register the IAS JWT middleware with the Starlette app.
-
-        The ``app`` argument is ignored — this implementation always uses
-        ``self.app`` provided at construction time.
-
-        Args:
-            app: Ignored.
-        """
-        attrs_var = self._attrs_var
-
-        class _Middleware(BaseHTTPMiddleware):
-            async def dispatch(self, request: Request, call_next: Any) -> Response:
-                attrs = _extract_ias_attrs(request)
-                token = attrs_var.set(attrs)
-                try:
-                    return await call_next(request)
-                finally:
-                    attrs_var.reset(token)
-
-        self.app.add_middleware(_Middleware)
-        logger.debug("Registered IAS telemetry middleware on %r", self.app)
+    def register(self) -> None:
+        """Register the IAS JWT middleware with ``self.app``."""
+        self.app.add_middleware(_IASMiddleware, attrs_var=self._attrs_var)
+        logger.info("Registered IAS telemetry middleware on %r", self.app)
 
     def get_attributes(self) -> Dict[str, Any]:
         """Return IAS JWT attributes extracted from the current request."""
@@ -100,7 +87,7 @@ def _extract_ias_attrs(request: Request) -> Dict[str, Any]:
 
     attrs: Dict[str, Any] = {}
     if claims.app_tid:
-        attrs[_ATTR_TENANT_ID] = claims.sap_gtid
+        attrs[ATTR_SAP_TENANT_ID] = claims.sap_gtid
     if claims.user_uuid:
-        attrs[_ATTR_USER_ID] = claims.user_uuid
+        attrs[ATTR_USER_ID] = claims.user_uuid
     return attrs

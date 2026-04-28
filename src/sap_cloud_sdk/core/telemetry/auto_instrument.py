@@ -119,13 +119,11 @@ def _register_middleware_processors(middlewares: list) -> None:
 
     provider = trace.get_tracer_provider()
     if not isinstance(provider, TracerProvider):
-        logger.warning(
-            "Unknown TracerProvider type. Skipping MiddlewareSpanProcessor registration"
-        )
+        logger.warning("Unknown TracerProvider type. Skipping MiddlewareSpanProcessor registration")
         return
 
     for middleware in middlewares:
-        middleware.register(None)
+        middleware.register()
 
     provider.add_span_processor(MiddlewareSpanProcessor(middlewares))
     logger.info("Registered MiddlewareSpanProcessor for %d middleware(s)", len(middlewares))

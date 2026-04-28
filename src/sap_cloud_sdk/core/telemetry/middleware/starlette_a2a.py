@@ -86,7 +86,7 @@ def _extract_ias_attrs(request: Request) -> Dict[str, Any]:
         return {}
 
     attrs: Dict[str, Any] = {}
-    if claims.app_tid:
+    if claims.sap_gtid:
         attrs[ATTR_SAP_TENANT_ID] = claims.sap_gtid
     if claims.user_uuid:
         attrs[ATTR_USER_ID] = claims.user_uuid

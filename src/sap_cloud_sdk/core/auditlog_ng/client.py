@@ -1,10 +1,11 @@
 """Audit Log OTLP Client.
 
-Sends audit log events as OpenTelemetry LogRecords over gRPC.
-Supports mTLS (client certificates) and insecure (no-auth) modes.
+Sends audit log events as OpenTelemetry LogRecords over gRPC or HTTP.
+Supports mTLS (client certificates) and insecure (no-auth) modes for gRPC.
 """
 
 import json
+import os
 import uuid
 from typing import Optional
 
@@ -20,7 +21,12 @@ from opentelemetry.sdk._logs.export import (
     BatchLogRecordProcessor,
 )
 from opentelemetry.sdk.resources import Resource
-from opentelemetry.exporter.otlp.proto.grpc._log_exporter import OTLPLogExporter
+from opentelemetry.exporter.otlp.proto.grpc._log_exporter import (
+    OTLPLogExporter as GRPCLogExporter,
+)
+from opentelemetry.exporter.otlp.proto.http._log_exporter import (
+    OTLPLogExporter as HTTPLogExporter,
+)
 from opentelemetry._logs.severity import SeverityNumber
 
 from sap_cloud_sdk.core.auditlog_ng.config import (
@@ -29,6 +35,33 @@ from sap_cloud_sdk.core.auditlog_ng.config import (
 )
 from sap_cloud_sdk.core.auditlog_ng.exceptions import ValidationError
 from sap_cloud_sdk.core.telemetry import Module
+from sap_cloud_sdk.core.telemetry.config import ENV_OTLP_PROTOCOL
+
+
+def _create_log_exporter(
+    config: AuditLogNGConfig,
+    credentials: Optional[grpc.ChannelCredentials],
+):
+    """Create an OTLP log exporter based on OTEL_EXPORTER_OTLP_PROTOCOL."""
+    protocol = os.getenv(ENV_OTLP_PROTOCOL, "grpc").lower()
+    if protocol == "grpc":
+        return GRPCLogExporter(
+            endpoint=config.endpoint,
+            insecure=config.insecure,
+            credentials=credentials,
+            compression=(
+                grpc.Compression.Gzip
+                if config.compression
+                else grpc.Compression.NoCompression
+            ),
+        )
+    elif protocol == "http/protobuf":
+        return HTTPLogExporter(endpoint=config.endpoint)
+    else:
+        raise ValueError(
+            f"Unsupported OTEL_EXPORTER_OTLP_PROTOCOL: '{protocol}'. "
+            "Supported values are 'grpc' and 'http/protobuf'."
+        )
 
 
 class AuditClient:
@@ -74,16 +107,7 @@ class AuditClient:
         credentials = self._build_credentials(config)
 
         # Create OTLP exporter
-        self._exporter = OTLPLogExporter(
-            endpoint=config.endpoint,
-            insecure=config.insecure,
-            credentials=credentials,
-            compression=(
-                grpc.Compression.Gzip
-                if config.compression
-                else grpc.Compression.NoCompression
-            ),
-        )
+        self._exporter = _create_log_exporter(config, credentials)
 
         # Create logger provider
         self._provider = LoggerProvider(

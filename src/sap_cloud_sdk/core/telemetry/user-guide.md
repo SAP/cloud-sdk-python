@@ -190,6 +190,54 @@ async def handle_request(query: str, user_id: str):
         return response
 ```
 
+## Request-scoped telemetry with middlewares
+
+`auto_instrument` accepts a `middlewares` list for injecting per-request attributes into spans — things like tenant ID and user ID that live in the incoming request but aren't visible to autoinstrumentation.
+
+Each middleware implements two methods:
+- `register()` — called once at startup to hook into the web framework
+- `get_attributes()` — called on every span to retrieve the current request's attributes
+
+You can write your own by subclassing `TelemetryMiddleware`:
+
+```python
+from sap_cloud_sdk.core.telemetry.middleware.base import TelemetryMiddleware
+
+class MyMiddleware(TelemetryMiddleware):
+    def register(self) -> None:
+        # hook into your framework here
+        ...
+
+    def get_attributes(self) -> dict:
+        # return attributes for the current request
+        return {"my.attribute": ...}
+```
+
+Pass it to `auto_instrument`:
+
+```python
+auto_instrument(middlewares=[MyMiddleware(app=app)])
+```
+
+### Built-in: `StarletteIASTelemetryMiddleware`
+
+For Starlette/FastAPI apps with IAS authentication, the SDK ships a ready-to-use middleware that reads the `Authorization: Bearer <token>` header on each request, parses it as an IAS JWT, and injects:
+- `sap.tenancy.tenant_id` from the `app_tid` claim
+- `user.id` from the `user_uuid` claim
+
+If the header is absent or the token cannot be parsed, no attributes are set and the request continues normally.
+
+```python
+from starlette.applications import Starlette
+from sap_cloud_sdk.core.telemetry import auto_instrument
+from sap_cloud_sdk.core.telemetry.middleware import StarletteIASTelemetryMiddleware
+
+app = Starlette(...)
+auto_instrument(middlewares=[StarletteIASTelemetryMiddleware(app=app)])
+```
+
+---
+
 ## Configuration
 
 ### Production

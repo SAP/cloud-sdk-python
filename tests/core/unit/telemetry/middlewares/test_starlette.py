@@ -6,20 +6,28 @@ from contextlib import ExitStack
 from unittest.mock import MagicMock, patch, create_autospec
 
 from opentelemetry.sdk.trace import TracerProvider as SDKTracerProvider
+from opentelemetry.sdk.trace.export import SpanProcessor
 
-from sap_cloud_sdk.core.telemetry.middlewares.base import HeaderSpanMiddleware
-from sap_cloud_sdk.core.telemetry.middlewares.starlette import A2AStarletteMiddleware
+from sap_cloud_sdk.core.telemetry.middlewares.base import TelemetryMiddleware
+from sap_cloud_sdk.core.telemetry.middlewares.starlette import (
+    A2AStarletteMiddleware,
+    _ASGIHeaderMiddleware,
+)
 from sap_cloud_sdk.core.telemetry.auto_instrument import auto_instrument
 
 
-class _CustomMiddleware(HeaderSpanMiddleware):
-    @property
-    def header_name(self) -> str:
-        return "x-custom"
+class _CustomMiddleware(TelemetryMiddleware):
+    """Minimal concrete middleware for testing auto_instrument wiring."""
+
+    def __init__(self):
+        self._span_processor = MagicMock(spec=SpanProcessor)
 
     @property
-    def span_attribute(self) -> str:
-        return "custom.value"
+    def span_processor(self) -> SpanProcessor:
+        return self._span_processor
+
+    def register(self) -> None:
+        pass
 
 
 def _run(coro):
@@ -27,19 +35,14 @@ def _run(coro):
 
 
 class TestA2AStarletteMiddleware:
-    def test_header_name(self):
-        assert A2AStarletteMiddleware(MagicMock()).header_name == "x-origin"
-
-    def test_span_attribute(self):
-        assert A2AStarletteMiddleware(MagicMock()).span_attribute == "a2a.origin"
-
     def test_register_calls_add_middleware_on_app(self):
         app = MagicMock()
         m = A2AStarletteMiddleware(app)
         m.register()
-        app.add_middleware.assert_called_once_with(m.asgi_middleware_class)
+        app.add_middleware.assert_called_once()
+        assert callable(app.add_middleware.call_args.args[0])
 
-    def test_captures_x_origin_header(self):
+    def test_captures_x_origin_header_into_context_var(self):
         m = A2AStarletteMiddleware(MagicMock())
         captured = []
 
@@ -47,22 +50,80 @@ class TestA2AStarletteMiddleware:
             captured.append(m._context_var.get())
 
         async def run():
-            instance = m.asgi_middleware_class(app)
+            instance = _ASGIHeaderMiddleware(app, m._context_var, m._extract)
             await instance(
                 {"type": "http", "headers": [(b"x-origin", b"agent-a")]},
                 None, None,
             )
 
         _run(run())
-        assert captured == ["agent-a"]
+        assert captured == [{"a2a.origin": "agent-a"}]
 
-    def test_stamps_a2a_origin_on_span(self):
+    def test_context_var_is_none_when_header_absent(self):
         m = A2AStarletteMiddleware(MagicMock())
-        m._context_var.set("agent-b")
+        captured = []
+
+        async def app(scope, receive, send):
+            captured.append(m._context_var.get())
+
+        async def run():
+            instance = _ASGIHeaderMiddleware(app, m._context_var, m._extract)
+            await instance({"type": "http", "headers": []}, None, None)
+
+        _run(run())
+        assert captured == [None]
+
+    def test_context_var_reset_after_request(self):
+        m = A2AStarletteMiddleware(MagicMock())
+
+        async def run():
+            async def noop(scope, receive, send):
+                pass
+            instance = _ASGIHeaderMiddleware(noop, m._context_var, m._extract)
+            await instance(
+                {"type": "http", "headers": [(b"x-origin", b"agent-a")]},
+                None, None,
+            )
+
+        _run(run())
+        assert m._context_var.get() is None
+
+    def test_non_http_scope_passes_through(self):
+        m = A2AStarletteMiddleware(MagicMock())
+        called = []
+
+        async def app(scope, receive, send):
+            called.append(scope["type"])
+
+        async def run():
+            instance = _ASGIHeaderMiddleware(app, m._context_var, m._extract)
+            await instance({"type": "websocket", "headers": []}, None, None)
+
+        _run(run())
+        assert called == ["websocket"]
+
+    def test_stamps_attributes_on_span(self):
+        m = A2AStarletteMiddleware(MagicMock())
+        m._context_var.set({"a2a.origin": "agent-b"})
         span = MagicMock()
         span.is_recording.return_value = True
         m.span_processor.on_start(span)
         span.set_attribute.assert_called_once_with("a2a.origin", "agent-b")
+
+    def test_no_attributes_when_context_var_is_none(self):
+        m = A2AStarletteMiddleware(MagicMock())
+        span = MagicMock()
+        span.is_recording.return_value = True
+        m.span_processor.on_start(span)
+        span.set_attribute.assert_not_called()
+
+    def test_no_attributes_when_span_not_recording(self):
+        m = A2AStarletteMiddleware(MagicMock())
+        m._context_var.set({"a2a.origin": "agent-b"})
+        span = MagicMock()
+        span.is_recording.return_value = False
+        m.span_processor.on_start(span)
+        span.set_attribute.assert_not_called()
 
 
 @pytest.fixture
@@ -120,7 +181,7 @@ class TestAutoInstrumentMiddlewares:
             auto_instrument(middlewares=[m1, m2])
 
         m1.register.assert_called_once()
-        app.add_middleware.assert_called_once_with(m2.asgi_middleware_class)
+        app.add_middleware.assert_called_once()
 
         provider = mock_traceloop_components["get_tracer_provider"].return_value
         calls = [c.args[0] for c in provider.add_span_processor.call_args_list]

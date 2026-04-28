@@ -101,17 +101,18 @@ class TestExtractIasAttrs:
 
 
 class TestInnerMiddlewareDispatch:
-    def _get_inner_class(self, mw: StarletteIASTelemetryMiddleware):
+    def _get_inner_class_and_kwargs(self, mw: StarletteIASTelemetryMiddleware):
         app = MagicMock()
         mw.app = app
         mw.register()
-        return app.add_middleware.call_args[0][0]
+        args, kwargs = app.add_middleware.call_args
+        return args[0], kwargs
 
     @pytest.mark.anyio
     async def test_sets_attrs_in_context_var_during_request(self):
         mw = StarletteIASTelemetryMiddleware(app=MagicMock())
         claims = _make_claims(sap_gtid="tenant-1", user_uuid="user-1")
-        inner_cls = self._get_inner_class(mw)
+        inner_cls, kwargs = self._get_inner_class_and_kwargs(mw)
 
         request = _make_request({"authorization": "Bearer tok"})
         captured = {}
@@ -120,7 +121,7 @@ class TestInnerMiddlewareDispatch:
             captured.update(mw._attrs_var.get())
             return MagicMock()
 
-        inner = inner_cls(app=MagicMock())
+        inner = inner_cls(app=MagicMock(), **kwargs)
         with patch(_PATCH_PARSE, lambda t: claims):
             await inner.dispatch(request, call_next)
 
@@ -130,10 +131,10 @@ class TestInnerMiddlewareDispatch:
     async def test_context_var_reset_after_request(self):
         mw = StarletteIASTelemetryMiddleware(app=MagicMock())
         claims = _make_claims(sap_gtid="t1", user_uuid="u1")
-        inner_cls = self._get_inner_class(mw)
+        inner_cls, kwargs = self._get_inner_class_and_kwargs(mw)
 
         request = _make_request({"authorization": "Bearer tok"})
-        inner = inner_cls(app=MagicMock())
+        inner = inner_cls(app=MagicMock(), **kwargs)
         with patch(_PATCH_PARSE, lambda t: claims):
             await inner.dispatch(request, AsyncMock(return_value=MagicMock()))
 
@@ -143,14 +144,14 @@ class TestInnerMiddlewareDispatch:
     async def test_context_var_reset_on_exception(self):
         mw = StarletteIASTelemetryMiddleware(app=MagicMock())
         claims = _make_claims(sap_gtid="t1", user_uuid="u1")
-        inner_cls = self._get_inner_class(mw)
+        inner_cls, kwargs = self._get_inner_class_and_kwargs(mw)
 
         request = _make_request({"authorization": "Bearer tok"})
 
         async def raises(req):
             raise RuntimeError("downstream")
 
-        inner = inner_cls(app=MagicMock())
+        inner = inner_cls(app=MagicMock(), **kwargs)
         with patch(_PATCH_PARSE, lambda t: claims):
             with pytest.raises(RuntimeError):
                 await inner.dispatch(request, raises)
@@ -160,7 +161,7 @@ class TestInnerMiddlewareDispatch:
     @pytest.mark.anyio
     async def test_no_auth_header_sets_empty_attrs(self):
         mw = StarletteIASTelemetryMiddleware(app=MagicMock())
-        inner_cls = self._get_inner_class(mw)
+        inner_cls, kwargs = self._get_inner_class_and_kwargs(mw)
 
         request = _make_request({})
         captured = {}
@@ -169,7 +170,7 @@ class TestInnerMiddlewareDispatch:
             captured.update(mw._attrs_var.get())
             return MagicMock()
 
-        inner = inner_cls(app=MagicMock())
+        inner = inner_cls(app=MagicMock(), **kwargs)
         await inner.dispatch(request, call_next)
 
         assert captured == {}
@@ -180,8 +181,10 @@ class TestInnerMiddlewareDispatch:
         mw2 = StarletteIASTelemetryMiddleware(app=MagicMock())
         claims1 = _make_claims(sap_gtid="tenant-1", user_uuid=None)
         claims2 = _make_claims(sap_gtid=None, user_uuid="user-2")
-        inner1 = self._get_inner_class(mw1)(app=MagicMock())
-        inner2 = self._get_inner_class(mw2)(app=MagicMock())
+        inner1_cls, kwargs1 = self._get_inner_class_and_kwargs(mw1)
+        inner2_cls, kwargs2 = self._get_inner_class_and_kwargs(mw2)
+        inner1 = inner1_cls(app=MagicMock(), **kwargs1)
+        inner2 = inner2_cls(app=MagicMock(), **kwargs2)
 
         req = _make_request({"authorization": "Bearer tok"})
         captured1, captured2 = {}, {}

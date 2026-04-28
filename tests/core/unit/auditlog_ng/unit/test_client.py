@@ -1,4 +1,5 @@
 """Tests for AuditClient."""
+
 from __future__ import annotations
 
 import json
@@ -39,7 +40,9 @@ def _make_config(**overrides: Unpack[ConfigKwargs]) -> AuditLogNGConfig:
 
 @patch("sap_cloud_sdk.core.auditlog_ng.client.GRPCLogExporter")
 @patch("sap_cloud_sdk.core.auditlog_ng.client.LoggerProvider")
-def _make_mocked_client(mock_provider_cls, mock_exporter_cls, *, validate_side_effect=None):
+def _make_mocked_client(
+    mock_provider_cls, mock_exporter_cls, *, validate_side_effect=None
+):
     mock_logger = Mock()
     mock_provider = Mock()
     mock_provider.get_logger.return_value = mock_logger
@@ -54,7 +57,14 @@ def _make_mocked_client(mock_provider_cls, mock_exporter_cls, *, validate_side_e
     )
     mock_validate = validate_patcher.start()
 
-    return client, mock_logger, mock_provider, mock_validate, validate_patcher, mock_provider_cls
+    return (
+        client,
+        mock_logger,
+        mock_provider,
+        mock_validate,
+        validate_patcher,
+        mock_provider_cls,
+    )
 
 
 def _make_mock_event(tenant_id="tenant-123", descriptor_name="DataAccess"):
@@ -66,7 +76,6 @@ def _make_mock_event(tenant_id="tenant-123", descriptor_name="DataAccess"):
 
 
 class TestAuditClientInit:
-
     @patch("sap_cloud_sdk.core.auditlog_ng.client.GRPCLogExporter")
     @patch("sap_cloud_sdk.core.auditlog_ng.client.LoggerProvider")
     def test_creates_insecure_client(self, mock_provider_cls, mock_exporter_cls):
@@ -107,7 +116,6 @@ class TestAuditClientInit:
 
 
 class TestAuditClientSend:
-
     def test_send_binary_success(self):
         client, mock_logger, _, mock_validate, patcher, _ = _make_mocked_client()
         try:
@@ -121,7 +129,10 @@ class TestAuditClientSend:
             _, kwargs = mock_logger.emit.call_args
             assert kwargs["event_name"] == "sap.als.AuditEvent.DataAccess.v2"
             assert kwargs["body"] == b"\x00\x01\x02"
-            assert kwargs["attributes"]["sap.auditlogging.mime_type"] == "application/protobuf"
+            assert (
+                kwargs["attributes"]["sap.auditlogging.mime_type"]
+                == "application/protobuf"
+            )
             assert kwargs["attributes"]["sap.tenancy.tenant_id"] == "tenant-123"
             assert "cloudevents.event_id" in kwargs["attributes"]
         finally:
@@ -137,7 +148,9 @@ class TestAuditClientSend:
             mock_logger.emit.assert_called_once()
 
             _, kwargs = mock_logger.emit.call_args
-            assert kwargs["attributes"]["sap.auditlogging.mime_type"] == "application/json"
+            assert (
+                kwargs["attributes"]["sap.auditlogging.mime_type"] == "application/json"
+            )
             assert isinstance(kwargs["body"], str)
         finally:
             patcher.stop()
@@ -197,7 +210,6 @@ class TestAuditClientSend:
 
 
 class TestAuditClientLifecycle:
-
     def test_flush(self):
         client, _, mock_provider, _, patcher, _ = _make_mocked_client()
         patcher.stop()
@@ -234,26 +246,52 @@ class TestAuditClientLifecycle:
 
 
 class TestAuditClientProtocol:
-
     @patch("sap_cloud_sdk.core.auditlog_ng.client.GRPCLogExporter")
     @patch("sap_cloud_sdk.core.auditlog_ng.client.LoggerProvider")
-    def test_grpc_is_default(self, mock_provider_cls, mock_grpc_exporter_cls, monkeypatch):
+    def test_grpc_is_default(
+        self, mock_provider_cls, mock_grpc_exporter_cls, monkeypatch
+    ):
         monkeypatch.delenv("OTEL_EXPORTER_OTLP_PROTOCOL", raising=False)
         AuditClient(_make_config())
         mock_grpc_exporter_cls.assert_called_once()
 
     @patch("sap_cloud_sdk.core.auditlog_ng.client.HTTPLogExporter")
     @patch("sap_cloud_sdk.core.auditlog_ng.client.LoggerProvider")
-    def test_http_protobuf_protocol(self, mock_provider_cls, mock_http_exporter_cls, monkeypatch):
+    def test_http_protobuf_protocol(
+        self, mock_provider_cls, mock_http_exporter_cls, monkeypatch
+    ):
         monkeypatch.setenv("OTEL_EXPORTER_OTLP_PROTOCOL", "http/protobuf")
-        AuditClient(_make_config())
+        AuditClient(
+            _make_config(
+                cert_file="client.pem", key_file="client.key", ca_file="ca.pem"
+            )
+        )
         mock_http_exporter_cls.assert_called_once()
         _, kwargs = mock_http_exporter_cls.call_args
         assert kwargs["endpoint"] == "localhost:4317"
+        assert kwargs["client_certificate_file"] == "client.pem"
+        assert kwargs["client_key_file"] == "client.key"
+        assert kwargs["certificate_file"] == "ca.pem"
+
+    @patch("sap_cloud_sdk.core.auditlog_ng.client.HTTPLogExporter")
+    @patch("sap_cloud_sdk.core.auditlog_ng.client.LoggerProvider")
+    def test_http_compression(
+        self, mock_provider_cls, mock_http_exporter_cls, monkeypatch
+    ):
+        from opentelemetry.exporter.otlp.proto.http import (
+            Compression as HTTPCompression,
+        )
+
+        monkeypatch.setenv("OTEL_EXPORTER_OTLP_PROTOCOL", "http/protobuf")
+        AuditClient(_make_config(compression=True))
+        _, kwargs = mock_http_exporter_cls.call_args
+        assert kwargs["compression"] == HTTPCompression.Gzip
 
     @patch("sap_cloud_sdk.core.auditlog_ng.client.GRPCLogExporter")
     @patch("sap_cloud_sdk.core.auditlog_ng.client.LoggerProvider")
-    def test_unsupported_protocol_raises(self, mock_provider_cls, mock_exporter_cls, monkeypatch):
+    def test_unsupported_protocol_raises(
+        self, mock_provider_cls, mock_exporter_cls, monkeypatch
+    ):
         monkeypatch.setenv("OTEL_EXPORTER_OTLP_PROTOCOL", "http/json")
         with pytest.raises(ValueError, match="Unsupported OTEL_EXPORTER_OTLP_PROTOCOL"):
             AuditClient(_make_config())

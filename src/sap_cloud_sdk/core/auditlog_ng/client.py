@@ -27,6 +27,7 @@ from opentelemetry.exporter.otlp.proto.grpc._log_exporter import (
 from opentelemetry.exporter.otlp.proto.http._log_exporter import (
     OTLPLogExporter as HTTPLogExporter,
 )
+from opentelemetry.exporter.otlp.proto.http import Compression as HTTPCompression
 from opentelemetry._logs.severity import SeverityNumber
 
 from sap_cloud_sdk.core.auditlog_ng.config import (
@@ -56,7 +57,17 @@ def _create_log_exporter(
             ),
         )
     elif protocol == "http/protobuf":
-        return HTTPLogExporter(endpoint=config.endpoint)
+        return HTTPLogExporter(
+            endpoint=config.endpoint,
+            certificate_file=config.ca_file,
+            client_key_file=config.key_file,
+            client_certificate_file=config.cert_file,
+            compression=(
+                HTTPCompression.Gzip
+                if config.compression
+                else HTTPCompression.NoCompression
+            ),
+        )
     else:
         raise ValueError(
             f"Unsupported OTEL_EXPORTER_OTLP_PROTOCOL: '{protocol}'. "

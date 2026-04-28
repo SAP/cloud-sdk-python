@@ -1,6 +1,7 @@
 import logging
 import os
 from collections.abc import Mapping
+from typing import Optional
 
 from opentelemetry import trace
 from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import (
@@ -15,7 +16,8 @@ from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import ConsoleSpanExporter, SpanExporter
 from traceloop.sdk import Traceloop
 
-from sap_cloud_sdk.core.telemetry import Module, Operation
+from sap_cloud_sdk.core.telemetry.module import Module
+from sap_cloud_sdk.core.telemetry.operation import Operation
 from sap_cloud_sdk.core.telemetry.config import (
     ENV_OTLP_ENDPOINT,
     ENV_OTLP_PROTOCOL,
@@ -32,7 +34,10 @@ logger = logging.getLogger(__name__)
 
 
 @record_metrics(Module.AICORE, Operation.AICORE_AUTO_INSTRUMENT)
-def auto_instrument(disable_batch: bool = False):
+def auto_instrument(
+    disable_batch: bool = False,
+    middlewares: Optional[list] = None,
+):
     """
     Initialize meta-instrumentation for GenAI tracing. Should be initialized before any AI frameworks.
 
@@ -43,6 +48,10 @@ def auto_instrument(disable_batch: bool = False):
         disable_batch: If True, uses SimpleSpanProcessor (synchronous, lower throughput).
                        Defaults to False, which uses BatchSpanProcessor (asynchronous,
                        recommended for production workloads).
+        middlewares: Optional list of TelemetryMiddleware instances. When provided,
+                     each middleware is registered with its application and a
+                     MiddlewareSpanProcessor is added so that headers extracted by
+                     the middlewares appear as attributes on every span.
     """
     otel_endpoint = os.getenv(ENV_OTLP_ENDPOINT, "")
     console_traces = os.getenv(ENV_TRACES_EXPORTER, "").lower() == "console"
@@ -67,6 +76,9 @@ def auto_instrument(disable_batch: bool = False):
     _merge_resource_attrs_into_active_provider_if_wrapper_installed(resource)
 
     _set_baggage_processor()
+
+    if middlewares:
+        _register_middleware_processors(middlewares)
 
     logger.info("Cloud auto instrumentation initialized successfully")
 
@@ -100,6 +112,23 @@ def _set_baggage_processor():
 
     provider.add_span_processor(BaggageSpanProcessor(ALLOW_ALL_BAGGAGE_KEYS))
     logger.info("Registered BaggageSpanProcessor for extension attribute propagation")
+
+
+def _register_middleware_processors(middlewares: list) -> None:
+    from sap_cloud_sdk.core.telemetry.middleware.span_processor import MiddlewareSpanProcessor
+
+    provider = trace.get_tracer_provider()
+    if not isinstance(provider, TracerProvider):
+        logger.warning(
+            "Unknown TracerProvider type. Skipping MiddlewareSpanProcessor registration"
+        )
+        return
+
+    for middleware in middlewares:
+        middleware.register(None)
+
+    provider.add_span_processor(MiddlewareSpanProcessor(middlewares))
+    logger.info("Registered MiddlewareSpanProcessor for %d middleware(s)", len(middlewares))
 
 
 def _merge_resource_attrs_into_active_provider_if_wrapper_installed(

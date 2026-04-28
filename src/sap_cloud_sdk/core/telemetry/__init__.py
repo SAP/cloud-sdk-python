@@ -24,6 +24,7 @@ from sap_cloud_sdk.core.telemetry.tracer import (
     execute_tool_span,
     invoke_agent_span,
 )
+from sap_cloud_sdk.core.telemetry.middleware import TelemetryMiddleware
 
 __all__ = [
     "Module",
@@ -41,4 +42,12 @@ __all__ = [
     "chat_span",
     "execute_tool_span",
     "invoke_agent_span",
+    "TelemetryMiddleware",
 ]
+
+try:
+    from sap_cloud_sdk.core.telemetry.middleware import StarletteIASTelemetryMiddleware
+
+    __all__ += ["StarletteIASTelemetryMiddleware"]
+except ImportError:
+    pass

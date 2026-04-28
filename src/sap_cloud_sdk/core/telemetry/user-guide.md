@@ -222,7 +222,7 @@ auto_instrument(middlewares=[MyMiddleware(app=app)])
 ### Built-in: `StarletteIASTelemetryMiddleware`
 
 For Starlette/FastAPI apps with IAS authentication, the SDK ships a ready-to-use middleware that reads the `Authorization: Bearer <token>` header on each request, parses it as an IAS JWT, and injects:
-- `sap.tenancy.tenant_id` from the `app_tid` claim
+- `sap.tenancy.tenant_id` from the `sap_gtid` claim
 - `user.id` from the `user_uuid` claim
 
 If the header is absent or the token cannot be parsed, no attributes are set and the request continues normally.

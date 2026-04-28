@@ -71,19 +71,19 @@ class TestOperation:
         assert Operation.DMS_GET_CONFIGS.value == "get_configs"
         assert Operation.DMS_UPDATE_CONFIG.value == "update_config"
         assert Operation.DMS_DELETE_CONFIG.value == "delete_config"
-        assert Operation.DMS_CREATE_FOLDER.value == "create_folder"
-        assert Operation.DMS_CREATE_DOCUMENT.value == "create_document"
-        assert Operation.DMS_CHECK_OUT.value == "check_out"
-        assert Operation.DMS_CHECK_IN.value == "check_in"
-        assert Operation.DMS_CANCEL_CHECK_OUT.value == "cancel_check_out"
-        assert Operation.DMS_APPLY_ACL.value == "apply_acl"
-        assert Operation.DMS_GET_OBJECT.value == "get_object"
-        assert Operation.DMS_GET_CONTENT.value == "get_content"
-        assert Operation.DMS_UPDATE_PROPERTIES.value == "update_properties"
-        assert Operation.DMS_GET_CHILDREN.value == "get_children"
-        assert Operation.DMS_DELETE_OBJECT.value == "delete_cmis_object"
-        assert Operation.DMS_RESTORE_OBJECT.value == "restore_object"
-        assert Operation.DMS_APPEND_CONTENT_STREAM.value == "append_content_stream"
+        assert Operation.DMS_CREATE_FOLDER.value == "cmis_create_folder"
+        assert Operation.DMS_CREATE_DOCUMENT.value == "cmis_create_document"
+        assert Operation.DMS_CHECK_OUT.value == "cmis_check_out"
+        assert Operation.DMS_CHECK_IN.value == "cmis_check_in"
+        assert Operation.DMS_CANCEL_CHECK_OUT.value == "cmis_cancel_check_out"
+        assert Operation.DMS_APPLY_ACL.value == "cmis_apply_acl"
+        assert Operation.DMS_GET_OBJECT.value == "cmis_get_object"
+        assert Operation.DMS_GET_CONTENT.value == "cmis_get_content"
+        assert Operation.DMS_UPDATE_PROPERTIES.value == "cmis_update_properties"
+        assert Operation.DMS_GET_CHILDREN.value == "cmis_get_children"
+        assert Operation.DMS_DELETE_OBJECT.value == "cmis_delete_object"
+        assert Operation.DMS_RESTORE_OBJECT.value == "cmis_restore_object"
+        assert Operation.DMS_APPEND_CONTENT_STREAM.value == "cmis_append_content_stream"
         assert Operation.DMS_CMIS_QUERY.value == "cmis_query"
 
     def test_operation_str_representation(self):
@@ -132,5 +132,5 @@ class TestOperation:
     def test_operation_count(self):
         """Test that we have the expected number of operations."""
         all_operations = list(Operation)
-        # 3 auditlog + 11 destination + 10 certificate + 10 fragment + 8 objectstore + 2 aicore + 22 dms = 66
-        assert len(all_operations) == 66
+        # 3 auditlog + 11 destination + 10 certificate + 10 fragment + 8 objectstore + 2 aicore + 23 dms = 67
+        assert len(all_operations) == 67

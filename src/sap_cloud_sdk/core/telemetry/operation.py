@@ -80,21 +80,22 @@ class Operation(str, Enum):
     DMS_DELETE_CONFIG = "delete_config"
 
     # DMS CMIS Operations
-    DMS_CREATE_FOLDER = "create_folder"
-    DMS_CREATE_DOCUMENT = "create_document"
-    DMS_CHECK_OUT = "check_out"
-    DMS_CHECK_IN = "check_in"
-    DMS_CANCEL_CHECK_OUT = "cancel_check_out"
-    DMS_APPLY_ACL = "apply_acl"
-    DMS_GET_OBJECT = "get_object"
-    DMS_GET_CONTENT = "get_content"
-    DMS_UPDATE_PROPERTIES = "update_properties"
-    DMS_GET_CHILDREN = "get_children"
-    # Value is "delete_cmis_object" (not "delete_object") to avoid collision
-    # with OBJECTSTORE_DELETE_OBJECT which already uses "delete_object".
-    DMS_DELETE_OBJECT = "delete_cmis_object"
-    DMS_RESTORE_OBJECT = "restore_object"
-    DMS_APPEND_CONTENT_STREAM = "append_content_stream"
+    # Prefixed with "cmis_" to distinguish from other modules (e.g.
+    # ObjectStore also has "get_object" / "delete_object") and to avoid
+    # Python enum aliasing on duplicate values.
+    DMS_CREATE_FOLDER = "cmis_create_folder"
+    DMS_CREATE_DOCUMENT = "cmis_create_document"
+    DMS_CHECK_OUT = "cmis_check_out"
+    DMS_CHECK_IN = "cmis_check_in"
+    DMS_CANCEL_CHECK_OUT = "cmis_cancel_check_out"
+    DMS_APPLY_ACL = "cmis_apply_acl"
+    DMS_GET_OBJECT = "cmis_get_object"
+    DMS_GET_CONTENT = "cmis_get_content"
+    DMS_UPDATE_PROPERTIES = "cmis_update_properties"
+    DMS_GET_CHILDREN = "cmis_get_children"
+    DMS_DELETE_OBJECT = "cmis_delete_object"
+    DMS_RESTORE_OBJECT = "cmis_restore_object"
+    DMS_APPEND_CONTENT_STREAM = "cmis_append_content_stream"
     DMS_CMIS_QUERY = "cmis_query"
 
     def __str__(self) -> str:

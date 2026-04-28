@@ -60,6 +60,32 @@ class TestOperation:
         assert Operation.AICORE_SET_CONFIG.value == "set_aicore_config"
         assert Operation.AICORE_AUTO_INSTRUMENT.value == "auto_instrument"
 
+    def test_dms_operations(self):
+        """Test DMS operation values."""
+        assert Operation.DMS_ONBOARD_REPOSITORY.value == "onboard_repository"
+        assert Operation.DMS_GET_REPOSITORY.value == "get_repository"
+        assert Operation.DMS_GET_ALL_REPOSITORIES.value == "get_all_repositories"
+        assert Operation.DMS_UPDATE_REPOSITORY.value == "update_repository"
+        assert Operation.DMS_DELETE_REPOSITORY.value == "delete_repository"
+        assert Operation.DMS_CREATE_CONFIG.value == "create_config"
+        assert Operation.DMS_GET_CONFIGS.value == "get_configs"
+        assert Operation.DMS_UPDATE_CONFIG.value == "update_config"
+        assert Operation.DMS_DELETE_CONFIG.value == "delete_config"
+        assert Operation.DMS_CREATE_FOLDER.value == "cmis_create_folder"
+        assert Operation.DMS_CREATE_DOCUMENT.value == "cmis_create_document"
+        assert Operation.DMS_CHECK_OUT.value == "cmis_check_out"
+        assert Operation.DMS_CHECK_IN.value == "cmis_check_in"
+        assert Operation.DMS_CANCEL_CHECK_OUT.value == "cmis_cancel_check_out"
+        assert Operation.DMS_APPLY_ACL.value == "cmis_apply_acl"
+        assert Operation.DMS_GET_OBJECT.value == "cmis_get_object"
+        assert Operation.DMS_GET_CONTENT.value == "cmis_get_content"
+        assert Operation.DMS_UPDATE_PROPERTIES.value == "cmis_update_properties"
+        assert Operation.DMS_GET_CHILDREN.value == "cmis_get_children"
+        assert Operation.DMS_DELETE_OBJECT.value == "cmis_delete_object"
+        assert Operation.DMS_RESTORE_OBJECT.value == "cmis_restore_object"
+        assert Operation.DMS_APPEND_CONTENT_STREAM.value == "cmis_append_content_stream"
+        assert Operation.DMS_CMIS_QUERY.value == "cmis_query"
+
     def test_operation_str_representation(self):
         """Test that Operation enum converts to string correctly."""
         assert str(Operation.AUDITLOG_LOG) == "log"
@@ -106,7 +132,5 @@ class TestOperation:
     def test_operation_count(self):
         """Test that we have the expected number of operations."""
         all_operations = list(Operation)
-        # 3 auditlog + 8 destination + 7 certificate + 7 fragment + 8 objectstore + 2 aicore = 34
-        # + 9 label operations (3 destination + 3 certificate + 3 fragment) = 44 (wait — comment is stale)
-        # 3 auditlog + 8+3 destination + 7+3 certificate + 7+3 fragment + 8 objectstore + 2 aicore = 44
-        assert len(all_operations) == 44
+        # 3 auditlog + 11 destination + 10 certificate + 10 fragment + 8 objectstore + 2 aicore + 23 dms = 67
+        assert len(all_operations) == 67

@@ -115,18 +115,24 @@ def _set_baggage_processor():
 
 
 def _register_middleware_processors(middlewares: list) -> None:
-    from sap_cloud_sdk.core.telemetry.middleware.span_processor import MiddlewareSpanProcessor
+    from sap_cloud_sdk.core.telemetry.middleware.span_processor import (
+        MiddlewareSpanProcessor,
+    )
 
     provider = trace.get_tracer_provider()
     if not isinstance(provider, TracerProvider):
-        logger.warning("Unknown TracerProvider type. Skipping MiddlewareSpanProcessor registration")
+        logger.warning(
+            "Unknown TracerProvider type. Skipping MiddlewareSpanProcessor registration"
+        )
         return
 
     for middleware in middlewares:
         middleware.register()
 
     provider.add_span_processor(MiddlewareSpanProcessor(middlewares))
-    logger.info("Registered MiddlewareSpanProcessor for %d middleware(s)", len(middlewares))
+    logger.info(
+        "Registered MiddlewareSpanProcessor for %d middleware(s)", len(middlewares)
+    )
 
 
 def _merge_resource_attrs_into_active_provider_if_wrapper_installed(

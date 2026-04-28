@@ -12,14 +12,14 @@ class TestTelemetryMiddlewareAbstract:
 
     def test_concrete_subclass_with_both_methods_works(self):
         class Concrete(TelemetryMiddleware):
-            def register(self, app):
+            def register(self):
                 pass
 
             def get_attributes(self):
                 return {"k": "v"}
 
         obj = Concrete()
-        obj.register(None)
+        obj.register()
         assert obj.get_attributes() == {"k": "v"}
 
     def test_missing_register_raises(self):
@@ -32,7 +32,7 @@ class TestTelemetryMiddlewareAbstract:
 
     def test_missing_get_attributes_raises(self):
         class Incomplete(TelemetryMiddleware):
-            def register(self, app):
+            def register(self):
                 pass
 
         with pytest.raises(TypeError):

@@ -10,9 +10,9 @@ from sap_cloud_sdk.core.auditlog_ng.exceptions import ClientCreationError
 
 class TestCreateClient:
 
-    @patch("sap_cloud_sdk.core.auditlog_ng.client.OTLPLogExporter")
+    @patch("sap_cloud_sdk.core.auditlog_ng.client._create_log_exporter")
     @patch("sap_cloud_sdk.core.auditlog_ng.client.LoggerProvider")
-    def test_create_client_with_config(self, mock_provider_cls, mock_exporter_cls):
+    def test_create_client_with_config(self, mock_provider_cls, mock_exporter_fn):
         mock_provider = Mock()
         mock_provider.get_logger.return_value = Mock()
         mock_provider_cls.return_value = mock_provider
@@ -28,9 +28,9 @@ class TestCreateClient:
 
         assert isinstance(client, AuditClient)
 
-    @patch("sap_cloud_sdk.core.auditlog_ng.client.OTLPLogExporter")
+    @patch("sap_cloud_sdk.core.auditlog_ng.client._create_log_exporter")
     @patch("sap_cloud_sdk.core.auditlog_ng.client.LoggerProvider")
-    def test_create_client_with_keyword_args(self, mock_provider_cls, mock_exporter_cls):
+    def test_create_client_with_keyword_args(self, mock_provider_cls, mock_exporter_fn):
         mock_provider = Mock()
         mock_provider.get_logger.return_value = Mock()
         mock_provider_cls.return_value = mock_provider
@@ -68,10 +68,10 @@ class TestCreateClient:
                 namespace="ns-1",
             )
 
-    @patch("sap_cloud_sdk.core.auditlog_ng.client.OTLPLogExporter")
+    @patch("sap_cloud_sdk.core.auditlog_ng.client._create_log_exporter")
     @patch("sap_cloud_sdk.core.auditlog_ng.client.LoggerProvider")
     def test_create_client_unexpected_exception_wraps_in_client_creation_error(
-        self, mock_provider_cls, mock_exporter_cls
+        self, mock_provider_cls, mock_exporter_fn
     ):
         mock_provider_cls.side_effect = RuntimeError("Unexpected failure")
 
@@ -83,9 +83,9 @@ class TestCreateClient:
                 insecure=True,
             )
 
-    @patch("sap_cloud_sdk.core.auditlog_ng.client.OTLPLogExporter")
+    @patch("sap_cloud_sdk.core.auditlog_ng.client._create_log_exporter")
     @patch("sap_cloud_sdk.core.auditlog_ng.client.LoggerProvider")
-    def test_config_keyword_args_are_forwarded(self, mock_provider_cls, mock_exporter_cls):
+    def test_config_keyword_args_are_forwarded(self, mock_provider_cls, mock_exporter_fn):
         mock_provider = Mock()
         mock_provider.get_logger.return_value = Mock()
         mock_provider_cls.return_value = mock_provider

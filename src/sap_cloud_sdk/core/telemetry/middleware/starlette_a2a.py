@@ -4,7 +4,11 @@ import logging
 from contextvars import ContextVar
 from typing import Any, Dict
 
-from sap_cloud_sdk.core.telemetry.constants import ATTR_SAP_ORIGIN, ATTR_SAP_TENANT_ID, ATTR_USER_ID
+from sap_cloud_sdk.core.telemetry.constants import (
+    ATTR_SAP_ORIGIN,
+    ATTR_SAP_TENANT_ID,
+    ATTR_USER_ID,
+)
 from sap_cloud_sdk.core.telemetry.middleware.base import TelemetryMiddleware
 
 try:

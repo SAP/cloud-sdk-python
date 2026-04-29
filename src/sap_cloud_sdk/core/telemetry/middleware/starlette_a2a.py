@@ -4,7 +4,7 @@ import logging
 from contextvars import ContextVar
 from typing import Any, Dict
 
-from sap_cloud_sdk.core.telemetry.constants import ATTR_SAP_TENANT_ID, ATTR_USER_ID
+from sap_cloud_sdk.core.telemetry.constants import ATTR_SAP_ORIGIN, ATTR_SAP_TENANT_ID, ATTR_USER_ID
 from sap_cloud_sdk.core.telemetry.middleware.base import TelemetryMiddleware
 
 try:
@@ -90,4 +90,7 @@ def _extract_ias_attrs(request: Request) -> Dict[str, Any]:
         attrs[ATTR_SAP_TENANT_ID] = claims.sap_gtid
     if claims.user_uuid:
         attrs[ATTR_USER_ID] = claims.user_uuid
+    origin = request.headers.get("x-sap-origin")
+    if origin:
+        attrs[ATTR_SAP_ORIGIN] = origin
     return attrs

@@ -3,7 +3,7 @@
 import pytest
 from unittest.mock import MagicMock, AsyncMock, patch
 
-from sap_cloud_sdk.core.telemetry.constants import ATTR_SAP_ORIGIN, ATTR_SAP_TENANT_ID, ATTR_USER_ID
+from sap_cloud_sdk.core.telemetry.constants import ATTR_SAP_TRIGGER_TYPE, ATTR_SAP_TENANT_ID, ATTR_USER_ID
 from sap_cloud_sdk.core.telemetry.middleware.starlette_a2a import (
     StarletteIASTelemetryMiddleware,
     _extract_ias_attrs,
@@ -104,14 +104,14 @@ class TestExtractIasAttrs:
         request = _make_request({"authorization": "Bearer tok", "x-sap-origin": "ui5"})
         with patch(_PATCH_PARSE, return_value=claims):
             result = _extract_ias_attrs(request)
-        assert result[ATTR_SAP_ORIGIN] == "ui5"
+        assert result[ATTR_SAP_TRIGGER_TYPE] == "ui5"
 
     def test_omits_origin_attr_when_header_absent(self):
         claims = _make_claims(sap_gtid="t1", user_uuid="u1")
         request = _make_request({"authorization": "Bearer tok"})
         with patch(_PATCH_PARSE, return_value=claims):
             result = _extract_ias_attrs(request)
-        assert ATTR_SAP_ORIGIN not in result
+        assert ATTR_SAP_TRIGGER_TYPE not in result
 
 
 class TestInnerMiddlewareDispatch:

@@ -315,3 +315,80 @@ class TestAutoInstrument:
             auto_instrument()
 
             assert wrapper_provider.resource.attributes['service.name'] == 'cloud-sdk-app'
+
+
+class TestAutoInstrumentMiddlewares:
+    """Tests for the middlewares parameter of auto_instrument."""
+
+    def test_middlewares_register_called_and_processor_added(self, mock_traceloop_components):
+        mock_traceloop_components['get_app_name'].return_value = 'test-app'
+        mock_traceloop_components['create_resource'].return_value = {}
+        middleware = MagicMock()
+
+        with patch('sap_cloud_sdk.core.telemetry.auto_instrument._register_middleware_processors') as mock_reg:
+            with patch.dict('os.environ', {'OTEL_EXPORTER_OTLP_ENDPOINT': 'http://localhost:4317'}, clear=True):
+                auto_instrument(middlewares=[middleware])
+                mock_reg.assert_called_once_with([middleware])
+
+    def test_middlewares_none_does_not_register_processor(self, mock_traceloop_components):
+        mock_traceloop_components['get_app_name'].return_value = 'test-app'
+        mock_traceloop_components['create_resource'].return_value = {}
+
+        with patch('sap_cloud_sdk.core.telemetry.auto_instrument._register_middleware_processors') as mock_reg:
+            with patch.dict('os.environ', {'OTEL_EXPORTER_OTLP_ENDPOINT': 'http://localhost:4317'}, clear=True):
+                auto_instrument(middlewares=None)
+                mock_reg.assert_not_called()
+
+    def test_empty_middlewares_list_does_not_register_processor(self, mock_traceloop_components):
+        mock_traceloop_components['get_app_name'].return_value = 'test-app'
+        mock_traceloop_components['create_resource'].return_value = {}
+
+        with patch('sap_cloud_sdk.core.telemetry.auto_instrument._register_middleware_processors') as mock_reg:
+            with patch.dict('os.environ', {'OTEL_EXPORTER_OTLP_ENDPOINT': 'http://localhost:4317'}, clear=True):
+                auto_instrument(middlewares=[])
+                mock_reg.assert_not_called()
+
+    def test_register_middleware_processors_calls_register_and_adds_processor(self, mock_traceloop_components):
+        from sap_cloud_sdk.core.telemetry.auto_instrument import _register_middleware_processors
+        from sap_cloud_sdk.core.telemetry.middleware.span_processor import MiddlewareSpanProcessor
+        from opentelemetry.sdk.trace import TracerProvider as SDKTracerProvider
+        from unittest.mock import create_autospec
+
+        provider = create_autospec(SDKTracerProvider)
+        middleware = MagicMock()
+
+        with patch('sap_cloud_sdk.core.telemetry.auto_instrument.trace.get_tracer_provider', return_value=provider):
+            _register_middleware_processors([middleware])
+
+        middleware.register.assert_called_once_with()
+        provider.add_span_processor.assert_called_once()
+        call_arg = provider.add_span_processor.call_args[0][0]
+        assert isinstance(call_arg, MiddlewareSpanProcessor)
+
+    def test_register_middleware_processors_skips_when_unknown_provider(self, mock_traceloop_components):
+        from sap_cloud_sdk.core.telemetry.auto_instrument import _register_middleware_processors
+
+        middleware = MagicMock()
+        unknown_provider = MagicMock()  # not a TracerProvider instance
+
+        with patch('sap_cloud_sdk.core.telemetry.auto_instrument.trace.get_tracer_provider', return_value=unknown_provider):
+            with patch('sap_cloud_sdk.core.telemetry.auto_instrument.logger') as mock_logger:
+                _register_middleware_processors([middleware])
+
+                mock_logger.warning.assert_called_once()
+                middleware.register.assert_not_called()
+                unknown_provider.add_span_processor.assert_not_called()
+
+    def test_baggage_and_middleware_processors_both_added(self, mock_traceloop_components):
+        mock_traceloop_components['get_app_name'].return_value = 'test-app'
+        mock_traceloop_components['create_resource'].return_value = {}
+        middleware = MagicMock()
+        mock_baggage_instance = MagicMock()
+        mock_traceloop_components['baggage_processor'].return_value = mock_baggage_instance
+
+        with patch.dict('os.environ', {'OTEL_EXPORTER_OTLP_ENDPOINT': 'http://localhost:4317'}, clear=True):
+            auto_instrument(middlewares=[middleware])
+
+        # add_span_processor called twice: once for baggage, once for middleware
+        assert mock_traceloop_components['get_tracer_provider'].return_value.add_span_processor.call_count == 2
+

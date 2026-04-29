@@ -2398,7 +2398,7 @@ wheels = [
 
 [[package]]
 name = "sap-cloud-sdk"
-version = "0.12.1"
+version = "0.13.0"
 source = { editable = "." }
 dependencies = [
     { name = "grpcio" },
@@ -2420,14 +2420,22 @@ dependencies = [
     { name = "traceloop-sdk" },
 ]
 
+[package.optional-dependencies]
+starlette = [
+    { name = "starlette" },
+]
+
 [package.dev-dependencies]
 dev = [
+    { name = "anyio" },
     { name = "cryptography" },
+    { name = "httpx" },
     { name = "pytest" },
     { name = "pytest-bdd" },
     { name = "pytest-cov" },
     { name = "python-dotenv" },
     { name = "ruff" },
+    { name = "starlette" },
     { name = "ty" },
 ]
 
@@ -2449,17 +2457,22 @@ requires-dist = [
     { name = "requests", specifier = ">=2.33.0" },
     { name = "requests-oauthlib", specifier = "~=2.0.0" },
     { name = "setuptools", specifier = "~=80.9.0" },
+    { name = "starlette", marker = "extra == 'starlette'", specifier = ">=0.40.0" },
     { name = "traceloop-sdk", specifier = "~=0.54.0" },
 ]
+provides-extras = ["starlette"]
 
 [package.metadata.requires-dev]
 dev = [
+    { name = "anyio", specifier = ">=3.6.2" },
     { name = "cryptography", specifier = ">=46.0.3" },
+    { name = "httpx", specifier = ">=0.27.0" },
     { name = "pytest", specifier = ">=8.4.2" },
     { name = "pytest-bdd", specifier = ">=7.2.0" },
     { name = "pytest-cov", specifier = ">=7.0.0" },
     { name = "python-dotenv", specifier = ">=1.0.0" },
     { name = "ruff", specifier = ">=0.8.0" },
+    { name = "starlette", specifier = ">=0.40.0" },
     { name = "ty", specifier = ">=0.0.21" },
 ]
 
@@ -2479,6 +2492,19 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/94/e7/b2c673351809dca68a0e064b6af791aa332cf192da575fd474ed7d6f16a2/six-1.17.0.tar.gz", hash = "sha256:ff70335d468e7eb6ec65b95b99d3a2836546063f63acc5171de367e834932a81", size = 34031, upload-time = "2024-12-04T17:35:28.174Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/b7/ce/149a00dd41f10bc29e5921b496af8b574d8413afcd5e30dfa0ed46c2cc5e/six-1.17.0-py2.py3-none-any.whl", hash = "sha256:4721f391ed90541fddacab5acf947aa0d3dc7d27b2e1e8eda2be8970586c3274", size = 11050, upload-time = "2024-12-04T17:35:26.475Z" },
+]
+
+[[package]]
+name = "starlette"
+version = "1.0.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "anyio" },
+    { name = "typing-extensions", marker = "python_full_version < '3.13'" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/81/69/17425771797c36cded50b7fe44e850315d039f28b15901ab44839e70b593/starlette-1.0.0.tar.gz", hash = "sha256:6a4beaf1f81bb472fd19ea9b918b50dc3a77a6f2e190a12954b25e6ed5eea149", size = 2655289, upload-time = "2026-03-22T18:29:46.779Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/0b/c9/584bc9651441b4ba60cc4d557d8a547b5aff901af35bda3a4ee30c819b82/starlette-1.0.0-py3-none-any.whl", hash = "sha256:d3ec55e0bb321692d275455ddfd3df75fff145d009685eb40dc91fc66b03d38b", size = 72651, upload-time = "2026-03-22T18:29:45.111Z" },
 ]
 
 [[package]]

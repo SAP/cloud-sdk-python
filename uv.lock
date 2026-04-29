@@ -2398,7 +2398,7 @@ wheels = [
 
 [[package]]
 name = "sap-cloud-sdk"
-version = "0.11.8"
+version = "0.12.1"
 source = { editable = "." }
 dependencies = [
     { name = "grpcio" },

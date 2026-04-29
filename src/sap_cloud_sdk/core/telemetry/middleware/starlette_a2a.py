@@ -10,12 +10,12 @@ from sap_cloud_sdk.core.telemetry.constants import (
     ATTR_USER_ID,
 )
 from sap_cloud_sdk.core.telemetry.middleware.base import TelemetryMiddleware
+from sap_cloud_sdk.ias import parse_token
 
 try:
     from starlette.middleware.base import BaseHTTPMiddleware
     from starlette.requests import Request
     from starlette.responses import Response
-    from sap_cloud_sdk.ias import parse_token
 except ImportError as exc:
     raise ImportError(
         "The 'starlette' package is required to use StarletteIASTelemetryMiddleware. "

@@ -1,3 +1,5 @@
+> **Disclaimer:** Do not include SAP-internal or customer-specific information in this PR (e.g. internal system URLs, customer names, tenant IDs, or confidential configurations). This is a public repository.
+
 ## Description
 
 Provide a clear description of your changes here.

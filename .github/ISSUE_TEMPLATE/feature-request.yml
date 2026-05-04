@@ -3,6 +3,10 @@ description: Request a new feature to help your project using the SAP Cloud SDK 
 labels:
   - feature request
 body:
+  - type: markdown
+    attributes:
+      value: |
+        > **Disclaimer:** Do not include SAP-internal or customer-specific information in this issue (e.g. internal system URLs, customer names, tenant IDs, or confidential configurations). This is a public repository.
   - type: textarea
     attributes:
       label: "Describe the Problem"

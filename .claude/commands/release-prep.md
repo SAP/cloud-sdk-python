@@ -36,7 +36,7 @@ Create `PULL_REQUEST.md` at the repo root following the structure of `.github/pu
 Create `RELEASE.md` at the repo root using this exact template structure:
 
 ```
-## [vX.Y.Z] - YYYY-MM-DD
+## [vX.Y.Z] - MM DD, YYYY
 
 ### What's New
 - ...

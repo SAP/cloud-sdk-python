@@ -10,6 +10,7 @@ from sap_cloud_sdk.destination._models import (
     Label,
     Level,
     AccessStrategy,
+    ConsumptionLevel,
     DestinationType,
     ListOptions,
     PatchLabels,
@@ -380,7 +381,7 @@ class TestDestinationClientReadOperations:
         assert result.auth_tokens[0].scope == "openid profile"
 
     def test_get_destination_with_level_instance(self):
-        """Test get_destination with level=SERVICE_INSTANCE uses @instance in path."""
+        """Test get_destination with level=INSTANCE uses @instance in path."""
         mock_http = MagicMock()
         resp = MagicMock(spec=Response)
         resp.status_code = 200
@@ -396,7 +397,7 @@ class TestDestinationClientReadOperations:
         mock_http.get.return_value = resp
 
         client = DestinationClient(mock_http)
-        result = client.get_destination("my-api", level=Level.SERVICE_INSTANCE)
+        result = client.get_destination("my-api", level=ConsumptionLevel.INSTANCE)
 
         assert result is not None
         assert result.name == "my-api"
@@ -406,7 +407,7 @@ class TestDestinationClientReadOperations:
         assert args[0] == "v2/destinations/my-api@instance"
 
     def test_get_destination_with_level_subaccount(self):
-        """Test get_destination with level=SUB_ACCOUNT uses @subaccount in path."""
+        """Test get_destination with level=SUBACCOUNT uses @subaccount in path."""
         mock_http = MagicMock()
         resp = MagicMock(spec=Response)
         resp.status_code = 200
@@ -422,7 +423,7 @@ class TestDestinationClientReadOperations:
         mock_http.get.return_value = resp
 
         client = DestinationClient(mock_http)
-        result = client.get_destination("my-api", level=Level.SUB_ACCOUNT)
+        result = client.get_destination("my-api", level=ConsumptionLevel.SUBACCOUNT)
 
         assert result is not None
         assert result.name == "my-api"
@@ -449,7 +450,7 @@ class TestDestinationClientReadOperations:
 
         client = DestinationClient(mock_http)
         options = ConsumptionOptions(fragment_name="production", tenant="tenant-1")
-        result = client.get_destination("my-api", level=Level.SUB_ACCOUNT, options=options)
+        result = client.get_destination("my-api", level=ConsumptionLevel.SUBACCOUNT, options=options)
 
         assert result is not None
 
@@ -458,6 +459,130 @@ class TestDestinationClientReadOperations:
         assert args[0] == "v2/destinations/my-api@subaccount"
         assert kwargs["headers"]["X-fragment-name"] == "production"
         assert kwargs["headers"]["X-tenant"] == "tenant-1"
+
+    def test_get_destination_with_level_provider_subaccount(self):
+        """Test get_destination with level=PROVIDER_SUBACCOUNT uses @provider_subaccount in path."""
+        mock_http = MagicMock()
+        resp = MagicMock(spec=Response)
+        resp.status_code = 200
+        resp.json.return_value = {
+            "destinationConfiguration": {
+                "name": "my-api",
+                "type": "HTTP",
+                "url": "https://api.example.com"
+            },
+            "authTokens": [],
+            "certificates": []
+        }
+        mock_http.get.return_value = resp
+
+        client = DestinationClient(mock_http)
+        result = client.get_destination("my-api", level=ConsumptionLevel.PROVIDER_SUBACCOUNT)
+
+        assert result is not None
+        args, kwargs = mock_http.get.call_args
+        assert args[0] == "v2/destinations/my-api@provider_subaccount"
+
+    def test_get_destination_with_level_provider_instance(self):
+        """Test get_destination with level=PROVIDER_INSTANCE uses @provider_instance in path."""
+        mock_http = MagicMock()
+        resp = MagicMock(spec=Response)
+        resp.status_code = 200
+        resp.json.return_value = {
+            "destinationConfiguration": {
+                "name": "my-api",
+                "type": "HTTP",
+                "url": "https://api.example.com"
+            },
+            "authTokens": [],
+            "certificates": []
+        }
+        mock_http.get.return_value = resp
+
+        client = DestinationClient(mock_http)
+        result = client.get_destination("my-api", level=ConsumptionLevel.PROVIDER_INSTANCE)
+
+        assert result is not None
+        args, kwargs = mock_http.get.call_args
+        assert args[0] == "v2/destinations/my-api@provider_instance"
+
+    def test_get_destination_with_fragment_level(self):
+        """Test that fragment_level appends @level to X-fragment-name header."""
+        mock_http = MagicMock()
+        resp = MagicMock(spec=Response)
+        resp.status_code = 200
+        resp.json.return_value = {
+            "destinationConfiguration": {
+                "name": "my-api",
+                "type": "HTTP",
+                "url": "https://api.example.com"
+            },
+            "authTokens": [],
+            "certificates": []
+        }
+        mock_http.get.return_value = resp
+
+        client = DestinationClient(mock_http)
+        options = ConsumptionOptions(
+            fragment_name="my-frag",
+            fragment_level=ConsumptionLevel.PROVIDER_SUBACCOUNT,
+        )
+        result = client.get_destination("my-api", options=options)
+
+        assert result is not None
+        _, kwargs = mock_http.get.call_args
+        assert kwargs["headers"]["X-fragment-name"] == "my-frag@provider_subaccount"
+
+    def test_get_destination_with_fragment_name_and_level_combined(self):
+        """Test fragment_name and fragment_level combine correctly into the header."""
+        mock_http = MagicMock()
+        resp = MagicMock(spec=Response)
+        resp.status_code = 200
+        resp.json.return_value = {
+            "destinationConfiguration": {
+                "name": "my-api",
+                "type": "HTTP",
+                "url": "https://api.example.com"
+            },
+            "authTokens": [],
+            "certificates": []
+        }
+        mock_http.get.return_value = resp
+
+        client = DestinationClient(mock_http)
+        options = ConsumptionOptions(
+            fragment_name="prod-frag",
+            fragment_level=ConsumptionLevel.INSTANCE,
+        )
+        result = client.get_destination("my-api", options=options)
+
+        assert result is not None
+        _, kwargs = mock_http.get.call_args
+        assert kwargs["headers"]["X-fragment-name"] == "prod-frag@instance"
+
+    def test_get_destination_fragment_level_without_fragment_name_has_no_effect(self):
+        """Test that fragment_level alone (no fragment_name) does not add X-fragment-name header."""
+        mock_http = MagicMock()
+        resp = MagicMock(spec=Response)
+        resp.status_code = 200
+        resp.json.return_value = {
+            "destinationConfiguration": {
+                "name": "my-api",
+                "type": "HTTP",
+                "url": "https://api.example.com"
+            },
+            "authTokens": [],
+            "certificates": []
+        }
+        mock_http.get.return_value = resp
+
+        client = DestinationClient(mock_http)
+        options = ConsumptionOptions(fragment_level=ConsumptionLevel.PROVIDER_INSTANCE)
+        result = client.get_destination("my-api", options=options)
+
+        assert result is not None
+        _, kwargs = mock_http.get.call_args
+        assert "X-fragment-name" not in kwargs["headers"]
 
     def test_get_destination_empty_auth_tokens_and_certificates(self):
         """Test consumption with no auth tokens or certificates."""

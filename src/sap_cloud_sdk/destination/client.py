@@ -8,6 +8,7 @@ from sap_cloud_sdk.core.telemetry import Module, Operation, record_metrics
 from sap_cloud_sdk.destination._http import DestinationHttp, API_V1, API_V2
 from sap_cloud_sdk.destination._models import (
     AccessStrategy,
+    ConsumptionLevel,
     ConsumptionOptions,
     Destination,
     Label,
@@ -31,9 +32,6 @@ T = TypeVar("T")
 
 _SUBACCOUNT_COLLECTION = "subaccountDestinations"
 _INSTANCE_COLLECTION = "instanceDestinations"
-
-_SUBACCOUNT_LEVEL = "subaccount"
-_INSTANCE_LEVEL = "instance"
 
 
 class DestinationClient:
@@ -279,7 +277,7 @@ class DestinationClient:
     def get_destination(
         self,
         name: str,
-        level: Optional[Level] = None,
+        level: Optional[ConsumptionLevel] = None,
         options: Optional[ConsumptionOptions] = None,
         proxy_enabled: Optional[bool] = None,
         tenant: Optional[str] = None,
@@ -296,8 +294,9 @@ class DestinationClient:
 
         Args:
             name: Destination name.
-            level: Optional level hint (subaccount or instance) to optimize lookup. If not
-                provided, the API will search on instance level.
+            level: Optional level hint to narrow the lookup scope. When provided, appended to
+                the destination name as @level (e.g., "my-dest@provider_subaccount"). Supported
+                values: PROVIDER_SUBACCOUNT, PROVIDER_INSTANCE, SUBACCOUNT, INSTANCE.
             options: Optional ConsumptionOptions controlling request headers sent to the
                 Destination Service. See ConsumptionOptions for the full list of supported
                 headers (fragment merging, token exchange, SAML, OAuth2 flows, chains, etc.).
@@ -324,7 +323,7 @@ class DestinationClient:
             dest = client.get_destination("my-api")
 
             # With level hint
-            dest = client.get_destination("my-api", level=Level.SERVICE_INSTANCE)
+            dest = client.get_destination("my-api", level=ConsumptionLevel.PROVIDER_SUBACCOUNT)
 
             # Fragment merging
             dest = client.get_destination("my-api", options=ConsumptionOptions(fragment_name="prod"))
@@ -359,7 +358,10 @@ class DestinationClient:
 
             if options:
                 if options.fragment_name:
-                    headers["X-fragment-name"] = options.fragment_name
+                    frag = options.fragment_name
+                    if options.fragment_level:
+                        frag = f"{frag}@{options.fragment_level.value}"
+                    headers["X-fragment-name"] = frag
                 if options.fragment_optional is not None:
                     headers["X-fragment-optional"] = str(
                         options.fragment_optional
@@ -393,11 +395,11 @@ class DestinationClient:
                         headers[f"X-chain-var-{var_name}"] = var_value
 
             # Build path with optional level hint
-            if level:
-                level_str = self._map_level_to_api(level)
-                path = f"{API_V2}/destinations/{name}@{level_str}"
-            else:
-                path = f"{API_V2}/destinations/{name}"
+            path = (
+                f"{API_V2}/destinations/{name}@{level.value}"
+                if level
+                else f"{API_V2}/destinations/{name}"
+            )
 
             resp = self._http.get(path, headers=headers, tenant_subdomain=tenant)
             data = resp.json()
@@ -821,8 +823,3 @@ class DestinationClient:
             if level == Level.SERVICE_INSTANCE
             else _SUBACCOUNT_COLLECTION
         )
-
-    @staticmethod
-    def _map_level_to_api(level: Level) -> str:
-        """Return the v2 API level string for the given level."""
-        return _INSTANCE_LEVEL if level == Level.SERVICE_INSTANCE else _SUBACCOUNT_LEVEL

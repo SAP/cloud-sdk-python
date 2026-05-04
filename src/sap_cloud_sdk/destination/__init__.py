@@ -29,6 +29,7 @@ from typing import Optional
 from sap_cloud_sdk.destination._models import (
     Destination,
     AuthToken,
+    ConsumptionLevel,
     ConsumptionOptions,
     Fragment,
     Certificate,
@@ -208,6 +209,7 @@ __all__ = [
     # Public types
     "Destination",
     "AuthToken",
+    "ConsumptionLevel",
     "ConsumptionOptions",
     "Fragment",
     "Certificate",

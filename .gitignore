@@ -35,3 +35,7 @@ test-results.*
 
 # Local Mode
 mocks/
+
+# Generated files
+PULL_REQUEST.md
+RELEASE.md

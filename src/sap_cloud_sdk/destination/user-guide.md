@@ -14,7 +14,9 @@ from sap_cloud_sdk.destination import (
     create_fragment_client,
     create_certificate_client,
     Level,
-    AccessStrategy
+    AccessStrategy,
+    ConsumptionLevel,
+    ConsumptionOptions,
 )
 
 # Auto-detection based on environment; in cloud mode it will load credentials
@@ -100,9 +102,15 @@ client.patch_destination_labels("my-dest", PatchLabels(action="DELETE", labels=l
 
 ## Concepts
 
-- Level:
+- Level (v1 admin API — write operations, label operations):
   - SERVICE_INSTANCE: Operates on instance destinations
   - SUB_ACCOUNT: Operates on subaccount destinations
+
+- ConsumptionLevel (v2 consumption API — `get_destination` only):
+  - PROVIDER_SUBACCOUNT: Provider subaccount scope
+  - PROVIDER_INSTANCE: Provider service instance scope
+  - SUBACCOUNT: Subscriber subaccount scope
+  - INSTANCE: Subscriber service instance scope
 
 - AccessStrategy (applies to subaccount reads):
   - SUBSCRIBER_ONLY: Only subscriber (tenant required)
@@ -133,7 +141,7 @@ class DestinationClient:
     def patch_destination_labels(self, name: str, patch: PatchLabels, level: Optional[Level] = Level.SUB_ACCOUNT, tenant: Optional[str] = None) -> None: ...
 
     # V2 Runtime API - Destination consumption with automatic token retrieval
-    def get_destination(self, name: str, level: Optional[Level] = None, options: Optional[ConsumptionOptions] = None, proxy_enabled: Optional[bool] = None, tenant: Optional[str] = None) -> Optional[Destination | TransparentProxyDestination]: ...
+    def get_destination(self, name: str, level: Optional[ConsumptionLevel] = None, options: Optional[ConsumptionOptions] = None, proxy_enabled: Optional[bool] = None, tenant: Optional[str] = None) -> Optional[Destination | TransparentProxyDestination]: ...
 ```
 
 ### Fragment Client
@@ -178,6 +186,7 @@ class CertificateClient:
   - `auth_tokens` and `certificates` are populated by the v2 consumption API
 - `ConsumptionOptions` - Options for v2 destination consumption, controls HTTP headers sent to the Destination Service:
   - `fragment_name?: str` - Fragment to merge into the destination (`X-fragment-name`)
+  - `fragment_level?: ConsumptionLevel` - Level hint for the fragment lookup; appended to `fragment_name` as `@level` (e.g., `"my-frag@provider_subaccount"`). Only effective when `fragment_name` is also provided.
   - `fragment_optional?: bool` - If `True`, a missing fragment does not cause an error (`X-fragment-optional`)
   - `tenant?: str` - Tenant subdomain for token retrieval (`X-tenant`)
   - `user_token?: str` - User JWT for OAuth2UserTokenExchange / OAuth2JWTBearer / OAuth2SAMLBearerAssertion (`X-user-token`)
@@ -323,16 +332,25 @@ dest = client.get_destination("my-api", options=options, proxy_enabled=False)
 
 # Example 8: V2 API with level parameter for optimized lookup
 client = create_client(instance="default")
-# Search only at instance level
-dest = client.get_destination("my-api", level=Level.SERVICE_INSTANCE)
-# Search only at subaccount level
-dest = client.get_destination("my-api", level=Level.SUB_ACCOUNT)
-# No level specified - searches at instance level as default
+# Search only at provider subaccount level
+dest = client.get_destination("my-api", level=ConsumptionLevel.PROVIDER_SUBACCOUNT)
+# Search only at subscriber subaccount level
+dest = client.get_destination("my-api", level=ConsumptionLevel.SUBACCOUNT)
+# Search only at service instance level
+dest = client.get_destination("my-api", level=ConsumptionLevel.INSTANCE)
+# No level specified - API resolves automatically
 dest = client.get_destination("my-api")
 
 # Example 9: Combine level with options
 options = ConsumptionOptions(fragment_name="production", tenant="tenant-1")
-dest = client.get_destination("my-api", level=Level.SUB_ACCOUNT, options=options)
+dest = client.get_destination("my-api", level=ConsumptionLevel.SUBACCOUNT, options=options)
+
+# Example 9b: Fragment with level hint
+options = ConsumptionOptions(
+    fragment_name="my-fragment",
+    fragment_level=ConsumptionLevel.PROVIDER_SUBACCOUNT,
+)
+dest = client.get_destination("my-api", options=options)
 
 # Example 10: Optional fragment (no error if fragment does not exist)
 options = ConsumptionOptions(fragment_name="maybe-exists", fragment_optional=True)

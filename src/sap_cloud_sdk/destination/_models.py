@@ -84,6 +84,25 @@ class AccessStrategy(Enum):
     PROVIDER_FIRST = "PROVIDER_FIRST"
 
 
+class ConsumptionLevel(Enum):
+    """Level hint for the v2 consumption API (get_destination).
+
+    Appended as @level to the destination name or fragment name in the API request,
+    allowing the caller to hint which scope to search.
+
+    Attributes:
+        PROVIDER_SUBACCOUNT: Provider subaccount scope
+        PROVIDER_INSTANCE: Provider service instance scope
+        SUBACCOUNT: Subscriber subaccount scope
+        INSTANCE: Subscriber service instance scope
+    """
+
+    PROVIDER_SUBACCOUNT = "provider_subaccount"
+    PROVIDER_INSTANCE = "provider_instance"
+    SUBACCOUNT = "subaccount"
+    INSTANCE = "instance"
+
+
 class DestinationType(Enum):
     """Destination type (subset of v1)."""
 
@@ -412,6 +431,9 @@ class ConsumptionOptions:
         fragment_name: Name of the destination fragment used to override/extend destination
             properties (X-fragment-name). In case of overlapping properties, fragment values
             take priority.
+        fragment_level: Level hint for the fragment lookup. When set, appended to the fragment
+            name as @level (e.g., "my-fragment@provider_subaccount"). Only effective when
+            fragment_name is also provided.
         fragment_optional: When True, if the fragment specified by fragment_name does not
             exist the destination is returned without it. When False (default), a missing
             fragment causes an error (X-fragment-optional).
@@ -488,6 +510,7 @@ class ConsumptionOptions:
     """
 
     fragment_name: Optional[str] = None
+    fragment_level: Optional[ConsumptionLevel] = None
     fragment_optional: Optional[bool] = None
     tenant: Optional[str] = None
     user_token: Optional[str] = None

@@ -23,15 +23,21 @@ jobs:
           CHANGED_FILES=$(git diff --name-only "$BASE_SHA" "$HEAD_SHA")
 
           if echo "$CHANGED_FILES" | grep -q "^src/"; then
-            VERSION_BUMPED=$(git diff -U0 "$BASE_SHA" "$HEAD_SHA" -- pyproject.toml \
-              | grep "^+version = ")
+            BASE_VERSION=$(git show "$BASE_SHA:pyproject.toml" | grep "^version = " | cut -d'"' -f2)
+            HEAD_VERSION=$(git show "$HEAD_SHA:pyproject.toml" | grep "^version = " | cut -d'"' -f2)
 
-            if [ -z "$VERSION_BUMPED" ]; then
-              echo "ERROR: Files under src/ were modified but the version in pyproject.toml was not bumped."
+            if [ "$BASE_VERSION" = "$HEAD_VERSION" ]; then
+              echo "ERROR: Files under src/ were modified but the version in pyproject.toml was not bumped (still $HEAD_VERSION)."
               exit 1
-            else
-              echo "Version bump detected: $VERSION_BUMPED"
             fi
+
+            HIGHER=$(printf '%s\n' "$BASE_VERSION" "$HEAD_VERSION" | sort -V | tail -1)
+            if [ "$HIGHER" != "$HEAD_VERSION" ]; then
+              echo "ERROR: Version regression detected. Base is $BASE_VERSION but PR has $HEAD_VERSION."
+              exit 1
+            fi
+
+            echo "Version bump OK: $BASE_VERSION → $HEAD_VERSION"
           else
             echo "No src/ changes. Version bump not required."
           fi

@@ -109,11 +109,7 @@ def _load_config_from_env() -> AuditLogConfig:
         binding_data: BindingData = BindingData("", "")
 
         read_from_mount_and_fallback_to_env_var(
-            base_volume_mount="/etc/secrets/appfnd",
-            base_var_name="CLOUD_SDK_CFG",
-            module="auditlog",
-            instance="default",
-            target=binding_data,
+            module="auditlog", instance="default", target=binding_data
         )
 
         binding_data.validate()

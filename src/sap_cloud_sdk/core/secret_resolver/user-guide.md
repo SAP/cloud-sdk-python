@@ -61,6 +61,18 @@ The Secret Resolver expects mounted secrets to follow this hierarchy:
         └── password
 ```
 
+### Base Path Resolution
+
+By default, the resolver looks for secrets under `/etc/secrets/appfnd`. You can override this by setting the `SERVICE_BINDING_ROOT` environment variable, which follows the [servicebinding.io](https://servicebinding.io) specification used across SAP SDKs and Kubernetes-native tooling.
+
+When `SERVICE_BINDING_ROOT` is set, it takes precedence over the default `/etc/secrets/appfnd` path:
+
+```bash
+export SERVICE_BINDING_ROOT=/bindings
+```
+
+With this set, the resolver looks for secrets at `$SERVICE_BINDING_ROOT/<module>/<instance>/<field>` instead of `/etc/secrets/appfnd/<module>/<instance>/<field>`.
+
 Example for the above configuration:
 ```
 /etc/secrets/appfnd

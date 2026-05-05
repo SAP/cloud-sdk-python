@@ -21,6 +21,6 @@ Usage:
     )
 """
 
-from .resolver import read_from_mount_and_fallback_to_env_var
+from .resolver import read_from_mount_and_fallback_to_env_var, resolve_base_mount
 
-__all__ = ["read_from_mount_and_fallback_to_env_var"]
+__all__ = ["read_from_mount_and_fallback_to_env_var", "resolve_base_mount"]

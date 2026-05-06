@@ -26,6 +26,14 @@ dependencies = [
     "grpcio>=1.60.0",
     "opentelemetry-api>=1.28.0",
     "opentelemetry-sdk>=1.28.0",
+    # Constrain wrapt to 1.x: opentelemetry-instrumentation-langchain (pulled
+    # via traceloop-sdk) calls wrap_function_wrapper(module=..., name=..., wrapper=...).
+    # wrapt 2.x removed the `module` keyword, causing the LangChain instrumentor
+    # initialization to fail at import time, which silently disables LangChain /
+    # LangGraph spans for any consumer using auto_instrument(). Remove this pin
+    # once a fixed opentelemetry-instrumentation-langchain release is published
+    # upstream (traceloop/openllmetry) and pinned by traceloop-sdk. See #91.
+    "wrapt<2",
 ]
 
 [project.optional-dependencies]

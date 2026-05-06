@@ -2418,6 +2418,7 @@ dependencies = [
     { name = "requests-oauthlib" },
     { name = "setuptools" },
     { name = "traceloop-sdk" },
+    { name = "wrapt" },
 ]
 
 [package.optional-dependencies]
@@ -2459,6 +2460,7 @@ requires-dist = [
     { name = "setuptools", specifier = "~=80.9.0" },
     { name = "starlette", marker = "extra == 'starlette'", specifier = ">=0.40.0" },
     { name = "traceloop-sdk", specifier = "~=0.54.0" },
+    { name = "wrapt", specifier = "<2" },
 ]
 provides-extras = ["starlette"]
 

@@ -16,6 +16,7 @@ class TestModule:
         assert Module.DATA_ANONYMIZATION.value == "data_anonymization"
         assert Module.DESTINATION.value == "destination"
         assert Module.OBJECTSTORE.value == "objectstore"
+        assert Module.DMS.value == "dms"
 
     def test_module_str_representation(self):
         """Test that Module enum converts to string correctly."""
@@ -25,6 +26,7 @@ class TestModule:
         assert str(Module.DATA_ANONYMIZATION) == "data_anonymization"
         assert str(Module.DESTINATION) == "destination"
         assert str(Module.OBJECTSTORE) == "objectstore"
+        assert str(Module.DMS) == "dms"
 
     def test_module_is_string_enum(self):
         """Test that Module enum inherits from str."""
@@ -33,6 +35,7 @@ class TestModule:
         assert isinstance(Module.AUDITLOG_NG, str)
         assert isinstance(Module.DATA_ANONYMIZATION, str)
         assert isinstance(Module.DESTINATION, str)
+        assert isinstance(Module.DMS, str)
 
     def test_module_equality(self):
         """Test Module enum equality comparisons."""
@@ -50,9 +53,10 @@ class TestModule:
     def test_all_modules_present(self):
         """Test that all expected modules are present."""
         all_modules = list(Module)
-        assert len(all_modules) == 6
+        assert len(all_modules) == 7
         assert Module.AICORE in all_modules
         assert Module.AUDITLOG in all_modules
+        assert Module.AUDITLOG_NG in all_modules
         assert Module.DATA_ANONYMIZATION in all_modules
         assert Module.DESTINATION in all_modules
         assert Module.OBJECTSTORE in all_modules
@@ -67,3 +71,4 @@ class TestModule:
         assert "data_anonymization" in module_values
         assert "destination" in module_values
         assert "objectstore" in module_values
+        assert "dms" in module_values

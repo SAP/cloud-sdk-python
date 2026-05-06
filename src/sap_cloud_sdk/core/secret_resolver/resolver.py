@@ -12,6 +12,7 @@ def resolve_base_mount(base_volume_mount: str = BASE_PATH) -> str:
     """Return SERVICE_BINDING_ROOT if set, otherwise the provided default."""
     return os.environ.get("SERVICE_BINDING_ROOT", base_volume_mount)
 
+
 def _validate_inputs(module: str, instance: str) -> None:
     """Validate module and instance inputs."""
     if not isinstance(module, str) or not module.strip():

@@ -5,12 +5,12 @@ from __future__ import annotations
 import os
 from dataclasses import fields, is_dataclass
 from typing import Any, Dict, Tuple
+from .constants import BASE_PATH, BASE_ENV_VAR_NAME
 
 
-def resolve_base_mount(default: str) -> str:
+def resolve_base_mount(base_volume_mount: str = BASE_PATH) -> str:
     """Return SERVICE_BINDING_ROOT if set, otherwise the provided default."""
-    return os.environ.get("SERVICE_BINDING_ROOT", default)
-
+    return os.environ.get("SERVICE_BINDING_ROOT", base_volume_mount)
 
 def _validate_inputs(module: str, instance: str) -> None:
     """Validate module and instance inputs."""
@@ -111,11 +111,11 @@ def _load_from_env(base_var_name: str, module: str, instance: str, target: Any) 
 
 
 def read_from_mount_and_fallback_to_env_var(
-    base_volume_mount: str,
-    base_var_name: str,
     module: str,
     instance: str,
     target: Any,
+    base_volume_mount: str = BASE_PATH,
+    base_var_name: str = BASE_ENV_VAR_NAME,
 ) -> None:
     """
     Load secrets for a given module and instance into the provided dataclass instance `target`.

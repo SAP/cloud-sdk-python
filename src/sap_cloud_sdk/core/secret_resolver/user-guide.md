@@ -34,10 +34,10 @@ class DatabaseConfig:
 config = DatabaseConfig()
 read_from_mount_and_fallback_to_env_var(
     base_volume_mount="/etc/secrets",      # Base mount path
-    base_var_name="DB",               # Environment variable prefix
-    module="database",        # Module/service name
-    instance="primary",       # Instance name
-    target=config           # Target dataclass instance
+    base_var_name="DB",                    # Environment variable prefix
+    module="database",                     # Module/service name
+    instance="primary",                    # Instance name
+    target=config                          # Target dataclass instance
 )
 
 print(f"Database: {config.username}@{config.host}:{config.port}")

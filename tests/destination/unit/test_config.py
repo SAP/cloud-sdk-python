@@ -126,8 +126,6 @@ class TestLoadFromEnvOrMount:
         # Verify resolver called with expected parameters
         assert mock_read.call_count == 1
         _, kwargs = mock_read.call_args
-        assert kwargs["base_volume_mount"] == "/etc/secrets/appfnd"
-        assert kwargs["base_var_name"] == "CLOUD_SDK_CFG"
         assert kwargs["module"] == "destination"
         assert kwargs["instance"] == "default"
         assert isinstance(kwargs["target"], BindingData)

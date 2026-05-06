@@ -14,6 +14,27 @@ class TestOperation:
         assert Operation.AUDITLOG_LOG_BATCH.value == "log_batch"
         assert Operation.AUDITLOG_CREATE_CLIENT.value == "create_client"
 
+    def test_data_anonymization_operations(self):
+        """Test Data Anonymization operation values."""
+        assert (
+            Operation.DATA_ANONYMIZATION_CREATE_CLIENT.value
+            == "create_data_anonymization_client"
+        )
+        assert (
+            Operation.DATA_ANONYMIZATION_ANONYMIZE_TEXT.value == "anonymize_text"
+        )
+        assert (
+            Operation.DATA_ANONYMIZATION_ANONYMIZE_FILE.value == "anonymize_file"
+        )
+        assert (
+            Operation.DATA_ANONYMIZATION_PSEUDONYMIZE_TEXT.value
+            == "pseudonymize_text"
+        )
+        assert (
+            Operation.DATA_ANONYMIZATION_PSEUDONYMIZE_FILE.value
+            == "pseudonymize_file"
+        )
+
     def test_destination_operations(self):
         """Test Destination operation values."""
         assert Operation.DESTINATION_GET_INSTANCE_DESTINATION.value == "get_instance_destination"
@@ -89,6 +110,10 @@ class TestOperation:
     def test_operation_str_representation(self):
         """Test that Operation enum converts to string correctly."""
         assert str(Operation.AUDITLOG_LOG) == "log"
+        assert (
+            str(Operation.DATA_ANONYMIZATION_ANONYMIZE_TEXT)
+            == "anonymize_text"
+        )
         assert str(Operation.DESTINATION_GET_INSTANCE_DESTINATION) == "get_instance_destination"
         assert str(Operation.OBJECTSTORE_PUT_OBJECT) == "put_object"
         assert str(Operation.AICORE_AUTO_INSTRUMENT) == "auto_instrument"
@@ -96,6 +121,7 @@ class TestOperation:
     def test_operation_is_string_enum(self):
         """Test that Operation enum inherits from str."""
         assert isinstance(Operation.AUDITLOG_LOG, str)
+        assert isinstance(Operation.DATA_ANONYMIZATION_ANONYMIZE_TEXT, str)
         assert isinstance(Operation.DESTINATION_CREATE_DESTINATION, str)
         assert isinstance(Operation.OBJECTSTORE_GET_OBJECT, str)
 
@@ -123,6 +149,7 @@ class TestOperation:
         all_operations = list(Operation)
         # Verify we have operations from all modules
         assert any("AUDITLOG" in op.name for op in all_operations)
+        assert any("DATA_ANONYMIZATION" in op.name for op in all_operations)
         assert any("DESTINATION" in op.name for op in all_operations)
         assert any("CERTIFICATE" in op.name for op in all_operations)
         assert any("FRAGMENT" in op.name for op in all_operations)
@@ -132,5 +159,5 @@ class TestOperation:
     def test_operation_count(self):
         """Test that we have the expected number of operations."""
         all_operations = list(Operation)
-        # 3 auditlog + 11 destination + 10 certificate + 10 fragment + 8 objectstore + 2 aicore + 23 dms = 67
-        assert len(all_operations) == 67
+        # 3 auditlog + 5 data anonymization + 11 destination + 10 certificate + 10 fragment + 8 objectstore + 2 aicore + 23 dms = 72
+        assert len(all_operations) == 72

@@ -13,6 +13,7 @@ class TestModule:
         assert Module.AICORE.value == "aicore"
         assert Module.AUDITLOG.value == "auditlog"
         assert Module.AUDITLOG_NG.value == "auditlog_ng"
+        assert Module.DATA_ANONYMIZATION.value == "data_anonymization"
         assert Module.DESTINATION.value == "destination"
         assert Module.OBJECTSTORE.value == "objectstore"
 
@@ -21,6 +22,7 @@ class TestModule:
         assert str(Module.AICORE) == "aicore"
         assert str(Module.AUDITLOG) == "auditlog"
         assert str(Module.AUDITLOG_NG) == "auditlog_ng"
+        assert str(Module.DATA_ANONYMIZATION) == "data_anonymization"
         assert str(Module.DESTINATION) == "destination"
         assert str(Module.OBJECTSTORE) == "objectstore"
 
@@ -29,6 +31,7 @@ class TestModule:
         assert isinstance(Module.AICORE, str)
         assert isinstance(Module.AUDITLOG, str)
         assert isinstance(Module.AUDITLOG_NG, str)
+        assert isinstance(Module.DATA_ANONYMIZATION, str)
         assert isinstance(Module.DESTINATION, str)
 
     def test_module_equality(self):
@@ -50,6 +53,7 @@ class TestModule:
         assert len(all_modules) == 6
         assert Module.AICORE in all_modules
         assert Module.AUDITLOG in all_modules
+        assert Module.DATA_ANONYMIZATION in all_modules
         assert Module.DESTINATION in all_modules
         assert Module.OBJECTSTORE in all_modules
         assert Module.DMS in all_modules
@@ -60,5 +64,6 @@ class TestModule:
         assert "aicore" in module_values
         assert "auditlog" in module_values
         assert "auditlog_ng" in module_values
+        assert "data_anonymization" in module_values
         assert "destination" in module_values
         assert "objectstore" in module_values

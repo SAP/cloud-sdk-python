@@ -62,6 +62,28 @@ CLOUD_SDK_CFG_DESTINATION_DEFAULT_URI=https://your-destination-configuration-uri
 CLOUD_SDK_CFG_DESTINATION_DEFAULT_IDENTITYZONE=your-identity-zone-here
 ```
 
+### Data Anonymization Integration Tests
+
+For Data Anonymization integration tests, configure the following variables in `.env_integration_tests`:
+
+```bash
+# Data Anonymization Configuration
+CLOUD_SDK_CFG_DATA_ANONYMIZATION_DEFAULT_URL=https://your-data-anonymization-api-url-here
+CLOUD_SDK_CFG_DATA_ANONYMIZATION_DEFAULT_CERT=your-base64-encoded-client-certificate-pem
+CLOUD_SDK_CFG_DATA_ANONYMIZATION_DEFAULT_KEY=your-base64-encoded-client-private-key-pem
+```
+
+`CLOUD_SDK_CFG_DATA_ANONYMIZATION_DEFAULT_CERT` and `CLOUD_SDK_CFG_DATA_ANONYMIZATION_DEFAULT_KEY` must contain the base64-encoded PEM content, not filesystem paths.
+
+If the certificate is managed through BTP Destination service, you can use a destination instead of inline certificate values:
+
+```bash
+CLOUD_SDK_CFG_DATA_ANONYMIZATION_DEFAULT_URL=https://your-data-anonymization-api-url-here
+CLOUD_SDK_CFG_DATA_ANONYMIZATION_DEFAULT_DESTINATION_NAME=your-client-certificate-destination-name
+```
+
+The destination must be configured with `ClientCertificateAuthentication` and reference a certificate bundle containing the client certificate and private key.
+
 ## Running Integration Tests
 
 ```bash
@@ -70,6 +92,7 @@ uv run pytest tests/ -m integration -v
 
 # Run specific module integration tests
 uv run pytest tests/core/integration/auditlog -v
+uv run pytest tests/core/integration/data_anonymization -v
 uv run pytest tests/objectstore/integration/ -v
 uv run pytest tests/destination/integration/ -v
 ```

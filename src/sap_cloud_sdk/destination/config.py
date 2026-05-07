@@ -132,6 +132,8 @@ def load_from_env_or_mount(instance: Optional[str] = None) -> DestinationConfig:
         # 1) Try mount at /etc/secrets/appfnd/destination/{instance}/...
         # 2) Fallback to env: CLOUD_SDK_CFG_DESTINATION_{INSTANCE}_{FIELD_KEY}
         read_from_mount_and_fallback_to_env_var(
+            base_volume_mount="/etc/secrets/appfnd",
+            base_var_name="CLOUD_SDK_CFG",
             module="destination",
             instance=inst,
             target=binding,

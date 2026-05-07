@@ -125,11 +125,11 @@ def _load_from_env(base_var_name: str, module: str, instance: str, target: Any) 
 
 
 def read_from_mount_and_fallback_to_env_var(
+    base_volume_mount: str,
+    base_var_name: str,
     module: str,
     instance: str,
     target: Any,
-    base_volume_mount: str = BASE_MOUNT_PATH,
-    base_var_name: str = CLOUD_SDK_ENV_PREFIX,
 ) -> None:
     """
     Load secrets for a given module and instance into the provided dataclass instance `target`.

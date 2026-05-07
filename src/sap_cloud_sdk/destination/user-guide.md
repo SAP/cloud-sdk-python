@@ -636,7 +636,7 @@ mocks/certificates.json
 
 Entries with a `"tenant"` field are treated as subscriber-specific. Entries without `"tenant"` are provider entries.
 
-## Secret Resolution
+## Configuration
 
 ### Service Binding
 
@@ -645,6 +645,8 @@ Entries with a `"tenant"` field are treated as subscriber-specific. Entries with
 - Fallback env vars: `CLOUD_SDK_CFG_DESTINATION_{INSTANCE}_{FIELD_KEY}` (uppercased)
 - The config loader normalizes to a unified binding:
   - `DestinationConfig(url=..., token_url=..., client_id=..., client_secret=..., identityzone=...)`
+
+> **Note:** The default mount base path (`/etc/secrets/appfnd`) can be overridden by setting the `SERVICE_BINDING_ROOT` environment variable. See the [Secret Resolver guide](../core/secret_resolver/user-guide.md) for details.
 
 ### Transparent Proxy
 

@@ -83,6 +83,8 @@ In Kubernetes environments, secrets are automatically loaded from:
 └── serviceurls           # JSON file with AI_API_URL field
 ```
 
+> **Note:** The default mount base path (`/etc/secrets/appfnd`) can be overridden by setting the `SERVICE_BINDING_ROOT` environment variable. See the [Secret Resolver guide](../core/secret_resolver/user-guide.md) for details.
+
 **serviceurls file format:**
 ```json
 {

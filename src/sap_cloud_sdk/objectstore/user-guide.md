@@ -224,6 +224,8 @@ This module automatically resolves credentials and configuration from the enviro
 - Uses the configured S3-compatible host (e.g., AWS S3, MinIO in cloud)
 - No manual setup required when deployed in Application Foundation
 
+> **Note:** The default mount base path (`/etc/secrets/appfnd`) can be overridden by setting the `SERVICE_BINDING_ROOT` environment variable. See the [Secret Resolver guide](../core/secret_resolver/user-guide.md) for details.
+
 #### Environment Variables for Cloud Mode
 
 ```bash

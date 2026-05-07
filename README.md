@@ -47,7 +47,9 @@ pip install sap-cloud-sdk
 
 The SDK automatically resolves configuration from multiple sources with the following priority:
 
-1. **Kubernetes-mounted secrets**: `/etc/secrets/appfnd/<module>/<instance>/<field>`
+1. **Kubernetes-mounted secrets**: `$SERVICE_BINDING_ROOT/<module>/<instance>/<field>`
+   - `SERVICE_BINDING_ROOT` defaults to `/etc/secrets/appfnd` when not set (follows the [servicebinding.io](https://servicebinding.io/spec/core/1.1.0/) spec). See the [Secret Resolver guide](../core/secret_resolver/user-guide.md) for details.
+
 2. **Environment variables**: `CLOUD_SDK_CFG_<MODULE>_<INSTANCE>_<FIELD>`
    - For instance names, hyphens (`"-"`) are replaced with underscores (`"_"`) for compatibility with system environment variables.
    - You can see examples in our [env_integration_tests.example](.env_integration_tests.example)

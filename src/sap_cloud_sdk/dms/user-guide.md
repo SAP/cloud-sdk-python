@@ -576,9 +576,12 @@ Reads secrets from mounted files or environment variables:
 - **Kubernetes-mounted secret** at `/etc/secrets/appfnd/sdm/<instance>/`
 - **Fallback** to environment variables with pattern `CLOUD_SDK_CFG_SDM_<INSTANCE>_<FIELD>`
 
+
 The binding provides:
 - `uri`: DMS API base URL
 - `uaa`: JSON string with XSUAA credentials (`clientid`, `clientsecret`, `url`, `identityzone`)
+
+> **Note:** The default mount base path (`/etc/secrets/appfnd`) can be overridden by setting the `SERVICE_BINDING_ROOT` environment variable. See the [Secret Resolver guide](../core/secret_resolver/user-guide.md) for details.
 
 ### Service Binding (UAA JSON)
 

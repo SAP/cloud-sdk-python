@@ -5,10 +5,10 @@ from __future__ import annotations
 import os
 from dataclasses import fields, is_dataclass
 from typing import Any, Dict, Tuple
-from .constants import BASE_PATH, BASE_ENV_VAR_NAME
+from .constants import BASE_MOUNT_PATH, CLOUD_SDK_ENV_PREFIX
 
 
-def resolve_base_mount(base_volume_mount: str = BASE_PATH) -> str:
+def resolve_base_mount(base_volume_mount: str = BASE_MOUNT_PATH) -> str:
     """Resolve the base mount path for service binding discovery.
 
     Checks the ``SERVICE_BINDING_ROOT`` environment variable first (as defined
@@ -128,8 +128,8 @@ def read_from_mount_and_fallback_to_env_var(
     module: str,
     instance: str,
     target: Any,
-    base_volume_mount: str = BASE_PATH,
-    base_var_name: str = BASE_ENV_VAR_NAME,
+    base_volume_mount: str = BASE_MOUNT_PATH,
+    base_var_name: str = CLOUD_SDK_ENV_PREFIX,
 ) -> None:
     """
     Load secrets for a given module and instance into the provided dataclass instance `target`.

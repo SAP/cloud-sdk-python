@@ -113,7 +113,7 @@ def _load_config_from_env() -> AuditLogConfig:
             base_var_name="CLOUD_SDK_CFG",
             module="auditlog",
             instance="default",
-            target=binding_data
+            target=binding_data,
         )
 
         binding_data.validate()

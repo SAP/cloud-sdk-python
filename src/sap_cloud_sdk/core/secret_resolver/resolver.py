@@ -5,7 +5,7 @@ from __future__ import annotations
 import os
 from dataclasses import fields, is_dataclass
 from typing import Any, Dict, Tuple
-from .constants import BASE_MOUNT_PATH, CLOUD_SDK_ENV_PREFIX
+from .constants import BASE_MOUNT_PATH
 
 
 def resolve_base_mount(base_volume_mount: str = BASE_MOUNT_PATH) -> str:

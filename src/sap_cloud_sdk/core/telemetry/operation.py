@@ -98,5 +98,20 @@ class Operation(str, Enum):
     DMS_APPEND_CONTENT_STREAM = "cmis_append_content_stream"
     DMS_CMIS_QUERY = "cmis_query"
 
+    # Agent Memory Operations
+    AGENT_MEMORY_ADD_MEMORY = "add_memory"
+    AGENT_MEMORY_GET_MEMORY = "get_memory"
+    AGENT_MEMORY_UPDATE_MEMORY = "update_memory"
+    AGENT_MEMORY_DELETE_MEMORY = "delete_memory"
+    AGENT_MEMORY_LIST_MEMORIES = "list_memories"
+    AGENT_MEMORY_COUNT_MEMORIES = "count_memories"
+    AGENT_MEMORY_SEARCH_MEMORIES = "search_memories"
+    AGENT_MEMORY_ADD_MESSAGE = "add_message"
+    AGENT_MEMORY_GET_MESSAGE = "get_message"
+    AGENT_MEMORY_DELETE_MESSAGE = "delete_message"
+    AGENT_MEMORY_LIST_MESSAGES = "list_messages"
+    AGENT_MEMORY_GET_RETENTION_CONFIG = "get_retention_config"
+    AGENT_MEMORY_UPDATE_RETENTION_CONFIG = "update_retention_config"
+
     def __str__(self) -> str:
         return self.value

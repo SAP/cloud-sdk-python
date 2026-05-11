@@ -19,7 +19,6 @@ from sap_cloud_sdk.destination import (
     ConsumptionOptions,
 )
 
-# Auto-detection based on environment; in cloud mode it will load credentials
 client = create_client(instance="default")
 fragment_client = create_fragment_client(instance="default")
 certificate_client = create_certificate_client(instance="default")
@@ -636,15 +635,43 @@ mocks/certificates.json
 
 Entries with a `"tenant"` field are treated as subscriber-specific. Entries without `"tenant"` are provider entries.
 
-## Secret Resolution
+## Error Handling
+
+- `DestinationNotFoundError`: mapped from HTTP 404 where applicable
+- `DestinationOperationError`: general operation failures
+- `HttpError`: HTTP-related or local store read/write errors with `status_code` and `response_text` when applicable
+
+## Configuration
 
 ### Service Binding
 
-- Mount path: `/etc/secrets/appfnd/destination/{instance}/`
-- Keys: `clientid`, `clientsecret`, `url` (auth base), `uri` (service base), `identityzone`
-- Fallback env vars: `CLOUD_SDK_CFG_DESTINATION_{INSTANCE}_{FIELD_KEY}` (uppercased)
-- The config loader normalizes to a unified binding:
-  - `DestinationConfig(url=..., token_url=..., client_id=..., client_secret=..., identityzone=...)`
+- **Mount path**: `$SERVICE_BINDING_ROOT/destination/{instance}/` (defaults to `/etc/secrets/appfnd/destination/{instance}/`)
+- *Required Keys**: `clientid`, `clientsecret`, `url` (auth base), `uri` (service base), `identityzone`
+- **Env var fallback**: `CLOUD_SDK_CFG_DESTINATION_{INSTANCE}_{FIELD}` (uppercased, hyphens in instance replaced with `_`)
+
+> **Note:** `SERVICE_BINDING_ROOT` defaults to `/etc/secrets/appfnd` when not set. See the [Secret Resolver guide](../core/secret_resolver/user-guide.md) for details.
+
+#### Mounted Secrets (Kubernetes)
+
+```
+$SERVICE_BINDING_ROOT/destination/{instance}/
+├── clientid
+├── clientsecret
+├── url
+├── uri
+└── identityzone
+```
+
+#### Environment Variables
+
+```bash
+# Example for Destination with instance name "default"
+export CLOUD_SDK_CFG_DESTINATION_DEFAULT_CLIENTID="your-client-id"
+export CLOUD_SDK_CFG_DESTINATION_DEFAULT_CLIENTSECRET="your-client-secret"
+export CLOUD_SDK_CFG_DESTINATION_DEFAULT_URL="https://subdomain.authentication.region.hana.ondemand.com"
+export CLOUD_SDK_CFG_DESTINATION_DEFAULT_URI="https://destination.cf.region.hana.ondemand.com"
+export CLOUD_SDK_CFG_DESTINATION_DEFAULT_IDENTITYZONE="subdomain"
+```
 
 ### Transparent Proxy
 
@@ -653,15 +680,9 @@ Entries with a `"tenant"` field are treated as subscriber-specific. Entries with
 - The proxy configuration is loaded and validated when the client is created
 - Proxy reachability is tested via HTTP HEAD request to `http://{proxy_name}.{namespace}`
 
-## Tokens and Access Strategy (Cloud Mode)
+### Tokens and Access Strategy
 
 The OAuth2 token URL is derived from service binding (`DestinationConfig.token_url`). For subscriber context, when a `tenant` is provided, the token provider constructs the subscriber token URL by replacing the identityzone segment with the tenant sub-domain.
-
-## Error Handling
-
-- `DestinationNotFoundError`: mapped from HTTP 404 where applicable
-- `DestinationOperationError`: general operation failures
-- `HttpError`: HTTP-related or local store read/write errors with `status_code` and `response_text` when applicable
 
 ## Notes
 

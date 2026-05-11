@@ -568,19 +568,33 @@ The SDK extracts the server's error message from JSON responses (the `"message"`
 
 ## Configuration
 
-The DMS module automatically resolves credentials from the environment.
+### Service Binding
 
-### Cloud Mode
+- **Mount path**: `$SERVICE_BINDING_ROOT/sdm/{instance}/` (defaults to `/etc/secrets/appfnd/sdm/{instance}/`)
+- **Required Keys**: `uri` (DMS API base URL), `uaa` (JSON string with XSUAA credentials)
+- **Env var fallback**: `CLOUD_SDK_CFG_SDM_{INSTANCE}_{FIELD}` (uppercased, hyphens in instance replaced with `_`)
 
-Reads secrets from mounted files or environment variables:
-- **Kubernetes-mounted secret** at `/etc/secrets/appfnd/sdm/<instance>/`
-- **Fallback** to environment variables with pattern `CLOUD_SDK_CFG_SDM_<INSTANCE>_<FIELD>`
+> **Note:** `SERVICE_BINDING_ROOT` defaults to `/etc/secrets/appfnd` when not set. See the [Secret Resolver guide](../core/secret_resolver/user-guide.md) for details.
 
-The binding provides:
-- `uri`: DMS API base URL
-- `uaa`: JSON string with XSUAA credentials (`clientid`, `clientsecret`, `url`, `identityzone`)
+#### Mounted Secrets (Kubernetes)
 
-### Service Binding (UAA JSON)
+```
+$SERVICE_BINDING_ROOT/sdm/{instance}/
+├── uri
+└── uaa
+```
+
+#### Environment Variables
+
+```bash
+# Example for DMS with instance name "default"
+export CLOUD_SDK_CFG_SDM_DEFAULT_URI="https://api.dms.example.com"
+export CLOUD_SDK_CFG_SDM_DEFAULT_UAA='{"clientid":"...","clientsecret":"...","url":"https://...","identityzone":"..."}'
+```
+
+#### UAA JSON Schema
+
+The `uaa` key must contain a JSON string with the XSUAA credentials:
 
 ```json
 {

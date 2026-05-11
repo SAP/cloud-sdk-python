@@ -386,6 +386,39 @@ for failed in failed_messages:
     print(f"Failed to log event: {failed.error}")
 ```
 
-## Environment Configuration
+## Configuration
 
-The audit log module automatically detects the environment and configures itself accordingly, events are sent to the SAP Audit Log Service using OAuth2 authentication with automatic credential resolution from service bindings
+### Service Binding
+
+- **Mount path**: `$SERVICE_BINDING_ROOT/auditlog/default/` (defaults to `/etc/secrets/appfnd/auditlog/default/`)
+- **Required Keys**: `url` (Audit Log service URL), `uaa` (JSON string with XSUAA credentials)
+- **Env var fallback**: `CLOUD_SDK_CFG_AUDITLOG_DEFAULT_{FIELD}` (uppercased)
+
+> **Note:** `SERVICE_BINDING_ROOT` defaults to `/etc/secrets/appfnd` when not set. See the [Secret Resolver guide](../secret_resolver/user-guide.md) for details.
+
+#### Mounted Secrets (Kubernetes)
+
+```
+$SERVICE_BINDING_ROOT/auditlog/default/
+├── url
+└── uaa
+```
+
+#### Environment Variables
+
+```bash
+export CLOUD_SDK_CFG_AUDITLOG_DEFAULT_URL="https://auditlog.example.com"
+export CLOUD_SDK_CFG_AUDITLOG_DEFAULT_UAA='{"clientid":"...","clientsecret":"...","url":"https://..."}'
+```
+
+#### UAA JSON Schema
+
+The `uaa` key must contain a JSON string with the XSUAA credentials:
+
+```json
+{
+  "clientid": "sb-xxx",
+  "clientsecret": "xxx",
+  "url": "https://subdomain.authentication.region.hana.ondemand.com"
+}
+```

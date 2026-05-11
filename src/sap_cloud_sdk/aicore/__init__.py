@@ -9,6 +9,7 @@ import logging
 import os
 from typing import Optional
 
+from sap_cloud_sdk.core.secret_resolver import resolve_base_mount
 from sap_cloud_sdk.core.telemetry.metrics_decorator import record_metrics
 from sap_cloud_sdk.core.telemetry.module import Module
 from sap_cloud_sdk.core.telemetry.operation import Operation
@@ -35,7 +36,8 @@ def _get_secret(
         instance_name: Name of the aicore instance defined in app.yaml. Defaults to aicore-instance
 
     """
-    secrets_base_path = f"/etc/secrets/appfnd/aicore/{instance_name}"
+    resolved_base_path = resolve_base_mount()
+    secrets_base_path = f"{resolved_base_path}/aicore/{instance_name}"
     secret_file_name = file_name if file_name else env_var_name
     secret_file_path = os.path.join(secrets_base_path, secret_file_name)
 
@@ -70,7 +72,8 @@ def _get_aicore_base_url(instance_name: str = "aicore-instance") -> str:
     Returns:
         Base URL for AI Core service
     """
-    secrets_base_path = f"/etc/secrets/appfnd/aicore/{instance_name}"
+    resolved_base_path = resolve_base_mount()
+    secrets_base_path = f"{resolved_base_path}/aicore/{instance_name}"
     serviceurls_file = os.path.join(secrets_base_path, "serviceurls")
 
     # Try reading from serviceurls file

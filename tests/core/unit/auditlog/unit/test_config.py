@@ -201,7 +201,8 @@ class TestLoadConfigFromEnv:
             uaa='{"clientid": "test", "clientsecret": "secret", "url": "oauth"}'
         )
 
-        def mock_read_side_effect(mount_path, env_var, service, instance, binding_data):
+        def mock_read_side_effect(*args, **kwargs):
+            binding_data: BindingData = kwargs["target"]
             binding_data.url = mock_binding.url
             binding_data.uaa = mock_binding.uaa
 
@@ -215,16 +216,17 @@ class TestLoadConfigFromEnv:
         assert config.service_url == "https://service.example.com"
 
         mock_read.assert_called_once_with(
-            "/etc/secrets/appfnd",
-            "CLOUD_SDK_CFG",
-            "auditlog",
-            "default",
-            mock_read.call_args[0][4]
+            base_volume_mount="/etc/secrets/appfnd",
+            base_var_name="CLOUD_SDK_CFG",
+            module="auditlog",
+            instance="default",
+            target=mock_read.call_args.kwargs["target"]
         )
 
     @patch('sap_cloud_sdk.core.secret_resolver.read_from_mount_and_fallback_to_env_var')
     def test_load_config_validation_error(self, mock_read):
-        def mock_read_side_effect(mount_path, env_var, service, instance, binding_data):
+        def mock_read_side_effect(*args, **kwargs):
+            binding_data: BindingData = kwargs["target"]
             binding_data.url = ""
             binding_data.uaa = ""
 
@@ -242,7 +244,8 @@ class TestLoadConfigFromEnv:
 
     @patch('sap_cloud_sdk.core.secret_resolver.read_from_mount_and_fallback_to_env_var')
     def test_load_config_invalid_uaa(self, mock_read):
-        def mock_read_side_effect(mount_path, env_var, service, instance, binding_data):
+        def mock_read_side_effect(*args, **kwargs):
+            binding_data: BindingData = kwargs["target"]
             binding_data.url = "https://service.example.com"
             binding_data.uaa = "invalid json"
 

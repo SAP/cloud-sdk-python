@@ -214,32 +214,30 @@ except ListObjectsError as e:
 
 ## Configuration
 
-This module automatically resolves credentials and configuration from the environment.
+### Service Binding
 
-### Cloud Mode
+- **Mount path**: `$SERVICE_BINDING_ROOT/objectstore/{instance}/` (defaults to `/etc/secrets/appfnd/objectstore/{instance}/`)
+- **Required Keys**: `access_key_id`, `secret_access_key`, `bucket`, `host`
+- **Env var fallback**: `CLOUD_SDK_CFG_OBJECTSTORE_{INSTANCE}_{FIELD}` (uppercased, hyphens in instance replaced with `_`)
 
-- Reads secrets from mounted files or environment variables
-  - **Kubernetes-mounted secret** at `/etc/secrets/appfnd/<module>/<instance>/`
-  - Fallback to environment variables with pattern `CLOUD_SDK_CFG_<MODULE>_<INSTANCE>_<FIELD>`
-- Uses the configured S3-compatible host (e.g., AWS S3, MinIO in cloud)
-- No manual setup required when deployed in Application Foundation
-
-#### Environment Variables for Cloud Mode
-
-```bash
-# Example for ObjectStore with instance name "credentials"
-export OBJECTSTORE_CREDENTIALS_ACCESS_KEY_ID="your-access-key"
-export OBJECTSTORE_CREDENTIALS_SECRET_ACCESS_KEY="your-secret-key"
-export OBJECTSTORE_CREDENTIALS_BUCKET="your-bucket-name"
-export OBJECTSTORE_CREDENTIALS_HOST="s3.amazonaws.com"
-```
+> **Note:** `SERVICE_BINDING_ROOT` defaults to `/etc/secrets/appfnd` when not set. See the [Secret Resolver guide](../core/secret_resolver/user-guide.md) for details.
 
 #### Mounted Secrets (Kubernetes)
 
 ```
-/etc/secrets/appfnd/objectstore/credentials/
+$SERVICE_BINDING_ROOT/objectstore/{instance}/
 ├── access_key_id
 ├── secret_access_key
 ├── bucket
 └── host
+```
+
+#### Environment Variables
+
+```bash
+# Example for ObjectStore with instance name "credentials"
+export CLOUD_SDK_CFG_OBJECTSTORE_CREDENTIALS_ACCESS_KEY_ID="your-access-key"
+export CLOUD_SDK_CFG_OBJECTSTORE_CREDENTIALS_SECRET_ACCESS_KEY="your-secret-key"
+export CLOUD_SDK_CFG_OBJECTSTORE_CREDENTIALS_BUCKET="your-bucket-name"
+export CLOUD_SDK_CFG_OBJECTSTORE_CREDENTIALS_HOST="s3.amazonaws.com"
 ```

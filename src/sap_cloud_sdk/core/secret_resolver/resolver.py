@@ -5,6 +5,25 @@ from __future__ import annotations
 import os
 from dataclasses import fields, is_dataclass
 from typing import Any, Dict, Tuple
+from .constants import BASE_MOUNT_PATH
+
+
+def resolve_base_mount(base_volume_mount: str = BASE_MOUNT_PATH) -> str:
+    """Resolve the base mount path for service binding discovery.
+
+    Checks the ``SERVICE_BINDING_ROOT`` environment variable first (as defined
+    by the `servicebinding.io <https://servicebinding.io/spec/core/1.1.0/>`_
+    specification). Falls back to ``base_volume_mount`` when the env var is
+    absent.
+
+    Args:
+        base_volume_mount: Default base path used when ``SERVICE_BINDING_ROOT``
+            is not set. Defaults to ``/etc/secrets/appfnd``.
+
+    Returns:
+        The effective base path for secret mount resolution.
+    """
+    return os.environ.get("SERVICE_BINDING_ROOT", base_volume_mount)
 
 
 def _validate_inputs(module: str, instance: str) -> None:
@@ -116,6 +135,8 @@ def read_from_mount_and_fallback_to_env_var(
     Load secrets for a given module and instance into the provided dataclass instance `target`.
     Fallback order:
       1. Mounted volume path: {base_volume_mount}/{module}/{instance}/{field_key}
+         (``SERVICE_BINDING_ROOT`` env var overrides ``base_volume_mount`` — see
+         :func:`resolve_base_mount`)
       2. Environment variables: {base_var_name}_{module}_{instance}_{field_key} (uppercased)
 
     Raises:
@@ -126,12 +147,13 @@ def read_from_mount_and_fallback_to_env_var(
     """
     _validate_inputs(module, instance)
 
+    resolved_base_path = resolve_base_mount(base_volume_mount)
     errors: list[str] = []
     normalized_module = module.replace("-", "_")
     normalized_instance = instance.replace("-", "_")
 
     try:
-        _load_from_mount(base_volume_mount, module, instance, target)
+        _load_from_mount(resolved_base_path, module, instance, target)
         return
     except Exception as e:
         errors.append(f"mount failed: {e};")
@@ -144,7 +166,7 @@ def read_from_mount_and_fallback_to_env_var(
 
     # Aggregate errors with actionable guidance for local dev and env fallback
     prefix_upper = f"{base_var_name}_{normalized_module}_{normalized_instance}".upper()
-    mount_dir = os.path.join(base_volume_mount, module, instance) + "/"
+    mount_dir = os.path.join(resolved_base_path, module, instance) + "/"
     guidance_parts: list[str] = []
     guidance_parts.append("Secrets could not be loaded from mount or environment.")
     guidance_parts.append("Options:")

@@ -185,3 +185,33 @@ class TestSecretResolver:
         assert config.username == "env_user_hyphen"
         assert config.password == "env_pass_hyphen"
         assert config.endpoint == "env_endpoint_hyphen"
+
+    @patch.dict(os.environ, {"SERVICE_BINDING_ROOT": "/custom/root"})
+    @patch('os.path.isdir', return_value=True)
+    @patch('os.stat')
+    @patch('builtins.open', new_callable=mock_open)
+    def test_service_binding_root_overrides_base_mount(self, mock_file, mock_stat, mock_isdir):
+        mock_file.side_effect = [
+            mock_open(read_data="u").return_value,
+            mock_open(read_data="p").return_value,
+            mock_open(read_data="e").return_value,
+        ]
+        config = SampleConfig()
+        read_from_mount_and_fallback_to_env_var("/etc/secrets/appfnd", "VAR", "module", "instance", config)
+        first_call_path = mock_file.call_args_list[0][0][0]
+        assert first_call_path.startswith("/custom/root")
+
+    @patch.dict(os.environ, {}, clear=True)
+    @patch('os.path.isdir', return_value=True)
+    @patch('os.stat')
+    @patch('builtins.open', new_callable=mock_open)
+    def test_default_base_mount_used_when_no_service_binding_root(self, mock_file, mock_stat, mock_isdir):
+        mock_file.side_effect = [
+            mock_open(read_data="u").return_value,
+            mock_open(read_data="p").return_value,
+            mock_open(read_data="e").return_value,
+        ]
+        config = SampleConfig()
+        read_from_mount_and_fallback_to_env_var("/etc/secrets/appfnd", "VAR", "module", "instance", config)
+        first_call_path = mock_file.call_args_list[0][0][0]
+        assert first_call_path.startswith("/etc/secrets/appfnd")

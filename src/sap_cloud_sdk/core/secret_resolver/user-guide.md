@@ -34,10 +34,10 @@ class DatabaseConfig:
 config = DatabaseConfig()
 read_from_mount_and_fallback_to_env_var(
     base_volume_mount="/etc/secrets",      # Base mount path
-    base_var_name="DB",               # Environment variable prefix
-    module="database",        # Module/service name
-    instance="primary",       # Instance name
-    target=config           # Target dataclass instance
+    base_var_name="DB",                    # Environment variable prefix
+    module="database",                     # Module/service name
+    instance="primary",                    # Instance name
+    target=config                          # Target dataclass instance
 )
 
 print(f"Database: {config.username}@{config.host}:{config.port}")
@@ -60,6 +60,18 @@ The Secret Resolver expects mounted secrets to follow this hierarchy:
         ├── username
         └── password
 ```
+
+### Base Path Resolution
+
+By default, the resolver looks for secrets under `/etc/secrets/appfnd`. You can override this by setting the `SERVICE_BINDING_ROOT` environment variable, which follows the [servicebinding.io](https://servicebinding.io) specification used across SAP SDKs and Kubernetes-native tooling.
+
+When `SERVICE_BINDING_ROOT` is set, it takes precedence over the default `/etc/secrets/appfnd` path:
+
+```bash
+export SERVICE_BINDING_ROOT=/bindings
+```
+
+With this set, the resolver looks for secrets at `$SERVICE_BINDING_ROOT/<module>/<instance>/<field>` instead of `/etc/secrets/appfnd/<module>/<instance>/<field>`.
 
 Example for the above configuration:
 ```

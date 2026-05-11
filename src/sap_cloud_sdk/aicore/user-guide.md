@@ -69,46 +69,6 @@ The function loads and configures these credentials:
 
 ---
 
-## Configuration
-
-### Cloud Mode (Mounted Secrets)
-
-In Kubernetes environments, secrets are automatically loaded from:
-
-```
-/etc/secrets/appfnd/aicore/{instance_name}/
-├── clientid              # OAuth2 client ID
-├── clientsecret          # OAuth2 client secret
-├── url                   # Authentication server URL
-└── serviceurls           # JSON file with AI_API_URL field
-```
-
-**serviceurls file format:**
-```json
-{
-  "AI_API_URL": "https://api.ai.prod.eu-central-1.aws.ml.hana.ondemand.com"
-}
-```
-
-### Environment Variable Fallback
-
-If mounted secrets are not available, the function falls back to environment variables:
-
-```bash
-# Authentication credentials
-export AICORE_CLIENT_ID="your-client-id"
-export AICORE_CLIENT_SECRET="your-client-secret"
-
-# Service endpoints
-export AICORE_AUTH_URL="https://your-subdomain.authentication.eu10.hana.ondemand.com/oauth/token"
-export AICORE_BASE_URL="https://api.ai.prod.eu-central-1.aws.ml.hana.ondemand.com/v2"
-
-# Optional: Resource group (defaults to "default")
-export AICORE_RESOURCE_GROUP="my-resource-group"
-```
-
----
-
 ## Usage with LiteLLM
 
 After calling `set_aicore_config()`, LiteLLM automatically uses the configured AI Core credentials:
@@ -171,38 +131,6 @@ embedding_response = embedding(
     input=["Hello world", "How are you?"]
 )
 ```
-
----
-
-## Multiple AI Core Instances
-
-If you have multiple AI Core instances (e.g., development, staging, production), specify the instance name:
-
-```python
-from sap_cloud_sdk.aicore import set_aicore_config
-
-# Development environment
-set_aicore_config(instance_name="aicore-dev")
-
-# Production environment
-set_aicore_config(instance_name="aicore-prod")
-```
-
-Each instance should have its own mounted secrets or environment variables.
-
----
-
-## URL Normalization
-
-The function automatically normalizes URLs to ensure compatibility:
-
-### Authentication URL
-- **Input**: `https://subdomain.authentication.region.hana.ondemand.com`
-- **Output**: `https://subdomain.authentication.region.hana.ondemand.com/oauth/token`
-
-### Base URL
-- **Input**: `https://api.ai.prod.region.aws.ml.hana.ondemand.com`
-- **Output**: `https://api.ai.prod.region.aws.ml.hana.ondemand.com/v2`
 
 ---
 
@@ -362,6 +290,65 @@ auto_instrument()
 # Configuration calls are now tracked
 set_aicore_config()
 ```
+
+---
+
+## Configuration
+
+### Service Binding
+
+- **Mount path**: `$SERVICE_BINDING_ROOT/aicore/{instance}/` (defaults to `/etc/secrets/appfnd/aicore/{instance}/`)
+- **Required Keys**: `clientid`, `clientsecret`, `url` (auth server), `serviceurls` (JSON with `AI_API_URL`)
+- **Env var fallback**: `CLOUD_SDK_CFG_AICORE_{INSTANCE}_{FIELD}` (uppercased, hyphens in instance replaced with `_`)
+
+> **Note:** `SERVICE_BINDING_ROOT` defaults to `/etc/secrets/appfnd` when not set. See the [Secret Resolver guide](../core/secret_resolver/user-guide.md) for details.
+
+#### Mounted Secrets (Kubernetes)
+
+```
+$SERVICE_BINDING_ROOT/aicore/{instance}/
+├── clientid              # OAuth2 client ID
+├── clientsecret          # OAuth2 client secret
+├── url                   # Authentication server URL
+└── serviceurls           # JSON file with AI_API_URL field
+```
+
+#### Environment Variables
+
+```bash
+# Authentication credentials
+export AICORE_CLIENT_ID="your-client-id"
+export AICORE_CLIENT_SECRET="your-client-secret"
+
+# Service endpoints
+export AICORE_AUTH_URL="https://your-subdomain.authentication.eu10.hana.ondemand.com/oauth/token"
+export AICORE_BASE_URL="https://aicore.example.com"
+
+# Optional: Resource group (defaults to "default")
+export AICORE_RESOURCE_GROUP="my-resource-group"
+```
+
+#### ServiceURLs JSON Schema
+
+The `serviceurls` file must contain:
+
+```json
+{
+  "AI_API_URL": "https://aicore.example.com"
+}
+```
+
+#### URL Normalization
+
+This module automatically normalizes URLs to ensure compatibility:
+
+##### Authentication URL
+- **Input**: `https://subdomain.authentication.region.hana.ondemand.com`
+- **Output**: `https://subdomain.authentication.region.hana.ondemand.com/oauth/token`
+
+##### Base URL
+- **Input**: `https://api.ai.prod.region.aws.ml.hana.ondemand.com`
+- **Output**: `https://api.ai.prod.region.aws.ml.hana.ondemand.com/v2`
 
 ---
 

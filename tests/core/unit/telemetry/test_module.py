@@ -47,13 +47,14 @@ class TestModule:
     def test_all_modules_present(self):
         """Test that all expected modules are present."""
         all_modules = list(Module)
-        assert len(all_modules) == 7
+        assert len(all_modules) == 9
         assert Module.AICORE in all_modules
         assert Module.AUDITLOG in all_modules
         assert Module.DESTINATION in all_modules
         assert Module.EXTENSIBILITY in all_modules
         assert Module.OBJECTSTORE in all_modules
         assert Module.DMS in all_modules
+        assert Module.AGENT_MEMORY in all_modules
 
     def test_module_iteration(self):
         """Test iterating over Module enum."""

@@ -1,6 +1,6 @@
 [project]
 name = "sap-cloud-sdk"
-version = "0.16.0"
+version = "0.17.0"
 description = "SAP Cloud SDK for Python"
 readme = "README.md"
 license = "Apache-2.0"
@@ -31,11 +31,13 @@ dependencies = [
     # wrapt 2.x removed the `module` keyword, causing the LangChain instrumentor
     # initialization to fail at import time, which silently disables LangChain
     "wrapt<2",
+    "mcp>=1.1.0",
 ]
 
 [project.optional-dependencies]
 extensibility = ["a2a-sdk>=0.2.0"]
 starlette = ["starlette>=0.40.0"]
+langchain = ["langchain-core>=1.2.7"]
 
 [build-system]
 requires = ["hatchling"]
@@ -58,6 +60,7 @@ dev = [
     "anyio>=3.6.2",
     "httpx>=0.27.0",
     "a2a-sdk>=0.2.0",
+    "langchain-core>=1.2.7",
 ]
 
 [tool.pytest.ini_options]

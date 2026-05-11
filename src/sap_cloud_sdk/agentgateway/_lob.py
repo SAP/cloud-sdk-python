@@ -8,6 +8,7 @@ LoB agents use BTP Destination Service for credential management:
 import asyncio
 import logging
 import os
+import uuid
 
 import httpx
 from mcp import ClientSession
@@ -239,7 +240,8 @@ async def list_server_tools(
         List of MCPTool objects from this server.
     """
     async with httpx.AsyncClient(
-        headers={"Authorization": system_auth}, timeout=_HTTP_TIMEOUT
+        headers={"Authorization": system_auth, "x-correlation-id": str(uuid.uuid4())},
+        timeout=_HTTP_TIMEOUT,
     ) as http_client:
         async with streamable_http_client(dest_url, http_client=http_client) as (
             read,
@@ -350,7 +352,8 @@ async def call_mcp_tool_lob(
     user_auth = await get_user_auth(tool.fragment_name, user_token, tenant_subdomain)
 
     async with httpx.AsyncClient(
-        headers={"Authorization": user_auth}, timeout=_HTTP_TIMEOUT
+        headers={"Authorization": user_auth, "x-correlation-id": str(uuid.uuid4())},
+        timeout=_HTTP_TIMEOUT,
     ) as http_client:
         async with streamable_http_client(tool.url, http_client=http_client) as (
             read,

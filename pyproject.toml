@@ -30,7 +30,7 @@ dependencies = [
     # via traceloop-sdk) calls wrap_function_wrapper(module=..., name=..., wrapper=...).
     # wrapt 2.x removed the `module` keyword, causing the LangChain instrumentor
     # initialization to fail at import time, which silently disables LangChain
-    "wrapt<2",
+    "wrapt<3",
 ]
 
 [project.optional-dependencies]

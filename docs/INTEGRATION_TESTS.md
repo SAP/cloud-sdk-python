@@ -9,10 +9,12 @@ Integration tests verify that the SDK modules work correctly with real external 
 ## Prerequisites
 
 ### Required Tools
+
 - **Python 3.11+**: Required for running the tests
 - **uv**: Package manager for dependency management
 
 ### Install Dependencies
+
 ```bash
 # Install all dependencies including test dependencies
 uv sync --all-extras
@@ -62,6 +64,18 @@ CLOUD_SDK_CFG_DESTINATION_DEFAULT_URI=https://your-destination-configuration-uri
 CLOUD_SDK_CFG_DESTINATION_DEFAULT_IDENTITYZONE=your-identity-zone-here
 ```
 
+### Agent Memory Integration Tests
+
+For Agent Memory integration tests, configure the following variables in `.env_integration_tests`:
+
+```bash
+# Agent Memory Configuration
+CLOUD_SDK_CFG_AGENT_MEMORY_DEFAULT_URL=https://your-agent-memory-api-url
+CLOUD_SDK_CFG_AGENT_MEMORY_DEFAULT_AUTH_URL=https://your-auth-url
+CLOUD_SDK_CFG_AGENT_MEMORY_DEFAULT_CLIENTID=your-client-id
+CLOUD_SDK_CFG_AGENT_MEMORY_DEFAULT_CLIENTSECRET=your-client-secret
+```
+
 ## Running Integration Tests
 
 ```bash
@@ -72,6 +86,7 @@ uv run pytest tests/ -m integration -v
 uv run pytest tests/core/integration/auditlog -v
 uv run pytest tests/objectstore/integration/ -v
 uv run pytest tests/destination/integration/ -v
+uv run pytest tests/agent_memory/integration/ -v
 ```
 
 ### BDD Scenarios

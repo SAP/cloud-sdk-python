@@ -349,6 +349,10 @@ async def call_mcp_tool_lob(
     Raises:
         MCPServerNotFoundError: If destination/auth fails.
     """
+    if not tool.fragment_name:
+        raise MCPServerNotFoundError(
+            f"Tool '{tool.name}' missing fragment_name for LoB invocation"
+        )
     user_auth = await get_user_auth(tool.fragment_name, user_token, tenant_subdomain)
 
     async with httpx.AsyncClient(

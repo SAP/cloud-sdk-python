@@ -10,6 +10,7 @@ class Module(str, Enum):
     AUDITLOG = "auditlog"
     AUDITLOG_NG = "auditlog_ng"
     DESTINATION = "destination"
+    EXTENSIBILITY = "extensibility"
     OBJECTSTORE = "objectstore"
     DMS = "dms"
 

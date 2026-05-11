@@ -64,6 +64,12 @@ class Operation(str, Enum):
     OBJECTSTORE_LIST_OBJECTS = "list_objects"
     OBJECTSTORE_OBJECT_EXISTS = "object_exists"
 
+    # Extensibility Operations
+    EXTENSIBILITY_GET_EXTENSION_CAPABILITY_IMPLEMENTATION = (
+        "get_extension_capability_implementation"
+    )
+    EXTENSIBILITY_CALL_HOOK = "call_hook"
+
     # AI Core Operations
     AICORE_SET_CONFIG = "set_aicore_config"
     AICORE_AUTO_INSTRUMENT = "auto_instrument"

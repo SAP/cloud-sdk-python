@@ -47,10 +47,11 @@ class TestModule:
     def test_all_modules_present(self):
         """Test that all expected modules are present."""
         all_modules = list(Module)
-        assert len(all_modules) == 6
+        assert len(all_modules) == 7
         assert Module.AICORE in all_modules
         assert Module.AUDITLOG in all_modules
         assert Module.DESTINATION in all_modules
+        assert Module.EXTENSIBILITY in all_modules
         assert Module.OBJECTSTORE in all_modules
         assert Module.DMS in all_modules
 
@@ -62,3 +63,4 @@ class TestModule:
         assert "auditlog_ng" in module_values
         assert "destination" in module_values
         assert "objectstore" in module_values
+        assert "extensibility" in module_values

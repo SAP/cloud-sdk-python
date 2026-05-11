@@ -1,0 +1,48 @@
+{
+    "capabilityId": "default",
+    "extensionNames": ["employee-onboarding-tools"],
+    "instruction": "Use the ServiceNow tools for hardware provisioning tasks during onboarding.",
+    "mcpServers": [
+        {
+            "ordId": "sap.mcp:apiResource:serviceNow:v1",
+            "globalTenantId": "tenant-abc-123",
+            "toolNames": [
+                "create_hardware_ticket_tool"
+            ]
+        }
+    ],
+    "hooks": [
+        {
+            "hookId": "hook-1774481137698",
+            "id": "9f6e5f66-7e4f-4ef0-a9f6-e6e1c1220c11",
+            "name": "Currency Conversion",
+            "hookType": "BEFORE",
+            "deploymentType": "N8N",
+            "n8nWorkflowConfig": {
+                "workflowId": "wf-currency-conversion-001",
+                "method": "POST"
+            },
+            "timeout": 30,
+            "executionMode": "SYNC",
+            "onFailure": "CONTINUE",
+            "order": 0,
+            "canShortCircuit": false
+        },
+        {
+            "hookId": "hook-1774481142176",
+            "id": "6a9e0cef-eed6-4f1b-9f86-3d8e9f5c1d22",
+            "name": "Trigger Email Notification",
+            "hookType": "AFTER",
+            "deploymentType": "N8N",
+            "n8nWorkflowConfig": {
+                "workflowId": "wf-trigger-email-notification-001",
+                "method": "POST"
+            },
+            "timeout": 30,
+            "executionMode": "SYNC",
+            "onFailure": "CONTINUE",
+            "order": 1,
+            "canShortCircuit": false
+        }
+    ]
+}

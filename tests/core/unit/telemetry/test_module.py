@@ -47,7 +47,7 @@ class TestModule:
     def test_all_modules_present(self):
         """Test that all expected modules are present."""
         all_modules = list(Module)
-        assert len(all_modules) == 7
+        assert len(all_modules) == 8
         assert Module.AICORE in all_modules
         assert Module.AUDITLOG in all_modules
         assert Module.DESTINATION in all_modules

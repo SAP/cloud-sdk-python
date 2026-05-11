@@ -12,6 +12,7 @@ class Module(str, Enum):
     DESTINATION = "destination"
     OBJECTSTORE = "objectstore"
     DMS = "dms"
+    AGENTGATEWAY = "agentgateway"
 
     def __str__(self) -> str:
         return self.value

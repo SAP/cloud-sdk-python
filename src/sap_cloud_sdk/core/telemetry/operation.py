@@ -98,5 +98,9 @@ class Operation(str, Enum):
     DMS_APPEND_CONTENT_STREAM = "cmis_append_content_stream"
     DMS_CMIS_QUERY = "cmis_query"
 
+    # Agent Gateway Operations
+    AGENTGATEWAY_LIST_MCP_TOOLS = "list_mcp_tools"
+    AGENTGATEWAY_CALL_MCP_TOOL = "call_mcp_tool"
+
     def __str__(self) -> str:
         return self.value

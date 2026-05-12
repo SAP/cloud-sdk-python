@@ -9,10 +9,13 @@ class Module(str, Enum):
     AICORE = "aicore"
     AUDITLOG = "auditlog"
     AUDITLOG_NG = "auditlog_ng"
+    AGENT_MEMORY = "agent_memory"
     DATA_ANONYMIZATION = "data_anonymization"
     DESTINATION = "destination"
+    EXTENSIBILITY = "extensibility"
     OBJECTSTORE = "objectstore"
     DMS = "dms"
+    AGENTGATEWAY = "agentgateway"
 
     def __str__(self) -> str:
         return self.value

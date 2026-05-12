@@ -1,7 +1,5 @@
 """Tests for Operation enum."""
 
-import pytest
-
 from sap_cloud_sdk.core.telemetry.operation import Operation
 
 
@@ -37,20 +35,44 @@ class TestOperation:
 
     def test_destination_operations(self):
         """Test Destination operation values."""
-        assert Operation.DESTINATION_GET_INSTANCE_DESTINATION.value == "get_instance_destination"
-        assert Operation.DESTINATION_GET_SUBACCOUNT_DESTINATION.value == "get_subaccount_destination"
-        assert Operation.DESTINATION_LIST_INSTANCE_DESTINATIONS.value == "list_instance_destinations"
-        assert Operation.DESTINATION_LIST_SUBACCOUNT_DESTINATIONS.value == "list_subaccount_destinations"
+        assert (
+            Operation.DESTINATION_GET_INSTANCE_DESTINATION.value
+            == "get_instance_destination"
+        )
+        assert (
+            Operation.DESTINATION_GET_SUBACCOUNT_DESTINATION.value
+            == "get_subaccount_destination"
+        )
+        assert (
+            Operation.DESTINATION_LIST_INSTANCE_DESTINATIONS.value
+            == "list_instance_destinations"
+        )
+        assert (
+            Operation.DESTINATION_LIST_SUBACCOUNT_DESTINATIONS.value
+            == "list_subaccount_destinations"
+        )
         assert Operation.DESTINATION_CREATE_DESTINATION.value == "create_destination"
         assert Operation.DESTINATION_UPDATE_DESTINATION.value == "update_destination"
         assert Operation.DESTINATION_DELETE_DESTINATION.value == "delete_destination"
 
     def test_certificate_operations(self):
         """Test Certificate operation values."""
-        assert Operation.CERTIFICATE_GET_INSTANCE_CERTIFICATE.value == "get_instance_certificate"
-        assert Operation.CERTIFICATE_GET_SUBACCOUNT_CERTIFICATE.value == "get_subaccount_certificate"
-        assert Operation.CERTIFICATE_LIST_INSTANCE_CERTIFICATES.value == "list_instance_certificates"
-        assert Operation.CERTIFICATE_LIST_SUBACCOUNT_CERTIFICATES.value == "list_subaccount_certificates"
+        assert (
+            Operation.CERTIFICATE_GET_INSTANCE_CERTIFICATE.value
+            == "get_instance_certificate"
+        )
+        assert (
+            Operation.CERTIFICATE_GET_SUBACCOUNT_CERTIFICATE.value
+            == "get_subaccount_certificate"
+        )
+        assert (
+            Operation.CERTIFICATE_LIST_INSTANCE_CERTIFICATES.value
+            == "list_instance_certificates"
+        )
+        assert (
+            Operation.CERTIFICATE_LIST_SUBACCOUNT_CERTIFICATES.value
+            == "list_subaccount_certificates"
+        )
         assert Operation.CERTIFICATE_CREATE_CERTIFICATE.value == "create_certificate"
         assert Operation.CERTIFICATE_UPDATE_CERTIFICATE.value == "update_certificate"
         assert Operation.CERTIFICATE_DELETE_CERTIFICATE.value == "delete_certificate"
@@ -58,9 +80,18 @@ class TestOperation:
     def test_fragment_operations(self):
         """Test Fragment operation values."""
         assert Operation.FRAGMENT_GET_INSTANCE_FRAGMENT.value == "get_instance_fragment"
-        assert Operation.FRAGMENT_GET_SUBACCOUNT_FRAGMENT.value == "get_subaccount_fragment"
-        assert Operation.FRAGMENT_LIST_INSTANCE_FRAGMENTS.value == "list_instance_fragments"
-        assert Operation.FRAGMENT_LIST_SUBACCOUNT_FRAGMENTS.value == "list_subaccount_fragments"
+        assert (
+            Operation.FRAGMENT_GET_SUBACCOUNT_FRAGMENT.value
+            == "get_subaccount_fragment"
+        )
+        assert (
+            Operation.FRAGMENT_LIST_INSTANCE_FRAGMENTS.value
+            == "list_instance_fragments"
+        )
+        assert (
+            Operation.FRAGMENT_LIST_SUBACCOUNT_FRAGMENTS.value
+            == "list_subaccount_fragments"
+        )
         assert Operation.FRAGMENT_CREATE_FRAGMENT.value == "create_fragment"
         assert Operation.FRAGMENT_UPDATE_FRAGMENT.value == "update_fragment"
         assert Operation.FRAGMENT_DELETE_FRAGMENT.value == "delete_fragment"
@@ -68,8 +99,12 @@ class TestOperation:
     def test_objectstore_operations(self):
         """Test Object Store operation values."""
         assert Operation.OBJECTSTORE_PUT_OBJECT.value == "put_object"
-        assert Operation.OBJECTSTORE_PUT_OBJECT_FROM_FILE.value == "put_object_from_file"
-        assert Operation.OBJECTSTORE_PUT_OBJECT_FROM_BYTES.value == "put_object_from_bytes"
+        assert (
+            Operation.OBJECTSTORE_PUT_OBJECT_FROM_FILE.value == "put_object_from_file"
+        )
+        assert (
+            Operation.OBJECTSTORE_PUT_OBJECT_FROM_BYTES.value == "put_object_from_bytes"
+        )
         assert Operation.OBJECTSTORE_GET_OBJECT.value == "get_object"
         assert Operation.OBJECTSTORE_HEAD_OBJECT.value == "head_object"
         assert Operation.OBJECTSTORE_DELETE_OBJECT.value == "delete_object"
@@ -80,6 +115,14 @@ class TestOperation:
         """Test AI Core operation values."""
         assert Operation.AICORE_SET_CONFIG.value == "set_aicore_config"
         assert Operation.AICORE_AUTO_INSTRUMENT.value == "auto_instrument"
+
+    def test_extensibility_operations(self):
+        """Test Extensibility operation values."""
+        assert (
+            Operation.EXTENSIBILITY_GET_EXTENSION_CAPABILITY_IMPLEMENTATION.value
+            == "get_extension_capability_implementation"
+        )
+        assert Operation.EXTENSIBILITY_CALL_HOOK.value == "call_hook"
 
     def test_dms_operations(self):
         """Test DMS operation values."""
@@ -115,6 +158,9 @@ class TestOperation:
             == "anonymize_text"
         )
         assert str(Operation.DESTINATION_GET_INSTANCE_DESTINATION) == "get_instance_destination"
+            str(Operation.DESTINATION_GET_INSTANCE_DESTINATION)
+            == "get_instance_destination"
+        )
         assert str(Operation.OBJECTSTORE_PUT_OBJECT) == "put_object"
         assert str(Operation.AICORE_AUTO_INSTRUMENT) == "auto_instrument"
 
@@ -152,6 +198,7 @@ class TestOperation:
         assert any("DATA_ANONYMIZATION" in op.name for op in all_operations)
         assert any("DESTINATION" in op.name for op in all_operations)
         assert any("CERTIFICATE" in op.name for op in all_operations)
+        assert any("EXTENSIBILITY" in op.name for op in all_operations)
         assert any("FRAGMENT" in op.name for op in all_operations)
         assert any("OBJECTSTORE" in op.name for op in all_operations)
         assert any("AICORE" in op.name for op in all_operations)
@@ -159,5 +206,6 @@ class TestOperation:
     def test_operation_count(self):
         """Test that we have the expected number of operations."""
         all_operations = list(Operation)
-        # 3 auditlog + 5 data anonymization + 11 destination + 10 certificate + 10 fragment + 8 objectstore + 2 aicore + 23 dms = 72
-        assert len(all_operations) == 72
+        # 3 auditlog + 11 destination + 10 certificate + 10 fragment + 8 objectstore
+        # + 2 extensibility + 2 aicore + 23 dms + 2 agentgateway + 13 agent_memory + 5 data anonymization = 89
+        assert len(all_operations) == 89

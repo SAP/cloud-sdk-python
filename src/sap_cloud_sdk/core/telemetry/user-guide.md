@@ -83,7 +83,54 @@ with context_overlay(GenAIOperation.RETRIEVAL, attributes={"index": "knowledge-b
     documents = retrieve_documents(query)
 ```
 
-Available operations:
+Thread-safe and async-safe. Automatic Propagation.
+
+### Propagate extension context
+
+When calling extension tools (e.g., MCP servers), wrap the call in
+`extension_context()` to propagate extension metadata via OTel baggage:
+
+```python
+from sap_cloud_sdk.core.telemetry import (
+    extension_context,
+    ExtensionType,
+)
+
+# When calling an extension tool
+with extension_context(
+    capability_id="default",
+    extension_name="ServiceNow Extension",
+):
+    result = await mcp_client.call_tool("generate_offer_letter", args)
+    # HTTP request includes baggage header with extension metadata
+```
+
+Available extension types:
+
+```python
+ExtensionType.TOOL          # MCP tool call (default)
+ExtensionType.INSTRUCTION   # Instruction/prompt injection
+```
+
+In downstream services, read the propagated context:
+
+```python
+from sap_cloud_sdk.core.telemetry import get_extension_context
+
+ext_ctx = get_extension_context()
+if ext_ctx:
+    print(ext_ctx["capability_id"])       # "default"
+    print(ext_ctx["extension_name"])      # "ServiceNow Extension"
+    print(ext_ctx["extension_type"])      # "tool"
+```
+
+The extension baggage span processor (registered automatically by `auto_instrument()`)
+stamps `sap.extension.*` attributes on all spans created inside an
+`extension_context()` block, including spans from third-party instrumentation.
+It uses the official `BaggageSpanProcessor` from `opentelemetry-processor-baggage`
+under the hood, filtering to only propagate `sap.extension.*` baggage keys.
+
+### Available operations
 
 ```python
 GenAIOperation.CHAT

@@ -902,7 +902,6 @@ class TestCallExtensionTool:
                 mcp_client=mock_client,
                 tool_name="create_ticket",
                 args={"title": "Bug"},
-                extension_name="ServiceNow",
             )
             assert result == "result-123"
             mock_client.call_tool.assert_awaited_once_with(
@@ -921,7 +920,7 @@ class TestCallExtensionTool:
                 extension_id: str
                 extension_version: str
 
-            mapping = {"prefix_tool1": FakeSourceInfo("Mapped Ext", "uuid-m", "7")}
+            mapping = {"tool1": FakeSourceInfo("Mapped Ext", "uuid-m", "7")}
             mock_client = AsyncMock()
             mock_client.call_tool.return_value = "ok"
 
@@ -930,9 +929,7 @@ class TestCallExtensionTool:
                 mcp_client=mock_client,
                 tool_name="tool1",
                 args={},
-                extension_name="Fallback",
                 source_mapping=mapping,
-                tool_prefix="prefix_",
             )
             assert result == "ok"
 
@@ -949,7 +946,6 @@ class TestCallExtensionTool:
                     mcp_client=mock_client,
                     tool_name="t",
                     args={},
-                    extension_name="E",
                 )
             count, _ = get_tool_call_metrics()
             assert count == 1  # Duration still recorded

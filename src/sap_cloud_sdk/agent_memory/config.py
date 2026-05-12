@@ -61,11 +61,17 @@ class AgentMemoryConfig:
         if not self.base_url:
             raise AgentMemoryConfigError("base_url must be a non-empty string")
         if self.token_url is not None and not self.token_url:
-            raise AgentMemoryConfigError("token_url must be a non-empty string when provided")
+            raise AgentMemoryConfigError(
+                "token_url must be a non-empty string when provided"
+            )
         if self.client_id is not None and not self.client_id:
-            raise AgentMemoryConfigError("client_id must be a non-empty string when provided")
+            raise AgentMemoryConfigError(
+                "client_id must be a non-empty string when provided"
+            )
         if self.client_secret is not None and not self.client_secret:
-            raise AgentMemoryConfigError("client_secret must be a non-empty string when provided")
+            raise AgentMemoryConfigError(
+                "client_secret must be a non-empty string when provided"
+            )
 
 
 @dataclass
@@ -81,9 +87,13 @@ class BindingData:
     def validate(self) -> None:
         """Raise ``AgentMemoryConfigError`` if any required field is empty."""
         if not self.url:
-            raise AgentMemoryConfigError("Agent Memory binding is missing required field: url")
+            raise AgentMemoryConfigError(
+                "Agent Memory binding is missing required field: url"
+            )
         if not self.uaa:
-            raise AgentMemoryConfigError("Agent Memory binding is missing required field: uaa")
+            raise AgentMemoryConfigError(
+                "Agent Memory binding is missing required field: uaa"
+            )
 
     def extract_config(self) -> AgentMemoryConfig:
         """Parse the UAA JSON string and return an ``AgentMemoryConfig``."""
@@ -116,7 +126,9 @@ def _load_config_from_env() -> AgentMemoryConfig:
     Raises:
         AgentMemoryConfigError: If configuration cannot be loaded or is incomplete.
     """
-    from sap_cloud_sdk.core.secret_resolver import read_from_mount_and_fallback_to_env_var
+    from sap_cloud_sdk.core.secret_resolver import (
+        read_from_mount_and_fallback_to_env_var,
+    )
 
     try:
         binding = BindingData()

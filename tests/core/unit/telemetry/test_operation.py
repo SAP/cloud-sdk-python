@@ -153,14 +153,8 @@ class TestOperation:
     def test_operation_str_representation(self):
         """Test that Operation enum converts to string correctly."""
         assert str(Operation.AUDITLOG_LOG) == "log"
-        assert (
-            str(Operation.DATA_ANONYMIZATION_ANONYMIZE_TEXT)
-            == "anonymize_text"
-        )
+        assert str(Operation.DATA_ANONYMIZATION_ANONYMIZE_TEXT)  == "anonymize_text"
         assert str(Operation.DESTINATION_GET_INSTANCE_DESTINATION) == "get_instance_destination"
-            str(Operation.DESTINATION_GET_INSTANCE_DESTINATION)
-            == "get_instance_destination"
-        )
         assert str(Operation.OBJECTSTORE_PUT_OBJECT) == "put_object"
         assert str(Operation.AICORE_AUTO_INSTRUMENT) == "auto_instrument"
 

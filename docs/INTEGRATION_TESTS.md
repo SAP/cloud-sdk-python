@@ -70,10 +70,8 @@ For Agent Memory integration tests, configure the following variables in `.env_i
 
 ```bash
 # Agent Memory Configuration
-CLOUD_SDK_CFG_AGENT_MEMORY_DEFAULT_URL=https://your-agent-memory-api-url
-CLOUD_SDK_CFG_AGENT_MEMORY_DEFAULT_AUTH_URL=https://your-auth-url
-CLOUD_SDK_CFG_AGENT_MEMORY_DEFAULT_CLIENTID=your-client-id
-CLOUD_SDK_CFG_AGENT_MEMORY_DEFAULT_CLIENTSECRET=your-client-secret
+CLOUD_SDK_CFG_HANA_AGENT_MEMORY_DEFAULT_URL=https://your-agent-memory-api-url
+CLOUD_SDK_CFG_HANA_AGENT_MEMORY_DEFAULT_UAA='{"url":"https://your-auth-url","clientid":"your-client-id","clientsecret":"your-client-secret"}'
 ```
 
 ## Running Integration Tests

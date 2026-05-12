@@ -772,14 +772,37 @@ environment variables or service binding.
 
 ## Configuration
 
-`create_client()` resolves credentials automatically in the following order:
+### Service Binding
 
-1. **Mounted volume** — `/etc/secrets/appfnd/hana-agent-memory/default/{field}`
-2. **Environment variables** — `CLOUD_SDK_CFG_HANA_AGENT_MEMORY_DEFAULT_*`
+- **Mount path**: `$SERVICE_BINDING_ROOT/hana-agent-memory/default/` (defaults to `/etc/secrets/appfnd/hana-agent-memory/default/`)
+- **Required keys**: `url` (Agent Memory service URL), `uaa` (JSON string with XSUAA credentials)
+- **Env var fallback**: `CLOUD_SDK_CFG_HANA_AGENT_MEMORY_DEFAULT_{FIELD}` (uppercased)
 
-| Environment Variable                                       | Description                          |
-| ---------------------------------------------------------- | ------------------------------------ |
-| `CLOUD_SDK_CFG_HANA_AGENT_MEMORY_DEFAULT_APPLICATION_URL`  | Base URL of the Agent Memory service |
-| `CLOUD_SDK_CFG_HANA_AGENT_MEMORY_DEFAULT_UAA_URL`          | OAuth2 authorization server base URL |
-| `CLOUD_SDK_CFG_HANA_AGENT_MEMORY_DEFAULT_UAA_CLIENTID`     | OAuth2 client ID                     |
-| `CLOUD_SDK_CFG_HANA_AGENT_MEMORY_DEFAULT_UAA_CLIENTSECRET` | OAuth2 client secret                 |
+> **Note:** `SERVICE_BINDING_ROOT` defaults to `/etc/secrets/appfnd` when not set. See the [Secret Resolver guide](../core/secret_resolver/user-guide.md) for details.
+
+#### Mounted Secrets (Kubernetes)
+
+```
+$SERVICE_BINDING_ROOT/hana-agent-memory/default/
+├── url
+└── uaa
+```
+
+#### Environment Variables
+
+```bash
+export CLOUD_SDK_CFG_HANA_AGENT_MEMORY_DEFAULT_URL="https://agent-memory.example.com"
+export CLOUD_SDK_CFG_HANA_AGENT_MEMORY_DEFAULT_UAA='{"clientid":"...","clientsecret":"...","url":"https://..."}'
+```
+
+#### UAA JSON Schema
+
+The `uaa` key must contain a JSON string with the XSUAA credentials:
+
+```json
+{
+  "clientid": "sb-xxx",
+  "clientsecret": "xxx",
+  "url": "https://subdomain.authentication.region.hana.ondemand.com"
+}
+```

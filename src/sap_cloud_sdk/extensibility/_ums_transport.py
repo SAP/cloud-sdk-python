@@ -436,7 +436,8 @@ class UmsTransport:
     1. ``config.destination_name`` (explicit config override).
     2. ``APPFND_UMS_DESTINATION_NAME`` environment variable.
     3. ``sap-managed-runtime-ums-{APPFND_CONHOS_LANDSCAPE}`` (constructed).
-    4. ``EXTENSIBILITY_SERVICE`` (fallback with warning).
+
+    If none of the above are available, resolution fails with a warning.
 
     Args:
         agent_ord_id: ORD ID of the agent.

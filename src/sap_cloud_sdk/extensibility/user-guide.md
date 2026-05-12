@@ -714,7 +714,7 @@ Validation issues produce log warnings but never prevent output generation.
 
 The module resolves the extensibility service URL and credentials through the SAP BTP Destination Service. The destination is looked up at the subaccount level.
 
-- **Default destination name resolution**: (1) `APPFND_UMS_DESTINATION_NAME` env var, (2) `sap-managed-runtime-ums-{APPFND_CONHOS_LANDSCAPE}`, (3) `EXTENSIBILITY_SERVICE` fallback.
+- **Default destination name resolution**: (1) `APPFND_UMS_DESTINATION_NAME` env var, (2) `sap-managed-runtime-ums-{APPFND_CONHOS_LANDSCAPE}`. If neither is available, resolution fails with a warning.
 - **Default destination instance**: `default`
 - Override via `ExtensibilityConfig(destination_name=...)` when the destination uses a non-standard name.
 

@@ -45,10 +45,13 @@ class TestCreateClient:
 
     def test_reads_env_when_no_config_provided(self, monkeypatch):
         """Factory falls back to environment variables when no config given."""
-        monkeypatch.setenv("CLOUD_SDK_CFG_HANA_AGENT_MEMORY_DEFAULT_APPLICATION_URL", "http://memory.example.com")
-        monkeypatch.setenv("CLOUD_SDK_CFG_HANA_AGENT_MEMORY_DEFAULT_UAA_URL", "http://auth.example.com")
-        monkeypatch.setenv("CLOUD_SDK_CFG_HANA_AGENT_MEMORY_DEFAULT_UAA_CLIENTID", "client-id")
-        monkeypatch.setenv("CLOUD_SDK_CFG_HANA_AGENT_MEMORY_DEFAULT_UAA_CLIENTSECRET", "client-secret")
+        import json
+        monkeypatch.setenv("CLOUD_SDK_CFG_HANA_AGENT_MEMORY_DEFAULT_URL", "http://memory.example.com")
+        monkeypatch.setenv("CLOUD_SDK_CFG_HANA_AGENT_MEMORY_DEFAULT_UAA", json.dumps({
+            "url": "http://auth.example.com",
+            "clientid": "client-id",
+            "clientsecret": "client-secret",
+        }))
         with patch("sap_cloud_sdk.agent_memory.HttpTransport") as MockTransport:
             MockTransport.return_value = MagicMock(spec=HttpTransport)
             client = create_client()

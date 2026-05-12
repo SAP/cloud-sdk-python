@@ -1,5 +1,6 @@
 """Unit tests for AgentMemoryConfig, BindingData, and _load_config_from_env."""
 
+import json
 from unittest.mock import patch
 
 import pytest
@@ -11,164 +12,178 @@ from sap_cloud_sdk.agent_memory.config import (
 )
 from sap_cloud_sdk.agent_memory.exceptions import AgentMemoryConfigError
 
+_VALID_UAA = json.dumps({
+    "url": "https://auth.example.com",
+    "clientid": "my-client",
+    "clientsecret": "my-secret",
+})
+
+_RESOLVER = "sap_cloud_sdk.core.secret_resolver.read_from_mount_and_fallback_to_env_var"
+
 
 # ── AgentMemoryConfig ─────────────────────────────────────────────────────────
 
 
 class TestAgentMemoryConfig:
     def test_raises_when_base_url_empty(self):
-        """AgentMemoryConfig rejects an empty base_url."""
         with pytest.raises(AgentMemoryConfigError, match="base_url"):
             AgentMemoryConfig(base_url="")
 
+    def test_raises_when_token_url_empty_string(self):
+        with pytest.raises(AgentMemoryConfigError, match="token_url"):
+            AgentMemoryConfig(base_url="http://localhost", token_url="")
+
+    def test_raises_when_client_id_empty_string(self):
+        with pytest.raises(AgentMemoryConfigError, match="client_id"):
+            AgentMemoryConfig(base_url="http://localhost", client_id="")
+
+    def test_raises_when_client_secret_empty_string(self):
+        with pytest.raises(AgentMemoryConfigError, match="client_secret"):
+            AgentMemoryConfig(base_url="http://localhost", client_secret="")
+
     def test_optional_fields_default_to_none(self):
-        """token_url, client_id, and client_secret default to None."""
         config = AgentMemoryConfig(base_url="http://localhost:8080")
         assert config.token_url is None
         assert config.client_id is None
         assert config.client_secret is None
 
     def test_timeout_default(self):
-        """Default timeout is 30.0 seconds."""
         config = AgentMemoryConfig(base_url="http://localhost:8080")
         assert config.timeout == 30.0
+
+    def test_valid_config_with_all_fields_does_not_raise(self):
+        AgentMemoryConfig(
+            base_url="https://memory.example.com",
+            token_url="https://auth.example.com/oauth/token",
+            client_id="my-client",
+            client_secret="my-secret",
+        )
 
 
 # ── BindingData ───────────────────────────────────────────────────────────────
 
 
 class TestBindingData:
-    def test_validate_raises_when_all_fields_empty(self):
-        """validate() raises AgentMemoryConfigError when all fields are empty."""
-        with pytest.raises(AgentMemoryConfigError, match="missing required fields"):
-            BindingData().validate()
+    def test_validate_raises_when_url_missing(self):
+        with pytest.raises(AgentMemoryConfigError, match="url"):
+            BindingData(url="", uaa=_VALID_UAA).validate()
 
-    def test_validate_raises_when_some_fields_empty(self):
-        """validate() raises when only some fields are populated."""
-        binding = BindingData(application_url="https://example.com")
-        with pytest.raises(AgentMemoryConfigError, match="missing required fields"):
-            binding.validate()
+    def test_validate_raises_when_uaa_missing(self):
+        with pytest.raises(AgentMemoryConfigError, match="uaa"):
+            BindingData(url="https://memory.example.com", uaa="").validate()
 
     def test_validate_passes_when_all_fields_set(self):
-        """validate() does not raise when all required fields are populated."""
-        binding = BindingData(
-            application_url="https://example.com",
-            uaa_url="https://auth.example.com",
-            uaa_clientid="client-id",
-            uaa_clientsecret="client-secret",
-        )
-        binding.validate()  # should not raise
+        BindingData(url="https://memory.example.com", uaa=_VALID_UAA).validate()
+
+    def test_extract_config_maps_url(self):
+        config = BindingData(url="https://memory.example.com", uaa=_VALID_UAA).extract_config()
+        assert config.base_url == "https://memory.example.com"
 
     def test_extract_config_derives_token_url(self):
-        """extract_config() appends /oauth/token to uaa_url."""
-        binding = BindingData(
-            application_url="https://memory.example.com",
-            uaa_url="https://auth.example.com",
-            uaa_clientid="cid",
-            uaa_clientsecret="csec",
-        )
-        config = binding.extract_config()
+        config = BindingData(url="https://memory.example.com", uaa=_VALID_UAA).extract_config()
         assert config.token_url == "https://auth.example.com/oauth/token"
 
     def test_extract_config_strips_trailing_slash_from_uaa_url(self):
-        """extract_config() strips a trailing slash before appending /oauth/token."""
-        binding = BindingData(
-            application_url="https://memory.example.com",
-            uaa_url="https://auth.example.com/",
-            uaa_clientid="cid",
-            uaa_clientsecret="csec",
-        )
-        config = binding.extract_config()
+        uaa = json.dumps({"url": "https://auth.example.com/", "clientid": "c", "clientsecret": "s"})
+        config = BindingData(url="https://memory.example.com", uaa=uaa).extract_config()
         assert config.token_url == "https://auth.example.com/oauth/token"
 
-    def test_extract_config_maps_all_fields(self):
-        """extract_config() maps all binding fields to AgentMemoryConfig."""
-        binding = BindingData(
-            application_url="https://memory.example.com",
-            uaa_url="https://auth.example.com",
-            uaa_clientid="my-client",
-            uaa_clientsecret="my-secret",
-        )
-        config = binding.extract_config()
-        assert config.base_url == "https://memory.example.com"
+    def test_extract_config_maps_client_credentials(self):
+        config = BindingData(url="https://memory.example.com", uaa=_VALID_UAA).extract_config()
         assert config.client_id == "my-client"
         assert config.client_secret == "my-secret"
+
+    def test_extract_config_raises_on_invalid_json(self):
+        with pytest.raises(AgentMemoryConfigError, match="Failed to parse uaa JSON"):
+            BindingData(url="https://memory.example.com", uaa="not-json").extract_config()
+
+    def test_extract_config_raises_on_missing_json_key(self):
+        uaa = json.dumps({"url": "https://auth.example.com"})  # missing clientid/clientsecret
+        with pytest.raises(AgentMemoryConfigError, match="Missing required field in uaa JSON"):
+            BindingData(url="https://memory.example.com", uaa=uaa).extract_config()
+
+    def test_extract_config_ignores_extra_uaa_fields(self):
+        uaa = json.dumps({
+            "apiurl": "https://api.authentication.eu12.hana.ondemand.com",
+            "clientid": "my-client",
+            "clientsecret": "my-secret",
+            "credential-type": "binding-secret",
+            "identityzone": "my-zone",
+            "tenantid": "tenant-123",
+            "url": "https://auth.example.com",
+            "xsappname": "my-app",
+            "zoneid": "1acb547d-6df6-40a6-abb6-e41dd7d079d1",
+        })
+        config = BindingData(url="https://memory.example.com", uaa=uaa).extract_config()
+        assert config.base_url == "https://memory.example.com"
+        assert config.token_url == "https://auth.example.com/oauth/token"
+        assert config.client_id == "my-client"
+        assert config.client_secret == "my-secret"
+
+    def test_extract_config_raises_on_empty_uaa_object(self):
+        with pytest.raises(AgentMemoryConfigError, match="Missing required field in uaa JSON"):
+            BindingData(url="https://memory.example.com", uaa="{}").extract_config()
 
 
 # ── _load_config_from_env ─────────────────────────────────────────────────────
 
-_MOUNT_LOADER = "sap_cloud_sdk.core.secret_resolver.resolver._load_from_mount"
 
-_ENV_VARS = {
-    "CLOUD_SDK_CFG_HANA_AGENT_MEMORY_DEFAULT_APPLICATION_URL": "https://memory.example.com",
-    "CLOUD_SDK_CFG_HANA_AGENT_MEMORY_DEFAULT_UAA_URL": "https://auth.example.com",
-    "CLOUD_SDK_CFG_HANA_AGENT_MEMORY_DEFAULT_UAA_CLIENTID": "env-client",
-    "CLOUD_SDK_CFG_HANA_AGENT_MEMORY_DEFAULT_UAA_CLIENTSECRET": "env-secret",
-}
-
-
-def _fill_binding(_base_volume_mount, _module, _instance, target) -> None:
-    target.application_url = "https://memory.example.com"
-    target.uaa_url = "https://auth.example.com"
-    target.uaa_clientid = "resolved-client"
-    target.uaa_clientsecret = "resolved-secret"
+def _fill_binding(**kwargs) -> None:
+    target = kwargs["target"]
+    target.url = "https://memory.example.com"
+    target.uaa = _VALID_UAA
 
 
 class TestLoadConfigFromEnv:
-    def test_success_from_mount(self):
-        """_load_config_from_env() returns a valid AgentMemoryConfig when mount succeeds."""
-        with patch(_MOUNT_LOADER, side_effect=_fill_binding):
+    def test_success_via_resolver(self):
+        with patch(_RESOLVER, side_effect=_fill_binding):
             config = _load_config_from_env()
 
         assert config.base_url == "https://memory.example.com"
         assert config.token_url == "https://auth.example.com/oauth/token"
-        assert config.client_id == "resolved-client"
-        assert config.client_secret == "resolved-secret"
+        assert config.client_id == "my-client"
+        assert config.client_secret == "my-secret"
 
-    def test_calls_mount_loader_with_correct_arguments(self):
-        """_load_config_from_env() calls _load_from_mount with the correct path/module/instance."""
-        with patch(_MOUNT_LOADER, side_effect=_fill_binding) as mock_mount:
+    def test_calls_resolver_with_correct_arguments(self):
+        with patch(_RESOLVER, side_effect=_fill_binding) as mock_resolver:
             _load_config_from_env()
 
-        mock_mount.assert_called_once()
-        args = mock_mount.call_args[0]
-        assert args[0] == "/etc/secrets/appfnd"
-        assert args[1] == "hana-agent-memory"
-        assert args[2] == "default"
+        mock_resolver.assert_called_once()
+        _, kwargs = mock_resolver.call_args
+        assert kwargs["base_volume_mount"] == "/etc/secrets/appfnd"
+        assert kwargs["base_var_name"] == "CLOUD_SDK_CFG"
+        assert kwargs["module"] == "hana-agent-memory"
+        assert kwargs["instance"] == "default"
 
-    def test_falls_back_to_env_when_mount_fails(self, monkeypatch):
-        """_load_config_from_env() reads env vars when the mount path is unavailable."""
-        for var, val in _ENV_VARS.items():
-            monkeypatch.setenv(var, val)
+    def test_falls_back_to_env_vars(self, monkeypatch):
+        monkeypatch.setenv("CLOUD_SDK_CFG_HANA_AGENT_MEMORY_DEFAULT_URL", "https://memory.example.com")
+        monkeypatch.setenv("CLOUD_SDK_CFG_HANA_AGENT_MEMORY_DEFAULT_UAA", _VALID_UAA)
 
-        with patch(_MOUNT_LOADER, side_effect=FileNotFoundError("no mount")):
+        # Let the real resolver run — mount will fail, env vars will succeed
+        with patch("os.stat", side_effect=FileNotFoundError("no mount")):
             config = _load_config_from_env()
 
         assert config.base_url == "https://memory.example.com"
-        assert config.client_id == "env-client"
+        assert config.client_id == "my-client"
 
-    def test_raises_config_error_when_mount_and_env_both_fail(self, monkeypatch):
-        """_load_config_from_env() raises AgentMemoryConfigError when both mount and env vars are absent."""
-        for var in _ENV_VARS:
-            monkeypatch.delenv(var, raising=False)
-
-        with patch(_MOUNT_LOADER, side_effect=FileNotFoundError("no mount")):
-            with pytest.raises(
-                AgentMemoryConfigError, match="Missing required environment variables"
-            ):
+    def test_raises_config_error_when_resolver_fails(self):
+        with patch(_RESOLVER, side_effect=RuntimeError("both sources failed")):
+            with pytest.raises(AgentMemoryConfigError, match="Failed to load Agent Memory configuration"):
                 _load_config_from_env()
 
-    def test_raises_config_error_when_mount_binding_incomplete_and_env_missing(
-        self, monkeypatch
-    ):
-        """_load_config_from_env() raises AgentMemoryConfigError when mount gives partial data and env is absent."""
-        for var in _ENV_VARS:
-            monkeypatch.delenv(var, raising=False)
+    def test_raises_config_error_when_binding_incomplete(self):
+        def partial_fill(**kwargs):
+            kwargs["target"].url = "https://memory.example.com"
+            # uaa remains empty → validate() raises
 
-        def incomplete_fill(_bvm, _mod, _inst, target):
-            target.application_url = "https://example.com"
-            # uaa_url/uaa_clientid/uaa_clientsecret remain empty → validate() raises
+        with patch(_RESOLVER, side_effect=partial_fill):
+            with pytest.raises(AgentMemoryConfigError, match="uaa"):
+                _load_config_from_env()
 
-        with patch(_MOUNT_LOADER, side_effect=incomplete_fill):
-            with pytest.raises(AgentMemoryConfigError):
+    def test_raises_config_error_when_uaa_json_invalid(self, monkeypatch):
+        monkeypatch.setenv("CLOUD_SDK_CFG_HANA_AGENT_MEMORY_DEFAULT_URL", "https://memory.example.com")
+        monkeypatch.setenv("CLOUD_SDK_CFG_HANA_AGENT_MEMORY_DEFAULT_UAA", "not-valid-json")
+
+        with patch("os.stat", side_effect=FileNotFoundError("no mount")):
+            with pytest.raises(AgentMemoryConfigError, match="Failed to parse uaa JSON"):
                 _load_config_from_env()

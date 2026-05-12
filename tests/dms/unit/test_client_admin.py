@@ -13,7 +13,7 @@ from unittest.mock import Mock, patch
 import pytest
 
 from sap_cloud_sdk.dms.client import DMSClient
-from sap_cloud_sdk.dms.model import (
+from sap_cloud_sdk.dms._models import (
     CreateConfigRequest,
     DMSCredentials,
     InternalRepoRequest,

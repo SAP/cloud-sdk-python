@@ -9,7 +9,7 @@ from sap_cloud_sdk.dms.exceptions import (
     DMSConnectionError,
     DMSPermissionDeniedException,
 )
-from sap_cloud_sdk.dms.model import DMSCredentials
+from sap_cloud_sdk.dms._models import DMSCredentials
 
 logger = logging.getLogger(__name__)
 

@@ -120,7 +120,7 @@ For new features or capabilities:
   ├── client.py
   ├── config.py
   ├── exceptions.py
-  ├── models.py
+  ├── _models.py
   ├── py.typed
   └── user-guide.md
   ```

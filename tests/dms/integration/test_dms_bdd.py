@@ -10,7 +10,7 @@ from pytest_bdd import scenarios, given, when, then, parsers
 from requests import Response
 
 from sap_cloud_sdk.dms.client import DMSClient
-from sap_cloud_sdk.dms.model import (
+from sap_cloud_sdk.dms._models import (
     Acl,
     ChildrenOptions,
     ChildrenPage,

@@ -1,7 +1,7 @@
 import logging
 from typing import BinaryIO, Dict, List, Optional, Union
 from requests import Response
-from sap_cloud_sdk.dms.model import (
+from sap_cloud_sdk.dms._models import (
     DMSCredentials,
     InternalRepoRequest,
     Repository,

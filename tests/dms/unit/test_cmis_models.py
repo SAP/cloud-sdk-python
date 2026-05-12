@@ -3,7 +3,7 @@
 from datetime import datetime, timezone
 
 
-from sap_cloud_sdk.dms.model import (
+from sap_cloud_sdk.dms._models import (
     Ace,
     Acl,
     ChildrenPage,

@@ -28,7 +28,7 @@ Usage:
 from typing import Optional
 
 from sap_cloud_sdk.core.telemetry import Module
-from sap_cloud_sdk.dms.model import (
+from sap_cloud_sdk.dms._models import (
     Ace,
     Acl,
     ChildrenOptions,

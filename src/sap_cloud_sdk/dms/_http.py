@@ -13,7 +13,7 @@ from sap_cloud_sdk.dms.exceptions import (
     DMSPermissionDeniedException,
     DMSRuntimeException,
 )
-from sap_cloud_sdk.dms.model import UserClaim
+from sap_cloud_sdk.dms._models import UserClaim
 
 logger = logging.getLogger(__name__)
 

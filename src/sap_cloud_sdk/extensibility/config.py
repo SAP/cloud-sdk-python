@@ -23,8 +23,8 @@ class ExtensibilityConfig:
             When ``None`` (the default), the destination name is resolved
             automatically in order:
             (1) ``APPFND_UMS_DESTINATION_NAME`` environment variable,
-            (2) ``sap-managed-runtime-ums-{APPFND_CONHOS_LANDSCAPE}``,
-            (3) fallback to ``"EXTENSIBILITY_SERVICE"`` with a warning.
+            (2) ``sap-managed-runtime-ums-{APPFND_CONHOS_LANDSCAPE}``.
+            If neither is available, resolution fails with a warning.
             Set this only when the destination follows a non-standard
             naming convention that cannot be expressed via environment
             variables.

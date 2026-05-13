@@ -332,14 +332,7 @@ class TestAutoInstrument:
 
     def test_auto_instrument_back_patches_cached_tracers(self, mock_traceloop_components):
         """Tracer objects cached in provider._tracers before auto_instrument() is
-        called must have their _resource updated to the merged resource.
-
-        The OTel operator's sitecustomize instruments libraries (requests, httpx,
-        langchain, starlette) by calling get_tracer() before the app calls
-        auto_instrument(). Each cached Tracer holds a _resource snapshot from that
-        earlier call. Without back-patching those tracers, their spans would export
-        without the SAP-specific resource attributes even after the provider's
-        _resource is updated."""
+        called must have their resource updated to the merged resource."""
         mock_traceloop_components['get_app_name'].return_value = 'cloud-sdk-app'
         sap_attrs = {
             'service.name': 'cloud-sdk-app',
@@ -356,8 +349,6 @@ class TestAutoInstrument:
         )
         mock_traceloop_components['get_tracer_provider'].return_value = wrapper_provider
 
-        # Simulate libraries calling get_tracer() BEFORE auto_instrument — these
-        # tracers will hold the pre-merge resource snapshot in their _resource.
         pre_merge_tracer_a = wrapper_provider.get_tracer("opentelemetry.instrumentation.requests")
         pre_merge_tracer_b = wrapper_provider.get_tracer("opentelemetry.instrumentation.langchain")
         pre_merge_resource = pre_merge_tracer_a.resource
@@ -366,9 +357,7 @@ class TestAutoInstrument:
             auto_instrument()
 
         merged_resource = wrapper_provider.resource
-        # Provider resource was updated.
         assert merged_resource.attributes['sap.cloud_sdk.name'] == 'SAP Cloud SDK for Python'
-        # Cached tracers now point at the merged resource, not the pre-merge one.
         assert pre_merge_tracer_a.resource is merged_resource
         assert pre_merge_tracer_b.resource is merged_resource
         assert pre_merge_tracer_a.resource is not pre_merge_resource

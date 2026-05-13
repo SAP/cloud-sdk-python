@@ -171,7 +171,8 @@ class AgentGatewayClient:
             raise
         except Exception as e:
             logger.exception("Unexpected error during tool discovery")
-            raise AgentGatewaySDKError(f"Tool discovery failed: {e}") from e
+            cause = _unwrap_exception_group(e)
+            raise AgentGatewaySDKError(f"Tool discovery failed: {cause}") from e
 
     @record_metrics(Module.AGENTGATEWAY, Operation.AGENTGATEWAY_CALL_MCP_TOOL)
     async def call_mcp_tool(
@@ -264,9 +265,17 @@ class AgentGatewayClient:
             raise
         except Exception as e:
             logger.exception("Unexpected error during tool invocation")
+            cause = _unwrap_exception_group(e)
             raise AgentGatewaySDKError(
-                f"Tool invocation failed for '{tool.name}': {e}"
+                f"Tool invocation failed for '{tool.name}': {cause}"
             ) from e
+
+
+def _unwrap_exception_group(exc: Exception) -> Exception:
+    """Unwrap nested ExceptionGroups to present meaningful error messages."""
+    while isinstance(exc, BaseExceptionGroup) and exc.exceptions:
+        exc = exc.exceptions[0]
+    return exc
 
 
 def create_client(

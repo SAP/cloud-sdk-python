@@ -278,7 +278,7 @@ class AgentGatewayClient:
             ) from e
 
 
-def _unwrap_exception_group(exc: Exception) -> Exception:
+def _unwrap_exception_group(exc: BaseException) -> BaseException:
     """Unwrap nested ExceptionGroups to present meaningful error messages."""
     while isinstance(exc, BaseExceptionGroup) and exc.exceptions:
         exc = exc.exceptions[0]

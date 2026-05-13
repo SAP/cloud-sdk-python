@@ -72,6 +72,7 @@ class AgentGatewayClient:
     def __init__(
         self,
         tenant_subdomain: str | Callable[[], str] | None = None,
+        timeout: float = 60.0,
     ):
         """Initialize the Agent Gateway client.
 
@@ -79,8 +80,11 @@ class AgentGatewayClient:
             tenant_subdomain: Tenant subdomain for multi-tenant lookup.
                 Can be a string or a callable returning a string.
                 Required for LoB agents, ignored for Customer agents.
+            timeout: HTTP timeout in seconds for token requests and MCP server calls.
+                Defaults to 60 seconds.
         """
         self._tenant_subdomain = tenant_subdomain
+        self._timeout = timeout
 
     @staticmethod
     def _resolve_value(
@@ -153,14 +157,14 @@ class AgentGatewayClient:
                     "Customer agent credentials detected at '%s'", credentials_path
                 )
                 credentials = load_customer_credentials(credentials_path)
-                return await get_mcp_tools_customer(credentials, app_tid)
+                return await get_mcp_tools_customer(credentials, app_tid, self._timeout)
 
             # LoB flow - requires tenant_subdomain
             if app_tid:
                 logger.warning("app_tid parameter ignored for LoB agent flow")
 
             tenant = self._resolve_tenant_subdomain()
-            return await get_mcp_tools_lob(tenant)
+            return await get_mcp_tools_lob(tenant, self._timeout)
 
         except AgentGatewaySDKError:
             # Re-raise SDK errors as-is
@@ -240,7 +244,7 @@ class AgentGatewayClient:
 
                 credentials = load_customer_credentials(credentials_path)
                 return await call_mcp_tool_customer(
-                    credentials, tool, resolved_user_token, app_tid, **kwargs
+                    credentials, tool, resolved_user_token, app_tid, self._timeout, **kwargs
                 )
 
             # LoB flow - requires user_token and tenant_subdomain
@@ -253,7 +257,7 @@ class AgentGatewayClient:
                 logger.warning("app_tid parameter ignored for LoB agent flow")
 
             tenant = self._resolve_tenant_subdomain()
-            return await call_mcp_tool_lob(tool, resolved_user_token, tenant, **kwargs)
+            return await call_mcp_tool_lob(tool, resolved_user_token, tenant, self._timeout, **kwargs)
 
         except AgentGatewaySDKError:
             # Re-raise SDK errors as-is
@@ -267,6 +271,7 @@ class AgentGatewayClient:
 
 def create_client(
     tenant_subdomain: str | Callable[[], str] | None = None,
+    timeout: float = 60.0,
 ) -> AgentGatewayClient:
     """Create an Agent Gateway client for discovering and invoking MCP tools.
 
@@ -277,6 +282,8 @@ def create_client(
         tenant_subdomain: Tenant subdomain for multi-tenant lookup.
             Can be a string or a callable returning a string.
             Required for LoB agents, ignored for Customer agents.
+        timeout: HTTP timeout in seconds for token requests and MCP server calls.
+            Defaults to 60 seconds.
 
     Returns:
         AgentGatewayClient instance.
@@ -319,4 +326,4 @@ def create_client(
         )
         ```
     """
-    return AgentGatewayClient(tenant_subdomain=tenant_subdomain)
+    return AgentGatewayClient(tenant_subdomain=tenant_subdomain, timeout=timeout)

@@ -37,7 +37,7 @@ _IAS_LABEL_VALUE = "subscriber.ias"
 _DESTINATION_INSTANCE = "default"
 
 # HTTP timeout for MCP server requests (seconds)
-_HTTP_TIMEOUT = 30.0
+_HTTP_TIMEOUT = 60.0
 
 
 def _ias_dest_name() -> str:
@@ -227,7 +227,7 @@ async def get_user_auth(
 
 
 async def list_server_tools(
-    dest_url: str, system_auth: str, fragment_name: str
+    dest_url: str, system_auth: str, fragment_name: str, timeout: float = _HTTP_TIMEOUT
 ) -> list[MCPTool]:
     """List tools from a single MCP server.
 
@@ -241,7 +241,7 @@ async def list_server_tools(
     """
     async with httpx.AsyncClient(
         headers={"Authorization": system_auth, "x-correlation-id": str(uuid.uuid4())},
-        timeout=_HTTP_TIMEOUT,
+        timeout=timeout,
     ) as http_client:
         async with streamable_http_client(dest_url, http_client=http_client) as (
             read,
@@ -273,6 +273,7 @@ async def list_server_tools(
 
 async def get_mcp_tools_lob(
     tenant_subdomain: str,
+    timeout: float = _HTTP_TIMEOUT,
 ) -> list[MCPTool]:
     """List all MCP tools using LoB flow (destination-based).
 
@@ -309,7 +310,7 @@ async def get_mcp_tools_lob(
 
         try:
             system_auth = await get_system_auth(tenant_subdomain)
-            server_tools = await list_server_tools(mcp_url, system_auth, fragment_name)
+            server_tools = await list_server_tools(mcp_url, system_auth, fragment_name, timeout)
             tools.extend(server_tools)
             logger.debug(
                 "Loaded %d tool(s) from fragment '%s'",
@@ -330,6 +331,7 @@ async def call_mcp_tool_lob(
     tool: MCPTool,
     user_token: str,
     tenant_subdomain: str,
+    timeout: float = _HTTP_TIMEOUT,
     **kwargs,
 ) -> str:
     """Invoke an MCP tool using LoB flow (destination-based).
@@ -357,7 +359,7 @@ async def call_mcp_tool_lob(
 
     async with httpx.AsyncClient(
         headers={"Authorization": user_auth, "x-correlation-id": str(uuid.uuid4())},
-        timeout=_HTTP_TIMEOUT,
+        timeout=timeout,
     ) as http_client:
         async with streamable_http_client(tool.url, http_client=http_client) as (
             read,

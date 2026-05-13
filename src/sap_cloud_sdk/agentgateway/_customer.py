@@ -36,7 +36,7 @@ _CREDENTIALS_PATH_ENV = "AGW_CREDENTIALS_PATH"
 _CREDENTIALS_DEFAULT_PATH = "/etc/ums/credentials/credentials"
 
 # HTTP timeout for token requests and MCP server calls (seconds)
-_HTTP_TIMEOUT = 30.0
+_HTTP_TIMEOUT = 60.0
 
 # Resource URN for Agent Gateway token scope (hardcoded - production value)
 _AGW_RESOURCE_URN = "urn:sap:identity:application:provider:name:agent-gateway"
@@ -371,6 +371,7 @@ async def _list_server_tools(
     url: str,
     auth_token: str,
     dependency: IntegrationDependency,
+    timeout: float = _HTTP_TIMEOUT,
 ) -> list[MCPTool]:
     """List tools from a single MCP server.
 
@@ -390,7 +391,7 @@ async def _list_server_tools(
             "Authorization": f"Bearer {auth_token}",
             "x-correlation-id": str(uuid.uuid4()),
         },
-        timeout=_HTTP_TIMEOUT,
+        timeout=timeout,
     ) as http_client:
         async with streamable_http_client(url, http_client=http_client) as (
             read,
@@ -428,6 +429,7 @@ async def _list_server_tools(
 async def get_mcp_tools_customer(
     credentials: CustomerCredentials,
     app_tid: str | None = None,
+    timeout: float = _HTTP_TIMEOUT,
 ) -> list[MCPTool]:
     """List all MCP tools from servers defined in credentials.
 
@@ -471,7 +473,7 @@ async def get_mcp_tools_customer(
         )
 
         try:
-            server_tools = await _list_server_tools(url, system_token, dep)
+            server_tools = await _list_server_tools(url, system_token, dep, timeout)
             tools.extend(server_tools)
             logger.debug("Loaded %d tool(s) from %s", len(server_tools), dep.ord_id)
         except Exception:
@@ -488,6 +490,7 @@ async def call_mcp_tool_customer(
     tool: MCPTool,
     user_token: str | None,
     app_tid: str | None = None,
+    timeout: float = _HTTP_TIMEOUT,
     **kwargs,
 ) -> str:
     """Invoke an MCP tool using customer flow.
@@ -532,7 +535,7 @@ async def call_mcp_tool_customer(
             "Authorization": f"Bearer {agw_token}",
             "x-correlation-id": str(uuid.uuid4()),
         },
-        timeout=_HTTP_TIMEOUT,
+        timeout=timeout,
     ) as http_client:
         async with streamable_http_client(tool.url, http_client=http_client) as (
             read,

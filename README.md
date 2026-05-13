@@ -13,6 +13,7 @@ The Python SDK offers a clean, type-safe API following Python best practices whi
 - **Agent Decorators**
 - **AI Core Integration**
 - **Audit Log Service**
+- **Agent Memory Service**
 - **Destination Service**
 - **Document Management Service**
 - **ObjectStore Service**
@@ -24,7 +25,6 @@ The Python SDK offers a clean, type-safe API following Python best practices whi
 - **Python**: 3.11 or higher
 
 ### Installation
-
 
 #### uv
 
@@ -42,7 +42,7 @@ poetry add sap-cloud-sdk
 
 ```bash
 pip install sap-cloud-sdk
-````
+```
 
 ### Environment Configuration
 
@@ -61,6 +61,7 @@ Each module has comprehensive usage guides:
 
 - [Agent Decorators](src/sap_cloud_sdk/agent_decorators/user-guide.md)
 - [AuditLog](src/sap_cloud_sdk/core/auditlog/user-guide.md)
+- [Agent Memory](src/sap_cloud_sdk/agent_memory/user-guide.md)
 - [Destination](src/sap_cloud_sdk/destination/user-guide.md)
 - [DMS](src/sap_cloud_sdk/dms/user-guide.md)
 - [ObjectStore](src/sap_cloud_sdk/objectstore/user-guide.md)

@@ -330,6 +330,49 @@ class TestAutoInstrument:
 
             assert wrapper_provider.resource.attributes['service.name'] == 'cloud-sdk-app'
 
+    def test_auto_instrument_back_patches_cached_tracers(self, mock_traceloop_components):
+        """Tracer objects cached in provider._tracers before auto_instrument() is
+        called must have their _resource updated to the merged resource.
+
+        The OTel operator's sitecustomize instruments libraries (requests, httpx,
+        langchain, starlette) by calling get_tracer() before the app calls
+        auto_instrument(). Each cached Tracer holds a _resource snapshot from that
+        earlier call. Without back-patching those tracers, their spans would export
+        without the SAP-specific resource attributes even after the provider's
+        _resource is updated."""
+        mock_traceloop_components['get_app_name'].return_value = 'cloud-sdk-app'
+        sap_attrs = {
+            'service.name': 'cloud-sdk-app',
+            'sap.cloud_sdk.name': 'SAP Cloud SDK for Python',
+            'sap.cloud_sdk.language': 'python',
+        }
+        mock_traceloop_components['create_resource'].return_value = sap_attrs
+
+        wrapper_provider = SDKTracerProvider(
+            resource=Resource.create({
+                'telemetry.auto.version': '0.62b1',
+                'service.name': 'operator-supplied-name',
+            })
+        )
+        mock_traceloop_components['get_tracer_provider'].return_value = wrapper_provider
+
+        # Simulate libraries calling get_tracer() BEFORE auto_instrument — these
+        # tracers will hold the pre-merge resource snapshot in their _resource.
+        pre_merge_tracer_a = wrapper_provider.get_tracer("opentelemetry.instrumentation.requests")
+        pre_merge_tracer_b = wrapper_provider.get_tracer("opentelemetry.instrumentation.langchain")
+        pre_merge_resource = pre_merge_tracer_a.resource
+
+        with patch.dict('os.environ', {'OTEL_EXPORTER_OTLP_ENDPOINT': 'http://localhost:4317'}, clear=True):
+            auto_instrument()
+
+        merged_resource = wrapper_provider.resource
+        # Provider resource was updated.
+        assert merged_resource.attributes['sap.cloud_sdk.name'] == 'SAP Cloud SDK for Python'
+        # Cached tracers now point at the merged resource, not the pre-merge one.
+        assert pre_merge_tracer_a.resource is merged_resource
+        assert pre_merge_tracer_b.resource is merged_resource
+        assert pre_merge_tracer_a.resource is not pre_merge_resource
+
 
 class TestAutoInstrumentMiddlewares:
     """Tests for the middlewares parameter of auto_instrument."""

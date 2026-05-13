@@ -159,6 +159,13 @@ def _merge_resource_attrs_into_active_provider_if_wrapper_installed(
 
     Mutates ``provider._resource`` because OTel SDK exposes no public API
     to swap a TracerProvider's Resource post-construction.
+
+    Also back-patches all Tracer instances already cached inside the provider.
+    The OTel SDK caches Tracer objects by instrumentation scope; each cached
+    Tracer holds a ``resource`` snapshot taken at ``get_tracer()`` time.
+    Auto-instrumented libraries (requests, httpx, starlette, langchain) call
+    ``get_tracer()` BEFORE the app calls``auto_instrument()``, so their
+    cached Tracers hold the pre-merge resource.
     """
     provider = trace.get_tracer_provider()
     if not isinstance(provider, TracerProvider):
@@ -169,8 +176,16 @@ def _merge_resource_attrs_into_active_provider_if_wrapper_installed(
     if "telemetry.auto.version" not in existing_attrs:
         return
 
-    provider._resource = provider.resource.merge(Resource.create(sap_attrs))
+    merged = provider.resource.merge(Resource.create(sap_attrs))
+    provider._resource = merged
+
+    tracers = getattr(provider, "_tracers", {})
+    for tracer in tracers.values():
+        if hasattr(tracer, "resource"):
+            tracer.resource = merged
+
     logger.info(
         "Merged sap-cloud-sdk resource attrs onto wrapper-installed "
-        "TracerProvider (marker: telemetry.auto.version)"
+        "TracerProvider and %d cached Tracer(s) (marker: telemetry.auto.version)",
+        len(tracers),
     )

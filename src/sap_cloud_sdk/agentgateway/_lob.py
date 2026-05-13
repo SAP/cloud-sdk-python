@@ -36,9 +36,6 @@ _IAS_LABEL_VALUE = "subscriber.ias"
 
 _DESTINATION_INSTANCE = "default"
 
-# HTTP timeout for MCP server requests (seconds)
-_HTTP_TIMEOUT = 60.0
-
 
 def _ias_dest_name() -> str:
     """Get IAS destination name based on landscape.
@@ -227,7 +224,7 @@ async def get_user_auth(
 
 
 async def list_server_tools(
-    dest_url: str, system_auth: str, fragment_name: str, timeout: float = _HTTP_TIMEOUT
+    dest_url: str, system_auth: str, fragment_name: str, timeout: float
 ) -> list[MCPTool]:
     """List tools from a single MCP server.
 
@@ -273,7 +270,7 @@ async def list_server_tools(
 
 async def get_mcp_tools_lob(
     tenant_subdomain: str,
-    timeout: float = _HTTP_TIMEOUT,
+    timeout: float,
 ) -> list[MCPTool]:
     """List all MCP tools using LoB flow (destination-based).
 
@@ -333,7 +330,7 @@ async def call_mcp_tool_lob(
     tool: MCPTool,
     user_token: str,
     tenant_subdomain: str,
-    timeout: float = _HTTP_TIMEOUT,
+    timeout: float,
     **kwargs,
 ) -> str:
     """Invoke an MCP tool using LoB flow (destination-based).

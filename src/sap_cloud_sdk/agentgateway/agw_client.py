@@ -158,7 +158,7 @@ class AgentGatewayClient:
                 )
                 credentials = load_customer_credentials(credentials_path)
                 return await get_mcp_tools_customer(
-                    credentials, app_tid, self._config.timeout
+                    credentials, self._config.timeout, app_tid
                 )
 
             # LoB flow - requires tenant_subdomain
@@ -250,8 +250,8 @@ class AgentGatewayClient:
                     credentials,
                     tool,
                     resolved_user_token,
-                    app_tid,
                     self._config.timeout,
+                    app_tid,
                     **kwargs,
                 )
 

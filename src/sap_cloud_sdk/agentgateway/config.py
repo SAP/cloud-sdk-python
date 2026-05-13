@@ -2,6 +2,8 @@
 
 from dataclasses import dataclass
 
+DEFAULT_TIMEOUT_SECONDS = 60.0
+
 
 @dataclass
 class ClientConfig:
@@ -12,4 +14,4 @@ class ClientConfig:
             Defaults to 60 seconds.
     """
 
-    timeout: float = 60.0
+    timeout: float = DEFAULT_TIMEOUT_SECONDS

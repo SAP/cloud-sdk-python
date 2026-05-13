@@ -310,7 +310,9 @@ async def get_mcp_tools_lob(
 
         try:
             system_auth = await get_system_auth(tenant_subdomain)
-            server_tools = await list_server_tools(mcp_url, system_auth, fragment_name, timeout)
+            server_tools = await list_server_tools(
+                mcp_url, system_auth, fragment_name, timeout
+            )
             tools.extend(server_tools)
             logger.debug(
                 "Loaded %d tool(s) from fragment '%s'",

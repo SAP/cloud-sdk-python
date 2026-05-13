@@ -245,7 +245,12 @@ class AgentGatewayClient:
 
                 credentials = load_customer_credentials(credentials_path)
                 return await call_mcp_tool_customer(
-                    credentials, tool, resolved_user_token, app_tid, self._timeout, **kwargs
+                    credentials,
+                    tool,
+                    resolved_user_token,
+                    app_tid,
+                    self._timeout,
+                    **kwargs,
                 )
 
             # LoB flow - requires user_token and tenant_subdomain
@@ -258,7 +263,9 @@ class AgentGatewayClient:
                 logger.warning("app_tid parameter ignored for LoB agent flow")
 
             tenant = self._resolve_tenant_subdomain()
-            return await call_mcp_tool_lob(tool, resolved_user_token, tenant, self._timeout, **kwargs)
+            return await call_mcp_tool_lob(
+                tool, resolved_user_token, tenant, self._timeout, **kwargs
+            )
 
         except AgentGatewaySDKError:
             # Re-raise SDK errors as-is

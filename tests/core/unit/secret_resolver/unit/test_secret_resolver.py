@@ -199,7 +199,8 @@ class TestSecretResolver:
         config = SampleConfig()
         read_from_mount_and_fallback_to_env_var("/etc/secrets/appfnd", "VAR", "module", "instance", config)
         first_call_path = mock_file.call_args_list[0][0][0]
-        assert first_call_path.startswith("/custom/root")
+        # With SERVICE_BINDING_ROOT set, flat path is tried first: $ROOT/<module>/<field>
+        assert first_call_path == "/custom/root/module/user"
 
     @patch.dict(os.environ, {}, clear=True)
     @patch('os.path.isdir', return_value=True)
@@ -214,4 +215,43 @@ class TestSecretResolver:
         config = SampleConfig()
         read_from_mount_and_fallback_to_env_var("/etc/secrets/appfnd", "VAR", "module", "instance", config)
         first_call_path = mock_file.call_args_list[0][0][0]
-        assert first_call_path.startswith("/etc/secrets/appfnd")
+        # Without SERVICE_BINDING_ROOT, only the legacy $ROOT/<module>/<instance>/<field> path is tried
+        assert first_call_path == "/etc/secrets/appfnd/module/instance/user"
+
+    @patch.dict(os.environ, {"SERVICE_BINDING_ROOT": "/bindings"})
+    @patch('os.path.isdir', return_value=True)
+    @patch('os.stat')
+    @patch('builtins.open', new_callable=mock_open)
+    def test_service_binding_root_flat_path_success(self, mock_file, mock_stat, mock_isdir):
+        mock_file.side_effect = [
+            mock_open(read_data="flat_user").return_value,
+            mock_open(read_data="flat_pass").return_value,
+            mock_open(read_data="flat_endpoint").return_value,
+        ]
+        config = SampleConfig()
+        read_from_mount_and_fallback_to_env_var("/etc/secrets/appfnd", "VAR", "module", "instance", config)
+        first_call_path = mock_file.call_args_list[0][0][0]
+        # Flat path $ROOT/<module>/<field> is tried first
+        assert first_call_path == "/bindings/module/user"
+        assert config.username == "flat_user"
+
+    @patch.dict(os.environ, {"SERVICE_BINDING_ROOT": "/bindings"})
+    @patch('os.path.isdir', return_value=True)
+    @patch('os.stat')
+    def test_service_binding_root_flat_fails_falls_back_to_module_instance(self, mock_stat, mock_isdir):
+        # Flat path: directory exists but field files are not there (old AppFND structure)
+        # Full path: files are present under <module>/<instance>/
+        flat_not_found = FileNotFoundError("flat file missing")
+        mock_file_calls = [
+            flat_not_found,                                   # flat: <module>/user → not found
+            mock_open(read_data="legacy_user").return_value,  # full: <module>/<instance>/user
+            mock_open(read_data="legacy_pass").return_value,  # full: <module>/<instance>/password
+            mock_open(read_data="legacy_ep").return_value,    # full: <module>/<instance>/endpoint
+        ]
+        with patch('builtins.open', side_effect=mock_file_calls):
+            config = SampleConfig()
+            read_from_mount_and_fallback_to_env_var("/bindings", "VAR", "module", "instance", config)
+
+        assert config.username == "legacy_user"
+        assert config.password == "legacy_pass"
+        assert config.endpoint == "legacy_ep"

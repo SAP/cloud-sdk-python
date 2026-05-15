@@ -8,6 +8,9 @@ on:
     branches:
       - "main"
 
+permissions:
+  contents: read
+
 jobs:
   check-reuse-compliance:
     runs-on: ${{ contains(github.server_url, 'github.com') && 'ubuntu-latest' || fromJSON('["self-hosted"]') }}

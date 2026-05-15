@@ -98,7 +98,11 @@ Once your proposal receives the `approved` label, you can begin implementation:
    git clone https://github.com/YOUR_USERNAME/cloud-sdk-python.git
    cd cloud-sdk-python
    ```
-3. **Create a feature branch** from `main`:
+3. **Install pre-commit hooks** to catch linting and formatting issues locally:
+   ```bash
+   pip install pre-commit && pre-commit install
+   ```
+4. **Create a feature branch** from `main`:
    ```bash
    git checkout -b feature/your-capability-name
    ```

@@ -3,6 +3,7 @@
 import logging
 from contextvars import ContextVar
 from typing import Any, Dict
+from opentelemetry import context as otel_context, propagate
 
 from sap_cloud_sdk.core.telemetry.constants import (
     ATTR_SAP_TRIGGER_TYPE,
@@ -32,9 +33,12 @@ class _IASMiddleware(BaseHTTPMiddleware):
 
     async def dispatch(self, request: Request, call_next: Any) -> Response:
         token = self._attrs_var.set(_extract_ias_attrs(request))
+        ctx = propagate.extract(request.headers)
+        ctx_token = otel_context.attach(ctx)
         try:
             return await call_next(request)
         finally:
+            otel_context.detach(ctx_token)
             self._attrs_var.reset(token)
 
 

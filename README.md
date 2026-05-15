@@ -11,11 +11,15 @@ The Python SDK offers a clean, type-safe API following Python best practices whi
 ### Key Features
 
 - **Agent Decorators**
+- **Agent Gateway**
+- **Agent Memory**
 - **AI Core Integration**
 - **Audit Log Service**
-- **Agent Memory Service**
+- **Audit Log NG**
 - **Destination Service**
 - **Document Management Service**
+- **Extensibility**
+- **IAS (Identity and Access Service)**
 - **ObjectStore Service**
 - **Secret Resolver**
 - **Telemetry & Observability**
@@ -60,10 +64,15 @@ The SDK automatically resolves configuration from multiple sources with the foll
 Each module has comprehensive usage guides:
 
 - [Agent Decorators](src/sap_cloud_sdk/agent_decorators/user-guide.md)
-- [AuditLog](src/sap_cloud_sdk/core/auditlog/user-guide.md)
+- [Agent Gateway](src/sap_cloud_sdk/agentgateway/user-guide.md)
 - [Agent Memory](src/sap_cloud_sdk/agent_memory/user-guide.md)
+- [AI Core](src/sap_cloud_sdk/aicore/user-guide.md)
+- [AuditLog](src/sap_cloud_sdk/core/auditlog/user-guide.md)
+- [AuditLog NG](src/sap_cloud_sdk/core/auditlog_ng/user-guide.md)
 - [Destination](src/sap_cloud_sdk/destination/user-guide.md)
 - [DMS](src/sap_cloud_sdk/dms/user-guide.md)
+- [Extensibility](src/sap_cloud_sdk/extensibility/user-guide.md)
+- [IAS](src/sap_cloud_sdk/ias/user-guide.md)
 - [ObjectStore](src/sap_cloud_sdk/objectstore/user-guide.md)
 - [Secret Resolver](src/sap_cloud_sdk/core/secret_resolver/user-guide.md)
 - [Telemetry](src/sap_cloud_sdk/core/telemetry/user-guide.md)

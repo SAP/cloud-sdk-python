@@ -305,7 +305,7 @@ class TestGetSystemTokenMtls:
             mock_client.post.return_value = mock_response
             mock_client_class.return_value = mock_client
 
-            result = get_system_token_mtls(credentials)
+            result = get_system_token_mtls(credentials, timeout=60.0)
 
             assert result == "system-token-123"
             mock_client.post.assert_called_once()
@@ -332,7 +332,7 @@ class TestGetSystemTokenMtls:
             mock_client_class.return_value = mock_client
 
             with pytest.raises(AgentGatewaySDKError, match="Token request failed"):
-                get_system_token_mtls(credentials)
+                get_system_token_mtls(credentials, timeout=60.0)
 
 
 # ============================================================
@@ -374,7 +374,7 @@ class TestExchangeUserToken:
             mock_client.post.return_value = mock_response
             mock_client_class.return_value = mock_client
 
-            result = exchange_user_token(credentials, "user-jwt-token")
+            result = exchange_user_token(credentials, "user-jwt-token", timeout=60.0)
 
             assert result == "exchanged-token-123"
             call_args = mock_client.post.call_args
@@ -402,7 +402,9 @@ class TestExchangeUserToken:
             mock_client.post.return_value = mock_response
             mock_client_class.return_value = mock_client
 
-            result = exchange_user_token(credentials, "user-jwt", app_tid="test-tid")
+            result = exchange_user_token(
+                credentials, "user-jwt", timeout=60.0, app_tid="test-tid"
+            )
 
             assert result == "token-with-tid"
             call_args = mock_client.post.call_args
@@ -449,7 +451,7 @@ class TestGetMcpToolsCustomer:
         with pytest.raises(
             AgentGatewaySDKError, match="integrationDependencies is empty"
         ):
-            await get_mcp_tools_customer(credentials)
+            await get_mcp_tools_customer(credentials, timeout=60.0)
 
     @pytest.mark.asyncio
     async def test_discovers_tools_from_credentials(self, credentials):
@@ -475,7 +477,7 @@ class TestGetMcpToolsCustomer:
                 return_value=mock_tools,
             ) as mock_list,
         ):
-            result = await get_mcp_tools_customer(credentials)
+            result = await get_mcp_tools_customer(credentials, timeout=60.0)
 
             assert len(result) == 1
             assert result[0].name == "list_cost_centers"
@@ -523,7 +525,7 @@ class TestGetMcpToolsCustomer:
                 side_effect=mock_list_tools,
             ),
         ):
-            result = await get_mcp_tools_customer(credentials)
+            result = await get_mcp_tools_customer(credentials, timeout=60.0)
 
             # Should still return tools from server2
             assert len(result) == 1
@@ -613,11 +615,11 @@ class TestCallMcpToolCustomer:
             mock_session_class.return_value = mock_session_ctx
 
             result = await call_mcp_tool_customer(
-                credentials, mock_tool, "user-jwt", order_id="12345"
+                credentials, mock_tool, "user-jwt", 60.0, order_id="12345"
             )
 
             assert result == "Order created successfully"
-            mock_exchange.assert_called_once_with(credentials, "user-jwt", None)
+            mock_exchange.assert_called_once_with(credentials, "user-jwt", 60.0, None)
 
     @pytest.mark.asyncio
     async def test_uses_system_token_when_user_token_not_provided(
@@ -669,10 +671,10 @@ class TestCallMcpToolCustomer:
 
             # Call without user_token (None)
             result = await call_mcp_tool_customer(
-                credentials, mock_tool, None, order_id="12345"
+                credentials, mock_tool, None, 60.0, order_id="12345"
             )
 
             assert result == "Result with system token"
             # Should use system token, not exchange
-            mock_system_token.assert_called_once_with(credentials, None)
+            mock_system_token.assert_called_once_with(credentials, 60.0, None)
             mock_exchange.assert_not_called()

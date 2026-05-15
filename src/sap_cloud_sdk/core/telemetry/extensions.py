@@ -417,10 +417,8 @@ async def call_extension_tool(
     mcp_client: Any,
     tool_name: str,
     args: dict[str, Any],
-    extension_name: str,
     capability: str = "default",
     source_mapping: dict[str, Any] | None = None,
-    tool_prefix: str = "",
 ) -> Any:
     """Call an MCP tool with telemetry instrumentation.
 
@@ -432,23 +430,18 @@ async def call_extension_tool(
     Args:
         mcp_client: The MCP client session connected to the tool's server.
             Must have an async ``call_tool(name, args)`` method.
-        tool_name: The raw MCP tool name (before any prefixing).
+        tool_name: The tool name used as the lookup key in *source_mapping*
+            and passed to ``mcp_client.call_tool()``.
         args: Dictionary of arguments to pass to the tool.
-        extension_name: Human-readable name of the extension.  Used as
-            fallback when *source_mapping* does not contain the tool.
         capability: Extension capability ID (default: ``"default"``).
-        source_mapping: Optional mapping of prefixed tool names to source
-            info objects (from ``ext_impl.source.tools``).
-        tool_prefix: The tool prefix (e.g. ``"sap_mcp_servicenow_v1_"``).
-            Used to reconstruct the lookup key for *source_mapping*.
+        source_mapping: Optional mapping of tool names to source info
+            objects (from ``ext_impl.source.tools``).
 
     Returns:
         The tool's response from the MCP server.
     """
-    lookup_key = tool_prefix + tool_name if tool_prefix else tool_name
-
     resolved_name, resolved_id, resolved_version, resolved_url, resolved_solution_id = (
-        resolve_source_info(lookup_key, source_mapping, extension_name)
+        resolve_source_info(tool_name, source_mapping, "unknown")
     )
 
     attrs = build_extension_span_attributes(

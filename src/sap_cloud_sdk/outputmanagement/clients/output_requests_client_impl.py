@@ -296,7 +296,7 @@ class OutputRequestsClientImpl(OutputRequestsClient):
                 import base64
                 from cryptography.hazmat.primitives.serialization import pkcs12, Encoding, PrivateFormat, NoEncryption
                 
-                certificate_client = create_certificate_client()
+                certificate_client = create_certificate_client(instance="ariba-sourcing-event-instance")
                 cert = certificate_client.get_subaccount_certificate(cert_name, access_strategy=AccessStrategy.PROVIDER_ONLY)
                 
                 # Check if certificate was found

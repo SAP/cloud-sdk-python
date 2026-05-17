@@ -64,7 +64,7 @@ class DestinationCredentialConfig(BaseModel):
         """
         from ...destination import create_client, AccessStrategy
         logger.info(f"Retrieving destination '{self.destination_name}'")
-        client = create_client()
+        client = create_client(instance="ariba-sourcing-event-instance")
         if self.access_strategy:
             if self.access_strategy == "PROVIDER_ONLY":
                 strategy = AccessStrategy.PROVIDER_ONLY

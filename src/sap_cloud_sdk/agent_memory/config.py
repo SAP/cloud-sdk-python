@@ -5,16 +5,16 @@ then normalises into an ``AgentMemoryConfig``.
 
 Mount path convention::
 
-    /etc/secrets/appfnd/hana-agent-memory/default/url
+    /etc/secrets/appfnd/hana-agent-memory/default/application_url
     /etc/secrets/appfnd/hana-agent-memory/default/uaa
 
-``url`` is the Agent Memory service base URL (plain string).
+``application_url`` is the Agent Memory service base URL (plain string).
 ``uaa`` is a JSON string with OAuth2 credentials containing at minimum:
 ``clientid``, ``clientsecret``, and ``url`` (UAA base URL).
 
 Env fallback convention::
 
-    CLOUD_SDK_CFG_HANA_AGENT_MEMORY_DEFAULT_URL
+    CLOUD_SDK_CFG_HANA_AGENT_MEMORY_DEFAULT_APPLICATION_URL
     CLOUD_SDK_CFG_HANA_AGENT_MEMORY_DEFAULT_UAA
 """
 
@@ -81,14 +81,14 @@ class BindingData:
     All fields must be plain ``str`` to satisfy the resolver contract.
     """
 
-    url: str = ""
+    application_url: str = ""
     uaa: str = ""
 
     def validate(self) -> None:
         """Raise ``AgentMemoryConfigError`` if any required field is empty."""
-        if not self.url:
+        if not self.application_url:
             raise AgentMemoryConfigError(
-                "Agent Memory binding is missing required field: url"
+                "Agent Memory binding is missing required field: application_url"
             )
         if not self.uaa:
             raise AgentMemoryConfigError(
@@ -104,7 +104,7 @@ class BindingData:
 
         try:
             return AgentMemoryConfig(
-                base_url=self.url,
+                base_url=self.application_url,
                 token_url=uaa_data["url"].rstrip("/") + "/oauth/token",
                 client_id=uaa_data["clientid"],
                 client_secret=uaa_data["clientsecret"],

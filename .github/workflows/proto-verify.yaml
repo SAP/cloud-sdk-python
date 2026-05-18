@@ -15,6 +15,9 @@ on:
       - 'src/sap_cloud_sdk/core/auditlog_ng/proto/**'
       - 'Makefile'
 
+permissions:
+  contents: read
+
 jobs:
   verify-proto:
     name: Verify generated proto code is up-to-date

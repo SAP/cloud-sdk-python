@@ -46,7 +46,7 @@ class TestCreateClient:
     def test_reads_env_when_no_config_provided(self, monkeypatch):
         """Factory falls back to environment variables when no config given."""
         import json
-        monkeypatch.setenv("CLOUD_SDK_CFG_HANA_AGENT_MEMORY_DEFAULT_URL", "http://memory.example.com")
+        monkeypatch.setenv("CLOUD_SDK_CFG_HANA_AGENT_MEMORY_DEFAULT_APPLICATION_URL", "http://memory.example.com")
         monkeypatch.setenv("CLOUD_SDK_CFG_HANA_AGENT_MEMORY_DEFAULT_UAA", json.dumps({
             "url": "http://auth.example.com",
             "clientid": "client-id",

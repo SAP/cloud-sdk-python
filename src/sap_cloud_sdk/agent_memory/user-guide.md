@@ -775,7 +775,7 @@ environment variables or service binding.
 ### Service Binding
 
 - **Mount path**: `$SERVICE_BINDING_ROOT/hana-agent-memory/default/` (defaults to `/etc/secrets/appfnd/hana-agent-memory/default/`)
-- **Required keys**: `url` (Agent Memory service URL), `uaa` (JSON string with XSUAA credentials)
+- **Required keys**: `application_url` (Agent Memory service URL), `uaa` (JSON string with XSUAA credentials)
 - **Env var fallback**: `CLOUD_SDK_CFG_HANA_AGENT_MEMORY_DEFAULT_{FIELD}` (uppercased)
 
 > **Note:** `SERVICE_BINDING_ROOT` defaults to `/etc/secrets/appfnd` when not set. See the [Secret Resolver guide](../core/secret_resolver/user-guide.md) for details.
@@ -784,14 +784,14 @@ environment variables or service binding.
 
 ```
 $SERVICE_BINDING_ROOT/hana-agent-memory/default/
-├── url
+├── application_url
 └── uaa
 ```
 
 #### Environment Variables
 
 ```bash
-export CLOUD_SDK_CFG_HANA_AGENT_MEMORY_DEFAULT_URL="https://agent-memory.example.com"
+export CLOUD_SDK_CFG_HANA_AGENT_MEMORY_DEFAULT_APPLICATION_URL="https://agent-memory.example.com"
 export CLOUD_SDK_CFG_HANA_AGENT_MEMORY_DEFAULT_UAA='{"clientid":"...","clientsecret":"...","url":"https://..."}'
 ```
 

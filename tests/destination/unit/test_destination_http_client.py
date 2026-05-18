@@ -98,37 +98,3 @@ class TestDestinationHttpClientRequest:
     def test_returns_response(self):
         with patch.object(self.client._session, "request", return_value=self.mock_response):
             assert self.client.request("GET", "/resource") is self.mock_response
-
-
-class TestDestinationHttpClientVerbHelpers:
-    def setup_method(self):
-        self.client = DestinationHttpClient(_dest())
-        self.mock_response = MagicMock()
-
-    def _patch(self):
-        return patch.object(self.client._session, "request", return_value=self.mock_response)
-
-    def test_get_uses_get_method(self):
-        with self._patch() as mock_req:
-            self.client.get("/r")
-            assert mock_req.call_args[1]["method"] == "GET"
-
-    def test_post_uses_post_method(self):
-        with self._patch() as mock_req:
-            self.client.post("/r", json={"a": 1})
-            assert mock_req.call_args[1]["method"] == "POST"
-
-    def test_put_uses_put_method(self):
-        with self._patch() as mock_req:
-            self.client.put("/r", json={})
-            assert mock_req.call_args[1]["method"] == "PUT"
-
-    def test_patch_uses_patch_method(self):
-        with self._patch() as mock_req:
-            self.client.patch("/r", json={})
-            assert mock_req.call_args[1]["method"] == "PATCH"
-
-    def test_delete_uses_delete_method(self):
-        with self._patch() as mock_req:
-            self.client.delete("/r")
-            assert mock_req.call_args[1]["method"] == "DELETE"

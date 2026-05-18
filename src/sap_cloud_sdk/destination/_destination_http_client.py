@@ -20,7 +20,7 @@ class DestinationHttpClient:
 
         dest = client.get_destination("my-erp")
         http = DestinationHttpClient(dest)
-        response = http.get("/sap/opu/odata/sap/API_BUSINESS_PARTNER")
+        response = http.request("GET", "/api/resource")
     """
 
     def __init__(self, destination: Destination) -> None:
@@ -77,51 +77,3 @@ class DestinationHttpClient:
             **kwargs,
         )
 
-    def get(
-        self,
-        path: str,
-        *,
-        params: Optional[Dict[str, Any]] = None,
-        headers: Optional[Dict[str, str]] = None,
-        **kwargs: Any,
-    ) -> Response:
-        return self.request("GET", path, params=params, headers=headers, **kwargs)
-
-    def post(
-        self,
-        path: str,
-        *,
-        json: Optional[Any] = None,
-        headers: Optional[Dict[str, str]] = None,
-        **kwargs: Any,
-    ) -> Response:
-        return self.request("POST", path, json=json, headers=headers, **kwargs)
-
-    def put(
-        self,
-        path: str,
-        *,
-        json: Optional[Any] = None,
-        headers: Optional[Dict[str, str]] = None,
-        **kwargs: Any,
-    ) -> Response:
-        return self.request("PUT", path, json=json, headers=headers, **kwargs)
-
-    def patch(
-        self,
-        path: str,
-        *,
-        json: Optional[Any] = None,
-        headers: Optional[Dict[str, str]] = None,
-        **kwargs: Any,
-    ) -> Response:
-        return self.request("PATCH", path, json=json, headers=headers, **kwargs)
-
-    def delete(
-        self,
-        path: str,
-        *,
-        headers: Optional[Dict[str, str]] = None,
-        **kwargs: Any,
-    ) -> Response:
-        return self.request("DELETE", path, headers=headers, **kwargs)

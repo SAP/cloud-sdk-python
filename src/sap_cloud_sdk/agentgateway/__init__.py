@@ -15,7 +15,7 @@ Usage (LoB agent):
     # Discover tools
     tools = await agw_client.list_mcp_tools()
     for tool in tools:
-        print(f"{tool.namespaced_name}: {tool.description}")
+        print(f"{tool.name}: {tool.description}")
 
     # Invoke a tool
     # Note: kwargs like "order_id" are tool-specific input parameters.

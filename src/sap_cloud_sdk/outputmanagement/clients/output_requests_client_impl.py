@@ -48,7 +48,7 @@ class OutputRequestsClientImpl(OutputRequestsClient):
         self._destination = destination
         
         # Get sender-provider-subaccount-id from environment variable
-        self._sender_provider_subaccount_id = os.getenv("SENDER_PROVIDER_SUBACCOUNT_ID")
+        self._sender_provider_subaccount_id = os.getenv("APPFND_CONHOS_SUBACCOUNTID")
         if self._sender_provider_subaccount_id:
             logger.info(f"Loaded SENDER_PROVIDER_SUBACCOUNT_ID: {self._sender_provider_subaccount_id}")
         else:

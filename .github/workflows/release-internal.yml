@@ -6,6 +6,9 @@ on:
       - main
     types: [opened, synchronize, reopened]
 
+permissions:
+  contents: read
+
 jobs:
   publish:
     name: Publish to Artifactory

@@ -323,7 +323,7 @@ class TestGetMcpToolsLob:
         with patch("sap_cloud_sdk.agentgateway._lob.list_mcp_fragments") as mock_list:
             mock_list.return_value = []
 
-            result = await get_mcp_tools_lob("tenant-sub")
+            result = await get_mcp_tools_lob("tenant-sub", 60.0)
 
             assert result == []
 
@@ -337,7 +337,7 @@ class TestGetMcpToolsLob:
         with patch("sap_cloud_sdk.agentgateway._lob.list_mcp_fragments") as mock_list:
             mock_list.return_value = [fragment]
 
-            result = await get_mcp_tools_lob("tenant-sub")
+            result = await get_mcp_tools_lob("tenant-sub", 60.0)
 
             assert result == []
 
@@ -372,7 +372,7 @@ class TestGetMcpToolsLob:
             mock_auth.return_value = "Bearer token"
             mock_tools.return_value = [mock_tool]
 
-            await get_mcp_tools_lob("tenant-sub")
+            await get_mcp_tools_lob("tenant-sub", 60.0)
 
             # Verify get_system_auth called with just tenant_subdomain
             mock_auth.assert_called_once_with("tenant-sub")
@@ -418,7 +418,7 @@ class TestGetMcpToolsLob:
             mock_auth.side_effect = [Exception("Auth failed"), "Bearer token"]
             mock_tools.return_value = [mock_tool]
 
-            result = await get_mcp_tools_lob("tenant-sub")
+            result = await get_mcp_tools_lob("tenant-sub", 60.0)
 
             # Should still get tools from second fragment
             assert len(result) == 1
@@ -477,7 +477,7 @@ class TestCallMcpToolLob:
             mock_session.return_value.__aenter__.return_value = mock_session_instance
 
             result = await call_mcp_tool_lob(
-                tool, "user-jwt", "tenant-sub", param1="value1"
+                tool, "user-jwt", "tenant-sub", 60.0, param1="value1"
             )
 
             assert result == "Tool result"
@@ -527,6 +527,6 @@ class TestCallMcpToolLob:
             mock_session_instance.call_tool = AsyncMock(return_value=mock_result)
             mock_session.return_value.__aenter__.return_value = mock_session_instance
 
-            result = await call_mcp_tool_lob(tool, "user-jwt", "tenant-sub")
+            result = await call_mcp_tool_lob(tool, "user-jwt", "tenant-sub", 60.0)
 
             assert result == ""

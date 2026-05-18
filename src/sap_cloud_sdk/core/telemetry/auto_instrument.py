@@ -37,7 +37,7 @@ from sap_cloud_sdk.core.telemetry.propagated_attributes_processor import (
 logger = logging.getLogger(__name__)
 
 
-@record_metrics(Module.AICORE, Operation.AICORE_AUTO_INSTRUMENT)
+@record_metrics(Module.TELEMETRY, Operation.AICORE_AUTO_INSTRUMENT)
 def auto_instrument(
     disable_batch: bool = False,
     middlewares: list[TelemetryMiddleware] | None = None,

@@ -11,6 +11,7 @@ import logging
 from typing import Callable
 
 from sap_cloud_sdk.agentgateway._models import MCPTool
+from sap_cloud_sdk.agentgateway.config import ClientConfig
 from sap_cloud_sdk.agentgateway._customer import (
     detect_customer_agent_credentials,
     load_customer_credentials,
@@ -72,6 +73,7 @@ class AgentGatewayClient:
     def __init__(
         self,
         tenant_subdomain: str | Callable[[], str] | None = None,
+        config: ClientConfig | None = None,
     ):
         """Initialize the Agent Gateway client.
 
@@ -79,8 +81,10 @@ class AgentGatewayClient:
             tenant_subdomain: Tenant subdomain for multi-tenant lookup.
                 Can be a string or a callable returning a string.
                 Required for LoB agents, ignored for Customer agents.
+            config: Client configuration. Uses defaults if not provided.
         """
         self._tenant_subdomain = tenant_subdomain
+        self._config = config or ClientConfig()
 
     @staticmethod
     def _resolve_value(
@@ -153,21 +157,24 @@ class AgentGatewayClient:
                     "Customer agent credentials detected at '%s'", credentials_path
                 )
                 credentials = load_customer_credentials(credentials_path)
-                return await get_mcp_tools_customer(credentials, app_tid)
+                return await get_mcp_tools_customer(
+                    credentials, self._config.timeout, app_tid
+                )
 
             # LoB flow - requires tenant_subdomain
             if app_tid:
                 logger.warning("app_tid parameter ignored for LoB agent flow")
 
             tenant = self._resolve_tenant_subdomain()
-            return await get_mcp_tools_lob(tenant)
+            return await get_mcp_tools_lob(tenant, self._config.timeout)
 
         except AgentGatewaySDKError:
             # Re-raise SDK errors as-is
             raise
         except Exception as e:
             logger.exception("Unexpected error during tool discovery")
-            raise AgentGatewaySDKError(f"Tool discovery failed: {e}") from e
+            cause = _unwrap_exception_group(e)
+            raise AgentGatewaySDKError(f"Tool discovery failed: {cause}") from e
 
     @record_metrics(Module.AGENTGATEWAY, Operation.AGENTGATEWAY_CALL_MCP_TOOL)
     async def call_mcp_tool(
@@ -240,7 +247,12 @@ class AgentGatewayClient:
 
                 credentials = load_customer_credentials(credentials_path)
                 return await call_mcp_tool_customer(
-                    credentials, tool, resolved_user_token, app_tid, **kwargs
+                    credentials,
+                    tool,
+                    resolved_user_token,
+                    self._config.timeout,
+                    app_tid,
+                    **kwargs,
                 )
 
             # LoB flow - requires user_token and tenant_subdomain
@@ -253,20 +265,31 @@ class AgentGatewayClient:
                 logger.warning("app_tid parameter ignored for LoB agent flow")
 
             tenant = self._resolve_tenant_subdomain()
-            return await call_mcp_tool_lob(tool, resolved_user_token, tenant, **kwargs)
+            return await call_mcp_tool_lob(
+                tool, resolved_user_token, tenant, self._config.timeout, **kwargs
+            )
 
         except AgentGatewaySDKError:
             # Re-raise SDK errors as-is
             raise
         except Exception as e:
             logger.exception("Unexpected error during tool invocation")
+            cause = _unwrap_exception_group(e)
             raise AgentGatewaySDKError(
-                f"Tool invocation failed for '{tool.name}': {e}"
+                f"Tool invocation failed for '{tool.name}': {cause}"
             ) from e
+
+
+def _unwrap_exception_group(exc: BaseException) -> BaseException:
+    """Unwrap nested ExceptionGroups to present meaningful error messages."""
+    while isinstance(exc, BaseExceptionGroup) and exc.exceptions:
+        exc = exc.exceptions[0]
+    return exc
 
 
 def create_client(
     tenant_subdomain: str | Callable[[], str] | None = None,
+    config: ClientConfig | None = None,
 ) -> AgentGatewayClient:
     """Create an Agent Gateway client for discovering and invoking MCP tools.
 
@@ -277,6 +300,7 @@ def create_client(
         tenant_subdomain: Tenant subdomain for multi-tenant lookup.
             Can be a string or a callable returning a string.
             Required for LoB agents, ignored for Customer agents.
+        config: Client configuration. Uses defaults if not provided.
 
     Returns:
         AgentGatewayClient instance.
@@ -319,4 +343,4 @@ def create_client(
         )
         ```
     """
-    return AgentGatewayClient(tenant_subdomain=tenant_subdomain)
+    return AgentGatewayClient(tenant_subdomain=tenant_subdomain, config=config)

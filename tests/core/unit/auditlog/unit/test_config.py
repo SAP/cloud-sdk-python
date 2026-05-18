@@ -216,8 +216,6 @@ class TestLoadConfigFromEnv:
         assert config.service_url == "https://service.example.com"
 
         mock_read.assert_called_once_with(
-            base_volume_mount="/etc/secrets/appfnd",
-            base_var_name="CLOUD_SDK_CFG",
             module="auditlog",
             instance="default",
             target=mock_read.call_args.kwargs["target"]

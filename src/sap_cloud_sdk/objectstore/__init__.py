@@ -54,8 +54,6 @@ def create_client(
     # Cloud mode: use secret resolver to load configuration
     config = ObjectStoreBindingData()
     read_from_mount_and_fallback_to_env_var(
-        base_volume_mount="/etc/secrets/appfnd",
-        base_var_name="CLOUD_SDK_CFG",
         module="objectstore",
         instance=instance,
         target=config,

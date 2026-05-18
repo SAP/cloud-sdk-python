@@ -25,21 +25,21 @@ class TestSecretResolver:
     def test_validate_inputs_empty_module(self):
         config = SampleConfig()
         with pytest.raises(ValueError, match="module name cannot be empty"):
-            read_from_mount_and_fallback_to_env_var("/path", "VAR", "", "instance", config)
+            read_from_mount_and_fallback_to_env_var("", "instance", config, base_volume_mount="/path", base_var_name="VAR")
 
     def test_validate_inputs_empty_instance(self):
         config = SampleConfig()
         with pytest.raises(ValueError, match="instance name cannot be empty"):
-            read_from_mount_and_fallback_to_env_var("/path", "VAR", "module", "", config)
+            read_from_mount_and_fallback_to_env_var("module", "", config, base_volume_mount="/path", base_var_name="VAR")
 
     def test_non_dataclass_target(self):
         with pytest.raises(RuntimeError, match="failed to read secrets.*target must be a dataclass instance"):
-            read_from_mount_and_fallback_to_env_var("/path", "VAR", "module", "instance", "not_dataclass")
+            read_from_mount_and_fallback_to_env_var("module", "instance", "not_dataclass", base_volume_mount="/path", base_var_name="VAR")
 
     def test_non_string_field_error(self):
         config = NonStringConfig()
         with pytest.raises(RuntimeError, match="failed to read secrets.*is not a string"):
-            read_from_mount_and_fallback_to_env_var("/path", "VAR", "module", "instance", config)
+            read_from_mount_and_fallback_to_env_var("module", "instance", config, base_volume_mount="/path", base_var_name="VAR")
 
     @patch('os.path.isdir', return_value=True)
     @patch('os.stat')
@@ -52,7 +52,7 @@ class TestSecretResolver:
         ]
 
         config = SampleConfig()
-        read_from_mount_and_fallback_to_env_var("/secrets", "VAR", "module", "instance", config)
+        read_from_mount_and_fallback_to_env_var("module", "instance", config, base_volume_mount="/secrets", base_var_name="VAR")
 
         assert config.username == "test_user"
         assert config.password == "test_pass"
@@ -64,20 +64,20 @@ class TestSecretResolver:
     def test_load_from_mount_file_not_found(self, mock_file, mock_stat, mock_isdir):
         config = SampleConfig()
         with pytest.raises(RuntimeError, match="failed to read secrets.*failed to read secret file"):
-            read_from_mount_and_fallback_to_env_var("/secrets", "VAR", "module", "instance", config)
+            read_from_mount_and_fallback_to_env_var("module", "instance", config, base_volume_mount="/secrets", base_var_name="VAR")
 
     @patch('os.stat', side_effect=FileNotFoundError("Path not found"))
     def test_validate_path_not_exists(self, mock_stat):
         config = SampleConfig()
         with pytest.raises(RuntimeError, match="mount failed"):
-            read_from_mount_and_fallback_to_env_var("/nonexistent", "VAR", "module", "instance", config)
+            read_from_mount_and_fallback_to_env_var("module", "instance", config, base_volume_mount="/nonexistent", base_var_name="VAR")
 
     @patch('os.path.isdir', return_value=False)
     @patch('os.stat')
     def test_validate_path_not_directory(self, mock_stat, mock_isdir):
         config = SampleConfig()
         with pytest.raises(RuntimeError, match="mount failed"):
-            read_from_mount_and_fallback_to_env_var("/file", "VAR", "module", "instance", config)
+            read_from_mount_and_fallback_to_env_var("module", "instance", config, base_volume_mount="/file", base_var_name="VAR")
 
     @patch.dict(os.environ, {
         "VAR_MODULE_INSTANCE_USER": "env_user",
@@ -88,7 +88,7 @@ class TestSecretResolver:
         config = SampleConfig()
         with patch('os.path.isdir', return_value=False), \
              patch('os.stat', side_effect=FileNotFoundError()):
-            read_from_mount_and_fallback_to_env_var("/nonexistent", "VAR", "module", "instance", config)
+            read_from_mount_and_fallback_to_env_var("module", "instance", config, base_volume_mount="/nonexistent", base_var_name="VAR")
 
         assert config.username == "env_user"
         assert config.password == "env_pass"
@@ -100,7 +100,7 @@ class TestSecretResolver:
         with patch('os.path.isdir', return_value=False), \
              patch('os.stat', side_effect=FileNotFoundError()):
             with pytest.raises(RuntimeError, match="env var failed"):
-                read_from_mount_and_fallback_to_env_var("/nonexistent", "VAR", "module", "instance", config)
+                read_from_mount_and_fallback_to_env_var("module", "instance", config, base_volume_mount="/nonexistent", base_var_name="VAR")
 
     @patch('os.path.isdir', return_value=True)
     @patch('os.stat')
@@ -113,7 +113,7 @@ class TestSecretResolver:
         ]
 
         config = SampleConfig()
-        read_from_mount_and_fallback_to_env_var("/secrets", "VAR", "module", "instance", config)
+        read_from_mount_and_fallback_to_env_var("module", "instance", config, base_volume_mount="/secrets", base_var_name="VAR")
 
         assert config.username == "mount_user"
 
@@ -123,7 +123,7 @@ class TestSecretResolver:
         with patch('os.path.isdir', return_value=False), \
              patch('os.stat', side_effect=FileNotFoundError()):
             with pytest.raises(RuntimeError, match="mount failed.*env var failed"):
-                read_from_mount_and_fallback_to_env_var("/nonexistent", "VAR", "module", "instance", config)
+                read_from_mount_and_fallback_to_env_var("module", "instance", config, base_volume_mount="/nonexistent", base_var_name="VAR")
 
     @patch('os.path.isdir', return_value=True)
     @patch('os.stat')
@@ -136,7 +136,7 @@ class TestSecretResolver:
         ]
 
         config = SampleConfig()
-        read_from_mount_and_fallback_to_env_var("/secrets", "VAR", "module", "instance", config)
+        read_from_mount_and_fallback_to_env_var("module", "instance", config, base_volume_mount="/secrets", base_var_name="VAR")
 
         assert config.username == "user\nwith\nnewlines"
 
@@ -149,7 +149,7 @@ class TestSecretResolver:
         config = CaseConfig()
         with patch('os.path.isdir', return_value=False), \
              patch('os.stat', side_effect=FileNotFoundError()):
-            read_from_mount_and_fallback_to_env_var("/nonexistent", "VAR", "module", "instance", config)
+            read_from_mount_and_fallback_to_env_var("module", "instance", config, base_volume_mount="/nonexistent", base_var_name="VAR")
 
         assert config.testfield == "test_value"
 
@@ -164,7 +164,7 @@ class TestSecretResolver:
         ]
 
         config = SampleConfig()
-        read_from_mount_and_fallback_to_env_var("/secrets", "VAR", "module", "instance", config)
+        read_from_mount_and_fallback_to_env_var("module", "instance", config, base_volume_mount="/secrets", base_var_name="VAR")
 
         assert config.username == "metadata_user"
 
@@ -179,7 +179,7 @@ class TestSecretResolver:
         with patch('os.path.isdir', return_value=False), \
              patch('os.stat', side_effect=FileNotFoundError()):
             read_from_mount_and_fallback_to_env_var(
-                "/nonexistent", "VAR", "module", "my-instance", config
+                "module", "my-instance", config, base_volume_mount="/nonexistent", base_var_name="VAR"
             )
 
         assert config.username == "env_user_hyphen"
@@ -197,7 +197,7 @@ class TestSecretResolver:
             mock_open(read_data="e").return_value,
         ]
         config = SampleConfig()
-        read_from_mount_and_fallback_to_env_var("/etc/secrets/appfnd", "VAR", "module", "instance", config)
+        read_from_mount_and_fallback_to_env_var("module", "instance", config, base_volume_mount="/etc/secrets/appfnd", base_var_name="VAR")
         first_call_path = mock_file.call_args_list[0][0][0]
         assert first_call_path.startswith("/custom/root")
 
@@ -212,6 +212,6 @@ class TestSecretResolver:
             mock_open(read_data="e").return_value,
         ]
         config = SampleConfig()
-        read_from_mount_and_fallback_to_env_var("/etc/secrets/appfnd", "VAR", "module", "instance", config)
+        read_from_mount_and_fallback_to_env_var("module", "instance", config, base_volume_mount="/etc/secrets/appfnd", base_var_name="VAR")
         first_call_path = mock_file.call_args_list[0][0][0]
         assert first_call_path.startswith("/etc/secrets/appfnd")

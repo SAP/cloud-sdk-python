@@ -27,7 +27,7 @@ agw_client = create_client()
 tools = await agw_client.list_mcp_tools()
 
 for tool in tools:
-    print(f"{tool.namespaced_name}: {tool.description}")
+    print(f"{tool.name}: {tool.description}")
 
 # Invoke a tool with user principal propagation
 result = await agw_client.call_mcp_tool(

@@ -489,15 +489,15 @@ class ExtensionSourceMapping:
     Returned by the extensibility backend when multiple extensions are merged
     into a single capability implementation response.
 
-    Tool keys are prefixed tool names
-    (e.g., ``"sap_mcp_servicenow_v1_create_ticket"``).
+    Tool keys are raw tool names
+    (e.g., ``"create_ticket"``).
     Hook keys are hook IDs (UUIDs) (e.g.,
     ``"3f5c8c8a-7b4d-4f9c-a4c0-7d5cb1a39f7e"``).
     Values are :class:`ExtensionSourceInfo` objects containing the extension's
     name, version, and unique identifier.
 
     Attributes:
-        tools: Mapping of prefixed tool name to extension source info.
+        tools: Mapping of tool name to extension source info.
         hooks: Mapping of hook ID to extension source info.
     """
 
@@ -512,7 +512,7 @@ class ExtensionSourceMapping:
 
             {
                 "tools": {
-                    "sap_mcp_taxvalidator_validate_validate_tax": {
+                    "validate_tax": {
                         "extensionName": "ap-invoice-extension",
                         "extensionVersion": "1",
                         "extensionId": "a1b2c3d4-..."
@@ -679,7 +679,7 @@ class ExtensionCapabilityImplementation:
                 ],
                 "source": {
                     "tools": {
-                        "sap_mcp_servicenow_v1_create_ticket": {
+                        "create_ticket": {
                             "extensionName": "servicenow-ext",
                             "extensionVersion": "1",
                             "extensionId": "abc-123"
@@ -740,8 +740,8 @@ class ExtensionCapabilityImplementation:
         """Look up the extension name that contributed a specific tool.
 
         Args:
-            tool_name: The prefixed tool name (e.g.,
-                ``"sap_mcp_servicenow_v1_create_ticket"``).
+            tool_name: The tool name (e.g.,
+                ``"create_ticket"``).
 
         Returns:
             Extension name, or ``None`` if source mapping is not available
@@ -774,8 +774,8 @@ class ExtensionCapabilityImplementation:
         ``None`` when source mapping is not available or the tool is not found.
 
         Args:
-            tool_name: The prefixed tool name (e.g.,
-                ``"sap_mcp_servicenow_v1_create_ticket"``).
+            tool_name: The tool name (e.g.,
+                ``"create_ticket"``).
 
         Returns:
             :class:`ExtensionSourceInfo` for the tool, or ``None``.

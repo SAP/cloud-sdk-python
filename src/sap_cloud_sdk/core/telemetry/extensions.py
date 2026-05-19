@@ -252,7 +252,7 @@ def resolve_source_info(
     fields when the key is not found in the mapping.
 
     Args:
-        key: Lookup key in the source mapping (e.g. prefixed tool name or
+        key: Lookup key in the source mapping (e.g. tool name or
             hook ID).
         source_mapping: Mapping of keys to source info objects or dicts.
             May be ``None``.
@@ -430,15 +430,22 @@ async def call_extension_tool(
     Args:
         mcp_client: The MCP client session connected to the tool's server.
             Must have an async ``call_tool(name, args)`` method.
-        tool_name: The tool name used as the lookup key in *source_mapping*
-            and passed to ``mcp_client.call_tool()``.
+        tool_name: The raw MCP tool name (e.g. ``"create_ticket"``), used
+            as the lookup key in *source_mapping* and passed directly to
+            ``mcp_client.call_tool()``.
         args: Dictionary of arguments to pass to the tool.
         capability: Extension capability ID (default: ``"default"``).
-        source_mapping: Optional mapping of tool names to source info
-            objects (from ``ext_impl.source.tools``).
+        source_mapping: Optional mapping of tool names to
+            :class:`~sap_cloud_sdk.extensibility.ExtensionSourceInfo`
+            objects (from ``ext_impl.source.tools``).  Keys must match the
+            *tool_name* values passed to this function.
+            See :class:`~sap_cloud_sdk.extensibility.ExtensionSourceMapping`.
 
     Returns:
         The tool's response from the MCP server.
+
+    See Also:
+        :func:`call_extension_hook` for hook-based extensions.
     """
     resolved_name, resolved_id, resolved_version, resolved_url, resolved_solution_id = (
         resolve_source_info(tool_name, source_mapping, "unknown")

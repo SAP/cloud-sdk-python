@@ -740,12 +740,12 @@ class TestExtensionSourceMapping:
         """Parse a complete source mapping from backend JSON (new format)."""
         data = {
             "tools": {
-                "sap_mcp_servicenow_v1_create_ticket": {
+                "create_ticket": {
                     "extensionName": "servicenow-ext",
                     "extensionVersion": "2",
                     "extensionId": "uuid-sn",
                 },
-                "sap_mcp_jira_v1_create_issue": {
+                "create_issue": {
                     "extensionName": "jira-ext",
                     "extensionVersion": "1",
                     "extensionId": "uuid-jira",
@@ -765,21 +765,10 @@ class TestExtensionSourceMapping:
             },
         }
         mapping = ExtensionSourceMapping.from_dict(data)
-        assert (
-            mapping.tools["sap_mcp_servicenow_v1_create_ticket"].extension_name
-            == "servicenow-ext"
-        )
-        assert (
-            mapping.tools["sap_mcp_servicenow_v1_create_ticket"].extension_version
-            == "2"
-        )
-        assert (
-            mapping.tools["sap_mcp_servicenow_v1_create_ticket"].extension_id
-            == "uuid-sn"
-        )
-        assert (
-            mapping.tools["sap_mcp_jira_v1_create_issue"].extension_name == "jira-ext"
-        )
+        assert mapping.tools["create_ticket"].extension_name == "servicenow-ext"
+        assert mapping.tools["create_ticket"].extension_version == "2"
+        assert mapping.tools["create_ticket"].extension_id == "uuid-sn"
+        assert mapping.tools["create_issue"].extension_name == "jira-ext"
         assert (
             mapping.hooks["3f5c8c8a-7b4d-4f9c-a4c0-7d5cb1a39f7e"].extension_name
             == "workflow-ext"
@@ -793,21 +782,16 @@ class TestExtensionSourceMapping:
         """Parse old format where values are plain strings."""
         data = {
             "tools": {
-                "sap_mcp_servicenow_v1_create_ticket": "servicenow-ext",
+                "create_ticket": "servicenow-ext",
             },
             "hooks": {
                 "3f5c8c8a-7b4d-4f9c-a4c0-7d5cb1a39f7e": "workflow-ext",
             },
         }
         mapping = ExtensionSourceMapping.from_dict(data)
-        assert (
-            mapping.tools["sap_mcp_servicenow_v1_create_ticket"].extension_name
-            == "servicenow-ext"
-        )
-        assert (
-            mapping.tools["sap_mcp_servicenow_v1_create_ticket"].extension_version == ""
-        )
-        assert mapping.tools["sap_mcp_servicenow_v1_create_ticket"].extension_id == ""
+        assert mapping.tools["create_ticket"].extension_name == "servicenow-ext"
+        assert mapping.tools["create_ticket"].extension_version == ""
+        assert mapping.tools["create_ticket"].extension_id == ""
         assert (
             mapping.hooks["3f5c8c8a-7b4d-4f9c-a4c0-7d5cb1a39f7e"].extension_name
             == "workflow-ext"
@@ -823,7 +807,7 @@ class TestExtensionSourceMapping:
         """Parse with only tools key present."""
         data = {
             "tools": {
-                "prefix_tool": {
+                "my_tool": {
                     "extensionName": "my-ext",
                     "extensionVersion": "1",
                     "extensionId": "id-1",
@@ -831,7 +815,7 @@ class TestExtensionSourceMapping:
             }
         }
         mapping = ExtensionSourceMapping.from_dict(data)
-        assert mapping.tools["prefix_tool"].extension_name == "my-ext"
+        assert mapping.tools["my_tool"].extension_name == "my-ext"
         assert mapping.hooks == {}
 
     def test_from_dict_only_hooks(self):
@@ -902,7 +886,7 @@ class TestExtensionCapabilityImplementationSource:
             ],
             "source": {
                 "tools": {
-                    "sap_mcp_servicenow_v1_create_ticket": {
+                    "create_ticket": {
                         "extensionName": "servicenow-ext",
                         "extensionVersion": "2",
                         "extensionId": "uuid-sn",
@@ -919,18 +903,9 @@ class TestExtensionCapabilityImplementationSource:
         }
         impl = ExtensionCapabilityImplementation.from_dict(data)
         assert impl.source is not None
-        assert (
-            impl.source.tools["sap_mcp_servicenow_v1_create_ticket"].extension_name
-            == "servicenow-ext"
-        )
-        assert (
-            impl.source.tools["sap_mcp_servicenow_v1_create_ticket"].extension_version
-            == "2"
-        )
-        assert (
-            impl.source.tools["sap_mcp_servicenow_v1_create_ticket"].extension_id
-            == "uuid-sn"
-        )
+        assert impl.source.tools["create_ticket"].extension_name == "servicenow-ext"
+        assert impl.source.tools["create_ticket"].extension_version == "2"
+        assert impl.source.tools["create_ticket"].extension_id == "uuid-sn"
         assert (
             impl.source.hooks["3f5c8c8a-7b4d-4f9c-a4c0-7d5cb1a39f7e"].extension_name
             == "workflow-ext"
@@ -942,20 +917,14 @@ class TestExtensionCapabilityImplementationSource:
             "capabilityId": "default",
             "mcpServers": [],
             "source": {
-                "tools": {"sap_mcp_servicenow_v1_create_ticket": "servicenow-ext"},
+                "tools": {"create_ticket": "servicenow-ext"},
                 "hooks": {"3f5c8c8a-7b4d-4f9c-a4c0-7d5cb1a39f7e": "workflow-ext"},
             },
         }
         impl = ExtensionCapabilityImplementation.from_dict(data)
         assert impl.source is not None
-        assert (
-            impl.source.tools["sap_mcp_servicenow_v1_create_ticket"].extension_name
-            == "servicenow-ext"
-        )
-        assert (
-            impl.source.tools["sap_mcp_servicenow_v1_create_ticket"].extension_version
-            == ""
-        )
+        assert impl.source.tools["create_ticket"].extension_name == "servicenow-ext"
+        assert impl.source.tools["create_ticket"].extension_version == ""
         assert (
             impl.source.hooks["3f5c8c8a-7b4d-4f9c-a4c0-7d5cb1a39f7e"].extension_name
             == "workflow-ext"

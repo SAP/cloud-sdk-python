@@ -920,18 +920,32 @@ class TestCallExtensionTool:
                 extension_id: str
                 extension_version: str
 
-            mapping = {"tool1": FakeSourceInfo("Mapped Ext", "uuid-m", "7")}
+            mapping = {"create_ticket": FakeSourceInfo("Mapped Ext", "uuid-m", "7")}
             mock_client = AsyncMock()
             mock_client.call_tool.return_value = "ok"
 
             reset_tool_call_metrics()
-            result = await call_extension_tool(
-                mcp_client=mock_client,
-                tool_name="tool1",
-                args={},
-                source_mapping=mapping,
-            )
-            assert result == "ok"
+            with patch(
+                "sap_cloud_sdk.core.telemetry.extensions._tracer"
+            ) as mock_tracer:
+                mock_tracer.start_as_current_span = MagicMock(
+                    return_value=MagicMock(
+                        __enter__=MagicMock(), __exit__=MagicMock(return_value=False)
+                    )
+                )
+                result = await call_extension_tool(
+                    mcp_client=mock_client,
+                    tool_name="create_ticket",
+                    args={},
+                    source_mapping=mapping,
+                )
+                assert result == "ok"
+                call_args = mock_tracer.start_as_current_span.call_args
+                attrs = call_args[1]["attributes"]
+                assert attrs[ATTR_EXTENSION_NAME] == "Mapped Ext"
+                assert attrs[ATTR_EXTENSION_ID] == "uuid-m"
+                assert attrs[ATTR_EXTENSION_VERSION] == "7"
+                assert attrs[ATTR_EXTENSION_ITEM_NAME] == "create_ticket"
 
         asyncio.run(_run())
 

@@ -63,6 +63,12 @@ class TestDestinationHttpClientInit:
         client = DestinationHttpClient(dest)
         assert "Authorization" not in client._session.headers
 
+    def test_url_headers_properties_pre_baked(self):
+        dest = _dest(**{"URL.headers.apiKey": "secret", "URL.headers.X-Tenant": "acme"})
+        client = DestinationHttpClient(dest)
+        assert client._session.headers["apiKey"] == "secret"
+        assert client._session.headers["X-Tenant"] == "acme"
+
 
 class TestDestinationHttpClientRequest:
     def setup_method(self):

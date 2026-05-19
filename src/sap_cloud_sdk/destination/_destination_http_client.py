@@ -13,8 +13,8 @@ from sap_cloud_sdk.destination._models import Destination, DestinationType
 class DestinationHttpClient:
     """Wraps requests.Session to call the target system described by a Destination.
 
-    Pre-bakes SAP ERP headers (sap-client, sap-language) and auth headers from
-    the destination so callers never have to set them manually.
+    Pre-bakes headers derived from the destination — ERP headers (sap-client,
+    sap-language), URL.headers.* properties, and auth tokens.
 
     Usage::
 
@@ -31,17 +31,7 @@ class DestinationHttpClient:
 
         self._destination = destination
         self._session = requests.Session()
-
-        # Pre-bake sap-client / sap-language — relevant mainly for OnPremise destinations
-        self._session.headers.update(destination.get_erp_headers())
-
-        # Pre-bake auth headers — BTP may return multiple tokens, skip empty ones
-        for token in destination.auth_tokens:
-            key = token.http_header.get("key")
-            value = token.http_header.get("value")
-            if key and value:
-                self._session.headers[key] = value
-
+        self._session.headers.update(destination.get_headers())
         self._base_url = destination.url.rstrip("/") if destination.url else ""
 
     def request(

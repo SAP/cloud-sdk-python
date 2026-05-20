@@ -6,6 +6,7 @@ from sap_cloud_sdk.core.auditlog_ng.config import (
     AuditLogNGConfig,
     SCHEMA_URL,
     _validate_source_arg,
+    endpoint_from_region,
 )
 
 
@@ -106,3 +107,27 @@ class TestAuditLogNGConfig:
         assert config.key_file is None
         assert config.ca_file is None
         assert config.insecure is False
+
+
+class TestEndpointFromRegion:
+
+    def test_standard_region(self):
+        assert endpoint_from_region("us30") == "us30.als.services.cloud.sap:443"
+
+    def test_eu_region(self):
+        assert endpoint_from_region("eu10") == "eu10.als.services.cloud.sap:443"
+
+    def test_region_with_dashes(self):
+        assert endpoint_from_region("ap21") == "ap21.als.services.cloud.sap:443"
+
+    def test_empty_region_raises(self):
+        with pytest.raises(ValueError, match="must not be empty"):
+            endpoint_from_region("")
+
+    def test_region_with_spaces_raises(self):
+        with pytest.raises(ValueError, match="region"):
+            endpoint_from_region("us 30")
+
+    def test_region_with_special_chars_raises(self):
+        with pytest.raises(ValueError, match="region"):
+            endpoint_from_region("us30@cloud")

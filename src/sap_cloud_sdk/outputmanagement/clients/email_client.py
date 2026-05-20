@@ -19,6 +19,82 @@ class EmailClient:
     minimal information: template key, recipients, business document, and destination.
     """
     
+    def create_output_request(
+        self,
+        notification_template_key: str,
+        to: List[str],
+        business_document: Dict[str, Any],
+        cc: Optional[List[str]] = None,
+        template_language: str = "en"
+    ) -> OutputRequest:
+        """
+        Create an OutputRequest object from the provided parameters.
+        
+        This method handles all the complexity of building the CloudEvents structure,
+        extracting document metadata, and configuring email settings.
+        
+        Args:
+            notification_template_key: ANS template identifier
+            to: List of recipient email addresses
+            business_document: The business document as a dictionary
+            cc: Optional list of CC email addresses
+            template_language: ISO language code for email template
+            
+        Returns:
+            OutputRequest: Fully constructed output request ready to send
+        """
+        # Extract document type and ID from business document
+        # Assuming the first key in business_document is the document type
+        doc_type_key = next(iter(business_document.keys()))
+        doc_content = business_document[doc_type_key]
+        
+        # Try to extract document ID from common field names
+        doc_id = None
+        for id_field in ['id', 'orderId', 'invoiceNumber', 'documentId', 'number']:
+            if id_field in doc_content:
+                doc_id = str(doc_content[id_field])
+                break
+        
+        # If no ID found, use template key as fallback
+        if not doc_id:
+            doc_id = f"{notification_template_key}-{id(business_document)}"
+        
+        # Generate business document type from the key
+        business_document_type = f"com.sap.{doc_type_key.lower()}"
+        
+        # Build email configuration
+        email_config = EmailConfiguration(
+            email_notification_template_key=notification_template_key,
+            email_template_language=template_language,
+            to=to,
+            cc=cc
+        )
+        
+        # Build output management info
+        output_mgmt = OutputManagementInfo(
+            business_document_type=business_document_type,
+            business_document_id=doc_id,
+            is_priority=False,
+            channels=[Channel.INTERNAL_EMAIL],
+            email_configuration=email_config
+        )
+        
+        # Build request data (OutputManagement + BusinessDocument)
+        data = OutputRequestData(
+            output_management=output_mgmt,
+            business_document=business_document
+        )
+        
+        # Build output request (CloudEvents structure)
+        # Source format must be /region/application/tenant per CloudEvents spec
+        output_request = OutputRequest(
+            source=f"/region/sap/{doc_type_key}",
+            type=f"{business_document_type}.notification.created.v1",
+            data=data
+        )
+        
+        return output_request
+    
     def send_email(
         self,
         notification_template_key: str,
@@ -108,54 +184,13 @@ class EmailClient:
             # Import here to avoid circular import at module initialization
             from ..client_provider import OutputManagementServiceClientProviderBuilder
             
-            # Extract document type and ID from business document
-            # Assuming the first key in business_document is the document type
-            doc_type_key = next(iter(business_document.keys()))
-            doc_content = business_document[doc_type_key]
-            
-            # Try to extract document ID from common field names
-            doc_id = None
-            for id_field in ['id', 'orderId', 'invoiceNumber', 'documentId', 'number']:
-                if id_field in doc_content:
-                    doc_id = str(doc_content[id_field])
-                    break
-            
-            # If no ID found, use template key as fallback
-            if not doc_id:
-                doc_id = f"{notification_template_key}-{id(business_document)}"
-            
-            # Generate business document type from the key
-            business_document_type = f"com.sap.{doc_type_key.lower()}"
-            
-            # Build email configuration
-            email_config = EmailConfiguration(
-                email_notification_template_key=notification_template_key,
-                email_template_language=template_language,
+            # Create the output request using the extracted method
+            output_request = self.create_output_request(
+                notification_template_key=notification_template_key,
                 to=to,
-                cc=cc
-            )
-            
-            # Build output management info
-            output_mgmt = OutputManagementInfo(
-                business_document_type=business_document_type,
-                business_document_id=doc_id,
-                is_priority=False,
-                channels=[Channel.INTERNAL_EMAIL],
-                email_configuration=email_config
-            )
-            
-            # Build request data (OutputManagement + BusinessDocument)
-            data = OutputRequestData(
-                output_management=output_mgmt,
-                business_document=business_document
-            )
-            
-            # Build output request (CloudEvents structure)
-            # Source format must be /region/application/tenant per CloudEvents spec
-            output_request = OutputRequest(
-                source=f"/region/sap/{doc_type_key}",
-                type=f"{business_document_type}.notification.created.v1",
-                data=data
+                business_document=business_document,
+                cc=cc,
+                template_language=template_language
             )
             
             # Validate the output request using RequestValidator

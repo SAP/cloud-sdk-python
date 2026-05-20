@@ -3,6 +3,7 @@
 This module provides an OTLP/gRPC client for sending structured audit log events
  to the SAP Audit Log Service (v3/NG). It supports mTLS, insecure mode for local
  testing, and both binary protobuf and JSON serialization formats.
+
 ---
 
 ## Overview
@@ -19,7 +20,7 @@ The Auditlog NG client sends audit log events as OpenTelemetry (OTLP) LogRecords
 
 ### 1. Required Dependencies
 
-```
+```text
 grpcio>=1.60.0
 protobuf>=4.25.0
 protovalidate>=0.13.0
@@ -40,7 +41,7 @@ All constructor parameters for `AuditClient`:
 
 | Parameter       | Type    | Required | Default        | Description                                                                                           |
 |-----------------|---------|----------|----------------|-------------------------------------------------------------------------------------------------------|
-| `endpoint`      | `str`   | ✅ Yes   | —              | OTLP gRPC endpoint of the Audit Log Service (`host:port`)                                             |
+| `endpoint`      | `str`   | ✅ Yes   | —              | OTLP gRPC endpoint of the Audit Log Service (`host:port`). When deploying on BTP, derive from the SPII payload: `endpoint_from_region(assignedTenant.deploymentRegion)` → e.g. `us30.als.services.cloud.sap:443`. |
 | `deployment_id` | `str`   | ✅ Yes   | —              | Deployment/region identifier. Validated: only `[a-zA-Z0-9._-/~]` allowed. Raises `ValueError` if invalid. |
 | `namespace`     | `str`   | ✅ Yes   | —              | Audit log namespace (e.g. `sap.als`). Same character-set validation as `deployment_id`.               |
 | `cert_file`     | `str`   | ❌ No    | `None`         | Path to the mTLS client certificate file (PEM). Required together with `key_file` for mTLS.           |
@@ -74,13 +75,25 @@ All constructor parameters for `AuditClient`:
 ### Step 1: Import the Client and Generated Protobuf
 
 ```python
-from sap_cloud_sdk.core.auditlog_ng import create_client, AuditLogNGConfig
+from sap_cloud_sdk.core.auditlog_ng import create_client, AuditLogNGConfig, endpoint_from_region
 from sap_cloud_sdk.core.auditlog_ng.gen.sap.auditlog.auditevent.v2 import auditevent_pb2 as pb
 ```
 
 ### Step 2: Initialize the Client
 
-**With mTLS (production):**
+**With SPII payload (BTP production):**
+
+```python
+client = create_client(
+    endpoint=endpoint_from_region(spii_payload["assignedTenant"]["deploymentRegion"]),
+    deployment_id=spii_payload["assignedTenant"]["deploymentId"],
+    namespace=spii_payload["assignedTenant"]["applicationNamespace"],
+    cert_file="/path/to/client-certificate_chain.pem",
+    key_file="/path/to/private-key.pem",
+)
+```
+
+**With explicit endpoint (production):**
 
 ```python
 client = create_client(
@@ -234,6 +247,56 @@ Events are validated against protobuf constraints using `protovalidate` before s
 - The event fails schema validation
 - The `tenant_id` is not a valid UUID
 - The client has already been closed
+
+---
+
+## BTP / SPII Integration
+
+When running on BTP, the agent receives a SPII payload at tenant-assign time. Use `endpoint_from_region` to derive the ALS NG endpoint and store all required values via the Destination Service so they are available at emit time.
+
+### SPII field mapping
+
+| SPII field | Parameter |
+| --- | --- |
+| `assignedTenant.deploymentRegion` | `endpoint_from_region(region)` |
+| `assignedTenant.deploymentId` | `deployment_id` |
+| `assignedTenant.applicationNamespace` | `namespace` |
+| `assignedTenant.applicationTenantId` | `event.common.tenant_id` (per event) |
+
+### At SPII assign time
+
+```python
+from sap_cloud_sdk.core.auditlog_ng import endpoint_from_region
+from sap_cloud_sdk.destination._models import Destination
+
+region = spii_payload["assignedTenant"]["deploymentRegion"]
+destination = Destination(
+    name="AuditLogV3_Destination",
+    type="TCP",
+    url=endpoint_from_region(region),
+    properties={
+        "deployment_id": spii_payload["assignedTenant"]["deploymentId"],
+        "namespace":     spii_payload["assignedTenant"]["applicationNamespace"],
+    }
+)
+# persist via Destination Service client
+```
+
+### At emit time
+
+```python
+from sap_cloud_sdk.core.auditlog_ng import create_client
+
+dest = await destination_client.get_destination("AuditLogV3_Destination")
+with create_client(
+    endpoint=dest.url,
+    deployment_id=dest.properties["deployment_id"],
+    namespace=dest.properties["namespace"],
+    cert_file="/path/to/client-certificate_chain.pem",
+    key_file="/path/to/private-key.pem",
+) as client:
+    client.send(event, "DataAccess")
+```
 
 ---
 

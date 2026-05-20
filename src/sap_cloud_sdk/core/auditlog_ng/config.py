@@ -69,3 +69,40 @@ class AuditLogNGConfig:
             raise ValueError("endpoint is required")
         _validate_source_arg(self.deployment_id, "deployment_id")
         _validate_source_arg(self.namespace, "namespace")
+
+
+_ALS_NG_ENDPOINT_SUFFIX = ".als.services.cloud.sap:443"
+
+
+def endpoint_from_region(region: str) -> str:
+    """Derive the ALS NG gRPC endpoint from a SPII ``deploymentRegion`` value.
+
+    Maps ``assignedTenant.deploymentRegion`` (e.g. ``"us30"``) to the
+    corresponding ALS NG host:port (e.g. ``"us30.als.services.cloud.sap:443"``).
+
+    Args:
+        region: ``assignedTenant.deploymentRegion`` from the SPII payload.
+
+    Returns:
+        Endpoint string suitable for :class:`AuditLogNGConfig`.
+
+    Raises:
+        ValueError: If *region* is empty or contains invalid characters.
+
+    Example::
+
+        from sap_cloud_sdk.core.auditlog_ng import endpoint_from_region, create_client
+
+        region = spii_payload["assignedTenant"]["deploymentRegion"]  # e.g. "us30"
+        client = create_client(
+            endpoint=endpoint_from_region(region),
+            deployment_id=spii_payload["assignedTenant"]["deploymentId"],
+            namespace=spii_payload["assignedTenant"]["applicationNamespace"],
+            cert_file="...",
+            key_file="...",
+        )
+    """
+    if not region:
+        raise ValueError("region must not be empty")
+    _validate_source_arg(region, "region")
+    return f"{region}{_ALS_NG_ENDPOINT_SUFFIX}"

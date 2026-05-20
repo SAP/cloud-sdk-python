@@ -29,6 +29,7 @@ from sap_cloud_sdk.core.auditlog_ng.client import AuditClient
 from sap_cloud_sdk.core.auditlog_ng.config import (
     AuditLogNGConfig,
     SCHEMA_URL,
+    endpoint_from_region,
 )
 from sap_cloud_sdk.core.auditlog_ng.exceptions import (
     AuditLogNGError,
@@ -116,6 +117,8 @@ def create_client(
 __all__ = [
     # Factory function
     "create_client",
+    # Helpers
+    "endpoint_from_region",
     # Client
     "AuditClient",
     # Configuration

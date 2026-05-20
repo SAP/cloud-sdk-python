@@ -16,6 +16,7 @@ Or against the deployed BTP service (with OAuth2):
 import pytest
 from pytest_bdd import given, scenario, then, when
 
+from sap_cloud_sdk.agent_memory import MessageRole
 from sap_cloud_sdk.agent_memory.client import AgentMemoryClient
 
 # -- Scenarios -----------------------------------------------------------------
@@ -176,7 +177,7 @@ def message_exists_list(context, agent_memory_client):
         "test-agent",
         "test-user",
         "conv-list",
-        "USER",
+        MessageRole.USER,
         "Listed message",
     )
 
@@ -190,7 +191,7 @@ def message_exists_delete(context, agent_memory_client):
         "test-agent",
         "test-user",
         "conv-del",
-        "USER",
+        MessageRole.USER,
         "To be deleted",
     )
 
@@ -258,7 +259,7 @@ def add_message(context):
         "test-agent",
         "test-user",
         "conv-1",
-        "USER",
+        MessageRole.USER,
         "Hello!",
     )
 
@@ -352,7 +353,7 @@ def check_message_id(context):
 
 @then('the message should have role "USER"')
 def check_message_role(context):
-    assert context["message"].role == "USER"
+    assert context["message"].role == MessageRole.USER
 
 
 @then('the message should have content "Hello!"')
@@ -458,7 +459,7 @@ def message_exists_filter(context, agent_memory_client):
         "test-agent",
         "test-user",
         "conv-filter",
-        "USER",
+        MessageRole.USER,
         "filter-test-message",
         metadata={"tag": "filter-marker"},
     )

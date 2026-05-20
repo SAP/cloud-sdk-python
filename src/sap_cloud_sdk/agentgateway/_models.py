@@ -1,7 +1,5 @@
 """Data models for Agent Gateway MCP tools."""
 
-import hashlib
-import re
 from dataclasses import dataclass
 from typing import Any
 
@@ -29,37 +27,6 @@ class MCPTool:
     input_schema: dict[str, Any]
     url: str
     fragment_name: str | None = None
-
-    @property
-    def namespaced_name(self) -> str:
-        """Unique tool name safe for LLM APIs: sanitized, namespaced, max 64 chars.
-
-        LLM tool-calling APIs (Anthropic, OpenAI) require names matching
-        ^[a-zA-Z0-9-_]+$ with a max length of 64 characters.
-
-        This property combines server_name and tool name to avoid collisions
-        across multiple MCP servers, then sanitizes and enforces the limit.
-
-        Examples:
-            Short names pass through unchanged:
-                "myserver__list_orders" (21 chars) → "myserver__list_orders"
-
-            Invalid chars are replaced with underscores:
-                "my.server:v1__get/data" → "my_server_v1__get_data"
-
-            Names over 64 chars are truncated with a hash suffix for uniqueness:
-                "sales_order_mcp_demo__get_supplier_operational_eval_scores_by_region" (70 chars)
-                → "sales_order_mcp_demo__get_supplier_operational_eval_s_a3b7c9d1" (64 chars)
-
-            Two servers with the same tool name remain distinct:
-                "server_a__get_metadata" vs "server_b__get_metadata"
-        """
-        raw = f"{self.server_name}__{self.name}"
-        sanitized = re.sub(r"[^a-zA-Z0-9\-_]", "_", raw)
-        if len(sanitized) <= 64:
-            return sanitized
-        suffix = hashlib.sha256(sanitized.encode()).hexdigest()[:8]
-        return f"{sanitized[:55]}_{suffix}"
 
 
 @dataclass

@@ -146,7 +146,7 @@ class AgentGatewayClient:
             ```python
             tools = await agw_client.list_mcp_tools()
             for tool in tools:
-                print(f"{tool.namespaced_name}: {tool.description}")
+                print(f"{tool.name}: {tool.description}")
             ```
         """
         try:

@@ -24,7 +24,7 @@ fragment_client = create_fragment_client(instance="default")
 certificate_client = create_certificate_client(instance="default")
 
 # Instance-level read
-dest = client.get_instance_destination("my-destination")
+dest = client.get_instance_destination("my-destination")  # deprecated: use get_destination()
 fragment = fragment_client.get_instance_fragment("my-fragment")
 cert = certificate_client.get_instance_certificate("my-cert")
 
@@ -39,12 +39,12 @@ fragments = fragment_client.list_instance_fragments(tenant="tenant-subdomain")
 certificates = certificate_client.list_instance_certificates(tenant="tenant-subdomain")
 
 # Subaccount-level read: provider only (no tenant required)
-dest = client.get_subaccount_destination("my-destination", access_strategy=AccessStrategy.PROVIDER_ONLY)
+dest = client.get_subaccount_destination("my-destination", access_strategy=AccessStrategy.PROVIDER_ONLY)  # deprecated: use get_destination()
 fragment = fragment_client.get_subaccount_fragment("my-fragment", access_strategy=AccessStrategy.PROVIDER_ONLY)
 cert = certificate_client.get_subaccount_certificate("my-cert", access_strategy=AccessStrategy.PROVIDER_ONLY)
 
 # Subaccount-level read: subscriber-first (tenant required), fallback to provider
-dest = client.get_subaccount_destination("my-destination", access_strategy=AccessStrategy.SUBSCRIBER_FIRST, tenant="tenant-subdomain")
+dest = client.get_subaccount_destination("my-destination", access_strategy=AccessStrategy.SUBSCRIBER_FIRST, tenant="tenant-subdomain")  # deprecated: use get_destination()
 fragment = fragment_client.get_subaccount_fragment("my-fragment", access_strategy=AccessStrategy.SUBSCRIBER_FIRST, tenant="tenant-subdomain")
 cert = certificate_client.get_subaccount_certificate("my-cert", access_strategy=AccessStrategy.SUBSCRIBER_FIRST, tenant="tenant-subdomain")
 
@@ -126,8 +126,8 @@ The client produced by `create_client()` exposes the following operations:
 ```python
 class DestinationClient:
     # V1 Admin API - Read operations for destinations
-    def get_instance_destination(self, name: str, proxy_enabled: Optional[bool] = None) -> Optional[Destination | TransparentProxyDestination]: ...
-    def get_subaccount_destination(self, name: str, access_strategy: AccessStrategy = AccessStrategy.SUBSCRIBER_FIRST, tenant: Optional[str] = None, proxy_enabled: Optional[bool] = None) -> Optional[Destination | TransparentProxyDestination]: ...
+    def get_instance_destination(self, name: str, proxy_enabled: Optional[bool] = None) -> Optional[Destination | TransparentProxyDestination]: ...  # deprecated: use get_destination()
+    def get_subaccount_destination(self, name: str, access_strategy: AccessStrategy = AccessStrategy.SUBSCRIBER_FIRST, tenant: Optional[str] = None, proxy_enabled: Optional[bool] = None) -> Optional[Destination | TransparentProxyDestination]: ...  # deprecated: use get_destination()
     def list_instance_destinations(self, tenant: Optional[str] = None, filter: Optional[ListOptions] = None) -> PagedResult[Destination]: ...
     def list_subaccount_destinations(self, access_strategy: AccessStrategy = AccessStrategy.SUBSCRIBER_FIRST, tenant: Optional[str] = None, filter: Optional[ListOptions] = None) -> PagedResult[Destination]: ...
 
@@ -217,6 +217,55 @@ class CertificateClient:
 - Fragment properties are stored as string key-value pairs in `Fragment.properties`.
 - Certificate `content` should be base64-encoded. Supported certificate types include PEM, JKS, P12, etc.
 - The v2 consumption API returns tokens in the `auth_tokens` field with ready-to-use HTTP headers in `http_header` dict.
+
+## Calling Target Systems
+
+`DestinationHttpClient` wraps `requests.Session` to call the target system described by a destination. It injects headers automatically so you don't have to handle auth tokens, ERP headers, or custom destination properties manually.
+
+> **Note:** `DestinationHttpClient` requires a destination fetched via the v2 API (`get_destination()`), which returns pre-fetched auth tokens. It does not support destinations fetched with the deprecated v1 methods.
+
+### Basic Usage
+
+```python
+from sap_cloud_sdk.destination import create_client, DestinationHttpClient
+
+client = create_client(instance="default")
+dest = client.get_destination("my-erp")
+
+http = DestinationHttpClient(dest)
+response = http.request("GET", "/api/resource")
+```
+
+### What headers are pre-baked
+
+When `DestinationHttpClient` is constructed, it reads the destination and pre-bakes the following headers into every request:
+
+1. **ERP headers** — `sap-client` and `sap-language` from destination properties (if present)
+2. **`URL.headers.*` properties** — any destination property prefixed with `URL.headers.` becomes a header (e.g. `URL.headers.apiKey = secret` → `apiKey: secret`)
+3. **Auth tokens** — pre-fetched by BTP and returned in `dest.auth_tokens`; each token's `http_header` is injected directly (e.g. `Authorization: Bearer eyJ...`)
+
+Auth tokens take precedence over `URL.headers.*` properties if both set the same header key.
+
+### Per-request headers
+
+Pass `headers=` to add or override headers for a single request:
+
+```python
+response = http.request("GET", "/api/resource", headers={"X-Correlation-ID": "abc123"})
+```
+
+Per-request headers are merged on top of the pre-baked session headers.
+
+### Using `get_headers()` directly
+
+If you manage your own HTTP client, use `dest.get_headers()` to get all derived headers as a plain dict:
+
+```python
+import requests
+
+dest = client.get_destination("my-erp")
+response = requests.get(dest.url + "/api/resource", headers=dest.get_headers())
+```
 
 ## Transparent Proxy Support
 

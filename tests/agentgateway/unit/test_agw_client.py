@@ -1,7 +1,9 @@
 """Unit tests for Agent Gateway client."""
 
-from unittest.mock import patch, AsyncMock
+import time
+from unittest.mock import patch, AsyncMock, MagicMock
 
+import httpx
 import pytest
 
 from sap_cloud_sdk.agentgateway import (
@@ -9,6 +11,10 @@ from sap_cloud_sdk.agentgateway import (
     AgentGatewayClient,
     MCPTool,
     AgentGatewaySDKError,
+)
+from sap_cloud_sdk.agentgateway._models import (
+    CustomerCredentials,
+    IntegrationDependency,
 )
 
 
@@ -411,3 +417,273 @@ class TestCallMcpTool:
             )
 
             assert result == "Success: Order created"
+
+
+# ============================================================
+# Test: Token cache behavior through the public API
+# ============================================================
+
+
+def _customer_credentials() -> CustomerCredentials:
+    """Build a minimal CustomerCredentials fixture for cache-behavior tests."""
+    return CustomerCredentials(
+        token_service_url="https://ias.example.com/oauth2/token",
+        client_id="test-client",
+        certificate="cert",
+        private_key="key",
+        gateway_url="https://agw.example.com",
+        integration_dependencies=[
+            IntegrationDependency(
+                ord_id="sap.test:apiResource:demo:v1",
+                global_tenant_id="250695",
+            ),
+        ],
+    )
+
+
+def _build_streaming_mocks(
+    initialize_side_effect=None,
+    call_tool_side_effect=None,
+    list_tools_side_effect=None,
+):
+    """Build the chain of mocks needed to drive customer flow MCP calls."""
+    http_client = AsyncMock()
+    http_client.__aenter__ = AsyncMock(return_value=http_client)
+    http_client.__aexit__ = AsyncMock(return_value=None)
+
+    stream_ctx = AsyncMock()
+    stream_ctx.__aenter__ = AsyncMock(return_value=(AsyncMock(), AsyncMock(), None))
+    stream_ctx.__aexit__ = AsyncMock(return_value=None)
+
+    session = AsyncMock()
+    if initialize_side_effect is not None:
+        session.initialize = AsyncMock(side_effect=initialize_side_effect)
+    else:
+        init_result = MagicMock()
+        init_result.serverInfo.name = "demo-server"
+        session.initialize = AsyncMock(return_value=init_result)
+
+    if list_tools_side_effect is not None:
+        session.list_tools = AsyncMock(side_effect=list_tools_side_effect)
+    else:
+        list_result = MagicMock()
+        list_result.tools = []
+        session.list_tools = AsyncMock(return_value=list_result)
+
+    if call_tool_side_effect is not None:
+        session.call_tool = AsyncMock(side_effect=call_tool_side_effect)
+    else:
+        call_result = MagicMock()
+        content = MagicMock()
+        content.text = "ok"
+        call_result.content = [content]
+        session.call_tool = AsyncMock(return_value=call_result)
+
+    session_ctx = AsyncMock()
+    session_ctx.__aenter__ = AsyncMock(return_value=session)
+    session_ctx.__aexit__ = AsyncMock(return_value=None)
+
+    return http_client, stream_ctx, session_ctx
+
+
+def _make_401() -> httpx.HTTPStatusError:
+    """Construct an httpx 401 HTTPStatusError for simulating MCP auth failures."""
+    request = httpx.Request("POST", "https://example.com")
+    response = httpx.Response(401, request=request)
+    return httpx.HTTPStatusError("Unauthorized", request=request, response=response)
+
+
+def _patch_customer_flow(token_request_side_effect):
+    """Patch detection/loading + IAS request + MCP transport for customer flow.
+
+    Returns the http/stream/session mocks plus the IAS request mock so callers
+    can assert on call counts.
+    """
+    http_client, stream_ctx, session_ctx = _build_streaming_mocks()
+
+    request_mock = MagicMock(side_effect=token_request_side_effect)
+
+    patches = [
+        patch(
+            "sap_cloud_sdk.agentgateway.agw_client.detect_customer_agent_credentials",
+            return_value="/path/to/credentials",
+        ),
+        patch(
+            "sap_cloud_sdk.agentgateway.agw_client.load_customer_credentials",
+            return_value=_customer_credentials(),
+        ),
+        patch(
+            "sap_cloud_sdk.agentgateway._customer._request_token_mtls",
+            request_mock,
+        ),
+        patch("httpx.AsyncClient", return_value=http_client),
+        patch(
+            "sap_cloud_sdk.agentgateway._customer.streamable_http_client",
+            return_value=stream_ctx,
+        ),
+        patch(
+            "sap_cloud_sdk.agentgateway._customer.ClientSession",
+            return_value=session_ctx,
+        ),
+    ]
+    return patches, request_mock, session_ctx
+
+
+class TestTokenCacheBehavior:
+    """Cache behavior verified through AgentGatewayClient public API."""
+
+    @pytest.mark.asyncio
+    async def test_list_mcp_tools_twice_hits_ias_once(self, mock_tool):
+        """Two list_mcp_tools calls share one cached system token."""
+        patches, request_mock, _ = _patch_customer_flow(
+            token_request_side_effect=lambda *a, **kw: (
+                "system-token",
+                time.monotonic() + 600,
+            )
+        )
+
+        with patches[0], patches[1], patches[2], patches[3], patches[4], patches[5]:
+            agw_client = create_client()
+
+            await agw_client.list_mcp_tools()
+            await agw_client.list_mcp_tools()
+
+            assert request_mock.call_count == 1
+
+    @pytest.mark.asyncio
+    async def test_call_mcp_tool_twice_same_user_token_hits_ias_once(self, mock_tool):
+        """Two call_mcp_tool calls with same user_token reuse exchanged token."""
+        patches, request_mock, _ = _patch_customer_flow(
+            token_request_side_effect=lambda *a, **kw: (
+                "exchanged-token",
+                time.monotonic() + 600,
+            )
+        )
+
+        with patches[0], patches[1], patches[2], patches[3], patches[4], patches[5]:
+            agw_client = create_client()
+
+            await agw_client.call_mcp_tool(tool=mock_tool, user_token="user-jwt-A")
+            await agw_client.call_mcp_tool(tool=mock_tool, user_token="user-jwt-A")
+
+            assert request_mock.call_count == 1
+
+    @pytest.mark.asyncio
+    async def test_different_user_tokens_isolated(self, mock_tool):
+        """Different user_tokens trigger separate exchanges."""
+        patches, request_mock, _ = _patch_customer_flow(
+            token_request_side_effect=[
+                ("tok-A", time.monotonic() + 600),
+                ("tok-B", time.monotonic() + 600),
+            ]
+        )
+
+        with patches[0], patches[1], patches[2], patches[3], patches[4], patches[5]:
+            agw_client = create_client()
+
+            await agw_client.call_mcp_tool(tool=mock_tool, user_token="user-jwt-A")
+            await agw_client.call_mcp_tool(tool=mock_tool, user_token="user-jwt-B")
+
+            assert request_mock.call_count == 2
+
+    @pytest.mark.asyncio
+    async def test_app_tid_isolation(self, mock_tool):
+        """Same user_token across different app_tid values stays isolated."""
+        patches, request_mock, _ = _patch_customer_flow(
+            token_request_side_effect=[
+                ("tok-tenant-a", time.monotonic() + 600),
+                ("tok-tenant-b", time.monotonic() + 600),
+            ]
+        )
+
+        with patches[0], patches[1], patches[2], patches[3], patches[4], patches[5]:
+            agw_client = create_client()
+
+            await agw_client.call_mcp_tool(
+                tool=mock_tool, user_token="user-jwt", app_tid="tenant-a"
+            )
+            await agw_client.call_mcp_tool(
+                tool=mock_tool, user_token="user-jwt", app_tid="tenant-b"
+            )
+
+            assert request_mock.call_count == 2
+
+    @pytest.mark.asyncio
+    async def test_clear_token_cache_forces_refetch(self, mock_tool):
+        """clear_token_cache drops cached tokens, next call refetches."""
+        patches, request_mock, _ = _patch_customer_flow(
+            token_request_side_effect=lambda *a, **kw: (
+                "any-token",
+                time.monotonic() + 600,
+            )
+        )
+
+        with patches[0], patches[1], patches[2], patches[3], patches[4], patches[5]:
+            agw_client = create_client()
+
+            await agw_client.call_mcp_tool(tool=mock_tool, user_token="user-jwt")
+            agw_client.clear_token_cache()
+            await agw_client.call_mcp_tool(tool=mock_tool, user_token="user-jwt")
+
+            assert request_mock.call_count == 2
+
+    @pytest.mark.asyncio
+    async def test_401_invalidates_cache_and_retries(self, mock_tool):
+        """A 401 from the MCP server drops the cached token and retries once."""
+        http_client, stream_ctx, _ = _build_streaming_mocks()
+
+        # First call_tool raises 401, second returns success
+        success = MagicMock()
+        content = MagicMock()
+        content.text = "ok-after-retry"
+        success.content = [content]
+
+        session = AsyncMock()
+        init_result = MagicMock()
+        init_result.serverInfo.name = "demo-server"
+        session.initialize = AsyncMock(return_value=init_result)
+        session.call_tool = AsyncMock(side_effect=[_make_401(), success])
+        session_ctx = AsyncMock()
+        session_ctx.__aenter__ = AsyncMock(return_value=session)
+        session_ctx.__aexit__ = AsyncMock(return_value=None)
+
+        request_mock = MagicMock(
+            side_effect=[
+                ("stale-token", time.monotonic() + 600),
+                ("fresh-token", time.monotonic() + 600),
+            ]
+        )
+
+        with (
+            patch(
+                "sap_cloud_sdk.agentgateway.agw_client.detect_customer_agent_credentials",
+                return_value="/path/to/credentials",
+            ),
+            patch(
+                "sap_cloud_sdk.agentgateway.agw_client.load_customer_credentials",
+                return_value=_customer_credentials(),
+            ),
+            patch(
+                "sap_cloud_sdk.agentgateway._customer._request_token_mtls",
+                request_mock,
+            ),
+            patch("httpx.AsyncClient", return_value=http_client),
+            patch(
+                "sap_cloud_sdk.agentgateway._customer.streamable_http_client",
+                return_value=stream_ctx,
+            ),
+            patch(
+                "sap_cloud_sdk.agentgateway._customer.ClientSession",
+                return_value=session_ctx,
+            ),
+        ):
+            agw_client = create_client()
+
+            result = await agw_client.call_mcp_tool(
+                tool=mock_tool, user_token="user-jwt"
+            )
+
+            assert result == "ok-after-retry"
+            # Stale exchange + fresh exchange after invalidation
+            assert request_mock.call_count == 2
+

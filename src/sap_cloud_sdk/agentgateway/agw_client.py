@@ -11,6 +11,7 @@ import logging
 from typing import Callable
 
 from sap_cloud_sdk.agentgateway._models import MCPTool
+from sap_cloud_sdk.agentgateway._token_cache import _TokenCache
 from sap_cloud_sdk.agentgateway.config import ClientConfig
 from sap_cloud_sdk.agentgateway._customer import (
     detect_customer_agent_credentials,
@@ -85,6 +86,16 @@ class AgentGatewayClient:
         """
         self._tenant_subdomain = tenant_subdomain
         self._config = config or ClientConfig()
+        self._token_cache = _TokenCache(self._config)
+
+    def clear_token_cache(self) -> None:
+        """Drop all cached tokens. Forces a fresh token fetch on the next call.
+
+        Useful when external state (revoked credentials, tenant change) makes
+        cached tokens unsafe to reuse, or for testing. No-op for LoB flow,
+        which delegates caching to BTP Destination Service.
+        """
+        self._token_cache.clear()
 
     @staticmethod
     def _resolve_value(
@@ -158,7 +169,11 @@ class AgentGatewayClient:
                 )
                 credentials = load_customer_credentials(credentials_path)
                 return await get_mcp_tools_customer(
-                    credentials, self._config.timeout, app_tid
+                    credentials,
+                    self._config.timeout,
+                    self._config,
+                    self._token_cache,
+                    app_tid,
                 )
 
             # LoB flow - requires tenant_subdomain
@@ -251,6 +266,8 @@ class AgentGatewayClient:
                     tool,
                     resolved_user_token,
                     self._config.timeout,
+                    self._config,
+                    self._token_cache,
                     app_tid,
                     **kwargs,
                 )

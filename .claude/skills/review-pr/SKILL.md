@@ -24,7 +24,7 @@ gh pr list --state open --json number,title,author,headRefName
 
 ## Phase 2: Gather Data
 
-Run all five commands **in parallel**:
+**Step 1** — Run all five commands **in parallel**:
 
 ```bash
 gh pr view <number> --json number,title,body,state,labels,headRefName,baseRefName,author,commits,reviews,reviewRequests,files,additions,deletions
@@ -42,13 +42,28 @@ gh pr view <number> --comments
 gh pr view <number> --json commits --jq '.commits[].messageHeadline'
 ```
 
+**Step 2** — Fetch each changed file at the PR head ref for accurate line references.
+
+From the `files` array in Step 1, for each non-binary file run (in parallel):
+
+```bash
+mkdir -p /tmp/pr<number>/$(dirname <path>)
+gh api "repos/SAP/cloud-sdk-python/contents/<path>?ref=<headRefName>" \
+  -H "Accept: application/vnd.github.raw+json" \
+  > /tmp/pr<number>/<path>
+```
+
+Skip files larger than 500 KB or with binary extensions (`.png`, `.jpg`, `.whl`, `.gz`, etc.).
+
+This gives you the full file content at the exact PR state, which you will use in Phase 3 for all `file:line` citations.
+
 ---
 
 ## Phase 3: Evaluate 23 Criteria
 
 Assign each: **✅ Pass** / **⚠️ Warning** / **❌ Fail** / **➖ N/A**
 
-Always include `file:line` references from the diff as evidence.
+For every `file:line` reference: use `Read /tmp/pr<number>/<path>` on the files fetched in Phase 2. Line numbers in that output are exact. Do not derive line positions from diff hunk offsets — diff arithmetic is unreliable.
 
 If you need to verify a specific rule, read the authoritative source directly:
 - `CONTRIBUTING.md`

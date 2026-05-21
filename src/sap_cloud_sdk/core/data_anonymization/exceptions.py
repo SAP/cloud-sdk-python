@@ -20,6 +20,6 @@ class TransportError(DataAnonymizationError):
 
 
 class AuthenticationError(DataAnonymizationError):
-    """Raised when OAuth2 authentication fails."""
+    """Raised when mTLS authentication fails."""
 
     pass

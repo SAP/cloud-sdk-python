@@ -23,7 +23,7 @@ import base64
 import binascii
 import os
 import tempfile
-from typing import Any, BinaryIO, Mapping, Optional, Protocol
+from typing import Any, BinaryIO, Mapping, Optional, Protocol, TypeAlias
 
 import requests
 
@@ -59,6 +59,9 @@ class _ResponseLike(Protocol):
     def json(self) -> Any: ...
 
 
+_FileRequest: TypeAlias = AnonymizeFileRequest | PseudonymizeFileRequest
+
+
 class HttpTransport(Transport):
     """HTTP transport authenticated via Key Store (mTLS client certificate)."""
 
@@ -81,7 +84,6 @@ class HttpTransport(Transport):
             response = self._session.post(
                 url,
                 data=request.to_form_fields(),
-                # params=request.to_query_params(),
                 timeout=_REQUEST_TIMEOUT,
             )
             self._raise_for_status(url, response)
@@ -114,7 +116,6 @@ class HttpTransport(Transport):
             response = self._session.post(
                 url,
                 data=request.to_form_fields(),
-                # params=request.to_query_params(),
                 timeout=_REQUEST_TIMEOUT,
             )
             self._raise_for_status(url, response)
@@ -174,7 +175,7 @@ class HttpTransport(Transport):
     def _post_file_request(
         self,
         url: str,
-        request: Any,
+        request: _FileRequest,
     ) -> requests.Response:
         """Submit a multipart request with either a file path or in-memory bytes."""
         file_handle: Optional[BinaryIO] = None
@@ -196,7 +197,6 @@ class HttpTransport(Transport):
                 url,
                 data=request.to_form_fields(),
                 files=files,
-                # params=request.to_query_params(),
                 timeout=_REQUEST_TIMEOUT,
             )
         finally:

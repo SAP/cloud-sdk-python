@@ -193,11 +193,15 @@ class BindingData:
 
     def to_config(self) -> <SHORT>Config:
         """Transform raw binding into a unified <SHORT>Config."""
+        # TODO: BTP service bindings vary — check the actual binding schema.
+        # Some services provide a separate UAA URL (e.g. binding["uaa"]["url"]);
+        # others include it as a top-level "url" field. Do not derive token_url
+        # from the service URL; read it from the binding instead.
         return <SHORT>Config(
             url=self.url,
             client_id=self.clientid,
             client_secret=self.clientsecret,
-            token_url=self.url.rstrip("/") + "/oauth/token",
+            token_url="",  # TODO: populate from the correct binding field
         )
 
 
@@ -314,7 +318,7 @@ requires:
 ## Installation
 
 ```bash
-uv add sap-cloud-sdk --index-url "https://int.repositories.cloud.sap/artifactory/api/pypi/proxy-3rd-party-pypi/simple"
+uv add sap-cloud-sdk
 ```
 
 ## Quick Start
@@ -430,9 +434,12 @@ Check the generated files against these criteria. Fix any issues found before re
 
 **D2: Public API hygiene**: verify `__all__` in `__init__.py` contains exactly the public symbols and nothing internal.
 
-Run lint to verify the generated files are clean:
+Run the full local quality gate on the generated files:
 ```bash
 uv run ruff check src/sap_cloud_sdk/<MODULE_NAME>/
+uv run ruff format --check src/sap_cloud_sdk/<MODULE_NAME>/
+uv run ty check src/sap_cloud_sdk/<MODULE_NAME>/
+uv run pytest tests/<MODULE_NAME>/ -v
 ```
 
 Fix any reported issues before proceeding.

@@ -23,7 +23,7 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 import httpx
 
-from sap_cloud_sdk.destination import Level
+from sap_cloud_sdk.destination import ConsumptionLevel
 from sap_cloud_sdk.destination import create_client as create_destination_client
 from sap_cloud_sdk.extensibility._models import (
     DEFAULT_EXTENSION_CAPABILITY_ID,
@@ -540,7 +540,8 @@ class UmsTransport:
         # 1. Resolve destination -----------------------------------------
         try:
             dest = self._dest_client.get_destination(
-                self._destination_name, level=Level.SUB_ACCOUNT
+                self._destination_name,
+                level=ConsumptionLevel.PROVIDER_SUBACCOUNT,
             )
         except Exception as exc:
             raise TransportError(

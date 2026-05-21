@@ -13,12 +13,20 @@ Reviews a PR against 23 criteria across 6 sections. Run from the root of the `cl
 
 ## Phase 1: Identify the PR
 
-If the user provided a PR number, use it.
+Determine `REPO` and `NUMBER` from what the user provided:
 
-Otherwise list open PRs and ask the user to pick one:
-```bash
-gh pr list --state open --json number,title,author,headRefName
-```
+- **Full GitHub URL** (e.g. `https://github.com/<owner>/cloud-sdk-python/pull/1`):
+  parse `REPO=<owner>/cloud-sdk-python`, `NUMBER=1`.
+- **`owner/repo#number`** (e.g. `<owner>/cloud-sdk-python#1`):
+  parse accordingly.
+- **Plain number** (e.g. `93`):
+  `REPO=SAP/cloud-sdk-python`, `NUMBER=93`.
+- **Nothing provided**: list open PRs from the default repo and ask the user to pick one:
+  ```bash
+  gh pr list --repo SAP/cloud-sdk-python --state open --json number,title,author,headRefName
+  ```
+
+Use `REPO` and `NUMBER` in every subsequent command.
 
 ---
 
@@ -27,19 +35,19 @@ gh pr list --state open --json number,title,author,headRefName
 **Step 1** — Run all five commands **in parallel**:
 
 ```bash
-gh pr view <number> --json number,title,body,state,labels,headRefName,baseRefName,author,commits,reviews,reviewRequests,files,additions,deletions
+gh pr view <NUMBER> --repo <REPO> --json number,title,body,state,labels,headRefName,baseRefName,author,commits,reviews,reviewRequests,files,additions,deletions
 ```
 ```bash
-gh pr diff <number>
+gh pr diff <NUMBER> --repo <REPO>
 ```
 ```bash
-gh pr checks <number> 2>/dev/null || echo "CI checks not yet available"
+gh pr checks <NUMBER> --repo <REPO> 2>/dev/null || echo "CI checks not yet available"
 ```
 ```bash
-gh pr view <number> --comments
+gh pr view <NUMBER> --repo <REPO> --comments
 ```
 ```bash
-gh pr view <number> --json commits --jq '.commits[].messageHeadline'
+gh pr view <NUMBER> --repo <REPO> --json commits --jq '.commits[].messageHeadline'
 ```
 
 **Step 2** — Fetch each changed file at the PR head ref for accurate line references.
@@ -47,11 +55,13 @@ gh pr view <number> --json commits --jq '.commits[].messageHeadline'
 From the `files` array in Step 1, for each non-binary file run (in parallel):
 
 ```bash
-mkdir -p /tmp/pr<number>/$(dirname <path>)
-gh api "repos/SAP/cloud-sdk-python/contents/<path>?ref=<headRefName>" \
+mkdir -p /tmp/pr<NUMBER>/$(dirname <path>)
+gh api "repos/<REPO>/contents/<path>?ref=<headCommitSHA>" \
   -H "Accept: application/vnd.github.raw+json" \
-  > /tmp/pr<number>/<path>
+  > /tmp/pr<NUMBER>/<path>
 ```
+
+Use the head **commit SHA** (not the branch name) as the ref — branch names are ambiguous for forks.
 
 Skip files larger than 500 KB or with binary extensions (`.png`, `.jpg`, `.whl`, `.gz`, etc.).
 
@@ -63,7 +73,7 @@ This gives you the full file content at the exact PR state, which you will use i
 
 Assign each: **✅ Pass** / **⚠️ Warning** / **❌ Fail** / **➖ N/A**
 
-For every `file:line` reference: use `Read /tmp/pr<number>/<path>` on the files fetched in Phase 2. Line numbers in that output are exact. Do not derive line positions from diff hunk offsets — diff arithmetic is unreliable.
+For every `file:line` reference: use `Read /tmp/pr<NUMBER>/<path>` on the files fetched in Phase 2. Line numbers in that output are exact. Do not derive line positions from diff hunk offsets — diff arithmetic is unreliable.
 
 If you need to verify a specific rule, read the authoritative source directly:
 - `CONTRIBUTING.md`

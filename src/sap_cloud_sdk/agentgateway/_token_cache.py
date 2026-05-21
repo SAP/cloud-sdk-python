@@ -57,7 +57,6 @@ def _parse_jwt_exp(jwt: str) -> int | None:
         if len(parts) < 2:
             return None
         payload_b64 = parts[1]
-        # Pad base64
         payload_b64 += "=" * (-len(payload_b64) % 4)
         claims = json.loads(base64.urlsafe_b64decode(payload_b64))
         exp = claims.get("exp")

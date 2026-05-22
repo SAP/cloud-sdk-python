@@ -10,6 +10,7 @@ from ..config.destination_credential_config import DestinationCredentialConfig
 from ..constants import Channel
 from ..utils.request_validator import RequestValidator
 
+logger = logging.getLogger(__name__)
 
 class EmailClient:
     """
@@ -223,4 +224,5 @@ class EmailClient:
             return output_requests_client.send_output_request(output_request)
             
         except Exception as e:
+        	logger.error(f"failed: {e}")
             raise Exception(f"Failed to send email via destination '{destination_name}': {str(e)}") from e

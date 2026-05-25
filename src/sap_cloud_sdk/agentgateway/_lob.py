@@ -6,7 +6,6 @@ LoB agents use BTP Destination Service for credential management:
 """
 
 import asyncio
-import base64
 import logging
 import os
 import uuid
@@ -61,11 +60,11 @@ def _fetch_auth_token(
     tenant_subdomain: str,
     options: ConsumptionOptions | None = None,
 ) -> tuple[str, str]:
-    """Fetch raw access token and gateway URL from destination service.
+    """Fetch auth token and gateway URL from destination service.
 
-    Extracts the raw JWT by base64-decoding the token value field
-    from the destination service response, and the gateway URL from
-    the destination's URL property.
+    Extracts the raw JWT from the Authorization header value returned by the
+    destination service (e.g. strips the "Bearer " prefix from "Bearer <jwt>"),
+    and the gateway URL from the destination's URL property.
 
     Args:
         dest_name: Destination name.
@@ -73,7 +72,7 @@ def _fetch_auth_token(
         options: Consumption options (fragment_name, user_token).
 
     Returns:
-        Tuple of (raw_access_token, gateway_url).
+        Tuple of (raw_jwt, gateway_url).
 
     Raises:
         MCPServerNotFoundError: If no auth token is returned.
@@ -91,14 +90,17 @@ def _fetch_auth_token(
             f"No auth token returned for destination '{dest_name}'"
         )
 
-    token_value = dest.auth_tokens[0].value
-    if not token_value:
-        raise MCPServerNotFoundError(f"Empty token value for destination '{dest_name}'")
+    auth_token = dest.auth_tokens[0]
+    header_value = auth_token.http_header.get("value") or ""
+    if not header_value:
+        raise MCPServerNotFoundError(f"Empty auth header for destination '{dest_name}'")
 
-    token = base64.b64decode(token_value).decode("utf-8")
+    # Strip "Bearer " prefix — AuthResult.access_token is always a raw JWT
+    raw_token = header_value.removeprefix("Bearer ").strip()
+
     gateway_url = (dest.url or "").rstrip("/")
 
-    return token, gateway_url
+    return raw_token, gateway_url
 
 
 def list_mcp_fragments(tenant_subdomain: str) -> list:

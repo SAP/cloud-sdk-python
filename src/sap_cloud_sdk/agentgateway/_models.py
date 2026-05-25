@@ -11,7 +11,7 @@ class AuthResult:
     Contains the access token and the Agent Gateway URL.
 
     Attributes:
-        access_token: Raw JWT access token string.
+        access_token: Raw JWT access token (no "Bearer " prefix).
         gateway_url: Agent Gateway base URL (no trailing slash).
 
     Example:

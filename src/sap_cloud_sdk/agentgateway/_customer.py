@@ -8,7 +8,6 @@ Authentication flow:
 - Tool invocation: mTLS + jwt-bearer grant → user-scoped token (principal propagation)
 """
 
-import asyncio
 import json
 import logging
 import os
@@ -432,17 +431,18 @@ async def _list_server_tools(
 
 async def get_mcp_tools_customer(
     credentials: CustomerCredentials,
+    system_token: str,
     timeout: float,
-    app_tid: str | None = None,
 ) -> list[MCPTool]:
     """List all MCP tools from servers defined in credentials.
 
     Iterates over all integrationDependencies in the credentials file and
-    discovers tools from each MCP server using mTLS client credentials.
+    discovers tools from each MCP server using a pre-fetched system token.
 
     Args:
         credentials: Customer credentials with integrationDependencies.
-        app_tid: BTP Application Tenant ID of subscriber (optional).
+        system_token: Pre-fetched raw system token for authentication.
+        timeout: HTTP timeout in seconds for MCP server calls.
 
     Returns:
         List of MCPTool objects from all servers.
@@ -458,12 +458,6 @@ async def get_mcp_tools_customer(
         )
 
     logger.info("Discovering tools from %d MCP server(s)", len(dependencies))
-
-    # Get system token for discovery
-    loop = asyncio.get_running_loop()
-    system_token = await loop.run_in_executor(
-        None, get_system_token_mtls, credentials, timeout, app_tid
-    )
 
     tools: list[MCPTool] = []
 
@@ -490,24 +484,20 @@ async def get_mcp_tools_customer(
 
 
 async def call_mcp_tool_customer(
-    credentials: CustomerCredentials,
     tool: MCPTool,
-    user_token: str | None,
+    auth_token: str,
     timeout: float,
-    app_tid: str | None = None,
     **kwargs,
 ) -> str:
     """Invoke an MCP tool using customer flow.
 
-    If user_token is provided, exchanges it for an AGW-scoped token to preserve
-    user identity for principal propagation. Otherwise, falls back to system token.
+    Uses a pre-fetched token (either user-scoped or system-scoped) for
+    authentication against the MCP server.
 
     Args:
-        credentials: Customer credentials.
         tool: MCPTool to invoke.
-        user_token: User's JWT token for principal propagation (optional).
-            If None, system token is used instead (no principal propagation).
-        app_tid: BTP Application Tenant ID of subscriber (optional).
+        auth_token: Pre-fetched raw access token for authentication.
+        timeout: HTTP timeout in seconds for the MCP server call.
         **kwargs: Tool input parameters.
 
     Returns:
@@ -515,28 +505,9 @@ async def call_mcp_tool_customer(
     """
     logger.info("Calling tool '%s' on server '%s'", tool.name, tool.server_name)
 
-    loop = asyncio.get_running_loop()
-
-    if user_token:
-        # Exchange user token for AGW-scoped token (with principal propagation)
-        agw_token = await loop.run_in_executor(
-            None, exchange_user_token, credentials, user_token, timeout, app_tid
-        )
-    else:
-        # TODO: IBD workaround - use system token when user_token is not available.
-        # This bypasses principal propagation. Remove this fallback once IBD
-        # supports proper user token flow.
-        logger.warning(
-            "No user_token provided - using system token for tool invocation. "
-            "Principal propagation will NOT work."
-        )
-        agw_token = await loop.run_in_executor(
-            None, get_system_token_mtls, credentials, timeout, app_tid
-        )
-
     async with httpx.AsyncClient(
         headers={
-            "Authorization": f"Bearer {agw_token}",
+            "Authorization": f"Bearer {auth_token}",
             "x-correlation-id": str(uuid.uuid4()),
         },
         timeout=timeout,

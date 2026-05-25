@@ -52,7 +52,7 @@ Usage (Customer agent):
     ]
 """
 
-from sap_cloud_sdk.agentgateway._models import MCPTool
+from sap_cloud_sdk.agentgateway._models import AuthResult, MCPTool
 from sap_cloud_sdk.agentgateway.config import ClientConfig
 from sap_cloud_sdk.agentgateway.agw_client import create_client, AgentGatewayClient
 from sap_cloud_sdk.agentgateway.exceptions import (
@@ -69,6 +69,7 @@ __all__ = [
     # Configuration
     "ClientConfig",
     # Data models
+    "AuthResult",
     "MCPTool",
     # Exceptions
     "AgentGatewaySDKError",

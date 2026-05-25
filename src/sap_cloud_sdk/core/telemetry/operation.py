@@ -114,6 +114,8 @@ class Operation(str, Enum):
     # Agent Gateway Operations
     AGENTGATEWAY_LIST_MCP_TOOLS = "list_mcp_tools"
     AGENTGATEWAY_CALL_MCP_TOOL = "call_mcp_tool"
+    AGENTGATEWAY_GET_SYSTEM_AUTH = "get_system_auth"
+    AGENTGATEWAY_GET_USER_AUTH = "get_user_auth"
 
     # Agent Memory Operations
     AGENT_MEMORY_ADD_MEMORY = "add_memory"

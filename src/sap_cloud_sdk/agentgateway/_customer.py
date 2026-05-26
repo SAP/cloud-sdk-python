@@ -25,7 +25,7 @@ from sap_cloud_sdk.agentgateway._models import (
     IntegrationDependency,
     MCPTool,
 )
-from sap_cloud_sdk.agentgateway._token_cache import _TokenCache, compute_expires_at
+from sap_cloud_sdk.agentgateway._token_cache import _TokenCache
 from sap_cloud_sdk.agentgateway.config import ClientConfig
 from sap_cloud_sdk.agentgateway.exceptions import AgentGatewaySDKError
 
@@ -213,7 +213,7 @@ def _request_token_mtls(
     credentials: CustomerCredentials,
     grant_type: str,
     timeout: float,
-    config: ClientConfig,
+    cache: _TokenCache,
     app_tid: str | None = None,
     extra_data: dict | None = None,
 ) -> tuple[str, float]:
@@ -223,7 +223,7 @@ def _request_token_mtls(
         credentials: Customer credentials with certificate and private key.
         grant_type: OAuth2 grant type.
         timeout: HTTP timeout in seconds.
-        config: Client configuration (used to compute cache expiry).
+        cache: Token cache to calculate expiry (for buffer and fallback TTL).
         app_tid: BTP Application Tenant ID of subscriber (optional).
         extra_data: Additional form data for the token request.
 
@@ -289,7 +289,7 @@ def _request_token_mtls(
                 f"Token response missing 'access_token'. Keys: {list(token_data.keys())}"
             )
 
-        expires_at = compute_expires_at(token_data, config)
+        expires_at = cache.compute_expires_at(token_data)
 
         logger.debug("Token acquired successfully (length: %d)", len(access_token))
         return access_token, expires_at
@@ -301,7 +301,6 @@ def _request_token_mtls(
 def get_system_token_mtls(
     credentials: CustomerCredentials,
     timeout: float,
-    config: ClientConfig,
     cache: _TokenCache,
     app_tid: str | None = None,
 ) -> str:
@@ -313,7 +312,6 @@ def get_system_token_mtls(
     Args:
         credentials: Customer credentials.
         timeout: HTTP timeout in seconds.
-        config: Client configuration.
         cache: Token cache to consult and update.
         app_tid: BTP Application Tenant ID of subscriber (optional).
 
@@ -330,7 +328,7 @@ def get_system_token_mtls(
         credentials,
         grant_type=_GRANT_TYPE_CLIENT_CREDENTIALS,
         timeout=timeout,
-        config=config,
+        cache=cache,
         app_tid=app_tid,
         extra_data={"response_type": "token"},
     )
@@ -342,7 +340,6 @@ def exchange_user_token(
     credentials: CustomerCredentials,
     user_token: str,
     timeout: float,
-    config: ClientConfig,
     cache: _TokenCache,
     app_tid: str | None = None,
 ) -> str:
@@ -356,7 +353,6 @@ def exchange_user_token(
         credentials: Customer credentials.
         user_token: User's JWT token to exchange.
         timeout: HTTP timeout in seconds.
-        config: Client configuration.
         cache: Token cache to consult and update.
         app_tid: BTP Application Tenant ID of subscriber (optional).
 
@@ -373,7 +369,7 @@ def exchange_user_token(
         credentials,
         grant_type=_GRANT_TYPE_JWT_BEARER,
         timeout=timeout,
-        config=config,
+        cache=cache,
         app_tid=app_tid,
         extra_data={
             "assertion": user_token,
@@ -505,7 +501,7 @@ async def get_mcp_tools_customer(
     async def refetch_system_token() -> str:
         loop = asyncio.get_running_loop()
         new_token = await loop.run_in_executor(
-            None, get_system_token_mtls, credentials, timeout, config, cache, app_tid
+            None, get_system_token_mtls, credentials, timeout, cache, app_tid
         )
         return new_token
 
@@ -592,7 +588,6 @@ async def call_mcp_tool_customer(
                 credentials,
                 user_token,
                 timeout,
-                config,
                 cache,
                 app_tid,
             )
@@ -604,7 +599,7 @@ async def call_mcp_tool_customer(
             "Principal propagation will NOT work."
         )
         return await loop.run_in_executor(
-            None, get_system_token_mtls, credentials, timeout, config, cache, app_tid
+            None, get_system_token_mtls, credentials, timeout, cache, app_tid
         )
 
     def _invalidate_token() -> None:

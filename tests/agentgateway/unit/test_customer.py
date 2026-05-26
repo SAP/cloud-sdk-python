@@ -308,7 +308,7 @@ class TestGetSystemTokenMtls:
             mock_client_class.return_value = mock_client
 
             result = get_system_token_mtls(
-                credentials, timeout=60.0, config=ClientConfig(), cache=_TokenCache(ClientConfig())
+                credentials, timeout=60.0, cache=_TokenCache(ClientConfig())
             )
 
             assert result == "system-token-123"
@@ -339,7 +339,6 @@ class TestGetSystemTokenMtls:
                 get_system_token_mtls(
                     credentials,
                     timeout=60.0,
-                    config=ClientConfig(),
                     cache=_TokenCache(ClientConfig()),
                 )
 
@@ -387,7 +386,6 @@ class TestExchangeUserToken:
                 credentials,
                 "user-jwt-token",
                 timeout=60.0,
-                config=ClientConfig(),
                 cache=_TokenCache(ClientConfig()),
             )
 
@@ -421,7 +419,6 @@ class TestExchangeUserToken:
                 credentials,
                 "user-jwt",
                 timeout=60.0,
-                config=ClientConfig(),
                 cache=_TokenCache(ClientConfig()),
                 app_tid="test-tid",
             )

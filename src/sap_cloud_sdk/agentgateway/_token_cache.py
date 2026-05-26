@@ -61,36 +61,6 @@ def _parse_jwt_exp(jwt: str) -> int | None:
         return None
 
 
-def compute_expires_at(token_data: dict, config: ClientConfig) -> float:
-    """Resolve the cache expiry timestamp (monotonic) for a token response.
-
-    Resolution order:
-      1. `expires_in` from the response, minus the buffer.
-      2. `exp` claim from `id_token` (translated from wall clock to monotonic),
-         minus the buffer.
-      3. Config-provided fallback TTL.
-    """
-    now_mono = time.monotonic()
-    buffer = config.token_expiry_buffer_seconds
-
-    expires_in = token_data.get("expires_in")
-    if expires_in is not None:
-        try:
-            return now_mono + int(expires_in) - buffer
-        except (ValueError, TypeError):
-            pass
-
-    id_token = token_data.get("id_token")
-    if id_token:
-        exp = _parse_jwt_exp(id_token)
-        if exp is not None:
-            remaining = exp - time.time()
-            if remaining > buffer:
-                return now_mono + remaining - buffer
-
-    return now_mono + config.fallback_token_ttl_seconds
-
-
 class _TokenCache:
     """Per-client token cache with TTL and LRU eviction.
 
@@ -170,6 +140,37 @@ class _TokenCache:
         key = self._hash_key(user_jwt, client_id)
         if self._user_tokens.pop(key, None):
             logger.debug("Invalidated user token (client_id=%s)", client_id)
+
+    # --- Utility ---
+
+    def compute_expires_at(self, token_data: dict) -> float:
+        """Resolve the cache expiry timestamp (monotonic) for a token response.
+
+        Resolution order:
+        1. `expires_in` from the response, minus the buffer.
+        2. `exp` claim from `id_token` (translated from wall clock to monotonic),
+            minus the buffer.
+        3. Config-provided fallback TTL.
+        """
+        now_mono = time.monotonic()
+        buffer = self._config.token_expiry_buffer_seconds
+
+        expires_in = token_data.get("expires_in")
+        if expires_in is not None:
+            try:
+                return now_mono + int(expires_in) - buffer
+            except (ValueError, TypeError):
+                pass
+
+        id_token = token_data.get("id_token")
+        if id_token:
+            exp = _parse_jwt_exp(id_token)
+            if exp is not None:
+                remaining = exp - time.time()
+                if remaining > buffer:
+                    return now_mono + remaining - buffer
+
+        return now_mono + self._config.fallback_token_ttl_seconds
 
     # --- Maintenance ---
 

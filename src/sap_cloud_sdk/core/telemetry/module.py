@@ -6,6 +6,7 @@ from enum import Enum
 class Module(str, Enum):
     """SDK module identifiers for telemetry."""
 
+    ADMS = "adms"
     AGENT_MEMORY = "agent_memory"
     AGENTGATEWAY = "agentgateway"
     AICORE = "aicore"

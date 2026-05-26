@@ -1,0 +1,135 @@
+"""SAP Cloud SDK for Python — DMS (Advanced Document Management) module.
+
+Provides a typed, high-level Python client for the SAP ADM OData V4 service.
+
+ADM is a **BTP Shared SaaS Application** (IAS-based multi-tenant service).
+It must be provisioned via Unified Provisioning / UCL before use.
+See the BTP Fabric SDK Business Services TRA for provisioning details.
+
+Quick start::
+
+    from sap_cloud_sdk.adms import (
+        create_client,
+        BaseType,
+        CreateDocumentInput,
+        CreateDocumentRelationInput,
+    )
+
+    # Reads binding from /etc/secrets/appfnd/adms/default/ or env vars
+    client = create_client("default")
+
+    # Link a document to a business object
+    relation = client.relations.create(
+        CreateDocumentRelationInput(
+            business_object_node_type_unique_id="PurchaseOrder",
+            host_business_object_node_id="PO-4500012345",
+            document=CreateDocumentInput(
+                document_name="Invoice.pdf",
+                document_base_type=BaseType.DOCUMENT,
+                document_type_id="INVOICE",
+            ),
+            is_active_entity=False,
+        )
+    )
+    # Upload bytes to presigned URL (outside SDK)
+    import requests
+    requests.put(relation.document.document_content_upload_urls[0], data=open("f.pdf","rb"))
+"""
+
+from __future__ import annotations
+
+from sap_cloud_sdk.adms.client import (
+    AdmsClient,
+    AsyncAdmsClient,
+    create_client,
+    create_async_client,
+)
+from sap_cloud_sdk.adms.config import AdmsConfig
+from sap_cloud_sdk.adms.exceptions import (
+    AuthError,
+    ClientCreationError,
+    ConfigError,
+    AdmsError,
+    AdmsOperationError,
+    DocumentNotFoundError,
+    HttpError,
+    ScanNotCleanError,
+)
+from sap_cloud_sdk.adms._models import (
+    AllowedDomain,
+    BaseType,
+    BusinessObjectNodeType,
+    CreateAllowedDomainInput,
+    CreateBusinessObjectNodeTypeInput,
+    CreateDocumentTypeBoTypeMapInput,
+    CreateDocumentInput,
+    CreateDocumentRelationInput,
+    CreateDocumentTypeInput,
+    DeleteUserDataJobParameters,
+    Document,
+    DocumentContentVersion,
+    DocumentRelation,
+    DocumentType,
+    DocumentTypeBusinessObjectTypeMap,
+    DocumentTypeText,
+    DraftActivateInput,
+    DraftInput,
+    JobInput,
+    JobOutput,
+    JobStatus,
+    JobType,
+    ScanStatus,
+    UpdateDocumentInput,
+    ZipDownloadJobParameters,
+)
+from sap_cloud_sdk.core.auth._token_cache import TokenCache
+
+
+__all__ = [
+    # factories
+    "create_client",
+    "create_async_client",
+    # clients
+    "AdmsClient",
+    "AsyncAdmsClient",
+    # config
+    "AdmsConfig",
+    # cache
+    "TokenCache",
+    # exceptions
+    "AuthError",
+    "ClientCreationError",
+    "ConfigError",
+    "AdmsError",
+    "AdmsOperationError",
+    "DocumentNotFoundError",
+    "HttpError",
+    "ScanNotCleanError",
+    # models — core
+    "BaseType",
+    "CreateDocumentInput",
+    "CreateDocumentRelationInput",
+    "DeleteUserDataJobParameters",
+    "Document",
+    "DocumentContentVersion",
+    "DocumentRelation",
+    "DraftActivateInput",
+    "DraftInput",
+    "JobInput",
+    "JobOutput",
+    "JobStatus",
+    "JobType",
+    "ScanStatus",
+    "UpdateDocumentInput",
+    "ZipDownloadJobParameters",
+    # models — config
+    "AllowedDomain",
+    "BusinessObjectNodeType",
+    "CreateAllowedDomainInput",
+    "CreateBusinessObjectNodeTypeInput",
+    "CreateDocumentTypeBoTypeMapInput",
+    "CreateDocumentTypeInput",
+    "DocumentType",
+    "DocumentTypeBusinessObjectTypeMap",
+    "DocumentTypeText",
+]

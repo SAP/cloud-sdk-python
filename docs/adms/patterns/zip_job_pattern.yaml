@@ -1,0 +1,88 @@
+name: zip_job_pattern
+version: "1.0"
+description: >
+  Start a ZIP_DOWNLOAD job in SAP ADM and poll until completion.
+  Used to batch-download multiple documents as a single ZIP archive.
+  The job runs asynchronously on the ADM server — the pattern handles
+  start → poll → download handoff.
+
+intent_keywords:
+  - download all documents
+  - bulk download
+  - zip download
+  - export all attachments
+  - download document package
+  - batch export
+  - zip all documents for business object
+
+required_apis:
+  - step: 1
+    id: start_zip_job
+    api: "client.jobs.start_zip_download"
+    description: >
+      Submit a ZIP_DOWNLOAD job to DocumentService.
+      Returns immediately with a JobID — the archive is built asynchronously.
+    input_schema:
+      type: ZipDownloadJobParameters
+      required_fields:
+        - business_object_node_type_unique_id
+        - host_business_object_node_id
+      optional_fields:
+        - document_relation_ids     # subset selection; omit for all documents
+    output: "JobOutput (job_id, job_status=RUNNING)"
+    service_path: odata/v4/DocumentService
+    depends_on: []
+
+  - step: 2
+    id: poll_job_status
+    api: "client.jobs.get_status"
+    description: >
+      Poll the job status using the job_id from step 1.
+      Repeat until job_status.is_terminal() returns True.
+      Terminal states: COMPLETED, FAILED, CANCELLED.
+    poll_interval_seconds: 10
+    max_polls: 30
+    terminal_check: "output.job_status.is_terminal()"
+    terminal_states:
+      - COMPLETED
+      - FAILED
+      - CANCELLED
+    depends_on: [start_zip_job]
+
+  - step: 3
+    id: retrieve_zip
+    api: "external_http_get"
+    description: >
+      On COMPLETED, read the presigned download URL from
+      job_result["DownloadURL"] and stream the ZIP to the caller.
+      The URL is time-limited — do not cache or log it.
+    precondition: "job_status == COMPLETED"
+    depends_on: [poll_job_status]
+
+validation_rules:
+  - rule: "Only proceed to step 3 if job_status == COMPLETED"
+    field: job_status
+  - rule: "DownloadURL from job_result must NOT be cached or logged"
+    security: true
+  - rule: "business_object_node_type_unique_id must not be empty"
+  - rule: "host_business_object_node_id must not be empty"
+
+error_handling:
+  - error: "job_status == FAILED"
+    action: >
+      Read job_result for error details, surface to user.
+      Do not retry automatically — FAILED jobs require investigation.
+  - error: "job_status == CANCELLED"
+    action: Inform user that the job was cancelled and offer to restart.
+  - error: "max_polls exceeded"
+    action: >
+      Warn user that the job is taking longer than expected.
+      Return the job_id so the user can check status later.
+  - error: HttpError
+    action: Retry get_status up to 3 times with backoff.
+
+use_cases:
+  - "User requests 'download all invoices for PO-4500012345'"
+  - "Nightly batch export of all documents for archival"
+  - "LangGraph node: package all attachments for a contract and deliver as ZIP"
+  - "Compliance: export all documents linked to a user for audit"

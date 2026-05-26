@@ -1,0 +1,104 @@
+name: draft_lifecycle_pattern
+version: "1.0"
+description: >
+  Manage the draft → validate → activate lifecycle for DocumentRelations in SAP ADM.
+  Used when document attachments must be prepared before the parent business object
+  is saved (e.g. SAP Fiori draft flows, CAP Draft handling).
+  Mirrors the CAP Draft pattern: create draft → upload → validate → activate OR discard.
+
+intent_keywords:
+  - create draft
+  - draft document
+  - draft lifecycle
+  - activate draft
+  - discard draft
+  - validate draft
+  - prepare document before save
+  - document draft
+
+required_apis:
+  - step: 1
+    id: create_draft
+    api: "client.relations.create_draft"
+    description: >
+      Create draft DocumentRelations for a business object node.
+      Returns draft relations that are not yet visible to other users.
+    input_schema:
+      type: DraftInput
+      required_fields:
+        - business_object_node_type_unique_id
+        - host_business_object_node_id
+    output: "List[DocumentRelation] — draft entities (IsActiveEntity=false)"
+    depends_on: []
+
+  - step: 2
+    id: upload_to_draft
+    api: "client.relations.generate_upload_urls"
+    description: >
+      Generate presigned upload URL(s) for the draft DocumentRelation.
+      Upload file bytes to the returned URLs before proceeding to validation.
+    input_fields:
+      - document_relation_id (from step 1 result)
+      - is_active_entity: false
+    depends_on: [create_draft]
+
+  - step: 3
+    id: validate_draft
+    api: "client.relations.validate_draft"
+    description: >
+      Validate the draft entities.  **Always call this before activate_draft.**
+      Validation checks business rules (required fields, format constraints).
+    input_schema:
+      type: DraftInput
+      required_fields:
+        - business_object_node_type_unique_id
+        - host_business_object_node_id
+    output: "List[DocumentRelation] — validated draft entities"
+    depends_on: [upload_to_draft]
+
+  - step: 4a
+    id: activate_draft
+    api: "client.relations.activate_draft"
+    description: >
+      Activate the validated draft — makes the relations visible as active entities.
+      Only call after a successful validate_draft.
+    input_schema:
+      type: DraftActivateInput
+      required_fields:
+        - business_object_node_type_unique_id
+        - host_business_object_node_id
+    output: "List[DocumentRelation] — now-active entities (IsActiveEntity=true)"
+    depends_on: [validate_draft]
+    alternative: discard_draft
+
+  - step: 4b
+    id: discard_draft
+    api: "client.relations.discard_draft"
+    description: >
+      Discard the draft without activating — call when validation fails or
+      the user cancelled the action.  Prevents orphaned draft entities.
+    input_schema:
+      type: DraftInput
+    depends_on: [create_draft]
+    alternative: activate_draft
+
+validation_rules:
+  - rule: "validate_draft MUST be called before activate_draft"
+    enforced_by: pattern_sequence
+  - rule: "Every create_draft MUST be followed by either activate_draft or discard_draft"
+    enforced_by: pattern_sequence
+  - rule: "Upload to draft relations using is_active_entity=false"
+    field: is_active_entity
+
+error_handling:
+  - error: HttpError on validate_draft
+    action: Call discard_draft to clean up the orphaned draft, then surface error.
+  - error: DocumentNotFoundError
+    action: Draft may have expired; start from create_draft.
+  - error: Any exception after create_draft
+    action: Always call discard_draft in the exception handler to avoid orphaned drafts.
+
+use_cases:
+  - "SAP Fiori app with CAP Draft flow — attach documents before saving the parent entity"
+  - "Prepare document package in a wizard before final submission"
+  - "LangGraph node: build a draft document set, validate, then activate on user confirmation"

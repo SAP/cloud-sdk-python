@@ -76,6 +76,46 @@ class Operation(str, Enum):
         "get_extension_capability_implementation"
     )
     EXTENSIBILITY_CALL_HOOK = "call_hook"
+    # ADMS — DocumentRelation Operations
+    ADMS_RELATIONS_GET_ALL = "relations_get_all"
+    ADMS_RELATIONS_GET = "relations_get"
+    ADMS_RELATIONS_CREATE = "relations_create"
+    ADMS_RELATIONS_DELETE = "relations_delete"
+    ADMS_RELATIONS_GENERATE_UPLOAD_URLS = "relations_generate_upload_urls"
+    ADMS_RELATIONS_COMPLETE_MULTIPART_UPLOAD = "relations_complete_multipart_upload"
+    ADMS_RELATIONS_LOCK = "relations_lock"
+    ADMS_RELATIONS_UNLOCK = "relations_unlock"
+    ADMS_RELATIONS_CREATE_DRAFT = "relations_create_draft"
+    ADMS_RELATIONS_VALIDATE_DRAFT = "relations_validate_draft"
+    ADMS_RELATIONS_ACTIVATE_DRAFT = "relations_activate_draft"
+    ADMS_RELATIONS_DISCARD_DRAFT = "relations_discard_draft"
+
+    # ADMS — Document Operations
+    ADMS_DOCUMENTS_GET_ALL = "documents_get_all"
+    ADMS_DOCUMENTS_GET = "documents_get"
+    ADMS_DOCUMENTS_GET_DOWNLOAD_URL = "documents_get_download_url"
+    ADMS_DOCUMENTS_UPDATE = "documents_update"
+    ADMS_DOCUMENTS_RESTORE_CONTENT_VERSION = "documents_restore_content_version"
+    ADMS_DOCUMENTS_DELETE_CONTENT_VERSION = "documents_delete_content_version"
+
+    # ADMS — Job Operations
+    ADMS_JOBS_START_ZIP_DOWNLOAD = "jobs_start_zip_download"
+    ADMS_JOBS_START_DELETE_USER_DATA = "jobs_start_delete_user_data"
+    ADMS_JOBS_GET_STATUS = "jobs_get_status"
+
+    # ADMS — Configuration Operations
+    ADMS_CONFIG_GET_ALL_ALLOWED_DOMAINS = "config_get_all_allowed_domains"
+    ADMS_CONFIG_CREATE_ALLOWED_DOMAIN = "config_create_allowed_domain"
+    ADMS_CONFIG_DELETE_ALLOWED_DOMAIN = "config_delete_allowed_domain"
+    ADMS_CONFIG_GET_ALL_DOCUMENT_TYPES = "config_get_all_document_types"
+    ADMS_CONFIG_CREATE_DOCUMENT_TYPE = "config_create_document_type"
+    ADMS_CONFIG_DELETE_DOCUMENT_TYPE = "config_delete_document_type"
+    ADMS_CONFIG_GET_ALL_BUSINESS_OBJECT_TYPES = "config_get_all_business_object_types"
+    ADMS_CONFIG_CREATE_BUSINESS_OBJECT_TYPE = "config_create_business_object_type"
+    ADMS_CONFIG_DELETE_BUSINESS_OBJECT_TYPE = "config_delete_business_object_type"
+    ADMS_CONFIG_GET_ALL_DOCTYPE_BOTYPE_MAPS = "config_get_all_doctype_botype_maps"
+    ADMS_CONFIG_CREATE_DOCTYPE_BOTYPE_MAP = "config_create_doctype_botype_map"
+    ADMS_CONFIG_DELETE_DOCTYPE_BOTYPE_MAP = "config_delete_doctype_botype_map"
 
     # AI Core Operations
     AICORE_SET_CONFIG = "set_aicore_config"

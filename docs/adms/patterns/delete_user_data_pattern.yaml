@@ -1,0 +1,102 @@
+name: delete_user_data_pattern
+version: "1.0"
+description: >
+  Start a DELETE_USER_DATA job in SAP ADM for GDPR erasure compliance.
+  Replaces all audit-field references (created_by, changed_by) to the specified
+  user across all Document and DocumentRelation records.
+  Routes to AdminService — requires system-user (client_credentials) auth,
+  NOT user-OBO auth.  This pattern must never be triggered by end-user interaction
+  without a confirmed deletion request workflow.
+
+intent_keywords:
+  - delete user data
+  - gdpr erasure
+  - right to be forgotten
+  - anonymize user
+  - erase personal data
+  - delete user from documents
+  - gdpr request
+
+required_apis:
+  - step: 1
+    id: confirm_deletion
+    api: "workflow_gate"
+    description: >
+      MANDATORY human-in-the-loop confirmation gate before starting erasure.
+      Never auto-trigger DELETE_USER_DATA without explicit user confirmation.
+      Log the confirmation event with timestamp and approver identity.
+    security: CRITICAL
+    depends_on: []
+
+  - step: 2
+    id: start_delete_job
+    api: "client.jobs.start_delete_user_data"
+    description: >
+      Submit a DELETE_USER_DATA job to **AdminService** (not DocumentService).
+      Must use service-to-service credentials (client_credentials grant —
+      do NOT use user_jwt for this call).
+    input_schema:
+      type: DeleteUserDataJobParameters
+      required_fields:
+        - user_id
+    output: "JobOutput (job_id, job_status=RUNNING)"
+    service_path: odata/v4/AdminService
+    auth_note: >
+      Use create_client("default") — NOT create_client("default", user_jwt=...).
+      AdminService enforces system-level authorization.
+    depends_on: [confirm_deletion]
+
+  - step: 3
+    id: poll_job_status
+    api: "client.jobs.get_status"
+    description: >
+      Poll using the job_id from step 2 until job_status.is_terminal() is True.
+    poll_interval_seconds: 15
+    max_polls: 20
+    terminal_check: "output.job_status.is_terminal()"
+    terminal_states:
+      - COMPLETED
+      - FAILED
+      - CANCELLED
+    depends_on: [start_delete_job]
+
+  - step: 4
+    id: audit_log_completion
+    api: "workflow_gate"
+    description: >
+      Write an audit log entry recording the completion (or failure) of the
+      erasure job, including job_id, user_id, timestamp, and final status.
+      Required for GDPR Article 17 compliance evidence.
+    depends_on: [poll_job_status]
+
+validation_rules:
+  - rule: "user_id must be a non-empty string matching the IAS user principal"
+    field: user_id
+  - rule: "NEVER trigger this pattern without explicit confirmation from an authorized approver"
+    security: CRITICAL
+  - rule: "NEVER use user_jwt — AdminService requires system auth (client_credentials)"
+    security: true
+  - rule: "job completion MUST be audit-logged for GDPR Art. 17 compliance"
+  - rule: "This pattern must only be available to GDPR officers / admins in AMS policy"
+
+error_handling:
+  - error: "job_status == FAILED"
+    action: >
+      Log failure with all details.  Escalate to platform admin.
+      Do not silently fail — GDPR erasure failures are compliance incidents.
+  - error: HttpError on start
+    action: Do not retry automatically — log and escalate.
+  - error: "max_polls exceeded"
+    action: >
+      Log that the job is still running.  Return job_id for manual follow-up.
+      Do not assume the erasure has completed.
+
+use_cases:
+  - "GDPR Right to Erasure request workflow for a departing employee"
+  - "Data subject access request — delete user from all ADM document audit fields"
+  - "LangGraph workflow: GDPR deletion pipeline triggered by HR offboarding event"
+
+compliance:
+  regulation: GDPR Article 17 (Right to Erasure)
+  evidence_required: true
+  requires_human_approval: true

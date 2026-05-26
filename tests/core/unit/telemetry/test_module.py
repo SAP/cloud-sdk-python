@@ -13,23 +13,29 @@ class TestModule:
         assert Module.AICORE.value == "aicore"
         assert Module.AUDITLOG.value == "auditlog"
         assert Module.AUDITLOG_NG.value == "auditlog_ng"
+        assert Module.DATA_ANONYMIZATION.value == "data_anonymization"
         assert Module.DESTINATION.value == "destination"
         assert Module.OBJECTSTORE.value == "objectstore"
+        assert Module.DMS.value == "dms"
 
     def test_module_str_representation(self):
         """Test that Module enum converts to string correctly."""
         assert str(Module.AICORE) == "aicore"
         assert str(Module.AUDITLOG) == "auditlog"
         assert str(Module.AUDITLOG_NG) == "auditlog_ng"
+        assert str(Module.DATA_ANONYMIZATION) == "data_anonymization"
         assert str(Module.DESTINATION) == "destination"
         assert str(Module.OBJECTSTORE) == "objectstore"
+        assert str(Module.DMS) == "dms"
 
     def test_module_is_string_enum(self):
         """Test that Module enum inherits from str."""
         assert isinstance(Module.AICORE, str)
         assert isinstance(Module.AUDITLOG, str)
         assert isinstance(Module.AUDITLOG_NG, str)
+        assert isinstance(Module.DATA_ANONYMIZATION, str)
         assert isinstance(Module.DESTINATION, str)
+        assert isinstance(Module.DMS, str)
 
     def test_module_equality(self):
         """Test Module enum equality comparisons."""
@@ -47,9 +53,11 @@ class TestModule:
     def test_all_modules_present(self):
         """Test that all expected modules are present."""
         all_modules = list(Module)
-        assert len(all_modules) == 10
+        assert len(all_modules) == 11
         assert Module.AICORE in all_modules
         assert Module.AUDITLOG in all_modules
+        assert Module.AUDITLOG_NG in all_modules
+        assert Module.DATA_ANONYMIZATION in all_modules
         assert Module.DESTINATION in all_modules
         assert Module.EXTENSIBILITY in all_modules
         assert Module.OBJECTSTORE in all_modules
@@ -62,6 +70,8 @@ class TestModule:
         assert "aicore" in module_values
         assert "auditlog" in module_values
         assert "auditlog_ng" in module_values
+        assert "data_anonymization" in module_values
         assert "destination" in module_values
         assert "objectstore" in module_values
+        assert "dms" in module_values
         assert "extensibility" in module_values

@@ -37,11 +37,13 @@ class TestAsyncHttpClientInit:
 
 
 class TestAsyncHttpClientContextManager:
+    @pytest.mark.asyncio
     async def test_aenter_returns_self(self, mock_httpx_client):
         c = AsyncHttpClient(base_url="https://api.example.com", client=mock_httpx_client)
         async with c as ctx:
             assert ctx is c
 
+    @pytest.mark.asyncio
     async def test_aexit_closes_client(self, mock_httpx_client):
         c = AsyncHttpClient(base_url="https://api.example.com", client=mock_httpx_client)
         async with c:
@@ -50,6 +52,7 @@ class TestAsyncHttpClientContextManager:
 
 
 class TestAsyncHttpClientGet:
+    @pytest.mark.asyncio
     async def test_get_injects_bearer_token(self, mock_httpx_client):
         mock_httpx_client.request.return_value = _make_response(200, {"items": []})
         c = AsyncHttpClient(
@@ -61,6 +64,7 @@ class TestAsyncHttpClientGet:
         headers = mock_httpx_client.request.call_args[1]["headers"]
         assert headers["Authorization"] == "Bearer my-token"
 
+    @pytest.mark.asyncio
     async def test_get_no_token_no_auth_header(self, mock_httpx_client):
         mock_httpx_client.request.return_value = _make_response(200, {})
         c = AsyncHttpClient(base_url="https://api.example.com", client=mock_httpx_client)
@@ -68,6 +72,7 @@ class TestAsyncHttpClientGet:
         headers = mock_httpx_client.request.call_args[1]["headers"]
         assert "Authorization" not in headers
 
+    @pytest.mark.asyncio
     async def test_get_constructs_correct_url(self, mock_httpx_client):
         mock_httpx_client.request.return_value = _make_response(200, {})
         c = AsyncHttpClient(base_url="https://api.example.com", client=mock_httpx_client)
@@ -75,6 +80,7 @@ class TestAsyncHttpClientGet:
         url = mock_httpx_client.request.call_args[1]["url"]
         assert url == "https://api.example.com/v1/items"
 
+    @pytest.mark.asyncio
     async def test_get_passes_params(self, mock_httpx_client):
         mock_httpx_client.request.return_value = _make_response(200, {})
         c = AsyncHttpClient(base_url="https://api.example.com", client=mock_httpx_client)
@@ -82,12 +88,14 @@ class TestAsyncHttpClientGet:
         params = mock_httpx_client.request.call_args[1]["params"]
         assert params == {"$top": "5"}
 
+    @pytest.mark.asyncio
     async def test_404_raises_not_found_error(self, mock_httpx_client):
         mock_httpx_client.request.return_value = _make_response(404, "not found")
         c = AsyncHttpClient(base_url="https://api.example.com", client=mock_httpx_client)
         with pytest.raises(NotFoundError):
             await c.get("/items/missing")
 
+    @pytest.mark.asyncio
     async def test_500_raises_http_error(self, mock_httpx_client):
         mock_httpx_client.request.return_value = _make_response(500, "server error")
         c = AsyncHttpClient(base_url="https://api.example.com", client=mock_httpx_client)
@@ -95,6 +103,7 @@ class TestAsyncHttpClientGet:
             await c.get("/items")
         assert exc_info.value.status_code == 500
 
+    @pytest.mark.asyncio
     async def test_network_error_raises_http_error(self, mock_httpx_client):
         mock_httpx_client.request.side_effect = httpx.RequestError("connection refused")
         c = AsyncHttpClient(base_url="https://api.example.com", client=mock_httpx_client)
@@ -103,6 +112,7 @@ class TestAsyncHttpClientGet:
 
 
 class TestAsyncHttpClientPost:
+    @pytest.mark.asyncio
     async def test_post_sends_json(self, mock_httpx_client):
         mock_httpx_client.request.return_value = _make_response(201, {"id": "new"})
         c = AsyncHttpClient(base_url="https://api.example.com", client=mock_httpx_client)
@@ -112,6 +122,7 @@ class TestAsyncHttpClientPost:
 
 
 class TestAsyncHttpClientPatch:
+    @pytest.mark.asyncio
     async def test_patch_sends_json(self, mock_httpx_client):
         mock_httpx_client.request.return_value = _make_response(200, {})
         c = AsyncHttpClient(base_url="https://api.example.com", client=mock_httpx_client)
@@ -120,6 +131,7 @@ class TestAsyncHttpClientPatch:
 
 
 class TestAsyncHttpClientDelete:
+    @pytest.mark.asyncio
     async def test_delete_request(self, mock_httpx_client):
         mock_httpx_client.request.return_value = _make_response(204, "")
         c = AsyncHttpClient(base_url="https://api.example.com", client=mock_httpx_client)
@@ -128,6 +140,7 @@ class TestAsyncHttpClientDelete:
 
 
 class TestAsyncHttpClientTokenResolution:
+    @pytest.mark.asyncio
     async def test_async_get_token_is_awaited(self, mock_httpx_client):
         mock_httpx_client.request.return_value = _make_response(200, {})
         token_called = []
@@ -146,6 +159,7 @@ class TestAsyncHttpClientTokenResolution:
         headers = mock_httpx_client.request.call_args[1]["headers"]
         assert headers["Authorization"] == "Bearer async-token"
 
+    @pytest.mark.asyncio
     async def test_default_headers_merged(self, mock_httpx_client):
         mock_httpx_client.request.return_value = _make_response(200, {})
         c = AsyncHttpClient(

@@ -65,9 +65,8 @@ dev = [
 
 [tool.pytest.ini_options]
 markers = [
-    "integration: marks tests as integration tests (requires a running HDM server or set CLOUD_SDK_ADMS_INTEGRATION_URL)",
+    "integration: marks tests as integration tests (requires Docker)",
 ]
-asyncio_mode = "auto"
 
 [tool.coverage.run]
 source = ["src"]

@@ -26,6 +26,8 @@ from sap_cloud_sdk.core.secret_resolver.resolver import (
 from sap_cloud_sdk.adms.exceptions import ConfigError
 
 _DEFAULT_INSTANCE = "default"
+_SECRET_MOUNT_BASE = "/etc/secrets/appfnd"
+_ENV_VAR_BASE = "CLOUD_SDK_CFG"
 _SERVICE_PATH = "/odata/v4/DocumentService"
 _ADMIN_SERVICE_PATH = "/odata/v4/AdminService"
 _CONFIG_SERVICE_PATH = "/odata/v4/ConfigurationService"
@@ -104,8 +106,8 @@ def load_from_env_or_mount(instance: str | None = None) -> AdmsConfig:
     raw = _BindingData()
     try:
         read_from_mount_and_fallback_to_env_var(
-            base_volume_mount="/etc/secrets/appfnd",
-            base_var_name="CLOUD_SDK_CFG",
+            base_volume_mount=_SECRET_MOUNT_BASE,
+            base_var_name=_ENV_VAR_BASE,
             module="adms",
             instance=instance,
             target=raw,

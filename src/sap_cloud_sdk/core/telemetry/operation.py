@@ -11,6 +11,13 @@ class Operation(str, Enum):
     AUDITLOG_LOG_BATCH = "log_batch"
     AUDITLOG_CREATE_CLIENT = "create_client"
 
+    # Data Anonymization Operations
+    DATA_ANONYMIZATION_CREATE_CLIENT = "create_data_anonymization_client"
+    DATA_ANONYMIZATION_ANONYMIZE_TEXT = "anonymize_text"
+    DATA_ANONYMIZATION_ANONYMIZE_FILE = "anonymize_file"
+    DATA_ANONYMIZATION_PSEUDONYMIZE_TEXT = "pseudonymize_text"
+    DATA_ANONYMIZATION_PSEUDONYMIZE_FILE = "pseudonymize_file"
+
     # Destination Operations
     DESTINATION_GET_INSTANCE_DESTINATION = "get_instance_destination"
     DESTINATION_GET_SUBACCOUNT_DESTINATION = "get_subaccount_destination"

@@ -88,16 +88,6 @@ class AgentGatewayClient:
         self._config = config or ClientConfig()
         self._token_cache = _TokenCache(self._config)
 
-    @record_metrics(Module.AGENTGATEWAY, Operation.AGENTGATEWAY_CLEAR_TOKEN_CACHE)
-    def clear_token_cache(self) -> None:
-        """Drop all cached tokens. Forces a fresh token fetch on the next call.
-
-        Useful when external state (revoked credentials, tenant change) makes
-        cached tokens unsafe to reuse, or for testing. No-op for LoB flow,
-        which delegates caching to BTP Destination Service.
-        """
-        self._token_cache.clear()
-
     @staticmethod
     def _resolve_value(
         value: str | Callable[[], str] | None,

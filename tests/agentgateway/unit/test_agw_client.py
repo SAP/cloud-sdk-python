@@ -609,25 +609,6 @@ class TestTokenCacheBehavior:
             assert request_mock.call_count == 2
 
     @pytest.mark.asyncio
-    async def test_clear_token_cache_forces_refetch(self, mock_tool):
-        """clear_token_cache drops cached tokens, next call refetches."""
-        patches, request_mock, _ = _patch_customer_flow(
-            token_request_side_effect=lambda *a, **kw: (
-                "any-token",
-                time.monotonic() + 600,
-            )
-        )
-
-        with patches[0], patches[1], patches[2], patches[3], patches[4], patches[5]:
-            agw_client = create_client()
-
-            await agw_client.call_mcp_tool(tool=mock_tool, user_token="user-jwt")
-            agw_client.clear_token_cache()
-            await agw_client.call_mcp_tool(tool=mock_tool, user_token="user-jwt")
-
-            assert request_mock.call_count == 2
-
-    @pytest.mark.asyncio
     async def test_401_invalidates_cache_and_retries(self, mock_tool):
         """A 401 from the MCP server drops the cached token and retries once."""
         http_client, stream_ctx, _ = _build_streaming_mocks()

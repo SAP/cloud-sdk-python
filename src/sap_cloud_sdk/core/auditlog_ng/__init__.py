@@ -104,13 +104,6 @@ def create_client(
                     compression=compression,
                     schema_url=schema_url,
                 )
-            except (ValueError, ValidationError):
-                record_error_metric(
-                    Module.AUDITLOG_NG,
-                    _telemetry_source,
-                    Operation.AUDITLOG_CREATE_CLIENT,
-                )
-                raise
             except Exception:
                 record_error_metric(
                     Module.AUDITLOG_NG,

@@ -320,9 +320,9 @@ def get_system_token_mtls(
     Returns:
         System-scoped access token.
     """
-    cached = cache.get_system_token(app_tid)
+    cached = cache.get_system_token(credentials.client_id)
     if cached:
-        logger.debug("Using cached system token (app_tid=%s)", app_tid)
+        logger.debug("Using cached system token (client_id=%s)", credentials.client_id)
         return cached
 
     logger.info("Acquiring system token via mTLS client credentials")
@@ -334,7 +334,7 @@ def get_system_token_mtls(
         app_tid=app_tid,
         extra_data={"response_type": "token"},
     )
-    cache.set_system_token(token, expires_at, app_tid)
+    cache.set_system_token(token, expires_at, credentials.client_id)
     return token
 
 
@@ -363,9 +363,9 @@ def exchange_user_token(
     Returns:
         AGW-scoped access token with user identity.
     """
-    cached = cache.get_user_token(user_token, app_tid)
+    cached = cache.get_user_token(user_token, credentials.client_id)
     if cached:
-        logger.debug("Using cached user token (app_tid=%s)", app_tid)
+        logger.debug("Using cached user token (client_id=%s)", credentials.client_id)
         return cached
 
     logger.info("Exchanging user token for AGW-scoped token via jwt-bearer grant")
@@ -380,7 +380,7 @@ def exchange_user_token(
             "token_format": "jwt",
         },
     )
-    cache.set_user_token(user_token, token, expires_at, app_tid)
+    cache.set_user_token(user_token, token, expires_at, credentials.client_id)
     return token
 
 
@@ -520,7 +520,7 @@ async def get_mcp_tools_customer(
             dep.global_tenant_id,
         )
 
-        while True:
+        for attempt in (1, 2):
             if not system_token:
                 # won't catch exceptions here - if token acquisition fails,
                 # we want the discovery to fail immediately
@@ -532,12 +532,12 @@ async def get_mcp_tools_customer(
                 logger.debug("Loaded %d tool(s) from %s", len(server_tools), dep.ord_id)
             except Exception as exc:
                 unwrapped = _unwrap_exception_group(exc)
-                if _is_unauthorized(unwrapped):
+                if _is_unauthorized(unwrapped) and attempt == 1:
                     logger.info(
                         "401 from %s — invalidating cached system token and retrying",
                         dep.ord_id,
                     )
-                    cache.invalidate_system_token(app_tid)
+                    cache.invalidate_system_token(credentials.client_id)
                     system_token = None  # Force refetch on next loop iteration
                     continue
                 logger.exception("Failed to load tools from %s — skipping", dep.ord_id)
@@ -609,9 +609,9 @@ async def call_mcp_tool_customer(
 
     def _invalidate_token() -> None:
         if user_token:
-            cache.invalidate_user_token(user_token, app_tid)
+            cache.invalidate_user_token(user_token, credentials.client_id)
         else:
-            cache.invalidate_system_token(app_tid)
+            cache.invalidate_system_token(credentials.client_id)
 
     last_exc: Exception | None = None
     for attempt in (1, 2):

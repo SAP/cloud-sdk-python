@@ -6,12 +6,8 @@ Service which has its own caching, so this module only serves the customer
 flow.
 
 Keying:
-- System tokens are keyed by `app_tid` (or "_default" when unset).
-- User tokens are keyed by `sha256(user_jwt + "|" + (app_tid or ""))[:16]`.
-
-The `app_tid` component is required because `_request_token_mtls` includes
-it in the form payload, producing a tenant-scoped token. Mixing tokens
-across tenants would break principal propagation.
+- System tokens are keyed by `client_id` (or "_default" when unset).
+- User tokens are keyed by `sha256(user_jwt + "|" + (client_id or ""))[:16]`.
 
 Thread safety:
 Token fetches run in the default `ThreadPoolExecutor` via
@@ -98,8 +94,7 @@ def compute_expires_at(token_data: dict, config: ClientConfig) -> float:
 class _TokenCache:
     """Per-client token cache with TTL and LRU eviction.
 
-    Both system and user tokens use OrderedDict for LRU ordering. Keys
-    include `app_tid` so tenant-scoped tokens never leak across tenants.
+    Both system and user tokens use OrderedDict for LRU ordering.
     """
 
     _SYSTEM_DEFAULT_KEY = "_default"
@@ -112,9 +107,9 @@ class _TokenCache:
 
     # --- System Token ---
 
-    def get_system_token(self, app_tid: str | None) -> str | None:
-        """Return a valid cached system token for `app_tid`, or None on miss/expiry."""
-        key = app_tid or self._SYSTEM_DEFAULT_KEY
+    def get_system_token(self, client_id: str) -> str | None:
+        """Return a valid cached system token for `client_id`, or None on miss/expiry."""
+        key = client_id
         cached = self._system_tokens.get(key)
         if cached and cached.is_valid():
             self._system_tokens.move_to_end(key)
@@ -123,28 +118,29 @@ class _TokenCache:
             del self._system_tokens[key]
         return None
 
-    def set_system_token(
-        self, token: str, expires_at: float, app_tid: str | None
-    ) -> None:
-        """Cache a system token under `app_tid`; evict LRU once size exceeds limit."""
-        key = app_tid or self._SYSTEM_DEFAULT_KEY
-        self._system_tokens[key] = _CachedToken(token=token, expires_at=expires_at)
+    def set_system_token(self, token: str, expires_at: float,
+                         client_id: str) -> None:
+        """Cache a system token under `client_id`; evict LRU once size exceeds limit."""
+        key = client_id
+        self._system_tokens[key] = _CachedToken(token=token,
+                                                expires_at=expires_at)
         self._system_tokens.move_to_end(key)
-        while len(self._system_tokens) > self._config.max_system_token_cache_size:
+        while len(self._system_tokens
+                  ) > self._config.max_system_token_cache_size:
             evicted, _ = self._system_tokens.popitem(last=False)
             logger.debug("System token cache full — evicted '%s'", evicted)
 
-    def invalidate_system_token(self, app_tid: str | None) -> None:
-        """Drop the cached system token for `app_tid` (no-op if absent)."""
-        key = app_tid or self._SYSTEM_DEFAULT_KEY
+    def invalidate_system_token(self, client_id: str) -> None:
+        """Drop the cached system token for `client_id` (no-op if absent)."""
+        key = client_id
         if self._system_tokens.pop(key, None):
-            logger.debug("Invalidated system token (app_tid=%s)", app_tid)
+            logger.debug("Invalidated system token (client_id=%s)", client_id)
 
     # --- User Tokens ---
 
-    def get_user_token(self, user_jwt: str, app_tid: str | None) -> str | None:
-        """Return a valid cached exchanged token for `(user_jwt, app_tid)`, or None."""
-        key = self._hash_key(user_jwt, app_tid)
+    def get_user_token(self, user_jwt: str, client_id: str) -> str | None:
+        """Return a valid cached exchanged token for `(user_jwt, client_id)`, or None."""
+        key = self._hash_key(user_jwt, client_id)
         cached = self._user_tokens.get(key)
         if cached and cached.is_valid():
             self._user_tokens.move_to_end(key)
@@ -158,21 +154,22 @@ class _TokenCache:
         user_jwt: str,
         token: str,
         expires_at: float,
-        app_tid: str | None,
+        client_id: str,
     ) -> None:
         """Cache an exchanged user token; evict LRU once size exceeds limit."""
-        key = self._hash_key(user_jwt, app_tid)
-        self._user_tokens[key] = _CachedToken(token=token, expires_at=expires_at)
+        key = self._hash_key(user_jwt, client_id)
+        self._user_tokens[key] = _CachedToken(token=token,
+                                              expires_at=expires_at)
         self._user_tokens.move_to_end(key)
         while len(self._user_tokens) > self._config.max_user_token_cache_size:
             evicted, _ = self._user_tokens.popitem(last=False)
             logger.debug("User token cache full — evicted '%s'", evicted)
 
-    def invalidate_user_token(self, user_jwt: str, app_tid: str | None) -> None:
-        """Drop the cached user token for `(user_jwt, app_tid)` (no-op if absent)."""
-        key = self._hash_key(user_jwt, app_tid)
+    def invalidate_user_token(self, user_jwt: str, client_id: str) -> None:
+        """Drop the cached user token for `(user_jwt, client_id)` (no-op if absent)."""
+        key = self._hash_key(user_jwt, client_id)
         if self._user_tokens.pop(key, None):
-            logger.debug("Invalidated user token (app_tid=%s)", app_tid)
+            logger.debug("Invalidated user token (client_id=%s)", client_id)
 
     # --- Maintenance ---
 
@@ -182,7 +179,7 @@ class _TokenCache:
         self._user_tokens.clear()
 
     @staticmethod
-    def _hash_key(user_jwt: str, app_tid: str | None) -> str:
-        """Derive a short, stable cache key from `(user_jwt, app_tid)` via sha256."""
-        material = f"{user_jwt}|{app_tid or ''}"
+    def _hash_key(user_jwt: str, client_id: str) -> str:
+        """Derive a short, stable cache key from `(user_jwt, client_id)` via sha256."""
+        material = f"{user_jwt}|{client_id}"
         return hashlib.sha256(material.encode()).hexdigest()[:16]

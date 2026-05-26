@@ -587,12 +587,11 @@ class TestTokenCacheBehavior:
             assert request_mock.call_count == 2
 
     @pytest.mark.asyncio
-    async def test_app_tid_isolation(self, mock_tool):
-        """Same user_token across different app_tid values stays isolated."""
+    async def test_same_user_token_different_app_tid_shares_cache(self, mock_tool):
+        """Same user_token + same client_id shares cache regardless of app_tid."""
         patches, request_mock, _ = _patch_customer_flow(
             token_request_side_effect=[
                 ("tok-tenant-a", time.monotonic() + 600),
-                ("tok-tenant-b", time.monotonic() + 600),
             ]
         )
 
@@ -606,7 +605,7 @@ class TestTokenCacheBehavior:
                 tool=mock_tool, user_token="user-jwt", app_tid="tenant-b"
             )
 
-            assert request_mock.call_count == 2
+            assert request_mock.call_count == 1
 
     @pytest.mark.asyncio
     async def test_401_invalidates_cache_and_retries(self, mock_tool):

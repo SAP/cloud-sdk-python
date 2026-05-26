@@ -11,6 +11,7 @@ import json
 import time
 
 from sap_cloud_sdk.agentgateway._token_cache import (
+    _TokenCache,
     _parse_jwt_exp,
     compute_expires_at,
 )
@@ -112,3 +113,49 @@ class TestComputeExpiresAt:
         before = time.monotonic()
         result = compute_expires_at({"expires_in": "not-a-number"}, cfg)
         assert before + 300 - 1 <= result <= before + 300 + 1
+
+
+class TestTokenCacheClientIdIsolation:
+    """Tokens are isolated by client_id — same user JWT, different credentials, no sharing."""
+
+    def test_system_tokens_isolated_by_client_id(self):
+        cache = _TokenCache(ClientConfig())
+        expires_at = time.monotonic() + 600
+
+        cache.set_system_token("token-a", expires_at, "client-a")
+        cache.set_system_token("token-b", expires_at, "client-b")
+
+        assert cache.get_system_token("client-a") == "token-a"
+        assert cache.get_system_token("client-b") == "token-b"
+
+    def test_user_tokens_isolated_by_client_id(self):
+        cache = _TokenCache(ClientConfig())
+        expires_at = time.monotonic() + 600
+
+        cache.set_user_token("user-jwt", "token-a", expires_at, "client-a")
+        cache.set_user_token("user-jwt", "token-b", expires_at, "client-b")
+
+        assert cache.get_user_token("user-jwt", "client-a") == "token-a"
+        assert cache.get_user_token("user-jwt", "client-b") == "token-b"
+
+    def test_invalidate_system_token_does_not_affect_other_clients(self):
+        cache = _TokenCache(ClientConfig())
+        expires_at = time.monotonic() + 600
+
+        cache.set_system_token("token-a", expires_at, "client-a")
+        cache.set_system_token("token-b", expires_at, "client-b")
+        cache.invalidate_system_token("client-a")
+
+        assert cache.get_system_token("client-a") is None
+        assert cache.get_system_token("client-b") == "token-b"
+
+    def test_invalidate_user_token_does_not_affect_other_clients(self):
+        cache = _TokenCache(ClientConfig())
+        expires_at = time.monotonic() + 600
+
+        cache.set_user_token("user-jwt", "token-a", expires_at, "client-a")
+        cache.set_user_token("user-jwt", "token-b", expires_at, "client-b")
+        cache.invalidate_user_token("user-jwt", "client-a")
+
+        assert cache.get_user_token("user-jwt", "client-a") is None
+        assert cache.get_user_token("user-jwt", "client-b") == "token-b"

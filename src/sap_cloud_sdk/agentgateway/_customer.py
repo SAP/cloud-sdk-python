@@ -499,11 +499,15 @@ async def get_mcp_tools_customer(
 
     logger.info("Discovering tools from %d MCP server(s)", len(dependencies))
 
-    # Get system token for discovery
-    loop = asyncio.get_running_loop()
-    system_token = await loop.run_in_executor(
-        None, get_system_token_mtls, credentials, timeout, config, cache, app_tid
-    )
+    system_token = None
+    # Define a helper closure to refetch the system token on demand, since it may need to be
+    # refreshed during the discovery loop if any server returns a 401
+    async def refetch_system_token() -> str:
+        loop = asyncio.get_running_loop()
+        new_token = await loop.run_in_executor(
+            None, get_system_token_mtls, credentials, timeout, config, cache, app_tid
+        )
+        return new_token
 
     tools: list[MCPTool] = []
 
@@ -516,47 +520,28 @@ async def get_mcp_tools_customer(
             dep.global_tenant_id,
         )
 
-        try:
-            server_tools = await _list_server_tools(url, system_token, dep, timeout)
-            tools.extend(server_tools)
-            logger.debug("Loaded %d tool(s) from %s", len(server_tools), dep.ord_id)
-        except Exception as exc:
-            unwrapped = _unwrap_exception_group(exc)
-            if _is_unauthorized(unwrapped):
-                logger.info(
-                    "401 from %s — invalidating cached system token and retrying",
-                    dep.ord_id,
-                )
-                cache.invalidate_system_token(app_tid)
-                try:
-                    fresh_token = await loop.run_in_executor(
-                        None,
-                        get_system_token_mtls,
-                        credentials,
-                        timeout,
-                        config,
-                        cache,
-                        app_tid,
-                    )
-                    server_tools = await _list_server_tools(
-                        url, fresh_token, dep, timeout
-                    )
-                    tools.extend(server_tools)
-                    # Replace stale token for remaining iterations
-                    system_token = fresh_token
-                    logger.debug(
-                        "Loaded %d tool(s) from %s after retry",
-                        len(server_tools),
+        while True:
+            if not system_token:
+                # won't catch exceptions here - if token acquisition fails,
+                # we want the discovery to fail immediately
+                system_token = await refetch_system_token()
+
+            try:
+                server_tools = await _list_server_tools(url, system_token, dep, timeout)
+                tools.extend(server_tools)
+                logger.debug("Loaded %d tool(s) from %s", len(server_tools), dep.ord_id)
+            except Exception as exc:
+                unwrapped = _unwrap_exception_group(exc)
+                if _is_unauthorized(unwrapped):
+                    logger.info(
+                        "401 from %s — invalidating cached system token and retrying",
                         dep.ord_id,
                     )
+                    cache.invalidate_system_token(app_tid)
+                    system_token = None  # Force refetch on next loop iteration
                     continue
-                except Exception:
-                    logger.exception(
-                        "Failed to load tools from %s after retry — skipping",
-                        dep.ord_id,
-                    )
-                    continue
-            logger.exception("Failed to load tools from %s — skipping", dep.ord_id)
+                logger.exception("Failed to load tools from %s — skipping", dep.ord_id)
+            break  # Success, move to next server
 
     logger.info(
         "Loaded %d MCP tool(s) from %d server(s)", len(tools), len(dependencies)

@@ -68,7 +68,7 @@ class TestCreateClient:
     )
     def test_create_client_config_errors_record_error_metric(self, kwargs, match):
         with patch(
-            "sap_cloud_sdk.core.auditlog_ng.record_error_metric"
+            "sap_cloud_sdk.core.auditlog_ng._record_error_metric"
         ) as mock_error_metric:
             with pytest.raises(
                 ValueError,

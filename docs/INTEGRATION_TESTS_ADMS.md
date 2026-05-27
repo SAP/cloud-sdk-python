@@ -1,4 +1,4 @@
-# DMS Integration Tests
+# ADMS Integration Tests
 
 End-to-end tests that verify the `sap_cloud_sdk.adms` module is correctly wired to a running **SAP Advanced Document Management (ADM / HDM)** server.
 
@@ -45,10 +45,11 @@ HDM startup takes ~30–60 seconds on first run. The server is kept alive for th
 
 ```bash
 export CLOUD_SDK_ADMS_INTEGRATION_URL=https://your-adm.cfapps.eu20.hana.ondemand.com
-export CLOUD_SDK_CFG_ADMS_DEFAULT_SERVICE_URL=$CLOUD_SDK_ADMS_INTEGRATION_URL
-export CLOUD_SDK_CFG_ADMS_DEFAULT_IAS_URL=https://your-tenant.accounts.ondemand.com
-export CLOUD_SDK_CFG_ADMS_DEFAULT_CLIENT_ID=...
-export CLOUD_SDK_CFG_ADMS_DEFAULT_CLIENT_SECRET=...
+export CLOUD_SDK_CFG_ADMS_DEFAULT_URL=https://your-tenant.accounts.ondemand.com
+export CLOUD_SDK_CFG_ADMS_DEFAULT_URI=$CLOUD_SDK_ADMS_INTEGRATION_URL
+export CLOUD_SDK_CFG_ADMS_DEFAULT_CLIENTID=...
+export CLOUD_SDK_CFG_ADMS_DEFAULT_CLIENTSECRET=...
+export CLOUD_SDK_CFG_ADMS_DEFAULT_RESOURCE=urn:sap:identity:application:provider:name:your-app
 
 .venv/bin/python -m pytest tests/adms/integration/ -m integration -v
 ```

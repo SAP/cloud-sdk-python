@@ -1,5 +1,5 @@
 """
-Pytest fixtures for DMS end-to-end integration tests.
+Pytest fixtures for ADMS end-to-end integration tests.
 
 Two modes are supported — controlled by environment variables:
 
@@ -10,9 +10,11 @@ Two modes are supported — controlled by environment variables:
   env-var pattern (CLOUD_SDK_CFG_ADMS_DEFAULT_*).
 
     export CLOUD_SDK_ADMS_INTEGRATION_URL=https://your-adm.cfapps.eu20.hana.ondemand.com
-    export CLOUD_SDK_CFG_ADMS_DEFAULT_IAS_URL=https://your-tenant.accounts.ondemand.com
-    export CLOUD_SDK_CFG_ADMS_DEFAULT_CLIENT_ID=...
-    export CLOUD_SDK_CFG_ADMS_DEFAULT_CLIENT_SECRET=...
+    export CLOUD_SDK_CFG_ADMS_DEFAULT_URL=https://your-tenant.accounts.ondemand.com
+    export CLOUD_SDK_CFG_ADMS_DEFAULT_URI=https://your-adm.cfapps.eu20.hana.ondemand.com
+    export CLOUD_SDK_CFG_ADMS_DEFAULT_CLIENTID=...
+    export CLOUD_SDK_CFG_ADMS_DEFAULT_CLIENTSECRET=...
+    export CLOUD_SDK_CFG_ADMS_DEFAULT_RESOURCE=urn:sap:identity:application:provider:name:your-app
 
   MODE 2 — Local HDM server (auto-started)
   -----------------------------------------

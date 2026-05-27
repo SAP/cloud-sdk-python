@@ -75,16 +75,14 @@ def _get_field_map(target: Any) -> Dict[str, Tuple[str, type]]:
     return mapping
 
 
-def _load_from_mount(
-    base_volume_mount: str, module: str, instance: str, target: Any
-) -> None:
+def _load_from_path(secret_dir: str, target: Any) -> None:
     """
-    Load secrets from files at:
-        {base_volume_mount}/{module}/{instance}/{field_key}
+    Load secrets from files directly in secret_dir into target dataclass.
 
-    Sets string attributes directly on the dataclass instance.
+    Reads each field key as a file name under secret_dir. Used for both the
+    servicebinding.io flat layout ($ROOT/<module>/<field>) and the legacy
+    three-level layout via :func:`_load_from_mount`.
     """
-    secret_dir = os.path.join(base_volume_mount, module, instance)
     _validate_path(secret_dir)
 
     field_map = _get_field_map(target)
@@ -104,6 +102,17 @@ def _load_from_mount(
 
         # Set target field (string only)
         setattr(target, attr_name, content)
+
+
+def _load_from_mount(
+    base_volume_mount: str, module: str, instance: str, target: Any
+) -> None:
+    """
+    Load secrets from files at:
+        {base_volume_mount}/{module}/{instance}/{field_key}
+    """
+    secret_dir = os.path.join(base_volume_mount, module, instance)
+    _load_from_path(secret_dir, target)
 
 
 def _load_from_env(base_var_name: str, module: str, instance: str, target: Any) -> None:
@@ -133,17 +142,21 @@ def read_from_mount_and_fallback_to_env_var(
 ) -> None:
     """
     Load secrets for a given module and instance into the provided dataclass instance `target`.
-    Fallback order:
-      1. Mounted volume path: {base_volume_mount}/{module}/{instance}/{field_key}
-         (``SERVICE_BINDING_ROOT`` env var overrides ``base_volume_mount`` — see
-         :func:`resolve_base_mount`)
+
+    Fallback order when ``SERVICE_BINDING_ROOT`` is set:
+      1. Flat path: {SERVICE_BINDING_ROOT}/{module}/{field_key}  (servicebinding.io spec)
+      2. Full path: {SERVICE_BINDING_ROOT}/{module}/{instance}/{field_key}  (legacy convention)
+      3. Environment variables: {base_var_name}_{module}_{instance}_{field_key} (uppercased)
+
+    Fallback order when ``SERVICE_BINDING_ROOT`` is **not** set:
+      1. Full path: {base_volume_mount}/{module}/{instance}/{field_key}
       2. Environment variables: {base_var_name}_{module}_{instance}_{field_key} (uppercased)
 
     Raises:
       ValueError: If inputs are invalid or target is not a dataclass instance
       FileNotFoundError / NotADirectoryError / OSError: If mount path issues occur
       KeyError: If environment variables are missing on fallback
-      RuntimeError: If both mount and env var loading fail (aggregated error)
+      RuntimeError: If all strategies fail (aggregated error)
     """
     _validate_inputs(module, instance)
 
@@ -151,6 +164,15 @@ def read_from_mount_and_fallback_to_env_var(
     errors: list[str] = []
     normalized_module = module.replace("-", "_")
     normalized_instance = instance.replace("-", "_")
+
+    # servicebinding.io: when SERVICE_BINDING_ROOT is explicitly set, try the flat path
+    # $ROOT/<module>/<field> before the legacy $ROOT/<module>/<instance>/<field> path.
+    if os.environ.get("SERVICE_BINDING_ROOT") is not None:
+        try:
+            _load_from_path(os.path.join(resolved_base_path, module), target)
+            return
+        except Exception as e:
+            errors.append(f"mount failed: {e};")
 
     try:
         _load_from_mount(resolved_base_path, module, instance, target)

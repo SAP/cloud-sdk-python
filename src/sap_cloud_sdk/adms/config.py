@@ -1,4 +1,4 @@
-"""Configuration and secret resolution for the DMS (ADM) module.
+"""Configuration and secret resolution for the ADMS (Advanced Document Management Service) module.
 
 Loads IAS service binding secrets from a mounted volume with environment fallback,
 then normalises into a AdmsConfig model that the HTTP layer consumes.
@@ -35,9 +35,9 @@ _CONFIG_SERVICE_PATH = "/odata/v4/ConfigurationService"
 
 @dataclass
 class AdmsConfig:
-    """Normalised configuration for the DMS / ADM service binding.
+    """Normalised configuration for the ADMS service binding.
 
-    Combines the IAS OAuth2 credentials with the ADM service base URL.
+    Combines the IAS OAuth2 credentials with the ADMS service base URL.
 
     Attributes:
         service_url: ADM service base URL (e.g. https://adm.cfapps.{region}.hana.ondemand.com)
@@ -77,7 +77,7 @@ class _BindingData:
         missing = [f for f in required if not getattr(self, f)]
         if missing:
             raise ConfigError(
-                f"DMS binding is missing required fields: {', '.join(missing)}"
+                f"ADMS binding is missing required fields: {', '.join(missing)}"
             )
 
     def to_config(self) -> AdmsConfig:
@@ -91,7 +91,7 @@ class _BindingData:
 
 
 def load_from_env_or_mount(instance: str | None = None) -> AdmsConfig:
-    """Load DMS configuration from a mounted secret volume or environment variables.
+    """Load ADMS configuration from a mounted secret volume or environment variables.
 
     Args:
         instance: Logical binding instance name.  Defaults to ``"default"``.
@@ -114,7 +114,7 @@ def load_from_env_or_mount(instance: str | None = None) -> AdmsConfig:
         )
     except Exception as exc:
         raise ConfigError(
-            f"failed to load DMS binding for instance '{instance}': {exc}"
+            f"failed to load ADMS binding for instance '{instance}': {exc}"
         ) from exc
 
     raw.validate()

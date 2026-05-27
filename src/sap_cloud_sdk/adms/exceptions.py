@@ -1,16 +1,16 @@
-"""Exception classes for the DMS (Document Management Service) module."""
+"""Exception classes for the ADMS (Advanced Document Management Service) module."""
 
 from __future__ import annotations
 
 
 class AdmsError(Exception):
-    """Base exception for all DMS module errors."""
+    """Base exception for all ADMS module errors."""
 
     pass
 
 
 class ClientCreationError(AdmsError):
-    """Raised when DMS client creation fails (configuration or auth setup)."""
+    """Raised when ADMS client creation fails (configuration or auth setup)."""
 
     pass
 
@@ -22,7 +22,7 @@ class ConfigError(AdmsError):
 
 
 class HttpError(AdmsError):
-    """Raised for HTTP-related errors communicating with the DMS / ADM service.
+    """Raised for HTTP-related errors communicating with the ADMS service.
 
     Attributes:
         status_code: HTTP status code returned by the service, if available.
@@ -42,7 +42,7 @@ class HttpError(AdmsError):
 
 
 class AdmsOperationError(AdmsError):
-    """Raised when a DMS API operation (CRUD, action, function) fails."""
+    """Raised when an ADMS API operation (CRUD, action, function) fails."""
 
     pass
 

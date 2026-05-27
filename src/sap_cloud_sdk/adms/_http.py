@@ -214,14 +214,14 @@ class AdmsHttp:
                 timeout=30,
             )
         except RequestException as exc:
-            raise HttpError(f"DMS request failed: {exc}") from exc
+            raise HttpError(f"ADMS request failed: {exc}") from exc
 
         if resp.status_code == 404:
             raise DocumentNotFoundError(f"Resource not found: {method} {url}")
 
         if not (200 <= resp.status_code < 300):
             raise HttpError(
-                f"DMS service returned HTTP {resp.status_code}",
+                f"ADMS service returned HTTP {resp.status_code}",
                 status_code=resp.status_code,
                 response_text=resp.text,
             )

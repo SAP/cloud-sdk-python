@@ -1,14 +1,14 @@
-"""IAS token management for the DMS module — thin DMS adapter over core auth.
+"""IAS token management for the ADMS module — thin ADMS adapter over core auth.
 
 All token-fetching logic lives in :mod:`sap_cloud_sdk.core.auth._ias_fetcher`.
-This module provides DMS-specific wrappers that:
+This module provides ADMS-specific wrappers that:
 
 * Accept :class:`~sap_cloud_sdk.adms.config.AdmsConfig` instead of raw URL/credentials.
-* Re-raise :class:`~sap_cloud_sdk.core.auth.AuthError` as DMS's own
+* Re-raise :class:`~sap_cloud_sdk.core.auth.AuthError` as ADMS's own
   :class:`~sap_cloud_sdk.adms.exceptions.AuthError` (a subclass of
   ``AdmsError``) so that callers using ``except AdmsError`` still catch auth failures.
 
-The public symbols exported here match what the existing DMS unit-tests import,
+The public symbols exported here match what the existing ADMS unit-tests import,
 so no test changes are required.
 """
 
@@ -36,7 +36,7 @@ __all__ = [
 
 
 class IasTokenFetcher(_CoreIasTokenFetcher):
-    """DMS-flavoured IAS token fetcher that accepts :class:`AdmsConfig`.
+    """ADMS-flavoured IAS token fetcher that accepts :class:`AdmsConfig`.
 
     Inherits all caching / fetching logic from the core layer.  Converts
     :class:`~sap_cloud_sdk.core.auth.AuthError` to

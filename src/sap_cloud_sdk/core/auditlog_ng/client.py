@@ -35,7 +35,7 @@ from sap_cloud_sdk.core.auditlog_ng.config import (
     _validate_source_arg,
 )
 from sap_cloud_sdk.core.auditlog_ng.exceptions import ValidationError
-from sap_cloud_sdk.core.telemetry import Module
+from sap_cloud_sdk.core.telemetry import Module, Operation, record_metrics
 from sap_cloud_sdk.core.telemetry.config import ENV_OTLP_PROTOCOL
 
 
@@ -102,6 +102,7 @@ class AuditClient:
         client.close()
     """
 
+    @record_metrics(Module.AUDITLOG_NG, Operation.AUDITLOG_CREATE_CLIENT)
     def __init__(
         self, config: AuditLogNGConfig, _telemetry_source: Optional[Module] = None
     ) -> None:

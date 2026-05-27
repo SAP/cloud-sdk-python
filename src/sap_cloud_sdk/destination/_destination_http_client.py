@@ -16,7 +16,7 @@ class DestinationHttpClient:
     Pre-bakes headers derived from the destination — ERP headers (sap-client,
     sap-language), URL.headers.* properties, and auth tokens.
 
-    Usage::
+    Usage:
 
         dest = client.get_destination("my-erp")
         http = DestinationHttpClient(dest)
@@ -24,12 +24,11 @@ class DestinationHttpClient:
     """
 
     def __init__(self, destination: Destination) -> None:
-        if destination.type not in (DestinationType.HTTP, "HTTP"):
+        if destination.type != DestinationType.HTTP:
             raise ValueError(
                 f"DestinationHttpClient only supports HTTP destinations, got: {destination.type}"
             )
 
-        self._destination = destination
         self._session = requests.Session()
         self._session.headers.update(destination.get_headers())
         self._base_url = destination.url.rstrip("/") if destination.url else ""
@@ -66,4 +65,3 @@ class DestinationHttpClient:
             headers=headers,
             **kwargs,
         )
-

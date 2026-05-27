@@ -23,7 +23,8 @@ from sap_cloud_sdk.destination import (
 )
 
 from sap_cloud_sdk.agentgateway._models import MCPTool
-from sap_cloud_sdk.agentgateway.exceptions import MCPServerNotFoundError
+from sap_cloud_sdk.agentgateway._token_cache import _TokenCache
+from sap_cloud_sdk.agentgateway.exceptions import AgentGatewaySDKError, MCPServerNotFoundError
 
 logger = logging.getLogger(__name__)
 
@@ -145,14 +146,17 @@ def get_ias_fragment_name(tenant_subdomain: str) -> str:
 
 async def get_system_auth(
     tenant_subdomain: str,
+    cache: _TokenCache,
 ) -> str:
     """Get system-scoped auth (Phase 1 - client credentials).
 
-    Looks up the IAS fragment (subscriber.ias label) and uses it to acquire
-    a client-credentials token via BTP Destination Service.
+    Checks the token cache first. On a miss, looks up the IAS fragment
+    (subscriber.ias label) and acquires a client-credentials token via
+    BTP Destination Service, then caches the result.
 
     Args:
         tenant_subdomain: Tenant subdomain for multi-tenant lookup.
+        cache: Token cache shared across calls.
 
     Returns:
         Authorization header value (e.g., "Bearer xxx").
@@ -160,6 +164,11 @@ async def get_system_auth(
     Raises:
         MCPServerNotFoundError: If no IAS fragment or auth token is found.
     """
+    cached = cache.get_system_token(tenant_subdomain)
+    if cached:
+        logger.debug("System token cache hit for tenant '%s'", tenant_subdomain)
+        return cached
+
     loop = asyncio.get_running_loop()
 
     def _fetch_system_auth_sync():
@@ -179,20 +188,31 @@ async def get_system_auth(
 
         return _fetch_auth_token(dest_name, tenant_subdomain, options)
 
-    return await loop.run_in_executor(None, _fetch_system_auth_sync)
+    auth = await loop.run_in_executor(None, _fetch_system_auth_sync)
+    expires_at = cache.compute_expires_at_from_bearer(auth)
+    cache.set_system_token(auth, expires_at, tenant_subdomain)
+    return auth
 
 
 async def get_user_auth(
     mcp_fragment_name: str,
     user_token: str,
     tenant_subdomain: str,
+    cache: _TokenCache,
 ) -> str:
     """Get user-scoped auth (Phase 2 - token exchange).
+
+    Checks the token cache first. On a miss, exchanges the user token via
+    BTP Destination Service, then caches the result.
+
+    Cache key is scoped to (user_token, mcp_fragment_name, tenant_subdomain)
+    since different fragments may yield differently-scoped tokens.
 
     Args:
         mcp_fragment_name: MCP fragment name for token exchange.
         user_token: User's JWT for principal propagation.
         tenant_subdomain: Tenant subdomain for multi-tenant lookup.
+        cache: Token cache shared across calls.
 
     Returns:
         Authorization header value with user identity embedded.
@@ -200,6 +220,16 @@ async def get_user_auth(
     Raises:
         MCPServerNotFoundError: If no auth token is returned.
     """
+    scope_key = f"{mcp_fragment_name}|{tenant_subdomain}"
+    cached = cache.get_user_token(user_token, scope_key)
+    if cached:
+        logger.debug(
+            "User token cache hit for tenant '%s', fragment '%s'",
+            tenant_subdomain,
+            mcp_fragment_name,
+        )
+        return cached
+
     loop = asyncio.get_running_loop()
 
     def _fetch_user_auth_sync():
@@ -220,7 +250,10 @@ async def get_user_auth(
 
         return _fetch_auth_token(dest_name, tenant_subdomain, options)
 
-    return await loop.run_in_executor(None, _fetch_user_auth_sync)
+    auth = await loop.run_in_executor(None, _fetch_user_auth_sync)
+    expires_at = cache.compute_expires_at_from_bearer(auth)
+    cache.set_user_token(user_token, auth, expires_at, scope_key)
+    return auth
 
 
 async def list_server_tools(
@@ -271,13 +304,18 @@ async def list_server_tools(
 async def get_mcp_tools_lob(
     tenant_subdomain: str,
     timeout: float,
+    cache: _TokenCache,
 ) -> list[MCPTool]:
     """List all MCP tools using LoB flow (destination-based).
 
     Uses Phase 1 auth (client-scoped) via BTP Destination Service.
+    On a 401 from an MCP server, invalidates the cached system token and
+    retries once before skipping the fragment.
 
     Args:
         tenant_subdomain: Tenant subdomain for multi-tenant lookup.
+        timeout: HTTP timeout in seconds.
+        cache: Token cache shared across calls.
 
     Returns:
         List of MCPTool objects from all MCP servers.
@@ -295,6 +333,11 @@ async def get_mcp_tools_lob(
         )
         return tools
 
+    system_auth = None
+
+    async def _refetch_system_auth() -> str:
+        return await get_system_auth(tenant_subdomain, cache)
+
     for fragment in fragments:
         fragment_name = fragment.name
         mcp_url = fragment.properties.get("URL") or fragment.properties.get("url")
@@ -305,22 +348,36 @@ async def get_mcp_tools_lob(
             )
             continue
 
-        try:
-            system_auth = await get_system_auth(tenant_subdomain)
-            server_tools = await list_server_tools(
-                mcp_url, system_auth, fragment_name, timeout
-            )
-            tools.extend(server_tools)
-            logger.debug(
-                "Loaded %d tool(s) from fragment '%s'",
-                len(server_tools),
-                fragment_name,
-            )
-        except Exception:
-            logger.exception(
-                "Failed to load tools from fragment '%s' — skipping",
-                fragment_name,
-            )
+        for attempt in (1, 2):
+            if not system_auth:
+                # Auth failure here is immediately fatal — same token is needed for
+                # all fragments, so there is no point continuing.
+                system_auth = await _refetch_system_auth()
+
+            try:
+                server_tools = await list_server_tools(
+                    mcp_url, system_auth, fragment_name, timeout
+                )
+                tools.extend(server_tools)
+                logger.debug(
+                    "Loaded %d tool(s) from fragment '%s'",
+                    len(server_tools),
+                    fragment_name,
+                )
+            except Exception as exc:
+                unwrapped = _unwrap_exception_group(exc)
+                if _is_unauthorized(unwrapped) and attempt == 1:
+                    logger.info(
+                        "401 from '%s' — invalidating cached system token and retrying",
+                        fragment_name,
+                    )
+                    cache.invalidate_system_token(tenant_subdomain)
+                    system_auth = None
+                    continue
+                logger.exception(
+                    "Failed to load tools from fragment '%s' — skipping", fragment_name
+                )
+            break
 
     logger.info("Loaded %d MCP tool(s) from %d fragment(s)", len(tools), len(fragments))
     return tools
@@ -331,17 +388,21 @@ async def call_mcp_tool_lob(
     user_token: str,
     tenant_subdomain: str,
     timeout: float,
+    cache: _TokenCache,
     **kwargs,
 ) -> str:
     """Invoke an MCP tool using LoB flow (destination-based).
 
     Uses Phase 2 auth (user-scoped) via token exchange.
     Principal propagation ensures LoB systems see user identity.
+    On a 401, invalidates the cached user token and retries once.
 
     Args:
         tool: MCPTool object (from list_mcp_tools).
         user_token: User's JWT for principal propagation.
         tenant_subdomain: Tenant subdomain for token exchange.
+        timeout: HTTP timeout in seconds.
+        cache: Token cache shared across calls.
         **kwargs: Tool input parameters.
 
     Returns:
@@ -349,27 +410,68 @@ async def call_mcp_tool_lob(
 
     Raises:
         MCPServerNotFoundError: If destination/auth fails.
+        AgentGatewaySDKError: If tool invocation fails after 401 retry.
     """
     if not tool.fragment_name:
         raise MCPServerNotFoundError(
             f"Tool '{tool.name}' missing fragment_name for LoB invocation"
         )
-    user_auth = await get_user_auth(tool.fragment_name, user_token, tenant_subdomain)
 
-    async with httpx.AsyncClient(
-        headers={"Authorization": user_auth, "x-correlation-id": str(uuid.uuid4())},
-        timeout=timeout,
-    ) as http_client:
-        async with streamable_http_client(tool.url, http_client=http_client) as (
-            read,
-            write,
-            _,
-        ):
-            async with ClientSession(read, write) as session:
-                await session.initialize()
-                result = await session.call_tool(tool.name, kwargs)
-                if not result.content:
-                    logger.warning("Tool '%s' returned empty content", tool.name)
-                    return ""
-                first = result.content[0]
-                return str(getattr(first, "text", ""))
+    scope_key = f"{tool.fragment_name}|{tenant_subdomain}"
+    last_exc: Exception | None = None
+
+    for attempt in (1, 2):
+        user_auth = await get_user_auth(
+            tool.fragment_name, user_token, tenant_subdomain, cache
+        )
+        try:
+            async with httpx.AsyncClient(
+                headers={
+                    "Authorization": user_auth,
+                    "x-correlation-id": str(uuid.uuid4()),
+                },
+                timeout=timeout,
+            ) as http_client:
+                async with streamable_http_client(
+                    tool.url, http_client=http_client
+                ) as (read, write, _):
+                    async with ClientSession(read, write) as session:
+                        await session.initialize()
+                        result = await session.call_tool(tool.name, kwargs)
+                        if not result.content:
+                            logger.warning(
+                                "Tool '%s' returned empty content", tool.name
+                            )
+                            return ""
+                        first = result.content[0]
+                        return str(getattr(first, "text", ""))
+        except Exception as exc:
+            unwrapped = _unwrap_exception_group(exc)
+            if _is_unauthorized(unwrapped) and attempt == 1:
+                logger.info(
+                    "401 from MCP server for tool '%s' — invalidating cached token and retrying",
+                    tool.name,
+                )
+                cache.invalidate_user_token(user_token, scope_key)
+                last_exc = exc
+                continue
+            raise
+
+    # Defensive — should not be reachable; second attempt either returns or raises.
+    raise AgentGatewaySDKError(
+        f"Tool invocation for '{tool.name}' failed after 401 retry: {last_exc}"
+    )
+
+
+def _unwrap_exception_group(exc: BaseException) -> BaseException:
+    """Unwrap nested ExceptionGroups to find the underlying cause."""
+    while isinstance(exc, BaseExceptionGroup) and exc.exceptions:
+        exc = exc.exceptions[0]
+    return exc
+
+
+def _is_unauthorized(exc: BaseException) -> bool:
+    """Detect a 401 response from the MCP server (httpx-based)."""
+    if isinstance(exc, httpx.HTTPStatusError):
+        return exc.response is not None and exc.response.status_code == 401
+    return False

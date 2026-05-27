@@ -20,8 +20,11 @@ from sap_cloud_sdk.agentgateway.config import ClientConfig
 
 def _make_jwt(claims: dict) -> str:
     """Build a non-signed JWT for testing (header.payload.signature)."""
-    header = base64.urlsafe_b64encode(json.dumps({"alg": "none"}).encode()).rstrip(b"=")
-    payload = base64.urlsafe_b64encode(json.dumps(claims).encode()).rstrip(b"=")
+    header = base64.urlsafe_b64encode(json.dumps({
+        "alg": "none"
+    }).encode()).rstrip(b"=")
+    payload = base64.urlsafe_b64encode(
+        json.dumps(claims).encode()).rstrip(b"=")
     return f"{header.decode()}.{payload.decode()}.signature"
 
 
@@ -54,14 +57,16 @@ class TestComputeExpiresAt:
 
     def test_uses_expires_in_when_present(self):
         """Prefer `expires_in` from the response and subtract the buffer."""
-        cfg = ClientConfig(token_expiry_buffer_seconds=60, fallback_token_ttl_seconds=300)
+        cfg = ClientConfig(token_expiry_buffer_seconds=60,
+                           fallback_token_ttl_seconds=300)
         before = time.monotonic()
         result = compute_expires_at({"expires_in": 3600}, cfg)
         assert before + 3540 - 1 <= result <= before + 3540 + 1
 
     def test_expires_in_equal_to_buffer_expires_immediately(self):
         """Token whose `expires_in` equals the buffer is treated as already expiring now."""
-        cfg = ClientConfig(token_expiry_buffer_seconds=60, fallback_token_ttl_seconds=300)
+        cfg = ClientConfig(token_expiry_buffer_seconds=60,
+                           fallback_token_ttl_seconds=300)
         before = time.monotonic()
         result = compute_expires_at({"expires_in": 60}, cfg)
         after = time.monotonic()
@@ -69,14 +74,16 @@ class TestComputeExpiresAt:
 
     def test_expires_in_below_buffer_is_already_stale(self):
         """Token whose `expires_in` is below the buffer resolves to a past timestamp."""
-        cfg = ClientConfig(token_expiry_buffer_seconds=60, fallback_token_ttl_seconds=300)
+        cfg = ClientConfig(token_expiry_buffer_seconds=60,
+                           fallback_token_ttl_seconds=300)
         before = time.monotonic()
         result = compute_expires_at({"expires_in": 30}, cfg)
         assert before - 31 <= result <= before - 29
 
     def test_falls_back_to_id_token_exp(self):
         """Fall back to the `exp` claim of `id_token` when `expires_in` is absent."""
-        cfg = ClientConfig(token_expiry_buffer_seconds=60, fallback_token_ttl_seconds=300)
+        cfg = ClientConfig(token_expiry_buffer_seconds=60,
+                           fallback_token_ttl_seconds=300)
         future_exp = int(time.time()) + 600
         jwt = _make_jwt({"exp": future_exp})
         before = time.monotonic()
@@ -85,14 +92,16 @@ class TestComputeExpiresAt:
 
     def test_uses_fallback_when_no_expiry_info(self):
         """Use config fallback TTL when neither `expires_in` nor `id_token` is present."""
-        cfg = ClientConfig(token_expiry_buffer_seconds=60, fallback_token_ttl_seconds=300)
+        cfg = ClientConfig(token_expiry_buffer_seconds=60,
+                           fallback_token_ttl_seconds=300)
         before = time.monotonic()
         result = compute_expires_at({"access_token": "opaque"}, cfg)
         assert before + 300 - 1 <= result <= before + 300 + 1
 
     def test_uses_fallback_when_id_token_malformed(self):
         """Use fallback TTL when the `id_token` cannot be parsed."""
-        cfg = ClientConfig(token_expiry_buffer_seconds=60, fallback_token_ttl_seconds=300)
+        cfg = ClientConfig(token_expiry_buffer_seconds=60,
+                           fallback_token_ttl_seconds=300)
         before = time.monotonic()
         result = compute_expires_at({"id_token": "garbage"}, cfg)
         assert before + 300 - 1 <= result <= before + 300 + 1
@@ -100,7 +109,8 @@ class TestComputeExpiresAt:
     def test_uses_fallback_when_id_token_exp_within_buffer(self):
         """Skip the `id_token` path when remaining lifetime is below the buffer."""
         # If remaining time is below the buffer, the id_token path is skipped.
-        cfg = ClientConfig(token_expiry_buffer_seconds=60, fallback_token_ttl_seconds=300)
+        cfg = ClientConfig(token_expiry_buffer_seconds=60,
+                           fallback_token_ttl_seconds=300)
         soon_exp = int(time.time()) + 30
         jwt = _make_jwt({"exp": soon_exp})
         before = time.monotonic()
@@ -109,13 +119,66 @@ class TestComputeExpiresAt:
 
     def test_handles_invalid_expires_in_value(self):
         """Use fallback TTL when `expires_in` is not coercible to int."""
-        cfg = ClientConfig(token_expiry_buffer_seconds=60, fallback_token_ttl_seconds=300)
+        cfg = ClientConfig(token_expiry_buffer_seconds=60,
+                           fallback_token_ttl_seconds=300)
         before = time.monotonic()
         result = compute_expires_at({"expires_in": "not-a-number"}, cfg)
         assert before + 300 - 1 <= result <= before + 300 + 1
 
 
-class TestTokenCacheClientIdIsolation:
+class TestComputeExpiresAtFromBearer:
+    """Tests for cache expiry resolution from a bearer auth header string."""
+
+    def test_uses_exp_from_bearer_jwt(self):
+        """Parse exp claim from Bearer JWT and apply buffer."""
+        cache = _TokenCache(
+            ClientConfig(token_expiry_buffer_seconds=60,
+                         fallback_token_ttl_seconds=300))
+        future_exp = int(time.time()) + 600
+        jwt = _make_jwt({"exp": future_exp})
+        before = time.monotonic()
+        result = cache.compute_expires_at_from_bearer(f"Bearer {jwt}")
+        assert before + 540 - 5 <= result <= before + 540 + 5
+
+    def test_falls_back_when_no_exp_in_jwt(self):
+        """Use fallback TTL when JWT has no exp claim."""
+        cache = _TokenCache(
+            ClientConfig(token_expiry_buffer_seconds=60,
+                         fallback_token_ttl_seconds=300))
+        jwt = _make_jwt({"sub": "user"})
+        before = time.monotonic()
+        result = cache.compute_expires_at_from_bearer(f"Bearer {jwt}")
+        assert before + 300 - 1 <= result <= before + 300 + 1
+
+    def test_falls_back_when_header_not_bearer(self):
+        """Use fallback TTL for non-Bearer auth headers."""
+        cache = _TokenCache(
+            ClientConfig(token_expiry_buffer_seconds=60,
+                         fallback_token_ttl_seconds=300))
+        before = time.monotonic()
+        result = cache.compute_expires_at_from_bearer("Basic dXNlcjpwYXNz")
+        assert before + 300 - 1 <= result <= before + 300 + 1
+
+    def test_falls_back_when_bearer_token_malformed(self):
+        """Use fallback TTL when bearer token is not a valid JWT."""
+        cache = _TokenCache(
+            ClientConfig(token_expiry_buffer_seconds=60,
+                         fallback_token_ttl_seconds=300))
+        before = time.monotonic()
+        result = cache.compute_expires_at_from_bearer("Bearer not-a-jwt")
+        assert before + 300 - 1 <= result <= before + 300 + 1
+
+    def test_strips_bearer_prefix_case_insensitively(self):
+        """Strip 'bearer ' prefix regardless of case."""
+        cache = _TokenCache(
+            ClientConfig(token_expiry_buffer_seconds=60,
+                         fallback_token_ttl_seconds=300))
+        future_exp = int(time.time()) + 600
+        jwt = _make_jwt({"exp": future_exp})
+        result_lower = cache.compute_expires_at_from_bearer(f"bearer {jwt}")
+        result_upper = cache.compute_expires_at_from_bearer(f"Bearer {jwt}")
+        assert abs(result_lower - result_upper) < 1
+
     """Tokens are isolated by client_id — same user JWT, different credentials, no sharing."""
 
     def test_system_tokens_isolated_by_client_id(self):

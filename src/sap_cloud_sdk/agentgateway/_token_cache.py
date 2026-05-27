@@ -1,9 +1,8 @@
-"""Token cache for Agent Gateway customer flow.
+"""Token cache for Agent Gateway flows.
 
 Caches IAS tokens (system + user-exchanged) per client to avoid redundant
-mTLS token requests during agentic loops. LoB flow uses BTP Destination
-Service which has its own caching, so this module only serves the customer
-flow.
+token requests during agentic loops. Used by both customer flow (mTLS) and
+LoB flow (BTP Destination Service).
 
 Keying:
 - System tokens are keyed by `client_id` (or "_default" when unset).
@@ -59,6 +58,36 @@ def _parse_jwt_exp(jwt: str) -> int | None:
         return int(exp) if exp is not None else None
     except (ValueError, KeyError, TypeError, json.JSONDecodeError):
         return None
+
+
+def compute_expires_at(token_data: dict, config: ClientConfig) -> float:
+    """Resolve the cache expiry timestamp (monotonic) for a token response.
+
+    Resolution order:
+    1. `expires_in` from the response, minus the buffer.
+    2. `exp` claim from `id_token` (translated from wall clock to monotonic),
+        minus the buffer.
+    3. Config-provided fallback TTL.
+    """
+    now_mono = time.monotonic()
+    buffer = config.token_expiry_buffer_seconds
+
+    expires_in = token_data.get("expires_in")
+    if expires_in is not None:
+        try:
+            return now_mono + int(expires_in) - buffer
+        except (ValueError, TypeError):
+            pass
+
+    id_token = token_data.get("id_token")
+    if id_token:
+        exp = _parse_jwt_exp(id_token)
+        if exp is not None:
+            remaining = exp - time.time()
+            if remaining > buffer:
+                return now_mono + remaining - buffer
+
+    return now_mono + config.fallback_token_ttl_seconds
 
 
 class _TokenCache:
@@ -144,31 +173,24 @@ class _TokenCache:
     # --- Utility ---
 
     def compute_expires_at(self, token_data: dict) -> float:
-        """Resolve the cache expiry timestamp (monotonic) for a token response.
+        """Resolve the cache expiry timestamp (monotonic) for a token response."""
+        return compute_expires_at(token_data, self._config)
 
-        Resolution order:
-        1. `expires_in` from the response, minus the buffer.
-        2. `exp` claim from `id_token` (translated from wall clock to monotonic),
-            minus the buffer.
-        3. Config-provided fallback TTL.
+    def compute_expires_at_from_bearer(self, auth_header: str) -> float:
+        """Resolve the cache expiry timestamp for a bearer auth header string.
+
+        Strips the 'Bearer ' prefix and parses the `exp` claim from the JWT.
+        Falls back to the config-provided fallback TTL if parsing fails.
         """
         now_mono = time.monotonic()
         buffer = self._config.token_expiry_buffer_seconds
 
-        expires_in = token_data.get("expires_in")
-        if expires_in is not None:
-            try:
-                return now_mono + int(expires_in) - buffer
-            except (ValueError, TypeError):
-                pass
-
-        id_token = token_data.get("id_token")
-        if id_token:
-            exp = _parse_jwt_exp(id_token)
-            if exp is not None:
-                remaining = exp - time.time()
-                if remaining > buffer:
-                    return now_mono + remaining - buffer
+        jwt = auth_header[7:] if auth_header.lower().startswith("bearer ") else auth_header
+        exp = _parse_jwt_exp(jwt)
+        if exp is not None:
+            remaining = exp - time.time()
+            if remaining > buffer:
+                return now_mono + remaining - buffer
 
         return now_mono + self._config.fallback_token_ttl_seconds
 

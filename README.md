@@ -23,6 +23,7 @@ The Python SDK offers a clean, type-safe API following Python best practices whi
 - **ObjectStore Service**
 - **Secret Resolver**
 - **Telemetry & Observability**
+- **Security Handler**
 - **Data Anonymization Service**
 
 ## Requirements and Setup
@@ -77,6 +78,7 @@ Each module has comprehensive usage guides:
 - [ObjectStore](src/sap_cloud_sdk/objectstore/user-guide.md)
 - [Secret Resolver](src/sap_cloud_sdk/core/secret_resolver/user-guide.md)
 - [Telemetry](src/sap_cloud_sdk/core/telemetry/user-guide.md)
+- [Security Handler](src/sap_cloud_sdk/security_handler/user-guide.md)
 - [Data Anonymization](src/sap_cloud_sdk/core/data_anonymization/user-guide.md)
 
 ## Support, Feedback, Contributing

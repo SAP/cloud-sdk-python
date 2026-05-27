@@ -197,7 +197,11 @@ class DestinationClient:
                 f"failed to list subaccount destinations: {e}"
             )
 
-    @record_metrics(Module.DESTINATION, Operation.DESTINATION_GET_INSTANCE_DESTINATION)
+    @record_metrics(
+        Module.DESTINATION,
+        Operation.DESTINATION_GET_INSTANCE_DESTINATION,
+        deprecated=True,
+    )
     def get_instance_destination(
         self, name: str, proxy_enabled: Optional[bool] = None
     ) -> Optional[Destination | TransparentProxyDestination]:
@@ -236,7 +240,9 @@ class DestinationClient:
             raise DestinationOperationError(f"failed to get destination '{name}': {e}")
 
     @record_metrics(
-        Module.DESTINATION, Operation.DESTINATION_GET_SUBACCOUNT_DESTINATION
+        Module.DESTINATION,
+        Operation.DESTINATION_GET_SUBACCOUNT_DESTINATION,
+        deprecated=True,
     )
     def get_subaccount_destination(
         self,

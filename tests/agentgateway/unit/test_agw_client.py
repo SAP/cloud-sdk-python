@@ -165,7 +165,7 @@ class TestListMcpTools:
 
             await agw_client.list_mcp_tools()
 
-            mock_lob.assert_called_once_with("my-tenant")
+            mock_lob.assert_called_once_with("my-tenant", 60.0)
 
     @pytest.mark.asyncio
     async def test_calls_lob_flow(self):
@@ -185,7 +185,7 @@ class TestListMcpTools:
 
             await agw_client.list_mcp_tools()
 
-            mock_lob.assert_called_once_with("my-tenant")
+            mock_lob.assert_called_once_with("my-tenant", 60.0)
 
     @pytest.mark.asyncio
     async def test_returns_tools_from_lob_flow(self):
@@ -306,7 +306,7 @@ class TestCallMcpTool:
 
             assert result == "result"
             mock_lob.assert_called_once_with(
-                mock_tool, "my-jwt", "my-tenant", param1="value1"
+                mock_tool, "my-jwt", "my-tenant", 60.0, param1="value1"
             )
 
     @pytest.mark.asyncio
@@ -332,7 +332,7 @@ class TestCallMcpTool:
             )
 
             assert result == "result"
-            mock_lob.assert_called_once_with(mock_tool, "my-jwt", "my-tenant")
+            mock_lob.assert_called_once_with(mock_tool, "my-jwt", "my-tenant", 60.0)
 
     @pytest.mark.asyncio
     async def test_customer_credentials_calls_customer_flow(self, mock_tool):
@@ -386,7 +386,7 @@ class TestCallMcpTool:
 
             assert result == "tool result"
             mock_lob.assert_called_once_with(
-                mock_tool, "jwt-token", "my-tenant", order_id="12345"
+                mock_tool, "jwt-token", "my-tenant", 60.0, order_id="12345"
             )
 
     @pytest.mark.asyncio

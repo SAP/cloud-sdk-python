@@ -35,9 +35,6 @@ _CREDENTIALS_PATH_ENV = "AGW_CREDENTIALS_PATH"
 # Default credential path for Kyma production deployments
 _CREDENTIALS_DEFAULT_PATH = "/etc/ums/credentials/credentials"
 
-# HTTP timeout for token requests and MCP server calls (seconds)
-_HTTP_TIMEOUT = 30.0
-
 # Resource URN for Agent Gateway token scope (hardcoded - production value)
 _AGW_RESOURCE_URN = "urn:sap:identity:application:provider:name:agent-gateway"
 
@@ -213,6 +210,7 @@ def _create_ssl_context(certificate: str, private_key: str) -> ssl.SSLContext:
 def _request_token_mtls(
     credentials: CustomerCredentials,
     grant_type: str,
+    timeout: float,
     app_tid: str | None = None,
     extra_data: dict | None = None,
 ) -> str:
@@ -255,7 +253,7 @@ def _request_token_mtls(
     try:
         with httpx.Client(
             verify=ssl_context,
-            timeout=_HTTP_TIMEOUT,
+            timeout=timeout,
         ) as client:
             response = client.post(
                 credentials.token_service_url,
@@ -293,6 +291,7 @@ def _request_token_mtls(
 
 def get_system_token_mtls(
     credentials: CustomerCredentials,
+    timeout: float,
     app_tid: str | None = None,
 ) -> str:
     """Get system-scoped token using mTLS client credentials flow.
@@ -301,6 +300,7 @@ def get_system_token_mtls(
 
     Args:
         credentials: Customer credentials.
+        timeout: HTTP timeout in seconds.
         app_tid: BTP Application Tenant ID of subscriber (optional).
 
     Returns:
@@ -310,6 +310,7 @@ def get_system_token_mtls(
     return _request_token_mtls(
         credentials,
         grant_type=_GRANT_TYPE_CLIENT_CREDENTIALS,
+        timeout=timeout,
         app_tid=app_tid,
         extra_data={"response_type": "token"},
     )
@@ -318,6 +319,7 @@ def get_system_token_mtls(
 def exchange_user_token(
     credentials: CustomerCredentials,
     user_token: str,
+    timeout: float,
     app_tid: str | None = None,
 ) -> str:
     """Exchange user token for AGW-scoped token using jwt-bearer grant.
@@ -328,6 +330,7 @@ def exchange_user_token(
     Args:
         credentials: Customer credentials.
         user_token: User's JWT token to exchange.
+        timeout: HTTP timeout in seconds.
         app_tid: BTP Application Tenant ID of subscriber (optional).
 
     Returns:
@@ -337,6 +340,7 @@ def exchange_user_token(
     return _request_token_mtls(
         credentials,
         grant_type=_GRANT_TYPE_JWT_BEARER,
+        timeout=timeout,
         app_tid=app_tid,
         extra_data={
             "assertion": user_token,
@@ -371,6 +375,7 @@ async def _list_server_tools(
     url: str,
     auth_token: str,
     dependency: IntegrationDependency,
+    timeout: float,
 ) -> list[MCPTool]:
     """List tools from a single MCP server.
 
@@ -390,7 +395,7 @@ async def _list_server_tools(
             "Authorization": f"Bearer {auth_token}",
             "x-correlation-id": str(uuid.uuid4()),
         },
-        timeout=_HTTP_TIMEOUT,
+        timeout=timeout,
     ) as http_client:
         async with streamable_http_client(url, http_client=http_client) as (
             read,
@@ -427,6 +432,7 @@ async def _list_server_tools(
 
 async def get_mcp_tools_customer(
     credentials: CustomerCredentials,
+    timeout: float,
     app_tid: str | None = None,
 ) -> list[MCPTool]:
     """List all MCP tools from servers defined in credentials.
@@ -456,7 +462,7 @@ async def get_mcp_tools_customer(
     # Get system token for discovery
     loop = asyncio.get_running_loop()
     system_token = await loop.run_in_executor(
-        None, get_system_token_mtls, credentials, app_tid
+        None, get_system_token_mtls, credentials, timeout, app_tid
     )
 
     tools: list[MCPTool] = []
@@ -471,7 +477,7 @@ async def get_mcp_tools_customer(
         )
 
         try:
-            server_tools = await _list_server_tools(url, system_token, dep)
+            server_tools = await _list_server_tools(url, system_token, dep, timeout)
             tools.extend(server_tools)
             logger.debug("Loaded %d tool(s) from %s", len(server_tools), dep.ord_id)
         except Exception:
@@ -487,6 +493,7 @@ async def call_mcp_tool_customer(
     credentials: CustomerCredentials,
     tool: MCPTool,
     user_token: str | None,
+    timeout: float,
     app_tid: str | None = None,
     **kwargs,
 ) -> str:
@@ -513,7 +520,7 @@ async def call_mcp_tool_customer(
     if user_token:
         # Exchange user token for AGW-scoped token (with principal propagation)
         agw_token = await loop.run_in_executor(
-            None, exchange_user_token, credentials, user_token, app_tid
+            None, exchange_user_token, credentials, user_token, timeout, app_tid
         )
     else:
         # TODO: IBD workaround - use system token when user_token is not available.
@@ -524,7 +531,7 @@ async def call_mcp_tool_customer(
             "Principal propagation will NOT work."
         )
         agw_token = await loop.run_in_executor(
-            None, get_system_token_mtls, credentials, app_tid
+            None, get_system_token_mtls, credentials, timeout, app_tid
         )
 
     async with httpx.AsyncClient(
@@ -532,7 +539,7 @@ async def call_mcp_tool_customer(
             "Authorization": f"Bearer {agw_token}",
             "x-correlation-id": str(uuid.uuid4()),
         },
-        timeout=_HTTP_TIMEOUT,
+        timeout=timeout,
     ) as http_client:
         async with streamable_http_client(tool.url, http_client=http_client) as (
             read,

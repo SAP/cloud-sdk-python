@@ -1,7 +1,8 @@
-"""Converters for MCPTool to framework-specific tools.
+"""Reference converter for MCPTool to LangChain StructuredTool.
 
-This module provides converters to transform MCPTool objects into
-tools compatible with popular agent frameworks.
+This module provides a sample converter as a starting point.
+End-users have full flexibility to write their own converters with
+custom tool naming, argument schemas, or framework integrations.
 """
 
 from __future__ import annotations
@@ -22,6 +23,9 @@ def mcp_tool_to_langchain(
     get_user_token: Callable[[], str],
 ) -> StructuredTool:
     """Convert MCPTool to LangChain StructuredTool.
+
+    This is a reference implementation. End-users can write their own
+    converter with custom naming, argument handling, or framework bindings.
 
     Args:
         mcp_tool: MCPTool object from list_mcp_tools().
@@ -71,13 +75,11 @@ def mcp_tool_to_langchain(
     # Build args schema from input_schema
     properties = mcp_tool.input_schema.get("properties", {})
     fields: dict[str, Any] = {k: (str, ...) for k in properties}
-    args_schema = (
-        create_model(f"{mcp_tool.namespaced_name}_args", **fields) if fields else None
-    )
+    args_schema = create_model(f"{mcp_tool.name}_args", **fields) if fields else None
 
     return StructuredTool.from_function(
         coroutine=run,
-        name=mcp_tool.namespaced_name,
+        name=mcp_tool.name,
         description=mcp_tool.description,
         args_schema=args_schema,
     )

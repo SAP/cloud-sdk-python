@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 from typing import TypedDict, Unpack
 from unittest.mock import MagicMock, Mock, patch
 
@@ -11,6 +10,7 @@ import pytest
 from sap_cloud_sdk.core.auditlog_ng.client import AuditClient
 from sap_cloud_sdk.core.auditlog_ng.config import AuditLogNGConfig, SCHEMA_URL
 from sap_cloud_sdk.core.auditlog_ng.exceptions import ValidationError
+from sap_cloud_sdk.core.telemetry import Module, Operation
 
 
 class ConfigKwargs(TypedDict, total=False):
@@ -34,7 +34,7 @@ def _make_config(**overrides: Unpack[ConfigKwargs]) -> AuditLogNGConfig:
         "namespace": "namespace-123",
         "insecure": True,
     }
-    defaults.update(overrides)  # ty: ignore[invalid-argument-type]
+    defaults.update(overrides)
     return AuditLogNGConfig(**defaults)
 
 
@@ -113,6 +113,46 @@ class TestAuditClientInit:
         assert attrs["service.name"] == "my-svc"
         assert attrs["sap.ucl.deployment_id"] == "deployment-123"
         assert attrs["sap.ucl.system_namespace"] == "namespace-123"
+
+    @patch("sap_cloud_sdk.core.auditlog_ng.client.GRPCLogExporter")
+    @patch("sap_cloud_sdk.core.auditlog_ng.client.LoggerProvider")
+    def test_init_records_create_client_metric(
+        self, mock_provider_cls, mock_exporter_cls
+    ):
+        config = _make_config()
+
+        with patch(
+            "sap_cloud_sdk.core.telemetry.metrics_decorator.record_request_metric"
+        ) as mock_metric:
+            AuditClient(config)
+
+        mock_metric.assert_called_once_with(
+            Module.AUDITLOG_NG,
+            None,
+            Operation.AUDITLOG_CREATE_CLIENT,
+            False,
+        )
+
+    @patch("sap_cloud_sdk.core.auditlog_ng.client.GRPCLogExporter")
+    @patch("sap_cloud_sdk.core.auditlog_ng.client.LoggerProvider")
+    def test_init_records_error_metric_on_failure(
+        self, mock_provider_cls, mock_exporter_cls
+    ):
+        mock_provider_cls.side_effect = RuntimeError("provider failed")
+        config = _make_config()
+
+        with patch(
+            "sap_cloud_sdk.core.telemetry.metrics_decorator.record_error_metric"
+        ) as mock_error_metric:
+            with pytest.raises(RuntimeError, match="provider failed"):
+                AuditClient(config, _telemetry_source=Module.DMS)
+
+        mock_error_metric.assert_called_once_with(
+            Module.AUDITLOG_NG,
+            Module.DMS,
+            Operation.AUDITLOG_CREATE_CLIENT,
+            False,
+        )
 
 
 class TestAuditClientSend:

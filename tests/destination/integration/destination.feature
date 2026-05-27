@@ -227,6 +227,19 @@ Feature: Destination Service Integration
   #   And I clean up the instance destination "test-v2-full-options"
   #   And I clean up the instance fragment "test-v2-full-fragment"
 
+  Scenario: DestinationHttpClient sends an authenticated request using token fetched from BTP
+    Given I have a destination named "sdk-test-http-client" of type "HTTP"
+    And the destination has URL "https://httpbin.org"
+    And the destination has authentication "OAuth2ClientCredentials"
+    And the destination has OAuth2 credentials from environment
+    When I create the destination at instance level
+    Then the destination creation should be successful
+    When I fetch the destination using the v2 API
+    And I create a DestinationHttpClient from the destination
+    And I send a GET request to "/headers"
+    Then the response contains an Authorization header
+    And I clean up the instance destination "sdk-test-http-client"
+
   Scenario: Manage labels for subaccount destination
     Given I have a destination named "test-dest-labels" of type "HTTP"
     And the destination has URL "https://labels.example.com"
@@ -303,3 +316,4 @@ Feature: Destination Service Integration
   #   Then the destination creation should be successful
   #   When I get subaccount destination "test-dest-sub-isolation" with "PROVIDER_ONLY" access strategy
   #   Then the destination should not be found
+

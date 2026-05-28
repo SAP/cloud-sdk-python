@@ -11,7 +11,7 @@ permissions:
 
 jobs:
   publish:
-    name: Publish to Artifactory
+    name: Publish Package to Internal Artifactory
     runs-on: ["self-hosted"]
     environment: 'artifactory:sap-cloud-sdk'
     if: ${{ !contains(github.server_url, 'github.com') }}

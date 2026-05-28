@@ -17,7 +17,7 @@ env:
 
 jobs:
   test:
-    name: Unit Tests with Coverage
+    name: Tests & Coverage
     runs-on: ${{ contains(github.server_url, 'github.com') && 'ubuntu-latest' || fromJSON('["self-hosted"]') }}
     steps:
       - name: "Checkout Repository"

@@ -9,7 +9,7 @@ jobs:
     permissions:
       contents: read
       id-token: write
-    name: Publish to PyPI
+    name: Publish Package to PyPI
     runs-on: ubuntu-latest
     environment: 'pypi:sap-cloud-sdk'
     steps:

@@ -10,6 +10,7 @@ permissions:
 
 jobs:
   sync:
+    name: Sync from External Repository
     runs-on: ["self-hosted"]
     if: ${{ !contains(github.server_url, 'github.com') && contains(github.repository, 'application-foundation') }}
     steps:

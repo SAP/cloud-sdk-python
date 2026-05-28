@@ -172,7 +172,9 @@ class AgentGatewayClient:
                 logger.warning("app_tid parameter ignored for LoB agent flow")
 
             tenant = self._resolve_tenant_subdomain()
-            return await get_mcp_tools_lob(tenant, self._config.timeout, self._token_cache)
+            return await get_mcp_tools_lob(
+                tenant, self._config.timeout, self._token_cache
+            )
 
         except AgentGatewaySDKError:
             # Re-raise SDK errors as-is
@@ -274,7 +276,12 @@ class AgentGatewayClient:
 
             tenant = self._resolve_tenant_subdomain()
             return await call_mcp_tool_lob(
-                tool, resolved_user_token, tenant, self._config.timeout, self._token_cache, **kwargs
+                tool,
+                resolved_user_token,
+                tenant,
+                self._config.timeout,
+                self._token_cache,
+                **kwargs,
             )
 
         except AgentGatewaySDKError:

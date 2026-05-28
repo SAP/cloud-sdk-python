@@ -496,6 +496,7 @@ async def get_mcp_tools_customer(
     logger.info("Discovering tools from %d MCP server(s)", len(dependencies))
 
     system_token = None
+
     # Define a helper closure to refetch the system token on demand, since it may need to be
     # refreshed during the discovery loop if any server returns a 401
     async def refetch_system_token() -> str:

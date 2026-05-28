@@ -117,15 +117,12 @@ class _TokenCache:
             del self._system_tokens[key]
         return None
 
-    def set_system_token(self, token: str, expires_at: float,
-                         client_id: str) -> None:
+    def set_system_token(self, token: str, expires_at: float, client_id: str) -> None:
         """Cache a system token under `client_id`; evict LRU once size exceeds limit."""
         key = client_id
-        self._system_tokens[key] = _CachedToken(token=token,
-                                                expires_at=expires_at)
+        self._system_tokens[key] = _CachedToken(token=token, expires_at=expires_at)
         self._system_tokens.move_to_end(key)
-        while len(self._system_tokens
-                  ) > self._config.max_system_token_cache_size:
+        while len(self._system_tokens) > self._config.max_system_token_cache_size:
             evicted, _ = self._system_tokens.popitem(last=False)
             logger.debug("System token cache full — evicted '%s'", evicted)
 
@@ -157,8 +154,7 @@ class _TokenCache:
     ) -> None:
         """Cache an exchanged user token; evict LRU once size exceeds limit."""
         key = self._hash_key(user_jwt, client_id)
-        self._user_tokens[key] = _CachedToken(token=token,
-                                              expires_at=expires_at)
+        self._user_tokens[key] = _CachedToken(token=token, expires_at=expires_at)
         self._user_tokens.move_to_end(key)
         while len(self._user_tokens) > self._config.max_user_token_cache_size:
             evicted, _ = self._user_tokens.popitem(last=False)
@@ -185,7 +181,11 @@ class _TokenCache:
         now_mono = time.monotonic()
         buffer = self._config.token_expiry_buffer_seconds
 
-        jwt = auth_header[7:] if auth_header.lower().startswith("bearer ") else auth_header
+        jwt = (
+            auth_header[7:]
+            if auth_header.lower().startswith("bearer ")
+            else auth_header
+        )
         exp = _parse_jwt_exp(jwt)
         if exp is not None:
             remaining = exp - time.time()

@@ -392,11 +392,6 @@ async def call_mcp_tool_lob(
     Returns:
         Tool execution result as string.
     """
-    if not tool.fragment_name:
-        raise MCPServerNotFoundError(
-            f"Tool '{tool.name}' missing fragment_name for LoB invocation"
-        )
-
     async with httpx.AsyncClient(
         headers={
             "Authorization": f"Bearer {user_auth_token}",

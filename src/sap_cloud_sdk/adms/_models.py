@@ -68,14 +68,14 @@ class JobType(str, Enum):
     """Async job types.
 
     Attributes:
-        ZIP_DOWNLOAD: Package documents into a ZIP archive.
-            Only allowed via DocumentService.StartJob.
         DELETE_USER_DATA: GDPR user data erasure.
             Only allowed via AdminService.StartJob (system-user auth required).
+        ZIP_DOWNLOAD: Package documents into a ZIP archive.
+            Only allowed via DocumentService.StartJob.
     """
 
-    ZIP_DOWNLOAD = "ZIP_DOWNLOAD"
     DELETE_USER_DATA = "DELETE_USER_DATA"
+    ZIP_DOWNLOAD = "ZIP_DOWNLOAD"
 
 
 class JobStatus(str, Enum):
@@ -85,11 +85,11 @@ class JobStatus(str, Enum):
     Non-terminal (keep polling): NOT_STARTED, IN_PROGRESS, PAUSED.
     """
 
-    NOT_STARTED = "NOT_STARTED"
-    IN_PROGRESS = "IN_PROGRESS"
+    CANCELLED = "CANCELLED"
     COMPLETED = "COMPLETED"
     FAILED = "FAILED"
-    CANCELLED = "CANCELLED"
+    IN_PROGRESS = "IN_PROGRESS"
+    NOT_STARTED = "NOT_STARTED"
     PAUSED = "PAUSED"
 
     def is_terminal(self) -> bool:

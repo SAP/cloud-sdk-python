@@ -4,7 +4,7 @@ BTP Business Services that use the ``accessStrategy: sap:cmp-mtls:v1`` trust
 model (SPII, Destination service, UCL callbacks) require the **calling
 application to present a client certificate** signed by the SAP Cloud Root CA.
 
-This module provides :class:`mTLSStrategy` — a single object that wraps a
+This module provides :class:`MTLSStrategy` — a single object that wraps a
 PEM-encoded client certificate + private key and applies it to either a
 ``requests.Session`` (sync) or an ``httpx.AsyncClient`` (async).
 
@@ -16,16 +16,16 @@ Service binding layout (Kyma / Cloud Foundry):
     * SPII / UCL mTLS endpoint:     ``tls.crt``, ``tls.key``
     * SAP Connectivity service:      ``onpremise_proxy_certificate``, ``onpremise_proxy_key``
 
-    :meth:`mTLSStrategy.from_binding_path` handles the common ``certificate``/``key``
+    :meth:`MTLSStrategy.from_binding_path` handles the common ``certificate``/``key``
     naming used by the CF Destination service.  For custom naming, use
-    :meth:`mTLSStrategy.from_pem` directly.
+    :meth:`MTLSStrategy.from_pem` directly.
 
 Usage::
 
-    from sap_cloud_sdk.core.auth import mTLSStrategy
+    from sap_cloud_sdk.core.auth import MTLSStrategy
 
     # Load from Kubernetes / CF mounted secret directory
-    strategy = mTLSStrategy.from_binding_path("/etc/secrets/appfnd/destination/default")
+    strategy = MTLSStrategy.from_binding_path("/etc/secrets/appfnd/destination/default")
 
     # Apply to a sync requests.Session
     import requests
@@ -34,12 +34,12 @@ Usage::
 
     # Apply to an async httpx.AsyncClient
     import httpx
-    async with strategy.apply_to_async_client(httpx.AsyncClient()) as client:
+    async with strategy.apply_to_async_client() as client:
         resp = await client.get("...")
 
     # Or load directly from PEM strings / file paths
-    strategy = mTLSStrategy.from_pem(cert_pem="-----BEGIN CERTIFICATE...", key_pem="...")
-    strategy = mTLSStrategy.from_files(cert_path="/var/certs/tls.crt", key_path="/var/certs/tls.key")
+    strategy = MTLSStrategy.from_pem(cert_pem="-----BEGIN CERTIFICATE...", key_pem="...")
+    strategy = MTLSStrategy.from_files(cert_path="/var/certs/tls.crt", key_path="/var/certs/tls.key")
 """
 
 from __future__ import annotations
@@ -55,7 +55,7 @@ import requests
 
 
 @dataclass(frozen=True)
-class mTLSConfig:
+class MTLSConfig:
     """Immutable holder for a client certificate + private key pair.
 
     Attributes:
@@ -71,7 +71,7 @@ class mTLSConfig:
     server_ca_pem: Optional[str] = None
 
 
-class mTLSStrategy:
+class MTLSStrategy:
     """Applies X.509 client certificate authentication to HTTP clients.
 
     Construct via one of the factory class methods:
@@ -85,7 +85,7 @@ class mTLSStrategy:
     create an HTTP client pre-configured with the certificate.
     """
 
-    def __init__(self, config: mTLSConfig) -> None:
+    def __init__(self, config: MTLSConfig) -> None:
         self._config = config
         self._session_temp_files: list[str] = []
 
@@ -107,7 +107,7 @@ class mTLSStrategy:
         cert_pem: str,
         key_pem: str,
         server_ca_pem: Optional[str] = None,
-    ) -> "mTLSStrategy":
+    ) -> "MTLSStrategy":
         """Create from PEM-encoded certificate and key strings.
 
         Args:
@@ -116,7 +116,7 @@ class mTLSStrategy:
             server_ca_pem: Optional PEM CA bundle to pin the server certificate.
         """
         return cls(
-            mTLSConfig(cert_pem=cert_pem, key_pem=key_pem, server_ca_pem=server_ca_pem)
+            MTLSConfig(cert_pem=cert_pem, key_pem=key_pem, server_ca_pem=server_ca_pem)
         )
 
     @classmethod
@@ -125,7 +125,7 @@ class mTLSStrategy:
         cert_path: str,
         key_path: str,
         server_ca_path: Optional[str] = None,
-    ) -> "mTLSStrategy":
+    ) -> "MTLSStrategy":
         """Create from certificate and key file paths.
 
         Args:
@@ -139,7 +139,7 @@ class mTLSStrategy:
             _read_file(server_ca_path, "server CA") if server_ca_path else None
         )
         return cls(
-            mTLSConfig(cert_pem=cert_pem, key_pem=key_pem, server_ca_pem=server_ca_pem)
+            MTLSConfig(cert_pem=cert_pem, key_pem=key_pem, server_ca_pem=server_ca_pem)
         )
 
     @classmethod
@@ -149,7 +149,7 @@ class mTLSStrategy:
         cert_key: str = "certificate",
         key_key: str = "key",
         server_ca_key: Optional[str] = None,
-    ) -> "mTLSStrategy":
+    ) -> "MTLSStrategy":
         """Create from a SAP BTP service binding directory.
 
         Reads files named *cert_key* and *key_key* from *binding_dir*.
@@ -158,7 +158,7 @@ class mTLSStrategy:
         (``certificate`` and ``key``).  Override for other services, e.g.::
 
             # Kubernetes TLS secret layout
-            strategy = mTLSStrategy.from_binding_path(
+            strategy = MTLSStrategy.from_binding_path(
                 "/var/bindings/compass-mtls",
                 cert_key="tls.crt",
                 key_key="tls.key",
@@ -178,7 +178,7 @@ class mTLSStrategy:
                 os.path.join(binding_dir, server_ca_key), "server CA"
             )
         return cls(
-            mTLSConfig(cert_pem=cert_pem, key_pem=key_pem, server_ca_pem=server_ca_pem)
+            MTLSConfig(cert_pem=cert_pem, key_pem=key_pem, server_ca_pem=server_ca_pem)
         )
 
     @classmethod
@@ -187,7 +187,7 @@ class mTLSStrategy:
         cert_env: str,
         key_env: str,
         server_ca_env: Optional[str] = None,
-    ) -> "mTLSStrategy":
+    ) -> "MTLSStrategy":
         """Create using environment variable names that hold file paths.
 
         Useful when the cert/key paths are injected via env vars (e.g. in
@@ -239,19 +239,11 @@ class mTLSStrategy:
 
         return session
 
-    def apply_to_async_client(
-        self, client: Optional[httpx.AsyncClient] = None
-    ) -> httpx.AsyncClient:
+    def apply_to_async_client(self) -> httpx.AsyncClient:
         """Return an ``httpx.AsyncClient`` configured with this client certificate.
 
-        Creates a new client (with a fresh ``ssl.SSLContext``) when *client* is
-        omitted.  If *client* is provided, note that ``httpx`` does not support
-        mutating an existing client's SSL context — a new client is always
-        constructed internally.
-
-        Args:
-            client: Ignored (kept for API symmetry).  Always creates a new
-                    ``httpx.AsyncClient`` with the correct SSL context.
+        ``httpx`` does not support mutating an existing client's SSL context, so
+        a new client is always constructed with a fresh ``ssl.SSLContext``.
 
         Returns:
             A new ``httpx.AsyncClient`` with mTLS configured.
@@ -326,11 +318,11 @@ def _read_file(path: str, label: str) -> str:
             return f.read()
     except FileNotFoundError as exc:
         raise FileNotFoundError(
-            f"mTLSStrategy: {label} file not found at '{path}'"
+            f"MTLSStrategy: {label} file not found at '{path}'"
         ) from exc
     except OSError as exc:
         raise OSError(
-            f"mTLSStrategy: cannot read {label} file at '{path}': {exc}"
+            f"MTLSStrategy: cannot read {label} file at '{path}': {exc}"
         ) from exc
 
 
@@ -339,6 +331,6 @@ def _require_env(name: str) -> str:
     value = os.environ.get(name)
     if not value:
         raise ValueError(
-            f"mTLSStrategy: required environment variable '{name}' is not set"
+            f"MTLSStrategy: required environment variable '{name}' is not set"
         )
     return value

@@ -1,4 +1,4 @@
-"""BDD step definitions: core/auth — IasTokenFetcher, mTLSStrategy, TokenCache."""
+"""BDD step definitions: core/auth — IasTokenFetcher, MTLSStrategy, TokenCache."""
 
 import ssl
 import time
@@ -7,7 +7,7 @@ import pytest
 from pytest_bdd import scenarios, given, when, then, parsers
 
 from sap_cloud_sdk.core.auth._ias_fetcher import AuthError, IasTokenFetcher
-from sap_cloud_sdk.core.auth._mtls import mTLSStrategy
+from sap_cloud_sdk.core.auth._mtls import MTLSStrategy
 
 scenarios("core_auth.feature")
 
@@ -270,7 +270,7 @@ def assert_ias_token(token, context):
     assert context["result"] == token
 
 
-# ─── mTLSStrategy — Given ────────────────────────────────────────────────────
+# ─── MTLSStrategy — Given ────────────────────────────────────────────────────
 
 @given("valid PEM certificate and key strings")
 def valid_pem(context):
@@ -323,13 +323,13 @@ def env_var_not_set(env_var, context, monkeypatch):
     context["key_env"] = "KEY_PATH"
 
 
-@given("an mTLSStrategy with valid cert and key")
+@given("an MTLSStrategy with valid cert and key")
 def mtls_strategy_given(context, tmp_path):
     cert = tmp_path / "cert.pem"
     key = tmp_path / "key.pem"
     cert.write_text(_VALID_PEM_CERT)
     key.write_text(_VALID_PEM_KEY)
-    context["strategy"] = mTLSStrategy.from_pem(_VALID_PEM_CERT, _VALID_PEM_KEY)
+    context["strategy"] = MTLSStrategy.from_pem(_VALID_PEM_CERT, _VALID_PEM_KEY)
 
 
 @given("a binding directory with only a \"key\" file")
@@ -338,37 +338,37 @@ def binding_dir_missing_cert(context, tmp_path):
     context["binding_dir"] = str(tmp_path)
 
 
-# ─── mTLSStrategy — When ─────────────────────────────────────────────────────
+# ─── MTLSStrategy — When ─────────────────────────────────────────────────────
 
-@when('I call "mTLSStrategy.from_pem" with cert_pem and key_pem')
+@when('I call "MTLSStrategy.from_pem" with cert_pem and key_pem')
 def call_from_pem(context):
-    context["result"] = mTLSStrategy.from_pem(context["cert_pem"], context["key_pem"])
+    context["result"] = MTLSStrategy.from_pem(context["cert_pem"], context["key_pem"])
 
 
-@when('I call "mTLSStrategy.from_files" with those paths')
+@when('I call "MTLSStrategy.from_files" with those paths')
 def call_from_files(context):
-    context["result"] = mTLSStrategy.from_files(context["cert_path"], context["key_path"])
+    context["result"] = MTLSStrategy.from_files(context["cert_path"], context["key_path"])
 
 
-@when('I call "mTLSStrategy.from_binding_path" with that directory')
+@when('I call "MTLSStrategy.from_binding_path" with that directory')
 def call_from_binding(context):
     try:
-        context["result"] = mTLSStrategy.from_binding_path(context["binding_dir"])
+        context["result"] = MTLSStrategy.from_binding_path(context["binding_dir"])
     except (ValueError, FileNotFoundError) as exc:
         context["error"] = exc
 
 
-@when(parsers.parse('I call "mTLSStrategy.from_binding_path" with cert_key "{ck}" and key_key "{kk}"'))
+@when(parsers.parse('I call "MTLSStrategy.from_binding_path" with cert_key "{ck}" and key_key "{kk}"'))
 def call_from_binding_custom(ck, kk, context):
-    context["result"] = mTLSStrategy.from_binding_path(
+    context["result"] = MTLSStrategy.from_binding_path(
         context["binding_dir"], cert_key=ck, key_key=kk
     )
 
 
-@when(parsers.parse('I call "mTLSStrategy.from_env" with cert_env "{cert_env}" and key_env "{key_env}"'))
+@when(parsers.parse('I call "MTLSStrategy.from_env" with cert_env "{cert_env}" and key_env "{key_env}"'))
 def call_from_env(cert_env, key_env, context):
     try:
-        context["result"] = mTLSStrategy.from_env(cert_env, key_env)
+        context["result"] = MTLSStrategy.from_env(cert_env, key_env)
     except ValueError as exc:
         context["error"] = exc
 
@@ -381,16 +381,15 @@ def call_apply_to_session(context):
 
 @when('I call "strategy.apply_to_async_client"')
 def call_apply_to_async_client(context):
-    with patch.object(mTLSStrategy, "_build_ssl_context", return_value=ssl.create_default_context()):
-        import httpx
-        context["result"] = context["strategy"].apply_to_async_client(httpx.AsyncClient())
+    with patch.object(MTLSStrategy, "_build_ssl_context", return_value=ssl.create_default_context()):
+        context["result"] = context["strategy"].apply_to_async_client()
 
 
-# ─── mTLSStrategy — Then ─────────────────────────────────────────────────────
+# ─── MTLSStrategy — Then ─────────────────────────────────────────────────────
 
-@then("an mTLSStrategy instance should be returned")
+@then("an MTLSStrategy instance should be returned")
 def assert_mtls_instance(context):
-    assert isinstance(context["result"], mTLSStrategy)
+    assert isinstance(context["result"], MTLSStrategy)
 
 
 @then("a ValueError should be raised")

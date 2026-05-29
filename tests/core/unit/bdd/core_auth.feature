@@ -70,54 +70,54 @@ Feature: Core Auth — IAS Token Fetcher, mTLS Strategy, Token Cache
     Then the custom cache "get" method should be called
 
   # ═══════════════════════════════════════════════════════════════════════════
-  # mTLSStrategy
+  # MTLSStrategy
   # ═══════════════════════════════════════════════════════════════════════════
 
-  Scenario: Create mTLSStrategy from PEM strings
+  Scenario: Create MTLSStrategy from PEM strings
     Given valid PEM certificate and key strings
-    When I call "mTLSStrategy.from_pem" with cert_pem and key_pem
-    Then an mTLSStrategy instance should be returned
+    When I call "MTLSStrategy.from_pem" with cert_pem and key_pem
+    Then an MTLSStrategy instance should be returned
 
-  Scenario: Create mTLSStrategy from file paths
+  Scenario: Create MTLSStrategy from file paths
     Given cert and key files exist at "/tmp/test.crt" and "/tmp/test.key"
-    When I call "mTLSStrategy.from_files" with those paths
-    Then an mTLSStrategy instance should be returned
+    When I call "MTLSStrategy.from_files" with those paths
+    Then an MTLSStrategy instance should be returned
 
-  Scenario: Create mTLSStrategy from a BTP binding directory
+  Scenario: Create MTLSStrategy from a BTP binding directory
     Given a binding directory with files "certificate" and "key"
-    When I call "mTLSStrategy.from_binding_path" with that directory
-    Then an mTLSStrategy instance should be returned
+    When I call "MTLSStrategy.from_binding_path" with that directory
+    Then an MTLSStrategy instance should be returned
 
-  Scenario: Create mTLSStrategy from custom binding file names
+  Scenario: Create MTLSStrategy from custom binding file names
     Given a binding directory with files "tls.crt" and "tls.key"
-    When I call "mTLSStrategy.from_binding_path" with cert_key "tls.crt" and key_key "tls.key"
-    Then an mTLSStrategy instance should be returned
+    When I call "MTLSStrategy.from_binding_path" with cert_key "tls.crt" and key_key "tls.key"
+    Then an MTLSStrategy instance should be returned
 
-  Scenario: Create mTLSStrategy from environment variable paths
+  Scenario: Create MTLSStrategy from environment variable paths
     Given env vars "CERT_PATH" and "KEY_PATH" point to cert and key files
-    When I call "mTLSStrategy.from_env" with cert_env "CERT_PATH" and key_env "KEY_PATH"
-    Then an mTLSStrategy instance should be returned
+    When I call "MTLSStrategy.from_env" with cert_env "CERT_PATH" and key_env "KEY_PATH"
+    Then an MTLSStrategy instance should be returned
 
   Scenario: from_env raises ValueError when env var is not set
     Given the env var "CERT_PATH" is not set
-    When I call "mTLSStrategy.from_env" with cert_env "CERT_PATH" and key_env "KEY_PATH"
+    When I call "MTLSStrategy.from_env" with cert_env "CERT_PATH" and key_env "KEY_PATH"
     Then a ValueError should be raised
     And the error should mention "CERT_PATH"
 
-  Scenario: Apply mTLSStrategy to a requests.Session
-    Given an mTLSStrategy with valid cert and key
+  Scenario: Apply MTLSStrategy to a requests.Session
+    Given an MTLSStrategy with valid cert and key
     When I call "strategy.apply_to_session"
     Then a configured requests.Session should be returned
     And the session cert attribute should be set
 
-  Scenario: Apply mTLSStrategy to an httpx.AsyncClient
-    Given an mTLSStrategy with valid cert and key
+  Scenario: Apply MTLSStrategy to an httpx.AsyncClient
+    Given an MTLSStrategy with valid cert and key
     When I call "strategy.apply_to_async_client"
     Then a configured httpx.AsyncClient should be returned
 
   Scenario: from_binding_path raises error when cert file is missing
     Given a binding directory with only a "key" file
-    When I call "mTLSStrategy.from_binding_path" with that directory
+    When I call "MTLSStrategy.from_binding_path" with that directory
     Then a ValueError should be raised
     And the error should mention "certificate"
 

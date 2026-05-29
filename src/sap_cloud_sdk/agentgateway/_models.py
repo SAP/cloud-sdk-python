@@ -5,6 +5,32 @@ from typing import Any
 
 
 @dataclass
+class AuthResult:
+    """Authentication result from Agent Gateway.
+
+    Contains the access token and the Agent Gateway URL.
+
+    Attributes:
+        access_token: Raw JWT access token (no "Bearer " prefix).
+        gateway_url: Agent Gateway base URL (no trailing slash).
+
+    Example:
+        ```python
+        from sap_cloud_sdk.agentgateway import create_client
+
+        agw_client = create_client(tenant_subdomain="my-tenant")
+
+        auth = await agw_client.get_system_auth()
+        print(auth.access_token)  # raw JWT
+        print(auth.gateway_url)   # "https://agw.example.com"
+        ```
+    """
+
+    access_token: str
+    gateway_url: str
+
+
+@dataclass
 class MCPTool:
     """MCP tool discovered from Agent Gateway.
 

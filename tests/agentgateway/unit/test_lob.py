@@ -10,13 +10,15 @@ from sap_cloud_sdk.agentgateway._lob import (
     _fetch_auth_token,
     list_mcp_fragments,
     get_ias_fragment_name,
-    get_system_auth,
-    get_user_auth,
+    get_ias_user_fragment_name,
+    fetch_system_auth,
+    fetch_user_auth,
     get_mcp_tools_lob,
     call_mcp_tool_lob,
     _LABEL_KEY,
     _MCP_LABEL_VALUE,
     _IAS_LABEL_VALUE,
+    _IAS_USER_LABEL_VALUE,
 )
 from sap_cloud_sdk.agentgateway._models import MCPTool
 from sap_cloud_sdk.agentgateway.exceptions import MCPServerNotFoundError
@@ -61,11 +63,13 @@ class TestIasDestName:
 class TestFetchAuthToken:
     """Tests for _fetch_auth_token function."""
 
-    def test_fetches_token_successfully(self):
-        """Fetch auth token from destination service."""
+    def test_fetches_and_decodes_token_and_url(self):
+        """Strip Bearer prefix from auth header and return raw JWT with gateway URL."""
+        header_value = "Bearer my-raw-jwt-token-123"
         mock_dest = MagicMock()
         mock_dest.auth_tokens = [MagicMock()]
-        mock_dest.auth_tokens[0].http_header = {"value": "Bearer test-token"}
+        mock_dest.auth_tokens[0].http_header = {"value": header_value}
+        mock_dest.url = "https://agw.example.com/"
 
         with patch(
             "sap_cloud_sdk.agentgateway._lob.create_destination_client"
@@ -74,13 +78,28 @@ class TestFetchAuthToken:
 
             result = _fetch_auth_token("dest-name", "tenant-sub")
 
-            assert result == "Bearer test-token"
+            assert result == ("my-raw-jwt-token-123", "https://agw.example.com")
             mock_client.return_value.get_destination.assert_called_once_with(
                 "dest-name",
                 level=ConsumptionLevel.PROVIDER_SUBACCOUNT,
                 options=None,
                 tenant="tenant-sub",
             )
+
+    def test_strips_trailing_slashes_from_url(self):
+        """Strip trailing slashes from gateway URL."""
+        header_value = "Bearer token"
+        mock_dest = MagicMock()
+        mock_dest.auth_tokens = [MagicMock()]
+        mock_dest.auth_tokens[0].http_header = {"value": header_value}
+        mock_dest.url = "https://agw.example.com/v1/mcp///"
+
+        with patch("sap_cloud_sdk.agentgateway._lob.create_destination_client") as mock_client:
+            mock_client.return_value.get_destination.return_value = mock_dest
+
+            result = _fetch_auth_token("dest-name", "tenant-sub")
+
+            assert result == ("token", "https://agw.example.com/v1/mcp")
 
     def test_raises_when_no_destination(self):
         """Raise MCPServerNotFoundError when destination is None."""
@@ -105,8 +124,8 @@ class TestFetchAuthToken:
             with pytest.raises(MCPServerNotFoundError, match="No auth token"):
                 _fetch_auth_token("dest-name", "tenant-sub")
 
-    def test_raises_when_empty_auth_header(self):
-        """Raise MCPServerNotFoundError when auth header is empty."""
+    def test_raises_when_empty_token_value(self):
+        """Raise MCPServerNotFoundError when http_header value is empty."""
         mock_dest = MagicMock()
         mock_dest.auth_tokens = [MagicMock()]
         mock_dest.auth_tokens[0].http_header = {"value": ""}
@@ -116,7 +135,7 @@ class TestFetchAuthToken:
         ) as mock_client:
             mock_client.return_value.get_destination.return_value = mock_dest
 
-            with pytest.raises(MCPServerNotFoundError, match="Empty Authorization"):
+            with pytest.raises(MCPServerNotFoundError, match="Empty auth header"):
                 _fetch_auth_token("dest-name", "tenant-sub")
 
     def test_passes_options_to_destination(self):
@@ -124,6 +143,7 @@ class TestFetchAuthToken:
         mock_dest = MagicMock()
         mock_dest.auth_tokens = [MagicMock()]
         mock_dest.auth_tokens[0].http_header = {"value": "Bearer token"}
+        mock_dest.url = "https://agw.example.com"
         mock_options = MagicMock()
 
         with patch(
@@ -242,16 +262,65 @@ class TestGetIasFragmentName:
 
 
 # ============================================================
-# Test: get_system_auth
+# Test: get_ias_user_fragment_name
 # ============================================================
 
 
-class TestGetSystemAuth:
-    """Tests for get_system_auth async function."""
+class TestGetIasUserFragmentName:
+    """Tests for get_ias_user_fragment_name function."""
+
+    def test_returns_fragment_name(self):
+        """Return name of first IAS user fragment found."""
+        fragment = MagicMock()
+        fragment.name = "sap-managed-runtime-agw-subscriber-ias-user-abc123"
+
+        with patch("sap_cloud_sdk.agentgateway._lob.create_fragment_client") as mock_client:
+            mock_client.return_value.list_instance_fragments.return_value = [fragment]
+
+            result = get_ias_user_fragment_name("tenant-sub")
+
+            assert result == "sap-managed-runtime-agw-subscriber-ias-user-abc123"
+
+    def test_uses_correct_filter_labels(self):
+        """Use correct label filter for IAS user fragments."""
+        fragment = MagicMock()
+        fragment.name = "ias-user-fragment"
+
+        with patch("sap_cloud_sdk.agentgateway._lob.create_fragment_client") as mock_client:
+            mock_client.return_value.list_instance_fragments.return_value = [fragment]
+
+            get_ias_user_fragment_name("tenant-sub")
+
+            call_args = mock_client.return_value.list_instance_fragments.call_args
+            filter_opt = call_args.kwargs.get("filter")
+            assert filter_opt is not None
+            assert len(filter_opt.filter_labels) == 1
+            assert filter_opt.filter_labels[0].key == _LABEL_KEY
+            assert filter_opt.filter_labels[0].values == [_IAS_USER_LABEL_VALUE]
+
+    def test_raises_when_no_fragment_found(self):
+        """Raise MCPServerNotFoundError when no IAS user fragment exists."""
+        with patch("sap_cloud_sdk.agentgateway._lob.create_fragment_client") as mock_client:
+            mock_client.return_value.list_instance_fragments.return_value = []
+
+            with pytest.raises(MCPServerNotFoundError, match="No IAS user fragment found"):
+                get_ias_user_fragment_name("tenant-sub")
+
+
+# ============================================================
+# Test: fetch_system_auth
+# ============================================================
+
+
+class TestFetchSystemAuth:
+    """Tests for fetch_system_auth async function."""
 
     @pytest.mark.asyncio
     async def test_fetches_system_auth(self):
-        """Fetch system auth using IAS fragment looked up by label."""
+        """Fetch system auth using IAS fragment and return tuple (token, url)."""
+        raw_token = "system-jwt-token-xyz"
+        gateway_url = "https://agw.example.com"
+
         with patch.dict(os.environ, {"APPFND_CONHOS_LANDSCAPE": "eu10"}):
             with (
                 patch(
@@ -262,11 +331,11 @@ class TestGetSystemAuth:
                 ) as mock_fetch,
             ):
                 mock_ias.return_value = "sap-managed-runtime-agw-subscriber-ias-abc"
-                mock_fetch.return_value = "Bearer system-token"
+                mock_fetch.return_value = (raw_token, gateway_url)
 
-                result = await get_system_auth("tenant-sub")
+                result = await fetch_system_auth("tenant-sub")
 
-                assert result == "Bearer system-token"
+                assert result == (raw_token, gateway_url)
                 mock_ias.assert_called_once_with("tenant-sub")
                 mock_fetch.assert_called_once()
                 call_args = mock_fetch.call_args
@@ -280,32 +349,38 @@ class TestGetSystemAuth:
 
 
 # ============================================================
-# Test: get_user_auth
+# Test: fetch_user_auth
 # ============================================================
 
 
-class TestGetUserAuth:
-    """Tests for get_user_auth async function."""
+class TestFetchUserAuth:
+    """Tests for fetch_user_auth async function."""
 
     @pytest.mark.asyncio
-    async def test_fetches_user_auth_with_token_exchange(self):
-        """Fetch user auth with token exchange."""
+    async def test_fetches_user_auth_with_ias_user_fragment(self):
+        """Fetch user auth using IAS user fragment and user_token, return tuple."""
+        raw_token = "exchanged-user-jwt-token"
+        gateway_url = "https://agw.example.com"
+
         with patch.dict(os.environ, {"APPFND_CONHOS_LANDSCAPE": "eu10"}):
-            with patch(
-                "sap_cloud_sdk.agentgateway._lob._fetch_auth_token"
-            ) as mock_fetch:
-                mock_fetch.return_value = "Bearer user-token"
+            with (
+                patch("sap_cloud_sdk.agentgateway._lob.get_ias_user_fragment_name") as mock_ias_user,
+                patch("sap_cloud_sdk.agentgateway._lob._fetch_auth_token") as mock_fetch,
+            ):
+                mock_ias_user.return_value = "sap-managed-runtime-agw-subscriber-ias-user-abc"
+                mock_fetch.return_value = (raw_token, gateway_url)
 
-                result = await get_user_auth("mcp-fragment", "user-jwt", "tenant-sub")
+                result = await fetch_user_auth("user-jwt", "tenant-sub")
 
-                assert result == "Bearer user-token"
+                assert result == (raw_token, gateway_url)
+                mock_ias_user.assert_called_once_with("tenant-sub")
                 mock_fetch.assert_called_once()
                 call_args = mock_fetch.call_args
                 assert call_args[0][0] == "sap-managed-runtime-ias-eu10"
                 assert call_args[0][1] == "tenant-sub"
                 options = call_args[0][2]
                 assert options.user_token == "user-jwt"
-                assert options.fragment_name == "mcp-fragment"
+                assert options.fragment_name == "sap-managed-runtime-agw-subscriber-ias-user-abc"
                 assert options.fragment_level == ConsumptionLevel.INSTANCE
 
 
@@ -323,7 +398,7 @@ class TestGetMcpToolsLob:
         with patch("sap_cloud_sdk.agentgateway._lob.list_mcp_fragments") as mock_list:
             mock_list.return_value = []
 
-            result = await get_mcp_tools_lob("tenant-sub", 60.0)
+            result = await get_mcp_tools_lob("tenant-sub", "system-token", 60.0)
 
             assert result == []
 
@@ -337,13 +412,13 @@ class TestGetMcpToolsLob:
         with patch("sap_cloud_sdk.agentgateway._lob.list_mcp_fragments") as mock_list:
             mock_list.return_value = [fragment]
 
-            result = await get_mcp_tools_lob("tenant-sub", 60.0)
+            result = await get_mcp_tools_lob("tenant-sub", "system-token", 60.0)
 
             assert result == []
 
     @pytest.mark.asyncio
-    async def test_uses_fragment_name_directly(self):
-        """Use fragment name as-is (no -technical stripping)."""
+    async def test_uses_pre_fetched_system_token(self):
+        """Use the pre-fetched system token for MCP server calls."""
         fragment = MagicMock()
         fragment.name = "mcp-server-a"
         fragment.properties = {"URL": "https://example.com/mcp"}
@@ -360,26 +435,19 @@ class TestGetMcpToolsLob:
         with (
             patch("sap_cloud_sdk.agentgateway._lob.list_mcp_fragments") as mock_list,
             patch(
-                "sap_cloud_sdk.agentgateway._lob.get_system_auth",
-                new_callable=AsyncMock,
-            ) as mock_auth,
-            patch(
                 "sap_cloud_sdk.agentgateway._lob.list_server_tools",
                 new_callable=AsyncMock,
             ) as mock_tools,
         ):
             mock_list.return_value = [fragment]
-            mock_auth.return_value = "Bearer token"
             mock_tools.return_value = [mock_tool]
 
-            await get_mcp_tools_lob("tenant-sub", 60.0)
+            await get_mcp_tools_lob("tenant-sub", "pre-fetched-token", 60.0)
 
-            # Verify get_system_auth called with just tenant_subdomain
-            mock_auth.assert_called_once_with("tenant-sub")
-            # Verify list_server_tools called with the unchanged fragment name
-            mock_tools.assert_called_once()
-            call_args = mock_tools.call_args[0]
-            assert call_args[2] == "mcp-server-a"
+            # Verify list_server_tools called with the pre-fetched token
+            mock_tools.assert_called_once_with(
+                "https://example.com/mcp", "pre-fetched-token", "mcp-server-a", 60.0
+            )
 
     @pytest.mark.asyncio
     async def test_handles_exception_for_single_fragment(self):
@@ -401,24 +469,25 @@ class TestGetMcpToolsLob:
             fragment_name="mcp-server2",
         )
 
+        call_count = 0
+
+        async def mock_list_tools_fn(*args, **kwargs):
+            nonlocal call_count
+            call_count += 1
+            if call_count == 1:
+                raise Exception("Server connection failed")
+            return [mock_tool]
+
         with (
             patch("sap_cloud_sdk.agentgateway._lob.list_mcp_fragments") as mock_list,
             patch(
-                "sap_cloud_sdk.agentgateway._lob.get_system_auth",
-                new_callable=AsyncMock,
-            ) as mock_auth,
-            patch(
                 "sap_cloud_sdk.agentgateway._lob.list_server_tools",
-                new_callable=AsyncMock,
-            ) as mock_tools,
+                side_effect=mock_list_tools_fn,
+            ),
         ):
             mock_list.return_value = [fragment1, fragment2]
 
-            # First fragment fails, second succeeds
-            mock_auth.side_effect = [Exception("Auth failed"), "Bearer token"]
-            mock_tools.return_value = [mock_tool]
-
-            result = await get_mcp_tools_lob("tenant-sub", 60.0)
+            result = await get_mcp_tools_lob("tenant-sub", "system-token", 60.0)
 
             # Should still get tools from second fragment
             assert len(result) == 1
@@ -434,8 +503,8 @@ class TestCallMcpToolLob:
     """Tests for call_mcp_tool_lob async function."""
 
     @pytest.mark.asyncio
-    async def test_calls_tool_with_user_auth(self):
-        """Call tool using user authentication."""
+    async def test_calls_tool_with_pre_fetched_token(self):
+        """Call tool using pre-fetched user auth token."""
         tool = MCPTool(
             name="test-tool",
             server_name="test-server",
@@ -450,17 +519,12 @@ class TestCallMcpToolLob:
         mock_result.content[0].text = "Tool result"
 
         with (
-            patch(
-                "sap_cloud_sdk.agentgateway._lob.get_user_auth", new_callable=AsyncMock
-            ) as mock_auth,
             patch("sap_cloud_sdk.agentgateway._lob.httpx.AsyncClient") as mock_http,
             patch(
                 "sap_cloud_sdk.agentgateway._lob.streamable_http_client"
             ) as mock_stream,
             patch("sap_cloud_sdk.agentgateway._lob.ClientSession") as mock_session,
         ):
-            mock_auth.return_value = "Bearer user-token"
-
             # Setup async context managers
             mock_http_instance = AsyncMock()
             mock_http.return_value.__aenter__.return_value = mock_http_instance
@@ -477,14 +541,18 @@ class TestCallMcpToolLob:
             mock_session.return_value.__aenter__.return_value = mock_session_instance
 
             result = await call_mcp_tool_lob(
-                tool, "user-jwt", "tenant-sub", 60.0, param1="value1"
+                tool, "user-auth-token", 60.0, param1="value1"
             )
 
             assert result == "Tool result"
-            mock_auth.assert_called_once_with("test-fragment", "user-jwt", "tenant-sub")
             mock_session_instance.call_tool.assert_called_once_with(
                 "test-tool", {"param1": "value1"}
             )
+
+            # Verify the Authorization header uses Bearer + raw token
+            mock_http.assert_called_once()
+            call_kwargs = mock_http.call_args.kwargs
+            assert call_kwargs["headers"]["Authorization"] == "Bearer user-auth-token"
 
     @pytest.mark.asyncio
     async def test_returns_empty_string_when_no_content(self):
@@ -502,17 +570,12 @@ class TestCallMcpToolLob:
         mock_result.content = []
 
         with (
-            patch(
-                "sap_cloud_sdk.agentgateway._lob.get_user_auth", new_callable=AsyncMock
-            ) as mock_auth,
             patch("sap_cloud_sdk.agentgateway._lob.httpx.AsyncClient") as mock_http,
             patch(
                 "sap_cloud_sdk.agentgateway._lob.streamable_http_client"
             ) as mock_stream,
             patch("sap_cloud_sdk.agentgateway._lob.ClientSession") as mock_session,
         ):
-            mock_auth.return_value = "Bearer user-token"
-
             mock_http_instance = AsyncMock()
             mock_http.return_value.__aenter__.return_value = mock_http_instance
 
@@ -527,6 +590,6 @@ class TestCallMcpToolLob:
             mock_session_instance.call_tool = AsyncMock(return_value=mock_result)
             mock_session.return_value.__aenter__.return_value = mock_session_instance
 
-            result = await call_mcp_tool_lob(tool, "user-jwt", "tenant-sub", 60.0)
+            result = await call_mcp_tool_lob(tool, "user-auth-token", 60.0)
 
             assert result == ""

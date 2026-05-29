@@ -111,6 +111,29 @@ CLOUD_SDK_CFG_ADMS_DEFAULT_RESOURCE=urn:sap:identity:application:provider:name:y
 
 `CLOUD_SDK_CFG_ADMS_DEFAULT_URI` points the tests at the target ADM service. The other `CLOUD_SDK_CFG_ADMS_DEFAULT_*` variables hold the IAS service-binding credentials used by the SDK to fetch Bearer tokens. Tests are skipped automatically when any of these are missing.
 
+### Agent Gateway Integration Tests
+
+Agent Gateway integration tests use the LoB agent flow via the Destination Service. Configure the following variables in `.env_integration_tests`:
+
+```bash
+# Destination Service (required by the LoB agent flow)
+CLOUD_SDK_CFG_DESTINATION_DEFAULT_CLIENTID=your-destination-client-id-here
+CLOUD_SDK_CFG_DESTINATION_DEFAULT_CLIENTSECRET=your-destination-client-secret-here
+CLOUD_SDK_CFG_DESTINATION_DEFAULT_URL=https://your-destination-auth-url-here
+CLOUD_SDK_CFG_DESTINATION_DEFAULT_URI=https://your-destination-configuration-uri-here
+CLOUD_SDK_CFG_DESTINATION_DEFAULT_IDENTITYZONE=your-identity-zone-here
+
+# Landscape suffix used to resolve the IAS destination name
+APPFND_CONHOS_LANDSCAPE=your-landscape-here
+
+# Tenant subdomain for multi-tenant lookup
+TENANT_SUBDOMAIN=your-tenant-subdomain-here
+
+# User JWT for token exchange scenarios (get_user_auth)
+# If not set, user auth scenarios are automatically skipped
+AGW_USER_TOKEN=your-user-jwt-here
+```
+
 ## Running Integration Tests
 
 ```bash
@@ -124,6 +147,7 @@ uv run pytest tests/objectstore/integration/ -v
 uv run pytest tests/destination/integration/ -v
 uv run pytest tests/agent_memory/integration/ -v
 uv run pytest tests/adms/integration/ -v
+uv run pytest tests/agentgateway/integration/ -v
 ```
 
 ### BDD Scenarios

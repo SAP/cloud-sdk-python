@@ -1,10 +1,9 @@
-"""SAP Cloud SDK for Python — DMS (Advanced Document Management) module.
+"""SAP Cloud SDK for Python — ADMS (Advanced Document Management Service) module.
 
 Provides a typed, high-level Python client for the SAP ADM OData V4 service.
 
 ADM is a **BTP Shared SaaS Application** (IAS-based multi-tenant service).
-It must be provisioned via Unified Provisioning / UCL before use.
-See the BTP Fabric SDK Business Services TRA for provisioning details.
+It must be provisioned as a BTP service instance before use.
 
 Quick start::
 

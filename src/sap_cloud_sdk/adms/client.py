@@ -1,4 +1,4 @@
-"""ADMS client module — sync and async entry points for the SAP Cloud SDK DMS module.
+"""ADMS client module — sync and async entry points for the SAP Cloud SDK ADMS module.
 
 Contains:
 - Private API classes: _DocumentApi, _DocumentRelationApi, _ConfigurationApi, _JobApi
@@ -773,7 +773,7 @@ class _ConfigurationApi:
 
 
 class _JobApi:
-    """Async job operations for the DMS module.
+    """Async job operations for the ADMS module.
 
     Access via :attr:`AdmsClient.jobs`.
     """
@@ -869,6 +869,7 @@ class _AsyncDocumentApi:
         skip: int | None = None,
         orderby: str | None = None,
     ) -> list[Document]:
+        """Async variant of :meth:`_DocumentApi.get_all` — same semantics."""
         params: dict = {}
         if filter is not None:
             params["$filter"] = filter
@@ -894,6 +895,7 @@ class _AsyncDocumentApi:
         *,
         is_active_entity: bool = True,
     ) -> Document:
+        """Async variant of :meth:`_DocumentApi.get` — same semantics."""
         is_active = str(is_active_entity).lower()
         path = (
             f"DocumentRelation("
@@ -952,6 +954,7 @@ class _AsyncDocumentApi:
         *,
         is_active_entity: bool = True,
     ) -> Document:
+        """Async variant of :meth:`_DocumentApi.update` — same semantics."""
         is_active = str(is_active_entity).lower()
         path = (
             f"DocumentRelation("
@@ -971,6 +974,7 @@ class _AsyncDocumentApi:
         *,
         is_active_entity: bool = True,
     ) -> None:
+        """Async variant of :meth:`_DocumentApi.delete_content_version` — same semantics."""
         is_active = str(is_active_entity).lower()
         path = (
             f"DocumentRelation("
@@ -993,6 +997,7 @@ class _AsyncDocumentApi:
         is_active_entity: bool = True,
         comment: str | None = None,
     ) -> Document:
+        """Async variant of :meth:`_DocumentApi.restore_content_version` — same semantics."""
         is_active = str(is_active_entity).lower()
         path = (
             f"DocumentRelation("
@@ -1030,6 +1035,7 @@ class _AsyncDocumentRelationApi:
         top: int | None = None,
         skip: int | None = None,
     ) -> list[DocumentRelation]:
+        """Async variant of :meth:`_DocumentRelationApi.get_all` — same semantics."""
         params: dict = {}
         if filter is not None:
             params["$filter"] = filter
@@ -1056,6 +1062,7 @@ class _AsyncDocumentRelationApi:
         is_active_entity: bool = True,
         expand: list[str] | None = None,
     ) -> DocumentRelation:
+        """Async variant of :meth:`_DocumentRelationApi.get` — same semantics."""
         is_active = str(is_active_entity).lower()
         params: dict = {}
         if expand:
@@ -1070,6 +1077,7 @@ class _AsyncDocumentRelationApi:
 
     @record_metrics(Module.ADMS, Operation.ADMS_RELATIONS_CREATE)
     async def create(self, input: CreateDocumentRelationInput) -> DocumentRelation:
+        """Async variant of :meth:`_DocumentRelationApi.create` — same semantics."""
         payload = {"DocumentRelation": input.to_odata_dict()}
         resp = await self._http.post(
             "CreateDocumentWithRelation",
@@ -1087,6 +1095,7 @@ class _AsyncDocumentRelationApi:
         is_multipart: bool = False,
         no_of_parts: int = 1,
     ) -> Document:
+        """Async variant of :meth:`_DocumentRelationApi.generate_upload_urls` — same semantics."""
         is_active = str(is_active_entity).lower()
         path = (
             f"DocumentRelation("
@@ -1108,6 +1117,7 @@ class _AsyncDocumentRelationApi:
         *,
         is_active_entity: bool = True,
     ) -> None:
+        """Async variant of :meth:`_DocumentRelationApi.complete_multipart_upload` — same semantics."""
         is_active = str(is_active_entity).lower()
         path = (
             f"DocumentRelation("
@@ -1124,6 +1134,7 @@ class _AsyncDocumentRelationApi:
         *,
         is_active_entity: bool = True,
     ) -> None:
+        """Async variant of :meth:`_DocumentRelationApi.lock` — same semantics."""
         is_active = str(is_active_entity).lower()
         path = (
             f"DocumentRelation("
@@ -1140,6 +1151,7 @@ class _AsyncDocumentRelationApi:
         *,
         is_active_entity: bool = True,
     ) -> None:
+        """Async variant of :meth:`_DocumentRelationApi.unlock` — same semantics."""
         is_active = str(is_active_entity).lower()
         path = (
             f"DocumentRelation("
@@ -1156,6 +1168,7 @@ class _AsyncDocumentRelationApi:
         *,
         is_active_entity: bool = True,
     ) -> None:
+        """Async variant of :meth:`_DocumentRelationApi.delete` — same semantics."""
         is_active = str(is_active_entity).lower()
         path = (
             f"DocumentRelation("
@@ -1166,6 +1179,7 @@ class _AsyncDocumentRelationApi:
 
     @record_metrics(Module.ADMS, Operation.ADMS_RELATIONS_CREATE_DRAFT)
     async def create_draft(self, draft_input: DraftInput) -> list[DocumentRelation]:
+        """Async variant of :meth:`_DocumentRelationApi.create_draft` — same semantics."""
         payload = {"BusinessObjectNode": draft_input.to_odata_dict()}
         resp = await self._http.post(
             "CreateBusinessObjNodeDraft",
@@ -1178,6 +1192,7 @@ class _AsyncDocumentRelationApi:
 
     @record_metrics(Module.ADMS, Operation.ADMS_RELATIONS_VALIDATE_DRAFT)
     async def validate_draft(self, draft_input: DraftInput) -> list[DocumentRelation]:
+        """Async variant of :meth:`_DocumentRelationApi.validate_draft` — same semantics."""
         payload = {"BusinessObjectNode": draft_input.to_odata_dict()}
         resp = await self._http.post(
             "ValidateBusinessObjNodeDraft",
@@ -1192,6 +1207,7 @@ class _AsyncDocumentRelationApi:
     async def activate_draft(
         self, activate_input: DraftActivateInput
     ) -> list[DocumentRelation]:
+        """Async variant of :meth:`_DocumentRelationApi.activate_draft` — same semantics."""
         payload = {"BusinessObjectNode": activate_input.to_odata_dict()}
         resp = await self._http.post(
             "ActivateBusinessObjNodeDraft",
@@ -1204,6 +1220,7 @@ class _AsyncDocumentRelationApi:
 
     @record_metrics(Module.ADMS, Operation.ADMS_RELATIONS_DISCARD_DRAFT)
     async def discard_draft(self, draft_input: DraftInput) -> None:
+        """Async variant of :meth:`_DocumentRelationApi.discard_draft` — same semantics."""
         payload = {"BusinessObjectNode": draft_input.to_odata_dict()}
         await self._http.post(
             "DiscardBusinessObjNodeDraft",
@@ -1229,6 +1246,7 @@ class _AsyncConfigurationApi:
         top: int | None = None,
         skip: int | None = None,
     ) -> list[AllowedDomain]:
+        """Async variant of :meth:`_ConfigurationApi.get_all_allowed_domains` — same semantics."""
         params: dict = {}
         if filter is not None:
             params["$filter"] = filter
@@ -1245,6 +1263,7 @@ class _AsyncConfigurationApi:
     async def create_allowed_domain(
         self, payload: CreateAllowedDomainInput
     ) -> AllowedDomain:
+        """Async variant of :meth:`_ConfigurationApi.create_allowed_domain` — same semantics."""
         resp = await self._http.post(
             "AllowedDomain",
             json=payload.to_odata_dict(),
@@ -1254,6 +1273,7 @@ class _AsyncConfigurationApi:
 
     @record_metrics(Module.ADMS, Operation.ADMS_CONFIG_DELETE_ALLOWED_DOMAIN)
     async def delete_allowed_domain(self, allowed_domain_id: str) -> None:
+        """Async variant of :meth:`_ConfigurationApi.delete_allowed_domain` — same semantics."""
         await self._http.delete(
             f"AllowedDomain(AllowedDomainID={allowed_domain_id})",
             service_base=_CONFIG_SERVICE_PATH,
@@ -1267,6 +1287,7 @@ class _AsyncConfigurationApi:
         top: int | None = None,
         skip: int | None = None,
     ) -> list[DocumentType]:
+        """Async variant of :meth:`_ConfigurationApi.get_all_document_types` — same semantics."""
         params: dict = {}
         if filter is not None:
             params["$filter"] = filter
@@ -1283,6 +1304,7 @@ class _AsyncConfigurationApi:
     async def create_document_type(
         self, payload: CreateDocumentTypeInput
     ) -> DocumentType:
+        """Async variant of :meth:`_ConfigurationApi.create_document_type` — same semantics."""
         resp = await self._http.post(
             "DocumentType",
             json=payload.to_odata_dict(),
@@ -1292,6 +1314,7 @@ class _AsyncConfigurationApi:
 
     @record_metrics(Module.ADMS, Operation.ADMS_CONFIG_DELETE_DOCUMENT_TYPE)
     async def delete_document_type(self, document_type_id: str) -> None:
+        """Async variant of :meth:`_ConfigurationApi.delete_document_type` — same semantics."""
         await self._http.delete(
             f"DocumentType(DocumentTypeID='{document_type_id}')",
             service_base=_CONFIG_SERVICE_PATH,
@@ -1305,6 +1328,7 @@ class _AsyncConfigurationApi:
         top: int | None = None,
         skip: int | None = None,
     ) -> list[BusinessObjectNodeType]:
+        """Async variant of :meth:`_ConfigurationApi.get_all_business_object_types` — same semantics."""
         params: dict = {}
         if filter is not None:
             params["$filter"] = filter
@@ -1324,6 +1348,7 @@ class _AsyncConfigurationApi:
     async def create_business_object_type(
         self, payload: CreateBusinessObjectNodeTypeInput
     ) -> BusinessObjectNodeType:
+        """Async variant of :meth:`_ConfigurationApi.create_business_object_type` — same semantics."""
         resp = await self._http.post(
             "BusinessObjectNodeType",
             json=payload.to_odata_dict(),
@@ -1335,6 +1360,7 @@ class _AsyncConfigurationApi:
     async def delete_business_object_type(
         self, business_object_node_type_unique_id: str
     ) -> None:
+        """Async variant of :meth:`_ConfigurationApi.delete_business_object_type` — same semantics."""
         await self._http.delete(
             f"BusinessObjectNodeType(BusinessObjectNodeTypeUniqueID='{business_object_node_type_unique_id}')",
             service_base=_CONFIG_SERVICE_PATH,
@@ -1348,6 +1374,7 @@ class _AsyncConfigurationApi:
         top: int | None = None,
         skip: int | None = None,
     ) -> list[DocumentTypeBusinessObjectTypeMap]:
+        """Async variant of :meth:`_ConfigurationApi.get_type_mappings` — same semantics."""
         params: dict = {}
         if filter is not None:
             params["$filter"] = filter
@@ -1369,6 +1396,7 @@ class _AsyncConfigurationApi:
     async def create_type_mapping(
         self, payload: CreateDocumentTypeBoTypeMapInput
     ) -> DocumentTypeBusinessObjectTypeMap:
+        """Async variant of :meth:`_ConfigurationApi.create_type_mapping` — same semantics."""
         resp = await self._http.post(
             "DocumentTypeBusinessObjectTypeMap",
             json=payload.to_odata_dict(),
@@ -1378,6 +1406,7 @@ class _AsyncConfigurationApi:
 
     @record_metrics(Module.ADMS, Operation.ADMS_CONFIG_DELETE_DOCTYPE_BOTYPE_MAP)
     async def delete_type_mapping(self, document_type_bo_type_map_id: str) -> None:
+        """Async variant of :meth:`_ConfigurationApi.delete_type_mapping` — same semantics."""
         await self._http.delete(
             f"DocumentTypeBusinessObjectTypeMap("
             f"DocumentTypeBOTypeMapID={document_type_bo_type_map_id})",

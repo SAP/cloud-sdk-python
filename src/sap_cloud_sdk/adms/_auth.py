@@ -22,6 +22,7 @@ from sap_cloud_sdk.core.auth import (
     AuthError as _CoreAuthError,
     TokenCache,
 )
+from sap_cloud_sdk.adms.config import AdmsConfig
 from sap_cloud_sdk.adms.exceptions import AuthError
 
 __all__ = [
@@ -48,7 +49,7 @@ class IasTokenFetcher(_CoreIasTokenFetcher):
 
     def __init__(
         self,
-        config,  # AdmsConfig — not type-annotated to avoid circular import at module level
+        config: AdmsConfig,
         session: requests.Session | None = None,
         cache: TokenCache | None = None,
     ) -> None:

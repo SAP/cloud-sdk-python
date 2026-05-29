@@ -12,8 +12,8 @@ IAS token fetching:
     - :data:`AuthError` — raised on token acquisition failures
 
 mTLS:
-    - :class:`mTLSStrategy` — apply X.509 client cert to requests.Session / httpx.AsyncClient
-    - :class:`mTLSConfig` — immutable holder for cert + key PEM material
+    - :class:`MTLSStrategy` — apply X.509 client cert to requests.Session / httpx.AsyncClient
+    - :class:`MTLSConfig` — immutable holder for cert + key PEM material
 """
 
 from sap_cloud_sdk.core.auth._token_cache import (
@@ -24,12 +24,10 @@ from sap_cloud_sdk.core.auth._token_cache import (
 from sap_cloud_sdk.core.auth._ias_fetcher import (
     AuthError,
     IasTokenFetcher,
-    _CC_CACHE_KEY,
-    _GRANT_JWT_BEARER,
 )
 from sap_cloud_sdk.core.auth._mtls import (
-    mTLSConfig,
-    mTLSStrategy,
+    MTLSConfig,
+    MTLSStrategy,
 )
 
 __all__ = [
@@ -41,9 +39,6 @@ __all__ = [
     "AuthError",
     "IasTokenFetcher",
     # mTLS
-    "mTLSConfig",
-    "mTLSStrategy",
-    # private constants (re-exported for internal use by sdk modules)
-    "_CC_CACHE_KEY",
-    "_GRANT_JWT_BEARER",
+    "MTLSConfig",
+    "MTLSStrategy",
 ]

@@ -19,6 +19,7 @@ Usage::
 
 from __future__ import annotations
 
+import threading
 import time
 from abc import ABC, abstractmethod
 from typing import Optional
@@ -55,22 +56,26 @@ class InMemoryTokenCache(TokenCache):
 
     def __init__(self) -> None:
         self._store: dict[str, tuple[str, float]] = {}  # key → (token, expires_at)
+        self._lock = threading.Lock()
 
     def get(self, key: str) -> Optional[str]:
-        entry = self._store.get(key)
-        if entry is None:
-            return None
-        token, expires_at = entry
-        if time.monotonic() >= expires_at:
-            del self._store[key]
-            return None
-        return token
+        with self._lock:
+            entry = self._store.get(key)
+            if entry is None:
+                return None
+            token, expires_at = entry
+            if time.monotonic() >= expires_at:
+                del self._store[key]
+                return None
+            return token
 
     def set(self, key: str, token: str, ttl_seconds: int) -> None:
-        self._store[key] = (token, time.monotonic() + ttl_seconds)
+        with self._lock:
+            self._store[key] = (token, time.monotonic() + ttl_seconds)
 
     def delete(self, key: str) -> None:
-        self._store.pop(key, None)
+        with self._lock:
+            self._store.pop(key, None)
 
 
 class RedisTokenCache(TokenCache):

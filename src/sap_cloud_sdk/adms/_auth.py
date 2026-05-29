@@ -21,17 +21,11 @@ from sap_cloud_sdk.core.auth import (
     IasTokenFetcher as _CoreIasTokenFetcher,
     AuthError as _CoreAuthError,
     TokenCache,
-    _CC_CACHE_KEY,
-    _GRANT_JWT_BEARER,
 )
 from sap_cloud_sdk.adms.exceptions import AuthError
 
-# Re-export so that ``from sap_cloud_sdk.adms._auth import _CC_CACHE_KEY`` works
-# (used by unit tests).
 __all__ = [
     "IasTokenFetcher",
-    "_CC_CACHE_KEY",
-    "_GRANT_JWT_BEARER",
 ]
 
 

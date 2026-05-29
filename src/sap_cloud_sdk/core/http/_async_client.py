@@ -7,10 +7,9 @@ that handles:
 * Consistent error propagation (:class:`HttpError`, :class:`NotFoundError`).
 * Async context manager protocol for proper connection cleanup.
 
-Unlike the DMS-specific :class:`~sap_cloud_sdk.adms._async_http.AsyncAdmsHttp`,
-this client is intentionally **service-agnostic** — it knows nothing about
-OData, CSRF tokens, or ADM.  Use it as the foundation for any SDK module that
-needs async HTTP with IAS Bearer auth.
+This client is intentionally **service-agnostic** — it knows nothing about
+OData, CSRF tokens, or any specific SAP service.  Use it as the foundation
+for any SDK module that needs async HTTP with IAS Bearer auth.
 
 Usage::
 

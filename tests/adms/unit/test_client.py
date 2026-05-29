@@ -37,11 +37,11 @@ from sap_cloud_sdk.adms._models import (
 from sap_cloud_sdk.adms.client import (
     AdmsClient,
     AsyncAdmsClient,
-    _AsyncConfigurationApi as AsyncConfigurationApi,
-    _ConfigurationApi as ConfigurationApi,
-    _DocumentApi as DocumentApi,
-    _DocumentRelationApi as DocumentRelationApi,
-    _JobApi as JobApi,
+    _AsyncConfigurationApi,
+    _ConfigurationApi,
+    _DocumentApi,
+    _DocumentRelationApi,
+    _JobApi,
     create_async_client,
 )
 from sap_cloud_sdk.adms.config import AdmsConfig
@@ -106,15 +106,15 @@ def mock_http() -> MagicMock:
 class TestAdmsClientInit:
     def test_exposes_document_api(self, mock_http):
         client = AdmsClient(mock_http)
-        assert isinstance(client.documents, DocumentApi)
+        assert isinstance(client.documents, _DocumentApi)
 
     def test_exposes_relation_api(self, mock_http):
         client = AdmsClient(mock_http)
-        assert isinstance(client.relations, DocumentRelationApi)
+        assert isinstance(client.relations, _DocumentRelationApi)
 
     def test_exposes_job_api(self, mock_http):
         client = AdmsClient(mock_http)
-        assert isinstance(client.jobs, JobApi)
+        assert isinstance(client.jobs, _JobApi)
 
     def test_with_user_jwt_returns_new_instance(self, mock_http):
         client = AdmsClient(mock_http)
@@ -271,16 +271,16 @@ class TestAsyncAdmsHttp:
 
 class TestAsyncAdmsClient:
     def test_exposes_api_attributes(self, config):
-        from sap_cloud_sdk.adms.client import _AsyncDocumentApi as AsyncDocumentApi
-        from sap_cloud_sdk.adms.client import _AsyncDocumentRelationApi as AsyncDocumentRelationApi
-        from sap_cloud_sdk.adms.client import _AsyncJobApi as AsyncJobApi
+        from sap_cloud_sdk.adms.client import _AsyncDocumentApi as _AsyncDocumentApi
+        from sap_cloud_sdk.adms.client import _AsyncDocumentRelationApi as _AsyncDocumentRelationApi
+        from sap_cloud_sdk.adms.client import _AsyncJobApi as _AsyncJobApi
 
         fetcher = _make_token_fetcher(config)
         http = _make_async_http(config, fetcher)
         client = AsyncAdmsClient(http)
-        assert isinstance(client.documents, AsyncDocumentApi)
-        assert isinstance(client.relations, AsyncDocumentRelationApi)
-        assert isinstance(client.jobs, AsyncJobApi)
+        assert isinstance(client.documents, _AsyncDocumentApi)
+        assert isinstance(client.relations, _AsyncDocumentRelationApi)
+        assert isinstance(client.jobs, _AsyncJobApi)
 
     def test_with_user_jwt_returns_new_instance(self, config):
         fetcher = _make_token_fetcher(config)
@@ -330,7 +330,7 @@ class TestCreateAsyncClient:
         assert isinstance(client, AsyncAdmsClient)
 
 
-# ── AsyncDocumentApi ──────────────────────────────────────────────────────────
+# ── _AsyncDocumentApi ──────────────────────────────────────────────────────────
 
 class TestAsyncDocumentApi:
     @pytest.mark.asyncio
@@ -346,8 +346,8 @@ class TestAsyncDocumentApi:
 
         http = AsyncAdmsHttp(config=config, token_fetcher=fetcher, client=mock_client)
         http._csrf_tokens = {"": "csrf-tok"}
-        from sap_cloud_sdk.adms.client import _AsyncDocumentApi as AsyncDocumentApi
-        api = AsyncDocumentApi(http)
+        from sap_cloud_sdk.adms.client import _AsyncDocumentApi as _AsyncDocumentApi
+        api = _AsyncDocumentApi(http)
 
         doc = await api.get("doc-1")
 
@@ -368,14 +368,14 @@ class TestAsyncDocumentApi:
         http = AsyncAdmsHttp(config=config, token_fetcher=fetcher, client=mock_client)
         http._csrf_tokens = {"": "x"}
 
-        from sap_cloud_sdk.adms.client import _AsyncDocumentApi as AsyncDocumentApi
-        api = AsyncDocumentApi(http)
+        from sap_cloud_sdk.adms.client import _AsyncDocumentApi as _AsyncDocumentApi
+        api = _AsyncDocumentApi(http)
 
         with pytest.raises(ScanNotCleanError):
             await api.get_download_url("rel-1", doc_content_version_id="1.0")
 
 
-# ── AsyncDocumentRelationApi ──────────────────────────────────────────────────
+# ── _AsyncDocumentRelationApi ──────────────────────────────────────────────────
 
 class TestAsyncDocumentRelationApi:
     @pytest.mark.asyncio
@@ -396,8 +396,8 @@ class TestAsyncDocumentRelationApi:
         http = AsyncAdmsHttp(config=config, token_fetcher=fetcher, client=mock_client)
         http._csrf_tokens = {"": "x"}
 
-        from sap_cloud_sdk.adms.client import _AsyncDocumentRelationApi as AsyncDocumentRelationApi
-        api = AsyncDocumentRelationApi(http)
+        from sap_cloud_sdk.adms.client import _AsyncDocumentRelationApi as _AsyncDocumentRelationApi
+        api = _AsyncDocumentRelationApi(http)
 
         relations = await api.get_all()
 
@@ -405,7 +405,7 @@ class TestAsyncDocumentRelationApi:
         assert relations[0].document_relation_id == "rel-1"
 
 
-# ── AsyncJobApi ───────────────────────────────────────────────────────────────
+# ── _AsyncJobApi ───────────────────────────────────────────────────────────────
 
 class TestAsyncJobApi:
     @pytest.mark.asyncio
@@ -420,8 +420,8 @@ class TestAsyncJobApi:
         http = AsyncAdmsHttp(config=config, token_fetcher=fetcher, client=mock_client)
         http._csrf_tokens = {"": "x"}
 
-        from sap_cloud_sdk.adms.client import _AsyncJobApi as AsyncJobApi
-        api = AsyncJobApi(http)
+        from sap_cloud_sdk.adms.client import _AsyncJobApi as _AsyncJobApi
+        api = _AsyncJobApi(http)
 
         output = await api.get_status("job-abc")
 
@@ -429,7 +429,7 @@ class TestAsyncJobApi:
         assert output.job_status == JobStatus.IN_PROGRESS
 
 
-# ── DocumentApi (sync) ────────────────────────────────────────────────────────
+# ── _DocumentApi (sync) ────────────────────────────────────────────────────────
 
 def _doc_http(get_data=None, post_data=None):
     http = MagicMock(spec=AdmsHttp)
@@ -456,7 +456,7 @@ _PENDING_DOC = {**_CLEAN_DOC, "DocumentState": "PENDING"}
 class TestDocumentApiGet:
     def test_get_calls_correct_path(self):
         http = _doc_http(get_data=_CLEAN_DOC)
-        api = DocumentApi(http)
+        api = _DocumentApi(http)
         doc = api.get("rel-1")
 
         call_path = http.get.call_args[0][0]
@@ -467,7 +467,7 @@ class TestDocumentApiGet:
 
     def test_get_includes_is_active_entity(self):
         http = _doc_http(get_data=_CLEAN_DOC)
-        api = DocumentApi(http)
+        api = _DocumentApi(http)
         api.get("rel-1")
 
         call_path = http.get.call_args[0][0]
@@ -475,7 +475,7 @@ class TestDocumentApiGet:
 
     def test_get_draft_uses_false_active_flag(self):
         http = _doc_http(get_data=_CLEAN_DOC)
-        api = DocumentApi(http)
+        api = _DocumentApi(http)
         api.get("rel-1", is_active_entity=False)
 
         call_path = http.get.call_args[0][0]
@@ -498,7 +498,7 @@ class TestDocumentApiDownloadUrl:
             MagicMock(**{"json.return_value": download_data}),
         ]
 
-        api = DocumentApi(http)
+        api = _DocumentApi(http)
         url = api.get_download_url("rel-1", doc_content_version_id="1.0")
 
         assert url == "https://s3.example.com/presigned-url"
@@ -513,7 +513,7 @@ class TestDocumentApiDownloadUrl:
         http = MagicMock(spec=AdmsHttp)
         http.get.return_value = MagicMock(**{"json.return_value": rel_data})
 
-        api = DocumentApi(http)
+        api = _DocumentApi(http)
         with pytest.raises(ScanNotCleanError, match="PENDING"):
             api.get_download_url("rel-1", doc_content_version_id="1.0")
 
@@ -527,7 +527,7 @@ class TestDocumentApiDownloadUrl:
         http = MagicMock(spec=AdmsHttp)
         http.get.return_value = MagicMock(**{"json.return_value": rel_data})
 
-        api = DocumentApi(http)
+        api = _DocumentApi(http)
         with pytest.raises(ScanNotCleanError, match="QUARANTINED"):
             api.get_download_url("rel-1", doc_content_version_id="1.0")
 
@@ -535,7 +535,7 @@ class TestDocumentApiDownloadUrl:
 class TestDocumentApiUpdate:
     def test_update_calls_bound_action(self):
         http = _doc_http(post_data=_CLEAN_DOC)
-        api = DocumentApi(http)
+        api = _DocumentApi(http)
 
         upd = UpdateDocumentInput(document_name="Renamed.pdf")
         doc = api.update("rel-1", upd)
@@ -546,7 +546,7 @@ class TestDocumentApiUpdate:
 
     def test_update_sends_only_set_fields(self):
         http = _doc_http(post_data=_CLEAN_DOC)
-        api = DocumentApi(http)
+        api = _DocumentApi(http)
 
         upd = UpdateDocumentInput(document_description="New desc")
         api.update("rel-1", upd)
@@ -559,7 +559,7 @@ class TestDocumentApiUpdate:
 class TestDocumentApiVersionOps:
     def test_restore_content_version(self):
         http = _doc_http(post_data=_CLEAN_DOC)
-        api = DocumentApi(http)
+        api = _DocumentApi(http)
 
         doc = api.restore_content_version("rel-1", "1.0", comment="Revert")
 
@@ -573,7 +573,7 @@ class TestDocumentApiVersionOps:
     def test_delete_content_version(self):
         http = MagicMock(spec=AdmsHttp)
         http.post.return_value = MagicMock()
-        api = DocumentApi(http)
+        api = _DocumentApi(http)
 
         api.delete_content_version("rel-1", "2.0")
 
@@ -585,7 +585,7 @@ class TestDocumentApiVersionOps:
 class TestDocumentApiGetAll:
     def test_get_all_returns_list(self):
         http = _doc_http(get_data={"value": [_CLEAN_DOC]})
-        api = DocumentApi(http)
+        api = _DocumentApi(http)
         result = api.get_all()
 
         assert len(result) == 1
@@ -594,13 +594,13 @@ class TestDocumentApiGetAll:
 
     def test_get_all_empty_response(self):
         http = _doc_http(get_data={"value": []})
-        api = DocumentApi(http)
+        api = _DocumentApi(http)
         result = api.get_all()
         assert result == []
 
     def test_get_all_no_params_by_default(self):
         http = _doc_http(get_data={"value": []})
-        api = DocumentApi(http)
+        api = _DocumentApi(http)
         api.get_all()
 
         _, kwargs = http.get.call_args
@@ -608,7 +608,7 @@ class TestDocumentApiGetAll:
 
     def test_get_all_passes_filter(self):
         http = _doc_http(get_data={"value": []})
-        api = DocumentApi(http)
+        api = _DocumentApi(http)
         api.get_all(filter="DocumentTypeID eq 'INV'")
 
         _, kwargs = http.get.call_args
@@ -616,7 +616,7 @@ class TestDocumentApiGetAll:
 
     def test_get_all_passes_select(self):
         http = _doc_http(get_data={"value": []})
-        api = DocumentApi(http)
+        api = _DocumentApi(http)
         api.get_all(select=["DocumentID", "DocumentName"])
 
         _, kwargs = http.get.call_args
@@ -624,7 +624,7 @@ class TestDocumentApiGetAll:
 
     def test_get_all_passes_expand(self):
         http = _doc_http(get_data={"value": []})
-        api = DocumentApi(http)
+        api = _DocumentApi(http)
         api.get_all(expand=["DocumentContentVersion"])
 
         _, kwargs = http.get.call_args
@@ -632,7 +632,7 @@ class TestDocumentApiGetAll:
 
     def test_get_all_passes_top_and_skip(self):
         http = _doc_http(get_data={"value": []})
-        api = DocumentApi(http)
+        api = _DocumentApi(http)
         api.get_all(top=20, skip=10)
 
         _, kwargs = http.get.call_args
@@ -641,7 +641,7 @@ class TestDocumentApiGetAll:
 
     def test_get_all_passes_orderby(self):
         http = _doc_http(get_data={"value": []})
-        api = DocumentApi(http)
+        api = _DocumentApi(http)
         api.get_all(orderby="DocumentName asc")
 
         _, kwargs = http.get.call_args
@@ -649,7 +649,7 @@ class TestDocumentApiGetAll:
 
     def test_get_all_calls_document_entity_set(self):
         http = _doc_http(get_data={"value": []})
-        api = DocumentApi(http)
+        api = _DocumentApi(http)
         api.get_all()
 
         args, _ = http.get.call_args
@@ -659,14 +659,14 @@ class TestDocumentApiGetAll:
         from sap_cloud_sdk.adms.config import _SERVICE_PATH
 
         http = _doc_http(get_data={"value": []})
-        api = DocumentApi(http)
+        api = _DocumentApi(http)
         api.get_all()
 
         _, kwargs = http.get.call_args
         assert kwargs["service_base"] == _SERVICE_PATH
 
 
-# ── DocumentRelationApi (sync) ────────────────────────────────────────────────
+# ── _DocumentRelationApi (sync) ────────────────────────────────────────────────
 
 def _rel_http(get_data=None, post_data=None):
     http = MagicMock(spec=AdmsHttp)
@@ -692,7 +692,7 @@ class TestDocumentRelationApiGet:
     def test_get_all_no_params(self):
         data = {"value": [_rel_dict("r1"), _rel_dict("r2")]}
         http = _rel_http(get_data=data)
-        api = DocumentRelationApi(http)
+        api = _DocumentRelationApi(http)
 
         results = api.get_all()
 
@@ -703,7 +703,7 @@ class TestDocumentRelationApiGet:
     def test_get_all_with_filter_and_expand(self):
         data = {"value": [_rel_dict()]}
         http = _rel_http(get_data=data)
-        api = DocumentRelationApi(http)
+        api = _DocumentRelationApi(http)
 
         api.get_all(
             filter="HostBusinessObjectNodeID eq 'PO-001'",
@@ -718,7 +718,7 @@ class TestDocumentRelationApiGet:
 
     def test_get_single_relation(self):
         http = _rel_http(get_data=_rel_dict("rel-99"))
-        api = DocumentRelationApi(http)
+        api = _DocumentRelationApi(http)
 
         rel = api.get("rel-99")
 
@@ -728,7 +728,7 @@ class TestDocumentRelationApiGet:
 
     def test_get_draft_uses_false_flag(self):
         http = _rel_http(get_data=_rel_dict())
-        api = DocumentRelationApi(http)
+        api = _DocumentRelationApi(http)
 
         api.get("rel-1", is_active_entity=False)
 
@@ -739,7 +739,7 @@ class TestDocumentRelationApiGet:
 class TestDocumentRelationApiCreate:
     def test_create_calls_correct_action(self):
         http = _rel_http(post_data=_rel_dict())
-        api = DocumentRelationApi(http)
+        api = _DocumentRelationApi(http)
 
         inp = CreateDocumentRelationInput(
             business_object_node_type_unique_id="PurchaseOrder",
@@ -757,7 +757,7 @@ class TestDocumentRelationApiCreate:
 
     def test_create_sends_correct_payload_structure(self):
         http = _rel_http(post_data=_rel_dict())
-        api = DocumentRelationApi(http)
+        api = _DocumentRelationApi(http)
 
         inp = CreateDocumentRelationInput(
             business_object_node_type_unique_id="PO",
@@ -785,7 +785,7 @@ class TestDocumentRelationApiUploadUrls:
             "DocumentContentUploadURLs": ["https://s3.example.com/upload-url"],
         }
         http = _rel_http(post_data=doc_data)
-        api = DocumentRelationApi(http)
+        api = _DocumentRelationApi(http)
 
         doc = api.generate_upload_urls("rel-1")
 
@@ -795,7 +795,7 @@ class TestDocumentRelationApiUploadUrls:
 
     def test_complete_multipart_upload(self):
         http = _rel_http()
-        api = DocumentRelationApi(http)
+        api = _DocumentRelationApi(http)
 
         api.complete_multipart_upload("rel-1")
 
@@ -806,19 +806,19 @@ class TestDocumentRelationApiUploadUrls:
 class TestDocumentRelationApiLockDelete:
     def test_lock(self):
         http = _rel_http()
-        api = DocumentRelationApi(http)
+        api = _DocumentRelationApi(http)
         api.lock("rel-1")
         assert "LockDocumentAndRelation" in http.post.call_args[0][0]
 
     def test_unlock(self):
         http = _rel_http()
-        api = DocumentRelationApi(http)
+        api = _DocumentRelationApi(http)
         api.unlock("rel-1")
         assert "UnlockDocumentAndRelation" in http.post.call_args[0][0]
 
     def test_delete_calls_http_delete(self):
         http = _rel_http()
-        api = DocumentRelationApi(http)
+        api = _DocumentRelationApi(http)
         api.delete("rel-1")
         http.delete.assert_called_once()
         call_path = http.delete.call_args[0][0]
@@ -834,7 +834,7 @@ class TestDocumentRelationApiDraftLifecycle:
 
     def test_create_draft(self):
         http = _rel_http(post_data={"value": [_rel_dict()]})
-        api = DocumentRelationApi(http)
+        api = _DocumentRelationApi(http)
         results = api.create_draft(self._draft_input())
 
         call_path = http.post.call_args[0][0]
@@ -843,14 +843,14 @@ class TestDocumentRelationApiDraftLifecycle:
 
     def test_validate_draft(self):
         http = _rel_http(post_data={"value": [_rel_dict()]})
-        api = DocumentRelationApi(http)
+        api = _DocumentRelationApi(http)
         api.validate_draft(self._draft_input())
 
         assert http.post.call_args[0][0] == "ValidateBusinessObjNodeDraft"
 
     def test_activate_draft(self):
         http = _rel_http(post_data={"value": [_rel_dict()]})
-        api = DocumentRelationApi(http)
+        api = _DocumentRelationApi(http)
 
         activate = DraftActivateInput(
             business_object_node_type_unique_id="PO",
@@ -862,13 +862,13 @@ class TestDocumentRelationApiDraftLifecycle:
 
     def test_discard_draft(self):
         http = _rel_http()
-        api = DocumentRelationApi(http)
+        api = _DocumentRelationApi(http)
         api.discard_draft(self._draft_input())
 
         assert http.post.call_args[0][0] == "DiscardBusinessObjNodeDraft"
 
 
-# ── ConfigurationApi (sync + async) ──────────────────────────────────────────
+# ── _ConfigurationApi (sync + async) ──────────────────────────────────────────
 
 _ALLOWED_DOMAIN_DICT = {
     "AllowedDomainID": "ad-uuid-1",
@@ -923,7 +923,7 @@ def _cfg_async_http(get_data=None, post_data=None):
 class TestConfigurationApiAllowedDomain:
     def test_get_all_returns_list(self):
         http = _cfg_sync_http(get_data={"value": [_ALLOWED_DOMAIN_DICT]})
-        api = ConfigurationApi(http)
+        api = _ConfigurationApi(http)
         result = api.get_all_allowed_domains()
 
         assert len(result) == 1
@@ -934,7 +934,7 @@ class TestConfigurationApiAllowedDomain:
 
     def test_get_all_passes_filter(self):
         http = _cfg_sync_http(get_data={"value": []})
-        api = ConfigurationApi(http)
+        api = _ConfigurationApi(http)
         api.get_all_allowed_domains(filter="AllowedDomainProtocol eq 'https'")
 
         _, kwargs = http.get.call_args
@@ -942,7 +942,7 @@ class TestConfigurationApiAllowedDomain:
 
     def test_get_all_passes_top_and_skip(self):
         http = _cfg_sync_http(get_data={"value": []})
-        api = ConfigurationApi(http)
+        api = _ConfigurationApi(http)
         api.get_all_allowed_domains(top=10, skip=5)
 
         _, kwargs = http.get.call_args
@@ -951,7 +951,7 @@ class TestConfigurationApiAllowedDomain:
 
     def test_get_all_empty_params_when_no_args(self):
         http = _cfg_sync_http(get_data={"value": []})
-        api = ConfigurationApi(http)
+        api = _ConfigurationApi(http)
         api.get_all_allowed_domains()
 
         _, kwargs = http.get.call_args
@@ -959,7 +959,7 @@ class TestConfigurationApiAllowedDomain:
 
     def test_create_posts_to_correct_entity(self):
         http = _cfg_sync_http(post_data=_ALLOWED_DOMAIN_DICT)
-        api = ConfigurationApi(http)
+        api = _ConfigurationApi(http)
         payload = CreateAllowedDomainInput(host_name="storage.example.com", protocol="https")
         result = api.create_allowed_domain(payload)
 
@@ -974,7 +974,7 @@ class TestConfigurationApiAllowedDomain:
 
     def test_delete_calls_correct_path(self):
         http = _cfg_sync_http()
-        api = ConfigurationApi(http)
+        api = _ConfigurationApi(http)
         api.delete_allowed_domain("ad-uuid-1")
 
         http.delete.assert_called_once()
@@ -986,7 +986,7 @@ class TestConfigurationApiAllowedDomain:
         from sap_cloud_sdk.adms.config import _CONFIG_SERVICE_PATH
 
         http = _cfg_sync_http(get_data={"value": []})
-        api = ConfigurationApi(http)
+        api = _ConfigurationApi(http)
         api.get_all_allowed_domains()
 
         _, kwargs = http.get.call_args
@@ -996,7 +996,7 @@ class TestConfigurationApiAllowedDomain:
 class TestConfigurationApiDocumentType:
     def test_get_all_returns_list(self):
         http = _cfg_sync_http(get_data={"value": [_DOC_TYPE_DICT]})
-        api = ConfigurationApi(http)
+        api = _ConfigurationApi(http)
         result = api.get_all_document_types()
 
         assert len(result) == 1
@@ -1008,13 +1008,13 @@ class TestConfigurationApiDocumentType:
     def test_get_all_description_is_optional(self):
         d = {**_DOC_TYPE_DICT, "DocumentTypeDescription": None}
         http = _cfg_sync_http(get_data={"value": [d]})
-        api = ConfigurationApi(http)
+        api = _ConfigurationApi(http)
         result = api.get_all_document_types()
         assert result[0].document_type_description is None
 
     def test_create_posts_to_correct_entity(self):
         http = _cfg_sync_http(post_data=_DOC_TYPE_DICT)
-        api = ConfigurationApi(http)
+        api = _ConfigurationApi(http)
         payload = CreateDocumentTypeInput(
             document_type_id="INVOICE",
             document_type_name="Invoice",
@@ -1032,7 +1032,7 @@ class TestConfigurationApiDocumentType:
 
     def test_create_omits_description_when_none(self):
         http = _cfg_sync_http(post_data=_DOC_TYPE_DICT)
-        api = ConfigurationApi(http)
+        api = _ConfigurationApi(http)
         payload = CreateDocumentTypeInput(
             document_type_id="INVOICE", document_type_name="Invoice"
         )
@@ -1043,7 +1043,7 @@ class TestConfigurationApiDocumentType:
 
     def test_delete_calls_correct_path(self):
         http = _cfg_sync_http()
-        api = ConfigurationApi(http)
+        api = _ConfigurationApi(http)
         api.delete_document_type("INVOICE")
 
         http.delete.assert_called_once()
@@ -1055,7 +1055,7 @@ class TestConfigurationApiDocumentType:
 class TestConfigurationApiBusinessObjectNodeType:
     def test_get_all_returns_list(self):
         http = _cfg_sync_http(get_data={"value": [_BO_NODE_TYPE_DICT]})
-        api = ConfigurationApi(http)
+        api = _ConfigurationApi(http)
         result = api.get_all_business_object_types()
 
         assert len(result) == 1
@@ -1066,7 +1066,7 @@ class TestConfigurationApiBusinessObjectNodeType:
 
     def test_create_posts_to_correct_entity(self):
         http = _cfg_sync_http(post_data=_BO_NODE_TYPE_DICT)
-        api = ConfigurationApi(http)
+        api = _ConfigurationApi(http)
         payload = CreateBusinessObjectNodeTypeInput(
             business_object_node_type_id="PurchaseOrder",
             business_object_node_type_name="Purchase Order",
@@ -1082,7 +1082,7 @@ class TestConfigurationApiBusinessObjectNodeType:
 
     def test_delete_uses_unique_id_in_path(self):
         http = _cfg_sync_http()
-        api = ConfigurationApi(http)
+        api = _ConfigurationApi(http)
         api.delete_business_object_type("bo-uuid-1")
 
         http.delete.assert_called_once()
@@ -1093,7 +1093,7 @@ class TestConfigurationApiBusinessObjectNodeType:
 class TestConfigurationApiTypeMappings:
     def test_get_type_mappings_returns_list(self):
         http = _cfg_sync_http(get_data={"value": [_MAPPING_DICT]})
-        api = ConfigurationApi(http)
+        api = _ConfigurationApi(http)
         result = api.get_type_mappings()
 
         assert len(result) == 1
@@ -1105,7 +1105,7 @@ class TestConfigurationApiTypeMappings:
 
     def test_create_mapping_posts_correct_payload(self):
         http = _cfg_sync_http(post_data=_MAPPING_DICT)
-        api = ConfigurationApi(http)
+        api = _ConfigurationApi(http)
         payload = CreateDocumentTypeBoTypeMapInput(
             business_object_node_type_unique_id="bo-uuid-1",
             document_type_id="INVOICE",
@@ -1125,7 +1125,7 @@ class TestConfigurationApiTypeMappings:
 
     def test_delete_mapping_uses_map_id(self):
         http = _cfg_sync_http()
-        api = ConfigurationApi(http)
+        api = _ConfigurationApi(http)
         api.delete_type_mapping("map-uuid-1")
 
         http.delete.assert_called_once()
@@ -1137,7 +1137,7 @@ class TestAsyncConfigurationApiAllowedDomain:
     @pytest.mark.asyncio
     async def test_get_all_returns_list(self):
         http = _cfg_async_http(get_data={"value": [_ALLOWED_DOMAIN_DICT]})
-        api = AsyncConfigurationApi(http)
+        api = _AsyncConfigurationApi(http)
         result = await api.get_all_allowed_domains()
 
         assert len(result) == 1
@@ -1147,7 +1147,7 @@ class TestAsyncConfigurationApiAllowedDomain:
     @pytest.mark.asyncio
     async def test_create_posts_to_correct_entity(self):
         http = _cfg_async_http(post_data=_ALLOWED_DOMAIN_DICT)
-        api = AsyncConfigurationApi(http)
+        api = _AsyncConfigurationApi(http)
         payload = CreateAllowedDomainInput(host_name="storage.example.com", protocol="https")
         result = await api.create_allowed_domain(payload)
 
@@ -1159,7 +1159,7 @@ class TestAsyncConfigurationApiAllowedDomain:
     @pytest.mark.asyncio
     async def test_delete_called(self):
         http = _cfg_async_http()
-        api = AsyncConfigurationApi(http)
+        api = _AsyncConfigurationApi(http)
         await api.delete_allowed_domain("ad-uuid-1")
         http.delete.assert_called_once()
 
@@ -1168,7 +1168,7 @@ class TestAsyncConfigurationApiDocumentType:
     @pytest.mark.asyncio
     async def test_get_all_returns_list(self):
         http = _cfg_async_http(get_data={"value": [_DOC_TYPE_DICT]})
-        api = AsyncConfigurationApi(http)
+        api = _AsyncConfigurationApi(http)
         result = await api.get_all_document_types()
 
         assert len(result) == 1
@@ -1178,7 +1178,7 @@ class TestAsyncConfigurationApiDocumentType:
     @pytest.mark.asyncio
     async def test_create_posts_to_correct_entity(self):
         http = _cfg_async_http(post_data=_DOC_TYPE_DICT)
-        api = AsyncConfigurationApi(http)
+        api = _AsyncConfigurationApi(http)
         payload = CreateDocumentTypeInput(
             document_type_id="INVOICE", document_type_name="Invoice"
         )
@@ -1190,7 +1190,7 @@ class TestAsyncConfigurationApiDocumentType:
     @pytest.mark.asyncio
     async def test_delete_called(self):
         http = _cfg_async_http()
-        api = AsyncConfigurationApi(http)
+        api = _AsyncConfigurationApi(http)
         await api.delete_document_type("INVOICE")
         http.delete.assert_called_once()
 
@@ -1199,7 +1199,7 @@ class TestAsyncConfigurationApiBusinessObjectNodeType:
     @pytest.mark.asyncio
     async def test_get_all_returns_list(self):
         http = _cfg_async_http(get_data={"value": [_BO_NODE_TYPE_DICT]})
-        api = AsyncConfigurationApi(http)
+        api = _AsyncConfigurationApi(http)
         result = await api.get_all_business_object_types()
 
         assert len(result) == 1
@@ -1209,7 +1209,7 @@ class TestAsyncConfigurationApiBusinessObjectNodeType:
     @pytest.mark.asyncio
     async def test_create_posts(self):
         http = _cfg_async_http(post_data=_BO_NODE_TYPE_DICT)
-        api = AsyncConfigurationApi(http)
+        api = _AsyncConfigurationApi(http)
         payload = CreateBusinessObjectNodeTypeInput(
             business_object_node_type_id="PurchaseOrder",
             business_object_node_type_name="Purchase Order",
@@ -1221,7 +1221,7 @@ class TestAsyncConfigurationApiBusinessObjectNodeType:
     @pytest.mark.asyncio
     async def test_delete_called(self):
         http = _cfg_async_http()
-        api = AsyncConfigurationApi(http)
+        api = _AsyncConfigurationApi(http)
         await api.delete_business_object_type("bo-uuid-1")
         http.delete.assert_called_once()
 
@@ -1230,7 +1230,7 @@ class TestAsyncConfigurationApiTypeMappings:
     @pytest.mark.asyncio
     async def test_get_type_mappings_returns_list(self):
         http = _cfg_async_http(get_data={"value": [_MAPPING_DICT]})
-        api = AsyncConfigurationApi(http)
+        api = _AsyncConfigurationApi(http)
         result = await api.get_type_mappings()
 
         assert len(result) == 1
@@ -1240,7 +1240,7 @@ class TestAsyncConfigurationApiTypeMappings:
     @pytest.mark.asyncio
     async def test_create_mapping_posts(self):
         http = _cfg_async_http(post_data=_MAPPING_DICT)
-        api = AsyncConfigurationApi(http)
+        api = _AsyncConfigurationApi(http)
         payload = CreateDocumentTypeBoTypeMapInput(
             business_object_node_type_unique_id="bo-uuid-1",
             document_type_id="INVOICE",
@@ -1252,12 +1252,12 @@ class TestAsyncConfigurationApiTypeMappings:
     @pytest.mark.asyncio
     async def test_delete_called(self):
         http = _cfg_async_http()
-        api = AsyncConfigurationApi(http)
+        api = _AsyncConfigurationApi(http)
         await api.delete_type_mapping("map-uuid-1")
         http.delete.assert_called_once()
 
 
-# ── JobApi (sync) ─────────────────────────────────────────────────────────────
+# ── _JobApi (sync) ─────────────────────────────────────────────────────────────
 
 def _job_http(post_data=None, get_data=None):
     http = MagicMock(spec=AdmsHttp)
@@ -1279,7 +1279,7 @@ def _job_http(post_data=None, get_data=None):
 class TestJobApiStartZipDownload:
     def test_routes_to_document_service(self):
         http = _job_http()
-        api = JobApi(http)
+        api = _JobApi(http)
 
         params = ZipDownloadJobParameters(
             business_object_node_type_unique_id="PurchaseOrder",
@@ -1294,7 +1294,7 @@ class TestJobApiStartZipDownload:
 
     def test_payload_has_zip_download_job_type(self):
         http = _job_http()
-        api = JobApi(http)
+        api = _JobApi(http)
 
         params = ZipDownloadJobParameters(
             business_object_node_type_unique_id="PO",
@@ -1309,7 +1309,7 @@ class TestJobApiStartZipDownload:
 
     def test_returns_job_output(self):
         http = _job_http(post_data={"JobID": "job-42", "JobStatus": "NOT_STARTED"})
-        api = JobApi(http)
+        api = _JobApi(http)
 
         params = ZipDownloadJobParameters(
             business_object_node_type_unique_id="PO",
@@ -1324,7 +1324,7 @@ class TestJobApiStartZipDownload:
 class TestJobApiStartDeleteUserData:
     def test_routes_to_admin_service(self):
         http = _job_http()
-        api = JobApi(http)
+        api = _JobApi(http)
 
         params = DeleteUserDataJobParameters(user_id="user-123")
         api.start_delete_user_data(params)
@@ -1334,7 +1334,7 @@ class TestJobApiStartDeleteUserData:
 
     def test_payload_has_delete_user_data_job_type(self):
         http = _job_http()
-        api = JobApi(http)
+        api = _JobApi(http)
 
         params = DeleteUserDataJobParameters(user_id="user-456")
         api.start_delete_user_data(params)
@@ -1347,7 +1347,7 @@ class TestJobApiStartDeleteUserData:
 class TestJobApiGetStatus:
     def test_routes_to_document_service_by_default(self):
         http = _job_http()
-        api = JobApi(http)
+        api = _JobApi(http)
 
         api.get_status("job-1")
 
@@ -1356,7 +1356,7 @@ class TestJobApiGetStatus:
 
     def test_routes_to_admin_service_when_flag_set(self):
         http = _job_http()
-        api = JobApi(http)
+        api = _JobApi(http)
 
         api.get_status("job-1", use_admin_service=True)
 
@@ -1365,7 +1365,7 @@ class TestJobApiGetStatus:
 
     def test_path_contains_job_id(self):
         http = _job_http()
-        api = JobApi(http)
+        api = _JobApi(http)
 
         api.get_status("job-99")
 
@@ -1375,7 +1375,7 @@ class TestJobApiGetStatus:
     def test_returns_job_output(self):
         http = _job_http(get_data={"JobID": "job-1", "JobStatus": "COMPLETED",
                                    "JobProgressPercentage": 100})
-        api = JobApi(http)
+        api = _JobApi(http)
 
         output = api.get_status("job-1")
 
@@ -1407,7 +1407,7 @@ class TestJobPollingWorkflow:
 
         http.get.side_effect = side_effect
 
-        api = JobApi(http)
+        api = _JobApi(http)
         params = ZipDownloadJobParameters(
             business_object_node_type_unique_id="PO",
             host_business_object_node_id="PO-1",

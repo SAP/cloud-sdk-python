@@ -24,7 +24,6 @@ from requests.exceptions import RequestException
 from sap_cloud_sdk.adms._auth import IasTokenFetcher
 from sap_cloud_sdk.adms.config import AdmsConfig
 from sap_cloud_sdk.adms.exceptions import DocumentNotFoundError, HttpError
-from sap_cloud_sdk.adms.exceptions import HttpError as AdmsHttpError
 from sap_cloud_sdk.core.http import AsyncHttpClient
 from sap_cloud_sdk.core.http import HttpError as CoreHttpError
 from sap_cloud_sdk.core.http import NotFoundError as CoreNotFoundError
@@ -372,7 +371,7 @@ class AsyncAdmsHttp(AsyncHttpClient):
         except CoreNotFoundError as exc:
             raise DocumentNotFoundError(str(exc)) from exc
         except CoreHttpError as exc:
-            raise AdmsHttpError(
+            raise HttpError(
                 str(exc),
                 status_code=exc.status_code,
                 response_text=exc.response_text,
@@ -404,7 +403,7 @@ class AsyncAdmsHttp(AsyncHttpClient):
                 },
             )
         except httpx.RequestError as exc:
-            raise AdmsHttpError(f"Async CSRF fetch request failed: {exc}") from exc
+            raise HttpError(f"Async CSRF fetch request failed: {exc}") from exc
 
         self._csrf_tokens[key] = resp.headers.get(_CSRF_FETCH_HEADER, "")
         return self._csrf_tokens[key]

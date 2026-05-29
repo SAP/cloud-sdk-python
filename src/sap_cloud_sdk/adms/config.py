@@ -45,7 +45,7 @@ class AdmsConfig:
         client_id: IAS OAuth2 client ID
         client_secret: IAS OAuth2 client secret
         resource: Optional IAS resource URI that scopes the token to the ADM application
-            (e.g. ``urn:sap:identity:application:provider:name:adwitiyadependency``).
+            (e.g. ``urn:sap:identity:application:provider:name:my-adm-app``).
             When set it is forwarded as the ``resource`` parameter in every
             ``client_credentials`` token request and IAS returns a JWT whose
             ``aud`` claim matches the ADM application, satisfying ADM's token

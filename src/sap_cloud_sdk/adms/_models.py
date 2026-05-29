@@ -46,17 +46,17 @@ class ScanStatus(str, Enum):
     After upload, the document is in PENDING state until the scanner reports back.
 
     Attributes:
-        PENDING: Upload received; virus scan is in progress.  Retry later.
         CLEAN: Scan passed — safe to download.
         FAILED: Scan infrastructure failure.  Contact support.
         FILE_EXT_RESTRICTED: Blocked by the tenant's file extension policy.
+        PENDING: Upload received; virus scan is in progress.  Retry later.
         QUARANTINED: Virus detected.  Access permanently blocked.
     """
 
-    PENDING = "PENDING"
     CLEAN = "CLEAN"
     FAILED = "FAILED"
     FILE_EXT_RESTRICTED = "FILE_EXT_RESTRICTED"
+    PENDING = "PENDING"
     QUARANTINED = "QUARANTINED"
 
     def is_downloadable(self) -> bool:

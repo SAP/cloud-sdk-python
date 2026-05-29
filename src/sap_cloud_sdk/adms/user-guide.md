@@ -80,7 +80,7 @@ client = create_client(user_jwt=request.headers["Authorization"].split()[1])
 ## Token Cache for Scale-Out
 
 ```python
-from sap_cloud_sdk.adms import create_client, TokenCache
+from sap_cloud_sdk.adms import create_client
 from sap_cloud_sdk.core.auth import RedisTokenCache
 
 # Share token cache across multiple pods

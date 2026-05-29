@@ -81,7 +81,6 @@ from sap_cloud_sdk.adms._models import (
     UpdateDocumentInput,
     ZipDownloadJobParameters,
 )
-from sap_cloud_sdk.core.auth import TokenCache
 
 
 __all__ = [
@@ -93,8 +92,6 @@ __all__ = [
     "AsyncAdmsClient",
     # config
     "AdmsConfig",
-    # cache
-    "TokenCache",
     # exceptions
     "AuthError",
     "ClientCreationError",

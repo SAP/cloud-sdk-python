@@ -69,6 +69,7 @@ dev = [
 [tool.pytest.ini_options]
 markers = [
     "integration: marks tests as integration tests (requires Docker)",
+    "aicore: marks tests that require AI Core credentials (AICORE_* env vars)",
 ]
 
 [tool.coverage.run]

@@ -1,8 +1,8 @@
 """mTLS (X.509 client certificate) authentication strategy for BTP services.
 
-BTP Business Services that use the ``accessStrategy: sap:cmp-mtls:v1`` trust
-model (SPII, Destination service, UCL callbacks) require the **calling
-application to present a client certificate** signed by the SAP Cloud Root CA.
+Some BTP business services use the ``accessStrategy: sap:cmp-mtls:v1`` trust
+model and require the **calling application to present a client certificate**
+signed by the SAP Cloud Root CA.
 
 This module provides :class:`MTLSStrategy` — a single object that wraps a
 PEM-encoded client certificate + private key and applies it to either a
@@ -13,8 +13,8 @@ Service binding layout (Kyma / Cloud Foundry):
     binding's mounted secret directory.  The exact key names vary by service:
 
     * Destination service (CF):     ``clientid``, ``certificate``, ``key``
-    * SPII / UCL mTLS endpoint:     ``tls.crt``, ``tls.key``
-    * SAP Connectivity service:      ``onpremise_proxy_certificate``, ``onpremise_proxy_key``
+    * Generic mTLS endpoint:        ``tls.crt``, ``tls.key``
+    * SAP Connectivity service:     ``onpremise_proxy_certificate``, ``onpremise_proxy_key``
 
     :meth:`MTLSStrategy.from_binding_path` handles the common ``certificate``/``key``
     naming used by the CF Destination service.  For custom naming, use

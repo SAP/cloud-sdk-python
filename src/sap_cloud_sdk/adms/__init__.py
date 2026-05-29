@@ -81,7 +81,7 @@ from sap_cloud_sdk.adms._models import (
     UpdateDocumentInput,
     ZipDownloadJobParameters,
 )
-from sap_cloud_sdk.core.auth._token_cache import TokenCache
+from sap_cloud_sdk.core.auth import TokenCache
 
 
 __all__ = [

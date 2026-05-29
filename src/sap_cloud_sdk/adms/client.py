@@ -64,7 +64,7 @@ from sap_cloud_sdk.adms.exceptions import (
     ConfigError,
     ScanNotCleanError,
 )
-from sap_cloud_sdk.core.auth._token_cache import TokenCache
+from sap_cloud_sdk.core.auth import TokenCache
 from sap_cloud_sdk.core.telemetry import Module, Operation, record_metrics
 
 

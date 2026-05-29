@@ -96,6 +96,22 @@ CLOUD_SDK_CFG_DATA_ANONYMIZATION_DEFAULT_DESTINATION_NAME=your-client-certificat
 
 The destination must be configured with `ClientCertificateAuthentication` and reference a certificate bundle containing the client certificate and private key.
 
+### ADMS Integration Tests
+
+For ADMS (Advanced Document Management Service) integration tests, configure the following variables in `.env_integration_tests`:
+
+```bash
+# ADMS Configuration
+CLOUD_SDK_ADMS_INTEGRATION_URL=https://your-adm-instance.cfapps.eu20.hana.ondemand.com
+CLOUD_SDK_CFG_ADMS_DEFAULT_URL=https://your-tenant.accounts.ondemand.com
+CLOUD_SDK_CFG_ADMS_DEFAULT_URI=https://your-adm-instance.cfapps.eu20.hana.ondemand.com
+CLOUD_SDK_CFG_ADMS_DEFAULT_CLIENTID=your-ias-client-id
+CLOUD_SDK_CFG_ADMS_DEFAULT_CLIENTSECRET=your-ias-client-secret
+CLOUD_SDK_CFG_ADMS_DEFAULT_RESOURCE=urn:sap:identity:application:provider:name:your-app
+```
+
+`CLOUD_SDK_ADMS_INTEGRATION_URL` is the target ADM service URL used by the tests. The `CLOUD_SDK_CFG_ADMS_DEFAULT_*` variables hold the IAS service-binding credentials used by the SDK to fetch Bearer tokens.
+
 ## Running Integration Tests
 
 ```bash
@@ -108,6 +124,7 @@ uv run pytest tests/core/integration/data_anonymization -v
 uv run pytest tests/objectstore/integration/ -v
 uv run pytest tests/destination/integration/ -v
 uv run pytest tests/agent_memory/integration/ -v
+uv run pytest tests/adms/integration/ -v
 ```
 
 ### BDD Scenarios

@@ -1,4 +1,4 @@
-"""Data models for the SAP ADMS (ADM Document Management Service) module.
+"""Data models for the SAP ADMS (Advanced Document Management Service) module.
 
 This module defines enums and dataclasses for all ADMS entities:
 - Enums: ``BaseType``, ``ScanStatus``, ``JobType``, ``JobStatus``

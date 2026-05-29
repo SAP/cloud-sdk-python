@@ -11,7 +11,7 @@ This package is part of the SAP Cloud SDK for Python. Import and use it directly
 ## Prerequisites
 
 ADM is a BTP Shared SaaS Application (IAS-based multi-tenant service). It must be provisioned
-via Unified Provisioning / UCL before use. See [INTEGRATION_TESTS.md](../../../docs/INTEGRATION_TESTS.md)
+as a BTP service instance before use. See [INTEGRATION_TESTS.md](../../../docs/INTEGRATION_TESTS.md)
 for the env vars used by integration tests.
 
 ## Quick Start

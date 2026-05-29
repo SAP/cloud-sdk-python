@@ -47,3 +47,4 @@ PULL_REQUEST.md
 src/sap_cloud_sdk/adms/ucl/
 RELEASE.md
 .env.adms
+scripts/adms_cli.py

@@ -102,7 +102,6 @@ For ADMS (Advanced Document Management Service) integration tests, configure the
 
 ```bash
 # ADMS Configuration
-CLOUD_SDK_ADMS_INTEGRATION_URL=https://your-adm-instance.cfapps.eu20.hana.ondemand.com
 CLOUD_SDK_CFG_ADMS_DEFAULT_URL=https://your-tenant.accounts.ondemand.com
 CLOUD_SDK_CFG_ADMS_DEFAULT_URI=https://your-adm-instance.cfapps.eu20.hana.ondemand.com
 CLOUD_SDK_CFG_ADMS_DEFAULT_CLIENTID=your-ias-client-id
@@ -110,7 +109,7 @@ CLOUD_SDK_CFG_ADMS_DEFAULT_CLIENTSECRET=your-ias-client-secret
 CLOUD_SDK_CFG_ADMS_DEFAULT_RESOURCE=urn:sap:identity:application:provider:name:your-app
 ```
 
-`CLOUD_SDK_ADMS_INTEGRATION_URL` is the target ADM service URL used by the tests. The `CLOUD_SDK_CFG_ADMS_DEFAULT_*` variables hold the IAS service-binding credentials used by the SDK to fetch Bearer tokens.
+`CLOUD_SDK_CFG_ADMS_DEFAULT_URI` points the tests at the target ADM service. The other `CLOUD_SDK_CFG_ADMS_DEFAULT_*` variables hold the IAS service-binding credentials used by the SDK to fetch Bearer tokens. Tests are skipped automatically when any of these are missing.
 
 ## Running Integration Tests
 

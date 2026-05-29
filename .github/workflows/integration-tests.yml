@@ -56,20 +56,6 @@ jobs:
             echo "Set variable: $var_name"
           done
 
-          # Integration service URLs from secrets/variables
-          ADMS_URL=$(echo '${{ toJSON(secrets) }}' | jq -r '.CLOUD_SDK_ADMS_INTEGRATION_URL // empty')
-          if [ -z "$ADMS_URL" ]; then
-            ADMS_URL=$(echo '${{ toJSON(vars) }}' | jq -r '.CLOUD_SDK_ADMS_INTEGRATION_URL // empty')
-          fi
-          if [ -n "$ADMS_URL" ]; then
-            echo "CLOUD_SDK_ADMS_INTEGRATION_URL=$ADMS_URL" >> $GITHUB_ENV
-            echo "Set: CLOUD_SDK_ADMS_INTEGRATION_URL"
-          else
-            # Skip ADMS integration tests when HDM service credentials are not configured
-            echo "CLOUD_SDK_ADMS_SKIP_IF_UNAVAILABLE=true" >> $GITHUB_ENV
-            echo "ADMS service URL not configured — ADMS integration tests will be skipped"
-          fi
-
           echo "Environment setup complete - automatically configured all CLOUD_SDK_CFG_* environment variables and secrets"
 
       - name: Run integration tests

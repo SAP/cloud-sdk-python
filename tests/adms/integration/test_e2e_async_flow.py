@@ -179,13 +179,17 @@ def create_concurrent_async_relations(
     assert context.client is not None
     assert context.bo_type_id is not None
     bo_ids = [f"{base_node_id}-{i}" for i in range(3)]
-    tasks = [
-        context.client.relations.create(
-            _make_relation_input(context.bo_type_id, bo_id, f"Concurrent_{i}.pdf")
-        )
-        for i, bo_id in enumerate(bo_ids)
-    ]
-    context.concurrent_relations = run_async(asyncio.gather(*tasks))
+
+    async def _gather() -> list[DocumentRelation]:
+        tasks = [
+            context.client.relations.create(
+                _make_relation_input(context.bo_type_id, bo_id, f"Concurrent_{i}.pdf")
+            )
+            for i, bo_id in enumerate(bo_ids)
+        ]
+        return await asyncio.gather(*tasks)
+
+    context.concurrent_relations = run_async(_gather())
 
 
 # ---------------------------------------------------------------------------

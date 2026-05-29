@@ -62,10 +62,10 @@ client = create_client(instance="production")
 from sap_cloud_sdk.adms import create_client, AdmsConfig
 
 config = AdmsConfig(
-    base_url="https://adm.cfapps.eu10.hana.ondemand.com",
+    service_url="https://adm.cfapps.eu10.hana.ondemand.com",
+    ias_url="https://your-tenant.accounts.ondemand.com",
     client_id="your-client-id",
     client_secret="your-client-secret",
-    token_url="https://your-tenant.accounts.ondemand.com/oauth2/token",
 )
 client = create_client(config=config)
 ```

@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   check-version-bump:
-    name: Enforce version bump when src/ is modified
+    name: Check Version Bump
     runs-on: ${{ contains(github.server_url, 'github.com') && 'ubuntu-latest' || fromJSON('["self-hosted"]') }}
     steps:
       - name: Checkout repository

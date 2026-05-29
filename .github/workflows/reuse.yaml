@@ -13,6 +13,7 @@ permissions:
 
 jobs:
   check-reuse-compliance:
+    name: REUSE Compliance Check
     runs-on: ${{ contains(github.server_url, 'github.com') && 'ubuntu-latest' || fromJSON('["self-hosted"]') }}
     steps:
     - uses: actions/checkout@v6

@@ -1,4 +1,4 @@
-name: Proto generation check
+name: Proto Generation Check
 
 on:
   pull_request:
@@ -20,7 +20,7 @@ permissions:
 
 jobs:
   verify-proto:
-    name: Verify generated proto code is up-to-date
+    name: Proto Generation Check
     runs-on: ubuntu-latest
 
     steps:

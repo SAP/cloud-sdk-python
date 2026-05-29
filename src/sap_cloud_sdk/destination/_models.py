@@ -366,6 +366,41 @@ class Destination:
                     payload[k] = v
         return payload
 
+    def get_erp_headers(self) -> Dict[str, str]:
+        """Return SAP ERP-specific headers derived from destination properties (sap-client, sap-language).
+
+        Returns:
+            Headers to inject into requests to the target system.
+        """
+        headers: Dict[str, str] = {}
+        if "sap-client" in self.properties:
+            headers["sap-client"] = self.properties["sap-client"]
+        if "sap-language" in self.properties:
+            headers["sap-language"] = self.properties["sap-language"]
+        return headers
+
+    def get_headers(self) -> Dict[str, str]:
+        """Return HTTP headers derived from this destination (ERP headers, URL.headers.* properties, and auth tokens), each overriding the previous on conflicting keys.
+
+        Returns:
+            Headers ready to inject into requests to the target system.
+        """
+        headers: Dict[str, str] = {}
+        headers.update(self.get_erp_headers())
+
+        _PREFIX = "URL.headers."
+        for key, value in self.properties.items():
+            if key.startswith(_PREFIX):
+                headers[key[len(_PREFIX) :]] = value
+
+        for token in self.auth_tokens:
+            key = token.http_header.get("key")
+            value = token.http_header.get("value")
+            if key and value:
+                headers[key] = value
+
+        return headers
+
 
 @dataclass
 class AuthToken:

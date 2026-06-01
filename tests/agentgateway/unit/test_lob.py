@@ -21,7 +21,7 @@ from sap_cloud_sdk.agentgateway._lob import (
     _IAS_USER_LABEL_VALUE,
 )
 from sap_cloud_sdk.agentgateway._models import MCPTool
-from sap_cloud_sdk.agentgateway._token_cache import _TokenCache
+from sap_cloud_sdk.agentgateway._token_cache import _GatewayUrlCache, _TokenCache
 from sap_cloud_sdk.agentgateway.config import ClientConfig
 from sap_cloud_sdk.agentgateway.exceptions import MCPServerNotFoundError
 from sap_cloud_sdk.destination import ConsumptionLevel
@@ -353,7 +353,7 @@ class TestFetchSystemAuth:
     async def test_reuses_cached_system_auth(self):
         """Reuse tenant-scoped system auth until it expires."""
         token_cache = _TokenCache(ClientConfig())
-        gateway_url_cache: dict[str, str] = {}
+        gateway_url_cache = _GatewayUrlCache()
 
         with patch.dict(os.environ, {"APPFND_CONHOS_LANDSCAPE": "eu10"}):
             with (
@@ -380,6 +380,18 @@ class TestFetchSystemAuth:
         assert first == ("system-token", "https://agw.example.com")
         assert second == ("system-token", "https://agw.example.com")
         mock_fetch.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_raises_when_only_token_cache_provided(self):
+        """Raise ValueError when token_cache given without gateway_url_cache."""
+        with pytest.raises(ValueError, match="both be provided or both be None"):
+            await fetch_system_auth("tenant-sub", token_cache=_TokenCache(ClientConfig()))
+
+    @pytest.mark.asyncio
+    async def test_raises_when_only_gateway_url_cache_provided(self):
+        """Raise ValueError when gateway_url_cache given without token_cache."""
+        with pytest.raises(ValueError, match="both be provided or both be None"):
+            await fetch_system_auth("tenant-sub", gateway_url_cache=_GatewayUrlCache())
 
 
 # ============================================================
@@ -421,7 +433,7 @@ class TestFetchUserAuth:
     async def test_reuses_cached_user_auth(self):
         """Reuse tenant-scoped user auth until it expires."""
         token_cache = _TokenCache(ClientConfig())
-        gateway_url_cache: dict[str, str] = {}
+        gateway_url_cache = _GatewayUrlCache()
 
         with patch.dict(os.environ, {"APPFND_CONHOS_LANDSCAPE": "eu10"}):
             with (
@@ -450,6 +462,18 @@ class TestFetchUserAuth:
         assert first == ("user-token", "https://agw.example.com")
         assert second == ("user-token", "https://agw.example.com")
         mock_fetch.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_raises_when_only_token_cache_provided(self):
+        """Raise ValueError when token_cache given without gateway_url_cache."""
+        with pytest.raises(ValueError, match="both be provided or both be None"):
+            await fetch_user_auth("user-jwt", "tenant-sub", token_cache=_TokenCache(ClientConfig()))
+
+    @pytest.mark.asyncio
+    async def test_raises_when_only_gateway_url_cache_provided(self):
+        """Raise ValueError when gateway_url_cache given without token_cache."""
+        with pytest.raises(ValueError, match="both be provided or both be None"):
+            await fetch_user_auth("user-jwt", "tenant-sub", gateway_url_cache=_GatewayUrlCache())
 
 
 # ============================================================

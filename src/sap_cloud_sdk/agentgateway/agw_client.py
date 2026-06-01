@@ -27,6 +27,7 @@ from sap_cloud_sdk.agentgateway._lob import (
     get_mcp_tools_lob,
 )
 from sap_cloud_sdk.agentgateway._models import AuthResult, MCPTool
+from sap_cloud_sdk.agentgateway._token_cache import _GatewayUrlCache, _TokenCache
 from sap_cloud_sdk.agentgateway.exceptions import AgentGatewaySDKError
 from sap_cloud_sdk.core.telemetry import Module, Operation, record_metrics
 
@@ -110,6 +111,8 @@ class AgentGatewayClient:
         """
         self._tenant_subdomain = tenant_subdomain
         self._config = config or ClientConfig()
+        self._token_cache = _TokenCache(self._config)
+        self._gateway_url_cache = _GatewayUrlCache()
 
     @staticmethod
     def _resolve_value(
@@ -182,6 +185,7 @@ class AgentGatewayClient:
                     credentials,
                     self._config.timeout,
                     app_tid,
+                    self._token_cache,
                 )
                 return AuthResult(
                     access_token=token,
@@ -193,7 +197,11 @@ class AgentGatewayClient:
                 logger.warning("app_tid parameter ignored for LoB agent flow")
 
             tenant = self._resolve_tenant_subdomain()
-            token, gateway_url = await fetch_system_auth(tenant)
+            token, gateway_url = await fetch_system_auth(
+                tenant,
+                token_cache=self._token_cache,
+                gateway_url_cache=self._gateway_url_cache,
+            )
             return AuthResult(access_token=token, gateway_url=gateway_url)
 
         except AgentGatewaySDKError:
@@ -255,6 +263,7 @@ class AgentGatewayClient:
                     resolved_user_token,
                     self._config.timeout,
                     app_tid,
+                    self._token_cache,
                 )
                 return AuthResult(
                     access_token=token,
@@ -266,7 +275,12 @@ class AgentGatewayClient:
                 logger.warning("app_tid parameter ignored for LoB agent flow")
 
             tenant = self._resolve_tenant_subdomain()
-            token, gateway_url = await fetch_user_auth(resolved_user_token, tenant)
+            token, gateway_url = await fetch_user_auth(
+                resolved_user_token,
+                tenant,
+                token_cache=self._token_cache,
+                gateway_url_cache=self._gateway_url_cache,
+            )
             return AuthResult(access_token=token, gateway_url=gateway_url)
 
         except AgentGatewaySDKError:

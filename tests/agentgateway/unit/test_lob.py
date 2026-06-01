@@ -21,6 +21,8 @@ from sap_cloud_sdk.agentgateway._lob import (
     _IAS_USER_LABEL_VALUE,
 )
 from sap_cloud_sdk.agentgateway._models import MCPTool
+from sap_cloud_sdk.agentgateway._token_cache import _TokenCache
+from sap_cloud_sdk.agentgateway.config import ClientConfig
 from sap_cloud_sdk.agentgateway.exceptions import MCPServerNotFoundError
 from sap_cloud_sdk.destination import ConsumptionLevel
 
@@ -347,6 +349,38 @@ class TestFetchSystemAuth:
                 )
                 assert call_args[0][2].fragment_level == ConsumptionLevel.INSTANCE
 
+    @pytest.mark.asyncio
+    async def test_reuses_cached_system_auth(self):
+        """Reuse tenant-scoped system auth until it expires."""
+        token_cache = _TokenCache(ClientConfig())
+        gateway_url_cache: dict[str, str] = {}
+
+        with patch.dict(os.environ, {"APPFND_CONHOS_LANDSCAPE": "eu10"}):
+            with (
+                patch(
+                    "sap_cloud_sdk.agentgateway._lob.get_ias_fragment_name",
+                    return_value="sap-managed-runtime-agw-subscriber-ias-abc",
+                ),
+                patch(
+                    "sap_cloud_sdk.agentgateway._lob._fetch_auth_token",
+                    return_value=("system-token", "https://agw.example.com"),
+                ) as mock_fetch,
+            ):
+                first = await fetch_system_auth(
+                    "tenant-sub",
+                    token_cache=token_cache,
+                    gateway_url_cache=gateway_url_cache,
+                )
+                second = await fetch_system_auth(
+                    "tenant-sub",
+                    token_cache=token_cache,
+                    gateway_url_cache=gateway_url_cache,
+                )
+
+        assert first == ("system-token", "https://agw.example.com")
+        assert second == ("system-token", "https://agw.example.com")
+        mock_fetch.assert_called_once()
+
 
 # ============================================================
 # Test: fetch_user_auth
@@ -382,6 +416,40 @@ class TestFetchUserAuth:
                 assert options.user_token == "user-jwt"
                 assert options.fragment_name == "sap-managed-runtime-agw-subscriber-ias-user-abc"
                 assert options.fragment_level == ConsumptionLevel.INSTANCE
+
+    @pytest.mark.asyncio
+    async def test_reuses_cached_user_auth(self):
+        """Reuse tenant-scoped user auth until it expires."""
+        token_cache = _TokenCache(ClientConfig())
+        gateway_url_cache: dict[str, str] = {}
+
+        with patch.dict(os.environ, {"APPFND_CONHOS_LANDSCAPE": "eu10"}):
+            with (
+                patch(
+                    "sap_cloud_sdk.agentgateway._lob.get_ias_user_fragment_name",
+                    return_value="sap-managed-runtime-agw-subscriber-ias-user-abc",
+                ),
+                patch(
+                    "sap_cloud_sdk.agentgateway._lob._fetch_auth_token",
+                    return_value=("user-token", "https://agw.example.com"),
+                ) as mock_fetch,
+            ):
+                first = await fetch_user_auth(
+                    "user-jwt",
+                    "tenant-sub",
+                    token_cache=token_cache,
+                    gateway_url_cache=gateway_url_cache,
+                )
+                second = await fetch_user_auth(
+                    "user-jwt",
+                    "tenant-sub",
+                    token_cache=token_cache,
+                    gateway_url_cache=gateway_url_cache,
+                )
+
+        assert first == ("user-token", "https://agw.example.com")
+        assert second == ("user-token", "https://agw.example.com")
+        mock_fetch.assert_called_once()
 
 
 # ============================================================

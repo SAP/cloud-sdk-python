@@ -31,6 +31,16 @@ def mock_tool():
     )
 
 
+def _client_token_cache(client: AgentGatewayClient):
+    """Access the client-owned token cache for white-box tests."""
+    return getattr(client, "_token_cache")
+
+
+def _client_gateway_url_cache(client: AgentGatewayClient):
+    """Access the client-owned gateway URL cache for white-box tests."""
+    return getattr(client, "_gateway_url_cache")
+
+
 # ============================================================
 # Test: create_client factory
 # ============================================================
@@ -117,13 +127,19 @@ class TestGetSystemAuth:
             return_value=("raw-system-jwt-token", "https://agw.example.com"),
         ) as mock_auth:
             agw_client = create_client(tenant_subdomain="my-tenant")
+            token_cache = _client_token_cache(agw_client)
+            gateway_url_cache = _client_gateway_url_cache(agw_client)
 
             result = await agw_client.get_system_auth()
 
             assert isinstance(result, AuthResult)
             assert result.access_token == "raw-system-jwt-token"
             assert result.gateway_url == "https://agw.example.com"
-            mock_auth.assert_called_once_with("my-tenant")
+            mock_auth.assert_called_once_with(
+                "my-tenant",
+                token_cache=token_cache,
+                gateway_url_cache=gateway_url_cache,
+            )
 
     @pytest.mark.asyncio
     async def test_customer_flow_returns_auth_result(self):
@@ -142,6 +158,7 @@ class TestGetSystemAuth:
             mock_load.return_value = mock_creds
 
             agw_client = create_client()
+            token_cache = _client_token_cache(agw_client)
 
             result = await agw_client.get_system_auth(app_tid="test-tid")
 
@@ -149,7 +166,9 @@ class TestGetSystemAuth:
             assert result.access_token == "customer-system-token"
             assert result.gateway_url == "https://agw.customer.com"
             mock_load.assert_called_once_with("/path/to/credentials")
-            mock_mtls.assert_called_once_with(mock_creds, 60.0, "test-tid")
+            mock_mtls.assert_called_once_with(
+                mock_creds, 60.0, "test-tid", token_cache
+            )
 
     @pytest.mark.asyncio
     async def test_missing_tenant_raises_for_lob(self):
@@ -176,10 +195,16 @@ class TestGetSystemAuth:
         ) as mock_auth:
             get_tenant = lambda: "dynamic-tenant"
             agw_client = create_client(tenant_subdomain=get_tenant)
+            token_cache = _client_token_cache(agw_client)
+            gateway_url_cache = _client_gateway_url_cache(agw_client)
 
             await agw_client.get_system_auth()
 
-            mock_auth.assert_called_once_with("dynamic-tenant")
+            mock_auth.assert_called_once_with(
+                "dynamic-tenant",
+                token_cache=token_cache,
+                gateway_url_cache=gateway_url_cache,
+            )
 
     @pytest.mark.asyncio
     async def test_wraps_unexpected_errors(self):
@@ -218,13 +243,20 @@ class TestGetUserAuth:
             return_value=("raw-user-jwt-token", "https://agw.example.com"),
         ) as mock_auth:
             agw_client = create_client(tenant_subdomain="my-tenant")
+            token_cache = _client_token_cache(agw_client)
+            gateway_url_cache = _client_gateway_url_cache(agw_client)
 
             result = await agw_client.get_user_auth(user_token="user-jwt")
 
             assert isinstance(result, AuthResult)
             assert result.access_token == "raw-user-jwt-token"
             assert result.gateway_url == "https://agw.example.com"
-            mock_auth.assert_called_once_with("user-jwt", "my-tenant")
+            mock_auth.assert_called_once_with(
+                "user-jwt",
+                "my-tenant",
+                token_cache=token_cache,
+                gateway_url_cache=gateway_url_cache,
+            )
 
     @pytest.mark.asyncio
     async def test_customer_flow_exchanges_token(self):
@@ -243,6 +275,7 @@ class TestGetUserAuth:
             mock_load.return_value = mock_creds
 
             agw_client = create_client()
+            token_cache = _client_token_cache(agw_client)
 
             result = await agw_client.get_user_auth(
                 user_token="user-jwt", app_tid="test-tid"
@@ -252,7 +285,7 @@ class TestGetUserAuth:
             assert result.access_token == "exchanged-token"
             assert result.gateway_url == "https://agw.customer.com"
             mock_exchange.assert_called_once_with(
-                mock_creds, "user-jwt", 60.0, "test-tid"
+                mock_creds, "user-jwt", 60.0, "test-tid", token_cache
             )
 
     @pytest.mark.asyncio
@@ -280,10 +313,17 @@ class TestGetUserAuth:
         ) as mock_auth:
             agw_client = create_client(tenant_subdomain="my-tenant")
             get_token = lambda: "dynamic-user-jwt"
+            token_cache = _client_token_cache(agw_client)
+            gateway_url_cache = _client_gateway_url_cache(agw_client)
 
             await agw_client.get_user_auth(user_token=get_token)
 
-            mock_auth.assert_called_once_with("dynamic-user-jwt", "my-tenant")
+            mock_auth.assert_called_once_with(
+                "dynamic-user-jwt",
+                "my-tenant",
+                token_cache=token_cache,
+                gateway_url_cache=gateway_url_cache,
+            )
 
     @pytest.mark.asyncio
     async def test_missing_tenant_raises_for_lob(self):

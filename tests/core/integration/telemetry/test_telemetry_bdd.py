@@ -83,6 +83,16 @@ def test_propagate_true_to_llm_span():
     pass
 
 
+@scenario("telemetry.feature", "propagate=False does not leak invoke_agent attributes to nested LLM span")
+def test_propagate_false_to_llm_span():
+    pass
+
+
+@scenario("telemetry.feature", "baggage attributes propagate to Traceloop-instrumented LLM spans")
+def test_baggage_propagates_to_llm_span():
+    pass
+
+
 @scenario("telemetry.feature", "LangGraph agent run produces an invoke_agent span with LangChain child spans")
 def test_langgraph_auto_instrumentation():
     pass
@@ -225,6 +235,29 @@ def invoke_agent_propagate_to_llm(memory_exporter, transforming_exporter, span_s
         attributes={"custom.session": "s42"},
         propagate=True,
     ):
+        _llm_call()
+    spans = transforming_exporter.get_finished_spans()
+    log.info("Emitted spans: %s", [(s.name, dict(s.attributes or {})) for s in spans])
+    span_store["all_local_spans"] = spans
+
+
+@when("I invoke an agent with propagate=False wrapping a real LLM call")
+def invoke_agent_no_propagate_to_llm(memory_exporter, transforming_exporter, span_store):
+    with invoke_agent_span(
+        provider="sap-aicore",
+        agent_name="no-propagate-llm-agent",
+        attributes={"custom.session": "s42"},
+        propagate=False,
+    ):
+        _llm_call()
+    spans = transforming_exporter.get_finished_spans()
+    log.info("Emitted spans: %s", [(s.name, dict(s.attributes or {})) for s in spans])
+    span_store["all_local_spans"] = spans
+
+
+@when("I invoke an agent wrapping a direct LLM call with baggage")
+def invoke_agent_wrapping_llm_with_baggage(memory_exporter, transforming_exporter, span_store):
+    with invoke_agent_span(provider="sap-aicore", agent_name="baggage-llm-agent"):
         _llm_call()
     spans = transforming_exporter.get_finished_spans()
     log.info("Emitted spans: %s", [(s.name, dict(s.attributes or {})) for s in spans])
@@ -452,6 +485,14 @@ def op_span_has_attribute_set(key, span_store):
     actual = (span.attributes or {}).get(key)
     log.info("Checking op span '%s': '%s' is set (actual: %r)", span.name, key, actual)
     assert actual is not None, f"Expected attribute '{key}' to be set on span '{span.name}', got None"
+
+
+@then(parsers.parse('that span does not have attribute "{key}"'))
+def op_span_lacks_attribute(key, span_store):
+    span = span_store["op_span"]
+    actual = (span.attributes or {}).get(key)
+    log.info("Checking op span '%s' does NOT have '%s' (actual: %r)", span.name, key, actual)
+    assert actual is None, f"Expected attribute '{key}' to be absent from '{span.name}', got {actual!r}"
 
 
 @then(parsers.parse('the span "{name}" has resource attribute "{key}" equal to "{value}"'))

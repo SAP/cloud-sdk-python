@@ -93,6 +93,21 @@ Feature: SDK telemetry instrumentation
     And that span has attribute "gen_ai.usage.input_tokens" set
 
   @aicore
+  Scenario: propagate=False does not leak invoke_agent attributes to nested LLM span
+    Given AI Core is configured via set_aicore_config
+    When I invoke an agent with propagate=False wrapping a real LLM call
+    Then a span with operation "chat" is a child of "invoke_agent no-propagate-llm-agent"
+    And that span does not have attribute "custom.session"
+
+  @aicore
+  Scenario: baggage attributes propagate to Traceloop-instrumented LLM spans
+    Given baggage key "sap.extension.capabilityId" is set to "cap-traceloop"
+    And AI Core is configured via set_aicore_config
+    When I invoke an agent wrapping a direct LLM call with baggage
+    Then a span with operation "chat" is a child of "invoke_agent baggage-llm-agent"
+    And that span has attribute "sap.extension.capabilityId" equal to "cap-traceloop"
+
+  @aicore
   Scenario: LangGraph agent run produces an invoke_agent span with LangChain child spans
     Given AI Core is configured via set_aicore_config
     When I run a LangGraph agent with provider "sap-aicore" and name "test-agent"

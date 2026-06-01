@@ -1,7 +1,7 @@
 """Step definitions for telemetry.feature."""
 
 import logging
-from contextlib import contextmanager
+import os
 
 import pytest
 from langchain_core.messages import HumanMessage
@@ -11,7 +11,11 @@ from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanE
 from opentelemetry.trace import StatusCode
 from pytest_bdd import given, parsers, scenario, then, when
 
-from sap_cloud_sdk.core.telemetry.tracer import invoke_agent_span
+from sap_cloud_sdk.core.telemetry.tracer import (
+    add_span_attribute,
+    execute_tool_span,
+    invoke_agent_span,
+)
 from ._agent import build_langgraph_agent
 
 log = logging.getLogger(__name__)
@@ -56,6 +60,26 @@ def test_propagate_false():
 
 @scenario("telemetry.feature", "baggage attributes appear on spans")
 def test_baggage_attributes():
+    pass
+
+
+@scenario("telemetry.feature", "add_span_attribute adds a custom attribute to the active span")
+def test_add_span_attribute():
+    pass
+
+
+@scenario("telemetry.feature", "invoke_agent_span wrapping a real LLM call produces a complete trace")
+def test_invoke_agent_wrapping_llm():
+    pass
+
+
+@scenario("telemetry.feature", "invoke_agent_span wrapping LLM call then tool produces a full agentic trace")
+def test_invoke_agent_llm_then_tool():
+    pass
+
+
+@scenario("telemetry.feature", "propagate=True flows invoke_agent attributes to nested LLM span")
+def test_propagate_true_to_llm_span():
     pass
 
 
@@ -151,6 +175,62 @@ def invoke_agent_with_propagation(propagate, key, value, memory_exporter, span_s
     span_store["child"] = child
 
 
+@when("I invoke an agent and add a custom attribute mid-span")
+def invoke_agent_add_custom_attr(memory_exporter, span_store):
+    with invoke_agent_span(provider="test", agent_name="custom-attr-agent"):
+        add_span_attribute("custom.response.tokens", 42)
+    span = _find_span(memory_exporter, "invoke_agent custom-attr-agent")
+    log.info("Emitted span: %s | attributes: %s", span.name, dict(span.attributes or {}))
+    span_store["last"] = span
+
+
+def _llm_call():
+    """Make a minimal real LLM call via AI Core using LangChain's LiteLLM integration.
+
+    Uses ChatLiteLLM so Traceloop's LangChain instrumentor fires and emits a span
+    with gen_ai.usage.* token counts.
+    """
+    from langchain_litellm import ChatLiteLLM
+    from langchain_core.messages import HumanMessage as LCHumanMessage
+    model_name = os.environ.get("AICORE_MODEL", "anthropic--claude-4.5-sonnet")
+    llm = ChatLiteLLM(model=f"sap/{model_name}")
+    llm.invoke([LCHumanMessage(content="Say hi in one word.")])
+
+
+@when("I invoke an agent wrapping a direct LLM call")
+def invoke_agent_wrapping_llm(memory_exporter, transforming_exporter, span_store):
+    with invoke_agent_span(provider="sap-aicore", agent_name="llm-agent"):
+        _llm_call()
+    spans = transforming_exporter.get_finished_spans()
+    log.info("Emitted spans: %s", [(s.name, dict(s.attributes or {})) for s in spans])
+    span_store["all_local_spans"] = spans
+
+
+@when("I invoke an agent that calls an LLM then executes a tool")
+def invoke_agent_llm_then_tool(memory_exporter, transforming_exporter, span_store):
+    with invoke_agent_span(provider="sap-aicore", agent_name="agent-with-tool"):
+        _llm_call()
+        with execute_tool_span(tool_name="search", tool_type="function"):
+            pass
+    spans = transforming_exporter.get_finished_spans()
+    log.info("Emitted spans: %s", [(s.name, dict(s.attributes or {})) for s in spans])
+    span_store["all_local_spans"] = spans
+
+
+@when("I invoke an agent with propagate=True wrapping a real LLM call")
+def invoke_agent_propagate_to_llm(memory_exporter, transforming_exporter, span_store):
+    with invoke_agent_span(
+        provider="sap-aicore",
+        agent_name="propagate-llm-agent",
+        attributes={"custom.session": "s42"},
+        propagate=True,
+    ):
+        _llm_call()
+    spans = transforming_exporter.get_finished_spans()
+    log.info("Emitted spans: %s", [(s.name, dict(s.attributes or {})) for s in spans])
+    span_store["all_local_spans"] = spans
+
+
 @when(parsers.parse('I run a LangGraph agent with provider "{provider}" and name "{name}"'))
 def run_langgraph_agent(provider, name, transforming_exporter, span_store):
     agent = build_langgraph_agent()
@@ -183,6 +263,14 @@ def span_has_attribute(key, value, span_store):
     actual = span.attributes.get(key)
     log.info("Checking span '%s': '%s' == '%s' (actual: %r)", span.name, key, value, actual)
     assert actual == value, f"Expected span attribute '{key}' == '{value}', got {actual!r}"
+
+
+@then(parsers.parse('the span has attribute "{key}" set'))
+def span_has_attribute_set(key, span_store):
+    span = span_store["last"]
+    actual = (span.attributes or {}).get(key)
+    log.info("Checking span '%s': '%s' is set (actual: %r)", span.name, key, actual)
+    assert actual is not None, f"Expected span attribute '{key}' to be set, got None"
 
 
 @then(parsers.parse('the span does not have attribute "{key}"'))
@@ -303,6 +391,87 @@ def no_descendant_has_exact_attribute(key, span_store):
     assert not violations, (
         f"Attribute '{key}' should have been transformed away but found on: {violations}"
     )
+
+
+@then(parsers.parse('the span "{name}" is a child of "{parent_name}"'))
+def span_is_child_of(name, parent_name, memory_exporter, span_store):
+    spans = span_store.get("all_local_spans") or memory_exporter.get_finished_spans()
+    child = _find_span_in(spans, name)
+    parent = _find_span_in(spans, parent_name)
+    assert child is not None, f"Span '{name}' not found. Available: {[s.name for s in spans]}"
+    assert parent is not None, f"Span '{parent_name}' not found. Available: {[s.name for s in spans]}"
+    parent_id = parent.get_span_context().span_id
+    log.info("Checking '%s' is child of '%s': child.parent=%s, parent.span_id=%s", name, parent_name, child.parent, parent_id)
+    assert child.parent is not None and child.parent.span_id == parent_id, (
+        f"Span '{name}' is not a child of '{parent_name}'. "
+        f"child.parent={child.parent}, expected span_id={parent_id}"
+    )
+
+
+@then(parsers.parse('the span "{name}" has attribute "{key}" equal to "{value}"'))
+def named_span_has_attribute(name, key, value, memory_exporter, span_store):
+    spans = span_store.get("all_local_spans") or memory_exporter.get_finished_spans()
+    span = _find_span_in(spans, name)
+    assert span is not None, f"Span '{name}' not found. Available: {[s.name for s in spans]}"
+    actual = span.attributes.get(key) if span.attributes else None
+    log.info("Checking span '%s': '%s' == '%s' (actual: %r)", name, key, value, actual)
+    assert str(actual) == value, f"Expected span '{name}' attribute '{key}' == '{value}', got {actual!r}"
+
+
+@then(parsers.parse('a span with operation "{operation}" is a child of "{parent_name}"'))
+def span_with_operation_is_child_of(operation, parent_name, memory_exporter, span_store):
+    spans = span_store.get("all_local_spans") or memory_exporter.get_finished_spans()
+    parent = _find_span_in(spans, parent_name)
+    assert parent is not None, f"Parent span '{parent_name}' not found. Available: {[s.name for s in spans]}"
+    parent_id = parent.get_span_context().span_id
+    child = next(
+        (s for s in spans if (s.attributes or {}).get("gen_ai.operation.name") == operation
+         and s.parent is not None and s.parent.span_id == parent_id),
+        None,
+    )
+    log.info("Checking child with operation '%s' under '%s': %s", operation, parent_name,
+             child.name if child else "NOT FOUND")
+    assert child is not None, (
+        f"No span with gen_ai.operation.name='{operation}' found as child of '{parent_name}'. "
+        f"Spans: {[(s.name, (s.attributes or {}).get('gen_ai.operation.name')) for s in spans]}"
+    )
+    span_store["op_span"] = child
+
+
+@then(parsers.parse('that span has attribute "{key}" equal to "{value}"'))
+def op_span_has_attribute_equals(key, value, span_store):
+    span = span_store["op_span"]
+    actual = (span.attributes or {}).get(key)
+    log.info("Checking op span '%s': '%s' == '%s' (actual: %r)", span.name, key, value, actual)
+    assert str(actual) == value, f"Expected attribute '{key}' == '{value}', got {actual!r}"
+
+
+@then(parsers.parse('that span has attribute "{key}" set'))
+def op_span_has_attribute_set(key, span_store):
+    span = span_store["op_span"]
+    actual = (span.attributes or {}).get(key)
+    log.info("Checking op span '%s': '%s' is set (actual: %r)", span.name, key, actual)
+    assert actual is not None, f"Expected attribute '{key}' to be set on span '{span.name}', got None"
+
+
+@then(parsers.parse('the span "{name}" has resource attribute "{key}" equal to "{value}"'))
+def named_span_resource_attr_equals(name, key, value, memory_exporter, span_store):
+    spans = span_store.get("all_local_spans") or memory_exporter.get_finished_spans()
+    span = _find_span_in(spans, name)
+    assert span is not None, f"Span '{name}' not found. Available: {[s.name for s in spans]}"
+    actual = span.resource.attributes.get(key)
+    log.info("Checking span '%s' resource '%s' == '%s' (actual: %r)", name, key, value, actual)
+    assert actual == value, f"Expected span '{name}' resource attribute '{key}' == '{value}', got {actual!r}"
+
+
+@then(parsers.parse('the span "{name}" has resource attribute "{key}" set'))
+def named_span_resource_attr_set(name, key, memory_exporter, span_store):
+    spans = span_store.get("all_local_spans") or memory_exporter.get_finished_spans()
+    span = _find_span_in(spans, name)
+    assert span is not None, f"Span '{name}' not found. Available: {[s.name for s in spans]}"
+    actual = span.resource.attributes.get(key)
+    log.info("Checking span '%s' resource '%s' is set (actual: %r)", name, key, actual)
+    assert actual, f"Expected span '{name}' resource attribute '{key}' to be set, got {actual!r}"
 
 
 # --- helpers ---

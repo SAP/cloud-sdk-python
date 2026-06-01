@@ -37,6 +37,9 @@ Feature: SDK telemetry instrumentation
     And the span resource has attribute "service.name" set
     And the span resource has attribute "cloud.region" set
     And the span resource has attribute "deployment.environment.name" set
+    And the span resource has attribute "sap.cld.subaccount_id" set
+    And the span resource has attribute "sap.cld.system_role" set
+    And the span resource has attribute "sap.solution_area" set
 
   Scenario: propagate=True flows attributes to child spans via ContextVar
     When I invoke an agent with propagate=True and attribute "custom.key" equal to "val"
@@ -51,6 +54,43 @@ Feature: SDK telemetry instrumentation
     When I invoke an agent with provider "test" and name "baggage-test"
     Then a span named "invoke_agent baggage-test" is recorded
     And the span has attribute "sap.extension.capabilityId" equal to "cap-1"
+
+  Scenario: add_span_attribute adds a custom attribute to the active span
+    When I invoke an agent and add a custom attribute mid-span
+    Then a span named "invoke_agent custom-attr-agent" is recorded
+    And the span has attribute "custom.response.tokens" set
+
+  # Real LLM call scenarios — require AI Core credentials
+
+  @aicore
+  Scenario: invoke_agent_span wrapping a real LLM call produces a complete trace
+    Given AI Core is configured via set_aicore_config
+    When I invoke an agent wrapping a direct LLM call
+    Then a span named "invoke_agent llm-agent" is recorded
+    And a span with operation "chat" is a child of "invoke_agent llm-agent"
+    And that span has attribute "gen_ai.usage.input_tokens" set
+    And that span has attribute "gen_ai.usage.output_tokens" set
+    And the span "invoke_agent llm-agent" has resource attribute "sap.cloud_sdk.name" equal to "SAP Cloud SDK for Python"
+    And the span "invoke_agent llm-agent" has resource attribute "sap.cloud_sdk.language" equal to "python"
+    And the span "invoke_agent llm-agent" has resource attribute "sap.cloud_sdk.version" set
+
+  @aicore
+  Scenario: invoke_agent_span wrapping LLM call then tool produces a full agentic trace
+    Given AI Core is configured via set_aicore_config
+    When I invoke an agent that calls an LLM then executes a tool
+    Then a span named "invoke_agent agent-with-tool" is recorded
+    And a span with operation "chat" is a child of "invoke_agent agent-with-tool"
+    And that span has attribute "gen_ai.usage.input_tokens" set
+    And the span "execute_tool search" is a child of "invoke_agent agent-with-tool"
+    And the span "execute_tool search" has attribute "gen_ai.tool.name" equal to "search"
+
+  @aicore
+  Scenario: propagate=True flows invoke_agent attributes to nested LLM span
+    Given AI Core is configured via set_aicore_config
+    When I invoke an agent with propagate=True wrapping a real LLM call
+    Then a span with operation "chat" is a child of "invoke_agent propagate-llm-agent"
+    And that span has attribute "custom.session" equal to "s42"
+    And that span has attribute "gen_ai.usage.input_tokens" set
 
   @aicore
   Scenario: LangGraph agent run produces an invoke_agent span with LangChain child spans

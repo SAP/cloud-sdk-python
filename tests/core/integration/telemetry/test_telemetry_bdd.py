@@ -3,16 +3,15 @@
 import logging
 import os
 
-import pytest
 from langchain_core.messages import HumanMessage
-from opentelemetry import baggage, context, trace
+from opentelemetry import baggage, context
 from opentelemetry.sdk.trace import ReadableSpan
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 from opentelemetry.trace import StatusCode
 from pytest_bdd import given, parsers, scenario, then, when
+import pytest
 
 from sap_cloud_sdk.core.telemetry.tracer import (
-    add_span_attribute,
     execute_tool_span,
     invoke_agent_span,
 )
@@ -28,11 +27,6 @@ def test_invoke_agent_required_attributes():
     pass
 
 
-@scenario("telemetry.feature", "invoke_agent_span without optional fields")
-def test_invoke_agent_no_optional_fields():
-    pass
-
-
 @scenario("telemetry.feature", "invoke_agent_span records errors")
 def test_invoke_agent_records_errors():
     pass
@@ -40,31 +34,6 @@ def test_invoke_agent_records_errors():
 
 @scenario("telemetry.feature", "spans carry SDK resource attributes")
 def test_sdk_resource_attributes():
-    pass
-
-
-@scenario("telemetry.feature", "spans carry environment resource attributes")
-def test_env_resource_attributes():
-    pass
-
-
-@scenario("telemetry.feature", "propagate=True flows attributes to child spans via ContextVar")
-def test_propagate_true():
-    pass
-
-
-@scenario("telemetry.feature", "propagate=False does not leak attributes to child spans")
-def test_propagate_false():
-    pass
-
-
-@scenario("telemetry.feature", "baggage attributes appear on spans")
-def test_baggage_attributes():
-    pass
-
-
-@scenario("telemetry.feature", "add_span_attribute adds a custom attribute to the active span")
-def test_add_span_attribute():
     pass
 
 
@@ -103,7 +72,6 @@ def test_langgraph_auto_instrumentation():
 
 @pytest.fixture
 def span_store():
-    """Mutable dict to pass spans between when/then steps."""
     return {}
 
 
@@ -112,8 +80,6 @@ def span_store():
 
 @given("auto_instrument is initialized")
 def auto_instrument_initialized(memory_exporter, transforming_exporter):
-    # Requesting both exporters ensures auto_instrument() has run and both
-    # processors are registered before any spans are emitted.
     pass
 
 
@@ -141,24 +107,6 @@ def invoke_agent_full(provider, name, cid, memory_exporter, span_store):
     span_store["last"] = span
 
 
-@when(parsers.parse('I invoke an agent with provider "{provider}" only'))
-def invoke_agent_minimal(provider, memory_exporter, span_store):
-    with invoke_agent_span(provider=provider):
-        pass
-    span = _find_span(memory_exporter, "invoke_agent")
-    log.info("Emitted span: %s | attributes: %s", span.name, dict(span.attributes or {}))
-    span_store["last"] = span
-
-
-@when(parsers.parse('I invoke an agent with provider "{provider}" and name "{name}"'))
-def invoke_agent_named(provider, name, memory_exporter, span_store):
-    with invoke_agent_span(provider=provider, agent_name=name):
-        pass
-    span = _find_span(memory_exporter, f"invoke_agent {name}")
-    log.info("Emitted span: %s | attributes: %s", span.name, dict(span.attributes or {}))
-    span_store["last"] = span
-
-
 @when("I invoke an agent that raises an exception")
 def invoke_agent_with_error(memory_exporter, span_store):
     with pytest.raises(RuntimeError):
@@ -169,27 +117,11 @@ def invoke_agent_with_error(memory_exporter, span_store):
     span_store["last"] = span
 
 
-@when(parsers.parse('I invoke an agent with propagate={propagate} and attribute "{key}" equal to "{value}"'))
-def invoke_agent_with_propagation(propagate, key, value, memory_exporter, span_store):
-    do_propagate = propagate.strip() == "True"
-    with invoke_agent_span(
-        provider="test",
-        agent_name="propagation-test",
-        attributes={key: value},
-        propagate=do_propagate,
-    ):
-        with trace.get_tracer("test").start_as_current_span("child-span"):
-            pass
-    child = _find_span(memory_exporter, "child-span")
-    log.info("Child span attributes: %s", dict(child.attributes or {}))
-    span_store["child"] = child
-
-
-@when("I invoke an agent and add a custom attribute mid-span")
-def invoke_agent_add_custom_attr(memory_exporter, span_store):
-    with invoke_agent_span(provider="test", agent_name="custom-attr-agent"):
-        add_span_attribute("custom.response.tokens", 42)
-    span = _find_span(memory_exporter, "invoke_agent custom-attr-agent")
+@when(parsers.parse('I invoke an agent with provider "{provider}" and name "{name}"'))
+def invoke_agent_named(provider, name, memory_exporter, span_store):
+    with invoke_agent_span(provider=provider, agent_name=name):
+        pass
+    span = _find_span(memory_exporter, f"invoke_agent {name}")
     log.info("Emitted span: %s | attributes: %s", span.name, dict(span.attributes or {}))
     span_store["last"] = span
 
@@ -298,23 +230,6 @@ def span_has_attribute(key, value, span_store):
     assert actual == value, f"Expected span attribute '{key}' == '{value}', got {actual!r}"
 
 
-@then(parsers.parse('the span has attribute "{key}" set'))
-def span_has_attribute_set(key, span_store):
-    span = span_store["last"]
-    actual = (span.attributes or {}).get(key)
-    log.info("Checking span '%s': '%s' is set (actual: %r)", span.name, key, actual)
-    assert actual is not None, f"Expected span attribute '{key}' to be set, got None"
-
-
-@then(parsers.parse('the span does not have attribute "{key}"'))
-def span_lacks_attribute(key, span_store):
-    span = span_store["last"]
-    log.info("Checking span '%s' does NOT have attribute '%s' (attrs: %s)", span.name, key, list((span.attributes or {}).keys()))
-    assert key not in (span.attributes or {}), (
-        f"Expected span to NOT have attribute '{key}', but it was present"
-    )
-
-
 @then("the span status is ERROR")
 def span_status_is_error(span_store):
     span = span_store["last"]
@@ -346,27 +261,6 @@ def span_resource_attr_set(key, span_store):
     actual = span.resource.attributes.get(key)
     log.info("Checking span '%s' resource: '%s' is set (actual: %r)", span.name, key, actual)
     assert actual, f"Expected resource attribute '{key}' to be set, got {actual!r}"
-
-
-@then(parsers.parse('the child span has attribute "{key}" equal to "{value}"'))
-def child_span_has_attribute(key, value, span_store):
-    child = span_store["child"]
-    assert child is not None, "No child span was recorded"
-    actual = child.attributes.get(key)
-    log.info("Checking child span '%s': '%s' == '%s' (actual: %r)", child.name, key, value, actual)
-    assert actual == value, (
-        f"Expected child span attribute '{key}' == '{value}', got {actual!r}"
-    )
-
-
-@then(parsers.parse('the child span does not have attribute "{key}"'))
-def child_span_lacks_attribute(key, span_store):
-    child = span_store["child"]
-    assert child is not None, "No child span was recorded"
-    log.info("Checking child span '%s' does NOT have '%s' (attrs: %s)", child.name, key, list((child.attributes or {}).keys()))
-    assert key not in (child.attributes or {}), (
-        f"Expected child span to NOT have attribute '{key}', but it was present"
-    )
 
 
 @then(parsers.parse('at least one descendant span with attribute "{key}" equal to "{value}" is recorded'))

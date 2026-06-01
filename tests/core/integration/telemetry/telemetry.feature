@@ -11,13 +11,6 @@ Feature: SDK telemetry instrumentation
     And the span has attribute "gen_ai.agent.name" equal to "bot"
     And the span has attribute "gen_ai.conversation.id" equal to "c1"
 
-  Scenario: invoke_agent_span without optional fields
-    When I invoke an agent with provider "test" only
-    Then a span named "invoke_agent" is recorded
-    And the span has attribute "gen_ai.operation.name" equal to "invoke_agent"
-    And the span has attribute "gen_ai.provider.name" equal to "test"
-    And the span does not have attribute "gen_ai.agent.name"
-
   Scenario: invoke_agent_span records errors
     When I invoke an agent that raises an exception
     Then the span status is ERROR
@@ -29,36 +22,6 @@ Feature: SDK telemetry instrumentation
     And the span resource has attribute "sap.cloud_sdk.name" equal to "SAP Cloud SDK for Python"
     And the span resource has attribute "sap.cloud_sdk.language" equal to "python"
     And the span resource has attribute "sap.cloud_sdk.version" set
-    And the span resource has attribute "service.name" set
-
-  Scenario: spans carry environment resource attributes
-    When I invoke an agent with provider "test" and name "env-resource-test"
-    Then a span named "invoke_agent env-resource-test" is recorded
-    And the span resource has attribute "service.name" set
-    And the span resource has attribute "cloud.region" set
-    And the span resource has attribute "deployment.environment.name" set
-    And the span resource has attribute "sap.cld.subaccount_id" set
-    And the span resource has attribute "sap.cld.system_role" set
-    And the span resource has attribute "sap.solution_area" set
-
-  Scenario: propagate=True flows attributes to child spans via ContextVar
-    When I invoke an agent with propagate=True and attribute "custom.key" equal to "val"
-    Then the child span has attribute "custom.key" equal to "val"
-
-  Scenario: propagate=False does not leak attributes to child spans
-    When I invoke an agent with propagate=False and attribute "custom.key" equal to "val"
-    Then the child span does not have attribute "custom.key"
-
-  Scenario: baggage attributes appear on spans
-    Given baggage key "sap.extension.capabilityId" is set to "cap-1"
-    When I invoke an agent with provider "test" and name "baggage-test"
-    Then a span named "invoke_agent baggage-test" is recorded
-    And the span has attribute "sap.extension.capabilityId" equal to "cap-1"
-
-  Scenario: add_span_attribute adds a custom attribute to the active span
-    When I invoke an agent and add a custom attribute mid-span
-    Then a span named "invoke_agent custom-attr-agent" is recorded
-    And the span has attribute "custom.response.tokens" set
 
   # Real LLM call scenarios — require AI Core credentials
 

@@ -1,9 +1,11 @@
 """Fixtures for telemetry integration tests."""
 
 import os
+from pathlib import Path
 from unittest.mock import patch
 
 import pytest
+from dotenv import load_dotenv
 from opentelemetry import trace
 from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
@@ -13,6 +15,10 @@ from sap_cloud_sdk.core.telemetry.auto_instrument import auto_instrument
 from sap_cloud_sdk.core.telemetry.genai_attribute_transformer import (
     GenAIAttributeTransformer,
 )
+
+_env_file = Path(__file__).parent.parent.parent.parent.parent / ".env_integration_tests"
+if _env_file.exists():
+    load_dotenv(_env_file, override=True)
 
 
 @pytest.fixture(scope="session")

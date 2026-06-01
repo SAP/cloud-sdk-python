@@ -1410,6 +1410,21 @@ wheels = [
 ]
 
 [[package]]
+name = "langchain-litellm"
+version = "0.6.6"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "cryptography" },
+    { name = "httpx" },
+    { name = "langchain-core" },
+    { name = "litellm" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/17/70/e1f42ceccd5fdad78ed7fd1a150c12661b63b92647d768168cd9efcdcf15/langchain_litellm-0.6.6.tar.gz", hash = "sha256:fb4399ae4c239b5bb85c19574a5bb4c17988433d48ec716e62144f0dad4a63af", size = 346225, upload-time = "2026-05-21T11:27:56.869Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/f9/d0/adda5508115c28d78b408cc8f6b1e3fa3b2cc83a551b62cd613bb705535c/langchain_litellm-0.6.6-py3-none-any.whl", hash = "sha256:d49d0353254e10e38c351d7eae3d7b34128a0d31a3a22928ac289a8987c21a30", size = 26393, upload-time = "2026-05-21T11:27:55.709Z" },
+]
+
+[[package]]
 name = "langchain-protocol"
 version = "0.0.15"
 source = { registry = "https://pypi.org/simple" }
@@ -3724,6 +3739,7 @@ dev = [
     { name = "httpx" },
     { name = "langchain-community" },
     { name = "langchain-core" },
+    { name = "langchain-litellm" },
     { name = "langgraph" },
     { name = "litellm" },
     { name = "pytest" },
@@ -3771,6 +3787,7 @@ dev = [
     { name = "httpx", specifier = ">=0.27.0" },
     { name = "langchain-community", specifier = ">=0.3.0" },
     { name = "langchain-core", specifier = ">=1.2.7" },
+    { name = "langchain-litellm", specifier = ">=0.6.6" },
     { name = "langgraph", specifier = ">=0.2.0" },
     { name = "litellm", specifier = ">=1.40.0" },
     { name = "pytest", specifier = ">=8.4.2" },

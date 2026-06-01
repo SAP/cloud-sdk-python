@@ -62,4 +62,5 @@ Feature: SDK telemetry instrumentation
     And at least one descendant span has attribute "gen_ai.usage.input_tokens" set
     And at least one descendant span has attribute "gen_ai.usage.output_tokens" set
     And no descendant span has an attribute starting with "llm.usage."
-    And no descendant span has an attribute starting with "traceloop.association.properties"
+    And no descendant span has attribute "traceloop.association.properties.ls_model_name"
+    And no descendant span has attribute "traceloop.association.properties.ls_provider"

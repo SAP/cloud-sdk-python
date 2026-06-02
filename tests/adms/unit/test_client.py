@@ -524,6 +524,27 @@ class TestAsyncJobApi:
         assert output.job_id == "job-abc"
         assert output.job_status == JobStatus.IN_PROGRESS
 
+    @pytest.mark.asyncio
+    async def test_get_status_admin_service(self, config):
+        """``use_admin_service=True`` must route through AdminService for DELETE_USER_DATA polling."""
+        fetcher = _make_token_fetcher(config)
+        mock_client = AsyncMock(spec=httpx.AsyncClient)
+        mock_client.request.return_value = _make_httpx_response(200, {
+            "JobID": "job-del",
+            "JobStatus": "COMPLETED",
+        })
+
+        http = AsyncAdmsHttp(config=config, token_fetcher=fetcher, client=mock_client)
+        http._csrf_tokens = {"": "x"}
+
+        from sap_cloud_sdk.adms.client import _AsyncJobApi as _AsyncJobApi
+        api = _AsyncJobApi(http)
+
+        await api.get_status("job-del", use_admin_service=True)
+
+        called_url = mock_client.request.call_args.kwargs["url"]
+        assert "AdminService" in str(called_url)
+
 
 # ── _DocumentApi (sync) ────────────────────────────────────────────────────────
 

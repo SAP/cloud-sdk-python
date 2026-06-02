@@ -1454,10 +1454,25 @@ class _AsyncJobApi:
         return JobOutput.from_dict(resp.json())
 
     @record_metrics(Module.ADMS, Operation.ADMS_JOBS_GET_STATUS)
-    async def get_status(self, job_id: str) -> JobOutput:
-        """Poll job status (async) — call until :meth:`JobOutput.job_status.is_terminal`."""
+    async def get_status(
+        self,
+        job_id: str,
+        *,
+        use_admin_service: bool = False,
+    ) -> JobOutput:
+        """Poll the status of a running job (async).
+
+        Args:
+            job_id: The ``job_id`` from :meth:`start_zip_download` or
+                :meth:`start_delete_user_data`.
+            use_admin_service: Set ``True`` when polling a ``DELETE_USER_DATA`` job.
+
+        Returns:
+            Current :class:`~sap_cloud_sdk.adms._models.JobOutput`.
+        """
+        service = _ADMIN_SERVICE_PATH if use_admin_service else _SERVICE_PATH
         path = f"JobStatus(JobID='{job_id}')"
-        resp = await self._http.get(path, service_base=_SERVICE_PATH)
+        resp = await self._http.get(path, service_base=service)
         return JobOutput.from_dict(resp.json())
 
 

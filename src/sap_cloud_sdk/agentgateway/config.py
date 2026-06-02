@@ -29,3 +29,10 @@ class ClientConfig:
     token_expiry_buffer_seconds: float = DEFAULT_TOKEN_EXPIRY_BUFFER_SECONDS
     max_system_token_cache_size: int = DEFAULT_MAX_SYSTEM_TOKEN_CACHE_SIZE
     max_user_token_cache_size: int = DEFAULT_MAX_USER_TOKEN_CACHE_SIZE
+
+    def __post_init__(self) -> None:
+        if self.token_expiry_buffer_seconds >= self.fallback_token_ttl_seconds:
+            raise ValueError(
+                f"token_expiry_buffer_seconds ({self.token_expiry_buffer_seconds}) "
+                f"must be less than fallback_token_ttl_seconds ({self.fallback_token_ttl_seconds})"
+            )

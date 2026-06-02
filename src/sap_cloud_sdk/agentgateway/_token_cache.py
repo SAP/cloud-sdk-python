@@ -92,7 +92,8 @@ def _parse_response_expires_at(expires_at: object) -> float | None:
     return parsed.timestamp()
 
 
-def _monotonic_expiry_from_epoch(expiry_epoch_seconds: float, buffer: float) -> float:
+def _monotonic_expiry_from_epoch(expiry_epoch_seconds: float,
+                                 buffer: float) -> float:
     """Translate a wall-clock expiry into a monotonic deadline."""
     return time.monotonic() + (expiry_epoch_seconds - time.time()) - buffer
 
@@ -160,9 +161,6 @@ class _GatewayUrlCache:
         while len(self._cache) > self._max_size:
             self._cache.popitem(last=False)
 
-    def __contains__(self, scope_key: str) -> bool:
-        return scope_key in self._cache
-
 
 class _TokenCache:
     """Per-client token cache with TTL and LRU eviction.
@@ -188,13 +186,14 @@ class _TokenCache:
             del self._system_tokens[scope_key]
         return None
 
-    def set_system_token(self, token: str, expires_at: float, scope_key: str) -> None:
+    def set_system_token(self, token: str, expires_at: float,
+                         scope_key: str) -> None:
         """Cache a system token under `scope_key`; evict LRU once size exceeds limit."""
-        self._system_tokens[scope_key] = _CachedToken(
-            token=token, expires_at=expires_at
-        )
+        self._system_tokens[scope_key] = _CachedToken(token=token,
+                                                      expires_at=expires_at)
         self._system_tokens.move_to_end(scope_key)
-        while len(self._system_tokens) > self._config.max_system_token_cache_size:
+        while len(self._system_tokens
+                  ) > self._config.max_system_token_cache_size:
             evicted, _ = self._system_tokens.popitem(last=False)
             logger.debug("System token cache full — evicted '%s'", evicted)
 
@@ -225,7 +224,8 @@ class _TokenCache:
     ) -> None:
         """Cache an exchanged user token; evict LRU once size exceeds limit."""
         key = self._hash_key(user_jwt, scope_key)
-        self._user_tokens[key] = _CachedToken(token=token, expires_at=expires_at)
+        self._user_tokens[key] = _CachedToken(token=token,
+                                              expires_at=expires_at)
         self._user_tokens.move_to_end(key)
         while len(self._user_tokens) > self._config.max_user_token_cache_size:
             evicted, _ = self._user_tokens.popitem(last=False)
@@ -251,11 +251,8 @@ class _TokenCache:
         """
         buffer = self._config.token_expiry_buffer_seconds
 
-        jwt = (
-            auth_header[7:]
-            if auth_header.lower().startswith("bearer ")
-            else auth_header
-        )
+        jwt = (auth_header[7:]
+               if auth_header.lower().startswith("bearer ") else auth_header)
         exp = _parse_jwt_exp(jwt)
         if exp is not None:
             return _monotonic_expiry_from_epoch(float(exp), buffer)

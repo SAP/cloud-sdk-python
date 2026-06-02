@@ -1522,7 +1522,7 @@ class AsyncAdmsClient:
         return self
 
     async def __aexit__(self, *_: object) -> None:
-        await self._http._client.aclose()
+        await self._http.aclose()
 
     def with_user_jwt(self, user_jwt: str) -> "AsyncAdmsClient":
         """Return a new :class:`AsyncAdmsClient` with user-context authentication.

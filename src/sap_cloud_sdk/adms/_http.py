@@ -174,7 +174,13 @@ class AdmsHttp:
         return self._token_fetcher.get_token()
 
     def _get_csrf_token(self, service_base: str | None = None) -> str:
-        """Return the CSRF token for this service root, fetching if not cached."""
+        """Return the CSRF token for this service root, fetching if not cached.
+
+        Uses ``self._session.get`` directly (not :meth:`_request`) so the
+        response status is *not* error-checked — many OData services return
+        403/405 on the bare service root yet still echo back a valid
+        ``X-CSRF-Token`` response header, which is all we need.
+        """
         key = service_base or ""
         if key in self._csrf_tokens:
             return self._csrf_tokens[key]
@@ -285,6 +291,10 @@ class AsyncAdmsHttp(AsyncHttpClient):
         self._config = config
         self._token_fetcher = token_fetcher
         self._user_jwt = user_jwt
+        # Default to owning the underlying ``httpx.AsyncClient``.  Borrowed
+        # instances created via :meth:`with_user_jwt` flip this to ``False``
+        # so they share — and do *not* close — the parent's connection pool.
+        self._owns_client = True
         _jwt = user_jwt  # capture for closure before super().__init__()
         get_token = (
             (lambda: token_fetcher.exchange_token(_jwt))
@@ -297,6 +307,14 @@ class AsyncAdmsHttp(AsyncHttpClient):
             client=client,
         )
         self._csrf_tokens: dict[str, str] = {}
+
+    async def aclose(self) -> None:
+        """Close the underlying ``httpx.AsyncClient`` if this instance owns it."""
+        if self._owns_client:
+            await self._client.aclose()
+
+    async def __aexit__(self, *args: Any) -> None:
+        await self.aclose()
 
     # ------------------------------------------------------------------
     # Public async HTTP verbs  (add service_base + CSRF on top of core)
@@ -454,14 +472,23 @@ class AsyncAdmsHttp(AsyncHttpClient):
     def with_user_jwt(self, user_jwt: str) -> "AsyncAdmsHttp":
         """Return a new :class:`AsyncAdmsHttp` configured for user-context calls.
 
+        The new instance **shares** the parent's underlying ``httpx.AsyncClient``
+        (and therefore its connection pool) and is marked as non-owning so
+        closing it is a no-op.  This avoids leaking a fresh connection pool
+        per user-scoped call (e.g. ``client.with_user_jwt(jwt)`` in a
+        request handler) while still letting the original parent close once.
+
         Args:
             user_jwt: The user's OIDC or XSUAA JWT from the inbound request.
 
         Returns:
             New :class:`AsyncAdmsHttp` for user-context calls.
         """
-        return AsyncAdmsHttp(
+        borrowed = AsyncAdmsHttp(
             config=self._config,
             token_fetcher=self._token_fetcher,
+            client=self._client,
             user_jwt=user_jwt,
         )
+        borrowed._owns_client = False
+        return borrowed

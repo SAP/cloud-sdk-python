@@ -248,6 +248,34 @@ class TestAsyncAdmsHttp:
         mock_client.aclose.assert_called_once()
 
     @pytest.mark.asyncio
+    async def test_with_user_jwt_shares_underlying_client(self, config):
+        fetcher = _make_token_fetcher(config)
+        mock_client = AsyncMock(spec=httpx.AsyncClient)
+
+        parent = AsyncAdmsHttp(config=config, token_fetcher=fetcher, client=mock_client)
+        child = parent.with_user_jwt("user-jwt-123")
+
+        # Child must share the parent's httpx client (no fresh pool allocated).
+        assert child._client is parent._client
+        # Child must not own the client; closing it is a no-op.
+        assert child._owns_client is False
+        assert parent._owns_client is True
+
+    @pytest.mark.asyncio
+    async def test_with_user_jwt_close_does_not_close_shared_client(self, config):
+        fetcher = _make_token_fetcher(config)
+        mock_client = AsyncMock(spec=httpx.AsyncClient)
+
+        parent = AsyncAdmsHttp(config=config, token_fetcher=fetcher, client=mock_client)
+        child = parent.with_user_jwt("user-jwt-123")
+
+        await child.aclose()
+        mock_client.aclose.assert_not_called()
+
+        await parent.aclose()
+        mock_client.aclose.assert_called_once()
+
+    @pytest.mark.asyncio
     async def test_user_jwt_calls_exchange_token(self, config):
         fetcher = _make_token_fetcher(config)
         mock_client = AsyncMock(spec=httpx.AsyncClient)

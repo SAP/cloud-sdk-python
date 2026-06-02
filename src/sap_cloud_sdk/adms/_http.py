@@ -32,6 +32,20 @@ _CSRF_FETCH_HEADER = "X-CSRF-Token"
 _CSRF_FETCH_VALUE = "Fetch"
 
 
+def quote_odata_string_key(value: str) -> str:
+    """Quote and escape a string value for use in an OData V4 entity key segment.
+
+    OData V4 §5.1.1.6.2 requires single-quoted string literals with embedded
+    single quotes doubled.  Without escaping, a value like ``O'Brien`` (or a
+    deliberately crafted ``'); ...``) breaks the URL or alters query intent.
+
+    Example::
+
+        path = f"Documents(DocID={quote_odata_string_key(doc_id)})"
+    """
+    return "'" + value.replace("'", "''") + "'"
+
+
 # ---------------------------------------------------------------------------
 # Sync HTTP wrapper
 # ---------------------------------------------------------------------------

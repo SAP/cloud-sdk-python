@@ -30,7 +30,7 @@ from __future__ import annotations
 import httpx
 
 from sap_cloud_sdk.adms._auth import IasTokenFetcher
-from sap_cloud_sdk.adms._http import AdmsHttp, AsyncAdmsHttp
+from sap_cloud_sdk.adms._http import AdmsHttp, AsyncAdmsHttp, quote_odata_string_key
 from sap_cloud_sdk.adms._models import (
     AllowedDomain,
     BusinessObjectNodeType,
@@ -201,7 +201,7 @@ class _DocumentApi:
 
         fn_key = (
             f"{rel_key}/DownloadDocument("
-            f"DocContentVersionID='{doc_content_version_id}')"
+            f"DocContentVersionID={quote_odata_string_key(doc_content_version_id)})"
         )
         resp = self._http.get(fn_key, service_base=_SERVICE_PATH)
         return resp.json().get("value", "")
@@ -674,7 +674,7 @@ class _ConfigurationApi:
     def delete_document_type(self, document_type_id: str) -> None:
         """Delete a document type classification."""
         self._http.delete(
-            f"DocumentType(DocumentTypeID='{document_type_id}')",
+            f"DocumentType(DocumentTypeID={quote_odata_string_key(document_type_id)})",
             service_base=_CONFIG_SERVICE_PATH,
         )
 
@@ -720,7 +720,7 @@ class _ConfigurationApi:
     ) -> None:
         """Delete a business object node type registration."""
         self._http.delete(
-            f"BusinessObjectNodeType(BusinessObjectNodeTypeUniqueID='{business_object_node_type_unique_id}')",
+            f"BusinessObjectNodeType(BusinessObjectNodeTypeUniqueID={quote_odata_string_key(business_object_node_type_unique_id)})",
             service_base=_CONFIG_SERVICE_PATH,
         )
 
@@ -839,7 +839,7 @@ class _JobApi:
             Current :class:`~sap_cloud_sdk.adms._models.JobOutput`.
         """
         service = _ADMIN_SERVICE_PATH if use_admin_service else _SERVICE_PATH
-        path = f"JobStatus(JobID='{job_id}')"
+        path = f"JobStatus(JobID={quote_odata_string_key(job_id)})"
         resp = self._http.get(path, service_base=service)
         return JobOutput.from_dict(resp.json())
 
@@ -941,7 +941,7 @@ class _AsyncDocumentApi:
 
         fn_key = (
             f"{rel_key}/DownloadDocument("
-            f"DocContentVersionID='{doc_content_version_id}')"
+            f"DocContentVersionID={quote_odata_string_key(doc_content_version_id)})"
         )
         resp = await self._http.get(fn_key, service_base=_SERVICE_PATH)
         return resp.json().get("value", "")
@@ -1316,7 +1316,7 @@ class _AsyncConfigurationApi:
     async def delete_document_type(self, document_type_id: str) -> None:
         """Async variant of :meth:`_ConfigurationApi.delete_document_type` — same semantics."""
         await self._http.delete(
-            f"DocumentType(DocumentTypeID='{document_type_id}')",
+            f"DocumentType(DocumentTypeID={quote_odata_string_key(document_type_id)})",
             service_base=_CONFIG_SERVICE_PATH,
         )
 
@@ -1362,7 +1362,7 @@ class _AsyncConfigurationApi:
     ) -> None:
         """Async variant of :meth:`_ConfigurationApi.delete_business_object_type` — same semantics."""
         await self._http.delete(
-            f"BusinessObjectNodeType(BusinessObjectNodeTypeUniqueID='{business_object_node_type_unique_id}')",
+            f"BusinessObjectNodeType(BusinessObjectNodeTypeUniqueID={quote_odata_string_key(business_object_node_type_unique_id)})",
             service_base=_CONFIG_SERVICE_PATH,
         )
 
@@ -1471,7 +1471,7 @@ class _AsyncJobApi:
             Current :class:`~sap_cloud_sdk.adms._models.JobOutput`.
         """
         service = _ADMIN_SERVICE_PATH if use_admin_service else _SERVICE_PATH
-        path = f"JobStatus(JobID='{job_id}')"
+        path = f"JobStatus(JobID={quote_odata_string_key(job_id)})"
         resp = await self._http.get(path, service_base=service)
         return JobOutput.from_dict(resp.json())
 

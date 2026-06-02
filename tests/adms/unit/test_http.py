@@ -7,7 +7,7 @@ import pytest
 import requests
 
 from sap_cloud_sdk.adms._auth import IasTokenFetcher
-from sap_cloud_sdk.adms._http import AdmsHttp
+from sap_cloud_sdk.adms._http import AdmsHttp, quote_odata_string_key
 from sap_cloud_sdk.adms.config import AdmsConfig
 from sap_cloud_sdk.adms.exceptions import DocumentNotFoundError, HttpError
 
@@ -200,3 +200,23 @@ class TestAdmsHttpUserJwt:
 
         token_fetcher.get_token.assert_called()
         token_fetcher.exchange_token.assert_not_called()
+
+
+class TestQuoteOdataStringKey:
+    def test_simple_value(self):
+        assert quote_odata_string_key("job-123") == "'job-123'"
+
+    def test_value_with_single_quote_is_doubled(self):
+        # OData V4 §5.1.1.6.2 — single quotes inside string literals must be doubled.
+        assert quote_odata_string_key("O'Brien") == "'O''Brien'"
+
+    def test_injection_attempt_is_neutralised(self):
+        # An attacker-controlled value must not break out of the quoted segment.
+        out = quote_odata_string_key("x'); DROP TABLE--")
+        assert out == "'x''); DROP TABLE--'"
+        # Result is one single-quoted literal, not two.
+        assert out.count("'") % 2 == 0
+
+    def test_empty_string(self):
+        assert quote_odata_string_key("") == "''"
+

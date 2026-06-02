@@ -124,7 +124,9 @@ def _set_baggage_processor():
 def _set_propagated_attributes_processor():
     provider = trace.get_tracer_provider()
     if not isinstance(provider, TracerProvider):
-        logger.warning("Unknown TracerProvider type. Skipping PropagatedAttributesSpanProcessor")
+        logger.warning(
+            "Unknown TracerProvider type. Skipping PropagatedAttributesSpanProcessor"
+        )
         return
 
     provider.add_span_processor(PropagatedAttributesSpanProcessor())

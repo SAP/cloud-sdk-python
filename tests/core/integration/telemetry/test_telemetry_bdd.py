@@ -1,5 +1,6 @@
 """Step definitions for telemetry.feature."""
 
+import logging
 import os
 
 from langchain_core.messages import HumanMessage
@@ -15,6 +16,8 @@ from sap_cloud_sdk.core.telemetry.tracer import (
     invoke_agent_span,
 )
 from ._agent import build_langgraph_agent
+
+log = logging.getLogger(__name__)
 
 # --- scenario bindings ---
 
@@ -99,7 +102,7 @@ def set_baggage(key, value):
 def invoke_agent_full(provider, name, cid, memory_exporter, span_store):
     with invoke_agent_span(provider=provider, agent_name=name, conversation_id=cid):
         pass
-    span_store["last"] = _find_span(memory_exporter, f"invoke_agent {name}")
+    span_store["last"] = _require_span(memory_exporter, f"invoke_agent {name}")
 
 
 @when("I invoke an agent that raises an exception")
@@ -107,14 +110,14 @@ def invoke_agent_with_error(memory_exporter, span_store):
     with pytest.raises(RuntimeError):
         with invoke_agent_span(provider="test", agent_name="error-agent"):
             raise RuntimeError("deliberate test error")
-    span_store["last"] = _find_span(memory_exporter, "invoke_agent error-agent")
+    span_store["last"] = _require_span(memory_exporter, "invoke_agent error-agent")
 
 
 @when(parsers.parse('I invoke an agent with provider "{provider}" and name "{name}"'))
 def invoke_agent_named(provider, name, memory_exporter, span_store):
     with invoke_agent_span(provider=provider, agent_name=name):
         pass
-    span_store["last"] = _find_span(memory_exporter, f"invoke_agent {name}")
+    span_store["last"] = _require_span(memory_exporter, f"invoke_agent {name}")
 
 
 def _llm_call():
@@ -134,7 +137,9 @@ def _llm_call():
 def invoke_agent_wrapping_llm(memory_exporter, transforming_exporter, span_store):
     with invoke_agent_span(provider="sap-aicore", agent_name="llm-agent"):
         _llm_call()
-    span_store["all_local_spans"] = transforming_exporter.get_finished_spans()
+    spans = transforming_exporter.get_finished_spans()
+    _log_spans(spans)
+    span_store["all_local_spans"] = spans
 
 
 @when("I invoke an agent that calls an LLM then executes a tool")
@@ -143,7 +148,9 @@ def invoke_agent_llm_then_tool(memory_exporter, transforming_exporter, span_stor
         _llm_call()
         with execute_tool_span(tool_name="search", tool_type="function"):
             pass
-    span_store["all_local_spans"] = transforming_exporter.get_finished_spans()
+    spans = transforming_exporter.get_finished_spans()
+    _log_spans(spans)
+    span_store["all_local_spans"] = spans
 
 
 @when("I invoke an agent with propagate=True wrapping a real LLM call")
@@ -155,7 +162,9 @@ def invoke_agent_propagate_to_llm(memory_exporter, transforming_exporter, span_s
         propagate=True,
     ):
         _llm_call()
-    span_store["all_local_spans"] = transforming_exporter.get_finished_spans()
+    spans = transforming_exporter.get_finished_spans()
+    _log_spans(spans)
+    span_store["all_local_spans"] = spans
 
 
 @when("I invoke an agent with propagate=False wrapping a real LLM call")
@@ -167,14 +176,18 @@ def invoke_agent_no_propagate_to_llm(memory_exporter, transforming_exporter, spa
         propagate=False,
     ):
         _llm_call()
-    span_store["all_local_spans"] = transforming_exporter.get_finished_spans()
+    spans = transforming_exporter.get_finished_spans()
+    _log_spans(spans)
+    span_store["all_local_spans"] = spans
 
 
 @when("I invoke an agent wrapping a direct LLM call with baggage")
 def invoke_agent_wrapping_llm_with_baggage(memory_exporter, transforming_exporter, span_store):
     with invoke_agent_span(provider="sap-aicore", agent_name="baggage-llm-agent"):
         _llm_call()
-    span_store["all_local_spans"] = transforming_exporter.get_finished_spans()
+    spans = transforming_exporter.get_finished_spans()
+    _log_spans(spans)
+    span_store["all_local_spans"] = spans
 
 
 @when(parsers.parse('I run a LangGraph agent with provider "{provider}" and name "{name}"'))
@@ -184,8 +197,9 @@ def run_langgraph_agent(provider, name, transforming_exporter, span_store):
         span_store["root_span_id"] = root_span.get_span_context().span_id
         agent.invoke({"messages": [HumanMessage(content="Say hello in one word.")]})
     all_spans = transforming_exporter.get_finished_spans()
+    _log_spans(all_spans)
     span_store["all_spans"] = all_spans
-    span_store["last"] = _find_span_in(all_spans, f"invoke_agent {name}")
+    span_store["last"] = _require_span_in(all_spans, f"invoke_agent {name}")
 
 
 # --- then steps ---
@@ -357,8 +371,28 @@ def _find_span(exporter: InMemorySpanExporter, name: str) -> ReadableSpan | None
     return _find_span_in(exporter.get_finished_spans(), name)
 
 
+def _require_span(exporter: InMemorySpanExporter, name: str) -> ReadableSpan:
+    spans = exporter.get_finished_spans()
+    return _require_span_in(spans, name)
+
+
 def _find_span_in(spans: list[ReadableSpan], name: str) -> ReadableSpan | None:
     return next((s for s in spans if s.name == name), None)
+
+
+def _require_span_in(spans: list[ReadableSpan], name: str) -> ReadableSpan:
+    span = _find_span_in(spans, name)
+    assert span is not None, (
+        f"No span named '{name}' found.\n"
+        f"Recorded spans: {[s.name for s in spans]}"
+    )
+    return span
+
+
+def _log_spans(spans: list[ReadableSpan]) -> None:
+    log.info("Collected %d span(s):", len(spans))
+    for s in spans:
+        log.info("  [%s] attrs=%s", s.name, dict(s.attributes or {}))
 
 
 def _get_descendants(all_spans: list[ReadableSpan], root_span_id: int) -> list[ReadableSpan]:

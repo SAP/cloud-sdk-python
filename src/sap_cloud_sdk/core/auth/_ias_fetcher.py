@@ -181,6 +181,12 @@ class IasTokenFetcher:
         if not access_token:
             raise AuthError("IAS token response is missing 'access_token'")
 
-        expires_in = int(data.get("expires_in", _DEFAULT_EXPIRES_IN))
+        raw_expires_in = data.get("expires_in", _DEFAULT_EXPIRES_IN)
+        try:
+            expires_in = int(raw_expires_in)
+        except (TypeError, ValueError) as exc:
+            raise AuthError(
+                f"IAS returned non-integer 'expires_in': {raw_expires_in!r}"
+            ) from exc
         ttl = max(expires_in - _EXPIRY_BUFFER_SECONDS, 0)
         return access_token, ttl

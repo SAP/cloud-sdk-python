@@ -93,6 +93,25 @@ class TestIasTokenFetcherCore:
         with pytest.raises(AuthError, match="token request failed"):
             fetcher.get_token()
 
+    def test_non_integer_expires_in_raises_auth_error(self, fetcher, mock_session):
+        """A misbehaving proxy/IAS response with ``expires_in: "abc"`` must
+        surface as ``AuthError`` rather than a raw ``ValueError``."""
+        resp = MagicMock()
+        resp.ok = True
+        resp.json.return_value = {"access_token": "tok", "expires_in": "not-a-number"}
+        mock_session.post.return_value = resp
+        with pytest.raises(AuthError, match="non-integer 'expires_in'"):
+            fetcher.get_token()
+
+    def test_null_expires_in_raises_auth_error(self, fetcher, mock_session):
+        """``expires_in: null`` (explicit JSON null) must surface as ``AuthError``."""
+        resp = MagicMock()
+        resp.ok = True
+        resp.json.return_value = {"access_token": "tok", "expires_in": None}
+        mock_session.post.return_value = resp
+        with pytest.raises(AuthError, match="non-integer 'expires_in'"):
+            fetcher.get_token()
+
     def test_exchange_token_uses_jwt_bearer_grant(self, fetcher, mock_session):
         mock_session.post.return_value = _make_token_response("obo-token")
         result = fetcher.exchange_token("user.jwt.here")

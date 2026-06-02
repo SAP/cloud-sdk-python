@@ -33,6 +33,12 @@ from typing import Any, Callable, Dict, Optional
 
 import httpx
 
+# Cap on ``response_text`` carried on error exceptions.  Some upstreams (e.g.
+# misconfigured ingresses) return very large HTML error bodies on failures —
+# attaching the full body to every exception leads to noisy logs and, if the
+# body embeds internal hostnames or stack traces, information disclosure.
+_RESPONSE_TEXT_TRUNCATION_LIMIT = 500
+
 
 class HttpError(Exception):
     """Raised for non-2xx HTTP responses.
@@ -253,12 +259,12 @@ class AsyncHttpClient:
             raise NotFoundError(
                 f"Resource not found: {method} {url}",
                 status_code=404,
-                response_text=resp.text,
+                response_text=resp.text[:_RESPONSE_TEXT_TRUNCATION_LIMIT],
             )
         if not resp.is_success:
             raise HttpError(
-                f"HTTP {resp.status_code}: {resp.text[:500]}",
+                f"HTTP {resp.status_code}: {resp.text[:_RESPONSE_TEXT_TRUNCATION_LIMIT]}",
                 status_code=resp.status_code,
-                response_text=resp.text,
+                response_text=resp.text[:_RESPONSE_TEXT_TRUNCATION_LIMIT],
             )
         return resp

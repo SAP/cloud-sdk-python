@@ -33,6 +33,17 @@ from sap_cloud_sdk.core.http import NotFoundError as CoreNotFoundError
 _CSRF_FETCH_HEADER = "X-CSRF-Token"
 _CSRF_FETCH_VALUE = "Fetch"
 
+# HTTP timeouts (seconds).  CSRF fetch is faster because it's a HEAD-like
+# probe to the service root that returns immediately with the token header;
+# the main request timeout covers full OData payloads which can be larger
+# and slower.
+_CSRF_FETCH_TIMEOUT_SECONDS = 10
+_REQUEST_TIMEOUT_SECONDS = 30
+
+# Cap on ``response_text`` carried on error exceptions — see
+# ``_async_client._RESPONSE_TEXT_TRUNCATION_LIMIT`` for rationale.
+_RESPONSE_TEXT_TRUNCATION_LIMIT = 500
+
 
 def quote_odata_string_key(value: str) -> str:
     """Quote and escape a string value for use in an OData V4 entity key segment.
@@ -230,7 +241,7 @@ class AdmsHttp:
                     "Authorization": f"Bearer {self._bearer_token()}",
                     _CSRF_FETCH_HEADER: _CSRF_FETCH_VALUE,
                 },
-                timeout=10,
+                timeout=_CSRF_FETCH_TIMEOUT_SECONDS,
             )
         except RequestException as exc:
             raise HttpError(f"CSRF fetch request failed: {exc}") from exc
@@ -272,7 +283,7 @@ class AdmsHttp:
                 headers=headers,
                 params=params,
                 json=json,
-                timeout=30,
+                timeout=_REQUEST_TIMEOUT_SECONDS,
             )
         except RequestException as exc:
             raise HttpError(f"ADMS request failed: {exc}") from exc
@@ -284,7 +295,7 @@ class AdmsHttp:
             raise HttpError(
                 f"ADMS service returned HTTP {resp.status_code}",
                 status_code=resp.status_code,
-                response_text=resp.text,
+                response_text=resp.text[:_RESPONSE_TEXT_TRUNCATION_LIMIT],
             )
 
         return resp
@@ -512,6 +523,7 @@ class AsyncAdmsHttp(AsyncHttpClient):
                     "Authorization": f"Bearer {bearer}",
                     _CSRF_FETCH_HEADER: _CSRF_FETCH_VALUE,
                 },
+                timeout=_CSRF_FETCH_TIMEOUT_SECONDS,
             )
         except httpx.RequestError as exc:
             raise HttpError(f"Async CSRF fetch request failed: {exc}") from exc

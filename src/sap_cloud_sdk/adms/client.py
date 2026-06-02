@@ -59,11 +59,7 @@ from sap_cloud_sdk.adms.config import (
     _SERVICE_PATH,
     load_from_env_or_mount,
 )
-from sap_cloud_sdk.adms.exceptions import (
-    ClientCreationError,
-    ConfigError,
-    ScanNotCleanError,
-)
+from sap_cloud_sdk.adms.exceptions import ScanNotCleanError
 from sap_cloud_sdk.core.auth import TokenCache
 from sap_cloud_sdk.core.telemetry import Module, Operation, record_metrics
 
@@ -1581,23 +1577,16 @@ def create_client(
 
     Raises:
         ConfigError: If the binding configuration is missing or incomplete.
-        ClientCreationError: If client instantiation fails.
+        ValueError: If ``instance`` is an empty string.
     """
-    try:
-        if instance is not None and instance == "":
-            raise ValueError(
-                "instance must not be an empty string; omit it to use 'default'"
-            )
-        binding = config or load_from_env_or_mount(instance)
-        token_fetcher = IasTokenFetcher(config=binding, cache=token_cache)
-        http = AdmsHttp(config=binding, token_fetcher=token_fetcher, user_jwt=user_jwt)
-        return AdmsClient(http)
-    except (ConfigError, ValueError):
-        raise
-    except Exception as exc:
-        raise ClientCreationError(
-            f"Failed to create ADMS client for instance '{instance or 'default'}': {exc}"
-        ) from exc
+    if instance is not None and instance == "":
+        raise ValueError(
+            "instance must not be an empty string; omit it to use 'default'"
+        )
+    binding = config or load_from_env_or_mount(instance)
+    token_fetcher = IasTokenFetcher(config=binding, cache=token_cache)
+    http = AdmsHttp(config=binding, token_fetcher=token_fetcher, user_jwt=user_jwt)
+    return AdmsClient(http)
 
 
 def create_async_client(
@@ -1623,25 +1612,18 @@ def create_async_client(
 
     Raises:
         ConfigError: If binding configuration is missing or incomplete.
-        ClientCreationError: If client instantiation fails.
+        ValueError: If ``instance`` is an empty string.
     """
-    try:
-        if instance is not None and instance == "":
-            raise ValueError(
-                "instance must not be an empty string; omit it to use 'default'"
-            )
-        binding = config or load_from_env_or_mount(instance)
-        token_fetcher = IasTokenFetcher(config=binding, cache=token_cache)
-        http = AsyncAdmsHttp(
-            config=binding,
-            token_fetcher=token_fetcher,
-            client=http_client,
-            user_jwt=user_jwt,
+    if instance is not None and instance == "":
+        raise ValueError(
+            "instance must not be an empty string; omit it to use 'default'"
         )
-        return AsyncAdmsClient(http)
-    except (ConfigError, ValueError):
-        raise
-    except Exception as exc:
-        raise ClientCreationError(
-            f"Failed to create async ADMS client for instance '{instance or 'default'}': {exc}"
-        ) from exc
+    binding = config or load_from_env_or_mount(instance)
+    token_fetcher = IasTokenFetcher(config=binding, cache=token_cache)
+    http = AsyncAdmsHttp(
+        config=binding,
+        token_fetcher=token_fetcher,
+        client=http_client,
+        user_jwt=user_jwt,
+    )
+    return AsyncAdmsClient(http)

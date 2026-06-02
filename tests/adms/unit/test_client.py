@@ -143,12 +143,17 @@ class TestCreateClientFactory:
             with pytest.raises(ConfigError, match="missing fields"):
                 create_client(instance="nonexistent-instance")
 
-    def test_wraps_unexpected_exception_in_client_creation_error(self):
+    def test_unexpected_exception_propagates_as_is(self):
+        """Real bugs (e.g. ``RuntimeError`` from internal logic) must surface
+        as themselves rather than being silently wrapped — wrapping makes
+        debugging harder and previously masked SDK programming errors as
+        "client creation failed".
+        """
         with patch(
             "sap_cloud_sdk.adms.client.load_from_env_or_mount",
             side_effect=RuntimeError("unexpected"),
         ):
-            with pytest.raises(ClientCreationError, match="Failed to create ADMS client"):
+            with pytest.raises(RuntimeError, match="unexpected"):
                 create_client(instance="bad-instance")
 
     def test_returns_adms_client_on_success(self):

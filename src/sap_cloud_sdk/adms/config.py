@@ -73,8 +73,16 @@ class _BindingData:
     resource: str = ""  # Optional IAS resource URI (app provider name)
 
     def validate(self) -> None:
-        required = ["clientid", "clientsecret", "url", "uri"]
-        missing = [f for f in required if not getattr(self, f)]
+        missing = [
+            name
+            for name, value in (
+                ("clientid", self.clientid),
+                ("clientsecret", self.clientsecret),
+                ("url", self.url),
+                ("uri", self.uri),
+            )
+            if not value
+        ]
         if missing:
             raise ConfigError(
                 f"ADMS binding is missing required fields: {', '.join(missing)}"

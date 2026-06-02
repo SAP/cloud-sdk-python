@@ -107,7 +107,9 @@ class TestRedisTokenCache:
 
         mock_redis_instance.delete.assert_called_once_with("sap_sdk:tokens:cc")
 
-    def test_get_redis_failure_returns_none(self):
+    def test_get_redis_failure_returns_none(self, caplog):
+        import logging
+
         mock_redis_cls = MagicMock()
         mock_redis_instance = MagicMock()
         mock_redis_instance.get.side_effect = Exception("Redis connection refused")
@@ -115,11 +117,18 @@ class TestRedisTokenCache:
 
         with patch.dict("sys.modules", {"redis": MagicMock(Redis=mock_redis_cls)}):
             cache = RedisTokenCache(host="localhost", ssl=False)
-            result = cache.get("cc")
+            with caplog.at_level(
+                logging.WARNING, logger="sap_cloud_sdk.core.auth._token_cache"
+            ):
+                result = cache.get("cc")
 
         assert result is None  # Non-fatal — falls through to fresh fetch
+        # Operator must have a signal that the cache is silently degrading.
+        assert any("RedisTokenCache.get failed" in r.message for r in caplog.records)
 
-    def test_set_redis_failure_is_nonfatal(self):
+    def test_set_redis_failure_is_nonfatal(self, caplog):
+        import logging
+
         mock_redis_cls = MagicMock()
         mock_redis_instance = MagicMock()
         mock_redis_instance.setex.side_effect = Exception("connection lost")
@@ -127,9 +136,16 @@ class TestRedisTokenCache:
 
         with patch.dict("sys.modules", {"redis": MagicMock(Redis=mock_redis_cls)}):
             cache = RedisTokenCache(host="localhost", ssl=False)
-            cache.set("cc", "some-token", 3540)  # Should NOT raise
+            with caplog.at_level(
+                logging.WARNING, logger="sap_cloud_sdk.core.auth._token_cache"
+            ):
+                cache.set("cc", "some-token", 3540)  # Should NOT raise
 
-    def test_delete_redis_failure_is_nonfatal(self):
+        assert any("RedisTokenCache.set failed" in r.message for r in caplog.records)
+
+    def test_delete_redis_failure_is_nonfatal(self, caplog):
+        import logging
+
         mock_redis_cls = MagicMock()
         mock_redis_instance = MagicMock()
         mock_redis_instance.delete.side_effect = Exception("connection lost")
@@ -137,7 +153,14 @@ class TestRedisTokenCache:
 
         with patch.dict("sys.modules", {"redis": MagicMock(Redis=mock_redis_cls)}):
             cache = RedisTokenCache(host="localhost", ssl=False)
-            cache.delete("cc")  # Should NOT raise
+            with caplog.at_level(
+                logging.WARNING, logger="sap_cloud_sdk.core.auth._token_cache"
+            ):
+                cache.delete("cc")  # Should NOT raise
+
+        assert any(
+            "RedisTokenCache.delete failed" in r.message for r in caplog.records
+        )
 
     def test_custom_key_prefix(self):
         mock_redis_cls = MagicMock()

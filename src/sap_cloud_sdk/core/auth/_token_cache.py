@@ -19,10 +19,13 @@ Usage::
 
 from __future__ import annotations
 
+import logging
 import threading
 import time
 from abc import ABC, abstractmethod
 from typing import Optional
+
+_log = logging.getLogger(__name__)
 
 
 class TokenCache(ABC):
@@ -149,17 +152,33 @@ class RedisTokenCache(TokenCache):
         try:
             return self._r.get(self._prefix + key)
         except Exception:
-            # On Redis failure, fall through to a fresh token fetch
+            # Cache read failures are non-fatal — the caller falls through to a
+            # fresh token fetch.  Logged at WARNING (not ERROR) because every
+            # subsequent call will hit the same misconfiguration; we want
+            # operator-visible signal, not a log flood.
+            _log.warning(
+                "RedisTokenCache.get failed for key=%r — degrading to direct fetch",
+                key,
+                exc_info=True,
+            )
             return None
 
     def set(self, key: str, token: str, ttl_seconds: int) -> None:
         try:
             self._r.setex(self._prefix + key, ttl_seconds, token)
         except Exception:
-            pass  # Cache write failure is non-fatal
+            _log.warning(
+                "RedisTokenCache.set failed for key=%r — token will not be cached",
+                key,
+                exc_info=True,
+            )
 
     def delete(self, key: str) -> None:
         try:
             self._r.delete(self._prefix + key)
         except Exception:
-            pass
+            _log.warning(
+                "RedisTokenCache.delete failed for key=%r",
+                key,
+                exc_info=True,
+            )

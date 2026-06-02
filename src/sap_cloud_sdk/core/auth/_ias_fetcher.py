@@ -36,6 +36,9 @@ _DEFAULT_EXPIRES_IN = 3600
 # Default cache key for the client_credentials token.
 _CC_CACHE_KEY = "cc"
 
+# HTTP timeout (seconds) for IAS token endpoint requests.
+_TOKEN_REQUEST_TIMEOUT_SECONDS = 10
+
 
 class AuthError(Exception):
     """Raised when IAS token acquisition or exchange fails."""
@@ -155,7 +158,11 @@ class IasTokenFetcher:
             A ``(access_token, ttl_seconds)`` tuple.
         """
         try:
-            resp = self._session.post(self._token_url, data=payload, timeout=10)
+            resp = self._session.post(
+                self._token_url,
+                data=payload,
+                timeout=_TOKEN_REQUEST_TIMEOUT_SECONDS,
+            )
         except requests.RequestException as exc:
             raise AuthError(f"IAS token request failed: {exc}") from exc
 

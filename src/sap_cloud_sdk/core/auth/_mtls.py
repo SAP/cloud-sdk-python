@@ -44,6 +44,7 @@ Usage::
 
 from __future__ import annotations
 
+import logging
 import os
 import ssl
 import tempfile
@@ -52,6 +53,8 @@ from typing import Optional
 
 import httpx
 import requests
+
+_log = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -83,14 +86,68 @@ class MTLSStrategy:
 
     Then call :meth:`apply_to_session` or :meth:`apply_to_async_client` to
     create an HTTP client pre-configured with the certificate.
+
+    Lifecycle:
+        :meth:`apply_to_session` writes the client cert and key to temp files
+        because ``requests`` only accepts file paths.  Those files contain
+        private-key material and should be removed as soon as the session is
+        no longer needed.
+
+        Prefer using the strategy as a context manager so cleanup is
+        deterministic::
+
+            with MTLSStrategy.from_binding_path(...) as strategy:
+                session = strategy.apply_to_session()
+                resp = session.get(...)
+            # temp key files have been deleted here
+
+        Or call :meth:`close` explicitly when the strategy is owned by a
+        longer-lived object.  ``__del__`` is retained as a best-effort
+        safety net only — relying on it can leak private-key bytes on
+        shared ``/tmp`` mounts when GC is delayed (long-lived containers,
+        interpreter shutdown).
     """
 
     def __init__(self, config: MTLSConfig) -> None:
         self._config = config
         self._session_temp_files: list[str] = []
+        self._closed = False
+
+    def close(self) -> None:
+        """Delete any temp files written for ``requests.Session`` cert paths.
+
+        Idempotent — calling more than once is safe.  After ``close()`` the
+        strategy may still be reused (e.g. another :meth:`apply_to_session`
+        call), and any new temp files are tracked the same way.
+        """
+        if self._closed:
+            return
+        for path in self._session_temp_files:
+            try:
+                os.unlink(path)
+            except OSError:
+                pass
+        self._session_temp_files.clear()
+        self._closed = True
+
+    def __enter__(self) -> "MTLSStrategy":
+        # A reuse after close() is fine — clear the flag so close() runs again on exit.
+        self._closed = False
+        return self
+
+    def __exit__(self, exc_type, exc, tb) -> None:
+        self.close()
 
     def __del__(self) -> None:
-        """Delete any temp files written for requests.Session cert paths."""
+        """Best-effort safety net for callers that did not call :meth:`close`."""
+        if self._closed or not self._session_temp_files:
+            return
+        _log.debug(
+            "MTLSStrategy garbage-collected without explicit close(); "
+            "cleaning up %d temp file(s). Prefer 'with MTLSStrategy(...)' "
+            "or strategy.close() for deterministic cleanup.",
+            len(self._session_temp_files),
+        )
         for path in self._session_temp_files:
             try:
                 os.unlink(path)
@@ -288,6 +345,8 @@ class MTLSStrategy:
         """Write *content* to a temp file, track the path for later cleanup."""
         path = _write_temp(content, suffix)
         self._session_temp_files.append(path)
+        # Re-arm cleanup for the new files even after a prior close().
+        self._closed = False
         return path
 
 

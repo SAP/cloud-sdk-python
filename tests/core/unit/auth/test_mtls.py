@@ -194,3 +194,61 @@ class TestHelpers:
     def test_require_env_returns_value(self, monkeypatch):
         monkeypatch.setenv("MY_VAR", "/some/path")
         assert _require_env("MY_VAR") == "/some/path"
+
+
+class TestMTLSStrategyLifecycle:
+    def test_close_deletes_tracked_temp_files(self):
+        s = MTLSStrategy.from_pem(_FAKE_CERT, _FAKE_KEY)
+        session = s.apply_to_session()
+        cert_path, key_path = session.cert  # type: ignore[misc]
+        assert os.path.exists(cert_path)
+        assert os.path.exists(key_path)
+
+        s.close()
+
+        assert not os.path.exists(cert_path)
+        assert not os.path.exists(key_path)
+
+    def test_close_is_idempotent(self):
+        s = MTLSStrategy.from_pem(_FAKE_CERT, _FAKE_KEY)
+        s.apply_to_session()
+        s.close()
+        s.close()  # second call must not raise
+
+    def test_context_manager_cleans_up_on_exit(self):
+        cert_path = key_path = None
+        with MTLSStrategy.from_pem(_FAKE_CERT, _FAKE_KEY) as strategy:
+            session = strategy.apply_to_session()
+            cert_path, key_path = session.cert  # type: ignore[misc]
+            assert os.path.exists(cert_path)
+
+        assert not os.path.exists(cert_path)
+        assert not os.path.exists(key_path)
+
+    def test_context_manager_cleans_up_on_exception(self):
+        cert_path = key_path = None
+        with pytest.raises(RuntimeError, match="boom"):
+            with MTLSStrategy.from_pem(_FAKE_CERT, _FAKE_KEY) as strategy:
+                session = strategy.apply_to_session()
+                cert_path, key_path = session.cert  # type: ignore[misc]
+                raise RuntimeError("boom")
+
+        assert not os.path.exists(cert_path)
+        assert not os.path.exists(key_path)
+
+    def test_reuse_after_close_tracks_new_files(self):
+        s = MTLSStrategy.from_pem(_FAKE_CERT, _FAKE_KEY)
+        first = s.apply_to_session()
+        first_paths = first.cert
+        s.close()
+        for p in first_paths:  # type: ignore[union-attr]
+            assert not os.path.exists(p)
+
+        second = s.apply_to_session()
+        second_paths = second.cert
+        assert second_paths != first_paths
+        for p in second_paths:  # type: ignore[union-attr]
+            assert os.path.exists(p)
+        s.close()
+        for p in second_paths:  # type: ignore[union-attr]
+            assert not os.path.exists(p)

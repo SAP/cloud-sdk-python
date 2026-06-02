@@ -59,7 +59,7 @@ class IasTokenFetcher(_CoreIasTokenFetcher):
             client_secret=config.client_secret,
             session=session,
             cache=cache,
-            resource=getattr(config, "resource", None),
+            resource=config.resource,
         )
 
     def get_token(self) -> str:

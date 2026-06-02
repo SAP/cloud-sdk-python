@@ -93,11 +93,11 @@ __all__ = [
     # config
     "AdmsConfig",
     # exceptions
+    "AdmsError",
+    "AdmsOperationError",
     "AuthError",
     "ClientCreationError",
     "ConfigError",
-    "AdmsError",
-    "AdmsOperationError",
     "DocumentNotFoundError",
     "HttpError",
     "ScanNotCleanError",

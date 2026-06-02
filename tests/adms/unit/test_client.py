@@ -266,6 +266,74 @@ class TestAsyncAdmsHttp:
         call_kwargs = mock_client.request.call_args[1]
         assert call_kwargs["headers"]["Authorization"] == "Bearer user-bearer-token"
 
+    @pytest.mark.asyncio
+    async def test_post_403_evicts_csrf_and_retries_once(self, config):
+        fetcher = _make_token_fetcher(config)
+        mock_client = AsyncMock(spec=httpx.AsyncClient)
+        # Two CSRF fetches via raw GET on the service root.
+        mock_client.get.side_effect = [
+            _make_httpx_response(200, {}, headers={"X-CSRF-Token": "stale"}),
+            _make_httpx_response(200, {}, headers={"X-CSRF-Token": "fresh"}),
+        ]
+        mock_client.request.side_effect = [
+            _make_httpx_response(403, {"error": "csrf"}),
+            _make_httpx_response(200, {"ok": True}),
+        ]
+
+        http = AsyncAdmsHttp(config=config, token_fetcher=fetcher, client=mock_client)
+        resp = await http.post(
+            "Action", json={"x": 1}, service_base="odata/v4/DocumentService"
+        )
+
+        assert resp.status_code == 200
+        assert mock_client.get.call_count == 2
+        assert mock_client.request.call_count == 2
+        assert (
+            mock_client.request.call_args_list[1][1]["headers"]["X-CSRF-Token"]
+            == "fresh"
+        )
+
+    @pytest.mark.asyncio
+    async def test_post_403_after_retry_raises(self, config):
+        fetcher = _make_token_fetcher(config)
+        mock_client = AsyncMock(spec=httpx.AsyncClient)
+        mock_client.get.side_effect = [
+            _make_httpx_response(200, {}, headers={"X-CSRF-Token": "first"}),
+            _make_httpx_response(200, {}, headers={"X-CSRF-Token": "second"}),
+        ]
+        mock_client.request.return_value = _make_httpx_response(
+            403, {"error": "denied"}
+        )
+
+        http = AsyncAdmsHttp(config=config, token_fetcher=fetcher, client=mock_client)
+        with pytest.raises(HttpError) as exc_info:
+            await http.post(
+                "Action", json={}, service_base="odata/v4/DocumentService"
+            )
+
+        assert exc_info.value.status_code == 403
+        assert mock_client.request.call_count == 2  # exactly one retry
+
+    @pytest.mark.asyncio
+    async def test_post_non_403_error_is_not_retried(self, config):
+        fetcher = _make_token_fetcher(config)
+        mock_client = AsyncMock(spec=httpx.AsyncClient)
+        mock_client.get.return_value = _make_httpx_response(
+            200, {}, headers={"X-CSRF-Token": "csrf"}
+        )
+        mock_client.request.return_value = _make_httpx_response(
+            500, {"error": "boom"}
+        )
+
+        http = AsyncAdmsHttp(config=config, token_fetcher=fetcher, client=mock_client)
+        with pytest.raises(HttpError) as exc_info:
+            await http.post(
+                "Action", json={}, service_base="odata/v4/DocumentService"
+            )
+
+        assert exc_info.value.status_code == 500
+        assert mock_client.request.call_count == 1  # no retry on non-403
+
 
 # ── AsyncAdmsClient ───────────────────────────────────────────────────────────
 

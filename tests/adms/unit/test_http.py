@@ -120,6 +120,59 @@ class TestAdmsHttpPost:
         # CSRF fetch should only happen once
         assert session.get.call_count == 1
 
+    def test_403_evicts_csrf_and_retries_once(self, config, token_fetcher):
+        session = MagicMock(spec=requests.Session)
+        # Two CSRF fetches: stale, then fresh.
+        session.get.side_effect = [
+            _make_resp(200, headers={"X-CSRF-Token": "stale"}),
+            _make_resp(200, headers={"X-CSRF-Token": "fresh"}),
+        ]
+        # First POST returns 403 (CSRF expired); retry succeeds.
+        session.request.side_effect = [
+            _make_resp(403, json_data={"error": "csrf"}),
+            _make_resp(200, json_data={"ok": True}),
+        ]
+
+        http = AdmsHttp(config=config, token_fetcher=token_fetcher, session=session)
+        resp = http.post(
+            "Action", json={"x": 1}, service_base="/odata/v4/DocumentService"
+        )
+
+        assert resp.status_code == 200
+        assert session.get.call_count == 2
+        assert session.request.call_count == 2
+        assert (
+            session.request.call_args_list[1][1]["headers"]["X-CSRF-Token"] == "fresh"
+        )
+
+    def test_403_after_retry_raises(self, config, token_fetcher):
+        session = MagicMock(spec=requests.Session)
+        session.get.side_effect = [
+            _make_resp(200, headers={"X-CSRF-Token": "first"}),
+            _make_resp(200, headers={"X-CSRF-Token": "second"}),
+        ]
+        # Both attempts return 403.
+        session.request.return_value = _make_resp(403, json_data={"error": "denied"})
+
+        http = AdmsHttp(config=config, token_fetcher=token_fetcher, session=session)
+        with pytest.raises(HttpError) as exc_info:
+            http.post("Action", json={}, service_base="/odata/v4/DocumentService")
+
+        assert exc_info.value.status_code == 403
+        assert session.request.call_count == 2  # exactly one retry
+
+    def test_non_403_error_is_not_retried(self, config, token_fetcher):
+        session = MagicMock(spec=requests.Session)
+        session.get.return_value = _make_resp(200, headers={"X-CSRF-Token": "csrf"})
+        session.request.return_value = _make_resp(500, json_data={"error": "boom"})
+
+        http = AdmsHttp(config=config, token_fetcher=token_fetcher, session=session)
+        with pytest.raises(HttpError) as exc_info:
+            http.post("Action", json={}, service_base="/odata/v4/DocumentService")
+
+        assert exc_info.value.status_code == 500
+        assert session.request.call_count == 1  # no retry on non-403
+
 
 class TestAdmsHttpUserJwt:
     def test_user_jwt_uses_exchange_token(self, config, token_fetcher):

@@ -102,14 +102,8 @@ class AdmsHttp:
         params: dict[str, Any] | None = None,
         service_base: str | None = None,
     ) -> Response:
-        csrf = self._get_csrf_token(service_base)
-        return self._request(
-            "POST",
-            path,
-            json=json,
-            params=params,
-            service_base=service_base,
-            extra_headers={_CSRF_FETCH_HEADER: csrf},
+        return self._send_with_csrf(
+            "POST", path, json=json, params=params, service_base=service_base
         )
 
     def delete(
@@ -119,13 +113,8 @@ class AdmsHttp:
         params: dict[str, Any] | None = None,
         service_base: str | None = None,
     ) -> Response:
-        csrf = self._get_csrf_token(service_base)
-        return self._request(
-            "DELETE",
-            path,
-            params=params,
-            service_base=service_base,
-            extra_headers={_CSRF_FETCH_HEADER: csrf},
+        return self._send_with_csrf(
+            "DELETE", path, params=params, service_base=service_base
         )
 
     def patch(
@@ -136,15 +125,44 @@ class AdmsHttp:
         params: dict[str, Any] | None = None,
         service_base: str | None = None,
     ) -> Response:
-        csrf = self._get_csrf_token(service_base)
-        return self._request(
-            "PATCH",
-            path,
-            json=json,
-            params=params,
-            service_base=service_base,
-            extra_headers={_CSRF_FETCH_HEADER: csrf},
+        return self._send_with_csrf(
+            "PATCH", path, json=json, params=params, service_base=service_base
         )
+
+    def _send_with_csrf(
+        self,
+        method: str,
+        path: str,
+        *,
+        json: Any | None = None,
+        params: dict[str, Any] | None = None,
+        service_base: str | None = None,
+    ) -> Response:
+        csrf = self._get_csrf_token(service_base)
+        try:
+            return self._request(
+                method,
+                path,
+                json=json,
+                params=params,
+                service_base=service_base,
+                extra_headers={_CSRF_FETCH_HEADER: csrf},
+            )
+        except HttpError as exc:
+            if exc.status_code != 403:
+                raise
+            # CSRF tokens have server-side TTLs; on 403, evict the cached token,
+            # re-fetch, and retry once before giving up.
+            self._csrf_tokens.pop(service_base or "", None)
+            csrf = self._get_csrf_token(service_base)
+            return self._request(
+                method,
+                path,
+                json=json,
+                params=params,
+                service_base=service_base,
+                extra_headers={_CSRF_FETCH_HEADER: csrf},
+            )
 
     # ------------------------------------------------------------------
     # Internal
@@ -303,13 +321,8 @@ class AsyncAdmsHttp(AsyncHttpClient):
         params: dict[str, Any] | None = None,
         service_base: str | None = None,
     ) -> httpx.Response:
-        csrf = await self._get_csrf_token(service_base)
-        return await self._request(
-            "POST",
-            self._prefixed(path, service_base),
-            json=json,
-            params=params,
-            extra_headers={_CSRF_FETCH_HEADER: csrf},
+        return await self._send_with_csrf(
+            "POST", path, json=json, params=params, service_base=service_base
         )
 
     async def delete(  # type: ignore[override]
@@ -319,12 +332,8 @@ class AsyncAdmsHttp(AsyncHttpClient):
         params: dict[str, Any] | None = None,
         service_base: str | None = None,
     ) -> httpx.Response:
-        csrf = await self._get_csrf_token(service_base)
-        return await self._request(
-            "DELETE",
-            self._prefixed(path, service_base),
-            params=params,
-            extra_headers={_CSRF_FETCH_HEADER: csrf},
+        return await self._send_with_csrf(
+            "DELETE", path, params=params, service_base=service_base
         )
 
     async def patch(  # type: ignore[override]
@@ -335,14 +344,42 @@ class AsyncAdmsHttp(AsyncHttpClient):
         params: dict[str, Any] | None = None,
         service_base: str | None = None,
     ) -> httpx.Response:
-        csrf = await self._get_csrf_token(service_base)
-        return await self._request(
-            "PATCH",
-            self._prefixed(path, service_base),
-            json=json,
-            params=params,
-            extra_headers={_CSRF_FETCH_HEADER: csrf},
+        return await self._send_with_csrf(
+            "PATCH", path, json=json, params=params, service_base=service_base
         )
+
+    async def _send_with_csrf(
+        self,
+        method: str,
+        path: str,
+        *,
+        json: Any | None = None,
+        params: dict[str, Any] | None = None,
+        service_base: str | None = None,
+    ) -> httpx.Response:
+        csrf = await self._get_csrf_token(service_base)
+        try:
+            return await self._request(
+                method,
+                self._prefixed(path, service_base),
+                json=json,
+                params=params,
+                extra_headers={_CSRF_FETCH_HEADER: csrf},
+            )
+        except HttpError as exc:
+            if exc.status_code != 403:
+                raise
+            # CSRF tokens have server-side TTLs; on 403, evict the cached token,
+            # re-fetch, and retry once before giving up.
+            self._csrf_tokens.pop(service_base or "", None)
+            csrf = await self._get_csrf_token(service_base)
+            return await self._request(
+                method,
+                self._prefixed(path, service_base),
+                json=json,
+                params=params,
+                extra_headers={_CSRF_FETCH_HEADER: csrf},
+            )
 
     # ------------------------------------------------------------------
     # Internal

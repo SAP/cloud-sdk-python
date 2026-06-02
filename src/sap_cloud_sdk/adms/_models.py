@@ -439,6 +439,7 @@ class DraftInput:
     host_business_object_node_id: str
 
     def to_odata_dict(self) -> dict:
+        """Serialise to the OData payload shape expected by ADM."""
         return {
             "BusinessObjectNodeTypeUniqueID": self.business_object_node_type_unique_id,
             "HostBusinessObjectNodeID": self.host_business_object_node_id,
@@ -455,6 +456,7 @@ class DraftActivateInput(DraftInput):
     late_host_business_object_node_id: str | None = None
 
     def to_odata_dict(self) -> dict:
+        """Serialise to the OData payload shape expected by ADM (extends parent with the optional ``LateHostBusinessObjectNodeID`` field)."""
         out = super().to_odata_dict()
         if self.late_host_business_object_node_id is not None:
             out["LateHostBusinessObjectNodeID"] = self.late_host_business_object_node_id
@@ -497,6 +499,7 @@ class AllowedDomain:
         )
 
     def to_odata_dict(self) -> dict:
+        """Serialise to the OData payload shape expected by ADM."""
         d: dict = {
             "AllowedDomainHostName": self.allowed_domain_host_name,
             "AllowedDomainProtocol": self.allowed_domain_protocol,
@@ -523,6 +526,7 @@ class CreateAllowedDomainInput:
     port: int | None = None
 
     def to_odata_dict(self) -> dict:
+        """Serialise to the OData payload shape expected by ADM."""
         d: dict = {
             "AllowedDomainHostName": self.host_name,
             "AllowedDomainProtocol": self.protocol,
@@ -558,6 +562,7 @@ class DocumentTypeText:
         )
 
     def to_odata_dict(self) -> dict:
+        """Serialise to the OData payload shape expected by ADM."""
         return {
             "locale": self.locale,
             "DocumentTypeID": self.document_type_id,
@@ -591,6 +596,7 @@ class DocumentType:
         )
 
     def to_odata_dict(self) -> dict:
+        """Serialise to the OData payload shape expected by ADM."""
         d: dict = {
             "DocumentTypeID": self.document_type_id,
             "DocumentTypeName": self.document_type_name,
@@ -628,6 +634,7 @@ class CreateDocumentTypeInput:
     texts: list[DocumentTypeText] | None = None
 
     def to_odata_dict(self) -> dict:
+        """Serialise to the OData payload shape expected by ADM."""
         d: dict = {
             "DocumentTypeID": self.document_type_id,
             "DocumentTypeName": self.document_type_name,
@@ -671,6 +678,7 @@ class BusinessObjectNodeType:
         )
 
     def to_odata_dict(self) -> dict:
+        """Serialise to the OData payload shape expected by ADM."""
         d: dict = {
             "BusinessObjectNodeTypeID": self.business_object_node_type_id,
             "BusinessObjectNodeTypeName": self.business_object_node_type_name,
@@ -695,6 +703,7 @@ class CreateBusinessObjectNodeTypeInput:
     business_object_type_id: str | None = None
 
     def to_odata_dict(self) -> dict:
+        """Serialise to the OData payload shape expected by ADM."""
         d: dict = {
             "BusinessObjectNodeTypeID": self.business_object_node_type_id,
             "BusinessObjectNodeTypeName": self.business_object_node_type_name,
@@ -735,6 +744,7 @@ class DocumentTypeBusinessObjectTypeMap:
         )
 
     def to_odata_dict(self) -> dict:
+        """Serialise to the OData payload shape expected by ADM."""
         return {
             "BusinessObjectNodeTypeUniqueID": self.business_object_node_type_unique_id,
             "DocumentTypeID": self.document_type_id,
@@ -757,6 +767,7 @@ class CreateDocumentTypeBoTypeMapInput:
     is_default: bool = False
 
     def to_odata_dict(self) -> dict:
+        """Serialise to the OData payload shape expected by ADM."""
         return {
             "BusinessObjectNodeTypeUniqueID": self.business_object_node_type_unique_id,
             "DocumentTypeID": self.document_type_id,
@@ -790,6 +801,7 @@ class ZipDownloadJobParameters:
     document_relation_ids: list[str] = field(default_factory=list)
 
     def to_odata_dict(self) -> dict[str, Any]:
+        """Serialise to the OData payload shape expected by ADM."""
         return {
             "BusinessObjectNodeTypeUniqueID": self.business_object_node_type_unique_id,
             "HostBusinessObjectNodeID": self.host_business_object_node_id,
@@ -815,6 +827,7 @@ class DeleteUserDataJobParameters:
     replacement_user_id: str | None = None
 
     def to_odata_dict(self) -> dict[str, Any]:
+        """Serialise to the OData payload shape expected by ADM."""
         out: dict[str, Any] = {"UserID": self.user_id}
         if self.replacement_user_id is not None:
             out["ReplacementUserID"] = self.replacement_user_id
@@ -834,6 +847,7 @@ class JobInput:
     job_parameters: dict[str, Any] = field(default_factory=dict)
 
     def to_odata_dict(self) -> dict:
+        """Serialise to the OData payload shape expected by ADM."""
         return {
             "JobInput": {
                 "JobType": self.job_type.value,

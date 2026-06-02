@@ -50,6 +50,26 @@ class TestAsyncHttpClientContextManager:
             pass
         mock_httpx_client.aclose.assert_awaited_once()
 
+    @pytest.mark.asyncio
+    async def test_aexit_closes_client_on_exception(self, mock_httpx_client):
+        c = AsyncHttpClient(base_url="https://api.example.com", client=mock_httpx_client)
+        with pytest.raises(RuntimeError, match="boom"):
+            async with c:
+                raise RuntimeError("boom")
+        mock_httpx_client.aclose.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_aclose_is_idempotent(self):
+        # Use a real httpx.AsyncClient — its aclose() must tolerate repeated calls
+        # because the context-manager protocol can result in double-cleanup
+        # (explicit aclose + __aexit__) in caller code.
+        real_client = httpx.AsyncClient()
+        c = AsyncHttpClient(base_url="https://api.example.com", client=real_client)
+        async with c:
+            pass
+        # Second close after __aexit__ already ran — must not raise.
+        await real_client.aclose()
+
 
 class TestAsyncHttpClientGet:
     @pytest.mark.asyncio

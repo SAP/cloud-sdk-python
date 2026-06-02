@@ -253,6 +253,30 @@ class TestAsyncAdmsHttp:
         mock_client.aclose.assert_called_once()
 
     @pytest.mark.asyncio
+    async def test_context_manager_closes_client_on_exception(self, config):
+        fetcher = _make_token_fetcher(config)
+        mock_client = AsyncMock(spec=httpx.AsyncClient)
+
+        with pytest.raises(RuntimeError, match="boom"):
+            async with AsyncAdmsHttp(config=config, token_fetcher=fetcher, client=mock_client):
+                raise RuntimeError("boom")
+
+        mock_client.aclose.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_aclose_idempotent_on_owned_client(self, config):
+        fetcher = _make_token_fetcher(config)
+        mock_client = AsyncMock(spec=httpx.AsyncClient)
+
+        http = AsyncAdmsHttp(config=config, token_fetcher=fetcher, client=mock_client)
+        await http.aclose()
+        await http.aclose()  # second call must not raise; httpx tolerates double aclose
+
+        # The owned client may be closed once or twice — both are valid.
+        # What matters is no exception is propagated.
+        assert mock_client.aclose.await_count >= 1
+
+    @pytest.mark.asyncio
     async def test_with_user_jwt_shares_underlying_client(self, config):
         fetcher = _make_token_fetcher(config)
         mock_client = AsyncMock(spec=httpx.AsyncClient)

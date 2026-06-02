@@ -14,6 +14,8 @@ Both handle:
 
 from __future__ import annotations
 
+import asyncio
+import threading
 from typing import Any
 
 import httpx
@@ -59,6 +61,11 @@ class AdmsHttp:
     * CSRF token fetch-and-carry for mutating requests, cached per service root.
     * Consistent error propagation.
 
+    Thread-safe: a single instance may be shared across threads.  Internal
+    state (the CSRF token cache) is guarded by a :class:`threading.Lock`,
+    matching the thread-safety guarantee of the underlying
+    :class:`requests.Session`.
+
     Args:
         config: AdmsConfig with service URL and IAS credentials.
         token_fetcher: IasTokenFetcher instance (injected for testability).
@@ -78,6 +85,12 @@ class AdmsHttp:
         self._session = session or requests.Session()
         self._user_jwt = user_jwt
         self._csrf_tokens: dict[str, str] = {}
+        # Guards the _csrf_tokens dict.  ``AdmsHttp`` is documented as safe to
+        # share across threads (matching ``requests.Session``); without this
+        # lock the read-then-fetch-then-write sequence in ``_get_csrf_token``
+        # races, leading to duplicate CSRF fetches and — on the 403-retry
+        # path — readers using a token that has just been evicted.
+        self._csrf_lock = threading.Lock()
 
     def with_user_jwt(self, user_jwt: str) -> "AdmsHttp":
         """Return a new :class:`AdmsHttp` configured for user-context calls.
@@ -167,7 +180,9 @@ class AdmsHttp:
                 raise
             # CSRF tokens have server-side TTLs; on 403, evict the cached token,
             # re-fetch, and retry once before giving up.
-            self._csrf_tokens.pop(service_base or "", None)
+            with self._csrf_lock:
+                if self._csrf_tokens.get(service_base or "") == csrf:
+                    self._csrf_tokens.pop(service_base or "", None)
             csrf = self._get_csrf_token(service_base)
             return self._request(
                 method,
@@ -194,10 +209,17 @@ class AdmsHttp:
         response status is *not* error-checked — many OData services return
         403/405 on the bare service root yet still echo back a valid
         ``X-CSRF-Token`` response header, which is all we need.
+
+        Thread-safe: reads and writes to ``self._csrf_tokens`` are guarded
+        by ``self._csrf_lock``; the network fetch is performed *outside* the
+        lock so it does not block sibling threads.  On a cold cache, parallel
+        callers may each issue their own fetch — ``setdefault`` ensures only
+        the first writer wins, so all callers observe the same token.
         """
         key = service_base or ""
-        if key in self._csrf_tokens:
-            return self._csrf_tokens[key]
+        with self._csrf_lock:
+            if key in self._csrf_tokens:
+                return self._csrf_tokens[key]
 
         base = self._resolve_base(service_base)
         url = f"{base}/"
@@ -214,8 +236,10 @@ class AdmsHttp:
             raise HttpError(f"CSRF fetch request failed: {exc}") from exc
 
         csrf = resp.headers.get(_CSRF_FETCH_HEADER, "")
-        self._csrf_tokens[key] = csrf
-        return csrf
+        with self._csrf_lock:
+            # If a sibling thread populated the cache while we were fetching,
+            # honour their value rather than overwriting it.
+            return self._csrf_tokens.setdefault(key, csrf)
 
     def _resolve_base(self, service_base: str | None) -> str:
         svc = service_base or ""
@@ -282,6 +306,10 @@ class AsyncAdmsHttp(AsyncHttpClient):
     * Mapping of core :class:`~sap_cloud_sdk.core.http.HttpError` /
       :class:`~sap_cloud_sdk.core.http.NotFoundError` to ADMS-specific types.
 
+    Coroutine-safe: a single instance may be shared across concurrent
+    coroutines on the same event loop.  The CSRF token cache is guarded
+    by :class:`asyncio.Lock`.
+
     Use as an async context manager to ensure the underlying ``httpx.AsyncClient``
     is properly closed::
 
@@ -321,6 +349,12 @@ class AsyncAdmsHttp(AsyncHttpClient):
             client=client,
         )
         self._csrf_tokens: dict[str, str] = {}
+        # Guards the _csrf_tokens dict.  asyncio is single-threaded, but
+        # parallel coroutines can still race (read miss → fetch → write
+        # while a sibling fetched concurrently).  Combined with ``setdefault``
+        # below, the lock ensures only the first writer wins so all callers
+        # observe the same token.
+        self._csrf_lock = asyncio.Lock()
 
     async def aclose(self) -> None:
         """Close the underlying ``httpx.AsyncClient`` if this instance owns it."""
@@ -403,7 +437,9 @@ class AsyncAdmsHttp(AsyncHttpClient):
                 raise
             # CSRF tokens have server-side TTLs; on 403, evict the cached token,
             # re-fetch, and retry once before giving up.
-            self._csrf_tokens.pop(service_base or "", None)
+            async with self._csrf_lock:
+                if self._csrf_tokens.get(service_base or "") == csrf:
+                    self._csrf_tokens.pop(service_base or "", None)
             csrf = await self._get_csrf_token(service_base)
             return await self._request(
                 method,
@@ -452,10 +488,16 @@ class AsyncAdmsHttp(AsyncHttpClient):
         Uses the raw ``httpx`` client directly to avoid triggering error-checking
         on what may be a non-2xx response — many OData services return 403/405
         on the root path but still include the ``X-CSRF-Token`` response header.
+
+        Coroutine-safe: reads and writes to ``self._csrf_tokens`` are guarded
+        by :class:`asyncio.Lock`.  On a cold cache, parallel coroutines may
+        each issue their own fetch — ``setdefault`` ensures only the first
+        writer wins, so all callers observe the same token.
         """
         key = service_base or ""
-        if key in self._csrf_tokens:
-            return self._csrf_tokens[key]
+        async with self._csrf_lock:
+            if key in self._csrf_tokens:
+                return self._csrf_tokens[key]
 
         if service_base:
             url = self._base_url.rstrip("/") + "/" + service_base.strip("/") + "/"
@@ -474,8 +516,9 @@ class AsyncAdmsHttp(AsyncHttpClient):
         except httpx.RequestError as exc:
             raise HttpError(f"Async CSRF fetch request failed: {exc}") from exc
 
-        self._csrf_tokens[key] = resp.headers.get(_CSRF_FETCH_HEADER, "")
-        return self._csrf_tokens[key]
+        csrf = resp.headers.get(_CSRF_FETCH_HEADER, "")
+        async with self._csrf_lock:
+            return self._csrf_tokens.setdefault(key, csrf)
 
     def _prefixed(self, path: str, service_base: str | None) -> str:
         """Prepend *service_base* to *path*, normalising slashes."""

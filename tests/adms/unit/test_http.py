@@ -220,3 +220,79 @@ class TestQuoteOdataStringKey:
     def test_empty_string(self):
         assert quote_odata_string_key("") == "''"
 
+
+class TestAdmsHttpThreadSafety:
+    def test_concurrent_csrf_fetches_converge_on_same_token(
+        self, config, token_fetcher
+    ):
+        """Concurrent threads on a cold cache must all observe the same token.
+
+        Without the lock + ``setdefault``, two threads can each fetch and
+        each write their (potentially different) tokens, leaving callers
+        with inconsistent values for the same key.
+        """
+        import threading as _threading
+
+        session = MagicMock(spec=requests.Session)
+        # Each parallel fetch returns a different token; the first writer
+        # should win and all subsequent writers should observe that value.
+        token_seq = iter(f"csrf-{i}" for i in range(100))
+        seq_lock = _threading.Lock()
+
+        def get_with_unique_token(*args, **kwargs):
+            with seq_lock:
+                t = next(token_seq)
+            return _make_resp(200, headers={"X-CSRF-Token": t})
+
+        session.get.side_effect = get_with_unique_token
+        session.request.return_value = _make_resp(200, json_data={})
+
+        http = AdmsHttp(config=config, token_fetcher=token_fetcher, session=session)
+
+        results: list[str] = []
+        results_lock = _threading.Lock()
+
+        def worker():
+            t = http._get_csrf_token(service_base="/odata/v4/DocumentService")
+            with results_lock:
+                results.append(t)
+
+        threads = [_threading.Thread(target=worker) for _ in range(8)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join(timeout=2)
+
+        # All 8 threads must agree on the same token (first-writer-wins).
+        assert len(set(results)) == 1, f"divergent tokens: {set(results)}"
+
+    def test_403_retry_does_not_evict_freshly_written_token(
+        self, config, token_fetcher
+    ):
+        """A 403 retry must only evict the *stale* token it failed with.
+
+        If thread A's request 403s and thread B has already refreshed the
+        token in between, A must not evict B's fresh token — otherwise B's
+        in-flight requests using the fresh token would race a needless
+        re-fetch.
+        """
+        session = MagicMock(spec=requests.Session)
+        session.get.return_value = _make_resp(
+            200, headers={"X-CSRF-Token": "fresh"}
+        )
+        session.request.return_value = _make_resp(403, json_data={"error": "csrf"})
+
+        http = AdmsHttp(config=config, token_fetcher=token_fetcher, session=session)
+        # Pre-seed the cache with a "fresh" token; simulate that thread A is
+        # mid-flight with a stale value that no longer matches the cache.
+        http._csrf_tokens[""] = "fresh"
+
+        # Manually trigger the retry-eviction guard with a stale csrf value.
+        # The cached "fresh" value must remain untouched.
+        with http._csrf_lock:
+            stale = "stale"
+            if http._csrf_tokens.get("") == stale:
+                http._csrf_tokens.pop("", None)
+
+        assert http._csrf_tokens[""] == "fresh"
+

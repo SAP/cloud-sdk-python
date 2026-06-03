@@ -2971,7 +2971,7 @@ requires-dist = [
     { name = "httpx", specifier = ">=0.27.0" },
     { name = "langchain-core", marker = "extra == 'langchain'", specifier = ">=1.2.7" },
     { name = "mcp", specifier = ">=1.1.0" },
-    { name = "minio", specifier = "~=7.2.20" },
+    { name = "minio", specifier = "~=7.2.16" },
     { name = "opentelemetry-api", specifier = ">=1.42.1" },
     { name = "opentelemetry-exporter-otlp-proto-grpc", specifier = "~=1.42.1" },
     { name = "opentelemetry-exporter-otlp-proto-http", specifier = "~=1.42.1" },

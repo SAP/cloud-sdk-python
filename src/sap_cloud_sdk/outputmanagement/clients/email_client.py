@@ -5,6 +5,7 @@ from ..models.output_request import OutputRequest
 from ..models.output_request_data import OutputRequestData
 from ..models.output_management_info import OutputManagementInfo
 from ..models.email_configuration import EmailConfiguration
+from ..models.pre_generated_attachment import PreGeneratedAttachment
 from ..models.output_response import OutputResponse, ErrorResponse
 from ..config.destination_credential_config import DestinationCredentialConfig
 from ..constants import Channel
@@ -25,7 +26,8 @@ class EmailClient:
         to: List[str],
         business_document: Dict[str, Any],
         cc: Optional[List[str]] = None,
-        template_language: str = "en"
+        template_language: str = "en",
+        pre_generated_attachments: Optional[List[str]] = None
     ) -> OutputRequest:
         """
         Create an OutputRequest object from the provided parameters.
@@ -39,6 +41,7 @@ class EmailClient:
             business_document: The business document as a dictionary
             cc: Optional list of CC email addresses
             template_language: ISO language code for email template
+            pre_generated_attachments: Optional list of pre-generated attachment URLs
             
         Returns:
             OutputRequest: Fully constructed output request ready to send
@@ -62,12 +65,20 @@ class EmailClient:
         # Generate business document type from the key
         business_document_type = f"com.sap.{doc_type_key.lower()}"
         
+        # Convert pre_generated_attachments strings to PreGeneratedAttachment objects
+        attachment_objects = None
+        if pre_generated_attachments:
+            attachment_objects = [
+                PreGeneratedAttachment(url=url) for url in pre_generated_attachments
+            ]
+
         # Build email configuration
         email_config = EmailConfiguration(
             email_notification_template_key=notification_template_key,
             email_template_language=template_language,
             to=to,
-            cc=cc
+            cc=cc,
+            pre_generated_attachments=attachment_objects
         )
         
         # Build output management info
@@ -103,7 +114,8 @@ class EmailClient:
         destination_name: str,
         cc: Optional[List[str]] = None,
         template_language: str = "en",
-        access_strategy: str = "PROVIDER_ONLY"
+        access_strategy: str = "PROVIDER_ONLY",
+        pre_generated_attachments: Optional[List[str]] = None
     ) -> OutputResponse:
         """
         Send an email using the SAP Ariba Output Service.
@@ -119,6 +131,7 @@ class EmailClient:
             cc: Optional list of CC email addresses
             template_language: ISO language code for email template (default: "en")
             access_strategy: Destination access strategy - "PROVIDER_ONLY" or "SUBSCRIBER_ONLY" (default: "PROVIDER_ONLY")
+            pre_generated_attachments: Optional list of pre-generated attachment URLs
             
         Returns:
             OutputResponse: Response from the output service
@@ -190,7 +203,8 @@ class EmailClient:
                 to=to,
                 business_document=business_document,
                 cc=cc,
-                template_language=template_language
+                template_language=template_language,
+                pre_generated_attachments=pre_generated_attachments
             )
             
             # Validate the output request using RequestValidator

@@ -8,6 +8,7 @@ from .email_configuration import EmailConfiguration
 from .attachment_config import AttachmentConfig
 from .direct_share_configuration import DirectShareConfiguration
 from .form_configuration import FormConfiguration
+from .pre_generated_attachment import PreGeneratedAttachment
 
 __all__ = [
     "OutputRequest",
@@ -19,4 +20,5 @@ __all__ = [
     "AttachmentConfig",
     "DirectShareConfiguration",
     "FormConfiguration",
+    "PreGeneratedAttachment",
 ]

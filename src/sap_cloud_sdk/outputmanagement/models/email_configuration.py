@@ -4,6 +4,7 @@ from typing import Optional, List
 from pydantic import BaseModel, Field, field_validator
 
 from .attachment_config import AttachmentConfig
+from .pre_generated_attachment import PreGeneratedAttachment
 
 
 class EmailConfiguration(BaseModel):
@@ -94,6 +95,12 @@ class EmailConfiguration(BaseModel):
     attachment: Optional[AttachmentConfig] = Field(
         None,
         description="Optional attachment configuration for PDF generation"
+    )
+
+    pre_generated_attachments: Optional[List[PreGeneratedAttachment]] = Field(
+        None,
+        alias="preGeneratedAttachments",
+        description="List of pre-generated attachments, each with a url and optional fileFormat"
     )
 
     @field_validator("to", "cc", "bcc")

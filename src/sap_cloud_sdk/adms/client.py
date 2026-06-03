@@ -30,7 +30,12 @@ from __future__ import annotations
 import httpx
 
 from sap_cloud_sdk.adms._auth import IasTokenFetcher
-from sap_cloud_sdk.adms._http import AdmsHttp, AsyncAdmsHttp, quote_odata_guid_key, quote_odata_string_key
+from sap_cloud_sdk.adms._http import (
+    AdmsHttp,
+    AsyncAdmsHttp,
+    quote_odata_guid_key,
+    quote_odata_string_key,
+)
 from sap_cloud_sdk.adms._models import (
     AllowedDomain,
     BusinessObjectNodeType,

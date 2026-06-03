@@ -30,7 +30,7 @@ from __future__ import annotations
 import httpx
 
 from sap_cloud_sdk.adms._auth import IasTokenFetcher
-from sap_cloud_sdk.adms._http import AdmsHttp, AsyncAdmsHttp, quote_odata_string_key
+from sap_cloud_sdk.adms._http import AdmsHttp, AsyncAdmsHttp, quote_odata_guid_key, quote_odata_string_key
 from sap_cloud_sdk.adms._models import (
     AllowedDomain,
     BusinessObjectNodeType,
@@ -140,7 +140,7 @@ class _DocumentApi:
         is_active = str(is_active_entity).lower()
         path = (
             f"DocumentRelation("
-            f"DocumentRelationID={document_relation_id},"
+            f"DocumentRelationID={quote_odata_guid_key(document_relation_id)},"
             f"IsActiveEntity={is_active})/Document"
         )
         resp = self._http.get(path, service_base=_SERVICE_PATH)
@@ -173,7 +173,7 @@ class _DocumentApi:
         is_active = str(is_active_entity).lower()
         rel_key = (
             f"DocumentRelation("
-            f"DocumentRelationID={document_relation_id},"
+            f"DocumentRelationID={quote_odata_guid_key(document_relation_id)},"
             f"IsActiveEntity={is_active})"
         )
         expanded = self._http.get(
@@ -223,7 +223,7 @@ class _DocumentApi:
         is_active = str(is_active_entity).lower()
         path = (
             f"DocumentRelation("
-            f"DocumentRelationID={document_relation_id},"
+            f"DocumentRelationID={quote_odata_guid_key(document_relation_id)},"
             f"IsActiveEntity={is_active})"
             f"/UpdateDocument"
         )
@@ -254,7 +254,7 @@ class _DocumentApi:
         is_active = str(is_active_entity).lower()
         path = (
             f"DocumentRelation("
-            f"DocumentRelationID={document_relation_id},"
+            f"DocumentRelationID={quote_odata_guid_key(document_relation_id)},"
             f"IsActiveEntity={is_active})"
             f"/RestoreDocumentContentVersion"
         )
@@ -286,7 +286,7 @@ class _DocumentApi:
         is_active = str(is_active_entity).lower()
         path = (
             f"DocumentRelation("
-            f"DocumentRelationID={document_relation_id},"
+            f"DocumentRelationID={quote_odata_guid_key(document_relation_id)},"
             f"IsActiveEntity={is_active})"
             f"/DeleteDocumentContentVersion"
         )
@@ -373,7 +373,7 @@ class _DocumentRelationApi:
             params["$expand"] = ",".join(expand)
         path = (
             f"DocumentRelation("
-            f"DocumentRelationID={document_relation_id},"
+            f"DocumentRelationID={quote_odata_guid_key(document_relation_id)},"
             f"IsActiveEntity={is_active})"
         )
         resp = self._http.get(path, params=params, service_base=_SERVICE_PATH)
@@ -421,7 +421,7 @@ class _DocumentRelationApi:
         is_active = str(is_active_entity).lower()
         path = (
             f"DocumentRelation("
-            f"DocumentRelationID={document_relation_id},"
+            f"DocumentRelationID={quote_odata_guid_key(document_relation_id)},"
             f"IsActiveEntity={is_active})"
             f"/GenerateDocumentUploadURLs"
         )
@@ -448,7 +448,7 @@ class _DocumentRelationApi:
         is_active = str(is_active_entity).lower()
         path = (
             f"DocumentRelation("
-            f"DocumentRelationID={document_relation_id},"
+            f"DocumentRelationID={quote_odata_guid_key(document_relation_id)},"
             f"IsActiveEntity={is_active})"
             f"/CompleteMultipartUpload"
         )
@@ -465,7 +465,7 @@ class _DocumentRelationApi:
         is_active = str(is_active_entity).lower()
         path = (
             f"DocumentRelation("
-            f"DocumentRelationID={document_relation_id},"
+            f"DocumentRelationID={quote_odata_guid_key(document_relation_id)},"
             f"IsActiveEntity={is_active})"
             f"/LockDocumentAndRelation"
         )
@@ -482,7 +482,7 @@ class _DocumentRelationApi:
         is_active = str(is_active_entity).lower()
         path = (
             f"DocumentRelation("
-            f"DocumentRelationID={document_relation_id},"
+            f"DocumentRelationID={quote_odata_guid_key(document_relation_id)},"
             f"IsActiveEntity={is_active})"
             f"/UnlockDocumentAndRelation"
         )
@@ -504,7 +504,7 @@ class _DocumentRelationApi:
         is_active = str(is_active_entity).lower()
         path = (
             f"DocumentRelation("
-            f"DocumentRelationID={document_relation_id},"
+            f"DocumentRelationID={quote_odata_guid_key(document_relation_id)},"
             f"IsActiveEntity={is_active})"
         )
         self._http.delete(path, service_base=_SERVICE_PATH)
@@ -631,7 +631,7 @@ class _ConfigurationApi:
     def delete_allowed_domain(self, allowed_domain_id: str) -> None:
         """Remove an entry from the domain allow-list."""
         self._http.delete(
-            f"AllowedDomain(AllowedDomainID={allowed_domain_id})",
+            f"AllowedDomain(AllowedDomainID={quote_odata_guid_key(allowed_domain_id)})",
             service_base=_CONFIG_SERVICE_PATH,
         )
 
@@ -763,7 +763,7 @@ class _ConfigurationApi:
         """Delete a DocumentType ↔ BusinessObjectNodeType mapping."""
         self._http.delete(
             f"DocumentTypeBusinessObjectTypeMap("
-            f"DocumentTypeBOTypeMapID={document_type_bo_type_map_id})",
+            f"DocumentTypeBOTypeMapID={quote_odata_guid_key(document_type_bo_type_map_id)})",
             service_base=_CONFIG_SERVICE_PATH,
         )
 
@@ -895,7 +895,7 @@ class _AsyncDocumentApi:
         is_active = str(is_active_entity).lower()
         path = (
             f"DocumentRelation("
-            f"DocumentRelationID={document_relation_id},"
+            f"DocumentRelationID={quote_odata_guid_key(document_relation_id)},"
             f"IsActiveEntity={is_active})/Document"
         )
         resp = await self._http.get(path, service_base=_SERVICE_PATH)
@@ -913,7 +913,7 @@ class _AsyncDocumentApi:
         is_active = str(is_active_entity).lower()
         rel_key = (
             f"DocumentRelation("
-            f"DocumentRelationID={document_relation_id},"
+            f"DocumentRelationID={quote_odata_guid_key(document_relation_id)},"
             f"IsActiveEntity={is_active})"
         )
         expanded = await self._http.get(
@@ -954,7 +954,7 @@ class _AsyncDocumentApi:
         is_active = str(is_active_entity).lower()
         path = (
             f"DocumentRelation("
-            f"DocumentRelationID={document_relation_id},"
+            f"DocumentRelationID={quote_odata_guid_key(document_relation_id)},"
             f"IsActiveEntity={is_active})"
             f"/UpdateDocument"
         )
@@ -974,7 +974,7 @@ class _AsyncDocumentApi:
         is_active = str(is_active_entity).lower()
         path = (
             f"DocumentRelation("
-            f"DocumentRelationID={document_relation_id},"
+            f"DocumentRelationID={quote_odata_guid_key(document_relation_id)},"
             f"IsActiveEntity={is_active})"
             f"/DeleteDocumentContentVersion"
         )
@@ -997,7 +997,7 @@ class _AsyncDocumentApi:
         is_active = str(is_active_entity).lower()
         path = (
             f"DocumentRelation("
-            f"DocumentRelationID={document_relation_id},"
+            f"DocumentRelationID={quote_odata_guid_key(document_relation_id)},"
             f"IsActiveEntity={is_active})"
             f"/RestoreDocumentContentVersion"
         )
@@ -1065,7 +1065,7 @@ class _AsyncDocumentRelationApi:
             params["$expand"] = ",".join(expand)
         path = (
             f"DocumentRelation("
-            f"DocumentRelationID={document_relation_id},"
+            f"DocumentRelationID={quote_odata_guid_key(document_relation_id)},"
             f"IsActiveEntity={is_active})"
         )
         resp = await self._http.get(path, params=params, service_base=_SERVICE_PATH)
@@ -1095,7 +1095,7 @@ class _AsyncDocumentRelationApi:
         is_active = str(is_active_entity).lower()
         path = (
             f"DocumentRelation("
-            f"DocumentRelationID={document_relation_id},"
+            f"DocumentRelationID={quote_odata_guid_key(document_relation_id)},"
             f"IsActiveEntity={is_active})"
             f"/GenerateDocumentUploadURLs"
         )
@@ -1117,7 +1117,7 @@ class _AsyncDocumentRelationApi:
         is_active = str(is_active_entity).lower()
         path = (
             f"DocumentRelation("
-            f"DocumentRelationID={document_relation_id},"
+            f"DocumentRelationID={quote_odata_guid_key(document_relation_id)},"
             f"IsActiveEntity={is_active})"
             f"/CompleteMultipartUpload"
         )
@@ -1134,7 +1134,7 @@ class _AsyncDocumentRelationApi:
         is_active = str(is_active_entity).lower()
         path = (
             f"DocumentRelation("
-            f"DocumentRelationID={document_relation_id},"
+            f"DocumentRelationID={quote_odata_guid_key(document_relation_id)},"
             f"IsActiveEntity={is_active})"
             f"/LockDocumentAndRelation"
         )
@@ -1151,7 +1151,7 @@ class _AsyncDocumentRelationApi:
         is_active = str(is_active_entity).lower()
         path = (
             f"DocumentRelation("
-            f"DocumentRelationID={document_relation_id},"
+            f"DocumentRelationID={quote_odata_guid_key(document_relation_id)},"
             f"IsActiveEntity={is_active})"
             f"/UnlockDocumentAndRelation"
         )
@@ -1168,7 +1168,7 @@ class _AsyncDocumentRelationApi:
         is_active = str(is_active_entity).lower()
         path = (
             f"DocumentRelation("
-            f"DocumentRelationID={document_relation_id},"
+            f"DocumentRelationID={quote_odata_guid_key(document_relation_id)},"
             f"IsActiveEntity={is_active})"
         )
         await self._http.delete(path, service_base=_SERVICE_PATH)
@@ -1271,7 +1271,7 @@ class _AsyncConfigurationApi:
     async def delete_allowed_domain(self, allowed_domain_id: str) -> None:
         """Async variant of :meth:`_ConfigurationApi.delete_allowed_domain` — same semantics."""
         await self._http.delete(
-            f"AllowedDomain(AllowedDomainID={allowed_domain_id})",
+            f"AllowedDomain(AllowedDomainID={quote_odata_guid_key(allowed_domain_id)})",
             service_base=_CONFIG_SERVICE_PATH,
         )
 
@@ -1405,7 +1405,7 @@ class _AsyncConfigurationApi:
         """Async variant of :meth:`_ConfigurationApi.delete_type_mapping` — same semantics."""
         await self._http.delete(
             f"DocumentTypeBusinessObjectTypeMap("
-            f"DocumentTypeBOTypeMapID={document_type_bo_type_map_id})",
+            f"DocumentTypeBOTypeMapID={quote_odata_guid_key(document_type_bo_type_map_id)})",
             service_base=_CONFIG_SERVICE_PATH,
         )
 

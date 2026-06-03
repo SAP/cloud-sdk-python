@@ -46,7 +46,6 @@ from sap_cloud_sdk.adms.client import (
 )
 from sap_cloud_sdk.adms.config import AdmsConfig
 from sap_cloud_sdk.adms.exceptions import (
-    ClientCreationError,
     ConfigError,
     DocumentNotFoundError,
     HttpError,
@@ -474,7 +473,7 @@ class TestAsyncDocumentApi:
         from sap_cloud_sdk.adms.client import _AsyncDocumentApi as _AsyncDocumentApi
         api = _AsyncDocumentApi(http)
 
-        doc = await api.get("doc-1")
+        doc = await api.get("11111111-1111-1111-1111-111111111111")
 
         assert doc.document_id == "doc-1"
         assert doc.document_name == "Invoice.pdf"
@@ -497,7 +496,7 @@ class TestAsyncDocumentApi:
         api = _AsyncDocumentApi(http)
 
         with pytest.raises(ScanNotCleanError):
-            await api.get_download_url("rel-1", doc_content_version_id="1.0")
+            await api.get_download_url("11111111-1111-1111-1111-111111111111", doc_content_version_id="1.0")
 
 
 # ── _AsyncDocumentRelationApi ──────────────────────────────────────────────────
@@ -510,7 +509,7 @@ class TestAsyncDocumentRelationApi:
         mock_client.request.return_value = _make_httpx_response(200, {
             "value": [
                 {
-                    "DocumentRelationID": "rel-1",
+                    "DocumentRelationID": "11111111-1111-1111-1111-111111111111",
                     "HostBusinessObjectNodeID": "PO-123",
                     "BusinessObjectNodeTypeUniqueID": "PurchaseOrder",
                     "IsActiveEntity": True,
@@ -527,7 +526,7 @@ class TestAsyncDocumentRelationApi:
         relations = await api.get_all()
 
         assert len(relations) == 1
-        assert relations[0].document_relation_id == "rel-1"
+        assert relations[0].document_relation_id == "11111111-1111-1111-1111-111111111111"
 
 
 # ── _AsyncJobApi ───────────────────────────────────────────────────────────────
@@ -603,18 +602,18 @@ class TestDocumentApiGet:
     def test_get_calls_correct_path(self):
         http = _doc_http(get_data=_CLEAN_DOC)
         api = _DocumentApi(http)
-        doc = api.get("rel-1")
+        doc = api.get("11111111-1111-1111-1111-111111111111")
 
         call_path = http.get.call_args[0][0]
         assert "DocumentRelation(" in call_path
-        assert "rel-1" in call_path
+        assert "11111111-1111-1111-1111-111111111111" in call_path
         assert "/Document" in call_path
         assert isinstance(doc, Document)
 
     def test_get_includes_is_active_entity(self):
         http = _doc_http(get_data=_CLEAN_DOC)
         api = _DocumentApi(http)
-        api.get("rel-1")
+        api.get("11111111-1111-1111-1111-111111111111")
 
         call_path = http.get.call_args[0][0]
         assert "IsActiveEntity=true" in call_path
@@ -622,7 +621,7 @@ class TestDocumentApiGet:
     def test_get_draft_uses_false_active_flag(self):
         http = _doc_http(get_data=_CLEAN_DOC)
         api = _DocumentApi(http)
-        api.get("rel-1", is_active_entity=False)
+        api.get("11111111-1111-1111-1111-111111111111", is_active_entity=False)
 
         call_path = http.get.call_args[0][0]
         assert "IsActiveEntity=false" in call_path
@@ -631,7 +630,7 @@ class TestDocumentApiGet:
 class TestDocumentApiDownloadUrl:
     def test_clean_document_returns_url(self):
         rel_data = {
-            "DocumentRelationID": "rel-1",
+            "DocumentRelationID": "11111111-1111-1111-1111-111111111111",
             "BusinessObjectNodeTypeUniqueID": "PO",
             "HostBusinessObjectNodeID": "PO-1",
             "Document": _CLEAN_DOC,
@@ -645,13 +644,13 @@ class TestDocumentApiDownloadUrl:
         ]
 
         api = _DocumentApi(http)
-        url = api.get_download_url("rel-1", doc_content_version_id="1.0")
+        url = api.get_download_url("11111111-1111-1111-1111-111111111111", doc_content_version_id="1.0")
 
         assert url == "https://s3.example.com/presigned-url"
 
     def test_pending_document_raises_scan_not_clean_error(self):
         rel_data = {
-            "DocumentRelationID": "rel-1",
+            "DocumentRelationID": "11111111-1111-1111-1111-111111111111",
             "BusinessObjectNodeTypeUniqueID": "PO",
             "HostBusinessObjectNodeID": "PO-1",
             "Document": _PENDING_DOC,
@@ -661,11 +660,11 @@ class TestDocumentApiDownloadUrl:
 
         api = _DocumentApi(http)
         with pytest.raises(ScanNotCleanError, match="PENDING"):
-            api.get_download_url("rel-1", doc_content_version_id="1.0")
+            api.get_download_url("11111111-1111-1111-1111-111111111111", doc_content_version_id="1.0")
 
     def test_quarantined_document_raises_scan_not_clean_error(self):
         rel_data = {
-            "DocumentRelationID": "rel-1",
+            "DocumentRelationID": "11111111-1111-1111-1111-111111111111",
             "BusinessObjectNodeTypeUniqueID": "PO",
             "HostBusinessObjectNodeID": "PO-1",
             "Document": {**_CLEAN_DOC, "DocumentState": "QUARANTINED"},
@@ -675,7 +674,7 @@ class TestDocumentApiDownloadUrl:
 
         api = _DocumentApi(http)
         with pytest.raises(ScanNotCleanError, match="QUARANTINED"):
-            api.get_download_url("rel-1", doc_content_version_id="1.0")
+            api.get_download_url("11111111-1111-1111-1111-111111111111", doc_content_version_id="1.0")
 
 
 class TestDocumentApiUpdate:
@@ -684,7 +683,7 @@ class TestDocumentApiUpdate:
         api = _DocumentApi(http)
 
         upd = UpdateDocumentInput(document_name="Renamed.pdf")
-        doc = api.update("rel-1", upd)
+        doc = api.update("11111111-1111-1111-1111-111111111111", upd)
 
         call_path = http.post.call_args[0][0]
         assert "UpdateDocument" in call_path
@@ -695,7 +694,7 @@ class TestDocumentApiUpdate:
         api = _DocumentApi(http)
 
         upd = UpdateDocumentInput(document_description="New desc")
-        api.update("rel-1", upd)
+        api.update("11111111-1111-1111-1111-111111111111", upd)
 
         payload = http.post.call_args[1]["json"]
         assert "DocumentDescription" in payload["Document"]
@@ -707,7 +706,7 @@ class TestDocumentApiVersionOps:
         http = _doc_http(post_data=_CLEAN_DOC)
         api = _DocumentApi(http)
 
-        doc = api.restore_content_version("rel-1", "1.0", comment="Revert")
+        doc = api.restore_content_version("11111111-1111-1111-1111-111111111111", "1.0", comment="Revert")
 
         call_path = http.post.call_args[0][0]
         assert "RestoreDocumentContentVersion" in call_path
@@ -721,7 +720,7 @@ class TestDocumentApiVersionOps:
         http.post.return_value = MagicMock()
         api = _DocumentApi(http)
 
-        api.delete_content_version("rel-1", "2.0")
+        api.delete_content_version("11111111-1111-1111-1111-111111111111", "2.0")
 
         call_path = http.post.call_args[0][0]
         assert "DeleteDocumentContentVersion" in call_path
@@ -826,7 +825,7 @@ def _rel_http(get_data=None, post_data=None):
     return http
 
 
-def _rel_dict(rel_id="rel-1"):
+def _rel_dict(rel_id="11111111-1111-1111-1111-111111111111"):
     return {
         "DocumentRelationID": rel_id,
         "BusinessObjectNodeTypeUniqueID": "PurchaseOrder",
@@ -863,20 +862,20 @@ class TestDocumentRelationApiGet:
         assert params["$top"] == 10
 
     def test_get_single_relation(self):
-        http = _rel_http(get_data=_rel_dict("rel-99"))
+        http = _rel_http(get_data=_rel_dict("99999999-9999-9999-9999-999999999999"))
         api = _DocumentRelationApi(http)
 
-        rel = api.get("rel-99")
+        rel = api.get("99999999-9999-9999-9999-999999999999")
 
         call_path = http.get.call_args[0][0]
-        assert "rel-99" in call_path
+        assert "99999999-9999-9999-9999-999999999999" in call_path
         assert isinstance(rel, DocumentRelation)
 
     def test_get_draft_uses_false_flag(self):
         http = _rel_http(get_data=_rel_dict())
         api = _DocumentRelationApi(http)
 
-        api.get("rel-1", is_active_entity=False)
+        api.get("11111111-1111-1111-1111-111111111111", is_active_entity=False)
 
         call_path = http.get.call_args[0][0]
         assert "IsActiveEntity=false" in call_path
@@ -933,7 +932,7 @@ class TestDocumentRelationApiUploadUrls:
         http = _rel_http(post_data=doc_data)
         api = _DocumentRelationApi(http)
 
-        doc = api.generate_upload_urls("rel-1")
+        doc = api.generate_upload_urls("11111111-1111-1111-1111-111111111111")
 
         call_path = http.post.call_args[0][0]
         assert "GenerateDocumentUploadURLs" in call_path
@@ -943,7 +942,7 @@ class TestDocumentRelationApiUploadUrls:
         http = _rel_http()
         api = _DocumentRelationApi(http)
 
-        api.complete_multipart_upload("rel-1")
+        api.complete_multipart_upload("11111111-1111-1111-1111-111111111111")
 
         call_path = http.post.call_args[0][0]
         assert "CompleteMultipartUpload" in call_path
@@ -953,22 +952,22 @@ class TestDocumentRelationApiLockDelete:
     def test_lock(self):
         http = _rel_http()
         api = _DocumentRelationApi(http)
-        api.lock("rel-1")
+        api.lock("11111111-1111-1111-1111-111111111111")
         assert "LockDocumentAndRelation" in http.post.call_args[0][0]
 
     def test_unlock(self):
         http = _rel_http()
         api = _DocumentRelationApi(http)
-        api.unlock("rel-1")
+        api.unlock("11111111-1111-1111-1111-111111111111")
         assert "UnlockDocumentAndRelation" in http.post.call_args[0][0]
 
     def test_delete_calls_http_delete(self):
         http = _rel_http()
         api = _DocumentRelationApi(http)
-        api.delete("rel-1")
+        api.delete("11111111-1111-1111-1111-111111111111")
         http.delete.assert_called_once()
         call_path = http.delete.call_args[0][0]
-        assert "rel-1" in call_path
+        assert "11111111-1111-1111-1111-111111111111" in call_path
 
 
 class TestDocumentRelationApiDraftLifecycle:
@@ -1017,7 +1016,7 @@ class TestDocumentRelationApiDraftLifecycle:
 # ── _ConfigurationApi (sync + async) ──────────────────────────────────────────
 
 _ALLOWED_DOMAIN_DICT = {
-    "AllowedDomainID": "ad-uuid-1",
+    "AllowedDomainID": "33333333-3333-3333-3333-333333333333",
     "AllowedDomainHostName": "storage.example.com",
     "AllowedDomainProtocol": "https",
 }
@@ -1036,7 +1035,7 @@ _BO_NODE_TYPE_DICT = {
 }
 
 _MAPPING_DICT = {
-    "DocumentTypeBOTypeMapID": "map-uuid-1",
+    "DocumentTypeBOTypeMapID": "44444444-4444-4444-4444-444444444444",
     "BusinessObjectNodeTypeUniqueID": "bo-uuid-1",
     "DocumentTypeID": "INVOICE",
     "IsDefault": False,
@@ -1074,7 +1073,7 @@ class TestConfigurationApiAllowedDomain:
 
         assert len(result) == 1
         assert isinstance(result[0], AllowedDomain)
-        assert result[0].allowed_domain_id == "ad-uuid-1"
+        assert result[0].allowed_domain_id == "33333333-3333-3333-3333-333333333333"
         assert result[0].allowed_domain_host_name == "storage.example.com"
         assert result[0].allowed_domain_protocol == "https"
 
@@ -1121,12 +1120,12 @@ class TestConfigurationApiAllowedDomain:
     def test_delete_calls_correct_path(self):
         http = _cfg_sync_http()
         api = _ConfigurationApi(http)
-        api.delete_allowed_domain("ad-uuid-1")
+        api.delete_allowed_domain("33333333-3333-3333-3333-333333333333")
 
         http.delete.assert_called_once()
         call_path = http.delete.call_args[0][0]
         assert "AllowedDomain" in call_path
-        assert "ad-uuid-1" in call_path
+        assert "33333333-3333-3333-3333-333333333333" in call_path
 
     def test_get_all_uses_config_service_path(self):
         from sap_cloud_sdk.adms.config import _CONFIG_SERVICE_PATH
@@ -1244,7 +1243,7 @@ class TestConfigurationApiTypeMappings:
 
         assert len(result) == 1
         assert isinstance(result[0], DocumentTypeBusinessObjectTypeMap)
-        assert result[0].document_type_bo_type_map_id == "map-uuid-1"
+        assert result[0].document_type_bo_type_map_id == "44444444-4444-4444-4444-444444444444"
         assert result[0].business_object_node_type_unique_id == "bo-uuid-1"
         assert result[0].document_type_id == "INVOICE"
         assert result[0].is_default is False
@@ -1272,11 +1271,11 @@ class TestConfigurationApiTypeMappings:
     def test_delete_mapping_uses_map_id(self):
         http = _cfg_sync_http()
         api = _ConfigurationApi(http)
-        api.delete_type_mapping("map-uuid-1")
+        api.delete_type_mapping("44444444-4444-4444-4444-444444444444")
 
         http.delete.assert_called_once()
         call_path = http.delete.call_args[0][0]
-        assert "map-uuid-1" in call_path
+        assert "44444444-4444-4444-4444-444444444444" in call_path
 
 
 class TestAsyncConfigurationApiAllowedDomain:
@@ -1288,7 +1287,7 @@ class TestAsyncConfigurationApiAllowedDomain:
 
         assert len(result) == 1
         assert isinstance(result[0], AllowedDomain)
-        assert result[0].allowed_domain_id == "ad-uuid-1"
+        assert result[0].allowed_domain_id == "33333333-3333-3333-3333-333333333333"
 
     @pytest.mark.asyncio
     async def test_create_posts_to_correct_entity(self):
@@ -1306,7 +1305,7 @@ class TestAsyncConfigurationApiAllowedDomain:
     async def test_delete_called(self):
         http = _cfg_async_http()
         api = _AsyncConfigurationApi(http)
-        await api.delete_allowed_domain("ad-uuid-1")
+        await api.delete_allowed_domain("33333333-3333-3333-3333-333333333333")
         http.delete.assert_called_once()
 
 
@@ -1399,7 +1398,7 @@ class TestAsyncConfigurationApiTypeMappings:
     async def test_delete_called(self):
         http = _cfg_async_http()
         api = _AsyncConfigurationApi(http)
-        await api.delete_type_mapping("map-uuid-1")
+        await api.delete_type_mapping("44444444-4444-4444-4444-444444444444")
         http.delete.assert_called_once()
 
 
@@ -1445,13 +1444,13 @@ class TestJobApiStartZipDownload:
         params = ZipDownloadJobParameters(
             business_object_node_type_unique_id="PO",
             host_business_object_node_id="PO-1",
-            document_relation_ids=["rel-1", "rel-2"],
+            document_relation_ids=["11111111-1111-1111-1111-111111111111", "22222222-2222-2222-2222-222222222222"],
         )
         api.start_zip_download(params)
 
         payload = http.post.call_args[1]["json"]
         assert payload["JobInput"]["JobType"] == "ZIP_DOWNLOAD"
-        assert payload["JobInput"]["JobParameters"]["DocumentRelationIDs"] == ["rel-1", "rel-2"]
+        assert payload["JobInput"]["JobParameters"]["DocumentRelationIDs"] == ["11111111-1111-1111-1111-111111111111", "22222222-2222-2222-2222-222222222222"]
 
     def test_returns_job_output(self):
         http = _job_http(post_data={"JobID": "job-42", "JobStatus": "NOT_STARTED"})

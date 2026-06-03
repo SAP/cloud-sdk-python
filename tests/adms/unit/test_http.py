@@ -1,13 +1,13 @@
 """Unit tests for AdmsHttp — Bearer injection, CSRF management, error mapping."""
 
 from typing import Optional
-from unittest.mock import MagicMock, call
+from unittest.mock import MagicMock
 
 import pytest
 import requests
 
 from sap_cloud_sdk.adms._auth import IasTokenFetcher
-from sap_cloud_sdk.adms._http import AdmsHttp, quote_odata_string_key
+from sap_cloud_sdk.adms._http import AdmsHttp, quote_odata_guid_key, quote_odata_string_key
 from sap_cloud_sdk.adms.config import AdmsConfig
 from sap_cloud_sdk.adms.exceptions import DocumentNotFoundError, HttpError
 
@@ -219,6 +219,40 @@ class TestQuoteOdataStringKey:
 
     def test_empty_string(self):
         assert quote_odata_string_key("") == "''"
+
+
+class TestQuoteOdataGuidKey:
+    def test_well_formed_guid_returned_unquoted(self):
+        # OData V4 §5.1.1.6.2 — Edm.Guid keys are NOT single-quoted (those
+        # are reserved for Edm.String).  The output must be the canonical
+        # lowercase 8-4-4-4-12 form, ready to drop into a key segment.
+        out = quote_odata_guid_key("a1b2c3d4-e5f6-4789-ab12-fedcba987654")
+        assert out == "a1b2c3d4-e5f6-4789-ab12-fedcba987654"
+        assert "'" not in out
+
+    def test_uppercase_guid_normalised_to_lowercase(self):
+        out = quote_odata_guid_key("A1B2C3D4-E5F6-4789-AB12-FEDCBA987654")
+        assert out == "a1b2c3d4-e5f6-4789-ab12-fedcba987654"
+
+    def test_malformed_guid_raises(self):
+        with pytest.raises(ValueError, match="invalid OData Edm.Guid key"):
+            quote_odata_guid_key("not-a-guid")
+
+    def test_injection_attempt_rejected(self):
+        # Path-separator and query-operator smuggling must be rejected
+        # before interpolation, not silently passed through.
+        with pytest.raises(ValueError, match="invalid OData Edm.Guid key"):
+            quote_odata_guid_key("a1b2c3d4-e5f6-4789-ab12-fedcba987654)/Documents")
+
+    def test_empty_string_raises(self):
+        with pytest.raises(ValueError, match="invalid OData Edm.Guid key"):
+            quote_odata_guid_key("")
+
+    def test_non_string_raises(self):
+        # The signature is str, but defend against accidental int / None
+        # callers — should surface as ValueError, not TypeError.
+        with pytest.raises(ValueError, match="invalid OData Edm.Guid key"):
+            quote_odata_guid_key(None)  # type: ignore[arg-type]
 
 
 class TestAdmsHttpThreadSafety:

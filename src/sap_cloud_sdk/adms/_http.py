@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import asyncio
 import threading
+import uuid
 from typing import Any
 
 import httpx
@@ -57,6 +58,31 @@ def quote_odata_string_key(value: str) -> str:
         path = f"Documents(DocID={quote_odata_string_key(doc_id)})"
     """
     return "'" + value.replace("'", "''") + "'"
+
+
+def quote_odata_guid_key(value: str) -> str:
+    """Validate and serialise an ``Edm.Guid`` value for an OData V4 key segment.
+
+    OData V4 §5.1.1.6.2 represents ``Edm.Guid`` keys *without* single quotes
+    (those are reserved for ``Edm.String``).  String-quoting a Guid would
+    cause SAP CAP / strict OData servers to reject the request as a type
+    mismatch.  Injection protection on Guid keys therefore comes from
+    *validation*, not escaping: any value that does not parse as a UUID is
+    rejected before interpolation, so an attacker cannot smuggle path
+    separators or query operators through this argument.
+
+    Example::
+
+        path = f"DocumentRelation(DocumentRelationID={quote_odata_guid_key(rel_id)},"
+               f"IsActiveEntity=true)"
+
+    Raises:
+        ValueError: If *value* is not a well-formed UUID.
+    """
+    try:
+        return str(uuid.UUID(value))
+    except (ValueError, AttributeError, TypeError) as exc:
+        raise ValueError(f"invalid OData Edm.Guid key: {value!r}") from exc
 
 
 # ---------------------------------------------------------------------------

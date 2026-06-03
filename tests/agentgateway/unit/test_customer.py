@@ -21,6 +21,8 @@ from sap_cloud_sdk.agentgateway._models import (
     IntegrationDependency,
     MCPTool,
 )
+from sap_cloud_sdk.agentgateway._token_cache import _TokenCache
+from sap_cloud_sdk.agentgateway.config import ClientConfig
 from sap_cloud_sdk.agentgateway.exceptions import AgentGatewaySDKError
 
 
@@ -334,6 +336,60 @@ class TestGetSystemTokenMtls:
             with pytest.raises(AgentGatewaySDKError, match="Token request failed"):
                 get_system_token_mtls(credentials, timeout=60.0)
 
+    def test_reuses_cached_system_token(self, credentials):
+        """Reuse cached system token until it expires."""
+        token_cache = _TokenCache(ClientConfig())
+
+        with patch(
+            "sap_cloud_sdk.agentgateway._customer._request_token_mtls",
+            return_value={"access_token": "system-token-123", "expires_in": 300},
+        ) as mock_request:
+            first = get_system_token_mtls(
+                credentials, timeout=60.0, token_cache=token_cache
+            )
+            second = get_system_token_mtls(
+                credentials, timeout=60.0, token_cache=token_cache
+            )
+
+        assert first == "system-token-123"
+        assert second == "system-token-123"
+        mock_request.assert_called_once()
+
+    def test_scopes_system_token_cache_by_app_tid(self, credentials):
+        """Keep app-tid-specific system tokens isolated in the cache."""
+        token_cache = _TokenCache(ClientConfig())
+
+        with patch(
+            "sap_cloud_sdk.agentgateway._customer._request_token_mtls",
+            side_effect=[
+                {"access_token": "token-tid-1", "expires_in": 300},
+                {"access_token": "token-tid-2", "expires_in": 300},
+            ],
+        ) as mock_request:
+            first = get_system_token_mtls(
+                credentials,
+                timeout=60.0,
+                app_tid="tid-1",
+                token_cache=token_cache,
+            )
+            second = get_system_token_mtls(
+                credentials,
+                timeout=60.0,
+                app_tid="tid-1",
+                token_cache=token_cache,
+            )
+            third = get_system_token_mtls(
+                credentials,
+                timeout=60.0,
+                app_tid="tid-2",
+                token_cache=token_cache,
+            )
+
+        assert first == "token-tid-1"
+        assert second == "token-tid-1"
+        assert third == "token-tid-2"
+        assert mock_request.call_count == 2
+
 
 # ============================================================
 # Test: exchange_user_token
@@ -410,6 +466,31 @@ class TestExchangeUserToken:
             call_args = mock_client.post.call_args
             data = call_args.kwargs.get("data", {})
             assert data["app_tid"] == "test-tid"
+
+    def test_reuses_cached_user_token(self, credentials):
+        """Reuse exchanged user token until it expires."""
+        token_cache = _TokenCache(ClientConfig())
+
+        with patch(
+            "sap_cloud_sdk.agentgateway._customer._request_token_mtls",
+            return_value={"access_token": "exchanged-token-123", "expires_in": 300},
+        ) as mock_request:
+            first = exchange_user_token(
+                credentials,
+                "user-jwt-token",
+                timeout=60.0,
+                token_cache=token_cache,
+            )
+            second = exchange_user_token(
+                credentials,
+                "user-jwt-token",
+                timeout=60.0,
+                token_cache=token_cache,
+            )
+
+        assert first == "exchanged-token-123"
+        assert second == "exchanged-token-123"
+        mock_request.assert_called_once()
 
 
 # ============================================================

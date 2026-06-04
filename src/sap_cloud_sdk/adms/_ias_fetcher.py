@@ -1,12 +1,8 @@
-"""Generic SAP IAS (Identity Authentication Service) token fetcher.
+"""SAP IAS (Identity Authentication Service) token fetcher for ADMS.
 
 Provides:
 - :class:`IasTokenFetcher` — client_credentials + jwt-bearer token acquisition
-  against any SAP IAS tenant, with pluggable :class:`~._token_cache.TokenCache`.
-
-This module is **service-agnostic**: pass raw ``ias_url``, ``client_id``, and
-``client_secret`` directly.  Service-specific config adapters (e.g. the DMS
-module's ``IasTokenFetcher``) subclass this and adapt their own config objects.
+  against the SAP IAS tenant, with pluggable :class:`~._token_cache.TokenCache`.
 
 Token caching:
     By default tokens are cached in-process via :class:`InMemoryTokenCache`.
@@ -22,6 +18,8 @@ from typing import Optional
 import requests
 
 from sap_cloud_sdk.adms._token_cache import InMemoryTokenCache, TokenCache
+from sap_cloud_sdk.adms.config import AdmsConfig
+from sap_cloud_sdk.adms.exceptions import AuthError
 
 # Grant types (RFC 6749 / RFC 7523)
 _GRANT_CLIENT_CREDENTIALS = "client_credentials"
@@ -40,10 +38,6 @@ _CC_CACHE_KEY = "cc"
 _TOKEN_REQUEST_TIMEOUT_SECONDS = 10
 
 
-class AuthError(Exception):
-    """Raised when IAS token acquisition or exchange fails."""
-
-
 class IasTokenFetcher:
     """Fetches and caches OAuth2 access tokens from SAP IAS.
 
@@ -54,9 +48,9 @@ class IasTokenFetcher:
       services can enforce per-user permissions.
 
     Args:
-        ias_url: IAS tenant base URL, e.g. ``https://tenant.accounts.ondemand.com``.
-        client_id: IAS OAuth2 client ID.
-        client_secret: IAS OAuth2 client secret.
+        config: :class:`~sap_cloud_sdk.adms.config.AdmsConfig` with IAS
+            credentials (``ias_url``, ``client_id``, ``client_secret``,
+            optional ``resource``).
         session: Optional ``requests.Session`` to reuse (useful for testing).
         cache: Pluggable :class:`TokenCache`.  Defaults to
             :class:`InMemoryTokenCache`.  Pass a :class:`RedisTokenCache` for
@@ -64,32 +58,33 @@ class IasTokenFetcher:
 
     Example::
 
-        from sap_cloud_sdk.adms import IasTokenFetcher
-        fetcher = IasTokenFetcher(
+        from sap_cloud_sdk.adms._ias_fetcher import IasTokenFetcher
+        from sap_cloud_sdk.adms.config import AdmsConfig
+
+        config = AdmsConfig(
+            service_url="https://adm.example.com",
             ias_url="https://tenant.accounts.ondemand.com",
             client_id="my-client",
             client_secret="my-secret",
         )
+        fetcher = IasTokenFetcher(config)
         token = fetcher.get_token()
         headers = {"Authorization": f"Bearer {token}"}
     """
 
     def __init__(
         self,
-        ias_url: str,
-        client_id: str,
-        client_secret: str,
+        config: AdmsConfig,
         session: Optional[requests.Session] = None,
         cache: Optional[TokenCache] = None,
-        resource: Optional[str] = None,
     ) -> None:
-        self._ias_url = ias_url.rstrip("/")
-        self._client_id = client_id
-        self._client_secret = client_secret
+        self._ias_url = config.ias_url.rstrip("/")
+        self._client_id = config.client_id
+        self._client_secret = config.client_secret
         self._session = session or requests.Session()
         self._token_url = self._ias_url + "/oauth2/token"
         self._cache: TokenCache = cache or InMemoryTokenCache()
-        self._resource: Optional[str] = resource
+        self._resource: Optional[str] = config.resource
 
     # ------------------------------------------------------------------
     # Public API

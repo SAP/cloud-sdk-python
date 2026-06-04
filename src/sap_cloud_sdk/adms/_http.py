@@ -24,7 +24,7 @@ import requests
 from requests import Response
 from requests.exceptions import RequestException
 
-from sap_cloud_sdk.adms._auth import IasTokenFetcher
+from sap_cloud_sdk.adms._ias_fetcher import IasTokenFetcher
 from sap_cloud_sdk.adms.config import AdmsConfig
 from sap_cloud_sdk.adms.exceptions import DocumentNotFoundError, HttpError
 from sap_cloud_sdk.adms._async_http import AsyncHttpClient

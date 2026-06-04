@@ -6,7 +6,7 @@ from unittest.mock import MagicMock
 import pytest
 import requests
 
-from sap_cloud_sdk.adms._auth import IasTokenFetcher
+from sap_cloud_sdk.adms._ias_fetcher import IasTokenFetcher
 from sap_cloud_sdk.adms._http import AdmsHttp, quote_odata_guid_key, quote_odata_string_key
 from sap_cloud_sdk.adms.config import AdmsConfig
 from sap_cloud_sdk.adms.exceptions import DocumentNotFoundError, HttpError

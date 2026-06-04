@@ -9,7 +9,7 @@ import httpx
 import pytest
 
 from sap_cloud_sdk.adms import create_client
-from sap_cloud_sdk.adms._auth import IasTokenFetcher
+from sap_cloud_sdk.adms._ias_fetcher import IasTokenFetcher
 from sap_cloud_sdk.adms._http import AdmsHttp, AsyncAdmsHttp
 from sap_cloud_sdk.adms._models import (
     AllowedDomain,

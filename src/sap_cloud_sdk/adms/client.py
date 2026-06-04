@@ -29,7 +29,7 @@ from __future__ import annotations
 
 import httpx
 
-from sap_cloud_sdk.adms._auth import IasTokenFetcher
+from sap_cloud_sdk.adms._ias_fetcher import IasTokenFetcher
 from sap_cloud_sdk.adms._http import (
     AdmsHttp,
     AsyncAdmsHttp,

@@ -1,16 +1,17 @@
-"""Unit tests for core auth — IasTokenFetcher."""
+"""Unit tests for IasTokenFetcher."""
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 import requests
 
 from sap_cloud_sdk.adms._ias_fetcher import (
-    AuthError,
     IasTokenFetcher,
     _CC_CACHE_KEY,
 )
 from sap_cloud_sdk.adms._token_cache import InMemoryTokenCache
+from sap_cloud_sdk.adms.config import AdmsConfig
+from sap_cloud_sdk.adms.exceptions import AuthError
 
 
 def _make_token_response(token: str = "core-access-token", expires_in: int = 3600):
@@ -20,19 +21,32 @@ def _make_token_response(token: str = "core-access-token", expires_in: int = 360
     return resp
 
 
+def _make_config(
+    ias_url: str = "https://tenant.accounts.ondemand.com",
+    client_id: str = "client-id",
+    client_secret: str = "client-secret",
+) -> AdmsConfig:
+    return AdmsConfig(
+        service_url="https://adm.example.com",
+        ias_url=ias_url,
+        client_id=client_id,
+        client_secret=client_secret,
+    )
+
+
+@pytest.fixture
+def config() -> AdmsConfig:
+    return _make_config()
+
+
 @pytest.fixture
 def mock_session():
     return MagicMock(spec=requests.Session)
 
 
 @pytest.fixture
-def fetcher(mock_session):
-    return IasTokenFetcher(
-        ias_url="https://tenant.accounts.ondemand.com",
-        client_id="client-id",
-        client_secret="client-secret",
-        session=mock_session,
-    )
+def fetcher(config, mock_session):
+    return IasTokenFetcher(config=config, session=mock_session)
 
 
 class TestIasTokenFetcherCore:
@@ -45,12 +59,8 @@ class TestIasTokenFetcherCore:
         assert url == "https://tenant.accounts.ondemand.com/oauth2/token"
 
     def test_ias_url_trailing_slash_normalised(self, mock_session):
-        fetcher = IasTokenFetcher(
-            ias_url="https://tenant.accounts.ondemand.com/",
-            client_id="c",
-            client_secret="s",
-            session=mock_session,
-        )
+        config = _make_config(ias_url="https://tenant.accounts.ondemand.com/")
+        fetcher = IasTokenFetcher(config=config, session=mock_session)
         mock_session.post.return_value = _make_token_response()
         fetcher.get_token()
         url = mock_session.post.call_args[0][0]
@@ -112,6 +122,17 @@ class TestIasTokenFetcherCore:
         with pytest.raises(AuthError, match="non-integer 'expires_in'"):
             fetcher.get_token()
 
+    def test_default_expiry_when_no_expires_in(self, fetcher, mock_session):
+        """An IAS response that omits ``expires_in`` entirely must fall back to
+        the default TTL and still cache the token."""
+        resp = MagicMock()
+        resp.ok = True
+        resp.json.return_value = {"access_token": "tok"}  # no expires_in
+        mock_session.post.return_value = resp
+        token = fetcher.get_token()
+        assert token == "tok"
+        assert fetcher._cache.get(_CC_CACHE_KEY) == "tok"
+
     def test_exchange_token_uses_jwt_bearer_grant(self, fetcher, mock_session):
         mock_session.post.return_value = _make_token_response("obo-token")
         result = fetcher.exchange_token("user.jwt.here")
@@ -125,16 +146,12 @@ class TestIasTokenFetcherCore:
         fetcher.exchange_token("jwt-1")
         fetcher.exchange_token("jwt-2")
         assert mock_session.post.call_count == 2
+        # In-memory cache must not be populated by OBO calls.
+        assert fetcher._cache.get(_CC_CACHE_KEY) is None
 
-    def test_custom_cache_used(self, mock_session):
+    def test_custom_cache_used(self, config, mock_session):
         custom = InMemoryTokenCache()
-        fetcher = IasTokenFetcher(
-            ias_url="https://t.accounts.ondemand.com",
-            client_id="c",
-            client_secret="s",
-            session=mock_session,
-            cache=custom,
-        )
+        fetcher = IasTokenFetcher(config=config, session=mock_session, cache=custom)
         mock_session.post.return_value = _make_token_response("tok")
         fetcher.get_token()
         assert custom.get(_CC_CACHE_KEY) == "tok"
@@ -179,4 +196,5 @@ class TestIasTokenFetcherCore:
             if call[1]["data"]["grant_type"] == "client_credentials"
         ]
         assert len(cc_grant_calls) == 1
+
 

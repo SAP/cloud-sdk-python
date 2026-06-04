@@ -5,7 +5,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from sap_cloud_sdk.core.auth._token_cache import InMemoryTokenCache, RedisTokenCache, TokenCache
+from sap_cloud_sdk.adms._token_cache import InMemoryTokenCache, RedisTokenCache, TokenCache
 
 
 class TestInMemoryTokenCache:
@@ -22,7 +22,7 @@ class TestInMemoryTokenCache:
         cache = InMemoryTokenCache()
         cache.set("cc", "my-token", 0)  # TTL = 0 → expires immediately
         # monotonic time may not have advanced; force expiry by patching
-        with patch("sap_cloud_sdk.core.auth._token_cache.time") as mock_time:
+        with patch("sap_cloud_sdk.adms._token_cache.time") as mock_time:
             mock_time.monotonic.return_value = time.monotonic() + 1
             result = cache.get("cc")
         assert result is None
@@ -118,7 +118,7 @@ class TestRedisTokenCache:
         with patch.dict("sys.modules", {"redis": MagicMock(Redis=mock_redis_cls)}):
             cache = RedisTokenCache(host="localhost", ssl=False)
             with caplog.at_level(
-                logging.WARNING, logger="sap_cloud_sdk.core.auth._token_cache"
+                logging.WARNING, logger="sap_cloud_sdk.adms._token_cache"
             ):
                 result = cache.get("cc")
 
@@ -137,7 +137,7 @@ class TestRedisTokenCache:
         with patch.dict("sys.modules", {"redis": MagicMock(Redis=mock_redis_cls)}):
             cache = RedisTokenCache(host="localhost", ssl=False)
             with caplog.at_level(
-                logging.WARNING, logger="sap_cloud_sdk.core.auth._token_cache"
+                logging.WARNING, logger="sap_cloud_sdk.adms._token_cache"
             ):
                 cache.set("cc", "some-token", 3540)  # Should NOT raise
 
@@ -154,7 +154,7 @@ class TestRedisTokenCache:
         with patch.dict("sys.modules", {"redis": MagicMock(Redis=mock_redis_cls)}):
             cache = RedisTokenCache(host="localhost", ssl=False)
             with caplog.at_level(
-                logging.WARNING, logger="sap_cloud_sdk.core.auth._token_cache"
+                logging.WARNING, logger="sap_cloud_sdk.adms._token_cache"
             ):
                 cache.delete("cc")  # Should NOT raise
 

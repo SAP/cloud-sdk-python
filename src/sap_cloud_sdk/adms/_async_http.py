@@ -13,8 +13,8 @@ for any SDK module that needs async HTTP with IAS Bearer auth.
 
 Usage::
 
-    from sap_cloud_sdk.core.http import AsyncHttpClient
-    from sap_cloud_sdk.core.auth import IasTokenFetcher
+    from sap_cloud_sdk.adms import AsyncHttpClient
+    from sap_cloud_sdk.adms import IasTokenFetcher
 
     fetcher = IasTokenFetcher(ias_url=..., client_id=..., client_secret=...)
 
@@ -80,8 +80,8 @@ class AsyncHttpClient:
 
     Example — service-to-service with IAS::
 
-        from sap_cloud_sdk.core.auth import IasTokenFetcher
-        from sap_cloud_sdk.core.http import AsyncHttpClient
+        from sap_cloud_sdk.adms import IasTokenFetcher
+        from sap_cloud_sdk.adms import AsyncHttpClient
 
         fetcher = IasTokenFetcher(ias_url=..., client_id=..., client_secret=...)
         async with AsyncHttpClient(base_url=..., get_token=fetcher.get_token) as http:

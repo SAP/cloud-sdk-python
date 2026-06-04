@@ -1,10 +1,10 @@
 """IAS token management for the ADMS module — thin ADMS adapter over core auth.
 
-All token-fetching logic lives in :mod:`sap_cloud_sdk.core.auth._ias_fetcher`.
+All token-fetching logic lives in :mod:`sap_cloud_sdk.adms._ias_fetcher`.
 This module provides ADMS-specific wrappers that:
 
 * Accept :class:`~sap_cloud_sdk.adms.config.AdmsConfig` instead of raw URL/credentials.
-* Re-raise :class:`~sap_cloud_sdk.core.auth.AuthError` as ADMS's own
+* Re-raise :class:`~sap_cloud_sdk.adms.AuthError` as ADMS's own
   :class:`~sap_cloud_sdk.adms.exceptions.AuthError` (a subclass of
   ``AdmsError``) so that callers using ``except AdmsError`` still catch auth failures.
 
@@ -17,11 +17,11 @@ from __future__ import annotations
 import requests
 
 # Core implementations — real logic lives here
-from sap_cloud_sdk.core.auth import (
+from sap_cloud_sdk.adms._ias_fetcher import (
     IasTokenFetcher as _CoreIasTokenFetcher,
     AuthError as _CoreAuthError,
-    TokenCache,
 )
+from sap_cloud_sdk.adms._token_cache import TokenCache
 from sap_cloud_sdk.adms.config import AdmsConfig
 from sap_cloud_sdk.adms.exceptions import AuthError
 
@@ -34,16 +34,16 @@ class IasTokenFetcher(_CoreIasTokenFetcher):
     """ADMS-flavoured IAS token fetcher that accepts :class:`AdmsConfig`.
 
     Inherits all caching / fetching logic from the core layer.  Converts
-    :class:`~sap_cloud_sdk.core.auth.AuthError` to
+    :class:`~sap_cloud_sdk.adms.AuthError` to
     :class:`~sap_cloud_sdk.adms.exceptions.AuthError` (a ``AdmsError`` subclass)
     so existing ``except AdmsError / AuthError`` handlers are unaffected.
 
     Args:
         config: :class:`~sap_cloud_sdk.adms.config.AdmsConfig` with IAS credentials.
         session: Optional ``requests.Session`` to reuse (useful for testing).
-        cache: Pluggable :class:`~sap_cloud_sdk.core.auth.TokenCache`.
-            Defaults to :class:`~sap_cloud_sdk.core.auth.InMemoryTokenCache`.
-            Pass a :class:`~sap_cloud_sdk.core.auth.RedisTokenCache` for
+        cache: Pluggable :class:`~sap_cloud_sdk.adms.TokenCache`.
+            Defaults to :class:`~sap_cloud_sdk.adms.InMemoryTokenCache`.
+            Pass a :class:`~sap_cloud_sdk.adms.RedisTokenCache` for
             multi-instance deployments.
     """
 

@@ -27,9 +27,9 @@ from requests.exceptions import RequestException
 from sap_cloud_sdk.adms._auth import IasTokenFetcher
 from sap_cloud_sdk.adms.config import AdmsConfig
 from sap_cloud_sdk.adms.exceptions import DocumentNotFoundError, HttpError
-from sap_cloud_sdk.core.http import AsyncHttpClient
-from sap_cloud_sdk.core.http import HttpError as CoreHttpError
-from sap_cloud_sdk.core.http import NotFoundError as CoreNotFoundError
+from sap_cloud_sdk.adms._async_http import AsyncHttpClient
+from sap_cloud_sdk.adms._async_http import HttpError as CoreHttpError
+from sap_cloud_sdk.adms._async_http import NotFoundError as CoreNotFoundError
 
 _CSRF_FETCH_HEADER = "X-CSRF-Token"
 _CSRF_FETCH_VALUE = "Fetch"
@@ -335,13 +335,13 @@ class AdmsHttp:
 class AsyncAdmsHttp(AsyncHttpClient):
     """Async HTTP wrapper for ADM OData V4 service.
 
-    Extends :class:`~sap_cloud_sdk.core.http.AsyncHttpClient` with:
+    Extends :class:`~sap_cloud_sdk.adms.AsyncHttpClient` with:
 
     * OData CSRF token fetch-and-carry for mutating requests (POST, PATCH,
       DELETE), cached per OData service root.
     * Dynamic ``service_base`` path prefix for multi-root OData services.
-    * Mapping of core :class:`~sap_cloud_sdk.core.http.HttpError` /
-      :class:`~sap_cloud_sdk.core.http.NotFoundError` to ADMS-specific types.
+    * Mapping of core :class:`~sap_cloud_sdk.adms.HttpError` /
+      :class:`~sap_cloud_sdk.adms.NotFoundError` to ADMS-specific types.
 
     Coroutine-safe: a single instance may be shared across concurrent
     coroutines on the same event loop.  The CSRF token cache is guarded

@@ -5,12 +5,12 @@ from unittest.mock import MagicMock, patch
 import pytest
 import requests
 
-from sap_cloud_sdk.core.auth._ias_fetcher import (
+from sap_cloud_sdk.adms._ias_fetcher import (
     AuthError,
     IasTokenFetcher,
     _CC_CACHE_KEY,
 )
-from sap_cloud_sdk.core.auth._token_cache import InMemoryTokenCache
+from sap_cloud_sdk.adms._token_cache import InMemoryTokenCache
 
 
 def _make_token_response(token: str = "core-access-token", expires_in: int = 3600):

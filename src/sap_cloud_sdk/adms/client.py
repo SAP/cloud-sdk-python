@@ -65,7 +65,7 @@ from sap_cloud_sdk.adms.config import (
     load_from_env_or_mount,
 )
 from sap_cloud_sdk.adms.exceptions import ScanNotCleanError
-from sap_cloud_sdk.core.auth import TokenCache
+from sap_cloud_sdk.adms._token_cache import TokenCache
 from sap_cloud_sdk.core.telemetry import Module, Operation, record_metrics
 
 

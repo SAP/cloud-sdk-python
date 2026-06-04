@@ -47,7 +47,7 @@ def _validate_path(path: str) -> None:
         raise NotADirectoryError(f"path is not a directory: {path}")
 
 
-def _get_field_map(target: Any) -> Dict[str, Tuple[str, Any]]:
+def _get_field_map(target: Any) -> Dict[str, Tuple[str, type]]:
     """
     Build a mapping from secret key -> (attribute_name, attribute_type) for a dataclass instance.
 
@@ -59,12 +59,11 @@ def _get_field_map(target: Any) -> Dict[str, Tuple[str, Any]]:
     if not is_dataclass(target) or isinstance(target, type):
         raise TypeError("target must be a dataclass instance")
 
-    mapping: Dict[str, Tuple[str, Any]] = {}
+    mapping: Dict[str, Tuple[str, type]] = {}
     for f in fields(target):
-        # Only support string fields for secrets (consistent with Go SDK).
-        # f.type may be the str class (normal annotations) or the string "str"
-        # (PEP 563 / from __future__ import annotations).  Accept both.
-        if f.type is not str and f.type != "str":
+        # Only support string fields for secrets (consistent with Go SDK)
+        # Allow plain 'str' annotations; reject others to keep behavior predictable
+        if f.type is not str:
             raise TypeError(
                 f"target field '{f.name}' is not a string (only str fields are supported)"
             )

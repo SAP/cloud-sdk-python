@@ -81,7 +81,7 @@ client = create_client(user_jwt=request.headers["Authorization"].split()[1])
 
 ```python
 from sap_cloud_sdk.adms import create_client
-from sap_cloud_sdk.core.auth import RedisTokenCache
+from sap_cloud_sdk.adms import RedisTokenCache
 
 # Share token cache across multiple pods
 cache = RedisTokenCache(host="redis-host", ssl=True)

@@ -8,11 +8,11 @@ Provides:
 Usage::
 
     # Single instance (default)
-    from sap_cloud_sdk.core.auth import IasTokenFetcher, InMemoryTokenCache
+    from sap_cloud_sdk.adms import IasTokenFetcher, InMemoryTokenCache
     fetcher = IasTokenFetcher(ias_url=..., client_id=..., client_secret=...)
 
     # Multi-instance: share tokens via Redis
-    from sap_cloud_sdk.core.auth import IasTokenFetcher, RedisTokenCache
+    from sap_cloud_sdk.adms import IasTokenFetcher, RedisTokenCache
     cache = RedisTokenCache(host="redis-host", ssl=True)
     fetcher = IasTokenFetcher(ias_url=..., client_id=..., client_secret=..., cache=cache)
 """
@@ -103,7 +103,7 @@ class RedisTokenCache(TokenCache):
 
     Example::
 
-        from sap_cloud_sdk.core.auth import RedisTokenCache, IasTokenFetcher
+        from sap_cloud_sdk.adms import RedisTokenCache, IasTokenFetcher
         cache = RedisTokenCache(
             host="adm-redis.redis.svc.cluster.local",
             ssl=True,

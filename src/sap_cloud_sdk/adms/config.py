@@ -16,8 +16,6 @@ Environment variable fallback (uppercase):
   e.g. CLOUD_SDK_CFG_ADMS_DEFAULT_CLIENTID
 """
 
-from __future__ import annotations
-
 from dataclasses import dataclass
 
 from sap_cloud_sdk.core.secret_resolver.resolver import (

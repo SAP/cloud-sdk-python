@@ -21,7 +21,7 @@ from typing import Optional
 
 import requests
 
-from sap_cloud_sdk.core.auth._token_cache import InMemoryTokenCache, TokenCache
+from sap_cloud_sdk.adms._token_cache import InMemoryTokenCache, TokenCache
 
 # Grant types (RFC 6749 / RFC 7523)
 _GRANT_CLIENT_CREDENTIALS = "client_credentials"
@@ -64,7 +64,7 @@ class IasTokenFetcher:
 
     Example::
 
-        from sap_cloud_sdk.core.auth import IasTokenFetcher
+        from sap_cloud_sdk.adms import IasTokenFetcher
         fetcher = IasTokenFetcher(
             ias_url="https://tenant.accounts.ondemand.com",
             client_id="my-client",

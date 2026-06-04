@@ -5,7 +5,7 @@ import httpx
 
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from sap_cloud_sdk.core.http._async_client import AsyncHttpClient, HttpError, NotFoundError
+from sap_cloud_sdk.adms._async_http import AsyncHttpClient, HttpError, NotFoundError
 
 
 def _make_response(status: int, body: dict | str = "") -> httpx.Response:

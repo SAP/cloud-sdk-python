@@ -8,7 +8,7 @@ import requests
 from sap_cloud_sdk.adms._auth import IasTokenFetcher
 from sap_cloud_sdk.adms.config import AdmsConfig
 from sap_cloud_sdk.adms.exceptions import AuthError
-from sap_cloud_sdk.core.auth._ias_fetcher import _CC_CACHE_KEY
+from sap_cloud_sdk.adms._ias_fetcher import _CC_CACHE_KEY
 
 
 @pytest.fixture

@@ -5,6 +5,16 @@ from typing import Annotated, TypedDict
 
 import pytest
 
+try:
+    from langchain_core.messages import BaseMessage
+    from langgraph.graph.message import add_messages
+
+    class State(TypedDict):
+        messages: Annotated[list[BaseMessage], add_messages]
+
+except ImportError:
+    pass
+
 
 def build_langgraph_agent():
     """Build a minimal single-node LangGraph agent backed by LiteLLM via AI Core.
@@ -14,18 +24,13 @@ def build_langgraph_agent():
     "sap/<model>" prefix to route through the SAP AI Core provider.
     """
     try:
-        from langchain_core.messages import BaseMessage
         from langchain_litellm import ChatLiteLLM
         from langgraph.graph import END, StateGraph
-        from langgraph.graph.message import add_messages
     except ImportError:
         pytest.skip("langchain-litellm or langgraph not installed")
 
     model_name = os.environ.get("AICORE_MODEL") or "anthropic--claude-4.5-sonnet"
     llm = ChatLiteLLM(model=f"sap/{model_name}")
-
-    class State(TypedDict):
-        messages: Annotated[list[BaseMessage], add_messages]
 
     def call_llm(state: State) -> State:
         return {"messages": [llm.invoke(state["messages"])]}

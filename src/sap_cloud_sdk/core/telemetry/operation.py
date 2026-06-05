@@ -81,6 +81,13 @@ class Operation(str, Enum):
     AICORE_SET_CONFIG = "set_aicore_config"
     AICORE_AUTO_INSTRUMENT = "auto_instrument"
 
+    # Print Operations
+    PRINT_LIST_QUEUES = "list_queues"
+    PRINT_CREATE_QUEUE = "create_queue"
+    PRINT_GET_PROFILES = "get_print_profiles"
+    PRINT_UPLOAD_DOCUMENT = "upload_document"
+    PRINT_CREATE_TASK = "create_print_task"
+
     # DMS Operations
     DMS_ONBOARD_REPOSITORY = "onboard_repository"
     DMS_GET_REPOSITORY = "get_repository"

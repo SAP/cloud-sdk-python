@@ -51,6 +51,7 @@ from sap_cloud_sdk.core.telemetry import (
     record_error_metric as _record_error_metric,
 )
 
+
 def create_client(
     *,
     instance: Optional[str] = None,

@@ -87,6 +87,7 @@ class Operation(str, Enum):
     PRINT_GET_PROFILES = "get_print_profiles"
     PRINT_UPLOAD_DOCUMENT = "upload_document"
     PRINT_CREATE_TASK = "create_print_task"
+    PRINT_CREATE_CLIENT = "create_client"
 
     # DMS Operations
     DMS_ONBOARD_REPOSITORY = "onboard_repository"

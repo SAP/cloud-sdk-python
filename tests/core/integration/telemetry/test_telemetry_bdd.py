@@ -2,6 +2,7 @@
 
 import logging
 import os
+from collections.abc import Sequence
 
 from langchain_core.messages import HumanMessage
 from opentelemetry import baggage, context
@@ -194,7 +195,9 @@ def invoke_agent_wrapping_llm_with_baggage(memory_exporter, transforming_exporte
 def run_langgraph_agent(provider, name, transforming_exporter, span_store):
     agent = build_langgraph_agent()
     with invoke_agent_span(provider=provider, agent_name=name) as root_span:
-        span_store["root_span_id"] = root_span.get_span_context().span_id
+        ctx = root_span.get_span_context()
+        assert ctx is not None
+        span_store["root_span_id"] = ctx.span_id
         agent.invoke({"messages": [HumanMessage(content="Say hello in one word.")]})
     all_spans = transforming_exporter.get_finished_spans()
     _log_spans(all_spans)
@@ -290,7 +293,7 @@ def span_is_child_of(name, parent_name, memory_exporter, span_store):
     parent = _find_span_in(spans, parent_name)
     assert child is not None, f"Span '{name}' not found. Available: {[s.name for s in spans]}"
     assert parent is not None, f"Span '{parent_name}' not found. Available: {[s.name for s in spans]}"
-    parent_id = parent.get_span_context().span_id
+    parent_id = _span_id(parent)
     assert child.parent is not None and child.parent.span_id == parent_id, (
         f"Span '{name}' is not a child of '{parent_name}'. "
         f"child.parent={child.parent}, expected span_id={parent_id}"
@@ -311,7 +314,7 @@ def span_with_operation_is_child_of(operation, parent_name, memory_exporter, spa
     spans = span_store.get("all_local_spans") or memory_exporter.get_finished_spans()
     parent = _find_span_in(spans, parent_name)
     assert parent is not None, f"Parent span '{parent_name}' not found. Available: {[s.name for s in spans]}"
-    parent_id = parent.get_span_context().span_id
+    parent_id = _span_id(parent)
     child = next(
         (s for s in spans
          if (s.attributes or {}).get("gen_ai.operation.name") == operation
@@ -376,11 +379,11 @@ def _require_span(exporter: InMemorySpanExporter, name: str) -> ReadableSpan:
     return _require_span_in(spans, name)
 
 
-def _find_span_in(spans: list[ReadableSpan], name: str) -> ReadableSpan | None:
+def _find_span_in(spans: Sequence[ReadableSpan], name: str) -> ReadableSpan | None:
     return next((s for s in spans if s.name == name), None)
 
 
-def _require_span_in(spans: list[ReadableSpan], name: str) -> ReadableSpan:
+def _require_span_in(spans: Sequence[ReadableSpan], name: str) -> ReadableSpan:
     span = _find_span_in(spans, name)
     assert span is not None, (
         f"No span named '{name}' found.\n"
@@ -389,23 +392,29 @@ def _require_span_in(spans: list[ReadableSpan], name: str) -> ReadableSpan:
     return span
 
 
-def _log_spans(spans: list[ReadableSpan]) -> None:
+def _log_spans(spans: Sequence[ReadableSpan]) -> None:
     log.info("Collected %d span(s):", len(spans))
     for s in spans:
         log.info("  [%s] attrs=%s", s.name, dict(s.attributes or {}))
 
 
-def _get_descendants(all_spans: list[ReadableSpan], root_span_id: int) -> list[ReadableSpan]:
+def _get_descendants(all_spans: Sequence[ReadableSpan], root_span_id: int) -> list[ReadableSpan]:
     return [
         s for s in all_spans
-        if s.get_span_context().span_id != root_span_id
+        if _span_id(s) != root_span_id
         and _is_descendant(s, root_span_id, all_spans)
     ]
 
 
-def _is_descendant(span: ReadableSpan, ancestor_id: int, all_spans: list[ReadableSpan]) -> bool:
-    current = span
-    visited = set()
+def _span_id(span: ReadableSpan) -> int:
+    ctx = span.get_span_context()
+    assert ctx is not None
+    return ctx.span_id
+
+
+def _is_descendant(span: ReadableSpan, ancestor_id: int, all_spans: Sequence[ReadableSpan]) -> bool:
+    current: ReadableSpan | None = span
+    visited: set[int] = set()
     while current is not None and current.parent is not None:
         parent_id = current.parent.span_id
         if parent_id in visited:
@@ -414,7 +423,7 @@ def _is_descendant(span: ReadableSpan, ancestor_id: int, all_spans: list[Readabl
         if parent_id == ancestor_id:
             return True
         current = next(
-            (s for s in all_spans if s.get_span_context().span_id == parent_id),
+            (s for s in all_spans if _span_id(s) == parent_id),
             None,
         )
     return False

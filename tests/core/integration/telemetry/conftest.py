@@ -7,6 +7,7 @@ from unittest.mock import patch
 import pytest
 from dotenv import load_dotenv
 from opentelemetry import trace
+from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 
@@ -32,7 +33,9 @@ def memory_exporter() -> InMemorySpanExporter:
     raw_exporter = InMemorySpanExporter()
     with patch.dict(os.environ, {"OTEL_TRACES_EXPORTER": "console"}, clear=False):
         auto_instrument(disable_batch=True)
-    trace.get_tracer_provider().add_span_processor(SimpleSpanProcessor(raw_exporter))
+    provider = trace.get_tracer_provider()
+    assert isinstance(provider, TracerProvider)
+    provider.add_span_processor(SimpleSpanProcessor(raw_exporter))
     return raw_exporter
 
 
@@ -44,7 +47,9 @@ def transforming_exporter(memory_exporter: InMemorySpanExporter) -> InMemorySpan
     (gen_ai.* attributes present, llm.usage.* and traceloop.* absent).
     """
     transformed_sink = InMemorySpanExporter()
-    trace.get_tracer_provider().add_span_processor(
+    provider = trace.get_tracer_provider()
+    assert isinstance(provider, TracerProvider)
+    provider.add_span_processor(
         SimpleSpanProcessor(GenAIAttributeTransformer(transformed_sink))
     )
     return transformed_sink

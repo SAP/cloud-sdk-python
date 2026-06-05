@@ -16,6 +16,7 @@ class Module(str, Enum):
     DMS = "dms"
     EXTENSIBILITY = "extensibility"
     OBJECTSTORE = "objectstore"
+    PRINT = "print"
     TELEMETRY = "telemetry"
 
     def __str__(self) -> str:

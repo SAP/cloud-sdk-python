@@ -1,19 +1,18 @@
 """LangGraph test agent used by the telemetry integration tests."""
 
 import os
-from typing import Annotated, TypedDict
+from dataclasses import dataclass
+from typing import Annotated
 
 import pytest
 
-try:
-    from langchain_core.messages import BaseMessage
-    from langgraph.graph.message import add_messages
+from langchain_core.messages import BaseMessage
+from langgraph.graph.message import add_messages
 
-    class State(TypedDict):
-        messages: Annotated[list[BaseMessage], add_messages]
 
-except ImportError:
-    pass
+@dataclass
+class State:
+    messages: Annotated[list[BaseMessage], add_messages]
 
 
 def build_langgraph_agent():
@@ -33,7 +32,7 @@ def build_langgraph_agent():
     llm = ChatLiteLLM(model=f"sap/{model_name}")
 
     def call_llm(state: State) -> State:
-        return {"messages": [llm.invoke(state["messages"])]}
+        return State(messages=[llm.invoke(state.messages)])
 
     graph = StateGraph(State)
     graph.add_node("llm", call_llm)

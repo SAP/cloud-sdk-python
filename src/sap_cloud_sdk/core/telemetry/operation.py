@@ -80,7 +80,7 @@ class Operation(str, Enum):
     # AI Core Operations
     AICORE_SET_CONFIG = "set_aicore_config"
     AICORE_AUTO_INSTRUMENT = "auto_instrument"
-    
+
     # Print Operations
     PRINT_LIST_QUEUES = "list_queues"
     PRINT_CREATE_QUEUE = "create_queue"

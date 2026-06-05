@@ -24,6 +24,7 @@ from sap_cloud_sdk.agentgateway._models import (
     IntegrationDependency,
     MCPTool,
 )
+from sap_cloud_sdk.agentgateway._token_cache import _TokenCache
 from sap_cloud_sdk.agentgateway.exceptions import AgentGatewaySDKError
 
 logger = logging.getLogger(__name__)
@@ -40,6 +41,11 @@ _AGW_RESOURCE_URN = "urn:sap:identity:application:provider:name:agent-gateway"
 # OAuth2 grant types
 _GRANT_TYPE_CLIENT_CREDENTIALS = "client_credentials"
 _GRANT_TYPE_JWT_BEARER = "urn:ietf:params:oauth:grant-type:jwt-bearer"
+
+
+def _cache_scope_key(credentials: CustomerCredentials, app_tid: str | None) -> str:
+    """Build a cache scope key for customer-flow tokens."""
+    return f"customer::{credentials.client_id}::{app_tid or ''}"
 
 
 class _CredentialFields:
@@ -212,17 +218,18 @@ def _request_token_mtls(
     timeout: float,
     app_tid: str | None = None,
     extra_data: dict | None = None,
-) -> str:
+) -> dict:
     """Make mTLS token request to IAS.
 
     Args:
         credentials: Customer credentials with certificate and private key.
         grant_type: OAuth2 grant type.
+        timeout: HTTP timeout in seconds.
         app_tid: BTP Application Tenant ID of subscriber (optional).
         extra_data: Additional form data for the token request.
 
     Returns:
-        Access token string.
+        Token response payload.
 
     Raises:
         AgentGatewaySDKError: If token request fails.
@@ -282,7 +289,7 @@ def _request_token_mtls(
             )
 
         logger.debug("Token acquired successfully (length: %d)", len(access_token))
-        return access_token
+        return token_data
 
     except httpx.RequestError as e:
         raise AgentGatewaySDKError(f"Token request failed: {e}")
@@ -292,6 +299,7 @@ def get_system_token_mtls(
     credentials: CustomerCredentials,
     timeout: float,
     app_tid: str | None = None,
+    token_cache: _TokenCache | None = None,
 ) -> str:
     """Get system-scoped token using mTLS client credentials flow.
 
@@ -301,18 +309,36 @@ def get_system_token_mtls(
         credentials: Customer credentials.
         timeout: HTTP timeout in seconds.
         app_tid: BTP Application Tenant ID of subscriber (optional).
+        token_cache: Optional token cache used to reuse still-valid tokens.
 
     Returns:
-        System-scoped access token.
+        System-scoped access token, fetched or served from cache.
     """
+    scope_key = _cache_scope_key(credentials, app_tid)
+    if token_cache:
+        cached_token = token_cache.get_system_token(scope_key)
+        if cached_token:
+            logger.debug("Using cached system token for scope '%s'", scope_key)
+            return cached_token
+
     logger.info("Acquiring system token via mTLS client credentials")
-    return _request_token_mtls(
+    token_data = _request_token_mtls(
         credentials,
         grant_type=_GRANT_TYPE_CLIENT_CREDENTIALS,
         timeout=timeout,
         app_tid=app_tid,
         extra_data={"response_type": "token"},
     )
+    access_token = token_data["access_token"]
+
+    if token_cache:
+        token_cache.set_system_token(
+            access_token,
+            token_cache.compute_expires_at(token_data),
+            scope_key,
+        )
+
+    return access_token
 
 
 def exchange_user_token(
@@ -320,6 +346,7 @@ def exchange_user_token(
     user_token: str,
     timeout: float,
     app_tid: str | None = None,
+    token_cache: _TokenCache | None = None,
 ) -> str:
     """Exchange user token for AGW-scoped token using jwt-bearer grant.
 
@@ -331,12 +358,21 @@ def exchange_user_token(
         user_token: User's JWT token to exchange.
         timeout: HTTP timeout in seconds.
         app_tid: BTP Application Tenant ID of subscriber (optional).
+        token_cache: Optional token cache used to reuse still-valid exchanged
+            tokens.
 
     Returns:
-        AGW-scoped access token with user identity.
+        AGW-scoped access token with user identity, fetched or served from cache.
     """
+    scope_key = _cache_scope_key(credentials, app_tid)
+    if token_cache:
+        cached_token = token_cache.get_user_token(user_token, scope_key)
+        if cached_token:
+            logger.debug("Using cached exchanged user token for scope '%s'", scope_key)
+            return cached_token
+
     logger.info("Exchanging user token for AGW-scoped token via jwt-bearer grant")
-    return _request_token_mtls(
+    token_data = _request_token_mtls(
         credentials,
         grant_type=_GRANT_TYPE_JWT_BEARER,
         timeout=timeout,
@@ -346,6 +382,17 @@ def exchange_user_token(
             "token_format": "jwt",
         },
     )
+    access_token = token_data["access_token"]
+
+    if token_cache:
+        token_cache.set_user_token(
+            user_token,
+            access_token,
+            token_cache.compute_expires_at(token_data),
+            scope_key,
+        )
+
+    return access_token
 
 
 def _build_mcp_url(gateway_url: str, ord_id: str, gt_id: str) -> str:

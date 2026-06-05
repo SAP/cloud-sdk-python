@@ -43,9 +43,10 @@ result = await agw_client.call_mcp_tool(
 LoB agents use BTP Destination Service for credential management. Tools are auto-discovered from destination fragments.
 
 ```python
-from sap_cloud_sdk.agentgateway import create_client
+from sap_cloud_sdk.agentgateway import ClientConfig, create_client
 
-agw_client = create_client(tenant_subdomain="my-tenant")
+config = ClientConfig(timeout=30.0)
+agw_client = create_client(tenant_subdomain="my-tenant", config=config)
 
 # Discover tools (auto-discovered from destination fragments)
 tools = await agw_client.list_mcp_tools()
@@ -99,10 +100,38 @@ The SDK automatically detects the agent type based on the presence of a credenti
 ```python
 def create_client(
     tenant_subdomain: str | Callable[[], str] | None = None,
+    config: ClientConfig | None = None,
 ) -> AgentGatewayClient
 ```
 
 - `tenant_subdomain`: Required for LoB agents, ignored for Customer agents. Can be a string or callable.
+- `config`: Optional `ClientConfig` used to control HTTP timeout and in-memory token cache behavior.
+
+### ClientConfig
+
+Use `ClientConfig` to tune request timeouts and token cache behavior for a client instance.
+
+```python
+from sap_cloud_sdk.agentgateway import ClientConfig, create_client
+
+config = ClientConfig(
+    timeout=30.0,
+    fallback_token_ttl_seconds=300.0,
+    token_expiry_buffer_seconds=30.0,
+    max_system_token_cache_size=32,
+    max_user_token_cache_size=256,
+)
+
+agw_client = create_client(tenant_subdomain="my-tenant", config=config)
+```
+
+- `timeout`: HTTP timeout in seconds for token requests and MCP calls. Default: `60.0`.
+- `fallback_token_ttl_seconds`: Used when the token response does not include expiry metadata. Default: `300.0`.
+- `token_expiry_buffer_seconds`: Safety buffer subtracted from explicit token expiries before a cached token is reused. Default: `30.0`.
+- `max_system_token_cache_size`: Maximum number of cached system tokens per client instance. Default: `32`.
+- `max_user_token_cache_size`: Maximum number of cached exchanged user tokens per client instance. Default: `256`.
+
+The SDK keeps token caches per `AgentGatewayClient` instance and reuses valid cached tokens for repeated authentication calls. System and user token caches are bounded independently with least-recently-used eviction.
 
 ### AgentGatewayClient
 

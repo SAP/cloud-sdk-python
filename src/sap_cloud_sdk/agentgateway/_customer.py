@@ -8,7 +8,6 @@ Authentication flow:
 - Tool invocation: mTLS + jwt-bearer grant → user-scoped token (principal propagation)
 """
 
-import asyncio
 import json
 import logging
 import os
@@ -25,6 +24,7 @@ from sap_cloud_sdk.agentgateway._models import (
     IntegrationDependency,
     MCPTool,
 )
+from sap_cloud_sdk.agentgateway._token_cache import _TokenCache
 from sap_cloud_sdk.agentgateway.exceptions import AgentGatewaySDKError
 
 logger = logging.getLogger(__name__)
@@ -35,15 +35,17 @@ _CREDENTIALS_PATH_ENV = "AGW_CREDENTIALS_PATH"
 # Default credential path for Kyma production deployments
 _CREDENTIALS_DEFAULT_PATH = "/etc/ums/credentials/credentials"
 
-# HTTP timeout for token requests and MCP server calls (seconds)
-_HTTP_TIMEOUT = 30.0
-
 # Resource URN for Agent Gateway token scope (hardcoded - production value)
 _AGW_RESOURCE_URN = "urn:sap:identity:application:provider:name:agent-gateway"
 
 # OAuth2 grant types
 _GRANT_TYPE_CLIENT_CREDENTIALS = "client_credentials"
 _GRANT_TYPE_JWT_BEARER = "urn:ietf:params:oauth:grant-type:jwt-bearer"
+
+
+def _cache_scope_key(credentials: CustomerCredentials, app_tid: str | None) -> str:
+    """Build a cache scope key for customer-flow tokens."""
+    return f"customer::{credentials.client_id}::{app_tid or ''}"
 
 
 class _CredentialFields:
@@ -213,19 +215,21 @@ def _create_ssl_context(certificate: str, private_key: str) -> ssl.SSLContext:
 def _request_token_mtls(
     credentials: CustomerCredentials,
     grant_type: str,
+    timeout: float,
     app_tid: str | None = None,
     extra_data: dict | None = None,
-) -> str:
+) -> dict:
     """Make mTLS token request to IAS.
 
     Args:
         credentials: Customer credentials with certificate and private key.
         grant_type: OAuth2 grant type.
+        timeout: HTTP timeout in seconds.
         app_tid: BTP Application Tenant ID of subscriber (optional).
         extra_data: Additional form data for the token request.
 
     Returns:
-        Access token string.
+        Token response payload.
 
     Raises:
         AgentGatewaySDKError: If token request fails.
@@ -255,7 +259,7 @@ def _request_token_mtls(
     try:
         with httpx.Client(
             verify=ssl_context,
-            timeout=_HTTP_TIMEOUT,
+            timeout=timeout,
         ) as client:
             response = client.post(
                 credentials.token_service_url,
@@ -285,7 +289,7 @@ def _request_token_mtls(
             )
 
         logger.debug("Token acquired successfully (length: %d)", len(access_token))
-        return access_token
+        return token_data
 
     except httpx.RequestError as e:
         raise AgentGatewaySDKError(f"Token request failed: {e}")
@@ -293,7 +297,9 @@ def _request_token_mtls(
 
 def get_system_token_mtls(
     credentials: CustomerCredentials,
+    timeout: float,
     app_tid: str | None = None,
+    token_cache: _TokenCache | None = None,
 ) -> str:
     """Get system-scoped token using mTLS client credentials flow.
 
@@ -301,24 +307,46 @@ def get_system_token_mtls(
 
     Args:
         credentials: Customer credentials.
+        timeout: HTTP timeout in seconds.
         app_tid: BTP Application Tenant ID of subscriber (optional).
+        token_cache: Optional token cache used to reuse still-valid tokens.
 
     Returns:
-        System-scoped access token.
+        System-scoped access token, fetched or served from cache.
     """
+    scope_key = _cache_scope_key(credentials, app_tid)
+    if token_cache:
+        cached_token = token_cache.get_system_token(scope_key)
+        if cached_token:
+            logger.debug("Using cached system token for scope '%s'", scope_key)
+            return cached_token
+
     logger.info("Acquiring system token via mTLS client credentials")
-    return _request_token_mtls(
+    token_data = _request_token_mtls(
         credentials,
         grant_type=_GRANT_TYPE_CLIENT_CREDENTIALS,
+        timeout=timeout,
         app_tid=app_tid,
         extra_data={"response_type": "token"},
     )
+    access_token = token_data["access_token"]
+
+    if token_cache:
+        token_cache.set_system_token(
+            access_token,
+            token_cache.compute_expires_at(token_data),
+            scope_key,
+        )
+
+    return access_token
 
 
 def exchange_user_token(
     credentials: CustomerCredentials,
     user_token: str,
+    timeout: float,
     app_tid: str | None = None,
+    token_cache: _TokenCache | None = None,
 ) -> str:
     """Exchange user token for AGW-scoped token using jwt-bearer grant.
 
@@ -328,21 +356,43 @@ def exchange_user_token(
     Args:
         credentials: Customer credentials.
         user_token: User's JWT token to exchange.
+        timeout: HTTP timeout in seconds.
         app_tid: BTP Application Tenant ID of subscriber (optional).
+        token_cache: Optional token cache used to reuse still-valid exchanged
+            tokens.
 
     Returns:
-        AGW-scoped access token with user identity.
+        AGW-scoped access token with user identity, fetched or served from cache.
     """
+    scope_key = _cache_scope_key(credentials, app_tid)
+    if token_cache:
+        cached_token = token_cache.get_user_token(user_token, scope_key)
+        if cached_token:
+            logger.debug("Using cached exchanged user token for scope '%s'", scope_key)
+            return cached_token
+
     logger.info("Exchanging user token for AGW-scoped token via jwt-bearer grant")
-    return _request_token_mtls(
+    token_data = _request_token_mtls(
         credentials,
         grant_type=_GRANT_TYPE_JWT_BEARER,
+        timeout=timeout,
         app_tid=app_tid,
         extra_data={
             "assertion": user_token,
             "token_format": "jwt",
         },
     )
+    access_token = token_data["access_token"]
+
+    if token_cache:
+        token_cache.set_user_token(
+            user_token,
+            access_token,
+            token_cache.compute_expires_at(token_data),
+            scope_key,
+        )
+
+    return access_token
 
 
 def _build_mcp_url(gateway_url: str, ord_id: str, gt_id: str) -> str:
@@ -371,6 +421,7 @@ async def _list_server_tools(
     url: str,
     auth_token: str,
     dependency: IntegrationDependency,
+    timeout: float,
 ) -> list[MCPTool]:
     """List tools from a single MCP server.
 
@@ -390,7 +441,7 @@ async def _list_server_tools(
             "Authorization": f"Bearer {auth_token}",
             "x-correlation-id": str(uuid.uuid4()),
         },
-        timeout=_HTTP_TIMEOUT,
+        timeout=timeout,
     ) as http_client:
         async with streamable_http_client(url, http_client=http_client) as (
             read,
@@ -427,16 +478,18 @@ async def _list_server_tools(
 
 async def get_mcp_tools_customer(
     credentials: CustomerCredentials,
-    app_tid: str | None = None,
+    system_token: str,
+    timeout: float,
 ) -> list[MCPTool]:
     """List all MCP tools from servers defined in credentials.
 
     Iterates over all integrationDependencies in the credentials file and
-    discovers tools from each MCP server using mTLS client credentials.
+    discovers tools from each MCP server using a pre-fetched system token.
 
     Args:
         credentials: Customer credentials with integrationDependencies.
-        app_tid: BTP Application Tenant ID of subscriber (optional).
+        system_token: Pre-fetched raw system token for authentication.
+        timeout: HTTP timeout in seconds for MCP server calls.
 
     Returns:
         List of MCPTool objects from all servers.
@@ -453,12 +506,6 @@ async def get_mcp_tools_customer(
 
     logger.info("Discovering tools from %d MCP server(s)", len(dependencies))
 
-    # Get system token for discovery
-    loop = asyncio.get_running_loop()
-    system_token = await loop.run_in_executor(
-        None, get_system_token_mtls, credentials, app_tid
-    )
-
     tools: list[MCPTool] = []
 
     for dep in dependencies:
@@ -471,7 +518,7 @@ async def get_mcp_tools_customer(
         )
 
         try:
-            server_tools = await _list_server_tools(url, system_token, dep)
+            server_tools = await _list_server_tools(url, system_token, dep, timeout)
             tools.extend(server_tools)
             logger.debug("Loaded %d tool(s) from %s", len(server_tools), dep.ord_id)
         except Exception:
@@ -484,23 +531,20 @@ async def get_mcp_tools_customer(
 
 
 async def call_mcp_tool_customer(
-    credentials: CustomerCredentials,
     tool: MCPTool,
-    user_token: str | None,
-    app_tid: str | None = None,
+    auth_token: str,
+    timeout: float,
     **kwargs,
 ) -> str:
     """Invoke an MCP tool using customer flow.
 
-    If user_token is provided, exchanges it for an AGW-scoped token to preserve
-    user identity for principal propagation. Otherwise, falls back to system token.
+    Uses a pre-fetched token (either user-scoped or system-scoped) for
+    authentication against the MCP server.
 
     Args:
-        credentials: Customer credentials.
         tool: MCPTool to invoke.
-        user_token: User's JWT token for principal propagation (optional).
-            If None, system token is used instead (no principal propagation).
-        app_tid: BTP Application Tenant ID of subscriber (optional).
+        auth_token: Pre-fetched raw access token for authentication.
+        timeout: HTTP timeout in seconds for the MCP server call.
         **kwargs: Tool input parameters.
 
     Returns:
@@ -508,31 +552,12 @@ async def call_mcp_tool_customer(
     """
     logger.info("Calling tool '%s' on server '%s'", tool.name, tool.server_name)
 
-    loop = asyncio.get_running_loop()
-
-    if user_token:
-        # Exchange user token for AGW-scoped token (with principal propagation)
-        agw_token = await loop.run_in_executor(
-            None, exchange_user_token, credentials, user_token, app_tid
-        )
-    else:
-        # TODO: IBD workaround - use system token when user_token is not available.
-        # This bypasses principal propagation. Remove this fallback once IBD
-        # supports proper user token flow.
-        logger.warning(
-            "No user_token provided - using system token for tool invocation. "
-            "Principal propagation will NOT work."
-        )
-        agw_token = await loop.run_in_executor(
-            None, get_system_token_mtls, credentials, app_tid
-        )
-
     async with httpx.AsyncClient(
         headers={
-            "Authorization": f"Bearer {agw_token}",
+            "Authorization": f"Bearer {auth_token}",
             "x-correlation-id": str(uuid.uuid4()),
         },
-        timeout=_HTTP_TIMEOUT,
+        timeout=timeout,
     ) as http_client:
         async with streamable_http_client(tool.url, http_client=http_client) as (
             read,

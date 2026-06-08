@@ -27,7 +27,7 @@ class TestMcpToolToLangchain:
 
         result = mcp_tool_to_langchain(tool, call_tool, get_user_token)
 
-        assert result.name == "s4hana__create_order"
+        assert result.name == "create_order"
         assert result.description == "Create a purchase order"
         assert result.coroutine is not None
 
@@ -75,7 +75,7 @@ class TestMcpToolToLangchain:
 
         result = mcp_tool_to_langchain(tool, call_tool, lambda: "token")
 
-        assert result.name == "server__simple_tool"
+        assert result.name == "simple_tool"
         assert result.args_schema is not None
 
     def test_handles_input_schema_without_properties(self):

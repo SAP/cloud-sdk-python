@@ -1,8 +1,8 @@
 """LoB agent flow - BTP Destination Service based.
 
 LoB agents use BTP Destination Service for credential management:
-- Phase 1 (discovery): Client credentials from destination
-- Phase 2 (execution): Token exchange with user_token for principal propagation
+- Phase 1 (discovery): Client credentials from destination (subscriber.ias fragment)
+- Phase 2 (execution): Token exchange with user_token (subscriber.ias.user fragment)
 """
 
 import asyncio
@@ -23,6 +23,7 @@ from sap_cloud_sdk.destination import (
 )
 
 from sap_cloud_sdk.agentgateway._models import MCPTool
+from sap_cloud_sdk.agentgateway._token_cache import _GatewayUrlCache, _TokenCache
 from sap_cloud_sdk.agentgateway.exceptions import MCPServerNotFoundError
 
 logger = logging.getLogger(__name__)
@@ -33,11 +34,19 @@ _LABEL_KEY = "sap-managed-runtime-type"
 # Label values for fragment discovery
 _MCP_LABEL_VALUE = "agw.mcp.server"
 _IAS_LABEL_VALUE = "subscriber.ias"
+_IAS_USER_LABEL_VALUE = "subscriber.ias.user"
 
 _DESTINATION_INSTANCE = "default"
 
-# HTTP timeout for MCP server requests (seconds)
-_HTTP_TIMEOUT = 30.0
+
+def _system_scope_key(tenant_subdomain: str) -> str:
+    """Build the cache scope key for tenant-scoped system auth."""
+    return f"lob-system::{tenant_subdomain}"
+
+
+def _user_scope_key(tenant_subdomain: str) -> str:
+    """Build the cache scope key for tenant-scoped user auth."""
+    return f"lob-user::{tenant_subdomain}"
 
 
 def _ias_dest_name() -> str:
@@ -61,8 +70,12 @@ def _fetch_auth_token(
     dest_name: str,
     tenant_subdomain: str,
     options: ConsumptionOptions | None = None,
-) -> str:
-    """Fetch auth token from destination service.
+) -> tuple[str, str]:
+    """Fetch auth token and gateway URL from destination service.
+
+    Extracts the raw JWT from the Authorization header value returned by the
+    destination service (e.g. strips the "Bearer " prefix from "Bearer <jwt>"),
+    and the gateway URL from the destination's URL property.
 
     Args:
         dest_name: Destination name.
@@ -70,7 +83,7 @@ def _fetch_auth_token(
         options: Consumption options (fragment_name, user_token).
 
     Returns:
-        Authorization header value.
+        Tuple of (raw_jwt, gateway_url).
 
     Raises:
         MCPServerNotFoundError: If no auth token is returned.
@@ -88,13 +101,17 @@ def _fetch_auth_token(
             f"No auth token returned for destination '{dest_name}'"
         )
 
-    auth = dest.auth_tokens[0].http_header.get("value", "")
-    if not auth:
-        raise MCPServerNotFoundError(
-            f"Empty Authorization header for destination '{dest_name}'"
-        )
+    auth_token = dest.auth_tokens[0]
+    header_value = auth_token.http_header.get("value") or ""
+    if not header_value:
+        raise MCPServerNotFoundError(f"Empty auth header for destination '{dest_name}'")
 
-    return auth
+    # Strip "Bearer " prefix — AuthResult.access_token is always a raw JWT
+    raw_token = header_value.removeprefix("Bearer ").strip()
+
+    gateway_url = (dest.url or "").rstrip("/")
+
+    return raw_token, gateway_url
 
 
 def list_mcp_fragments(tenant_subdomain: str) -> list:
@@ -146,23 +163,71 @@ def get_ias_fragment_name(tenant_subdomain: str) -> str:
     return fragments[0].name
 
 
-async def get_system_auth(
+def get_ias_user_fragment_name(tenant_subdomain: str) -> str:
+    """Get the IAS user fragment name for token exchange (principal propagation).
+
+    Looks up the IAS user fragment created during subscription by the
+    sap-managed-runtime-type=subscriber.ias.user label.
+
+    Args:
+        tenant_subdomain: Tenant subdomain for multi-tenant lookup.
+
+    Returns:
+        IAS user fragment name.
+
+    Raises:
+        MCPServerNotFoundError: If no IAS user fragment is found.
+    """
+    client = create_fragment_client(instance=_DESTINATION_INSTANCE)
+    fragments = client.list_instance_fragments(
+        filter=ListOptions(
+            filter_labels=[Label(key=_LABEL_KEY, values=[_IAS_USER_LABEL_VALUE])]
+        ),
+        tenant=tenant_subdomain,
+    )
+    if not fragments:
+        raise MCPServerNotFoundError(
+            f"No IAS user fragment found (label {_LABEL_KEY}={_IAS_USER_LABEL_VALUE}) "
+            f"for tenant '{tenant_subdomain}'"
+        )
+    return fragments[0].name
+
+
+async def fetch_system_auth(
     tenant_subdomain: str,
-) -> str:
-    """Get system-scoped auth (Phase 1 - client credentials).
+    token_cache: _TokenCache | None = None,
+    gateway_url_cache: _GatewayUrlCache | None = None,
+) -> tuple[str, str]:
+    """Fetch system-scoped auth (Phase 1 - client credentials).
 
     Looks up the IAS fragment (subscriber.ias label) and uses it to acquire
     a client-credentials token via BTP Destination Service.
 
     Args:
         tenant_subdomain: Tenant subdomain for multi-tenant lookup.
+        token_cache: Optional token cache used to reuse still-valid system
+            tokens.
+        gateway_url_cache: Optional cache for gateway URLs associated with the
+            cached system-token scope.
 
     Returns:
-        Authorization header value (e.g., "Bearer xxx").
+        Tuple of `(raw_access_token, gateway_url)`, fetched or served from cache.
 
     Raises:
         MCPServerNotFoundError: If no IAS fragment or auth token is found.
     """
+    scope_key = _system_scope_key(tenant_subdomain)
+    if (token_cache is None) != (gateway_url_cache is None):
+        raise ValueError(
+            "token_cache and gateway_url_cache must both be provided or both be None"
+        )
+    if token_cache and gateway_url_cache is not None:
+        cached_token = token_cache.get_system_token(scope_key)
+        cached_gateway_url = gateway_url_cache.get(scope_key)
+        if cached_token and cached_gateway_url:
+            logger.debug("Using cached system auth for tenant '%s'", tenant_subdomain)
+            return cached_token, cached_gateway_url
+
     loop = asyncio.get_running_loop()
 
     def _fetch_system_auth_sync():
@@ -182,66 +247,113 @@ async def get_system_auth(
 
         return _fetch_auth_token(dest_name, tenant_subdomain, options)
 
-    return await loop.run_in_executor(None, _fetch_system_auth_sync)
+    token, gateway_url = await loop.run_in_executor(None, _fetch_system_auth_sync)
+
+    if token_cache:
+        token_cache.set_system_token(
+            token,
+            token_cache.compute_expires_at_from_bearer(token),
+            scope_key,
+        )
+    if gateway_url_cache is not None:
+        gateway_url_cache[scope_key] = gateway_url
+
+    return token, gateway_url
 
 
-async def get_user_auth(
-    mcp_fragment_name: str,
+async def fetch_user_auth(
     user_token: str,
     tenant_subdomain: str,
-) -> str:
-    """Get user-scoped auth (Phase 2 - token exchange).
+    token_cache: _TokenCache | None = None,
+    gateway_url_cache: _GatewayUrlCache | None = None,
+) -> tuple[str, str]:
+    """Fetch user-scoped auth (Phase 2 - token exchange).
+
+    Looks up the IAS user fragment (subscriber.ias.user label) and uses it
+    together with the user_token to perform a token exchange via BTP
+    Destination Service.
 
     Args:
-        mcp_fragment_name: MCP fragment name for token exchange.
         user_token: User's JWT for principal propagation.
         tenant_subdomain: Tenant subdomain for multi-tenant lookup.
+        token_cache: Optional token cache used to reuse still-valid exchanged
+            user tokens.
+        gateway_url_cache: Optional cache for gateway URLs associated with the
+            cached user-token scope.
 
     Returns:
-        Authorization header value with user identity embedded.
+        Tuple of `(raw_access_token, gateway_url)`, fetched or served from cache.
 
     Raises:
-        MCPServerNotFoundError: If no auth token is returned.
+        MCPServerNotFoundError: If no IAS user fragment or auth token is found.
     """
+    scope_key = _user_scope_key(tenant_subdomain)
+    if (token_cache is None) != (gateway_url_cache is None):
+        raise ValueError(
+            "token_cache and gateway_url_cache must both be provided or both be None"
+        )
+    if token_cache and gateway_url_cache is not None:
+        cached_token = token_cache.get_user_token(user_token, scope_key)
+        cached_gateway_url = gateway_url_cache.get(scope_key)
+        if cached_token and cached_gateway_url:
+            logger.debug("Using cached user auth for tenant '%s'", tenant_subdomain)
+            return cached_token, cached_gateway_url
+
     loop = asyncio.get_running_loop()
 
     def _fetch_user_auth_sync():
+        ias_user_fragment_name = get_ias_user_fragment_name(tenant_subdomain)
         dest_name = _ias_dest_name()
 
         logger.info(
             "Exchanging user auth — destination: '%s', fragment: '%s', tenant: '%s'",
             dest_name,
-            mcp_fragment_name,
+            ias_user_fragment_name,
             tenant_subdomain,
         )
 
         options = ConsumptionOptions(
             user_token=user_token,
-            fragment_name=mcp_fragment_name,
+            fragment_name=ias_user_fragment_name,
             fragment_level=ConsumptionLevel.INSTANCE,
         )
 
         return _fetch_auth_token(dest_name, tenant_subdomain, options)
 
-    return await loop.run_in_executor(None, _fetch_user_auth_sync)
+    token, gateway_url = await loop.run_in_executor(None, _fetch_user_auth_sync)
+
+    if token_cache:
+        token_cache.set_user_token(
+            user_token,
+            token,
+            token_cache.compute_expires_at_from_bearer(token),
+            scope_key,
+        )
+    if gateway_url_cache is not None:
+        gateway_url_cache[scope_key] = gateway_url
+
+    return token, gateway_url
 
 
 async def list_server_tools(
-    dest_url: str, system_auth: str, fragment_name: str
+    dest_url: str, auth_token: str, fragment_name: str, timeout: float
 ) -> list[MCPTool]:
     """List tools from a single MCP server.
 
     Args:
         dest_url: MCP endpoint URL.
-        system_auth: Authorization header for the request.
+        auth_token: Raw access token for the request.
         fragment_name: Fragment name for reference.
 
     Returns:
         List of MCPTool objects from this server.
     """
     async with httpx.AsyncClient(
-        headers={"Authorization": system_auth, "x-correlation-id": str(uuid.uuid4())},
-        timeout=_HTTP_TIMEOUT,
+        headers={
+            "Authorization": f"Bearer {auth_token}",
+            "x-correlation-id": str(uuid.uuid4()),
+        },
+        timeout=timeout,
     ) as http_client:
         async with streamable_http_client(dest_url, http_client=http_client) as (
             read,
@@ -273,13 +385,17 @@ async def list_server_tools(
 
 async def get_mcp_tools_lob(
     tenant_subdomain: str,
+    system_token: str,
+    timeout: float,
 ) -> list[MCPTool]:
     """List all MCP tools using LoB flow (destination-based).
 
-    Uses Phase 1 auth (client-scoped) via BTP Destination Service.
+    Uses a pre-fetched system token for authentication against MCP servers.
 
     Args:
         tenant_subdomain: Tenant subdomain for multi-tenant lookup.
+        system_token: Pre-fetched raw system token (from get_system_auth).
+        timeout: HTTP timeout in seconds for MCP server calls.
 
     Returns:
         List of MCPTool objects from all MCP servers.
@@ -308,8 +424,9 @@ async def get_mcp_tools_lob(
             continue
 
         try:
-            system_auth = await get_system_auth(tenant_subdomain)
-            server_tools = await list_server_tools(mcp_url, system_auth, fragment_name)
+            server_tools = await list_server_tools(
+                mcp_url, system_token, fragment_name, timeout
+            )
             tools.extend(server_tools)
             logger.debug(
                 "Loaded %d tool(s) from fragment '%s'",
@@ -328,36 +445,29 @@ async def get_mcp_tools_lob(
 
 async def call_mcp_tool_lob(
     tool: MCPTool,
-    user_token: str,
-    tenant_subdomain: str,
+    user_auth_token: str,
+    timeout: float,
     **kwargs,
 ) -> str:
     """Invoke an MCP tool using LoB flow (destination-based).
 
-    Uses Phase 2 auth (user-scoped) via token exchange.
-    Principal propagation ensures LoB systems see user identity.
+    Uses a pre-fetched user token for principal propagation.
 
     Args:
         tool: MCPTool object (from list_mcp_tools).
-        user_token: User's JWT for principal propagation.
-        tenant_subdomain: Tenant subdomain for token exchange.
+        user_auth_token: Pre-fetched raw user token (from get_user_auth).
+        timeout: HTTP timeout in seconds for the MCP server call.
         **kwargs: Tool input parameters.
 
     Returns:
         Tool execution result as string.
-
-    Raises:
-        MCPServerNotFoundError: If destination/auth fails.
     """
-    if not tool.fragment_name:
-        raise MCPServerNotFoundError(
-            f"Tool '{tool.name}' missing fragment_name for LoB invocation"
-        )
-    user_auth = await get_user_auth(tool.fragment_name, user_token, tenant_subdomain)
-
     async with httpx.AsyncClient(
-        headers={"Authorization": user_auth, "x-correlation-id": str(uuid.uuid4())},
-        timeout=_HTTP_TIMEOUT,
+        headers={
+            "Authorization": f"Bearer {user_auth_token}",
+            "x-correlation-id": str(uuid.uuid4()),
+        },
+        timeout=timeout,
     ) as http_client:
         async with streamable_http_client(tool.url, http_client=http_client) as (
             read,

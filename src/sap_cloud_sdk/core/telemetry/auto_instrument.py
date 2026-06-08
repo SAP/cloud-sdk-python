@@ -37,7 +37,7 @@ from sap_cloud_sdk.core.telemetry.propagated_attributes_processor import (
 logger = logging.getLogger(__name__)
 
 
-@record_metrics(Module.AICORE, Operation.AICORE_AUTO_INSTRUMENT)
+@record_metrics(Module.TELEMETRY, Operation.AICORE_AUTO_INSTRUMENT)
 def auto_instrument(
     disable_batch: bool = False,
     middlewares: list[TelemetryMiddleware] | None = None,
@@ -82,6 +82,7 @@ def auto_instrument(
     _merge_resource_attrs_into_active_provider_if_wrapper_installed(resource)
 
     _set_baggage_processor()
+    _set_propagated_attributes_processor()
 
     if middlewares:
         _register_middleware_processors(middlewares)
@@ -118,6 +119,15 @@ def _set_baggage_processor():
 
     provider.add_span_processor(BaggageSpanProcessor(ALLOW_ALL_BAGGAGE_KEYS))
     logger.info("Registered BaggageSpanProcessor for extension attribute propagation")
+
+
+def _set_propagated_attributes_processor():
+    provider = trace.get_tracer_provider()
+    if not isinstance(provider, TracerProvider):
+        logger.warning(
+            "Unknown TracerProvider type. Skipping PropagatedAttributesSpanProcessor"
+        )
+        return
 
     provider.add_span_processor(PropagatedAttributesSpanProcessor())
     logger.info(

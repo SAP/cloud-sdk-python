@@ -99,6 +99,24 @@ class TestRecordMetricsDecorator:
                 False  # deprecated parameter
             )
 
+    def test_decorator_reads_source_from_kwargs_when_self_source_missing(self):
+        """Test source detection before constructors assign _telemetry_source."""
+
+        class TestClient:
+            @record_metrics(Module.AUDITLOG_NG, Operation.AUDITLOG_CREATE_CLIENT)
+            def __init__(self, _telemetry_source=None):
+                self._telemetry_source = _telemetry_source
+
+        with patch('sap_cloud_sdk.core.telemetry.metrics_decorator.record_request_metric') as mock_metric:
+            TestClient(_telemetry_source=Module.DMS)
+
+            mock_metric.assert_called_once_with(
+                Module.AUDITLOG_NG,
+                Module.DMS,
+                Operation.AUDITLOG_CREATE_CLIENT,
+                False  # deprecated parameter
+            )
+
     def test_decorator_records_error_metric_on_exception(self):
         """Test that decorator records error metric when function raises exception."""
 

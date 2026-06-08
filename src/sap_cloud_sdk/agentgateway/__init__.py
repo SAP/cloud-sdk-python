@@ -15,7 +15,7 @@ Usage (LoB agent):
     # Discover tools
     tools = await agw_client.list_mcp_tools()
     for tool in tools:
-        print(f"{tool.namespaced_name}: {tool.description}")
+        print(f"{tool.name}: {tool.description}")
 
     # Invoke a tool
     # Note: kwargs like "order_id" are tool-specific input parameters.
@@ -52,7 +52,8 @@ Usage (Customer agent):
     ]
 """
 
-from sap_cloud_sdk.agentgateway._models import MCPTool
+from sap_cloud_sdk.agentgateway._models import AuthResult, MCPTool
+from sap_cloud_sdk.agentgateway.config import ClientConfig
 from sap_cloud_sdk.agentgateway.agw_client import create_client, AgentGatewayClient
 from sap_cloud_sdk.agentgateway.exceptions import (
     AgentGatewaySDKError,
@@ -65,7 +66,10 @@ __all__ = [
     "create_client",
     # Client class
     "AgentGatewayClient",
+    # Configuration
+    "ClientConfig",
     # Data models
+    "AuthResult",
     "MCPTool",
     # Exceptions
     "AgentGatewaySDKError",

@@ -58,10 +58,10 @@ class _DocumentApi:
             ordered by first occurrence across relations.
         """
         # Build RelationQueryOptions that always includes Document in $expand.
-        rel_params: dict = {}
+        rel_params: dict[str, str | int] = {}
         if options:
             rel_params = options.to_query_params()
-        existing_expand = rel_params.get("$expand", "")
+        existing_expand = str(rel_params.get("$expand", ""))
         if existing_expand:
             if "Document" not in existing_expand.split(","):
                 rel_params["$expand"] = existing_expand + ",Document"
@@ -261,10 +261,10 @@ class _AsyncDocumentApi:
         options: DocumentQueryOptions | None = None,
     ) -> list[Document]:
         """Async variant of :meth:`_DocumentApi.get_all` — same semantics."""
-        rel_params: dict = {}
+        rel_params: dict[str, str | int] = {}
         if options:
             rel_params = options.to_query_params()
-        existing_expand = rel_params.get("$expand", "")
+        existing_expand = str(rel_params.get("$expand", ""))
         if existing_expand:
             if "Document" not in existing_expand.split(","):
                 rel_params["$expand"] = existing_expand + ",Document"

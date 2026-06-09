@@ -779,7 +779,7 @@ class TestDocumentApiVersionOps:
 
 class TestDocumentApiGetAll:
     def test_get_all_returns_list(self):
-        http = _doc_http(get_data={"value": [_CLEAN_DOC]})
+        http = _doc_http(get_data={"value": [{"Document": _CLEAN_DOC}]})
         api = _DocumentApi(http)
         result = api.get_all()
 
@@ -793,13 +793,41 @@ class TestDocumentApiGetAll:
         result = api.get_all()
         assert result == []
 
-    def test_get_all_no_params_by_default(self):
+    def test_get_all_relations_without_document_skipped(self):
+        # A relation whose Document navigation property is absent or null is skipped.
+        http = _doc_http(
+            get_data={"value": [{"Document": None}, {"Document": _CLEAN_DOC}]}
+        )
+        api = _DocumentApi(http)
+        result = api.get_all()
+        assert len(result) == 1
+        assert result[0].document_id == "doc-1"
+
+    def test_get_all_deduplicates_by_document_id(self):
+        # Same document linked to two different relations must appear only once.
+        http = _doc_http(
+            get_data={"value": [{"Document": _CLEAN_DOC}, {"Document": _CLEAN_DOC}]}
+        )
+        api = _DocumentApi(http)
+        result = api.get_all()
+        assert len(result) == 1
+
+    def test_get_all_always_expands_document(self):
+        # $expand=Document must always be present, even with no options.
         http = _doc_http(get_data={"value": []})
         api = _DocumentApi(http)
         api.get_all()
 
         _, kwargs = http.get.call_args
-        assert kwargs["params"] == {}
+        assert "Document" in kwargs["params"]["$expand"]
+
+    def test_get_all_no_params_other_than_expand_by_default(self):
+        http = _doc_http(get_data={"value": []})
+        api = _DocumentApi(http)
+        api.get_all()
+
+        _, kwargs = http.get.call_args
+        assert set(kwargs["params"].keys()) == {"$expand"}
 
     def test_get_all_passes_filter(self):
         http = _doc_http(get_data={"value": []})
@@ -817,13 +845,17 @@ class TestDocumentApiGetAll:
         _, kwargs = http.get.call_args
         assert kwargs["params"]["$select"] == "DocumentID,DocumentName"
 
-    def test_get_all_passes_expand(self):
+    def test_get_all_merges_caller_expand_with_document(self):
+        # If the caller passes expand=["DocumentContentVersion"], the resulting
+        # $expand must contain both that value AND "Document".
         http = _doc_http(get_data={"value": []})
         api = _DocumentApi(http)
         api.get_all(DocumentQueryOptions(expand=["DocumentContentVersion"]))
 
         _, kwargs = http.get.call_args
-        assert kwargs["params"]["$expand"] == "DocumentContentVersion"
+        expand_parts = kwargs["params"]["$expand"].split(",")
+        assert "Document" in expand_parts
+        assert "DocumentContentVersion" in expand_parts
 
     def test_get_all_passes_top_and_skip(self):
         http = _doc_http(get_data={"value": []})
@@ -842,13 +874,14 @@ class TestDocumentApiGetAll:
         _, kwargs = http.get.call_args
         assert kwargs["params"]["$orderby"] == "DocumentName asc"
 
-    def test_get_all_calls_document_entity_set(self):
+    def test_get_all_calls_document_relation_entity_set(self):
+        # Must query DocumentRelation, not the Document collection directly.
         http = _doc_http(get_data={"value": []})
         api = _DocumentApi(http)
         api.get_all()
 
         args, _ = http.get.call_args
-        assert args[0] == "Document"
+        assert args[0] == "DocumentRelation"
 
     def test_get_all_uses_service_path(self):
         from sap_cloud_sdk.adms.config import _SERVICE_PATH

@@ -33,19 +33,55 @@ class _DocumentApi:
         self,
         options: DocumentQueryOptions | None = None,
     ) -> list[Document]:
-        """Query the Document entity set with OData V4 query options.
+        """List all Documents accessible to the caller.
+
+        ADM does not expose ``Document`` as a top-level queryable collection;
+        Documents are only reachable as children of ``DocumentRelation``.
+        This method transparently queries ``DocumentRelation?$expand=Document``
+        and returns the unique set of Documents found across all relations,
+        preserving first-seen order.
+
+        ``$filter``, ``$top``, ``$skip``, and ``$orderby`` in *options* are
+        applied to the underlying ``DocumentRelation`` query (not to the
+        Document entity itself).  ``$select`` and ``$expand`` are forwarded
+        as-is; if you need to expand additional navigation properties on
+        DocumentRelation alongside ``Document``, include them in
+        ``options.expand``.
 
         Args:
-            options: :class:`DocumentQueryOptions` with the OData parameters
-                (``filter``, ``select``, ``expand``, ``top``, ``skip``,
-                ``orderby``).  If ``None``, no query parameters are sent.
+            options: :class:`DocumentQueryOptions` with OData parameters.
+                If ``None``, all relations are fetched and their documents
+                returned deduplicated.
 
         Returns:
-            List of :class:`~sap_cloud_sdk.adms._models.Document`.
+            Unique :class:`~sap_cloud_sdk.adms._models.Document` instances,
+            ordered by first occurrence across relations.
         """
-        params = options.to_query_params() if options else {}
-        resp = self._http.get("Document", params=params, service_base=_SERVICE_PATH)
-        return [Document.from_dict(item) for item in resp.json().get("value", [])]
+        # Build RelationQueryOptions that always includes Document in $expand.
+        rel_params: dict = {}
+        if options:
+            rel_params = options.to_query_params()
+        existing_expand = rel_params.get("$expand", "")
+        if existing_expand:
+            if "Document" not in existing_expand.split(","):
+                rel_params["$expand"] = existing_expand + ",Document"
+        else:
+            rel_params["$expand"] = "Document"
+
+        resp = self._http.get(
+            "DocumentRelation", params=rel_params, service_base=_SERVICE_PATH
+        )
+        seen: set[str] = set()
+        docs: list[Document] = []
+        for rel_data in resp.json().get("value", []):
+            doc_data = rel_data.get("Document")
+            if not doc_data:
+                continue
+            doc = Document.from_dict(doc_data)
+            if doc.document_id and doc.document_id not in seen:
+                seen.add(doc.document_id)
+                docs.append(doc)
+        return docs
 
     @record_metrics(Module.ADMS, Operation.ADMS_DOCUMENTS_GET)
     def get(
@@ -225,11 +261,30 @@ class _AsyncDocumentApi:
         options: DocumentQueryOptions | None = None,
     ) -> list[Document]:
         """Async variant of :meth:`_DocumentApi.get_all` — same semantics."""
-        params = options.to_query_params() if options else {}
+        rel_params: dict = {}
+        if options:
+            rel_params = options.to_query_params()
+        existing_expand = rel_params.get("$expand", "")
+        if existing_expand:
+            if "Document" not in existing_expand.split(","):
+                rel_params["$expand"] = existing_expand + ",Document"
+        else:
+            rel_params["$expand"] = "Document"
+
         resp = await self._http.get(
-            "Document", params=params, service_base=_SERVICE_PATH
+            "DocumentRelation", params=rel_params, service_base=_SERVICE_PATH
         )
-        return [Document.from_dict(item) for item in resp.json().get("value", [])]
+        seen: set[str] = set()
+        docs: list[Document] = []
+        for rel_data in resp.json().get("value", []):
+            doc_data = rel_data.get("Document")
+            if not doc_data:
+                continue
+            doc = Document.from_dict(doc_data)
+            if doc.document_id and doc.document_id not in seen:
+                seen.add(doc.document_id)
+                docs.append(doc)
+        return docs
 
     @record_metrics(Module.ADMS, Operation.ADMS_DOCUMENTS_GET)
     async def get(

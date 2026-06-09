@@ -8,20 +8,28 @@ Contains:
 
 Usage::
 
-    from sap_cloud_sdk.adms import create_client, create_async_client
+    from sap_cloud_sdk.adms import (
+        create_client,
+        create_async_client,
+        RelationQueryOptions,
+    )
 
     # Sync (service-to-service)
     client = create_client()
     relations = client.relations.get_all(
-        filter="HostBusinessObjectNodeID eq 'PO-4500012345'",
-        expand=["Document"],
+        RelationQueryOptions(
+            filter="HostBusinessObjectNodeID eq 'PO-4500012345'",
+            expand=["Document"],
+        )
     )
 
     # Async (FastAPI / LangGraph)
     async with create_async_client() as client:
         relations = await client.relations.get_all(
-            filter="HostBusinessObjectNodeID eq 'PO-4500012345'",
-            expand=["Document"],
+            RelationQueryOptions(
+                filter="HostBusinessObjectNodeID eq 'PO-4500012345'",
+                expand=["Document"],
+            )
         )
 """
 
@@ -65,6 +73,11 @@ from sap_cloud_sdk.adms.config import (
     load_from_env_or_mount,
 )
 from sap_cloud_sdk.adms.exceptions import ScanNotCleanError
+from sap_cloud_sdk.adms._query_options import (
+    ConfigQueryOptions,
+    DocumentQueryOptions,
+    RelationQueryOptions,
+)
 from sap_cloud_sdk.adms._token_cache import TokenCache
 from sap_cloud_sdk.core.telemetry import Module, Operation, record_metrics
 
@@ -86,40 +99,19 @@ class _DocumentApi:
     @record_metrics(Module.ADMS, Operation.ADMS_DOCUMENTS_GET_ALL)
     def get_all(
         self,
-        *,
-        filter: str | None = None,
-        select: list[str] | None = None,
-        expand: list[str] | None = None,
-        top: int | None = None,
-        skip: int | None = None,
-        orderby: str | None = None,
+        options: DocumentQueryOptions | None = None,
     ) -> list[Document]:
         """Query the Document entity set with OData V4 query options.
 
         Args:
-            filter: OData ``$filter`` expression.
-            select: Properties to include in the response.
-            expand: Navigation properties to inline.
-            top: Maximum number of records to return.
-            skip: Number of records to skip (paging).
-            orderby: OData ``$orderby`` expression.
+            options: :class:`DocumentQueryOptions` with the OData parameters
+                (``filter``, ``select``, ``expand``, ``top``, ``skip``,
+                ``orderby``).  If ``None``, no query parameters are sent.
 
         Returns:
             List of :class:`~sap_cloud_sdk.adms._models.Document`.
         """
-        params: dict = {}
-        if filter is not None:
-            params["$filter"] = filter
-        if select is not None:
-            params["$select"] = ",".join(select)
-        if expand is not None:
-            params["$expand"] = ",".join(expand)
-        if top is not None:
-            params["$top"] = top
-        if skip is not None:
-            params["$skip"] = skip
-        if orderby is not None:
-            params["$orderby"] = orderby
+        params = options.to_query_params() if options else {}
         resp = self._http.get("Document", params=params, service_base=_SERVICE_PATH)
         return [Document.from_dict(item) for item in resp.json().get("value", [])]
 
@@ -314,36 +306,19 @@ class _DocumentRelationApi:
     @record_metrics(Module.ADMS, Operation.ADMS_RELATIONS_GET_ALL)
     def get_all(
         self,
-        *,
-        filter: str | None = None,
-        expand: list[str] | None = None,
-        select: list[str] | None = None,
-        top: int | None = None,
-        skip: int | None = None,
+        options: RelationQueryOptions | None = None,
     ) -> list[DocumentRelation]:
         """Query DocumentRelations with OData V4 query options.
 
         Args:
-            filter: OData ``$filter`` expression.
-            expand: Navigation properties to inline (e.g. ``["Document"]``).
-            select: Properties to include in the response.
-            top: Maximum number of records to return.
-            skip: Number of records to skip (paging).
+            options: :class:`RelationQueryOptions` with the OData parameters
+                (``filter``, ``select``, ``expand``, ``top``, ``skip``).
+                Note: ``$orderby`` is not supported by this entity set.
 
         Returns:
             List of :class:`~sap_cloud_sdk.adms._models.DocumentRelation`.
         """
-        params: dict = {}
-        if filter is not None:
-            params["$filter"] = filter
-        if expand is not None:
-            params["$expand"] = ",".join(expand)
-        if select is not None:
-            params["$select"] = ",".join(select)
-        if top is not None:
-            params["$top"] = top
-        if skip is not None:
-            params["$skip"] = skip
+        params = options.to_query_params() if options else {}
         resp = self._http.get(
             "DocumentRelation", params=params, service_base=_SERVICE_PATH
         )
@@ -604,19 +579,10 @@ class _ConfigurationApi:
     @record_metrics(Module.ADMS, Operation.ADMS_CONFIG_GET_ALL_ALLOWED_DOMAINS)
     def get_all_allowed_domains(
         self,
-        *,
-        filter: str | None = None,
-        top: int | None = None,
-        skip: int | None = None,
+        options: ConfigQueryOptions | None = None,
     ) -> list[AllowedDomain]:
         """Return all allowed-domain entries visible to the current tenant."""
-        params: dict = {}
-        if filter is not None:
-            params["$filter"] = filter
-        if top is not None:
-            params["$top"] = top
-        if skip is not None:
-            params["$skip"] = skip
+        params = options.to_query_params() if options else {}
         resp = self._http.get(
             "AllowedDomain", params=params, service_base=_CONFIG_SERVICE_PATH
         )
@@ -643,19 +609,10 @@ class _ConfigurationApi:
     @record_metrics(Module.ADMS, Operation.ADMS_CONFIG_GET_ALL_DOCUMENT_TYPES)
     def get_all_document_types(
         self,
-        *,
-        filter: str | None = None,
-        top: int | None = None,
-        skip: int | None = None,
+        options: ConfigQueryOptions | None = None,
     ) -> list[DocumentType]:
         """Return all document type classifications."""
-        params: dict = {}
-        if filter is not None:
-            params["$filter"] = filter
-        if top is not None:
-            params["$top"] = top
-        if skip is not None:
-            params["$skip"] = skip
+        params = options.to_query_params() if options else {}
         resp = self._http.get(
             "DocumentType", params=params, service_base=_CONFIG_SERVICE_PATH
         )
@@ -682,19 +639,10 @@ class _ConfigurationApi:
     @record_metrics(Module.ADMS, Operation.ADMS_CONFIG_GET_ALL_BUSINESS_OBJECT_TYPES)
     def get_all_business_object_types(
         self,
-        *,
-        filter: str | None = None,
-        top: int | None = None,
-        skip: int | None = None,
+        options: ConfigQueryOptions | None = None,
     ) -> list[BusinessObjectNodeType]:
         """Return all registered business object node types."""
-        params: dict = {}
-        if filter is not None:
-            params["$filter"] = filter
-        if top is not None:
-            params["$top"] = top
-        if skip is not None:
-            params["$skip"] = skip
+        params = options.to_query_params() if options else {}
         resp = self._http.get(
             "BusinessObjectNodeType", params=params, service_base=_CONFIG_SERVICE_PATH
         )
@@ -728,19 +676,10 @@ class _ConfigurationApi:
     @record_metrics(Module.ADMS, Operation.ADMS_CONFIG_GET_ALL_DOCTYPE_BOTYPE_MAPS)
     def get_type_mappings(
         self,
-        *,
-        filter: str | None = None,
-        top: int | None = None,
-        skip: int | None = None,
+        options: ConfigQueryOptions | None = None,
     ) -> list[DocumentTypeBusinessObjectTypeMap]:
         """Return all DocumentType ↔ BusinessObjectNodeType mappings."""
-        params: dict = {}
-        if filter is not None:
-            params["$filter"] = filter
-        if top is not None:
-            params["$top"] = top
-        if skip is not None:
-            params["$skip"] = skip
+        params = options.to_query_params() if options else {}
         resp = self._http.get(
             "DocumentTypeBusinessObjectTypeMap",
             params=params,
@@ -862,28 +801,10 @@ class _AsyncDocumentApi:
     @record_metrics(Module.ADMS, Operation.ADMS_DOCUMENTS_GET_ALL)
     async def get_all(
         self,
-        *,
-        filter: str | None = None,
-        select: list[str] | None = None,
-        expand: list[str] | None = None,
-        top: int | None = None,
-        skip: int | None = None,
-        orderby: str | None = None,
+        options: DocumentQueryOptions | None = None,
     ) -> list[Document]:
         """Async variant of :meth:`_DocumentApi.get_all` — same semantics."""
-        params: dict = {}
-        if filter is not None:
-            params["$filter"] = filter
-        if select is not None:
-            params["$select"] = ",".join(select)
-        if expand is not None:
-            params["$expand"] = ",".join(expand)
-        if top is not None:
-            params["$top"] = top
-        if skip is not None:
-            params["$skip"] = skip
-        if orderby is not None:
-            params["$orderby"] = orderby
+        params = options.to_query_params() if options else {}
         resp = await self._http.get(
             "Document", params=params, service_base=_SERVICE_PATH
         )
@@ -1029,25 +950,10 @@ class _AsyncDocumentRelationApi:
     @record_metrics(Module.ADMS, Operation.ADMS_RELATIONS_GET_ALL)
     async def get_all(
         self,
-        *,
-        filter: str | None = None,
-        expand: list[str] | None = None,
-        select: list[str] | None = None,
-        top: int | None = None,
-        skip: int | None = None,
+        options: RelationQueryOptions | None = None,
     ) -> list[DocumentRelation]:
         """Async variant of :meth:`_DocumentRelationApi.get_all` — same semantics."""
-        params: dict = {}
-        if filter is not None:
-            params["$filter"] = filter
-        if expand is not None:
-            params["$expand"] = ",".join(expand)
-        if select is not None:
-            params["$select"] = ",".join(select)
-        if top is not None:
-            params["$top"] = top
-        if skip is not None:
-            params["$skip"] = skip
+        params = options.to_query_params() if options else {}
         resp = await self._http.get(
             "DocumentRelation", params=params, service_base=_SERVICE_PATH
         )
@@ -1242,19 +1148,10 @@ class _AsyncConfigurationApi:
     @record_metrics(Module.ADMS, Operation.ADMS_CONFIG_GET_ALL_ALLOWED_DOMAINS)
     async def get_all_allowed_domains(
         self,
-        *,
-        filter: str | None = None,
-        top: int | None = None,
-        skip: int | None = None,
+        options: ConfigQueryOptions | None = None,
     ) -> list[AllowedDomain]:
         """Async variant of :meth:`_ConfigurationApi.get_all_allowed_domains` — same semantics."""
-        params: dict = {}
-        if filter is not None:
-            params["$filter"] = filter
-        if top is not None:
-            params["$top"] = top
-        if skip is not None:
-            params["$skip"] = skip
+        params = options.to_query_params() if options else {}
         resp = await self._http.get(
             "AllowedDomain", params=params, service_base=_CONFIG_SERVICE_PATH
         )
@@ -1283,19 +1180,10 @@ class _AsyncConfigurationApi:
     @record_metrics(Module.ADMS, Operation.ADMS_CONFIG_GET_ALL_DOCUMENT_TYPES)
     async def get_all_document_types(
         self,
-        *,
-        filter: str | None = None,
-        top: int | None = None,
-        skip: int | None = None,
+        options: ConfigQueryOptions | None = None,
     ) -> list[DocumentType]:
         """Async variant of :meth:`_ConfigurationApi.get_all_document_types` — same semantics."""
-        params: dict = {}
-        if filter is not None:
-            params["$filter"] = filter
-        if top is not None:
-            params["$top"] = top
-        if skip is not None:
-            params["$skip"] = skip
+        params = options.to_query_params() if options else {}
         resp = await self._http.get(
             "DocumentType", params=params, service_base=_CONFIG_SERVICE_PATH
         )
@@ -1324,19 +1212,10 @@ class _AsyncConfigurationApi:
     @record_metrics(Module.ADMS, Operation.ADMS_CONFIG_GET_ALL_BUSINESS_OBJECT_TYPES)
     async def get_all_business_object_types(
         self,
-        *,
-        filter: str | None = None,
-        top: int | None = None,
-        skip: int | None = None,
+        options: ConfigQueryOptions | None = None,
     ) -> list[BusinessObjectNodeType]:
         """Async variant of :meth:`_ConfigurationApi.get_all_business_object_types` — same semantics."""
-        params: dict = {}
-        if filter is not None:
-            params["$filter"] = filter
-        if top is not None:
-            params["$top"] = top
-        if skip is not None:
-            params["$skip"] = skip
+        params = options.to_query_params() if options else {}
         resp = await self._http.get(
             "BusinessObjectNodeType", params=params, service_base=_CONFIG_SERVICE_PATH
         )
@@ -1370,19 +1249,10 @@ class _AsyncConfigurationApi:
     @record_metrics(Module.ADMS, Operation.ADMS_CONFIG_GET_ALL_DOCTYPE_BOTYPE_MAPS)
     async def get_type_mappings(
         self,
-        *,
-        filter: str | None = None,
-        top: int | None = None,
-        skip: int | None = None,
+        options: ConfigQueryOptions | None = None,
     ) -> list[DocumentTypeBusinessObjectTypeMap]:
         """Async variant of :meth:`_ConfigurationApi.get_type_mappings` — same semantics."""
-        params: dict = {}
-        if filter is not None:
-            params["$filter"] = filter
-        if top is not None:
-            params["$top"] = top
-        if skip is not None:
-            params["$skip"] = skip
+        params = options.to_query_params() if options else {}
         resp = await self._http.get(
             "DocumentTypeBusinessObjectTypeMap",
             params=params,

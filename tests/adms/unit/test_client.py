@@ -11,6 +11,11 @@ import pytest
 from sap_cloud_sdk.adms import create_client
 from sap_cloud_sdk.adms._ias_fetcher import IasTokenFetcher
 from sap_cloud_sdk.adms._http import AdmsHttp, AsyncAdmsHttp
+from sap_cloud_sdk.adms._query_options import (
+    ConfigQueryOptions,
+    DocumentQueryOptions,
+    RelationQueryOptions,
+)
 from sap_cloud_sdk.adms._models import (
     AllowedDomain,
     BaseType,
@@ -754,7 +759,7 @@ class TestDocumentApiGetAll:
     def test_get_all_passes_filter(self):
         http = _doc_http(get_data={"value": []})
         api = _DocumentApi(http)
-        api.get_all(filter="DocumentTypeID eq 'INV'")
+        api.get_all(DocumentQueryOptions(filter="DocumentTypeID eq 'INV'"))
 
         _, kwargs = http.get.call_args
         assert kwargs["params"]["$filter"] == "DocumentTypeID eq 'INV'"
@@ -762,7 +767,7 @@ class TestDocumentApiGetAll:
     def test_get_all_passes_select(self):
         http = _doc_http(get_data={"value": []})
         api = _DocumentApi(http)
-        api.get_all(select=["DocumentID", "DocumentName"])
+        api.get_all(DocumentQueryOptions(select=["DocumentID", "DocumentName"]))
 
         _, kwargs = http.get.call_args
         assert kwargs["params"]["$select"] == "DocumentID,DocumentName"
@@ -770,7 +775,7 @@ class TestDocumentApiGetAll:
     def test_get_all_passes_expand(self):
         http = _doc_http(get_data={"value": []})
         api = _DocumentApi(http)
-        api.get_all(expand=["DocumentContentVersion"])
+        api.get_all(DocumentQueryOptions(expand=["DocumentContentVersion"]))
 
         _, kwargs = http.get.call_args
         assert kwargs["params"]["$expand"] == "DocumentContentVersion"
@@ -778,7 +783,7 @@ class TestDocumentApiGetAll:
     def test_get_all_passes_top_and_skip(self):
         http = _doc_http(get_data={"value": []})
         api = _DocumentApi(http)
-        api.get_all(top=20, skip=10)
+        api.get_all(DocumentQueryOptions(top=20, skip=10))
 
         _, kwargs = http.get.call_args
         assert kwargs["params"]["$top"] == 20
@@ -787,7 +792,7 @@ class TestDocumentApiGetAll:
     def test_get_all_passes_orderby(self):
         http = _doc_http(get_data={"value": []})
         api = _DocumentApi(http)
-        api.get_all(orderby="DocumentName asc")
+        api.get_all(DocumentQueryOptions(orderby="DocumentName asc"))
 
         _, kwargs = http.get.call_args
         assert kwargs["params"]["$orderby"] == "DocumentName asc"
@@ -851,9 +856,11 @@ class TestDocumentRelationApiGet:
         api = _DocumentRelationApi(http)
 
         api.get_all(
-            filter="HostBusinessObjectNodeID eq 'PO-001'",
-            expand=["Document"],
-            top=10,
+            RelationQueryOptions(
+                filter="HostBusinessObjectNodeID eq 'PO-001'",
+                expand=["Document"],
+                top=10,
+            )
         )
 
         params = http.get.call_args[1]["params"]
@@ -1080,7 +1087,9 @@ class TestConfigurationApiAllowedDomain:
     def test_get_all_passes_filter(self):
         http = _cfg_sync_http(get_data={"value": []})
         api = _ConfigurationApi(http)
-        api.get_all_allowed_domains(filter="AllowedDomainProtocol eq 'https'")
+        api.get_all_allowed_domains(
+            ConfigQueryOptions(filter="AllowedDomainProtocol eq 'https'")
+        )
 
         _, kwargs = http.get.call_args
         assert kwargs["params"]["$filter"] == "AllowedDomainProtocol eq 'https'"
@@ -1088,7 +1097,7 @@ class TestConfigurationApiAllowedDomain:
     def test_get_all_passes_top_and_skip(self):
         http = _cfg_sync_http(get_data={"value": []})
         api = _ConfigurationApi(http)
-        api.get_all_allowed_domains(top=10, skip=5)
+        api.get_all_allowed_domains(ConfigQueryOptions(top=10, skip=5))
 
         _, kwargs = http.get.call_args
         assert kwargs["params"]["$top"] == 10

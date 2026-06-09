@@ -91,14 +91,16 @@ client = create_client(token_cache=cache)
 ## Async Client
 
 ```python
-from sap_cloud_sdk.adms import create_async_client, BaseType, CreateDocumentInput, CreateDocumentRelationInput
+from sap_cloud_sdk.adms import create_async_client, BaseType, CreateDocumentInput, CreateDocumentRelationInput, RelationQueryOptions
 
 async def main():
     async with create_async_client() as client:
         # List all document relations for a business object
         relations = await client.relations.get_all(
-            filter="HostBusinessObjectNodeID eq 'PO-4500012345'",
-            expand=["Document"],
+            RelationQueryOptions(
+                filter="HostBusinessObjectNodeID eq 'PO-4500012345'",
+                expand=["Document"],
+            )
         )
         for relation in relations:
             doc = relation.document
@@ -108,6 +110,56 @@ async def main():
                     doc_content_version_id="1.0",
                 )
                 print(url)
+```
+
+## Query Options
+
+List endpoints (`documents.get_all`, `relations.get_all`,
+`config.get_all_*`) accept an options class that encapsulates the OData V4
+query parameters.  The classes nest by capability — Configuration endpoints
+expose the smallest subset, DocumentRelation adds `$select`/`$expand`, and
+Document adds `$orderby` on top of that.
+
+| Class | filter | select | expand | top | skip | orderby |
+|---|:-:|:-:|:-:|:-:|:-:|:-:|
+| `ConfigQueryOptions` | ✓ | – | – | ✓ | ✓ | – |
+| `RelationQueryOptions` | ✓ | ✓ | ✓ | ✓ | ✓ | – |
+| `DocumentQueryOptions` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+
+```python
+from sap_cloud_sdk.adms import (
+    ConfigQueryOptions,
+    DocumentQueryOptions,
+    RelationQueryOptions,
+)
+
+# Document — full OData surface
+docs = client.documents.get_all(
+    DocumentQueryOptions(
+        filter="DocumentName eq 'Invoice.pdf'",
+        top=10,
+        orderby="CreatedAt desc",
+    )
+)
+
+# Relation — no $orderby on this entity set
+relations = client.relations.get_all(
+    RelationQueryOptions(
+        filter="HostBusinessObjectNodeID eq 'PO-4500012345'",
+        expand=["Document"],
+    )
+)
+
+# Configuration endpoints — only $filter/$top/$skip
+domains = client.config.get_all_allowed_domains(
+    ConfigQueryOptions(filter="AllowedDomainProtocol eq 'https'")
+)
+```
+
+Passing no options yields an unfiltered, unpaginated request:
+
+```python
+all_relations = client.relations.get_all()
 ```
 
 ## Document Operations

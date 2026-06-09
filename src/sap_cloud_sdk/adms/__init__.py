@@ -81,6 +81,11 @@ from sap_cloud_sdk.adms._models import (
     UpdateDocumentInput,
     ZipDownloadJobParameters,
 )
+from sap_cloud_sdk.adms._query_options import (
+    ConfigQueryOptions,
+    DocumentQueryOptions,
+    RelationQueryOptions,
+)
 
 
 __all__ = [
@@ -128,4 +133,8 @@ __all__ = [
     "DocumentType",
     "DocumentTypeBusinessObjectTypeMap",
     "DocumentTypeText",
+    # query options
+    "ConfigQueryOptions",
+    "DocumentQueryOptions",
+    "RelationQueryOptions",
 ]

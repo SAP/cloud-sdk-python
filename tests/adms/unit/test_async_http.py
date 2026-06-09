@@ -3,7 +3,7 @@
 import pytest
 import httpx
 
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock
 
 from sap_cloud_sdk.adms._async_http import AsyncHttpClient, HttpError, NotFoundError
 

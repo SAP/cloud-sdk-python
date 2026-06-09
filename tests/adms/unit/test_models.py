@@ -1,6 +1,5 @@
 """Unit tests for DMS data models."""
 
-import pytest
 
 from sap_cloud_sdk.adms._models import (
     AllowedDomain,
@@ -20,10 +19,8 @@ from sap_cloud_sdk.adms._models import (
     DocumentTypeBusinessObjectTypeMap,
     DraftActivateInput,
     DraftInput,
-    JobInput,
     JobOutput,
     JobStatus,
-    JobType,
     ScanStatus,
     UpdateDocumentInput,
     ZipDownloadJobParameters,

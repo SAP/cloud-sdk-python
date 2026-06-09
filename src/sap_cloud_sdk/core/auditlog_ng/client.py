@@ -152,14 +152,12 @@ class AuditClient:
     def send(
         self,
         event: Message,
-        event_type: Optional[str] = None,
         format: str = "protobuf-binary",
     ) -> str:
         """Send an audit log event.
 
         Args:
             event: Protobuf message (audit event).
-            event_type: Event type name (defaults to message type name).
             format: Serialization format (``"protobuf-binary"`` or ``"json"``).
 
         Returns:
@@ -193,16 +191,11 @@ class AuditClient:
 
         event_id = str(uuid.uuid4())
 
-        if event_type is None:
-            descriptor = getattr(event, "DESCRIPTOR", None)
-            descriptor_name = getattr(descriptor, "name", None)
-            if not isinstance(descriptor_name, str) or not descriptor_name:
-                raise ValueError(
-                    "Could not determine event type from message descriptor"
-                )
-            event_type = descriptor_name
-
-        event_type = f"sap.als.AuditEvent.{event_type}.v2"
+        descriptor = getattr(event, "DESCRIPTOR", None)
+        descriptor_full_name = getattr(descriptor, "full_name", None)
+        if not isinstance(descriptor_full_name, str) or not descriptor_full_name:
+            raise ValueError("Could not determine event type from message descriptor")
+        event_type = descriptor_full_name
 
         if format == "json":
             mime_type = "application/json"
@@ -226,9 +219,9 @@ class AuditClient:
 
         return event_id
 
-    def send_json(self, event: Message, event_type: Optional[str] = None) -> str:
+    def send_json(self, event: Message) -> str:
         """Send event in JSON format."""
-        return self.send(event, event_type, format="json")
+        return self.send(event, format="json")
 
     def flush(self) -> None:
         """Flush pending events (for batch mode)."""

@@ -521,6 +521,60 @@ class TestListMcpTools:
                 mock_creds, "customer-system-token", 60.0
             )
 
+    @pytest.mark.asyncio
+    async def test_lob_flow_with_user_token_uses_user_auth(self):
+        """LoB flow uses user auth when user_token is provided."""
+        with (
+            patch(
+                "sap_cloud_sdk.agentgateway.agw_client.detect_customer_agent_credentials",
+                return_value=None,
+            ),
+            patch(
+                "sap_cloud_sdk.agentgateway.agw_client.fetch_user_auth",
+                new_callable=AsyncMock,
+                return_value=("user-token-xyz", "https://agw.example.com"),
+            ) as mock_user_auth,
+            patch(
+                "sap_cloud_sdk.agentgateway.agw_client.get_mcp_tools_lob",
+                new_callable=AsyncMock,
+                return_value=[],
+            ) as mock_lob,
+        ):
+            agw_client = create_client(tenant_subdomain="my-tenant")
+
+            await agw_client.list_mcp_tools(user_token="user-jwt")
+
+            mock_user_auth.assert_called_once()
+            mock_lob.assert_called_once_with("my-tenant", "user-token-xyz", 60.0)
+
+    @pytest.mark.asyncio
+    async def test_customer_flow_with_user_token_uses_user_auth(self):
+        """Customer flow uses user auth when user_token is provided."""
+        with patch(
+            "sap_cloud_sdk.agentgateway.agw_client.detect_customer_agent_credentials",
+            return_value="/path/to/credentials",
+        ), patch(
+            "sap_cloud_sdk.agentgateway.agw_client.load_customer_credentials",
+        ) as mock_load, patch(
+            "sap_cloud_sdk.agentgateway.agw_client.exchange_user_token",
+            return_value="exchanged-user-token",
+        ), patch(
+            "sap_cloud_sdk.agentgateway.agw_client.get_mcp_tools_customer",
+            new_callable=AsyncMock,
+            return_value=[],
+        ) as mock_customer:
+            mock_creds = MagicMock()
+            mock_creds.gateway_url = "https://agw.customer.com"
+            mock_load.return_value = mock_creds
+
+            agw_client = create_client()
+
+            await agw_client.list_mcp_tools(user_token="user-jwt", app_tid="tid")
+
+            mock_customer.assert_called_once_with(
+                mock_creds, "exchanged-user-token", 60.0
+            )
+
 
 # ============================================================
 # Test: call_mcp_tool

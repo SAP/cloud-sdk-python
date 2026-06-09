@@ -23,7 +23,7 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 import httpx
 
-from sap_cloud_sdk.destination import Level
+from sap_cloud_sdk.destination import ConsumptionLevel
 from sap_cloud_sdk.destination import create_client as create_destination_client
 from sap_cloud_sdk.extensibility._models import (
     DEFAULT_EXTENSION_CAPABILITY_ID,
@@ -436,7 +436,8 @@ class UmsTransport:
     1. ``config.destination_name`` (explicit config override).
     2. ``APPFND_UMS_DESTINATION_NAME`` environment variable.
     3. ``sap-managed-runtime-ums-{APPFND_CONHOS_LANDSCAPE}`` (constructed).
-    4. ``EXTENSIBILITY_SERVICE`` (fallback with warning).
+
+    If none of the above are available, resolution fails with a warning.
 
     Args:
         agent_ord_id: ORD ID of the agent.
@@ -540,7 +541,8 @@ class UmsTransport:
         # 1. Resolve destination -----------------------------------------
         try:
             dest = self._dest_client.get_destination(
-                self._destination_name, level=Level.SUB_ACCOUNT
+                self._destination_name,
+                level=ConsumptionLevel.PROVIDER_SUBACCOUNT,
             )
         except Exception as exc:
             raise TransportError(

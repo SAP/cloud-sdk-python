@@ -23,7 +23,8 @@ def record_metrics(
     instrumentation and should not be confused with general instrumentation or tracing.
 
     The decorator automatically detects the source of the call by checking the
-    `_telemetry_source` property on the client instance (self):
+    `_telemetry_source` property on the client instance (self), or the
+    `_telemetry_source` keyword argument before constructors assign it:
     - If the client has `_telemetry_source` set, it means it was created by another
       SDK module (e.g., objectstore → auditlog), and that module becomes the source
     - If `_telemetry_source` is None or not present, the call is from user code
@@ -62,9 +63,14 @@ def record_metrics(
         @wraps(func)
         def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
             # Extract source from the client instance (self is the first argument)
+            # or from constructor kwargs before self._telemetry_source exists.
             source: Optional[Module] = None
             if args:
                 source = getattr(args[0], "_telemetry_source", None)
+            if source is None:
+                source_kwarg = kwargs.get("_telemetry_source")
+                if isinstance(source_kwarg, Module):
+                    source = source_kwarg
 
             try:
                 result = func(*args, **kwargs)

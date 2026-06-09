@@ -18,6 +18,7 @@ on:
 
 jobs:
   integration-tests:
+    name: Integration Tests
     # Skip integration tests for PRs from forks (they don't have access to secrets)
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ${{ contains(github.server_url, 'github.com') && 'ubuntu-latest' || fromJSON('["self-hosted"]') }}
@@ -43,20 +44,20 @@ jobs:
           echo "Setting up environment variables for integration tests..."
 
           # Process GitHub secrets (all configuration stored as secrets)
-          echo '${{ toJSON(secrets) }}' | jq -r 'to_entries[] | select(.key | startswith("CLOUD_SDK_CFG_")) | "\(.key)=\(.value)"' | while read line; do
+          echo '${{ toJSON(secrets) }}' | jq -r 'to_entries[] | select(.key | startswith("CLOUD_SDK_CFG_") or startswith("AICORE_")) | "\(.key)=\(.value)"' | while read line; do
             echo "$line" >> $GITHUB_ENV
             var_name=$(echo "$line" | cut -d= -f1)
             echo "Set secret: $var_name"
           done
 
           # Process GitHub variables (all configuration stored as variables)
-          echo '${{ toJSON(vars) }}' | jq -r 'to_entries[] | select(.key | startswith("CLOUD_SDK_CFG_")) | "\(.key)=\(.value)"' | while read line; do
+          echo '${{ toJSON(vars) }}' | jq -r 'to_entries[] | select(.key | startswith("CLOUD_SDK_CFG_") or startswith("AICORE_")) | "\(.key)=\(.value)"' | while read line; do
             echo "$line" >> $GITHUB_ENV
             var_name=$(echo "$line" | cut -d= -f1)
             echo "Set variable: $var_name"
           done
 
-          echo "Environment setup complete - automatically configured all CLOUD_SDK_CFG_* environment variables and secrets"
+          echo "Environment setup complete - automatically configured all CLOUD_SDK_CFG_* and AICORE_* environment variables and secrets"
 
       - name: Run integration tests
         run: uv run pytest tests/*/integration/ -v --tb=short

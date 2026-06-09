@@ -21,6 +21,8 @@ from sap_cloud_sdk.agentgateway._models import (
     IntegrationDependency,
     MCPTool,
 )
+from sap_cloud_sdk.agentgateway._token_cache import _TokenCache
+from sap_cloud_sdk.agentgateway.config import ClientConfig
 from sap_cloud_sdk.agentgateway.exceptions import AgentGatewaySDKError
 
 
@@ -305,7 +307,7 @@ class TestGetSystemTokenMtls:
             mock_client.post.return_value = mock_response
             mock_client_class.return_value = mock_client
 
-            result = get_system_token_mtls(credentials)
+            result = get_system_token_mtls(credentials, timeout=60.0)
 
             assert result == "system-token-123"
             mock_client.post.assert_called_once()
@@ -332,7 +334,61 @@ class TestGetSystemTokenMtls:
             mock_client_class.return_value = mock_client
 
             with pytest.raises(AgentGatewaySDKError, match="Token request failed"):
-                get_system_token_mtls(credentials)
+                get_system_token_mtls(credentials, timeout=60.0)
+
+    def test_reuses_cached_system_token(self, credentials):
+        """Reuse cached system token until it expires."""
+        token_cache = _TokenCache(ClientConfig())
+
+        with patch(
+            "sap_cloud_sdk.agentgateway._customer._request_token_mtls",
+            return_value={"access_token": "system-token-123", "expires_in": 300},
+        ) as mock_request:
+            first = get_system_token_mtls(
+                credentials, timeout=60.0, token_cache=token_cache
+            )
+            second = get_system_token_mtls(
+                credentials, timeout=60.0, token_cache=token_cache
+            )
+
+        assert first == "system-token-123"
+        assert second == "system-token-123"
+        mock_request.assert_called_once()
+
+    def test_scopes_system_token_cache_by_app_tid(self, credentials):
+        """Keep app-tid-specific system tokens isolated in the cache."""
+        token_cache = _TokenCache(ClientConfig())
+
+        with patch(
+            "sap_cloud_sdk.agentgateway._customer._request_token_mtls",
+            side_effect=[
+                {"access_token": "token-tid-1", "expires_in": 300},
+                {"access_token": "token-tid-2", "expires_in": 300},
+            ],
+        ) as mock_request:
+            first = get_system_token_mtls(
+                credentials,
+                timeout=60.0,
+                app_tid="tid-1",
+                token_cache=token_cache,
+            )
+            second = get_system_token_mtls(
+                credentials,
+                timeout=60.0,
+                app_tid="tid-1",
+                token_cache=token_cache,
+            )
+            third = get_system_token_mtls(
+                credentials,
+                timeout=60.0,
+                app_tid="tid-2",
+                token_cache=token_cache,
+            )
+
+        assert first == "token-tid-1"
+        assert second == "token-tid-1"
+        assert third == "token-tid-2"
+        assert mock_request.call_count == 2
 
 
 # ============================================================
@@ -374,7 +430,7 @@ class TestExchangeUserToken:
             mock_client.post.return_value = mock_response
             mock_client_class.return_value = mock_client
 
-            result = exchange_user_token(credentials, "user-jwt-token")
+            result = exchange_user_token(credentials, "user-jwt-token", timeout=60.0)
 
             assert result == "exchanged-token-123"
             call_args = mock_client.post.call_args
@@ -402,12 +458,39 @@ class TestExchangeUserToken:
             mock_client.post.return_value = mock_response
             mock_client_class.return_value = mock_client
 
-            result = exchange_user_token(credentials, "user-jwt", app_tid="test-tid")
+            result = exchange_user_token(
+                credentials, "user-jwt", timeout=60.0, app_tid="test-tid"
+            )
 
             assert result == "token-with-tid"
             call_args = mock_client.post.call_args
             data = call_args.kwargs.get("data", {})
             assert data["app_tid"] == "test-tid"
+
+    def test_reuses_cached_user_token(self, credentials):
+        """Reuse exchanged user token until it expires."""
+        token_cache = _TokenCache(ClientConfig())
+
+        with patch(
+            "sap_cloud_sdk.agentgateway._customer._request_token_mtls",
+            return_value={"access_token": "exchanged-token-123", "expires_in": 300},
+        ) as mock_request:
+            first = exchange_user_token(
+                credentials,
+                "user-jwt-token",
+                timeout=60.0,
+                token_cache=token_cache,
+            )
+            second = exchange_user_token(
+                credentials,
+                "user-jwt-token",
+                timeout=60.0,
+                token_cache=token_cache,
+            )
+
+        assert first == "exchanged-token-123"
+        assert second == "exchanged-token-123"
+        mock_request.assert_called_once()
 
 
 # ============================================================
@@ -449,11 +532,11 @@ class TestGetMcpToolsCustomer:
         with pytest.raises(
             AgentGatewaySDKError, match="integrationDependencies is empty"
         ):
-            await get_mcp_tools_customer(credentials)
+            await get_mcp_tools_customer(credentials, "system-token", 60.0)
 
     @pytest.mark.asyncio
     async def test_discovers_tools_from_credentials(self, credentials):
-        """Discover tools from integrationDependencies in credentials."""
+        """Discover tools from integrationDependencies using pre-fetched token."""
         mock_tools = [
             MCPTool(
                 name="list_cost_centers",
@@ -466,20 +549,21 @@ class TestGetMcpToolsCustomer:
 
         with (
             patch(
-                "sap_cloud_sdk.agentgateway._customer.get_system_token_mtls",
-                return_value="system-token",
-            ),
-            patch(
                 "sap_cloud_sdk.agentgateway._customer._list_server_tools",
                 new_callable=AsyncMock,
                 return_value=mock_tools,
             ) as mock_list,
         ):
-            result = await get_mcp_tools_customer(credentials)
+            result = await get_mcp_tools_customer(
+                credentials, "pre-fetched-system-token", 60.0
+            )
 
             assert len(result) == 1
             assert result[0].name == "list_cost_centers"
             mock_list.assert_called_once()
+            # Verify the pre-fetched token was passed
+            call_args = mock_list.call_args[0]
+            assert call_args[1] == "pre-fetched-system-token"
 
     @pytest.mark.asyncio
     async def test_handles_server_error_gracefully(self):
@@ -515,15 +599,13 @@ class TestGetMcpToolsCustomer:
 
         with (
             patch(
-                "sap_cloud_sdk.agentgateway._customer.get_system_token_mtls",
-                return_value="system-token",
-            ),
-            patch(
                 "sap_cloud_sdk.agentgateway._customer._list_server_tools",
                 side_effect=mock_list_tools,
             ),
         ):
-            result = await get_mcp_tools_customer(credentials)
+            result = await get_mcp_tools_customer(
+                credentials, "system-token", 60.0
+            )
 
             # Should still return tools from server2
             assert len(result) == 1
@@ -570,13 +652,9 @@ class TestCallMcpToolCustomer:
         )
 
     @pytest.mark.asyncio
-    async def test_exchanges_user_token_before_call(self, credentials, mock_tool):
-        """Exchange user token before making tool call."""
+    async def test_calls_tool_with_pre_fetched_token(self, credentials, mock_tool):
+        """Call tool using pre-fetched auth token."""
         with (
-            patch(
-                "sap_cloud_sdk.agentgateway._customer.exchange_user_token",
-                return_value="exchanged-token",
-            ) as mock_exchange,
             patch(
                 "httpx.AsyncClient",
             ) as mock_client_class,
@@ -613,25 +691,19 @@ class TestCallMcpToolCustomer:
             mock_session_class.return_value = mock_session_ctx
 
             result = await call_mcp_tool_customer(
-                credentials, mock_tool, "user-jwt", order_id="12345"
+                mock_tool, "pre-fetched-token", 60.0, order_id="12345"
             )
 
             assert result == "Order created successfully"
-            mock_exchange.assert_called_once_with(credentials, "user-jwt", None)
+            # Verify the token was used in the Authorization header
+            mock_client_class.assert_called_once()
+            call_kwargs = mock_client_class.call_args.kwargs
+            assert call_kwargs["headers"]["Authorization"] == "Bearer pre-fetched-token"
 
     @pytest.mark.asyncio
-    async def test_uses_system_token_when_user_token_not_provided(
-        self, credentials, mock_tool
-    ):
-        """Fall back to system token when user_token is None (IBD workaround)."""
+    async def test_returns_empty_string_when_no_content(self, credentials, mock_tool):
+        """Return empty string when tool returns no content."""
         with (
-            patch(
-                "sap_cloud_sdk.agentgateway._customer.get_system_token_mtls",
-                return_value="system-token",
-            ) as mock_system_token,
-            patch(
-                "sap_cloud_sdk.agentgateway._customer.exchange_user_token",
-            ) as mock_exchange,
             patch(
                 "httpx.AsyncClient",
             ) as mock_client_class,
@@ -642,7 +714,6 @@ class TestCallMcpToolCustomer:
                 "sap_cloud_sdk.agentgateway._customer.ClientSession",
             ) as mock_session_class,
         ):
-            # Set up mock chain
             mock_client = AsyncMock()
             mock_client.__aenter__ = AsyncMock(return_value=mock_client)
             mock_client.__aexit__ = AsyncMock(return_value=None)
@@ -658,21 +729,15 @@ class TestCallMcpToolCustomer:
             mock_session = AsyncMock()
             mock_session.initialize = AsyncMock()
             mock_result = MagicMock()
-            mock_content = MagicMock()
-            mock_content.text = "Result with system token"
-            mock_result.content = [mock_content]
+            mock_result.content = []
             mock_session.call_tool = AsyncMock(return_value=mock_result)
             mock_session_ctx = AsyncMock()
             mock_session_ctx.__aenter__ = AsyncMock(return_value=mock_session)
             mock_session_ctx.__aexit__ = AsyncMock(return_value=None)
             mock_session_class.return_value = mock_session_ctx
 
-            # Call without user_token (None)
             result = await call_mcp_tool_customer(
-                credentials, mock_tool, None, order_id="12345"
+                mock_tool, "auth-token", 60.0
             )
 
-            assert result == "Result with system token"
-            # Should use system token, not exchange
-            mock_system_token.assert_called_once_with(credentials, None)
-            mock_exchange.assert_not_called()
+            assert result == ""

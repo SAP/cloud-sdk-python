@@ -89,9 +89,6 @@ from sap_cloud_sdk.extensibility._models import (
     Tools,
 )
 from sap_cloud_sdk.extensibility._noop_transport import NoOpTransport
-from sap_cloud_sdk.extensibility._ord_integration import (
-    add_extension_integration_dependencies,
-)
 from sap_cloud_sdk.extensibility._ums_transport import UmsTransport
 from sap_cloud_sdk.extensibility.client import ExtensibilityClient
 from sap_cloud_sdk.extensibility.config import ExtensibilityConfig, HookConfig
@@ -187,8 +184,6 @@ __all__ = [
     # A2A card helpers
     "build_extension_capabilities",
     "EXTENSION_CAPABILITY_SCHEMA_VERSION",
-    # ORD integration
-    "add_extension_integration_dependencies",
     # Models -- A2A card
     "ExtensionCapability",
     "ToolAdditions",

@@ -5,7 +5,7 @@ from dataclasses import is_dataclass
 import pytest
 
 from sap_cloud_sdk.destination._models import Destination, DestinationType, ProxyType, Authentication
-from sap_cloud_sdk.destination._models import Fragment
+from sap_cloud_sdk.destination._models import AuthToken, Fragment
 from sap_cloud_sdk.destination._models import Label, PatchLabels
 from sap_cloud_sdk.destination._models import ListOptions
 from sap_cloud_sdk.destination.config import DestinationConfig
@@ -239,6 +239,58 @@ class TestDestinationModel:
             Destination.from_dict(data)
 
         assert "missing required fields" in str(exc_info.value)
+
+    def test_get_erp_headers_returns_sap_client(self):
+        dest = Destination.from_dict({
+            "Name": "my-erp", "Type": "HTTP",
+            "sap-client": "100",
+        })
+        assert dest.get_erp_headers() == {"sap-client": "100"}
+
+    def test_get_erp_headers_returns_sap_language(self):
+        dest = Destination.from_dict({
+            "Name": "my-erp", "Type": "HTTP",
+            "sap-language": "en",
+        })
+        assert dest.get_erp_headers() == {"sap-language": "en"}
+
+    def test_get_erp_headers_returns_both(self):
+        dest = Destination.from_dict({
+            "Name": "my-erp", "Type": "HTTP",
+            "sap-client": "100",
+            "sap-language": "en",
+        })
+        assert dest.get_erp_headers() == {"sap-client": "100", "sap-language": "en"}
+
+    def test_get_erp_headers_returns_empty_when_no_erp_properties(self):
+        dest = Destination.from_dict({"Name": "my-erp", "Type": "HTTP"})
+        assert dest.get_erp_headers() == {}
+
+    def test_get_erp_headers_ignores_other_properties(self):
+        dest = Destination.from_dict({
+            "Name": "my-erp", "Type": "HTTP",
+            "sap-client": "100",
+            "some-other-prop": "value",
+        })
+        assert dest.get_erp_headers() == {"sap-client": "100"}
+
+    def test_get_headers_returns_empty_when_nothing_set(self):
+        dest = Destination.from_dict({"Name": "test", "Type": "HTTP"})
+        assert dest.get_headers() == {}
+
+    def test_get_headers_includes_erp_headers(self):
+        dest = Destination.from_dict({"Name": "test", "Type": "HTTP", "sap-client": "100", "sap-language": "EN"})
+        assert dest.get_headers() == {"sap-client": "100", "sap-language": "EN"}
+
+    def test_get_headers_includes_url_headers_properties(self):
+        dest = Destination.from_dict({"Name": "test", "Type": "HTTP", "URL.headers.apiKey": "secret"})
+        assert dest.get_headers()["apiKey"] == "secret"
+        assert "URL.headers.apiKey" not in dest.get_headers()
+
+    def test_get_headers_includes_auth_tokens(self):
+        dest = Destination.from_dict({"Name": "test", "Type": "HTTP"})
+        dest.auth_tokens = [AuthToken(type="Bearer", value="raw", http_header={"key": "Authorization", "value": "Bearer eyJ123"})]
+        assert dest.get_headers()["Authorization"] == "Bearer eyJ123"
 
 
 class TestFragmentModel:

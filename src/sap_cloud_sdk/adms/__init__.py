@@ -86,6 +86,7 @@ from sap_cloud_sdk.adms._query_options import (
     DocumentQueryOptions,
     RelationQueryOptions,
 )
+from sap_cloud_sdk.adms._token_cache import InMemoryTokenCache, TokenCache
 
 
 __all__ = [
@@ -137,4 +138,7 @@ __all__ = [
     "ConfigQueryOptions",
     "DocumentQueryOptions",
     "RelationQueryOptions",
+    # token cache
+    "TokenCache",
+    "InMemoryTokenCache",
 ]

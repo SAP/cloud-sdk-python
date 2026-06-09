@@ -7,8 +7,9 @@ Provides:
 Token caching:
     By default tokens are cached in-process via :class:`InMemoryTokenCache`.
     For horizontally scaled deployments (Kyma ``replicas > 1``, Cloud Foundry
-    ``instances > 1``) pass a :class:`RedisTokenCache` to share tokens across
-    pods and avoid thundering-herd on the IAS token endpoint.
+    ``instances > 1``) implement a :class:`TokenCache` subclass backed by
+    your runtime's shared cache and pass it via the ``cache=`` argument to
+    avoid each pod fetching its own independent token.
 """
 
 from __future__ import annotations
@@ -53,8 +54,9 @@ class IasTokenFetcher:
             optional ``resource``).
         session: Optional ``requests.Session`` to reuse (useful for testing).
         cache: Pluggable :class:`TokenCache`.  Defaults to
-            :class:`InMemoryTokenCache`.  Pass a :class:`RedisTokenCache` for
-            multi-instance deployments.
+            :class:`InMemoryTokenCache`.  For multi-instance deployments,
+            implement a custom :class:`TokenCache` subclass backed by your
+            runtime's shared cache.
 
     Example::
 

@@ -80,12 +80,18 @@ client = create_client(user_jwt=request.headers["Authorization"].split()[1])
 ## Token Cache for Scale-Out
 
 ```python
-from sap_cloud_sdk.adms import create_client
-from sap_cloud_sdk.adms import RedisTokenCache
+from sap_cloud_sdk.adms import create_client, TokenCache
 
-# Share token cache across multiple pods
-cache = RedisTokenCache(host="redis-host", ssl=True)
-client = create_client(token_cache=cache)
+# By default tokens are cached in-process via InMemoryTokenCache.
+# For multi-instance deployments (Kyma replicas > 1, CF instances > 1),
+# implement your own TokenCache subclass backed by the shared cache your
+# runtime offers, then pass it via create_client(token_cache=...).
+class MySharedCache(TokenCache):
+    def get(self, key): ...
+    def set(self, key, token, ttl_seconds): ...
+    def delete(self, key): ...
+
+client = create_client(token_cache=MySharedCache())
 ```
 
 ## Async Client

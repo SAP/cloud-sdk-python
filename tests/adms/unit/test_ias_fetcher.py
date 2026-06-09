@@ -175,14 +175,14 @@ class TestIasTokenFetcherCore:
         or cache-bust CC on every OBO call.
         """
         mock_session.post.side_effect = [
-            _make_token_response("cc-token"),     # first get_token → IAS hit
+            _make_token_response("cc-token"),  # first get_token → IAS hit
             _make_token_response("obo-token-a"),  # exchange_token(jwt_a) → IAS hit
             _make_token_response("obo-token-b"),  # exchange_token(jwt_b) → IAS hit
         ]
 
         cc1 = fetcher.get_token()
         obo_a = fetcher.exchange_token("jwt-a")
-        cc2 = fetcher.get_token()             # must hit cache → no extra IAS call
+        cc2 = fetcher.get_token()  # must hit cache → no extra IAS call
         obo_b = fetcher.exchange_token("jwt-b")
 
         assert cc1 == cc2 == "cc-token"
@@ -192,9 +192,8 @@ class TestIasTokenFetcherCore:
         assert mock_session.post.call_count == 3
 
         cc_grant_calls = [
-            call for call in mock_session.post.call_args_list
+            call
+            for call in mock_session.post.call_args_list
             if call[1]["data"]["grant_type"] == "client_credentials"
         ]
         assert len(cc_grant_calls) == 1
-
-

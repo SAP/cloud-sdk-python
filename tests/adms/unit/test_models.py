@@ -34,6 +34,7 @@ from sap_cloud_sdk.adms._models import (
 # Enum behaviour
 # ---------------------------------------------------------------------------
 
+
 class TestScanStatus:
     def test_clean_is_downloadable(self):
         assert ScanStatus.CLEAN.is_downloadable() is True
@@ -45,7 +46,9 @@ class TestScanStatus:
             ScanStatus.QUARANTINED,
             ScanStatus.FILE_EXT_RESTRICTED,
         ):
-            assert status.is_downloadable() is False, f"{status} should not be downloadable"
+            assert status.is_downloadable() is False, (
+                f"{status} should not be downloadable"
+            )
 
     def test_string_values(self):
         assert ScanStatus.PENDING == "PENDING"
@@ -67,6 +70,7 @@ class TestJobStatus:
 # ---------------------------------------------------------------------------
 # Document models
 # ---------------------------------------------------------------------------
+
 
 class TestDocument:
     def test_from_dict_full(self):
@@ -133,6 +137,7 @@ class TestUpdateDocumentInput:
 # ---------------------------------------------------------------------------
 # DocumentRelation models
 # ---------------------------------------------------------------------------
+
 
 class TestDocumentRelation:
     def test_from_dict_with_expanded_document(self):
@@ -221,6 +226,7 @@ class TestDraftActivateInput:
 # Job models
 # ---------------------------------------------------------------------------
 
+
 class TestZipDownloadJobParameters:
     def test_to_odata_dict(self):
         params = ZipDownloadJobParameters(
@@ -290,6 +296,7 @@ class TestDocumentContentVersion:
 # Config models
 # ---------------------------------------------------------------------------
 
+
 class TestAllowedDomain:
     def test_from_dict(self):
         data = {
@@ -324,7 +331,10 @@ class TestCreateAllowedDomainInput:
     def test_to_odata_dict(self):
         inp = CreateAllowedDomainInput(host_name="example.com", protocol="https")
         d = inp.to_odata_dict()
-        assert d == {"AllowedDomainHostName": "example.com", "AllowedDomainProtocol": "https"}
+        assert d == {
+            "AllowedDomainHostName": "example.com",
+            "AllowedDomainProtocol": "https",
+        }
 
 
 class TestDocumentType:
@@ -376,7 +386,9 @@ class TestCreateDocumentTypeInput:
         }
 
     def test_to_odata_dict_without_description(self):
-        inp = CreateDocumentTypeInput(document_type_id="CONTRACT", document_type_name="Contract")
+        inp = CreateDocumentTypeInput(
+            document_type_id="CONTRACT", document_type_name="Contract"
+        )
         d = inp.to_odata_dict()
         assert "DocumentTypeDescription" not in d
 

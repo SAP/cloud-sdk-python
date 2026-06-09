@@ -89,8 +89,6 @@ class _JobApi:
         return JobOutput.from_dict(resp.json())
 
 
-
-
 class _AsyncJobApi:
     """Async version of :class:`_JobApi`.
 
@@ -151,5 +149,3 @@ class _AsyncJobApi:
         path = build_job_status_key_path(job_id)
         resp = await self._http.get(path, service_base=service)
         return JobOutput.from_dict(resp.json())
-
-

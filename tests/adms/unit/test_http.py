@@ -40,7 +40,11 @@ def token_fetcher(config):
     return fetcher
 
 
-def _make_resp(status_code: int = 200, json_data: Optional[dict] = None, headers: Optional[dict] = None):
+def _make_resp(
+    status_code: int = 200,
+    json_data: Optional[dict] = None,
+    headers: Optional[dict] = None,
+):
     resp = MagicMock(spec=requests.Response)
     resp.status_code = status_code
     resp.ok = 200 <= status_code < 300
@@ -73,7 +77,9 @@ class TestAdmsHttpGet:
         http.get("Document(ID='x')", service_base="/odata/v4/DocumentService")
 
         url = session.request.call_args[1]["url"]
-        assert url == "https://adm.example.com/odata/v4/DocumentService/Document(ID='x')"
+        assert (
+            url == "https://adm.example.com/odata/v4/DocumentService/Document(ID='x')"
+        )
 
     def test_404_raises_document_not_found(self, config, token_fetcher):
         session = MagicMock(spec=requests.Session)
@@ -111,8 +117,11 @@ class TestAdmsHttpPost:
         session.request.return_value = _make_resp(200, json_data={"result": "ok"})
 
         http = AdmsHttp(config=config, token_fetcher=token_fetcher, session=session)
-        http.post("CreateDocumentWithRelation", json={"data": 1},
-                  service_base="/odata/v4/DocumentService")
+        http.post(
+            "CreateDocumentWithRelation",
+            json={"data": 1},
+            service_base="/odata/v4/DocumentService",
+        )
 
         req_headers = session.request.call_args[1]["headers"]
         assert req_headers["X-CSRF-Token"] == "csrf-abc"
@@ -321,9 +330,7 @@ class TestAdmsHttpThreadSafety:
         re-fetch.
         """
         session = MagicMock(spec=requests.Session)
-        session.get.return_value = _make_resp(
-            200, headers={"X-CSRF-Token": "fresh"}
-        )
+        session.get.return_value = _make_resp(200, headers={"X-CSRF-Token": "fresh"})
         session.request.return_value = _make_resp(403, json_data={"error": "csrf"})
 
         http = AdmsHttp(config=config, token_fetcher=token_fetcher, session=session)
@@ -341,15 +348,12 @@ class TestAdmsHttpThreadSafety:
         assert http._csrf_tokens[""] == "fresh"
 
 
-
 class TestEntityKeyPathBuilders:
     """Each helper produces the expected entity-key segment and routes its
     key through the appropriate quote_odata_* function."""
 
     def test_relation_key_active(self):
-        out = build_relation_key_path(
-            "a1b2c3d4-e5f6-4789-ab12-fedcba987654", True
-        )
+        out = build_relation_key_path("a1b2c3d4-e5f6-4789-ab12-fedcba987654", True)
         assert out == (
             "DocumentRelation("
             "DocumentRelationID=a1b2c3d4-e5f6-4789-ab12-fedcba987654,"
@@ -357,9 +361,7 @@ class TestEntityKeyPathBuilders:
         )
 
     def test_relation_key_draft(self):
-        out = build_relation_key_path(
-            "a1b2c3d4-e5f6-4789-ab12-fedcba987654", False
-        )
+        out = build_relation_key_path("a1b2c3d4-e5f6-4789-ab12-fedcba987654", False)
         assert "IsActiveEntity=false" in out
 
     def test_relation_key_invalid_guid_raises(self):
@@ -367,10 +369,10 @@ class TestEntityKeyPathBuilders:
             build_relation_key_path("not-a-guid", True)
 
     def test_allowed_domain_key(self):
-        out = build_allowed_domain_key_path(
-            "a1b2c3d4-e5f6-4789-ab12-fedcba987654"
+        out = build_allowed_domain_key_path("a1b2c3d4-e5f6-4789-ab12-fedcba987654")
+        assert (
+            out == "AllowedDomain(AllowedDomainID=a1b2c3d4-e5f6-4789-ab12-fedcba987654)"
         )
-        assert out == "AllowedDomain(AllowedDomainID=a1b2c3d4-e5f6-4789-ab12-fedcba987654)"
 
     def test_allowed_domain_key_invalid_guid_raises(self):
         with pytest.raises(ValueError, match="invalid OData Edm.Guid key"):
@@ -387,12 +389,13 @@ class TestEntityKeyPathBuilders:
 
     def test_business_object_node_type_key(self):
         out = build_business_object_node_type_key_path("PurchaseOrder")
-        assert out == "BusinessObjectNodeType(BusinessObjectNodeTypeUniqueID='PurchaseOrder')"
+        assert (
+            out
+            == "BusinessObjectNodeType(BusinessObjectNodeTypeUniqueID='PurchaseOrder')"
+        )
 
     def test_doctype_botype_map_key(self):
-        out = build_doctype_botype_map_key_path(
-            "a1b2c3d4-e5f6-4789-ab12-fedcba987654"
-        )
+        out = build_doctype_botype_map_key_path("a1b2c3d4-e5f6-4789-ab12-fedcba987654")
         assert out == (
             "DocumentTypeBusinessObjectTypeMap("
             "DocumentTypeBOTypeMapID=a1b2c3d4-e5f6-4789-ab12-fedcba987654)"
@@ -405,4 +408,3 @@ class TestEntityKeyPathBuilders:
     def test_job_status_key(self):
         out = build_job_status_key_path("JOB-001")
         assert out == "JobStatus(JobID='JOB-001')"
-

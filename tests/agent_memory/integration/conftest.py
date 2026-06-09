@@ -27,4 +27,4 @@ def agent_memory_client() -> AgentMemoryClient:
     try:
         return create_client()
     except Exception as e:
-        pytest.skip(f"Agent Memory credentials not configured — skipping integration tests: {e}")
+        pytest.fail(f"Failed to create Agent Memory client for integration tests: {e}")

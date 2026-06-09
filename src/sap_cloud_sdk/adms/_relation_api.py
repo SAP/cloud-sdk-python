@@ -270,8 +270,6 @@ class _DocumentRelationApi:
         )
 
 
-
-
 class _AsyncDocumentRelationApi:
     """Async version of :class:`_DocumentRelationApi`.
 
@@ -446,5 +444,3 @@ class _AsyncDocumentRelationApi:
             json=payload,
             service_base=_SERVICE_PATH,
         )
-
-

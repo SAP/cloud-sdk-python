@@ -210,8 +210,6 @@ class _DocumentApi:
         )
 
 
-
-
 class _AsyncDocumentApi:
     """Async version of :class:`_DocumentApi`.
 
@@ -343,5 +341,3 @@ class _AsyncDocumentApi:
             payload["DocumentContentVersion"]["DocContentVersionComment"] = comment
         resp = await self._http.post(path, json=payload, service_base=_SERVICE_PATH)
         return Document.from_dict(resp.json())
-
-

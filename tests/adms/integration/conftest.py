@@ -32,6 +32,7 @@ from sap_cloud_sdk.adms.exceptions import ConfigError
 # Configuration fixture
 # ---------------------------------------------------------------------------
 
+
 @pytest.fixture(scope="session")
 def adms_config() -> AdmsConfig:
     """Resolve AdmsConfig from env/secret-mount.
@@ -48,6 +49,7 @@ def adms_config() -> AdmsConfig:
 # Client fixtures
 # ---------------------------------------------------------------------------
 
+
 @pytest.fixture(scope="session")
 def adms_client(adms_config: AdmsConfig) -> AdmsClient:
     """Sync AdmsClient wired to the real ADM instance."""
@@ -63,6 +65,7 @@ def async_adms_client(adms_config: AdmsConfig) -> AsyncAdmsClient:
 # ---------------------------------------------------------------------------
 # Pre-requisite: business object type ID
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture(scope="session")
 def bo_type_id(adms_client: AdmsClient) -> str:

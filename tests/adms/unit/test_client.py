@@ -60,6 +60,7 @@ from sap_cloud_sdk.adms.exceptions import (
 
 # ── Shared async helpers ──────────────────────────────────────────────────────
 
+
 @pytest.fixture
 def config() -> AdmsConfig:
     return AdmsConfig(
@@ -76,6 +77,7 @@ def _make_httpx_response(
     headers: dict | None = None,
 ) -> httpx.Response:
     import json as _json
+
     body = _json.dumps(json_body or {}).encode()
     return httpx.Response(
         status_code=status_code,
@@ -99,6 +101,7 @@ def _make_async_http(config: AdmsConfig, fetcher: IasTokenFetcher) -> AsyncAdmsH
 
 
 # ── AdmsClient ────────────────────────────────────────────────────────────────
+
 
 @pytest.fixture
 def mock_http() -> MagicMock:
@@ -206,6 +209,7 @@ class TestCreateClientFactory:
 
 # ── AsyncAdmsHttp ─────────────────────────────────────────────────────────────
 
+
 class TestAsyncAdmsHttp:
     @pytest.mark.asyncio
     async def test_get_injects_bearer_token(self, config):
@@ -232,7 +236,9 @@ class TestAsyncAdmsHttp:
         http._csrf_tokens = {"": "x"}
 
         with pytest.raises(DocumentNotFoundError):
-            await http.get("Document('missing')", service_base="odata/v4/DocumentService")
+            await http.get(
+                "Document('missing')", service_base="odata/v4/DocumentService"
+            )
 
     @pytest.mark.asyncio
     async def test_5xx_raises_http_error(self, config):
@@ -251,7 +257,9 @@ class TestAsyncAdmsHttp:
         fetcher = _make_token_fetcher(config)
         mock_client = AsyncMock(spec=httpx.AsyncClient)
 
-        async with AsyncAdmsHttp(config=config, token_fetcher=fetcher, client=mock_client):
+        async with AsyncAdmsHttp(
+            config=config, token_fetcher=fetcher, client=mock_client
+        ):
             pass
 
         mock_client.aclose.assert_called_once()
@@ -262,7 +270,9 @@ class TestAsyncAdmsHttp:
         mock_client = AsyncMock(spec=httpx.AsyncClient)
 
         with pytest.raises(RuntimeError, match="boom"):
-            async with AsyncAdmsHttp(config=config, token_fetcher=fetcher, client=mock_client):
+            async with AsyncAdmsHttp(
+                config=config, token_fetcher=fetcher, client=mock_client
+            ):
                 raise RuntimeError("boom")
 
         mock_client.aclose.assert_called_once()
@@ -368,9 +378,7 @@ class TestAsyncAdmsHttp:
 
         http = AsyncAdmsHttp(config=config, token_fetcher=fetcher, client=mock_client)
         with pytest.raises(HttpError) as exc_info:
-            await http.post(
-                "Action", json={}, service_base="odata/v4/DocumentService"
-            )
+            await http.post("Action", json={}, service_base="odata/v4/DocumentService")
 
         assert exc_info.value.status_code == 403
         assert mock_client.request.call_count == 2  # exactly one retry
@@ -382,15 +390,11 @@ class TestAsyncAdmsHttp:
         mock_client.get.return_value = _make_httpx_response(
             200, {}, headers={"X-CSRF-Token": "csrf"}
         )
-        mock_client.request.return_value = _make_httpx_response(
-            500, {"error": "boom"}
-        )
+        mock_client.request.return_value = _make_httpx_response(500, {"error": "boom"})
 
         http = AsyncAdmsHttp(config=config, token_fetcher=fetcher, client=mock_client)
         with pytest.raises(HttpError) as exc_info:
-            await http.post(
-                "Action", json={}, service_base="odata/v4/DocumentService"
-            )
+            await http.post("Action", json={}, service_base="odata/v4/DocumentService")
 
         assert exc_info.value.status_code == 500
         assert mock_client.request.call_count == 1  # no retry on non-403
@@ -398,10 +402,13 @@ class TestAsyncAdmsHttp:
 
 # ── AsyncAdmsClient ───────────────────────────────────────────────────────────
 
+
 class TestAsyncAdmsClient:
     def test_exposes_api_attributes(self, config):
         from sap_cloud_sdk.adms.client import _AsyncDocumentApi as _AsyncDocumentApi
-        from sap_cloud_sdk.adms.client import _AsyncDocumentRelationApi as _AsyncDocumentRelationApi
+        from sap_cloud_sdk.adms.client import (
+            _AsyncDocumentRelationApi as _AsyncDocumentRelationApi,
+        )
         from sap_cloud_sdk.adms.client import _AsyncJobApi as _AsyncJobApi
 
         fetcher = _make_token_fetcher(config)
@@ -461,21 +468,26 @@ class TestCreateAsyncClient:
 
 # ── _AsyncDocumentApi ──────────────────────────────────────────────────────────
 
+
 class TestAsyncDocumentApi:
     @pytest.mark.asyncio
     async def test_get_document(self, config):
         fetcher = _make_token_fetcher(config)
         mock_client = AsyncMock(spec=httpx.AsyncClient)
-        mock_client.request.return_value = _make_httpx_response(200, {
-            "DocumentID": "doc-1",
-            "DocumentName": "Invoice.pdf",
-            "DocumentState": ScanStatus.CLEAN.value,
-            "IsActiveEntity": True,
-        })
+        mock_client.request.return_value = _make_httpx_response(
+            200,
+            {
+                "DocumentID": "doc-1",
+                "DocumentName": "Invoice.pdf",
+                "DocumentState": ScanStatus.CLEAN.value,
+                "IsActiveEntity": True,
+            },
+        )
 
         http = AsyncAdmsHttp(config=config, token_fetcher=fetcher, client=mock_client)
         http._csrf_tokens = {"": "csrf-tok"}
         from sap_cloud_sdk.adms.client import _AsyncDocumentApi as _AsyncDocumentApi
+
         api = _AsyncDocumentApi(http)
 
         doc = await api.get("11111111-1111-1111-1111-111111111111")
@@ -487,69 +499,89 @@ class TestAsyncDocumentApi:
     async def test_get_download_url_raises_when_not_clean(self, config):
         fetcher = _make_token_fetcher(config)
         mock_client = AsyncMock(spec=httpx.AsyncClient)
-        mock_client.request.return_value = _make_httpx_response(200, {
-            "Document": {
-                "DocumentID": "doc-1",
-                "DocumentState": ScanStatus.PENDING.value,
-            }
-        })
+        mock_client.request.return_value = _make_httpx_response(
+            200,
+            {
+                "Document": {
+                    "DocumentID": "doc-1",
+                    "DocumentState": ScanStatus.PENDING.value,
+                }
+            },
+        )
 
         http = AsyncAdmsHttp(config=config, token_fetcher=fetcher, client=mock_client)
         http._csrf_tokens = {"": "x"}
 
         from sap_cloud_sdk.adms.client import _AsyncDocumentApi as _AsyncDocumentApi
+
         api = _AsyncDocumentApi(http)
 
         with pytest.raises(ScanNotCleanError):
-            await api.get_download_url("11111111-1111-1111-1111-111111111111", doc_content_version_id="1.0")
+            await api.get_download_url(
+                "11111111-1111-1111-1111-111111111111", doc_content_version_id="1.0"
+            )
 
 
 # ── _AsyncDocumentRelationApi ──────────────────────────────────────────────────
+
 
 class TestAsyncDocumentRelationApi:
     @pytest.mark.asyncio
     async def test_get_all_returns_list(self, config):
         fetcher = _make_token_fetcher(config)
         mock_client = AsyncMock(spec=httpx.AsyncClient)
-        mock_client.request.return_value = _make_httpx_response(200, {
-            "value": [
-                {
-                    "DocumentRelationID": "11111111-1111-1111-1111-111111111111",
-                    "HostBusinessObjectNodeID": "PO-123",
-                    "BusinessObjectNodeTypeUniqueID": "PurchaseOrder",
-                    "IsActiveEntity": True,
-                }
-            ]
-        })
+        mock_client.request.return_value = _make_httpx_response(
+            200,
+            {
+                "value": [
+                    {
+                        "DocumentRelationID": "11111111-1111-1111-1111-111111111111",
+                        "HostBusinessObjectNodeID": "PO-123",
+                        "BusinessObjectNodeTypeUniqueID": "PurchaseOrder",
+                        "IsActiveEntity": True,
+                    }
+                ]
+            },
+        )
 
         http = AsyncAdmsHttp(config=config, token_fetcher=fetcher, client=mock_client)
         http._csrf_tokens = {"": "x"}
 
-        from sap_cloud_sdk.adms.client import _AsyncDocumentRelationApi as _AsyncDocumentRelationApi
+        from sap_cloud_sdk.adms.client import (
+            _AsyncDocumentRelationApi as _AsyncDocumentRelationApi,
+        )
+
         api = _AsyncDocumentRelationApi(http)
 
         relations = await api.get_all()
 
         assert len(relations) == 1
-        assert relations[0].document_relation_id == "11111111-1111-1111-1111-111111111111"
+        assert (
+            relations[0].document_relation_id == "11111111-1111-1111-1111-111111111111"
+        )
 
 
 # ── _AsyncJobApi ───────────────────────────────────────────────────────────────
+
 
 class TestAsyncJobApi:
     @pytest.mark.asyncio
     async def test_get_status(self, config):
         fetcher = _make_token_fetcher(config)
         mock_client = AsyncMock(spec=httpx.AsyncClient)
-        mock_client.request.return_value = _make_httpx_response(200, {
-            "JobID": "job-abc",
-            "JobStatus": "IN_PROGRESS",
-        })
+        mock_client.request.return_value = _make_httpx_response(
+            200,
+            {
+                "JobID": "job-abc",
+                "JobStatus": "IN_PROGRESS",
+            },
+        )
 
         http = AsyncAdmsHttp(config=config, token_fetcher=fetcher, client=mock_client)
         http._csrf_tokens = {"": "x"}
 
         from sap_cloud_sdk.adms.client import _AsyncJobApi as _AsyncJobApi
+
         api = _AsyncJobApi(http)
 
         output = await api.get_status("job-abc")
@@ -562,15 +594,19 @@ class TestAsyncJobApi:
         """``use_admin_service=True`` must route through AdminService for DELETE_USER_DATA polling."""
         fetcher = _make_token_fetcher(config)
         mock_client = AsyncMock(spec=httpx.AsyncClient)
-        mock_client.request.return_value = _make_httpx_response(200, {
-            "JobID": "job-del",
-            "JobStatus": "COMPLETED",
-        })
+        mock_client.request.return_value = _make_httpx_response(
+            200,
+            {
+                "JobID": "job-del",
+                "JobStatus": "COMPLETED",
+            },
+        )
 
         http = AsyncAdmsHttp(config=config, token_fetcher=fetcher, client=mock_client)
         http._csrf_tokens = {"": "x"}
 
         from sap_cloud_sdk.adms.client import _AsyncJobApi as _AsyncJobApi
+
         api = _AsyncJobApi(http)
 
         await api.get_status("job-del", use_admin_service=True)
@@ -580,6 +616,7 @@ class TestAsyncJobApi:
 
 
 # ── _DocumentApi (sync) ────────────────────────────────────────────────────────
+
 
 def _doc_http(get_data=None, post_data=None):
     http = MagicMock(spec=AdmsHttp)
@@ -649,7 +686,9 @@ class TestDocumentApiDownloadUrl:
         ]
 
         api = _DocumentApi(http)
-        url = api.get_download_url("11111111-1111-1111-1111-111111111111", doc_content_version_id="1.0")
+        url = api.get_download_url(
+            "11111111-1111-1111-1111-111111111111", doc_content_version_id="1.0"
+        )
 
         assert url == "https://s3.example.com/presigned-url"
 
@@ -665,7 +704,9 @@ class TestDocumentApiDownloadUrl:
 
         api = _DocumentApi(http)
         with pytest.raises(ScanNotCleanError, match="PENDING"):
-            api.get_download_url("11111111-1111-1111-1111-111111111111", doc_content_version_id="1.0")
+            api.get_download_url(
+                "11111111-1111-1111-1111-111111111111", doc_content_version_id="1.0"
+            )
 
     def test_quarantined_document_raises_scan_not_clean_error(self):
         rel_data = {
@@ -679,7 +720,9 @@ class TestDocumentApiDownloadUrl:
 
         api = _DocumentApi(http)
         with pytest.raises(ScanNotCleanError, match="QUARANTINED"):
-            api.get_download_url("11111111-1111-1111-1111-111111111111", doc_content_version_id="1.0")
+            api.get_download_url(
+                "11111111-1111-1111-1111-111111111111", doc_content_version_id="1.0"
+            )
 
 
 class TestDocumentApiUpdate:
@@ -711,7 +754,9 @@ class TestDocumentApiVersionOps:
         http = _doc_http(post_data=_CLEAN_DOC)
         api = _DocumentApi(http)
 
-        doc = api.restore_content_version("11111111-1111-1111-1111-111111111111", "1.0", comment="Revert")
+        doc = api.restore_content_version(
+            "11111111-1111-1111-1111-111111111111", "1.0", comment="Revert"
+        )
 
         call_path = http.post.call_args[0][0]
         assert "RestoreDocumentContentVersion" in call_path
@@ -817,6 +862,7 @@ class TestDocumentApiGetAll:
 
 
 # ── _DocumentRelationApi (sync) ────────────────────────────────────────────────
+
 
 def _rel_http(get_data=None, post_data=None):
     http = MagicMock(spec=AdmsHttp)
@@ -1114,7 +1160,9 @@ class TestConfigurationApiAllowedDomain:
     def test_create_posts_to_correct_entity(self):
         http = _cfg_sync_http(post_data=_ALLOWED_DOMAIN_DICT)
         api = _ConfigurationApi(http)
-        payload = CreateAllowedDomainInput(host_name="storage.example.com", protocol="https")
+        payload = CreateAllowedDomainInput(
+            host_name="storage.example.com", protocol="https"
+        )
         result = api.create_allowed_domain(payload)
 
         http.post.assert_called_once()
@@ -1252,7 +1300,10 @@ class TestConfigurationApiTypeMappings:
 
         assert len(result) == 1
         assert isinstance(result[0], DocumentTypeBusinessObjectTypeMap)
-        assert result[0].document_type_bo_type_map_id == "44444444-4444-4444-4444-444444444444"
+        assert (
+            result[0].document_type_bo_type_map_id
+            == "44444444-4444-4444-4444-444444444444"
+        )
         assert result[0].business_object_node_type_unique_id == "bo-uuid-1"
         assert result[0].document_type_id == "INVOICE"
         assert result[0].is_default is False
@@ -1302,7 +1353,9 @@ class TestAsyncConfigurationApiAllowedDomain:
     async def test_create_posts_to_correct_entity(self):
         http = _cfg_async_http(post_data=_ALLOWED_DOMAIN_DICT)
         api = _AsyncConfigurationApi(http)
-        payload = CreateAllowedDomainInput(host_name="storage.example.com", protocol="https")
+        payload = CreateAllowedDomainInput(
+            host_name="storage.example.com", protocol="https"
+        )
         result = await api.create_allowed_domain(payload)
 
         http.post.assert_called_once()
@@ -1413,17 +1466,20 @@ class TestAsyncConfigurationApiTypeMappings:
 
 # ── _JobApi (sync) ─────────────────────────────────────────────────────────────
 
+
 def _job_http(post_data=None, get_data=None):
     http = MagicMock(spec=AdmsHttp)
     post_resp = MagicMock()
     post_resp.json.return_value = (
-        post_data if post_data is not None
+        post_data
+        if post_data is not None
         else {"JobID": "job-1", "JobStatus": "IN_PROGRESS"}
     )
     http.post.return_value = post_resp
     get_resp = MagicMock()
     get_resp.json.return_value = (
-        get_data if get_data is not None
+        get_data
+        if get_data is not None
         else {"JobID": "job-1", "JobStatus": "COMPLETED"}
     )
     http.get.return_value = get_resp
@@ -1453,13 +1509,19 @@ class TestJobApiStartZipDownload:
         params = ZipDownloadJobParameters(
             business_object_node_type_unique_id="PO",
             host_business_object_node_id="PO-1",
-            document_relation_ids=["11111111-1111-1111-1111-111111111111", "22222222-2222-2222-2222-222222222222"],
+            document_relation_ids=[
+                "11111111-1111-1111-1111-111111111111",
+                "22222222-2222-2222-2222-222222222222",
+            ],
         )
         api.start_zip_download(params)
 
         payload = http.post.call_args[1]["json"]
         assert payload["JobInput"]["JobType"] == "ZIP_DOWNLOAD"
-        assert payload["JobInput"]["JobParameters"]["DocumentRelationIDs"] == ["11111111-1111-1111-1111-111111111111", "22222222-2222-2222-2222-222222222222"]
+        assert payload["JobInput"]["JobParameters"]["DocumentRelationIDs"] == [
+            "11111111-1111-1111-1111-111111111111",
+            "22222222-2222-2222-2222-222222222222",
+        ]
 
     def test_returns_job_output(self):
         http = _job_http(post_data={"JobID": "job-42", "JobStatus": "NOT_STARTED"})
@@ -1527,8 +1589,13 @@ class TestJobApiGetStatus:
         assert "job-99" in call_path
 
     def test_returns_job_output(self):
-        http = _job_http(get_data={"JobID": "job-1", "JobStatus": "COMPLETED",
-                                   "JobProgressPercentage": 100})
+        http = _job_http(
+            get_data={
+                "JobID": "job-1",
+                "JobStatus": "COMPLETED",
+                "JobProgressPercentage": 100,
+            }
+        )
         api = _JobApi(http)
 
         output = api.get_status("job-1")

@@ -29,6 +29,7 @@ _HOST_BO_NODE_ID = "PY-SDK-IT-PO-001"
 # Context
 # ---------------------------------------------------------------------------
 
+
 class ScenarioContext:
     def __init__(self) -> None:
         self.client: AdmsClient | None = None
@@ -51,6 +52,7 @@ def context() -> ScenarioContext:
 # Background
 # ---------------------------------------------------------------------------
 
+
 @given("the ADMS service is available")
 def adms_service_available(adms_client: AdmsClient) -> None:
     assert adms_client is not None
@@ -60,8 +62,11 @@ def adms_service_available(adms_client: AdmsClient) -> None:
 # Given steps
 # ---------------------------------------------------------------------------
 
+
 @given("I have a business object node type ID")
-def have_bo_type_id(context: ScenarioContext, adms_client: AdmsClient, bo_type_id: str) -> None:
+def have_bo_type_id(
+    context: ScenarioContext, adms_client: AdmsClient, bo_type_id: str
+) -> None:
     context.client = adms_client
     context.bo_type_id = bo_type_id
 
@@ -88,6 +93,7 @@ def have_created_relation(context: ScenarioContext, name: str) -> None:
 # ---------------------------------------------------------------------------
 # When steps
 # ---------------------------------------------------------------------------
+
 
 @when(parsers.parse('I create a document relation named "{name}"'))
 def create_relation(context: ScenarioContext, name: str) -> None:
@@ -219,7 +225,9 @@ def discard_draft(context: ScenarioContext, bo_node_id: str) -> None:
 
 
 @when(parsers.parse('I get a document with relation ID "{relation_id}"'))
-def get_document_nonexistent(context: ScenarioContext, relation_id: str, adms_client: AdmsClient) -> None:
+def get_document_nonexistent(
+    context: ScenarioContext, relation_id: str, adms_client: AdmsClient
+) -> None:
     context.client = adms_client
     try:
         adms_client.documents.get(relation_id)
@@ -229,7 +237,9 @@ def get_document_nonexistent(context: ScenarioContext, relation_id: str, adms_cl
 
 
 @when(parsers.parse('I get a relation with ID "{relation_id}"'))
-def get_relation_nonexistent(context: ScenarioContext, relation_id: str, adms_client: AdmsClient) -> None:
+def get_relation_nonexistent(
+    context: ScenarioContext, relation_id: str, adms_client: AdmsClient
+) -> None:
     context.client = adms_client
     try:
         adms_client.relations.get(relation_id)
@@ -241,6 +251,7 @@ def get_relation_nonexistent(context: ScenarioContext, relation_id: str, adms_cl
 # ---------------------------------------------------------------------------
 # Then steps
 # ---------------------------------------------------------------------------
+
 
 @then("the relation should be created with a valid ID")
 def relation_has_valid_id(context: ScenarioContext) -> None:
@@ -261,7 +272,10 @@ def created_relation_in_results(context: ScenarioContext) -> None:
 def retrieved_relation_id_matches(context: ScenarioContext) -> None:
     assert context.relation is not None
     assert context.retrieved_relation is not None
-    assert context.retrieved_relation.document_relation_id == context.relation.document_relation_id
+    assert (
+        context.retrieved_relation.document_relation_id
+        == context.relation.document_relation_id
+    )
 
 
 @then("the scan state should be PENDING or CLEAN")
@@ -300,7 +314,9 @@ def active_relation_list_not_empty(context: ScenarioContext) -> None:
 def no_active_relations_for_node(context: ScenarioContext, bo_node_id: str) -> None:
     assert context.client is not None
     all_relations = context.client.relations.get_all()
-    matching = [r for r in all_relations if r.host_business_object_node_id == bo_node_id]
+    matching = [
+        r for r in all_relations if r.host_business_object_node_id == bo_node_id
+    ]
     assert matching == [], f"Expected no active relations, found: {matching}"
 
 
@@ -312,6 +328,7 @@ def document_not_found_error_raised(context: ScenarioContext) -> None:
 # ---------------------------------------------------------------------------
 # Cleanup steps
 # ---------------------------------------------------------------------------
+
 
 @then("I clean up the created relation")
 def cleanup_created_relation(context: ScenarioContext) -> None:

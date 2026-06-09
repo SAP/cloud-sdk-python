@@ -10,13 +10,16 @@ from sap_cloud_sdk.adms._async_http import AsyncHttpClient, HttpError, NotFoundE
 
 def _make_response(status: int, body: dict | str = "") -> httpx.Response:
     import json
+
     if isinstance(body, dict):
         content = json.dumps(body).encode()
         content_type = "application/json"
     else:
         content = body.encode()
         content_type = "text/plain"
-    return httpx.Response(status, content=content, headers={"content-type": content_type})
+    return httpx.Response(
+        status, content=content, headers={"content-type": content_type}
+    )
 
 
 @pytest.fixture
@@ -39,20 +42,26 @@ class TestAsyncHttpClientInit:
 class TestAsyncHttpClientContextManager:
     @pytest.mark.asyncio
     async def test_aenter_returns_self(self, mock_httpx_client):
-        c = AsyncHttpClient(base_url="https://api.example.com", client=mock_httpx_client)
+        c = AsyncHttpClient(
+            base_url="https://api.example.com", client=mock_httpx_client
+        )
         async with c as ctx:
             assert ctx is c
 
     @pytest.mark.asyncio
     async def test_aexit_closes_client(self, mock_httpx_client):
-        c = AsyncHttpClient(base_url="https://api.example.com", client=mock_httpx_client)
+        c = AsyncHttpClient(
+            base_url="https://api.example.com", client=mock_httpx_client
+        )
         async with c:
             pass
         mock_httpx_client.aclose.assert_awaited_once()
 
     @pytest.mark.asyncio
     async def test_aexit_closes_client_on_exception(self, mock_httpx_client):
-        c = AsyncHttpClient(base_url="https://api.example.com", client=mock_httpx_client)
+        c = AsyncHttpClient(
+            base_url="https://api.example.com", client=mock_httpx_client
+        )
         with pytest.raises(RuntimeError, match="boom"):
             async with c:
                 raise RuntimeError("boom")
@@ -87,7 +96,9 @@ class TestAsyncHttpClientGet:
     @pytest.mark.asyncio
     async def test_get_no_token_no_auth_header(self, mock_httpx_client):
         mock_httpx_client.request.return_value = _make_response(200, {})
-        c = AsyncHttpClient(base_url="https://api.example.com", client=mock_httpx_client)
+        c = AsyncHttpClient(
+            base_url="https://api.example.com", client=mock_httpx_client
+        )
         await c.get("/items")
         headers = mock_httpx_client.request.call_args[1]["headers"]
         assert "Authorization" not in headers
@@ -95,7 +106,9 @@ class TestAsyncHttpClientGet:
     @pytest.mark.asyncio
     async def test_get_constructs_correct_url(self, mock_httpx_client):
         mock_httpx_client.request.return_value = _make_response(200, {})
-        c = AsyncHttpClient(base_url="https://api.example.com", client=mock_httpx_client)
+        c = AsyncHttpClient(
+            base_url="https://api.example.com", client=mock_httpx_client
+        )
         await c.get("/v1/items")
         url = mock_httpx_client.request.call_args[1]["url"]
         assert url == "https://api.example.com/v1/items"
@@ -103,7 +116,9 @@ class TestAsyncHttpClientGet:
     @pytest.mark.asyncio
     async def test_get_passes_params(self, mock_httpx_client):
         mock_httpx_client.request.return_value = _make_response(200, {})
-        c = AsyncHttpClient(base_url="https://api.example.com", client=mock_httpx_client)
+        c = AsyncHttpClient(
+            base_url="https://api.example.com", client=mock_httpx_client
+        )
         await c.get("/items", params={"$top": "5"})
         params = mock_httpx_client.request.call_args[1]["params"]
         assert params == {"$top": "5"}
@@ -111,14 +126,18 @@ class TestAsyncHttpClientGet:
     @pytest.mark.asyncio
     async def test_404_raises_not_found_error(self, mock_httpx_client):
         mock_httpx_client.request.return_value = _make_response(404, "not found")
-        c = AsyncHttpClient(base_url="https://api.example.com", client=mock_httpx_client)
+        c = AsyncHttpClient(
+            base_url="https://api.example.com", client=mock_httpx_client
+        )
         with pytest.raises(NotFoundError):
             await c.get("/items/missing")
 
     @pytest.mark.asyncio
     async def test_500_raises_http_error(self, mock_httpx_client):
         mock_httpx_client.request.return_value = _make_response(500, "server error")
-        c = AsyncHttpClient(base_url="https://api.example.com", client=mock_httpx_client)
+        c = AsyncHttpClient(
+            base_url="https://api.example.com", client=mock_httpx_client
+        )
         with pytest.raises(HttpError) as exc_info:
             await c.get("/items")
         assert exc_info.value.status_code == 500
@@ -126,7 +145,9 @@ class TestAsyncHttpClientGet:
     @pytest.mark.asyncio
     async def test_network_error_raises_http_error(self, mock_httpx_client):
         mock_httpx_client.request.side_effect = httpx.RequestError("connection refused")
-        c = AsyncHttpClient(base_url="https://api.example.com", client=mock_httpx_client)
+        c = AsyncHttpClient(
+            base_url="https://api.example.com", client=mock_httpx_client
+        )
         with pytest.raises(HttpError, match="connection refused"):
             await c.get("/items")
 
@@ -135,7 +156,9 @@ class TestAsyncHttpClientPost:
     @pytest.mark.asyncio
     async def test_post_sends_json(self, mock_httpx_client):
         mock_httpx_client.request.return_value = _make_response(201, {"id": "new"})
-        c = AsyncHttpClient(base_url="https://api.example.com", client=mock_httpx_client)
+        c = AsyncHttpClient(
+            base_url="https://api.example.com", client=mock_httpx_client
+        )
         await c.post("/items", json={"name": "test"})
         assert mock_httpx_client.request.call_args[1]["json"] == {"name": "test"}
         assert mock_httpx_client.request.call_args[1]["method"] == "POST"
@@ -145,7 +168,9 @@ class TestAsyncHttpClientPatch:
     @pytest.mark.asyncio
     async def test_patch_sends_json(self, mock_httpx_client):
         mock_httpx_client.request.return_value = _make_response(200, {})
-        c = AsyncHttpClient(base_url="https://api.example.com", client=mock_httpx_client)
+        c = AsyncHttpClient(
+            base_url="https://api.example.com", client=mock_httpx_client
+        )
         await c.patch("/items/1", json={"name": "updated"})
         assert mock_httpx_client.request.call_args[1]["method"] == "PATCH"
 
@@ -154,7 +179,9 @@ class TestAsyncHttpClientDelete:
     @pytest.mark.asyncio
     async def test_delete_request(self, mock_httpx_client):
         mock_httpx_client.request.return_value = _make_response(204, "")
-        c = AsyncHttpClient(base_url="https://api.example.com", client=mock_httpx_client)
+        c = AsyncHttpClient(
+            base_url="https://api.example.com", client=mock_httpx_client
+        )
         await c.delete("/items/1")
         assert mock_httpx_client.request.call_args[1]["method"] == "DELETE"
 

@@ -26,6 +26,7 @@ pytestmark = pytest.mark.integration
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 @pytest.fixture
 def run_async():
     """Provide a synchronous runner for async coroutines."""
@@ -34,7 +35,9 @@ def run_async():
     loop.close()
 
 
-def _make_relation_input(bo_type_id: str, bo_node_id: str, name: str) -> CreateDocumentRelationInput:
+def _make_relation_input(
+    bo_type_id: str, bo_node_id: str, name: str
+) -> CreateDocumentRelationInput:
     return CreateDocumentRelationInput(
         business_object_node_type_unique_id=bo_type_id,
         host_business_object_node_id=bo_node_id,
@@ -51,6 +54,7 @@ def _make_relation_input(bo_type_id: str, bo_node_id: str, name: str) -> CreateD
 # ---------------------------------------------------------------------------
 # Context
 # ---------------------------------------------------------------------------
+
 
 class AsyncScenarioContext:
     def __init__(self) -> None:
@@ -73,6 +77,7 @@ def context() -> AsyncScenarioContext:
 # Background
 # ---------------------------------------------------------------------------
 
+
 @given("the ADMS service is available")
 def adms_service_available(async_adms_client: AsyncAdmsClient) -> None:
     assert async_adms_client is not None
@@ -81,6 +86,7 @@ def adms_service_available(async_adms_client: AsyncAdmsClient) -> None:
 # ---------------------------------------------------------------------------
 # Given steps
 # ---------------------------------------------------------------------------
+
 
 @given("I have a business object node type ID")
 def have_bo_type_id(
@@ -96,18 +102,29 @@ def have_bo_type_id(
 # When steps
 # ---------------------------------------------------------------------------
 
-@when(parsers.parse('I create a document relation using the async client named "{name}" for node "{bo_node_id}"'))
+
+@when(
+    parsers.parse(
+        'I create a document relation using the async client named "{name}" for node "{bo_node_id}"'
+    )
+)
 def create_async_relation(
     context: AsyncScenarioContext, name: str, bo_node_id: str, run_async
 ) -> None:
     assert context.client is not None
     assert context.bo_type_id is not None
     context.relation = run_async(
-        context.client.relations.create(_make_relation_input(context.bo_type_id, bo_node_id, name))
+        context.client.relations.create(
+            _make_relation_input(context.bo_type_id, bo_node_id, name)
+        )
     )
 
 
-@when(parsers.parse('I query all relations using the async client for node "{bo_node_id}"'))
+@when(
+    parsers.parse(
+        'I query all relations using the async client for node "{bo_node_id}"'
+    )
+)
 def query_async_relations(
     context: AsyncScenarioContext, bo_node_id: str, run_async
 ) -> None:
@@ -172,7 +189,11 @@ def get_async_relation_nonexistent(
         context.operation_error = e
 
 
-@when(parsers.parse('I concurrently create 3 relations using the async client for nodes "{base_node_id}"'))
+@when(
+    parsers.parse(
+        'I concurrently create 3 relations using the async client for nodes "{base_node_id}"'
+    )
+)
 def create_concurrent_async_relations(
     context: AsyncScenarioContext, base_node_id: str, run_async
 ) -> None:
@@ -198,6 +219,7 @@ def create_concurrent_async_relations(
 # Then steps
 # ---------------------------------------------------------------------------
 
+
 @then("the async relation should be created with a valid ID")
 def async_relation_has_valid_id(context: AsyncScenarioContext) -> None:
     assert context.relation is not None
@@ -215,7 +237,10 @@ def async_relation_in_results(context: AsyncScenarioContext) -> None:
 def async_retrieved_id_matches(context: AsyncScenarioContext) -> None:
     assert context.relation is not None
     assert context.retrieved_relation is not None
-    assert context.retrieved_relation.document_relation_id == context.relation.document_relation_id
+    assert (
+        context.retrieved_relation.document_relation_id
+        == context.relation.document_relation_id
+    )
 
 
 @then("the async scan state should be PENDING or CLEAN")
@@ -248,23 +273,33 @@ def async_concurrent_unique_ids(context: AsyncScenarioContext) -> None:
 # Cleanup steps
 # ---------------------------------------------------------------------------
 
+
 @then("I clean up the async relation")
 def cleanup_async_relation(context: AsyncScenarioContext, run_async) -> None:
     if context.relation is not None and context.client is not None:
         try:
-            run_async(context.client.relations.delete(context.relation.document_relation_id))
+            run_async(
+                context.client.relations.delete(context.relation.document_relation_id)
+            )
         except Exception:
             pass
 
 
 @then("I clean up all concurrent async relations")
-def cleanup_concurrent_async_relations(context: AsyncScenarioContext, run_async) -> None:
+def cleanup_concurrent_async_relations(
+    context: AsyncScenarioContext, run_async
+) -> None:
     if not context.concurrent_relations or context.client is None:
         return
     client = context.client
+
     async def _cleanup() -> None:
         await asyncio.gather(
-            *[client.relations.delete(r.document_relation_id) for r in context.concurrent_relations],
+            *[
+                client.relations.delete(r.document_relation_id)
+                for r in context.concurrent_relations
+            ],
             return_exceptions=True,
         )
+
     run_async(_cleanup())

@@ -128,7 +128,9 @@ class _ConfigurationApi:
     ) -> None:
         """Delete a business object node type registration."""
         self._http.delete(
-            build_business_object_node_type_key_path(business_object_node_type_unique_id),
+            build_business_object_node_type_key_path(
+                business_object_node_type_unique_id
+            ),
             service_base=_CONFIG_SERVICE_PATH,
         )
 
@@ -168,8 +170,6 @@ class _ConfigurationApi:
             build_doctype_botype_map_key_path(document_type_bo_type_map_id),
             service_base=_CONFIG_SERVICE_PATH,
         )
-
-
 
 
 class _AsyncConfigurationApi:
@@ -278,7 +278,9 @@ class _AsyncConfigurationApi:
     ) -> None:
         """Async variant of :meth:`_ConfigurationApi.delete_business_object_type` — same semantics."""
         await self._http.delete(
-            build_business_object_node_type_key_path(business_object_node_type_unique_id),
+            build_business_object_node_type_key_path(
+                business_object_node_type_unique_id
+            ),
             service_base=_CONFIG_SERVICE_PATH,
         )
 
@@ -318,5 +320,3 @@ class _AsyncConfigurationApi:
             build_doctype_botype_map_key_path(document_type_bo_type_map_id),
             service_base=_CONFIG_SERVICE_PATH,
         )
-
-

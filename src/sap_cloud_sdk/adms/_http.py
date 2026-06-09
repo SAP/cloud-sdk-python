@@ -96,9 +96,7 @@ def quote_odata_guid_key(value: str) -> str:
 # its OData type (``Edm.Guid`` validates, ``Edm.String`` doubles quotes).
 
 
-def build_relation_key_path(
-    document_relation_id: str, is_active_entity: bool
-) -> str:
+def build_relation_key_path(document_relation_id: str, is_active_entity: bool) -> str:
     """Return ``DocumentRelation(DocumentRelationID=<guid>,IsActiveEntity=<bool>)``.
 
     Used by every Document- and DocumentRelation-scoped operation, both as
@@ -114,16 +112,12 @@ def build_relation_key_path(
 
 def build_allowed_domain_key_path(allowed_domain_id: str) -> str:
     """Return ``AllowedDomain(AllowedDomainID=<guid>)``."""
-    return (
-        f"AllowedDomain(AllowedDomainID={quote_odata_guid_key(allowed_domain_id)})"
-    )
+    return f"AllowedDomain(AllowedDomainID={quote_odata_guid_key(allowed_domain_id)})"
 
 
 def build_document_type_key_path(document_type_id: str) -> str:
     """Return ``DocumentType(DocumentTypeID=<string>)`` (Edm.String key)."""
-    return (
-        f"DocumentType(DocumentTypeID={quote_odata_string_key(document_type_id)})"
-    )
+    return f"DocumentType(DocumentTypeID={quote_odata_string_key(document_type_id)})"
 
 
 def build_business_object_node_type_key_path(unique_id: str) -> str:

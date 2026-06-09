@@ -292,6 +292,7 @@ class AgentGatewayClient:
     @record_metrics(Module.AGENTGATEWAY, Operation.AGENTGATEWAY_LIST_MCP_TOOLS)
     async def list_mcp_tools(
         self,
+        user_token: str | Callable[[], str] | None = None,
         app_tid: str | None = None,
     ) -> list[MCPTool]:
         """List all MCP tools from MCP servers.
@@ -301,10 +302,16 @@ class AgentGatewayClient:
 
         For LoB agents: Uses Phase 1 auth (client-scoped) via BTP Destination Service.
             Tools are auto-discovered from destination fragments.
+            If user_token is provided, uses Phase 2 auth (user-scoped) instead.
         For Customer agents: Uses mTLS client credentials.
             Tools are discovered from all servers in credentials integrationDependencies.
+            If user_token is provided, uses token exchange (jwt-bearer) instead of
+            system token.
 
         Args:
+            user_token: User's JWT for principal propagation.
+                Can be a string or a callable returning a string.
+                If provided, uses user-scoped auth instead of system auth.
             app_tid: BTP Application Tenant ID of the subscriber.
                 Only used for customer agents.
 
@@ -319,6 +326,9 @@ class AgentGatewayClient:
             tools = await agw_client.list_mcp_tools()
             for tool in tools:
                 print(f"{tool.name}: {tool.description}")
+
+            # With user token for principal propagation:
+            tools = await agw_client.list_mcp_tools(user_token="user-jwt")
             ```
         """
         try:
@@ -329,7 +339,10 @@ class AgentGatewayClient:
                     "Customer agent credentials detected at '%s'", credentials_path
                 )
                 credentials = load_customer_credentials(credentials_path)
-                auth = await self.get_system_auth(app_tid=app_tid)
+                if user_token:
+                    auth = await self.get_user_auth(user_token, app_tid)
+                else:
+                    auth = await self.get_system_auth(app_tid=app_tid)
                 return await get_mcp_tools_customer(
                     credentials, auth.access_token, self._config.timeout
                 )
@@ -339,7 +352,10 @@ class AgentGatewayClient:
                 logger.warning("app_tid parameter ignored for LoB agent flow")
 
             tenant = self._resolve_tenant_subdomain()
-            auth = await self.get_system_auth()
+            if user_token:
+                auth = await self.get_user_auth(user_token)
+            else:
+                auth = await self.get_system_auth()
             return await get_mcp_tools_lob(
                 tenant, auth.access_token, self._config.timeout
             )

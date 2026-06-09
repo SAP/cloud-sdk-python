@@ -41,7 +41,12 @@ from sap_cloud_sdk.adms._ias_fetcher import IasTokenFetcher
 from sap_cloud_sdk.adms._http import (
     AdmsHttp,
     AsyncAdmsHttp,
-    quote_odata_guid_key,
+    build_allowed_domain_key_path,
+    build_business_object_node_type_key_path,
+    build_doctype_botype_map_key_path,
+    build_document_type_key_path,
+    build_job_status_key_path,
+    build_relation_key_path,
     quote_odata_string_key,
 )
 from sap_cloud_sdk.adms._models import (
@@ -134,11 +139,9 @@ class _DocumentApi:
         Raises:
             DocumentNotFoundError: If no relation with this ID exists.
         """
-        is_active = str(is_active_entity).lower()
         path = (
-            f"DocumentRelation("
-            f"DocumentRelationID={quote_odata_guid_key(document_relation_id)},"
-            f"IsActiveEntity={is_active})/Document"
+            build_relation_key_path(document_relation_id, is_active_entity)
+            + "/Document"
         )
         resp = self._http.get(path, service_base=_SERVICE_PATH)
         return Document.from_dict(resp.json())
@@ -167,12 +170,7 @@ class _DocumentApi:
             ScanNotCleanError: If the document is not in ``CLEAN`` scan state.
             DocumentNotFoundError: If the relation/document cannot be found.
         """
-        is_active = str(is_active_entity).lower()
-        rel_key = (
-            f"DocumentRelation("
-            f"DocumentRelationID={quote_odata_guid_key(document_relation_id)},"
-            f"IsActiveEntity={is_active})"
-        )
+        rel_key = build_relation_key_path(document_relation_id, is_active_entity)
         expanded = self._http.get(
             f"{rel_key}?$expand=Document",
             service_base=_SERVICE_PATH,
@@ -217,12 +215,9 @@ class _DocumentApi:
         Returns:
             Updated :class:`~sap_cloud_sdk.adms._models.Document`.
         """
-        is_active = str(is_active_entity).lower()
         path = (
-            f"DocumentRelation("
-            f"DocumentRelationID={quote_odata_guid_key(document_relation_id)},"
-            f"IsActiveEntity={is_active})"
-            f"/UpdateDocument"
+            build_relation_key_path(document_relation_id, is_active_entity)
+            + "/UpdateDocument"
         )
         payload = {"Document": update_input.to_odata_dict()}
         resp = self._http.post(path, json=payload, service_base=_SERVICE_PATH)
@@ -248,12 +243,9 @@ class _DocumentApi:
         Returns:
             Updated :class:`~sap_cloud_sdk.adms._models.Document`.
         """
-        is_active = str(is_active_entity).lower()
         path = (
-            f"DocumentRelation("
-            f"DocumentRelationID={quote_odata_guid_key(document_relation_id)},"
-            f"IsActiveEntity={is_active})"
-            f"/RestoreDocumentContentVersion"
+            build_relation_key_path(document_relation_id, is_active_entity)
+            + "/RestoreDocumentContentVersion"
         )
         payload: dict = {
             "DocumentContentVersion": {
@@ -280,12 +272,9 @@ class _DocumentApi:
             doc_content_version_id: Version to delete.
             is_active_entity: Active vs draft entity flag.
         """
-        is_active = str(is_active_entity).lower()
         path = (
-            f"DocumentRelation("
-            f"DocumentRelationID={quote_odata_guid_key(document_relation_id)},"
-            f"IsActiveEntity={is_active})"
-            f"/DeleteDocumentContentVersion"
+            build_relation_key_path(document_relation_id, is_active_entity)
+            + "/DeleteDocumentContentVersion"
         )
         self._http.post(
             path,
@@ -347,15 +336,10 @@ class _DocumentRelationApi:
         Raises:
             DocumentNotFoundError: If the relation does not exist.
         """
-        is_active = str(is_active_entity).lower()
         params: dict = {}
         if expand:
             params["$expand"] = ",".join(expand)
-        path = (
-            f"DocumentRelation("
-            f"DocumentRelationID={quote_odata_guid_key(document_relation_id)},"
-            f"IsActiveEntity={is_active})"
-        )
+        path = build_relation_key_path(document_relation_id, is_active_entity)
         resp = self._http.get(path, params=params, service_base=_SERVICE_PATH)
         return DocumentRelation.from_dict(resp.json())
 
@@ -398,12 +382,9 @@ class _DocumentRelationApi:
         Returns:
             :class:`~sap_cloud_sdk.adms._models.Document` with upload URLs.
         """
-        is_active = str(is_active_entity).lower()
         path = (
-            f"DocumentRelation("
-            f"DocumentRelationID={quote_odata_guid_key(document_relation_id)},"
-            f"IsActiveEntity={is_active})"
-            f"/GenerateDocumentUploadURLs"
+            build_relation_key_path(document_relation_id, is_active_entity)
+            + "/GenerateDocumentUploadURLs"
         )
         payload = {
             "DocumentIsMultipart": is_multipart,
@@ -425,12 +406,9 @@ class _DocumentRelationApi:
             document_relation_id: UUID of the DocumentRelation.
             is_active_entity: Active vs draft entity flag.
         """
-        is_active = str(is_active_entity).lower()
         path = (
-            f"DocumentRelation("
-            f"DocumentRelationID={quote_odata_guid_key(document_relation_id)},"
-            f"IsActiveEntity={is_active})"
-            f"/CompleteMultipartUpload"
+            build_relation_key_path(document_relation_id, is_active_entity)
+            + "/CompleteMultipartUpload"
         )
         self._http.post(path, json={}, service_base=_SERVICE_PATH)
 
@@ -442,12 +420,9 @@ class _DocumentRelationApi:
         is_active_entity: bool = True,
     ) -> None:
         """Lock a document and its relation to prevent concurrent modifications."""
-        is_active = str(is_active_entity).lower()
         path = (
-            f"DocumentRelation("
-            f"DocumentRelationID={quote_odata_guid_key(document_relation_id)},"
-            f"IsActiveEntity={is_active})"
-            f"/LockDocumentAndRelation"
+            build_relation_key_path(document_relation_id, is_active_entity)
+            + "/LockDocumentAndRelation"
         )
         self._http.post(path, json={}, service_base=_SERVICE_PATH)
 
@@ -459,12 +434,9 @@ class _DocumentRelationApi:
         is_active_entity: bool = True,
     ) -> None:
         """Unlock a previously locked document and relation."""
-        is_active = str(is_active_entity).lower()
         path = (
-            f"DocumentRelation("
-            f"DocumentRelationID={quote_odata_guid_key(document_relation_id)},"
-            f"IsActiveEntity={is_active})"
-            f"/UnlockDocumentAndRelation"
+            build_relation_key_path(document_relation_id, is_active_entity)
+            + "/UnlockDocumentAndRelation"
         )
         self._http.post(path, json={}, service_base=_SERVICE_PATH)
 
@@ -481,12 +453,7 @@ class _DocumentRelationApi:
             document_relation_id: UUID of the relation to delete.
             is_active_entity: Active vs draft entity flag.
         """
-        is_active = str(is_active_entity).lower()
-        path = (
-            f"DocumentRelation("
-            f"DocumentRelationID={quote_odata_guid_key(document_relation_id)},"
-            f"IsActiveEntity={is_active})"
-        )
+        path = build_relation_key_path(document_relation_id, is_active_entity)
         self._http.delete(path, service_base=_SERVICE_PATH)
 
     @record_metrics(Module.ADMS, Operation.ADMS_RELATIONS_CREATE_DRAFT)
@@ -602,7 +569,7 @@ class _ConfigurationApi:
     def delete_allowed_domain(self, allowed_domain_id: str) -> None:
         """Remove an entry from the domain allow-list."""
         self._http.delete(
-            f"AllowedDomain(AllowedDomainID={quote_odata_guid_key(allowed_domain_id)})",
+            build_allowed_domain_key_path(allowed_domain_id),
             service_base=_CONFIG_SERVICE_PATH,
         )
 
@@ -632,7 +599,7 @@ class _ConfigurationApi:
     def delete_document_type(self, document_type_id: str) -> None:
         """Delete a document type classification."""
         self._http.delete(
-            f"DocumentType(DocumentTypeID={quote_odata_string_key(document_type_id)})",
+            build_document_type_key_path(document_type_id),
             service_base=_CONFIG_SERVICE_PATH,
         )
 
@@ -669,7 +636,7 @@ class _ConfigurationApi:
     ) -> None:
         """Delete a business object node type registration."""
         self._http.delete(
-            f"BusinessObjectNodeType(BusinessObjectNodeTypeUniqueID={quote_odata_string_key(business_object_node_type_unique_id)})",
+            build_business_object_node_type_key_path(business_object_node_type_unique_id),
             service_base=_CONFIG_SERVICE_PATH,
         )
 
@@ -706,8 +673,7 @@ class _ConfigurationApi:
     def delete_type_mapping(self, document_type_bo_type_map_id: str) -> None:
         """Delete a DocumentType ↔ BusinessObjectNodeType mapping."""
         self._http.delete(
-            f"DocumentTypeBusinessObjectTypeMap("
-            f"DocumentTypeBOTypeMapID={quote_odata_guid_key(document_type_bo_type_map_id)})",
+            build_doctype_botype_map_key_path(document_type_bo_type_map_id),
             service_base=_CONFIG_SERVICE_PATH,
         )
 
@@ -779,7 +745,7 @@ class _JobApi:
             Current :class:`~sap_cloud_sdk.adms._models.JobOutput`.
         """
         service = _ADMIN_SERVICE_PATH if use_admin_service else _SERVICE_PATH
-        path = f"JobStatus(JobID={quote_odata_string_key(job_id)})"
+        path = build_job_status_key_path(job_id)
         resp = self._http.get(path, service_base=service)
         return JobOutput.from_dict(resp.json())
 
@@ -818,11 +784,9 @@ class _AsyncDocumentApi:
         is_active_entity: bool = True,
     ) -> Document:
         """Async variant of :meth:`_DocumentApi.get` — same semantics."""
-        is_active = str(is_active_entity).lower()
         path = (
-            f"DocumentRelation("
-            f"DocumentRelationID={quote_odata_guid_key(document_relation_id)},"
-            f"IsActiveEntity={is_active})/Document"
+            build_relation_key_path(document_relation_id, is_active_entity)
+            + "/Document"
         )
         resp = await self._http.get(path, service_base=_SERVICE_PATH)
         return Document.from_dict(resp.json())
@@ -836,12 +800,7 @@ class _AsyncDocumentApi:
         doc_content_version_id: str,
     ) -> str:
         """Async download URL fetch with scan-state gate."""
-        is_active = str(is_active_entity).lower()
-        rel_key = (
-            f"DocumentRelation("
-            f"DocumentRelationID={quote_odata_guid_key(document_relation_id)},"
-            f"IsActiveEntity={is_active})"
-        )
+        rel_key = build_relation_key_path(document_relation_id, is_active_entity)
         expanded = await self._http.get(
             f"{rel_key}?$expand=Document",
             service_base=_SERVICE_PATH,
@@ -877,12 +836,9 @@ class _AsyncDocumentApi:
         is_active_entity: bool = True,
     ) -> Document:
         """Async variant of :meth:`_DocumentApi.update` — same semantics."""
-        is_active = str(is_active_entity).lower()
         path = (
-            f"DocumentRelation("
-            f"DocumentRelationID={quote_odata_guid_key(document_relation_id)},"
-            f"IsActiveEntity={is_active})"
-            f"/UpdateDocument"
+            build_relation_key_path(document_relation_id, is_active_entity)
+            + "/UpdateDocument"
         )
         payload = {"Document": update.to_odata_dict()}
         resp = await self._http.post(path, json=payload, service_base=_SERVICE_PATH)
@@ -897,12 +853,9 @@ class _AsyncDocumentApi:
         is_active_entity: bool = True,
     ) -> None:
         """Async variant of :meth:`_DocumentApi.delete_content_version` — same semantics."""
-        is_active = str(is_active_entity).lower()
         path = (
-            f"DocumentRelation("
-            f"DocumentRelationID={quote_odata_guid_key(document_relation_id)},"
-            f"IsActiveEntity={is_active})"
-            f"/DeleteDocumentContentVersion"
+            build_relation_key_path(document_relation_id, is_active_entity)
+            + "/DeleteDocumentContentVersion"
         )
         await self._http.post(
             path,
@@ -920,12 +873,9 @@ class _AsyncDocumentApi:
         comment: str | None = None,
     ) -> Document:
         """Async variant of :meth:`_DocumentApi.restore_content_version` — same semantics."""
-        is_active = str(is_active_entity).lower()
         path = (
-            f"DocumentRelation("
-            f"DocumentRelationID={quote_odata_guid_key(document_relation_id)},"
-            f"IsActiveEntity={is_active})"
-            f"/RestoreDocumentContentVersion"
+            build_relation_key_path(document_relation_id, is_active_entity)
+            + "/RestoreDocumentContentVersion"
         )
         payload: dict = {
             "DocumentContentVersion": {
@@ -970,15 +920,10 @@ class _AsyncDocumentRelationApi:
         expand: list[str] | None = None,
     ) -> DocumentRelation:
         """Async variant of :meth:`_DocumentRelationApi.get` — same semantics."""
-        is_active = str(is_active_entity).lower()
         params: dict = {}
         if expand:
             params["$expand"] = ",".join(expand)
-        path = (
-            f"DocumentRelation("
-            f"DocumentRelationID={quote_odata_guid_key(document_relation_id)},"
-            f"IsActiveEntity={is_active})"
-        )
+        path = build_relation_key_path(document_relation_id, is_active_entity)
         resp = await self._http.get(path, params=params, service_base=_SERVICE_PATH)
         return DocumentRelation.from_dict(resp.json())
 
@@ -1003,12 +948,9 @@ class _AsyncDocumentRelationApi:
         no_of_parts: int = 1,
     ) -> Document:
         """Async variant of :meth:`_DocumentRelationApi.generate_upload_urls` — same semantics."""
-        is_active = str(is_active_entity).lower()
         path = (
-            f"DocumentRelation("
-            f"DocumentRelationID={quote_odata_guid_key(document_relation_id)},"
-            f"IsActiveEntity={is_active})"
-            f"/GenerateDocumentUploadURLs"
+            build_relation_key_path(document_relation_id, is_active_entity)
+            + "/GenerateDocumentUploadURLs"
         )
         payload = {
             "DocumentIsMultipart": is_multipart,
@@ -1025,12 +967,9 @@ class _AsyncDocumentRelationApi:
         is_active_entity: bool = True,
     ) -> None:
         """Async variant of :meth:`_DocumentRelationApi.complete_multipart_upload` — same semantics."""
-        is_active = str(is_active_entity).lower()
         path = (
-            f"DocumentRelation("
-            f"DocumentRelationID={quote_odata_guid_key(document_relation_id)},"
-            f"IsActiveEntity={is_active})"
-            f"/CompleteMultipartUpload"
+            build_relation_key_path(document_relation_id, is_active_entity)
+            + "/CompleteMultipartUpload"
         )
         await self._http.post(path, json={}, service_base=_SERVICE_PATH)
 
@@ -1042,12 +981,9 @@ class _AsyncDocumentRelationApi:
         is_active_entity: bool = True,
     ) -> None:
         """Async variant of :meth:`_DocumentRelationApi.lock` — same semantics."""
-        is_active = str(is_active_entity).lower()
         path = (
-            f"DocumentRelation("
-            f"DocumentRelationID={quote_odata_guid_key(document_relation_id)},"
-            f"IsActiveEntity={is_active})"
-            f"/LockDocumentAndRelation"
+            build_relation_key_path(document_relation_id, is_active_entity)
+            + "/LockDocumentAndRelation"
         )
         await self._http.post(path, json={}, service_base=_SERVICE_PATH)
 
@@ -1059,12 +995,9 @@ class _AsyncDocumentRelationApi:
         is_active_entity: bool = True,
     ) -> None:
         """Async variant of :meth:`_DocumentRelationApi.unlock` — same semantics."""
-        is_active = str(is_active_entity).lower()
         path = (
-            f"DocumentRelation("
-            f"DocumentRelationID={quote_odata_guid_key(document_relation_id)},"
-            f"IsActiveEntity={is_active})"
-            f"/UnlockDocumentAndRelation"
+            build_relation_key_path(document_relation_id, is_active_entity)
+            + "/UnlockDocumentAndRelation"
         )
         await self._http.post(path, json={}, service_base=_SERVICE_PATH)
 
@@ -1076,12 +1009,7 @@ class _AsyncDocumentRelationApi:
         is_active_entity: bool = True,
     ) -> None:
         """Async variant of :meth:`_DocumentRelationApi.delete` — same semantics."""
-        is_active = str(is_active_entity).lower()
-        path = (
-            f"DocumentRelation("
-            f"DocumentRelationID={quote_odata_guid_key(document_relation_id)},"
-            f"IsActiveEntity={is_active})"
-        )
+        path = build_relation_key_path(document_relation_id, is_active_entity)
         await self._http.delete(path, service_base=_SERVICE_PATH)
 
     @record_metrics(Module.ADMS, Operation.ADMS_RELATIONS_CREATE_DRAFT)
@@ -1173,7 +1101,7 @@ class _AsyncConfigurationApi:
     async def delete_allowed_domain(self, allowed_domain_id: str) -> None:
         """Async variant of :meth:`_ConfigurationApi.delete_allowed_domain` — same semantics."""
         await self._http.delete(
-            f"AllowedDomain(AllowedDomainID={quote_odata_guid_key(allowed_domain_id)})",
+            build_allowed_domain_key_path(allowed_domain_id),
             service_base=_CONFIG_SERVICE_PATH,
         )
 
@@ -1205,7 +1133,7 @@ class _AsyncConfigurationApi:
     async def delete_document_type(self, document_type_id: str) -> None:
         """Async variant of :meth:`_ConfigurationApi.delete_document_type` — same semantics."""
         await self._http.delete(
-            f"DocumentType(DocumentTypeID={quote_odata_string_key(document_type_id)})",
+            build_document_type_key_path(document_type_id),
             service_base=_CONFIG_SERVICE_PATH,
         )
 
@@ -1242,7 +1170,7 @@ class _AsyncConfigurationApi:
     ) -> None:
         """Async variant of :meth:`_ConfigurationApi.delete_business_object_type` — same semantics."""
         await self._http.delete(
-            f"BusinessObjectNodeType(BusinessObjectNodeTypeUniqueID={quote_odata_string_key(business_object_node_type_unique_id)})",
+            build_business_object_node_type_key_path(business_object_node_type_unique_id),
             service_base=_CONFIG_SERVICE_PATH,
         )
 
@@ -1279,8 +1207,7 @@ class _AsyncConfigurationApi:
     async def delete_type_mapping(self, document_type_bo_type_map_id: str) -> None:
         """Async variant of :meth:`_ConfigurationApi.delete_type_mapping` — same semantics."""
         await self._http.delete(
-            f"DocumentTypeBusinessObjectTypeMap("
-            f"DocumentTypeBOTypeMapID={quote_odata_guid_key(document_type_bo_type_map_id)})",
+            build_doctype_botype_map_key_path(document_type_bo_type_map_id),
             service_base=_CONFIG_SERVICE_PATH,
         )
 
@@ -1342,7 +1269,7 @@ class _AsyncJobApi:
             Current :class:`~sap_cloud_sdk.adms._models.JobOutput`.
         """
         service = _ADMIN_SERVICE_PATH if use_admin_service else _SERVICE_PATH
-        path = f"JobStatus(JobID={quote_odata_string_key(job_id)})"
+        path = build_job_status_key_path(job_id)
         resp = await self._http.get(path, service_base=service)
         return JobOutput.from_dict(resp.json())
 

@@ -7,7 +7,17 @@ import pytest
 import requests
 
 from sap_cloud_sdk.adms._ias_fetcher import IasTokenFetcher
-from sap_cloud_sdk.adms._http import AdmsHttp, quote_odata_guid_key, quote_odata_string_key
+from sap_cloud_sdk.adms._http import (
+    AdmsHttp,
+    build_allowed_domain_key_path,
+    build_business_object_node_type_key_path,
+    build_doctype_botype_map_key_path,
+    build_document_type_key_path,
+    build_job_status_key_path,
+    build_relation_key_path,
+    quote_odata_guid_key,
+    quote_odata_string_key,
+)
 from sap_cloud_sdk.adms.config import AdmsConfig
 from sap_cloud_sdk.adms.exceptions import DocumentNotFoundError, HttpError
 
@@ -329,4 +339,70 @@ class TestAdmsHttpThreadSafety:
                 http._csrf_tokens.pop("", None)
 
         assert http._csrf_tokens[""] == "fresh"
+
+
+
+class TestEntityKeyPathBuilders:
+    """Each helper produces the expected entity-key segment and routes its
+    key through the appropriate quote_odata_* function."""
+
+    def test_relation_key_active(self):
+        out = build_relation_key_path(
+            "a1b2c3d4-e5f6-4789-ab12-fedcba987654", True
+        )
+        assert out == (
+            "DocumentRelation("
+            "DocumentRelationID=a1b2c3d4-e5f6-4789-ab12-fedcba987654,"
+            "IsActiveEntity=true)"
+        )
+
+    def test_relation_key_draft(self):
+        out = build_relation_key_path(
+            "a1b2c3d4-e5f6-4789-ab12-fedcba987654", False
+        )
+        assert "IsActiveEntity=false" in out
+
+    def test_relation_key_invalid_guid_raises(self):
+        with pytest.raises(ValueError, match="invalid OData Edm.Guid key"):
+            build_relation_key_path("not-a-guid", True)
+
+    def test_allowed_domain_key(self):
+        out = build_allowed_domain_key_path(
+            "a1b2c3d4-e5f6-4789-ab12-fedcba987654"
+        )
+        assert out == "AllowedDomain(AllowedDomainID=a1b2c3d4-e5f6-4789-ab12-fedcba987654)"
+
+    def test_allowed_domain_key_invalid_guid_raises(self):
+        with pytest.raises(ValueError, match="invalid OData Edm.Guid key"):
+            build_allowed_domain_key_path("nope")
+
+    def test_document_type_key_quotes_string(self):
+        out = build_document_type_key_path("INVOICE")
+        assert out == "DocumentType(DocumentTypeID='INVOICE')"
+
+    def test_document_type_key_escapes_single_quote(self):
+        # OData V4 §5.1.1.6.2: single quotes inside string literals must be doubled.
+        out = build_document_type_key_path("O'Brien")
+        assert out == "DocumentType(DocumentTypeID='O''Brien')"
+
+    def test_business_object_node_type_key(self):
+        out = build_business_object_node_type_key_path("PurchaseOrder")
+        assert out == "BusinessObjectNodeType(BusinessObjectNodeTypeUniqueID='PurchaseOrder')"
+
+    def test_doctype_botype_map_key(self):
+        out = build_doctype_botype_map_key_path(
+            "a1b2c3d4-e5f6-4789-ab12-fedcba987654"
+        )
+        assert out == (
+            "DocumentTypeBusinessObjectTypeMap("
+            "DocumentTypeBOTypeMapID=a1b2c3d4-e5f6-4789-ab12-fedcba987654)"
+        )
+
+    def test_doctype_botype_map_key_invalid_guid_raises(self):
+        with pytest.raises(ValueError, match="invalid OData Edm.Guid key"):
+            build_doctype_botype_map_key_path("bad")
+
+    def test_job_status_key(self):
+        out = build_job_status_key_path("JOB-001")
+        assert out == "JobStatus(JobID='JOB-001')"
 

@@ -1115,7 +1115,7 @@ _DOC_TYPE_DICT = {
 
 _BO_NODE_TYPE_DICT = {
     "BusinessObjectNodeTypeUniqueID": "bo-uuid-1",
-    "BusinessObjectNodeTypeID": "PurchaseOrder",
+    "BusinessObjectNodeType": "PurchaseOrder",
     "BusinessObjectNodeTypeName": "Purchase Order",
     "BusinessObjectTypeID": None,
 }
@@ -1296,23 +1296,25 @@ class TestConfigurationApiBusinessObjectNodeType:
         assert len(result) == 1
         assert isinstance(result[0], BusinessObjectNodeType)
         assert result[0].business_object_node_type_unique_id == "bo-uuid-1"
-        assert result[0].business_object_node_type_id == "PurchaseOrder"
+        assert result[0].business_object_node_type == "PurchaseOrder"
         assert result[0].business_object_node_type_name == "Purchase Order"
 
     def test_create_posts_to_correct_entity(self):
         http = _cfg_sync_http(post_data=_BO_NODE_TYPE_DICT)
         api = _ConfigurationApi(http)
         payload = CreateBusinessObjectNodeTypeInput(
-            business_object_node_type_id="PurchaseOrder",
+            business_object_node_type="PurchaseOrder",
             business_object_node_type_name="Purchase Order",
+            application_tenant_id="tenant-uuid",
         )
         result = api.create_business_object_type(payload)
 
         http.post.assert_called_once()
         args, kwargs = http.post.call_args
         assert args[0] == "BusinessObjectNodeType"
-        assert kwargs["json"]["BusinessObjectNodeTypeID"] == "PurchaseOrder"
+        assert kwargs["json"]["BusinessObjectNodeType"] == "PurchaseOrder"
         assert kwargs["json"]["BusinessObjectNodeTypeName"] == "Purchase Order"
+        assert kwargs["json"]["ApplicationTenantID"] == "tenant-uuid"
         assert isinstance(result, BusinessObjectNodeType)
 
     def test_delete_uses_unique_id_in_path(self):
@@ -1444,15 +1446,16 @@ class TestAsyncConfigurationApiBusinessObjectNodeType:
 
         assert len(result) == 1
         assert isinstance(result[0], BusinessObjectNodeType)
-        assert result[0].business_object_node_type_id == "PurchaseOrder"
+        assert result[0].business_object_node_type == "PurchaseOrder"
 
     @pytest.mark.asyncio
     async def test_create_posts(self):
         http = _cfg_async_http(post_data=_BO_NODE_TYPE_DICT)
         api = _AsyncConfigurationApi(http)
         payload = CreateBusinessObjectNodeTypeInput(
-            business_object_node_type_id="PurchaseOrder",
+            business_object_node_type="PurchaseOrder",
             business_object_node_type_name="Purchase Order",
+            application_tenant_id="tenant-uuid",
         )
         result = await api.create_business_object_type(payload)
         http.post.assert_called_once()

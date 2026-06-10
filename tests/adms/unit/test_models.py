@@ -394,67 +394,62 @@ class TestBusinessObjectNodeType:
     def test_from_dict(self):
         data = {
             "BusinessObjectNodeTypeUniqueID": "bo-uuid-1",
-            "BusinessObjectNodeTypeID": "PurchaseOrder",
+            "BusinessObjectNodeType": "PurchaseOrder",
             "BusinessObjectNodeTypeName": "Purchase Order",
-            "BusinessObjectTypeID": "Procurement",
+            "ApplicationTenantID": "tenant-1",
         }
         bo = BusinessObjectNodeType.from_dict(data)
         assert bo.business_object_node_type_unique_id == "bo-uuid-1"
-        assert bo.business_object_node_type_id == "PurchaseOrder"
+        assert bo.business_object_node_type == "PurchaseOrder"
         assert bo.business_object_node_type_name == "Purchase Order"
-        assert bo.business_object_type_id == "Procurement"
+        assert bo.application_tenant_id == "tenant-1"
 
-    def test_from_dict_optional_parent_type(self):
+    def test_from_dict_optional_fields(self):
         data = {
             "BusinessObjectNodeTypeUniqueID": "bo-uuid-1",
-            "BusinessObjectNodeTypeID": "PurchaseOrder",
+            "BusinessObjectNodeType": "PurchaseOrder",
             "BusinessObjectNodeTypeName": "Purchase Order",
         }
         bo = BusinessObjectNodeType.from_dict(data)
-        assert bo.business_object_type_id is None
+        assert bo.application_tenant_id is None
+        assert bo.odm_entity_name is None
 
-    def test_to_odata_dict_with_parent_type(self):
+    def test_to_odata_dict(self):
         bo = BusinessObjectNodeType(
             business_object_node_type_unique_id="bo-uuid-1",
-            business_object_node_type_id="PurchaseOrder",
+            business_object_node_type="PurchaseOrder",
             business_object_node_type_name="Purchase Order",
-            business_object_type_id="Procurement",
         )
         d = bo.to_odata_dict()
-        assert d["BusinessObjectNodeTypeID"] == "PurchaseOrder"
+        assert d["BusinessObjectNodeType"] == "PurchaseOrder"
         assert d["BusinessObjectNodeTypeName"] == "Purchase Order"
-        assert d["BusinessObjectTypeID"] == "Procurement"
-
-    def test_to_odata_dict_without_parent_type(self):
-        bo = BusinessObjectNodeType(
-            business_object_node_type_unique_id="bo-uuid-1",
-            business_object_node_type_id="PurchaseOrder",
-            business_object_node_type_name="Purchase Order",
-        )
-        d = bo.to_odata_dict()
-        assert "BusinessObjectTypeID" not in d
+        assert "BusinessObjectNodeTypeID" not in d
 
 
 class TestCreateBusinessObjectNodeTypeInput:
     def test_to_odata_dict(self):
         inp = CreateBusinessObjectNodeTypeInput(
-            business_object_node_type_id="SalesOrder",
+            business_object_node_type="SalesOrder",
             business_object_node_type_name="Sales Order",
+            application_tenant_id="tenant-uuid",
         )
         d = inp.to_odata_dict()
         assert d == {
-            "BusinessObjectNodeTypeID": "SalesOrder",
+            "BusinessObjectNodeType": "SalesOrder",
             "BusinessObjectNodeTypeName": "Sales Order",
+            "ApplicationTenantID": "tenant-uuid",
         }
 
-    def test_to_odata_dict_with_parent(self):
+    def test_to_odata_dict_required_fields(self):
         inp = CreateBusinessObjectNodeTypeInput(
-            business_object_node_type_id="SalesOrder",
-            business_object_node_type_name="Sales Order",
-            business_object_type_id="Sales",
+            business_object_node_type="PO",
+            business_object_node_type_name="Purchase Order",
+            application_tenant_id="tenant-uuid",
         )
         d = inp.to_odata_dict()
-        assert d["BusinessObjectTypeID"] == "Sales"
+        assert "BusinessObjectNodeType" in d
+        assert "ApplicationTenantID" in d
+        assert "BusinessObjectNodeTypeID" not in d
 
 
 class TestDocumentTypeBusinessObjectTypeMap:

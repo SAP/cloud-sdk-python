@@ -795,18 +795,18 @@ class BusinessObjectNodeType:
     type must be registered here before relations can be created.
 
     Attributes:
-        business_object_node_type_unique_id: UUID or logical key (max 36 chars).
-        business_object_node_type_id: Short display identifier (max 40 chars).
-        business_object_node_type_name: Human-readable label (max 40 chars).
-        business_object_type_id: Parent business object type (max 40 chars).
+        business_object_node_type_unique_id: UUID primary key (max 36 chars).
+        business_object_node_type: Short identifier code (max 30 chars),
+            e.g. ``"PO"``. Note: the CDS field name is ``BusinessObjectNodeType``
+            (not ``BusinessObjectNodeTypeID``).
+        business_object_node_type_name: Human-readable label (max 50 chars).
         odm_entity_name: Optional ODM (One Domain Model) entity name.
         application_tenant_id: Tenant identifier this BO type belongs to.
     """
 
     business_object_node_type_unique_id: str
-    business_object_node_type_id: str
+    business_object_node_type: str
     business_object_node_type_name: str
-    business_object_type_id: str | None = None
     odm_entity_name: str | None = None
     application_tenant_id: str | None = None
 
@@ -816,22 +816,18 @@ class BusinessObjectNodeType:
             business_object_node_type_unique_id=data.get(
                 "BusinessObjectNodeTypeUniqueID", ""
             ),
-            business_object_node_type_id=data.get("BusinessObjectNodeTypeID", ""),
+            business_object_node_type=data.get("BusinessObjectNodeType", ""),
             business_object_node_type_name=data.get("BusinessObjectNodeTypeName", ""),
-            business_object_type_id=data.get("BusinessObjectTypeID"),
             odm_entity_name=data.get("ODMEntityName"),
             application_tenant_id=data.get("ApplicationTenantID"),
         )
 
     def to_odata_dict(self) -> dict:
         """Serialise to the OData payload shape expected by ADM."""
-        d: dict = {
-            "BusinessObjectNodeTypeID": self.business_object_node_type_id,
+        return {
+            "BusinessObjectNodeType": self.business_object_node_type,
             "BusinessObjectNodeTypeName": self.business_object_node_type_name,
         }
-        if self.business_object_type_id is not None:
-            d["BusinessObjectTypeID"] = self.business_object_type_id
-        return d
 
 
 @dataclass
@@ -839,24 +835,22 @@ class CreateBusinessObjectNodeTypeInput:
     """Input for creating a :class:`BusinessObjectNodeType`.
 
     Attributes:
-        business_object_node_type_id: Short identifier (max 40 chars).
-        business_object_node_type_name: Human-readable label (max 40 chars).
-        business_object_type_id: Optional parent type (max 40 chars).
+        business_object_node_type: Short identifier code (max 30 chars), e.g. ``"PO"``.
+        business_object_node_type_name: Human-readable label (max 50 chars).
+        application_tenant_id: Tenant this BO type belongs to.
     """
 
-    business_object_node_type_id: str
+    business_object_node_type: str
     business_object_node_type_name: str
-    business_object_type_id: str | None = None
+    application_tenant_id: str
 
     def to_odata_dict(self) -> dict:
         """Serialise to the OData payload shape expected by ADM."""
-        d: dict = {
-            "BusinessObjectNodeTypeID": self.business_object_node_type_id,
+        return {
+            "BusinessObjectNodeType": self.business_object_node_type,
             "BusinessObjectNodeTypeName": self.business_object_node_type_name,
+            "ApplicationTenantID": self.application_tenant_id,
         }
-        if self.business_object_type_id is not None:
-            d["BusinessObjectTypeID"] = self.business_object_type_id
-        return d
 
 
 @dataclass
@@ -866,13 +860,17 @@ class UpdateBusinessObjectNodeTypeInput:
     Only non-``None`` fields are included in the PATCH payload.
 
     Attributes:
+        business_object_node_type: New short identifier code.
         business_object_node_type_name: New human-readable label.
     """
 
+    business_object_node_type: str | None = None
     business_object_node_type_name: str | None = None
 
     def to_odata_dict(self) -> dict:
         d: dict = {}
+        if self.business_object_node_type is not None:
+            d["BusinessObjectNodeType"] = self.business_object_node_type
         if self.business_object_node_type_name is not None:
             d["BusinessObjectNodeTypeName"] = self.business_object_node_type_name
         return d

@@ -363,6 +363,7 @@ class _ConfigurationApi:
 def _quote_guid(value: str) -> str:
     """Wrap a UUID value in the OData Edm.Guid format for key segments."""
     from sap_cloud_sdk.adms._http import quote_odata_guid_key
+
     return quote_odata_guid_key(value)
 
 
@@ -643,9 +644,7 @@ class _AsyncConfigurationApi:
         return FileExtensionPolicy.from_dict(resp.json())
 
     @record_metrics(Module.ADMS, Operation.ADMS_CONFIG_DELETE_FILE_EXT_POLICY)
-    async def delete_file_extension_policy(
-        self, file_extension_policy_id: str
-    ) -> None:
+    async def delete_file_extension_policy(self, file_extension_policy_id: str) -> None:
         """Async variant of :meth:`_ConfigurationApi.delete_file_extension_policy` — same semantics."""
         await self._http.delete(
             f"FileExtensionPolicy(FileExtensionPolicyID={_quote_guid(file_extension_policy_id)})",

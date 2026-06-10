@@ -125,17 +125,16 @@ event.object_id = "resource-001"
 **Binary protobuf:**
 
 ```python
-event_id = client.send(event, "DataAccess")
+event_id = client.send(event)
 print(f"Sent event with ID: {event_id}")
 ```
 
 **JSON format:**
 
 ```python
-event_id = client.send_json(event, "DataAccess")
+event_id = client.send_json(event)
 ```
 
-> The `event_type` argument is optional. If omitted, the client derives it from the protobuf descriptor name (e.g., `"sap.als.AuditEvent.DataAccess.v2"`).
 
 ### Step 5: Close the Client
 
@@ -177,7 +176,7 @@ class AgentAuditLogger:
         event.object_type = "resource"
         event.object_id = resource
 
-        event_id = self.client.send(event, "DataAccess")
+        event_id = self.client.send(event)
         return event_id
 
     def shutdown(self):
@@ -213,7 +212,7 @@ with create_client(
     cert_file="/path/to/cert.pem",
     key_file="/path/to/key.pem",
 ) as client:
-    event_id = client.send(event, "DataAccess")
+    event_id = client.send(event)
 ```
 
 ---

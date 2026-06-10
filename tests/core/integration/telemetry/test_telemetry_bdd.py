@@ -127,7 +127,7 @@ def _llm_call():
     Uses ChatLiteLLM so Traceloop's LangChain instrumentor fires and emits a span
     with gen_ai.usage.* token counts.
     """
-    from langchain_litellm import ChatLiteLLM
+    from langchain_litellm import ChatLiteLLM  # ty: ignore[unresolved-import]
     from langchain_core.messages import HumanMessage as LCHumanMessage
     model_name = os.environ.get("AICORE_MODEL", "anthropic--claude-4.5-sonnet")
     llm = ChatLiteLLM(model=f"sap/{model_name}")

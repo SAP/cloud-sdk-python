@@ -340,4 +340,3 @@ class TestUmsTransportPagination:
     def test_max_pages_constant(self):
         """Safety limit constant is 100."""
         assert _MAX_PAGES == 100
-

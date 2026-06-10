@@ -459,4 +459,3 @@ class TestTransformUmsResponse:
         }
         result = _transform_ums_response(data, "default")
         assert result.mcp_servers == []
-

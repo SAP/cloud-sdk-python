@@ -342,6 +342,48 @@ class UpdateDocumentInput:
 
 
 @dataclass
+class DraftAdministrativeData:
+    """CAP draft administrative metadata returned on draft DocumentRelation records.
+
+    Populated only when the relation is a draft (``IsActiveEntity=false`` and
+    ``HasDraftEntity=true``), typically after ``CreateBusinessObjNodeDraft``,
+    ``ValidateBusinessObjNodeDraft``, or ``ActivateBusinessObjNodeDraft``.
+
+    Attributes:
+        draft_uuid: Internal UUID identifying this draft instance.
+        creation_date_time: ISO-8601 timestamp when the draft was created.
+        created_by_user: User who created the draft.
+        draft_is_created_by_me: Whether the current user created the draft.
+        last_change_date_time: ISO-8601 timestamp of the last draft modification.
+        last_changed_by_user: User who last modified the draft.
+        in_process_by_user: User currently editing the draft (lock owner).
+        draft_is_processed_by_me: Whether the current user holds the draft lock.
+    """
+
+    draft_uuid: str | None = None
+    creation_date_time: str | None = None
+    created_by_user: str | None = None
+    draft_is_created_by_me: bool | None = None
+    last_change_date_time: str | None = None
+    last_changed_by_user: str | None = None
+    in_process_by_user: str | None = None
+    draft_is_processed_by_me: bool | None = None
+
+    @classmethod
+    def from_dict(cls, data: dict) -> DraftAdministrativeData:
+        return cls(
+            draft_uuid=data.get("DraftUUID"),
+            creation_date_time=data.get("CreationDateTime"),
+            created_by_user=data.get("CreatedByUser"),
+            draft_is_created_by_me=data.get("DraftIsCreatedByMe"),
+            last_change_date_time=data.get("LastChangeDateTime"),
+            last_changed_by_user=data.get("LastChangedByUser"),
+            in_process_by_user=data.get("InProcessByUser"),
+            draft_is_processed_by_me=data.get("DraftIsProcessedByMe"),
+        )
+
+
+@dataclass
 class DocumentRelation:
     """Represents the link between a business object node and a stored document.
 
@@ -364,6 +406,8 @@ class DocumentRelation:
         document_relation_is_deleted: Whether the relation is soft-deleted.
         document_relation_is_output_relevant: Whether the relation is flagged for output.
         draft_messages: SAP draft validation messages (populated during draft lifecycle).
+        draft_administrative_data: CAP draft metadata — only present on draft records
+            returned by the draft lifecycle actions (create/validate/activate draft).
         doc_relation_created_by_user_name: User who created the relation.
         doc_relation_created_at_date_time: ISO-8601 creation timestamp.
         doc_relation_changed_by_user_name: User who last modified the relation.
@@ -386,6 +430,7 @@ class DocumentRelation:
     document_relation_is_deleted: bool = False
     document_relation_is_output_relevant: bool = False
     draft_messages: list = field(default_factory=list)
+    draft_administrative_data: DraftAdministrativeData | None = None
     document: Document | None = None
     doc_relation_created_by_user_name: str | None = None
     doc_relation_created_at_date_time: str | None = None
@@ -397,6 +442,13 @@ class DocumentRelation:
         """Parse an OData V4 entity payload into a :class:`DocumentRelation`."""
         doc_data = data.get("Document") or data.get("document")
         doc = Document.from_dict(doc_data) if doc_data else None
+
+        draft_admin_data = data.get("DraftAdministrativeData")
+        draft_admin = (
+            DraftAdministrativeData.from_dict(draft_admin_data)
+            if draft_admin_data
+            else None
+        )
 
         return cls(
             document_relation_id=data.get("DocumentRelationID", ""),
@@ -416,6 +468,7 @@ class DocumentRelation:
                 "DocumentRelationIsOutputRelevant", False
             ),
             draft_messages=data.get("DraftMessages") or [],
+            draft_administrative_data=draft_admin,
             document=doc,
             doc_relation_created_by_user_name=data.get("DocRelationCreatedByUserName"),
             doc_relation_created_at_date_time=data.get("DocRelationCreatedAtDateTime"),

@@ -354,6 +354,20 @@ class DocumentRelation:
             (e.g. ``"PurchaseOrder"``).  Max 36 chars.
         host_business_object_node_id: Identifies the specific business object instance
             (e.g. ``"PO-4500012345"``).  Max 50 chars.
+        host_business_obj_node_display_id: Human-readable display ID for the BO node.
+        document_id: UUID of the linked Document entity.
+        document_is_active_entity: Whether the linked Document is the active version.
+        is_active_entity: Whether this DocumentRelation record is the active version.
+        has_active_entity: Whether an active version of this relation exists.
+        has_draft_entity: Whether a draft version of this relation exists.
+        document_relation_is_locked: Whether the relation (and its document) is locked.
+        document_relation_is_deleted: Whether the relation is soft-deleted.
+        document_relation_is_output_relevant: Whether the relation is flagged for output.
+        draft_messages: SAP draft validation messages (populated during draft lifecycle).
+        doc_relation_created_by_user_name: User who created the relation.
+        doc_relation_created_at_date_time: ISO-8601 creation timestamp.
+        doc_relation_changed_by_user_name: User who last modified the relation.
+        doc_relation_changed_at_date_time: ISO-8601 last-modified timestamp.
         document: Expanded :class:`Document` — populated when the caller requests
             ``?$expand=Document``.
     """
@@ -365,11 +379,18 @@ class DocumentRelation:
     host_business_obj_node_display_id: str | None = None
     document_id: str | None = None
     document_is_active_entity: bool | None = None
+    is_active_entity: bool | None = None
+    has_active_entity: bool = False
+    has_draft_entity: bool = False
     document_relation_is_locked: bool = False
     document_relation_is_deleted: bool = False
+    document_relation_is_output_relevant: bool = False
+    draft_messages: list = field(default_factory=list)
     document: Document | None = None
     doc_relation_created_by_user_name: str | None = None
     doc_relation_created_at_date_time: str | None = None
+    doc_relation_changed_by_user_name: str | None = None
+    doc_relation_changed_at_date_time: str | None = None
 
     @classmethod
     def from_dict(cls, data: dict) -> DocumentRelation:
@@ -386,11 +407,20 @@ class DocumentRelation:
             host_business_obj_node_display_id=data.get("HostBusinessObjNodeDisplayID"),
             document_id=data.get("DocumentID"),
             document_is_active_entity=data.get("DocumentIsActiveEntity"),
+            is_active_entity=data.get("IsActiveEntity"),
+            has_active_entity=data.get("HasActiveEntity", False),
+            has_draft_entity=data.get("HasDraftEntity", False),
             document_relation_is_locked=data.get("DocumentRelationIsLocked", False),
             document_relation_is_deleted=data.get("DocumentRelationIsDeleted", False),
+            document_relation_is_output_relevant=data.get(
+                "DocumentRelationIsOutputRelevant", False
+            ),
+            draft_messages=data.get("DraftMessages") or [],
             document=doc,
             doc_relation_created_by_user_name=data.get("DocRelationCreatedByUserName"),
             doc_relation_created_at_date_time=data.get("DocRelationCreatedAtDateTime"),
+            doc_relation_changed_by_user_name=data.get("DocRelationChangedByUserName"),
+            doc_relation_changed_at_date_time=data.get("DocRelationChangedAtDateTime"),
         )
 
 

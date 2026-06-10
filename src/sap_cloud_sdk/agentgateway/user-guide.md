@@ -29,6 +29,9 @@ tools = await agw_client.list_mcp_tools()
 for tool in tools:
     print(f"{tool.name}: {tool.description}")
 
+# Discover tools with user principal propagation
+tools = await agw_client.list_mcp_tools(user_token="user-jwt")
+
 # Invoke a tool with user principal propagation
 result = await agw_client.call_mcp_tool(
     tool=tools[0],
@@ -50,6 +53,9 @@ agw_client = create_client(tenant_subdomain="my-tenant", config=config)
 
 # Discover tools (auto-discovered from destination fragments)
 tools = await agw_client.list_mcp_tools()
+
+# Discover tools with user principal propagation
+tools = await agw_client.list_mcp_tools(user_token="user-jwt")
 
 # Invoke a tool (user_token required for principal propagation)
 result = await agw_client.call_mcp_tool(
@@ -139,6 +145,7 @@ The SDK keeps token caches per `AgentGatewayClient` instance and reuses valid ca
 class AgentGatewayClient:
     async def list_mcp_tools(
         self,
+        user_token: str | Callable[[], str] | None = None,
         app_tid: str | None = None,
     ) -> list[MCPTool]
 

@@ -571,20 +571,12 @@ class AllowedDomain:
         allowed_domain_port: Port number the service resolves during URL validation.
             Defaults to the protocol default (443 for https, 80 for http) when
             not explicitly stored.
-        created_by_user_name: User who created the entry.
-        created_at_date_time: ISO-8601 creation timestamp.
-        changed_by_user_name: User who last modified the entry.
-        changed_at_date_time: ISO-8601 last-modified timestamp.
     """
 
     allowed_domain_id: str
     allowed_domain_host_name: str
     allowed_domain_protocol: str
     allowed_domain_port: int | None = None
-    created_by_user_name: str | None = None
-    created_at_date_time: str | None = None
-    changed_by_user_name: str | None = None
-    changed_at_date_time: str | None = None
 
     @classmethod
     def from_dict(cls, data: dict) -> AllowedDomain:
@@ -593,10 +585,6 @@ class AllowedDomain:
             allowed_domain_host_name=data.get("AllowedDomainHostName", ""),
             allowed_domain_protocol=data.get("AllowedDomainProtocol", ""),
             allowed_domain_port=data.get("AllowedDomainPort"),
-            created_by_user_name=data.get("CreatedByUserName"),
-            created_at_date_time=data.get("CreatedAtDateTime"),
-            changed_by_user_name=data.get("ChangedByUserName"),
-            changed_at_date_time=data.get("ChangedAtDateTime"),
         )
 
     def to_odata_dict(self) -> dict:
@@ -710,19 +698,11 @@ class DocumentType:
         document_type_id: Short code, max 10 chars (e.g. ``"INVOICE"``).
         document_type_name: Human-readable label (max 40 chars).
         document_type_description: Optional longer description (max 255 chars).
-        created_by_user_name: User who created the entry.
-        created_at_date_time: ISO-8601 creation timestamp.
-        changed_by_user_name: User who last modified the entry.
-        changed_at_date_time: ISO-8601 last-modified timestamp.
     """
 
     document_type_id: str
     document_type_name: str
     document_type_description: str | None = None
-    created_by_user_name: str | None = None
-    created_at_date_time: str | None = None
-    changed_by_user_name: str | None = None
-    changed_at_date_time: str | None = None
 
     @classmethod
     def from_dict(cls, data: dict) -> DocumentType:
@@ -730,10 +710,6 @@ class DocumentType:
             document_type_id=data.get("DocumentTypeID", ""),
             document_type_name=data.get("DocumentTypeName", ""),
             document_type_description=data.get("DocumentTypeDescription"),
-            created_by_user_name=data.get("CreatedByUserName"),
-            created_at_date_time=data.get("CreatedAtDateTime"),
-            changed_by_user_name=data.get("ChangedByUserName"),
-            changed_at_date_time=data.get("ChangedAtDateTime"),
         )
 
     def to_odata_dict(self) -> dict:
@@ -823,20 +799,16 @@ class BusinessObjectNodeType:
         business_object_node_type_id: Short display identifier (max 40 chars).
         business_object_node_type_name: Human-readable label (max 40 chars).
         business_object_type_id: Parent business object type (max 40 chars).
-        created_by_user_name: User who created the entry.
-        created_at_date_time: ISO-8601 creation timestamp.
-        changed_by_user_name: User who last modified the entry.
-        changed_at_date_time: ISO-8601 last-modified timestamp.
+        odm_entity_name: Optional ODM (One Domain Model) entity name.
+        application_tenant_id: Tenant identifier this BO type belongs to.
     """
 
     business_object_node_type_unique_id: str
     business_object_node_type_id: str
     business_object_node_type_name: str
     business_object_type_id: str | None = None
-    created_by_user_name: str | None = None
-    created_at_date_time: str | None = None
-    changed_by_user_name: str | None = None
-    changed_at_date_time: str | None = None
+    odm_entity_name: str | None = None
+    application_tenant_id: str | None = None
 
     @classmethod
     def from_dict(cls, data: dict) -> BusinessObjectNodeType:
@@ -847,10 +819,8 @@ class BusinessObjectNodeType:
             business_object_node_type_id=data.get("BusinessObjectNodeTypeID", ""),
             business_object_node_type_name=data.get("BusinessObjectNodeTypeName", ""),
             business_object_type_id=data.get("BusinessObjectTypeID"),
-            created_by_user_name=data.get("CreatedByUserName"),
-            created_at_date_time=data.get("CreatedAtDateTime"),
-            changed_by_user_name=data.get("ChangedByUserName"),
-            changed_at_date_time=data.get("ChangedAtDateTime"),
+            odm_entity_name=data.get("ODMEntityName"),
+            application_tenant_id=data.get("ApplicationTenantID"),
         )
 
     def to_odata_dict(self) -> dict:
@@ -920,20 +890,12 @@ class DocumentTypeBusinessObjectTypeMap:
         business_object_node_type_unique_id: FK to :class:`BusinessObjectNodeType`.
         document_type_id: FK to :class:`DocumentType`.
         is_default: If ``True`` this is the default type for the BO node type.
-        created_by_user_name: User who created the entry.
-        created_at_date_time: ISO-8601 creation timestamp.
-        changed_by_user_name: User who last modified the entry.
-        changed_at_date_time: ISO-8601 last-modified timestamp.
     """
 
     document_type_bo_type_map_id: str
     business_object_node_type_unique_id: str
     document_type_id: str
     is_default: bool = False
-    created_by_user_name: str | None = None
-    created_at_date_time: str | None = None
-    changed_by_user_name: str | None = None
-    changed_at_date_time: str | None = None
 
     @classmethod
     def from_dict(cls, data: dict) -> DocumentTypeBusinessObjectTypeMap:
@@ -944,10 +906,6 @@ class DocumentTypeBusinessObjectTypeMap:
             ),
             document_type_id=data.get("DocumentTypeID", ""),
             is_default=data.get("IsDefault", False),
-            created_by_user_name=data.get("CreatedByUserName"),
-            created_at_date_time=data.get("CreatedAtDateTime"),
-            changed_by_user_name=data.get("ChangedByUserName"),
-            changed_at_date_time=data.get("ChangedAtDateTime"),
         )
 
     def to_odata_dict(self) -> dict:

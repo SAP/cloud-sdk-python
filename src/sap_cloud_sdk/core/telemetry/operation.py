@@ -115,7 +115,14 @@ class Operation(str, Enum):
     ADMS_CONFIG_DELETE_BUSINESS_OBJECT_TYPE = "config_delete_business_object_type"
     ADMS_CONFIG_GET_ALL_DOCTYPE_BOTYPE_MAPS = "config_get_all_doctype_botype_maps"
     ADMS_CONFIG_CREATE_DOCTYPE_BOTYPE_MAP = "config_create_doctype_botype_map"
+    ADMS_CONFIG_GET_DOCTYPE_BOTYPE_MAP = "config_get_doctype_botype_map"
     ADMS_CONFIG_DELETE_DOCTYPE_BOTYPE_MAP = "config_delete_doctype_botype_map"
+    ADMS_CONFIG_GET_ALLOWED_DOMAIN = "config_get_allowed_domain"
+    ADMS_CONFIG_UPDATE_ALLOWED_DOMAIN = "config_update_allowed_domain"
+    ADMS_CONFIG_GET_DOCUMENT_TYPE = "config_get_document_type"
+    ADMS_CONFIG_UPDATE_DOCUMENT_TYPE = "config_update_document_type"
+    ADMS_CONFIG_GET_BUSINESS_OBJECT_TYPE = "config_get_business_object_type"
+    ADMS_CONFIG_UPDATE_BUSINESS_OBJECT_TYPE = "config_update_business_object_type"
 
     # AI Core Operations
     AICORE_SET_CONFIG = "set_aicore_config"

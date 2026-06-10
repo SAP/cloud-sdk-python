@@ -79,7 +79,10 @@ from sap_cloud_sdk.adms._models import (
     JobStatus,
     JobType,
     ScanStatus,
+    UpdateAllowedDomainInput,
+    UpdateBusinessObjectNodeTypeInput,
     UpdateDocumentInput,
+    UpdateDocumentTypeInput,
     ZipDownloadJobParameters,
 )
 from sap_cloud_sdk.adms._query_options import (
@@ -131,6 +134,9 @@ __all__ = [
     "BusinessObjectNodeType",
     "CreateAllowedDomainInput",
     "CreateBusinessObjectNodeTypeInput",
+    "UpdateAllowedDomainInput",
+    "UpdateBusinessObjectNodeTypeInput",
+    "UpdateDocumentTypeInput",
     "CreateDocumentTypeBoTypeMapInput",
     "CreateDocumentTypeInput",
     "DocumentType",

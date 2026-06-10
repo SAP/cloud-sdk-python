@@ -632,6 +632,34 @@ class CreateAllowedDomainInput:
 
 
 @dataclass
+class UpdateAllowedDomainInput:
+    """Input for updating an existing :class:`AllowedDomain` entry (PATCH).
+
+    Only non-``None`` fields are included in the PATCH payload.
+
+    Attributes:
+        host_name: New hostname.
+        protocol: New protocol (``"https"`` or ``"http"``).
+        port: New port.  Pass ``0`` to explicitly clear an existing port.
+    """
+
+    host_name: str | None = None
+    protocol: str | None = None
+    port: int | None = None
+
+    def to_odata_dict(self) -> dict:
+        """Serialise only non-None fields to the OData PATCH payload."""
+        d: dict = {}
+        if self.host_name is not None:
+            d["AllowedDomainHostName"] = self.host_name
+        if self.protocol is not None:
+            d["AllowedDomainProtocol"] = self.protocol
+        if self.port is not None:
+            d["AllowedDomainPort"] = self.port
+        return d
+
+
+@dataclass
 class DocumentTypeText:
     """Localization entry for a :class:`DocumentType` (CAP ``texts`` deep-insert).
 
@@ -754,6 +782,29 @@ class CreateDocumentTypeInput:
 
 
 @dataclass
+class UpdateDocumentTypeInput:
+    """Input for updating an existing :class:`DocumentType` (PATCH).
+
+    Only non-``None`` fields are included in the PATCH payload.
+
+    Attributes:
+        document_type_name: New human-readable label.
+        document_type_description: New description.
+    """
+
+    document_type_name: str | None = None
+    document_type_description: str | None = None
+
+    def to_odata_dict(self) -> dict:
+        d: dict = {}
+        if self.document_type_name is not None:
+            d["DocumentTypeName"] = self.document_type_name
+        if self.document_type_description is not None:
+            d["DocumentTypeDescription"] = self.document_type_description
+        return d
+
+
+@dataclass
 class BusinessObjectNodeType:
     """Tenant-configured business object node type.
 
@@ -829,6 +880,25 @@ class CreateBusinessObjectNodeTypeInput:
         }
         if self.business_object_type_id is not None:
             d["BusinessObjectTypeID"] = self.business_object_type_id
+        return d
+
+
+@dataclass
+class UpdateBusinessObjectNodeTypeInput:
+    """Input for updating an existing :class:`BusinessObjectNodeType` (PATCH).
+
+    Only non-``None`` fields are included in the PATCH payload.
+
+    Attributes:
+        business_object_node_type_name: New human-readable label.
+    """
+
+    business_object_node_type_name: str | None = None
+
+    def to_odata_dict(self) -> dict:
+        d: dict = {}
+        if self.business_object_node_type_name is not None:
+            d["BusinessObjectNodeTypeName"] = self.business_object_node_type_name
         return d
 
 

@@ -20,6 +20,9 @@ from sap_cloud_sdk.adms._models import (
     CreateDocumentTypeInput,
     DocumentType,
     DocumentTypeBusinessObjectTypeMap,
+    UpdateAllowedDomainInput,
+    UpdateBusinessObjectNodeTypeInput,
+    UpdateDocumentTypeInput,
 )
 from sap_cloud_sdk.adms._query_options import ConfigQueryOptions
 from sap_cloud_sdk.adms.config import _CONFIG_SERVICE_PATH
@@ -57,6 +60,27 @@ class _ConfigurationApi:
         )
         return AllowedDomain.from_dict(resp.json())
 
+    @record_metrics(Module.ADMS, Operation.ADMS_CONFIG_GET_ALLOWED_DOMAIN)
+    def get_allowed_domain(self, allowed_domain_id: str) -> AllowedDomain:
+        """Fetch a single AllowedDomain by its UUID."""
+        resp = self._http.get(
+            build_allowed_domain_key_path(allowed_domain_id),
+            service_base=_CONFIG_SERVICE_PATH,
+        )
+        return AllowedDomain.from_dict(resp.json())
+
+    @record_metrics(Module.ADMS, Operation.ADMS_CONFIG_UPDATE_ALLOWED_DOMAIN)
+    def update_allowed_domain(
+        self, allowed_domain_id: str, payload: UpdateAllowedDomainInput
+    ) -> AllowedDomain:
+        """Update an existing AllowedDomain entry (PATCH — only sent fields change)."""
+        resp = self._http.patch(
+            build_allowed_domain_key_path(allowed_domain_id),
+            json=payload.to_odata_dict(),
+            service_base=_CONFIG_SERVICE_PATH,
+        )
+        return AllowedDomain.from_dict(resp.json())
+
     @record_metrics(Module.ADMS, Operation.ADMS_CONFIG_DELETE_ALLOWED_DOMAIN)
     def delete_allowed_domain(self, allowed_domain_id: str) -> None:
         """Remove an entry from the domain allow-list."""
@@ -82,6 +106,27 @@ class _ConfigurationApi:
         """Create a new document type classification."""
         resp = self._http.post(
             "DocumentType",
+            json=payload.to_odata_dict(),
+            service_base=_CONFIG_SERVICE_PATH,
+        )
+        return DocumentType.from_dict(resp.json())
+
+    @record_metrics(Module.ADMS, Operation.ADMS_CONFIG_GET_DOCUMENT_TYPE)
+    def get_document_type(self, document_type_id: str) -> DocumentType:
+        """Fetch a single DocumentType by its ID."""
+        resp = self._http.get(
+            build_document_type_key_path(document_type_id),
+            service_base=_CONFIG_SERVICE_PATH,
+        )
+        return DocumentType.from_dict(resp.json())
+
+    @record_metrics(Module.ADMS, Operation.ADMS_CONFIG_UPDATE_DOCUMENT_TYPE)
+    def update_document_type(
+        self, document_type_id: str, payload: UpdateDocumentTypeInput
+    ) -> DocumentType:
+        """Update an existing DocumentType (PATCH — only sent fields change)."""
+        resp = self._http.patch(
+            build_document_type_key_path(document_type_id),
             json=payload.to_odata_dict(),
             service_base=_CONFIG_SERVICE_PATH,
         )
@@ -117,6 +162,35 @@ class _ConfigurationApi:
         """Register a new business object node type."""
         resp = self._http.post(
             "BusinessObjectNodeType",
+            json=payload.to_odata_dict(),
+            service_base=_CONFIG_SERVICE_PATH,
+        )
+        return BusinessObjectNodeType.from_dict(resp.json())
+
+    @record_metrics(Module.ADMS, Operation.ADMS_CONFIG_GET_BUSINESS_OBJECT_TYPE)
+    def get_business_object_type(
+        self, business_object_node_type_unique_id: str
+    ) -> BusinessObjectNodeType:
+        """Fetch a single BusinessObjectNodeType by its unique ID."""
+        resp = self._http.get(
+            build_business_object_node_type_key_path(
+                business_object_node_type_unique_id
+            ),
+            service_base=_CONFIG_SERVICE_PATH,
+        )
+        return BusinessObjectNodeType.from_dict(resp.json())
+
+    @record_metrics(Module.ADMS, Operation.ADMS_CONFIG_UPDATE_BUSINESS_OBJECT_TYPE)
+    def update_business_object_type(
+        self,
+        business_object_node_type_unique_id: str,
+        payload: UpdateBusinessObjectNodeTypeInput,
+    ) -> BusinessObjectNodeType:
+        """Update an existing BusinessObjectNodeType (PATCH)."""
+        resp = self._http.patch(
+            build_business_object_node_type_key_path(
+                business_object_node_type_unique_id
+            ),
             json=payload.to_odata_dict(),
             service_base=_CONFIG_SERVICE_PATH,
         )
@@ -163,6 +237,17 @@ class _ConfigurationApi:
         )
         return DocumentTypeBusinessObjectTypeMap.from_dict(resp.json())
 
+    @record_metrics(Module.ADMS, Operation.ADMS_CONFIG_GET_DOCTYPE_BOTYPE_MAP)
+    def get_type_mapping(
+        self, document_type_bo_type_map_id: str
+    ) -> DocumentTypeBusinessObjectTypeMap:
+        """Fetch a single DocumentType ↔ BusinessObjectNodeType mapping by its UUID."""
+        resp = self._http.get(
+            build_doctype_botype_map_key_path(document_type_bo_type_map_id),
+            service_base=_CONFIG_SERVICE_PATH,
+        )
+        return DocumentTypeBusinessObjectTypeMap.from_dict(resp.json())
+
     @record_metrics(Module.ADMS, Operation.ADMS_CONFIG_DELETE_DOCTYPE_BOTYPE_MAP)
     def delete_type_mapping(self, document_type_bo_type_map_id: str) -> None:
         """Delete a DocumentType ↔ BusinessObjectNodeType mapping."""
@@ -205,6 +290,27 @@ class _AsyncConfigurationApi:
         )
         return AllowedDomain.from_dict(resp.json())
 
+    @record_metrics(Module.ADMS, Operation.ADMS_CONFIG_GET_ALLOWED_DOMAIN)
+    async def get_allowed_domain(self, allowed_domain_id: str) -> AllowedDomain:
+        """Async variant of :meth:`_ConfigurationApi.get_allowed_domain` — same semantics."""
+        resp = await self._http.get(
+            build_allowed_domain_key_path(allowed_domain_id),
+            service_base=_CONFIG_SERVICE_PATH,
+        )
+        return AllowedDomain.from_dict(resp.json())
+
+    @record_metrics(Module.ADMS, Operation.ADMS_CONFIG_UPDATE_ALLOWED_DOMAIN)
+    async def update_allowed_domain(
+        self, allowed_domain_id: str, payload: UpdateAllowedDomainInput
+    ) -> AllowedDomain:
+        """Async variant of :meth:`_ConfigurationApi.update_allowed_domain` — same semantics."""
+        resp = await self._http.patch(
+            build_allowed_domain_key_path(allowed_domain_id),
+            json=payload.to_odata_dict(),
+            service_base=_CONFIG_SERVICE_PATH,
+        )
+        return AllowedDomain.from_dict(resp.json())
+
     @record_metrics(Module.ADMS, Operation.ADMS_CONFIG_DELETE_ALLOWED_DOMAIN)
     async def delete_allowed_domain(self, allowed_domain_id: str) -> None:
         """Async variant of :meth:`_ConfigurationApi.delete_allowed_domain` — same semantics."""
@@ -232,6 +338,27 @@ class _AsyncConfigurationApi:
         """Async variant of :meth:`_ConfigurationApi.create_document_type` — same semantics."""
         resp = await self._http.post(
             "DocumentType",
+            json=payload.to_odata_dict(),
+            service_base=_CONFIG_SERVICE_PATH,
+        )
+        return DocumentType.from_dict(resp.json())
+
+    @record_metrics(Module.ADMS, Operation.ADMS_CONFIG_GET_DOCUMENT_TYPE)
+    async def get_document_type(self, document_type_id: str) -> DocumentType:
+        """Async variant of :meth:`_ConfigurationApi.get_document_type` — same semantics."""
+        resp = await self._http.get(
+            build_document_type_key_path(document_type_id),
+            service_base=_CONFIG_SERVICE_PATH,
+        )
+        return DocumentType.from_dict(resp.json())
+
+    @record_metrics(Module.ADMS, Operation.ADMS_CONFIG_UPDATE_DOCUMENT_TYPE)
+    async def update_document_type(
+        self, document_type_id: str, payload: UpdateDocumentTypeInput
+    ) -> DocumentType:
+        """Async variant of :meth:`_ConfigurationApi.update_document_type` — same semantics."""
+        resp = await self._http.patch(
+            build_document_type_key_path(document_type_id),
             json=payload.to_odata_dict(),
             service_base=_CONFIG_SERVICE_PATH,
         )
@@ -267,6 +394,35 @@ class _AsyncConfigurationApi:
         """Async variant of :meth:`_ConfigurationApi.create_business_object_type` — same semantics."""
         resp = await self._http.post(
             "BusinessObjectNodeType",
+            json=payload.to_odata_dict(),
+            service_base=_CONFIG_SERVICE_PATH,
+        )
+        return BusinessObjectNodeType.from_dict(resp.json())
+
+    @record_metrics(Module.ADMS, Operation.ADMS_CONFIG_GET_BUSINESS_OBJECT_TYPE)
+    async def get_business_object_type(
+        self, business_object_node_type_unique_id: str
+    ) -> BusinessObjectNodeType:
+        """Async variant of :meth:`_ConfigurationApi.get_business_object_type` — same semantics."""
+        resp = await self._http.get(
+            build_business_object_node_type_key_path(
+                business_object_node_type_unique_id
+            ),
+            service_base=_CONFIG_SERVICE_PATH,
+        )
+        return BusinessObjectNodeType.from_dict(resp.json())
+
+    @record_metrics(Module.ADMS, Operation.ADMS_CONFIG_UPDATE_BUSINESS_OBJECT_TYPE)
+    async def update_business_object_type(
+        self,
+        business_object_node_type_unique_id: str,
+        payload: UpdateBusinessObjectNodeTypeInput,
+    ) -> BusinessObjectNodeType:
+        """Async variant of :meth:`_ConfigurationApi.update_business_object_type` — same semantics."""
+        resp = await self._http.patch(
+            build_business_object_node_type_key_path(
+                business_object_node_type_unique_id
+            ),
             json=payload.to_odata_dict(),
             service_base=_CONFIG_SERVICE_PATH,
         )
@@ -309,6 +465,17 @@ class _AsyncConfigurationApi:
         resp = await self._http.post(
             "DocumentTypeBusinessObjectTypeMap",
             json=payload.to_odata_dict(),
+            service_base=_CONFIG_SERVICE_PATH,
+        )
+        return DocumentTypeBusinessObjectTypeMap.from_dict(resp.json())
+
+    @record_metrics(Module.ADMS, Operation.ADMS_CONFIG_GET_DOCTYPE_BOTYPE_MAP)
+    async def get_type_mapping(
+        self, document_type_bo_type_map_id: str
+    ) -> DocumentTypeBusinessObjectTypeMap:
+        """Async variant of :meth:`_ConfigurationApi.get_type_mapping` — same semantics."""
+        resp = await self._http.get(
+            build_doctype_botype_map_key_path(document_type_bo_type_map_id),
             service_base=_CONFIG_SERVICE_PATH,
         )
         return DocumentTypeBusinessObjectTypeMap.from_dict(resp.json())

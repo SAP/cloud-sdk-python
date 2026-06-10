@@ -152,7 +152,7 @@ class TestOperation:
 
     def test_print_operations(self):
         """Test Print operation values."""
-        assert Operation.PRINT_CREATE_CLIENT.value == "create_client"
+        assert Operation.PRINT_CREATE_CLIENT.value == "print_create_client"
         assert Operation.PRINT_LIST_QUEUES.value == "list_queues"
         assert Operation.PRINT_CREATE_QUEUE.value == "create_queue"
         assert Operation.PRINT_GET_PROFILES.value == "get_print_profiles"
@@ -212,4 +212,4 @@ class TestOperation:
         all_operations = list(Operation)
         # 3 auditlog + 11 destination + 10 certificate + 10 fragment + 8 objectstore
         # + 2 extensibility + 2 aicore + 23 dms + 4 agentgateway + 13 agent_memory + 5 data anonymization + 6 print = 97
-        assert len(all_operations) == 96
+        assert len(all_operations) == 97

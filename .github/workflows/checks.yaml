@@ -32,8 +32,5 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
-      - name: "Install pre-commit"
-        run: uv tool install pre-commit
-
       - name: "Run pre-commit hooks"
-        run: uv tool run pre-commit run --all-files
+        run: uvx pre-commit run --all-files

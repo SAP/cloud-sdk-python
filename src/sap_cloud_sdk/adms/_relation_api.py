@@ -8,13 +8,16 @@ from sap_cloud_sdk.adms._http import (
     build_relation_key_path,
 )
 from sap_cloud_sdk.adms._models import (
+    BusinessObjectNodeChangeLog,
+    ChangeLog,
     CreateDocumentRelationInput,
+    DeleteBusinessObjectNodeResult,
     Document,
     DocumentRelation,
     DraftActivateInput,
     DraftInput,
 )
-from sap_cloud_sdk.adms._query_options import RelationQueryOptions
+from sap_cloud_sdk.adms._query_options import ConfigQueryOptions, RelationQueryOptions
 from sap_cloud_sdk.adms.config import _SERVICE_PATH
 from sap_cloud_sdk.core.telemetry import Module, Operation, record_metrics
 
@@ -257,17 +260,68 @@ class _DocumentRelationApi:
 
     @record_metrics(Module.ADMS, Operation.ADMS_RELATIONS_DISCARD_DRAFT)
     def discard_draft(self, draft_input: DraftInput) -> None:
-        """Discard draft DocumentRelations without activating.
-
-        Args:
-            draft_input: Business object node identifier.
-        """
+        """Discard draft DocumentRelations without activating."""
         payload = {"BusinessObjectNode": draft_input.to_odata_dict()}
         self._http.post(
             "DiscardBusinessObjNodeDraft",
             json=payload,
             service_base=_SERVICE_PATH,
         )
+
+    @record_metrics(Module.ADMS, Operation.ADMS_RELATIONS_DELETE_BO_NODE)
+    def delete_business_object_node(
+        self, draft_input: DraftInput
+    ) -> DeleteBusinessObjectNodeResult:
+        """Delete all DocumentRelations for a business object node.
+
+        Requires ``system-user`` scope.  This is a destructive operation —
+        all relations for the given BO node are permanently deleted.
+
+        Args:
+            draft_input: Business object node identifier.
+
+        Returns:
+            :class:`DeleteBusinessObjectNodeResult` with the number of
+            relations deleted.
+        """
+        payload = {"BusinessObjectNode": draft_input.to_odata_dict()}
+        resp = self._http.post(
+            "DeleteBusinessObjectNode",
+            json=payload,
+            service_base=_SERVICE_PATH,
+        )
+        return DeleteBusinessObjectNodeResult.from_dict(resp.json())
+
+    @record_metrics(Module.ADMS, Operation.ADMS_CHANGELOG_GET_ALL)
+    def get_change_logs(
+        self, options: ConfigQueryOptions | None = None
+    ) -> list[ChangeLog]:
+        """Fetch the audit change log for all document management operations.
+
+        Returns:
+            List of :class:`~sap_cloud_sdk.adms._models.ChangeLog` entries.
+        """
+        params = options.to_query_params() if options else {}
+        resp = self._http.get("ChangeLog", params=params, service_base=_SERVICE_PATH)
+        return [ChangeLog.from_dict(item) for item in resp.json().get("value", [])]
+
+    @record_metrics(Module.ADMS, Operation.ADMS_BO_CHANGELOG_GET_ALL)
+    def get_bo_node_change_logs(
+        self, options: ConfigQueryOptions | None = None
+    ) -> list[BusinessObjectNodeChangeLog]:
+        """Fetch the change log joined with business object node context.
+
+        Returns:
+            List of :class:`~sap_cloud_sdk.adms._models.BusinessObjectNodeChangeLog`.
+        """
+        params = options.to_query_params() if options else {}
+        resp = self._http.get(
+            "BusinessObjectNodeChangeLog", params=params, service_base=_SERVICE_PATH
+        )
+        return [
+            BusinessObjectNodeChangeLog.from_dict(item)
+            for item in resp.json().get("value", [])
+        ]
 
 
 class _AsyncDocumentRelationApi:
@@ -444,3 +498,41 @@ class _AsyncDocumentRelationApi:
             json=payload,
             service_base=_SERVICE_PATH,
         )
+
+    @record_metrics(Module.ADMS, Operation.ADMS_RELATIONS_DELETE_BO_NODE)
+    async def delete_business_object_node(
+        self, draft_input: DraftInput
+    ) -> DeleteBusinessObjectNodeResult:
+        """Async variant of :meth:`_DocumentRelationApi.delete_business_object_node` — same semantics."""
+        payload = {"BusinessObjectNode": draft_input.to_odata_dict()}
+        resp = await self._http.post(
+            "DeleteBusinessObjectNode",
+            json=payload,
+            service_base=_SERVICE_PATH,
+        )
+        return DeleteBusinessObjectNodeResult.from_dict(resp.json())
+
+    @record_metrics(Module.ADMS, Operation.ADMS_CHANGELOG_GET_ALL)
+    async def get_change_logs(
+        self, options: ConfigQueryOptions | None = None
+    ) -> list[ChangeLog]:
+        """Async variant of :meth:`_DocumentRelationApi.get_change_logs` — same semantics."""
+        params = options.to_query_params() if options else {}
+        resp = await self._http.get(
+            "ChangeLog", params=params, service_base=_SERVICE_PATH
+        )
+        return [ChangeLog.from_dict(item) for item in resp.json().get("value", [])]
+
+    @record_metrics(Module.ADMS, Operation.ADMS_BO_CHANGELOG_GET_ALL)
+    async def get_bo_node_change_logs(
+        self, options: ConfigQueryOptions | None = None
+    ) -> list[BusinessObjectNodeChangeLog]:
+        """Async variant of :meth:`_DocumentRelationApi.get_bo_node_change_logs` — same semantics."""
+        params = options.to_query_params() if options else {}
+        resp = await self._http.get(
+            "BusinessObjectNodeChangeLog", params=params, service_base=_SERVICE_PATH
+        )
+        return [
+            BusinessObjectNodeChangeLog.from_dict(item)
+            for item in resp.json().get("value", [])
+        ]

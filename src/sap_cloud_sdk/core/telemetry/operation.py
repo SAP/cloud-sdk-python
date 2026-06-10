@@ -123,6 +123,20 @@ class Operation(str, Enum):
     ADMS_CONFIG_UPDATE_DOCUMENT_TYPE = "config_update_document_type"
     ADMS_CONFIG_GET_BUSINESS_OBJECT_TYPE = "config_get_business_object_type"
     ADMS_CONFIG_UPDATE_BUSINESS_OBJECT_TYPE = "config_update_business_object_type"
+    # ADMS — new DocumentService actions
+    ADMS_RELATIONS_DELETE_BO_NODE = "relations_delete_bo_node"
+    ADMS_CHANGELOG_GET_ALL = "changelog_get_all"
+    ADMS_BO_CHANGELOG_GET_ALL = "bo_changelog_get_all"
+    # ADMS — new ConfigurationService entities
+    ADMS_CONFIG_MARK_DEFAULT = "config_mark_default"
+    ADMS_CONFIG_GET_ALL_FILE_EXT_POLICIES = "config_get_all_file_ext_policies"
+    ADMS_CONFIG_CREATE_FILE_EXT_POLICY = "config_create_file_ext_policy"
+    ADMS_CONFIG_GET_FILE_EXT_POLICY = "config_get_file_ext_policy"
+    ADMS_CONFIG_DELETE_FILE_EXT_POLICY = "config_delete_file_ext_policy"
+    ADMS_CONFIG_GET_ALL_APP_TENANTS = "config_get_all_app_tenants"
+    ADMS_CONFIG_CREATE_APP_TENANT = "config_create_app_tenant"
+    ADMS_CONFIG_GET_APP_TENANT = "config_get_app_tenant"
+    ADMS_CONFIG_DELETE_APP_TENANT = "config_delete_app_tenant"
 
     # AI Core Operations
     AICORE_SET_CONFIG = "set_aicore_config"

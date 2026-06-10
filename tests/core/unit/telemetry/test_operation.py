@@ -202,5 +202,5 @@ class TestOperation:
         all_operations = list(Operation)
         # 3 auditlog + 11 destination + 10 certificate + 10 fragment + 8 objectstore
         # + 2 extensibility + 2 aicore + 23 dms + 4 agentgateway + 13 agent_memory
-        # + 5 data_anonymization + 40 adms = 131
-        assert len(all_operations) == 131
+        # + 5 data_anonymization + 52 adms = 143
+        assert len(all_operations) == 143

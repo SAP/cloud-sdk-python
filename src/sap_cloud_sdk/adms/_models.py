@@ -1056,3 +1056,263 @@ class JobOutput:
             job_error_details=raw.get("JobErrorDetails"),
             job_progress_percentage=raw.get("JobProgressPercentage"),
         )
+
+
+# ---------------------------------------------------------------------------
+# ChangeLog / audit models
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class ChangeLog:
+    """A single audit entry tracking a property change in ADM.
+
+    Read-only entity from ``GET /DocumentService/ChangeLog``.
+
+    Attributes:
+        change_log_id: Primary key UUID.
+        change_log_created_at_date_time: When the change was recorded.
+        change_log_created_by_user_name: User who made the change.
+        change_log_group_id: Groups related change entries together.
+        change_log_root_entity: Root entity where the change originated.
+        change_log_root_identifier: Identifier of the root entity.
+        changed_property_name: The attribute/property that was changed.
+        changed_property_old_value: Previous value.
+        changed_property_new_value: New value.
+        changed_property_data_type: Data type of the changed property.
+        change_log_target_entity: Target entity affected by the change.
+        change_log_target_identifier: Identifier of the target entity.
+        change_log_path: Path to the changed element.
+        change_log_modification_type: "create", "update", or "delete".
+        change_log_description: Human-readable description of the change.
+        is_active_entity: Whether this is an active (non-draft) entry.
+        business_object_node_type_unique_id: BO type context.
+        host_business_object_node_id: BO instance context.
+        document_type_id: Document type context.
+        document_name: Document name context.
+    """
+
+    change_log_id: str
+    change_log_created_at_date_time: str | None = None
+    change_log_created_by_user_name: str | None = None
+    change_log_group_id: str | None = None
+    change_log_root_entity: str | None = None
+    change_log_root_identifier: str | None = None
+    changed_property_name: str | None = None
+    changed_property_old_value: str | None = None
+    changed_property_new_value: str | None = None
+    changed_property_data_type: str | None = None
+    change_log_target_entity: str | None = None
+    change_log_target_identifier: str | None = None
+    change_log_path: str | None = None
+    change_log_modification_type: str | None = None
+    change_log_description: str | None = None
+    is_active_entity: bool = True
+    business_object_node_type_unique_id: str | None = None
+    host_business_object_node_id: str | None = None
+    document_type_id: str | None = None
+    document_name: str | None = None
+
+    @classmethod
+    def from_dict(cls, data: dict) -> ChangeLog:
+        return cls(
+            change_log_id=data.get("ChangeLogID", ""),
+            change_log_created_at_date_time=data.get("ChangeLogCreatedAtDateTime"),
+            change_log_created_by_user_name=data.get("ChangeLogCreatedByUserName"),
+            change_log_group_id=data.get("ChangeLogGroupID"),
+            change_log_root_entity=data.get("ChangeLogRootEntity"),
+            change_log_root_identifier=data.get("ChangeLogRootIdentifier"),
+            changed_property_name=data.get("ChangedPropertyName"),
+            changed_property_old_value=data.get("ChangedPropertyOldValue"),
+            changed_property_new_value=data.get("ChangedPropertyNewValue"),
+            changed_property_data_type=data.get("ChangedPropertyDataType"),
+            change_log_target_entity=data.get("ChangeLogTargetEntity"),
+            change_log_target_identifier=data.get("ChangeLogTargetIdentifier"),
+            change_log_path=data.get("ChangeLogPath"),
+            change_log_modification_type=data.get("ChangeLogModificationType"),
+            change_log_description=data.get("ChangeLogDescription"),
+            is_active_entity=data.get("IsActiveEntity", True),
+            business_object_node_type_unique_id=data.get(
+                "BusinessObjectNodeTypeUniqueID"
+            ),
+            host_business_object_node_id=data.get("HostBusinessObjectNodeID"),
+            document_type_id=data.get("DocumentTypeID"),
+            document_name=data.get("DocumentName"),
+        )
+
+
+@dataclass
+class BusinessObjectNodeChangeLog:
+    """Change log entry joined with DocumentRelation context.
+
+    Read-only view from ``GET /DocumentService/BusinessObjectNodeChangeLog``.
+    Same fields as :class:`ChangeLog` but always has BO node context.
+    """
+
+    change_log_id: str
+    business_object_node_type_unique_id: str | None = None
+    host_business_object_node_id: str | None = None
+    document_type_id: str | None = None
+    document_name: str | None = None
+    change_log_root_entity: str | None = None
+    change_log_root_identifier: str | None = None
+    change_log_target_identifier: str | None = None
+    changed_property_name: str | None = None
+    change_log_modification_type: str | None = None
+    changed_property_old_value: str | None = None
+    changed_property_new_value: str | None = None
+    change_log_description: str | None = None
+    change_log_is_active_entity: bool = True
+    change_log_created_at_date_time: str | None = None
+    change_log_created_by_user_name: str | None = None
+
+    @classmethod
+    def from_dict(cls, data: dict) -> BusinessObjectNodeChangeLog:
+        return cls(
+            change_log_id=data.get("ChangeLogID", ""),
+            business_object_node_type_unique_id=data.get(
+                "BusinessObjectNodeTypeUniqueID"
+            ),
+            host_business_object_node_id=data.get("HostBusinessObjectNodeID"),
+            document_type_id=data.get("DocumentTypeID"),
+            document_name=data.get("DocumentName"),
+            change_log_root_entity=data.get("ChangeLogRootEntity"),
+            change_log_root_identifier=data.get("ChangeLogRootIdentifier"),
+            change_log_target_identifier=data.get("ChangeLogTargetIdentifier"),
+            changed_property_name=data.get("ChangedPropertyName"),
+            change_log_modification_type=data.get("ChangeLogModificationType"),
+            changed_property_old_value=data.get("ChangedPropertyOldValue"),
+            changed_property_new_value=data.get("ChangedPropertyNewValue"),
+            change_log_description=data.get("ChangeLogDescription"),
+            change_log_is_active_entity=data.get("ChangeLogIsActiveEntity", True),
+            change_log_created_at_date_time=data.get("ChangeLogCreatedAtDateTime"),
+            change_log_created_by_user_name=data.get("ChangeLogCreatedByUserName"),
+        )
+
+
+@dataclass
+class DeleteBusinessObjectNodeResult:
+    """Result of ``DeleteBusinessObjectNode`` action.
+
+    Attributes:
+        relations_deleted: Number of DocumentRelations that were deleted.
+    """
+
+    relations_deleted: int | None = None
+
+    @classmethod
+    def from_dict(cls, data: dict) -> DeleteBusinessObjectNodeResult:
+        raw = data.get("value", data)
+        return cls(relations_deleted=raw.get("RelationsDeleted"))
+
+
+# ---------------------------------------------------------------------------
+# FileExtensionPolicy model
+# ---------------------------------------------------------------------------
+
+
+class MimeTypePolicy(str, Enum):
+    """Controls whether a file extension is allowed or blocked."""
+
+    ALLOW = "A"
+    BLOCK = "B"
+
+
+@dataclass
+class FileExtensionPolicy:
+    """Tenant-level file extension allow/block policy.
+
+    ADM checks this list before accepting an upload.
+
+    Attributes:
+        file_extension_policy_id: Primary key UUID.
+        file_extension_policy_option: ``ALLOW`` (``"A"``) or ``BLOCK`` (``"B"``).
+        file_extension: File extension string, e.g. ``"pdf"``, ``"exe"``.
+    """
+
+    file_extension_policy_id: str
+    file_extension_policy_option: MimeTypePolicy
+    file_extension: str
+
+    @classmethod
+    def from_dict(cls, data: dict) -> FileExtensionPolicy:
+        option_raw = data.get("FileExtensionPolicyOption", MimeTypePolicy.ALLOW.value)
+        try:
+            option = MimeTypePolicy(option_raw)
+        except ValueError:
+            option = MimeTypePolicy.ALLOW
+        return cls(
+            file_extension_policy_id=data.get("FileExtensionPolicyID", ""),
+            file_extension_policy_option=option,
+            file_extension=data.get("FileExtension", ""),
+        )
+
+    def to_odata_dict(self) -> dict:
+        return {
+            "FileExtensionPolicyOption": self.file_extension_policy_option.value,
+            "FileExtension": self.file_extension,
+        }
+
+
+@dataclass
+class CreateFileExtensionPolicyInput:
+    """Input for creating a :class:`FileExtensionPolicy` entry.
+
+    Attributes:
+        file_extension_policy_option: ``MimeTypePolicy.ALLOW`` or ``MimeTypePolicy.BLOCK``.
+        file_extension: File extension to allow/block (e.g. ``"pdf"``).
+    """
+
+    file_extension_policy_option: MimeTypePolicy
+    file_extension: str
+
+    def to_odata_dict(self) -> dict:
+        return {
+            "FileExtensionPolicyOption": self.file_extension_policy_option.value,
+            "FileExtension": self.file_extension,
+        }
+
+
+# ---------------------------------------------------------------------------
+# ApplicationTenant model
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class ApplicationTenant:
+    """Tenant-level application configuration.
+
+    Attributes:
+        application_tenant_id: Primary key identifier.
+        application_tenant_name: Human-readable tenant name.
+    """
+
+    application_tenant_id: str
+    application_tenant_name: str | None = None
+
+    @classmethod
+    def from_dict(cls, data: dict) -> ApplicationTenant:
+        return cls(
+            application_tenant_id=data.get("ApplicationTenantID", ""),
+            application_tenant_name=data.get("ApplicationTenantName"),
+        )
+
+    def to_odata_dict(self) -> dict:
+        d: dict = {"ApplicationTenantID": self.application_tenant_id}
+        if self.application_tenant_name is not None:
+            d["ApplicationTenantName"] = self.application_tenant_name
+        return d
+
+
+@dataclass
+class CreateApplicationTenantInput:
+    """Input for creating an :class:`ApplicationTenant`."""
+
+    application_tenant_id: str
+    application_tenant_name: str
+
+    def to_odata_dict(self) -> dict:
+        return {
+            "ApplicationTenantID": self.application_tenant_id,
+            "ApplicationTenantName": self.application_tenant_name,
+        }

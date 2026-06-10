@@ -374,8 +374,18 @@ class AdmsHttp:
             raise DocumentNotFoundError(f"Resource not found: {method} {url}")
 
         if not (200 <= resp.status_code < 300):
+            # Try to extract the ADM error message from the OData error body.
+            # ADM returns: {"error": {"code": "...", "message": "..."}}
+            adm_message: str | None = None
+            try:
+                body = resp.json()
+                err = body.get("error") or {}
+                adm_message = err.get("message") or err.get("code")
+            except Exception:
+                pass
+            detail = f" — {adm_message}" if adm_message else ""
             raise HttpError(
-                f"ADMS service returned HTTP {resp.status_code}",
+                f"ADMS service returned HTTP {resp.status_code}{detail}",
                 status_code=resp.status_code,
                 response_text=resp.text[:_RESPONSE_TEXT_TRUNCATION_LIMIT],
             )

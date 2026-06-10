@@ -170,20 +170,29 @@ class _DocumentApi:
     ) -> Document:
         """Update document metadata via the bound ``UpdateDocument`` action.
 
+        ADM's UpdateDocument action returns only the changed fields.  This
+        method transparently follows up with a GET to return the full Document.
+
         Args:
             document_relation_id: UUID of the parent DocumentRelation.
             update_input: Fields to update (only non-None fields are sent).
             is_active_entity: Active vs draft entity flag.
 
         Returns:
-            Updated :class:`~sap_cloud_sdk.adms._models.Document`.
+            Full updated :class:`~sap_cloud_sdk.adms._models.Document`.
         """
         path = (
             build_relation_key_path(document_relation_id, is_active_entity)
             + "/UpdateDocument"
         )
         payload = {"Document": update_input.to_odata_dict()}
-        resp = self._http.post(path, json=payload, service_base=_SERVICE_PATH)
+        self._http.post(path, json=payload, service_base=_SERVICE_PATH)
+        # UpdateDocument returns only changed fields — fetch the full entity.
+        full_path = (
+            build_relation_key_path(document_relation_id, is_active_entity)
+            + "/Document"
+        )
+        resp = self._http.get(full_path, service_base=_SERVICE_PATH)
         return Document.from_dict(resp.json())
 
     @record_metrics(Module.ADMS, Operation.ADMS_DOCUMENTS_RESTORE_CONTENT_VERSION)
@@ -351,7 +360,12 @@ class _AsyncDocumentApi:
             + "/UpdateDocument"
         )
         payload = {"Document": update.to_odata_dict()}
-        resp = await self._http.post(path, json=payload, service_base=_SERVICE_PATH)
+        await self._http.post(path, json=payload, service_base=_SERVICE_PATH)
+        full_path = (
+            build_relation_key_path(document_relation_id, is_active_entity)
+            + "/Document"
+        )
+        resp = await self._http.get(full_path, service_base=_SERVICE_PATH)
         return Document.from_dict(resp.json())
 
     @record_metrics(Module.ADMS, Operation.ADMS_DOCUMENTS_DELETE_CONTENT_VERSION)

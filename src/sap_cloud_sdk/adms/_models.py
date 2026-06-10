@@ -211,6 +211,10 @@ class Document:
     document_created_at_date_time: str | None = None
     document_changed_by_user_name: str | None = None
     document_changed_at_date_time: str | None = None
+    # Human-readable text for the current scan state (e.g. "File Extension Restricted").
+    document_state_text: str | None = None
+    # SHA-256 or similar hash of the stored content (populated after upload).
+    document_content_hash: str | None = None
 
     @classmethod
     def from_dict(cls, data: dict) -> Document:
@@ -250,6 +254,8 @@ class Document:
             document_created_at_date_time=data.get("DocumentCreatedAtDateTime"),
             document_changed_by_user_name=data.get("DocumentChangedByUserName"),
             document_changed_at_date_time=data.get("DocumentChangedAtDateTime"),
+            document_state_text=data.get("DocumentStateText"),
+            document_content_hash=data.get("DocumentContentHash"),
         )
 
 

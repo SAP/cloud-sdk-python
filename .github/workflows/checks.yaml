@@ -32,11 +32,8 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
-      - name: "Run Ruff Linter"
-        run: uv run ruff check --output-format=github .
+      - name: "Install dependencies"
+        run: uv sync --all-extras
 
-      - name: "Run Ruff Formatter Check"
-        run: uv run ruff format --check --diff .
-
-      - name: "Run ty Type Check"
-        run: uv run ty check --output-format github --python-version ${{ env.PYTHON_VERSION }} .
+      - name: "Run pre-commit hooks"
+        run: uvx pre-commit run --all-files

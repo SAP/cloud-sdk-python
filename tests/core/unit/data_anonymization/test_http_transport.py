@@ -1,6 +1,7 @@
 """Unit tests for the HTTP transport."""
 
 import base64
+from collections.abc import Mapping
 from pathlib import Path
 import importlib
 import types
@@ -55,7 +56,7 @@ class DummyResponse:
         self.status_code = status_code
         self._json_data = json_data
         self.text = text
-        self.headers = headers or {}
+        self.headers: Mapping[str, str] = headers or {}
         self.content = content
 
     def json(self):

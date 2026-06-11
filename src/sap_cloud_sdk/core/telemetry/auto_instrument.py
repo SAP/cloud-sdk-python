@@ -180,6 +180,11 @@ def _merge_resource_attrs_into_active_provider_if_wrapper_installed(
         return
 
     provider._resource = provider.resource.merge(Resource.create(sap_attrs))
+
+    with provider._tracers_lock:
+        for tracer in provider._tracers.values():
+            tracer.resource = provider._resource
+
     logger.info(
         "Merged sap-cloud-sdk resource attrs onto wrapper-installed "
         "TracerProvider (marker: telemetry.auto.version)"

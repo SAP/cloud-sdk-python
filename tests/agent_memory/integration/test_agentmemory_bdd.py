@@ -17,6 +17,7 @@ import pytest
 from pytest_bdd import given, scenario, then, when
 
 from sap_cloud_sdk.agent_memory.client import AgentMemoryClient
+from sap_cloud_sdk.agent_memory import MessageRole
 
 # -- Scenarios -----------------------------------------------------------------
 
@@ -258,7 +259,7 @@ def add_message(context):
         "test-agent",
         "test-user",
         "conv-1",
-        "USER",
+        MessageRole.USER,
         "Hello!",
     )
 

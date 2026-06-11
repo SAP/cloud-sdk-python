@@ -1,18 +1,8 @@
 """LangGraph test agent used by the telemetry integration tests."""
 
 import os
-from dataclasses import dataclass
-from typing import Annotated
 
 import pytest
-
-from langchain_core.messages import BaseMessage
-from langgraph.graph.message import add_messages
-
-
-@dataclass
-class State:
-    messages: Annotated[list[BaseMessage], add_messages]
 
 
 def build_langgraph_agent():
@@ -23,10 +13,19 @@ def build_langgraph_agent():
     "sap/<model>" prefix to route through the SAP AI Core provider.
     """
     try:
-        from langchain_litellm import ChatLiteLLM
-        from langgraph.graph import END, StateGraph
+        from dataclasses import dataclass
+        from typing import Annotated
+
+        from langchain_core.messages import BaseMessage
+        from langchain_litellm import ChatLiteLLM  # ty: ignore[unresolved-import]
+        from langgraph.graph import END, StateGraph  # ty: ignore[unresolved-import]
+        from langgraph.graph.message import add_messages  # ty: ignore[unresolved-import]
     except ImportError:
         pytest.skip("langchain-litellm or langgraph not installed")
+
+    @dataclass
+    class State:
+        messages: Annotated[list[BaseMessage], add_messages]
 
     model_name = os.environ.get("AICORE_MODEL") or "anthropic--claude-4.5-sonnet"
     llm = ChatLiteLLM(model=f"sap/{model_name}")

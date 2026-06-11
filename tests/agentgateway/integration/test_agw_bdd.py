@@ -101,6 +101,7 @@ def call_get_user_auth(context: ScenarioContext, agw_client: AgentGatewayClient)
 def call_get_user_auth_callable(context: ScenarioContext, agw_client: AgentGatewayClient):
     """Call get_user_auth with a callable and store the result."""
     token = context.user_token
+    assert token is not None
     context.last_result = run(
         agw_client.get_user_auth(user_token=lambda: token)
     )

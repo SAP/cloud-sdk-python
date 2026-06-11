@@ -157,5 +157,3 @@ class AgentGatewayClient:
         **kwargs,
     ) -> str
 ```
-
-

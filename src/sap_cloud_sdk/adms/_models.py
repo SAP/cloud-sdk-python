@@ -126,7 +126,7 @@ class DocumentContentVersion:
     doc_content_version_comment: str | None = None
     doc_content_version_is_latest: bool | None = None
     doc_content_version_mime_type: str | None = None
-    doc_content_version_size_in_byte: float | None = None
+    doc_content_version_size_in_byte: int | None = None
     # Internal object-store URI — do not expose to end users.
     doc_content_version_stream_uri: str | None = None
     doc_content_version_content_hash: str | None = None
@@ -194,7 +194,7 @@ class Document:
 
     document_mime_type: str | None = None
     document_description: str | None = None
-    document_size_in_byte: float | None = None
+    document_size_in_byte: int | None = None
     # Internal object store URI — do NOT expose directly to end users.
     document_content_stream_uri: str | None = None
     # Only populated for BaseType.URL documents.

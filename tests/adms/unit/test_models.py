@@ -78,7 +78,7 @@ class TestDocument:
             "DocumentTypeID": "INVOICE",
             "DocumentState": "CLEAN",
             "DocumentMimeType": "application/pdf",
-            "DocumentSizeInByte": 1024.0,
+            "DocumentSizeInByte": 1024,
             "DocumentIsLocked": False,
         }
         doc = Document.from_dict(data)

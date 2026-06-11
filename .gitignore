@@ -43,10 +43,5 @@ RELEASE.md
 # macOS metadata
 .DS_Store
 
-# UCL provisioning artefacts (separate repo concern)
-.ucl-provision/
-src/sap_cloud_sdk/adms/ucl/
-
-# ADMS local dev files (credentials + debug CLI — never commit)
+# ADMS credentials — anyone setting up ADMS integration tests creates this file locally
 .env.adms
-scripts/adms_cli.py

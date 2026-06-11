@@ -36,15 +36,18 @@ class OutputManagementServiceDefaultClient(OutputManagementServiceClient):
         self,
         base_url: str,
         destination: any = None,
+        destination_instance: str = None,
     ):
         """Initialize client.
 
         Args:
             base_url: Base URL of the service
             destination: Optional Cloud SDK destination object for making requests
+            destination_instance: Optional Destination Service instance name
         """
         self._base_url = base_url.rstrip("/")
         self._destination = destination
+        self._destination_instance = destination_instance
 
         # Create a simple requests session
         self._session = requests.Session()
@@ -54,6 +57,7 @@ class OutputManagementServiceDefaultClient(OutputManagementServiceClient):
             self._session,
             self._base_url,
             self._destination,
+            self._destination_instance,
         )
 
         logger.info(f"Initialized Output Management Service client for {base_url}")

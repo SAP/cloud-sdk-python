@@ -11,8 +11,6 @@ from .client_provider import (
 from .models.output_request import OutputRequest, OutputRequestBuilder
 from .models.output_response import (
     OutputResponse,
-    OutputRequestStatusResponse,
-    DocumentResponse,
 )
 from .models.email_configuration import EmailConfiguration
 from .models.attachment_config import AttachmentConfig
@@ -45,8 +43,6 @@ __all__ = [
     "OutputRequest",
     "OutputRequestBuilder",
     "OutputResponse",
-    "OutputRequestStatusResponse",
-    "DocumentResponse",
     "EmailConfiguration",
     "AttachmentConfig",
     "OutputManagementInfo",

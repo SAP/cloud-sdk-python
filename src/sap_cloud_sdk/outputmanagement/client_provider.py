@@ -78,11 +78,13 @@ class OutputManagementServiceClientProviderBuilder:
         base_url = self._destination_credential_config.get_base_url()
         logger.info(f"Retrieved destination base URL: {base_url}")
         
-        # Build client with destination object
+        # Build client with destination object and instance name
         # The destination object handles auth automatically
+        # Use the same instance for both destination fetch and certificate retrieval
         client = OutputManagementServiceDefaultClient(
             base_url=base_url,
             destination=http_destination,
+            destination_instance=self._destination_credential_config.instance,
         )
 
         logger.info("Built Output Management Service client provider")

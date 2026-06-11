@@ -150,41 +150,6 @@ class RequestValidator:
         return None
 
     @staticmethod
-    def validate_job_status_request(output_request_id: str) -> Optional[str]:
-        """
-        Validates job status request parameters.
-        
-        Args:
-            output_request_id: The output request ID to validate
-            
-        Returns:
-            Optional error message if validation fails, None if valid
-        """
-        if not output_request_id or not output_request_id.strip():
-            return "OutputRequestId id cannot be null or empty"
-        return None
-
-    @staticmethod
-    def validate_get_document_request(channel: str, output_request_id: str) -> Optional[str]:
-        """
-        Validates get document request parameters.
-        
-        Args:
-            channel: The channel name
-            output_request_id: The output request ID
-            
-        Returns:
-            Optional error message if validation fails, None if valid
-        """
-        if not channel or not channel.strip():
-            return "Channel cannot be null or empty"
-        
-        if not output_request_id or not output_request_id.strip():
-            return "Output Request ID cannot be null or empty"
-        
-        return None
-
-    @staticmethod
     def validate_email_parameters(
         notification_template_key: str,
         to: List[str],

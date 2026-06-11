@@ -31,6 +31,10 @@ class DestinationCredentialConfig(BaseModel):
         default=None,
         description="Access strategy: 'PROVIDER_ONLY' or 'SUBSCRIBER_ONLY' (optional)"
     )
+    instance: Optional[str] = Field(
+        default=None,
+        description="Destination service instance name (defaults to 'default' if not provided)"
+    )
     @field_validator("destination_name")
     @classmethod
     def validate_destination_name(cls, v: str) -> str:
@@ -60,11 +64,23 @@ class DestinationCredentialConfig(BaseModel):
         Returns:
             Destination object with URL, authentication, and properties
         Raises:
+            ValueError: If destination is not found
             Exception: If destination retrieval fails
         """
         from ...destination import create_client, AccessStrategy
-        logger.info(f"Retrieving destination '{self.destination_name}'")
-        client = create_client(instance="ariba-sourcing-event-instance")
+        
+        # Resolve instance name: use provided value or default to "default"
+        inst = self.instance or "default"
+        logger.info(f"Retrieving destination '{self.destination_name}' from instance '{inst}'")
+        
+        try:
+            client = create_client(instance=inst)
+        except Exception as e:
+            logger.error(f"Failed to create destination client for instance '{inst}': {e}")
+            raise ValueError(
+                f"Failed to create destination client for instance '{inst}'. "
+                f"Ensure the Destination Service is properly bound and configured."
+            ) from e
         if self.access_strategy:
             if self.access_strategy == "PROVIDER_ONLY":
                 strategy = AccessStrategy.PROVIDER_ONLY

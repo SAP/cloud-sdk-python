@@ -11,9 +11,6 @@ from .output_requests_client import OutputRequestsClient
 from ..models.output_request import OutputRequest
 from ..models.output_response import (
     OutputResponse,
-    JobStatusResponse,
-    OutputRequestStatusResponse,
-    DocumentResponse,
 )
 from ..constants import Constants
 from ..utils.request_validator import RequestValidator
@@ -34,6 +31,7 @@ class OutputRequestsClientImpl(OutputRequestsClient):
         http_session: requests.Session,
         base_url: str,
         destination: any = None,
+        destination_instance: str = None,
     ):
         """
         Constructs a new OutputRequestsClientImpl.
@@ -42,10 +40,12 @@ class OutputRequestsClientImpl(OutputRequestsClient):
             http_session: The requests Session for making HTTP requests
             base_url: The base URL of the Output Management service
             destination: Optional Cloud SDK destination object for making authenticated requests
+            destination_instance: Optional Destination Service instance name (defaults to "default")
         """
         self._http_session = http_session
         self._base_url = base_url.rstrip("/")
         self._destination = destination
+        self._destination_instance = destination_instance
         
         # Get sender-provider-subaccount-id from environment variable
         self._sender_provider_subaccount_id = os.getenv("APPFND_CONHOS_SUBACCOUNTID")
@@ -99,7 +99,7 @@ class OutputRequestsClientImpl(OutputRequestsClient):
                 response_data = response.json()
                 request_id = response_data.get("requestId")
                 logger.info(f"Request submitted successfully with ID: {request_id}")
-                return OutputResponse(output_request_id=request_id, errors=None)
+                return OutputResponse(output_request_id=request_id, error=None)
 
             # Handle error responses
             response_body = response.text
@@ -120,116 +120,6 @@ class OutputRequestsClientImpl(OutputRequestsClient):
             return self._create_output_error_response(
                 "OUTPUT_REQUEST_FAILED",
                 f"Failed to send output request: {str(e)}"
-            )
-
-    def get_output_request_status(self, request_id: str) -> JobStatusResponse:
-        """Retrieves the status of a previously submitted output request."""
-        logger.info(f"Getting status for request: {request_id}")
-
-        validation_error = RequestValidator.validate_job_status_request(request_id)
-        if validation_error:
-            logger.error(f"Validation failed for output request status: {validation_error}")
-            return self._create_status_error_response(
-                "INVALID_REQUEST",
-                validation_error
-            )
-
-        endpoint = f"{self._base_url}{Constants.API_OUTPUT_CONTROL}outputRequest/{request_id}"
-        logger.debug(f"Endpoint: {endpoint}")
-
-        headers = self._get_headers()
-        headers[Constants.HEADER_ACCEPT] = Constants.CONTENT_TYPE_JSON
-        
-        # Add sender-provider-subaccount-id header if available
-        if self._sender_provider_subaccount_id:
-            headers[Constants.HEADER_SENDER_PROVIDER_SUBACCOUNT_ID] = self._sender_provider_subaccount_id
-            logger.debug(f"Added sender-provider-subaccount-id header for get status")
-
-        try:
-            response = self._execute_request('GET', endpoint, headers=headers)
-            status_code = response.status_code
-
-            logger.debug(f"Response status: {status_code}")
-
-            if status_code == 200:
-                response_data = response.json()
-                status_response = OutputRequestStatusResponse(**response_data)
-                logger.info("Status retrieved successfully")
-                return JobStatusResponse(status=status_response, errors=None)
-
-            # Handle error responses
-            response_body = response.text
-            if self._is_retryable(status_code):
-                logger.error(f"Retryable error with status: {status_code}, body: {response_body}")
-            else:
-                logger.error(f"Non-retryable error with status: {status_code}, body: {response_body}")
-
-            error_type = self._map_status_code_to_error(status_code)
-            if error_type:
-                return self._create_status_error_response(error_type, status_code)
-            else:
-                logger.warning(f"Unhandled status code: {status_code}. Using original status code and message.")
-                return self._create_status_error_response(status_code, response_body)
-
-        except Exception as e:
-            logger.error(f"Exception occurred: {e}", exc_info=True)
-            return self._create_status_error_response(
-                f"Failed to get output request status: {str(e)}"
-            )
-
-    def get_document(self, channel: str, output_request_id: str) -> DocumentResponse:
-        """Retrieves a generated document from the Output Management service."""
-        logger.info(f"Getting document for request: {output_request_id}, channel: {channel}")
-
-        validation_error = RequestValidator.validate_get_document_request(channel, output_request_id)
-        if validation_error:
-            logger.error(f"Validation failed for get document: {validation_error}")
-            return self._create_document_error_response(
-                "INVALID_REQUEST",
-                validation_error
-            )
-
-        endpoint = f"{self._base_url}{Constants.API_OUTPUT_CONTROL}document/{channel}"
-        logger.debug(f"Endpoint: {endpoint}")
-
-        headers = self._get_headers()
-        headers[Constants.HEADER_CONTENT_TYPE] = Constants.CONTENT_TYPE_JSON
-        headers[Constants.HEADER_ACCEPT] = Constants.CONTENT_TYPE_PDF
-        
-        # Add sender-provider-subaccount-id header if available
-        if self._sender_provider_subaccount_id:
-            headers[Constants.HEADER_SENDER_PROVIDER_SUBACCOUNT_ID] = self._sender_provider_subaccount_id
-            logger.debug(f"Added sender-provider-subaccount-id header for get document")
-
-        try:
-            response = self._execute_request('POST', endpoint, data=output_request_id, headers=headers)
-            status_code = response.status_code
-
-            logger.debug(f"Response status: {status_code}")
-
-            if status_code == 200:
-                document = response.content
-                logger.info(f"Document retrieved successfully, size: {len(document)} bytes")
-                return DocumentResponse(document_content=document, errors=None)
-
-            # Handle error responses
-            response_body = response.text
-            if self._is_retryable(status_code):
-                logger.error(f"Retryable error with status: {status_code}, body: {response_body}")
-            else:
-                logger.error(f"Non-retryable error with status: {status_code}, body: {response_body}")
-
-            error_type = self._map_status_code_to_error(status_code)
-            if error_type:
-                return self._create_document_error_response(error_type, status_code)
-            else:
-                logger.warning(f"Unhandled status code: {status_code}. Using original status code and message.")
-                return self._create_document_error_response(status_code, response_body)
-
-        except Exception as e:
-            logger.error(f"Exception occurred: {e}", exc_info=True)
-            return self._create_document_error_response(
-                f"Failed to get document: {str(e)}"
             )
 
     def _fetch_oauth_token_from_destination(self) -> Optional[str]:
@@ -296,7 +186,19 @@ class OutputRequestsClientImpl(OutputRequestsClient):
                 import base64
                 from cryptography.hazmat.primitives.serialization import pkcs12, Encoding, PrivateFormat, NoEncryption
                 
-                certificate_client = create_certificate_client(instance="ariba-sourcing-event-instance")
+                # Resolve instance name: use provided value or default to "default" (following DMS pattern)
+                inst = self._destination_instance or "default"
+                logger.info(f"✓ Creating certificate client for instance '{inst}'")
+                
+                try:
+                    certificate_client = create_certificate_client(instance=inst)
+                    logger.info(f"✓ Certificate client created successfully for instance '{inst}'")
+                except Exception as e:
+                    logger.error(f"✗ Failed to create certificate client for instance '{inst}': {e}")
+                    logger.error("✗ Ensure the Destination Service is properly bound and configured")
+                    return None
+                
+                logger.info(f"✓ Retrieving certificate '{cert_name}' from Destination Service")
                 cert = certificate_client.get_subaccount_certificate(cert_name, access_strategy=AccessStrategy.PROVIDER_ONLY)
                 
                 # Check if certificate was found
@@ -527,25 +429,10 @@ class OutputRequestsClientImpl(OutputRequestsClient):
     @staticmethod
     def _create_output_error_response(error_type, message) -> OutputResponse:
         """Create an OutputResponse with error information."""
+        from ..models.output_response import ErrorResponse
         return OutputResponse(
             output_request_id=None,
-            errors=[{"type": error_type, "message": str(message)}]
+            error=ErrorResponse(message=str(message), code=error_type)
         )
 
-    @staticmethod
-    def _create_status_error_response(error_type_or_message, status_code=None) -> JobStatusResponse:
-        """Create a JobStatusResponse with error information."""
-        if status_code:
-            error_msg = {"type": error_type_or_message, "status_code": status_code}
-        else:
-            error_msg = {"message": error_type_or_message}
-        return JobStatusResponse(status=None, errors=[error_msg])
 
-    @staticmethod
-    def _create_document_error_response(error_type_or_message, status_code=None) -> DocumentResponse:
-        """Create a DocumentResponse with error information."""
-        if status_code:
-            error_msg = {"type": error_type_or_message, "status_code": status_code}
-        else:
-            error_msg = {"message": error_type_or_message}
-        return DocumentResponse(document_content=None, errors=[error_msg])

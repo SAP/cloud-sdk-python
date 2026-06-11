@@ -6,8 +6,6 @@ from abc import ABC, abstractmethod
 from ..models.output_request import OutputRequest
 from ..models.output_response import (
     OutputResponse,
-    JobStatusResponse,
-    DocumentResponse,
 )
 
 logger = logging.getLogger(__name__)
@@ -42,17 +40,6 @@ class OutputRequestsClient(ABC):
         else:
             request_id = response.output_request_id
             print(f"Request ID: {request_id}")
-            
-            # Check status
-            status = requests_client.get_output_request_status(request_id)
-            if not status.errors:
-                print(f"Status: {status.created_at}")
-            
-            # Get document
-            document_response = requests_client.get_document("DIRECT_SHARE", request_id)
-            if not document_response.errors:
-                document = document_response.document_content
-                print(f"Document size: {len(document)}")
     """
 
     @abstractmethod
@@ -81,53 +68,4 @@ class OutputRequestsClient(ABC):
         """
         pass
 
-    @abstractmethod
-    def get_output_request_status(self, request_id: str) -> JobStatusResponse:
-        """
-        Retrieves the status of a previously submitted output request.
-        
-        Use this method to check the processing status of an output request after submission.
-        The response contains detailed information about the request processing state.
-        
-        Common Status Values:
-        - PENDING - Request is queued for processing
-        - PROCESSING - Document generation in progress
-        - COMPLETED - Document successfully generated and delivered
-        - FAILED - Processing failed (check error details)
-        
-        Note: This method does not raise exceptions. Check the response's errors field
-        to determine if the operation failed.
-        
-        Args:
-            request_id: The ID of the request to check
-            
-        Returns:
-            JobStatusResponse containing request details if successful, or error details if failed
-        """
-        pass
 
-    @abstractmethod
-    def get_document(self, channel: str, output_request_id: str) -> DocumentResponse:
-        """
-        Retrieves a generated document from the Output Management service.
-        
-        This method downloads the binary content of a document that was generated
-        as part of an output request. The document must be available (request status = COMPLETED)
-        before it can be retrieved.
-        
-        Supported Channels:
-        - DIRECT_SHARE - Documents stored for direct download
-        - EMAIL - Attachments from email deliveries (if accessible)
-        - PRINT - Print-ready documents
-        
-        Note: This method does not raise exceptions. Check the response's errors field
-        to determine if the operation failed.
-        
-        Args:
-            channel: The delivery channel (e.g., "DIRECT_SHARE")
-            output_request_id: The output request ID
-            
-        Returns:
-            DocumentResponse containing the document content if successful, or error details if failed
-        """
-        pass

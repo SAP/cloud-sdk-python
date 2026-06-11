@@ -103,7 +103,8 @@ class EmailClient:
         destination_name: str,
         cc: Optional[List[str]] = None,
         template_language: str = "en",
-        access_strategy: str = "PROVIDER_ONLY"
+        access_strategy: str = "PROVIDER_ONLY",
+        instance: Optional[str] = None
     ) -> OutputResponse:
         """
         Send an email using the SAP Ariba Output Service.
@@ -119,6 +120,7 @@ class EmailClient:
             cc: Optional list of CC email addresses
             template_language: ISO language code for email template (default: "en")
             access_strategy: Destination access strategy - "PROVIDER_ONLY" or "SUBSCRIBER_ONLY" (default: "PROVIDER_ONLY")
+            instance: Destination service instance name (defaults to "default" if not provided)
             
         Returns:
             OutputResponse: Response from the output service
@@ -183,6 +185,12 @@ class EmailClient:
         try:
             # Import here to avoid circular import at module initialization
             from ..client_provider import OutputManagementServiceClientProviderBuilder
+            import logging
+            logger = logging.getLogger(__name__)
+            
+            # Resolve instance name for logging
+            inst = instance or "default"
+            logger.info(f"Sending email via destination '{destination_name}' using instance '{inst}'")
             
             # Create the output request using the extracted method
             output_request = self.create_output_request(
@@ -192,10 +200,12 @@ class EmailClient:
                 cc=cc,
                 template_language=template_language
             )
+            logger.debug(f"Created output request for template '{notification_template_key}'")
             
             # Validate the output request using RequestValidator
             validation_error = RequestValidator.validate(output_request)
             if validation_error:
+                logger.error(f"Output request validation failed: {validation_error}")
                 return OutputResponse(
                     output_request_id=None,
                     error=ErrorResponse(
@@ -204,10 +214,12 @@ class EmailClient:
                     )
                 )
             
-            # Create destination config with access strategy
+            # Create destination config with access strategy and instance
+            logger.debug(f"Creating destination config with access_strategy='{access_strategy}', instance='{inst}'")
             destination_config = DestinationCredentialConfig(
                 destination_name=destination_name,
-                access_strategy=access_strategy
+                access_strategy=access_strategy,
+                instance=instance
             )
             
             # Build the client provider using the existing builder

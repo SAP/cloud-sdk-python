@@ -767,6 +767,17 @@ class TestListOptionsLabelFilter:
         params = opts.to_query_params()
         assert params["$filter"] == "Label['env'] HAS ('prod') AND Label['team'] HAS ('platform')"
 
+    def test_multiple_labels_real_keys(self):
+        opts = ListOptions(filter_labels=[
+            Label(key="sap-managed-runtime-type", values=["agw.a2a.server"]),
+            Label(key="sap-managed-runtime-ordid", values=["d95a09d8-2152-40c9-abfd-52f3a53f6150"]),
+        ])
+        params = opts.to_query_params()
+        assert params["$filter"] == (
+            "Label['sap-managed-runtime-type'] HAS ('agw.a2a.server') AND "
+            "Label['sap-managed-runtime-ordid'] HAS ('d95a09d8-2152-40c9-abfd-52f3a53f6150')"
+        )
+
     def test_filter_labels_and_filter_names_raises(self):
         opts = ListOptions(
             filter_names=["dest1"],

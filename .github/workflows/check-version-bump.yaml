@@ -25,12 +25,12 @@ jobs:
 
           CHANGED_FILES=$(git diff --name-only "$BASE_SHA" "$HEAD_SHA")
 
-          if echo "$CHANGED_FILES" | grep -q "^src/"; then
+          if echo "$CHANGED_FILES" | grep -qE "^src/.*\.(py|pyi|proto)$"; then
             BASE_VERSION=$(git show "$BASE_SHA:pyproject.toml" | grep "^version = " | cut -d'"' -f2)
             HEAD_VERSION=$(git show "$HEAD_SHA:pyproject.toml" | grep "^version = " | cut -d'"' -f2)
 
             if [ "$BASE_VERSION" = "$HEAD_VERSION" ]; then
-              echo "ERROR: Files under src/ were modified but the version in pyproject.toml was not bumped (still $HEAD_VERSION)."
+              echo "ERROR: Source files under src/ were modified but the version in pyproject.toml was not bumped (still $HEAD_VERSION)."
               exit 1
             fi
 
@@ -42,5 +42,5 @@ jobs:
 
             echo "Version bump OK: $BASE_VERSION → $HEAD_VERSION"
           else
-            echo "No src/ changes. Version bump not required."
+            echo "No source file changes under src/. Version bump not required."
           fi

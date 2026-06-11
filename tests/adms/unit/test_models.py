@@ -1,6 +1,5 @@
 """Unit tests for DMS data models."""
 
-
 from sap_cloud_sdk.adms._models import (
     AllowedDomain,
     BaseType,

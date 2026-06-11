@@ -471,47 +471,52 @@ class AsyncAdmsHttp(AsyncHttpClient):
     # Public async HTTP verbs  (add service_base + CSRF on top of core)
     # ------------------------------------------------------------------
 
-    async def get(  # type: ignore[override]
+    async def get(
         self,
         path: str,
         *,
         params: dict[str, Any] | None = None,
         service_base: str | None = None,
+        headers: dict[str, str] | None = None,  # accepted for LSP compat, ignored
     ) -> httpx.Response:
         return await self._request(
             "GET", self._prefixed(path, service_base), params=params
         )
 
-    async def post(  # type: ignore[override]
+    async def post(
         self,
         path: str,
         *,
         json: Any | None = None,
         params: dict[str, Any] | None = None,
         service_base: str | None = None,
+        content: bytes | None = None,  # accepted for LSP compat, ignored
+        headers: dict[str, str] | None = None,  # accepted for LSP compat, ignored
     ) -> httpx.Response:
         return await self._send_with_csrf(
             "POST", path, json=json, params=params, service_base=service_base
         )
 
-    async def delete(  # type: ignore[override]
+    async def delete(
         self,
         path: str,
         *,
         params: dict[str, Any] | None = None,
         service_base: str | None = None,
+        headers: dict[str, str] | None = None,  # accepted for LSP compat, ignored
     ) -> httpx.Response:
         return await self._send_with_csrf(
             "DELETE", path, params=params, service_base=service_base
         )
 
-    async def patch(  # type: ignore[override]
+    async def patch(
         self,
         path: str,
         *,
         json: Any | None = None,
         params: dict[str, Any] | None = None,
         service_base: str | None = None,
+        headers: dict[str, str] | None = None,  # accepted for LSP compat, ignored
     ) -> httpx.Response:
         return await self._send_with_csrf(
             "PATCH", path, json=json, params=params, service_base=service_base

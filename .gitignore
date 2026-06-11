@@ -42,6 +42,3 @@ RELEASE.md
 
 # macOS metadata
 .DS_Store
-
-# ADMS credentials — anyone setting up ADMS integration tests creates this file locally
-.env.adms

@@ -264,6 +264,15 @@ def use_tenant(context, tenant):
     context.tenant = tenant
 
 
+@given("I use the configured subscriber tenant")
+def use_configured_subscriber_tenant(context):
+    """Set the tenant from the TENANT_SUBDOMAIN environment variable."""
+    tenant = os.environ.get("TENANT_SUBDOMAIN")
+    if not tenant:
+        pytest.skip("TENANT_SUBDOMAIN environment variable not set")
+    context.tenant = tenant
+
+
 # ==================== DESTINATION WHEN STEPS ====================
 
 @when("I create the destination at instance level")

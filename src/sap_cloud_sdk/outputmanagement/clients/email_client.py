@@ -25,7 +25,8 @@ class EmailClient:
         to: List[str],
         business_document: Dict[str, Any],
         cc: Optional[List[str]] = None,
-        template_language: str = "en"
+        template_language: str = "en",
+        attachment_urls: Optional[List[str]] = None
     ) -> OutputRequest:
         """
         Create an OutputRequest object from the provided parameters.
@@ -39,6 +40,7 @@ class EmailClient:
             business_document: The business document as a dictionary
             cc: Optional list of CC email addresses
             template_language: ISO language code for email template
+            attachment_urls: Optional list of DMS URLs for pre-generated attachments
             
         Returns:
             OutputRequest: Fully constructed output request ready to send
@@ -62,12 +64,29 @@ class EmailClient:
         # Generate business document type from the key
         business_document_type = f"com.sap.{doc_type_key.lower()}"
         
+        # Build attachment config if URLs are provided
+        attachment_config = None
+        if attachment_urls:
+            from ..models.attachment_config import AttachmentConfig
+            from ..models.pre_generated_attachment import PreGeneratedAttachment
+            
+            # Convert URLs to PreGeneratedAttachment objects
+            pre_gen_attachments = [
+                PreGeneratedAttachment(url=url, source="DMS")
+                for url in attachment_urls
+            ]
+            
+            attachment_config = AttachmentConfig(
+                pre_generated_attachments=pre_gen_attachments
+            )
+        
         # Build email configuration
         email_config = EmailConfiguration(
             email_notification_template_key=notification_template_key,
             email_template_language=template_language,
             to=to,
-            cc=cc
+            cc=cc,
+            attachment=attachment_config
         )
         
         # Build output management info
@@ -104,7 +123,8 @@ class EmailClient:
         cc: Optional[List[str]] = None,
         template_language: str = "en",
         access_strategy: str = "PROVIDER_ONLY",
-        instance: Optional[str] = None
+        instance: Optional[str] = None,
+        attachment_urls: Optional[List[str]] = None
     ) -> OutputResponse:
         """
         Send an email using the SAP Ariba Output Service.
@@ -121,6 +141,7 @@ class EmailClient:
             template_language: ISO language code for email template (default: "en")
             access_strategy: Destination access strategy - "PROVIDER_ONLY" or "SUBSCRIBER_ONLY" (default: "PROVIDER_ONLY")
             instance: Destination service instance name (defaults to "default" if not provided)
+            attachment_urls: Optional list of DMS URLs for pre-generated attachments (default: None)
             
         Returns:
             OutputResponse: Response from the output service
@@ -129,13 +150,12 @@ class EmailClient:
             ValueError: If required parameters are invalid
             Exception: If the email sending fails
             
-        Example:
+        Example - Simple Email:
             ```python
             from sap_cloud_sdk.outputmanagement.clients.email_client import EmailClient
             
             client = EmailClient()
             
-            # Just provide essentials - that's it!
             response = client.send_email(
                 notification_template_key="PO_APPROVAL_NOTIFICATION",
                 to=["finance@company.com"],
@@ -153,6 +173,20 @@ class EmailClient:
                 print(f"Failed: {response.error}")
             else:
                 print(f"Success: {response.output_request_id}")
+            ```
+            
+        Example - Email with DMS Attachments:
+            ```python
+            response = client.send_email(
+                notification_template_key="PO_APPROVAL_NOTIFICATION",
+                to=["finance@company.com"],
+                business_document={"PurchaseOrder": {"orderId": "PO-12345"}},
+                destination_name="ARIBA_OUTPUT_SERVICE",
+                attachment_urls=[
+                    "https://dms.example.com/browser/root?objectId=12345&cmisselector=content",
+                    "https://dms.example.com/browser/root?objectId=67890&cmisselector=content"
+                ]
+            )
             ```
         """
         # Validate input parameters using RequestValidator
@@ -198,9 +232,14 @@ class EmailClient:
                 to=to,
                 business_document=business_document,
                 cc=cc,
-                template_language=template_language
+                template_language=template_language,
+                attachment_urls=attachment_urls
             )
-            logger.debug(f"Created output request for template '{notification_template_key}'")
+            
+            if attachment_urls:
+                logger.debug(f"Created output request for template '{notification_template_key}' with {len(attachment_urls)} DMS attachment(s)")
+            else:
+                logger.debug(f"Created output request for template '{notification_template_key}'")
             
             # Validate the output request using RequestValidator
             validation_error = RequestValidator.validate(output_request)

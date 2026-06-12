@@ -436,6 +436,9 @@ class ExtensibilityClient:
 async def call_hook(
     hook: Hook,
     agw_client: AgentGatewayClient,
+    user_token: Optional[str] = None,
+    message: Optional[Any] = None,
+    headers: Optional[dict] = None,
 ) -> Optional[Message]:
     """Call a hook via Agent Gateway MCP tool invocation.
 
@@ -473,7 +476,7 @@ async def call_hook(
         ```
     """
     # 1. Discover MCP tools — AGW resolves N8N GTID and handles auth internally
-    tools = await agw_client.list_mcp_tools()
+    tools = await agw_client.list_mcp_tools(user_token=user_token or None)
 
     execute_tool = next(
         (
@@ -502,17 +505,19 @@ async def call_hook(
         )
 
     # 2. Execute workflow
+    message_body = message.model_dump(mode="json") if message is not None else {}
     try:
         result_str = await agw_client.call_mcp_tool(
             execute_tool,
+            user_token=user_token or None,
             workflowId=hook.n8n_workflow_config.workflow_id,
             inputs={
                 "type": "webhook",
                 "webhookData": {
                     "method": hook.n8n_workflow_config.method,
                     "query": {},
-                    "body": {},
-                    "headers": {},
+                    "body": message_body,
+                    "headers": headers or {},
                 },
             },
         )
@@ -563,6 +568,7 @@ async def call_hook(
         try:
             result_str = await agw_client.call_mcp_tool(
                 get_exec_tool,
+                user_token=user_token or None,
                 workflowId=hook.n8n_workflow_config.workflow_id,
                 executionId=str(execution_id),
                 includeData=True,

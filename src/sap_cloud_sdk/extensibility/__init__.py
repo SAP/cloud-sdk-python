@@ -90,7 +90,7 @@ from sap_cloud_sdk.extensibility._models import (
 )
 from sap_cloud_sdk.extensibility._noop_transport import NoOpTransport
 from sap_cloud_sdk.extensibility._ums_transport import UmsTransport
-from sap_cloud_sdk.extensibility.client import ExtensibilityClient
+from sap_cloud_sdk.extensibility.client import ExtensibilityClient, call_hook
 from sap_cloud_sdk.extensibility.config import ExtensibilityConfig, HookConfig
 from sap_cloud_sdk.extensibility.exceptions import (
     ClientCreationError,
@@ -177,6 +177,7 @@ __all__ = [
     # Client
     "create_client",
     "ExtensibilityClient",
+    "call_hook",
     # Local mode
     "LocalTransport",
     "CLOUD_SDK_LOCAL_EXTENSIBILITY_FILE_ENV",

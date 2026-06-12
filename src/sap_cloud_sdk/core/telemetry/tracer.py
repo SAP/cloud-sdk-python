@@ -9,7 +9,7 @@ by auto_instrument().
 from contextlib import contextmanager, nullcontext
 from typing import Optional, Dict, Any
 
-from opentelemetry import trace
+from opentelemetry import trace, baggage
 from opentelemetry.trace import Status, StatusCode, Span
 
 from sap_cloud_sdk.core.telemetry.genai_operation import GenAIOperation
@@ -32,6 +32,28 @@ _ATTR_GEN_AI_AGENT_ID = "gen_ai.agent.id"
 _ATTR_GEN_AI_AGENT_DESCRIPTION = "gen_ai.agent.description"
 _ATTR_GEN_AI_CONVERSATION_ID = "gen_ai.conversation.id"
 _ATTR_SERVER_ADDRESS = "server.address"
+
+
+def _resolve_conversation_id(conversation_id: Optional[str]) -> Optional[str]:
+    """
+    Resolve conversation ID with priority: explicit param > baggage > None.
+
+    Priority order:
+    1. Explicit conversation_id parameter (highest priority)
+    2. W3C baggage header value (gen_ai.conversation.id)
+    3. None (no conversation ID)
+
+    This ensures consistent conversation ID across all spans in a trace,
+    even when traceloop or other instrumentation sets a different value.
+    """
+    if conversation_id is not None:
+        return conversation_id
+
+    baggage_conversation_id = baggage.get_baggage(_ATTR_GEN_AI_CONVERSATION_ID)
+    if baggage_conversation_id:
+        return baggage_conversation_id
+
+    return None
 
 
 @contextmanager
@@ -149,8 +171,9 @@ def chat_span(
         _ATTR_GEN_AI_PROVIDER_NAME: provider,
         _ATTR_GEN_AI_REQUEST_MODEL: model,
     }
-    if conversation_id is not None:
-        base_attrs[_ATTR_GEN_AI_CONVERSATION_ID] = conversation_id
+    resolved_conversation_id = _resolve_conversation_id(conversation_id)
+    if resolved_conversation_id is not None:
+        base_attrs[_ATTR_GEN_AI_CONVERSATION_ID] = resolved_conversation_id
     if server_address is not None:
         base_attrs[_ATTR_SERVER_ADDRESS] = server_address
     # Add tenant_id if set
@@ -312,8 +335,9 @@ def invoke_agent_span(
         base_attrs[_ATTR_GEN_AI_AGENT_ID] = agent_id
     if agent_description is not None:
         base_attrs[_ATTR_GEN_AI_AGENT_DESCRIPTION] = agent_description
-    if conversation_id is not None:
-        base_attrs[_ATTR_GEN_AI_CONVERSATION_ID] = conversation_id
+    resolved_conversation_id = _resolve_conversation_id(conversation_id)
+    if resolved_conversation_id is not None:
+        base_attrs[_ATTR_GEN_AI_CONVERSATION_ID] = resolved_conversation_id
     if server_address is not None:
         base_attrs[_ATTR_SERVER_ADDRESS] = server_address
     # Add tenant_id if set

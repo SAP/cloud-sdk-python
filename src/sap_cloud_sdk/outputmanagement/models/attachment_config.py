@@ -1,26 +1,25 @@
 """Attachment configuration model for email documents."""
 
-from typing import Optional
+from typing import Optional, List
 from pydantic import BaseModel, Field
 
 from .form_configuration import FormConfiguration
+from .pre_generated_attachment import PreGeneratedAttachment
 
 
 class AttachmentConfig(BaseModel):
     """
     Attachment configuration for email documents.
     
-    This is a helper class used to parse attachment configuration from INTERNAL_EMAIL requests.
-    It contains form configuration details that will be used to populate FormConfiguration
-    for document generation.
-    
-    If provided in EmailConfiguration, a PDF document will be generated using these form details
-    and attached to the email. If not provided, no document will be generated.
+    This class supports two types of attachments:
+    1. Generated attachments: PDF documents generated from form templates
+    2. Pre-generated attachments: Existing documents from external systems (e.g., DMS)
     
     Attributes:
-        form_configuration: Form configuration for PDF generation
+        form_configuration: Form configuration for PDF generation (optional)
+        pre_generated_attachments: List of pre-generated attachments from external sources (optional)
         
-    Example:
+    Example - Generated Attachment:
         ```python
         from sap_cloud_sdk.outputmanagement.models.attachment_config import AttachmentConfig
         from sap_cloud_sdk.outputmanagement.models.form_configuration import FormConfiguration
@@ -35,12 +34,41 @@ class AttachmentConfig(BaseModel):
         
         attachment = AttachmentConfig(form_configuration=form_config)
         ```
+        
+    Example - Pre-generated Attachment from DMS:
+        ```python
+        from sap_cloud_sdk.outputmanagement.models.attachment_config import AttachmentConfig
+        from sap_cloud_sdk.outputmanagement.models.pre_generated_attachment import PreGeneratedAttachment
+        
+        pre_gen_attachment = PreGeneratedAttachment(
+            url="https://dms.example.com/browser/root?objectId=12345&cmisselector=content",
+            source="DMS"
+        )
+        
+        attachment = AttachmentConfig(
+            pre_generated_attachments=[pre_gen_attachment]
+        )
+        ```
+        
+    Example - Both Types:
+        ```python
+        attachment = AttachmentConfig(
+            form_configuration=form_config,
+            pre_generated_attachments=[pre_gen_attachment]
+        )
+        ```
     """
 
-    form_configuration: FormConfiguration = Field(
-        ...,
+    form_configuration: Optional[FormConfiguration] = Field(
+        None,
         alias="formConfiguration",
         description="Form configuration for PDF generation"
+    )
+    
+    pre_generated_attachments: Optional[List[PreGeneratedAttachment]] = Field(
+        None,
+        alias="preGeneratedAttachments",
+        description="List of pre-generated attachments from external sources like DMS"
     )
 
     class Config:

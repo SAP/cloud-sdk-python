@@ -93,7 +93,7 @@ class EmailConfiguration(BaseModel):
     
     attachment: Optional[AttachmentConfig] = Field(
         None,
-        description="Optional attachment configuration for PDF generation"
+        description="Optional attachment configuration for PDF generation and pre-generated attachments"
     )
 
     @field_validator("to", "cc", "bcc")

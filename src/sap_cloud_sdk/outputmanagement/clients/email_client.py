@@ -275,3 +275,125 @@ class EmailClient:
             
         except Exception as e:
             raise Exception(f"Failed to send email via destination '{destination_name}': {str(e)}") from e
+    
+    async def send_email_with_mcp(
+        self,
+        tool_name: str,
+        notification_template_key: str,
+        to_emails: List[str],
+        business_document: Dict[str, Any],
+        cc_email: Optional[str] = None,
+        attachment_url: Optional[str] = None,
+        mcp_tool: Any = None,
+        sender_provider_subaccount_id: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """
+        Create an output request and invoke MCP tool with traceparent and sender_provider_subaccount_id.
+        
+        This method first generates an output request using the provided parameters, then invokes
+        the specified MCP tool with the output request as the body, along with traceparent for
+        distributed tracing and sender_provider_subaccount_id for multi-tenancy support.
+        
+        Args:
+            tool_name: Name of the MCP tool to invoke
+            notification_template_key: Template key for the notification
+            to_emails: List of recipient email addresses
+            business_document: Business document data
+            cc_email: Optional CC email address
+            attachment_url: Optional attachment URL
+            mcp_tool: The MCP tool instance to invoke
+            sender_provider_subaccount_id: Optional sender provider subaccount ID (defaults to env var)
+            
+        Returns:
+            Result from the MCP tool invocation
+            
+        Raises:
+            Exception: If the MCP tool invocation fails
+            
+        Example:
+            ```python
+            import asyncio
+            from sap_cloud_sdk.outputmanagement.clients.email_client import EmailClient
+            
+            async def send_with_mcp():
+                client = EmailClient()
+                
+                result = await client.send_email_with_output_request_and_mcp_async(
+                    tool_name="send_output_request",
+                    notification_template_key="PO_APPROVAL_NOTIFICATION",
+                    to_emails=["finance@company.com"],
+                    business_document={
+                        "PurchaseOrder": {
+                            "orderId": "PO-12345",
+                            "vendor": "ACME Corp",
+                            "total": 1500.00
+                        }
+                    },
+                    mcp_tool=my_mcp_tool,
+                    sender_provider_subaccount_id="my-subaccount-id"
+                )
+                return result
+            
+            result = asyncio.run(send_with_mcp())
+            ```
+        """
+        import logging
+        import os
+        
+        logger = logging.getLogger(__name__)
+        
+        try:
+            logger.info("Creating output request for MCP tool '%s'", tool_name)
+            
+            # Create the output request
+            output_request = self.create_output_request(
+                notification_template_key=notification_template_key,
+                to=to_emails,
+                business_document=business_document,
+                cc=[cc_email] if cc_email else None,
+                template_language="en",
+                attachment_urls=[attachment_url] if attachment_url else None
+            )
+            
+            logger.info("Output request created successfully")
+            
+            # Convert output request to dict for MCP payload
+            payload = output_request.model_dump(by_alias=True, exclude_none=True)
+            
+            # Get sender_provider_subaccount_id from parameter or environment variable
+            subaccount_id = sender_provider_subaccount_id or os.getenv("APPFND_CONHOS_SUBACCOUNTID")
+            
+            if not subaccount_id:
+                logger.warning("sender_provider_subaccount_id not provided and APPFND_CONHOS_SUBACCOUNTID env var not set")
+            
+            logger.info("Invoking MCP tool '%s' with body, traceparent, and sender_provider_subaccount_id", tool_name)
+            
+            # Generate traceparent for distributed tracing
+            import uuid
+            trace_id = uuid.uuid4().hex  # 32 hex chars
+            parent_id = uuid.uuid4().hex[:16]  # 16 hex chars
+            traceparent = f"00-{trace_id}-{parent_id}-01"
+            
+            # Prepare the invocation payload
+            invocation_payload = {
+                "body": payload,
+                "traceparent": traceparent,
+                "sender_provider_subaccount_id": subaccount_id
+            }
+            
+            # Log the payload before invoking
+            logger.info("MCP tool '%s' invocation payload: %s", tool_name, invocation_payload)
+            
+            # Validate that mcp_tool is provided
+            if mcp_tool is None:
+                raise ValueError("mcp_tool parameter is required")
+            
+            # Use ainvoke for async invocation
+            result = await mcp_tool.ainvoke(invocation_payload)
+            logger.info("MCP tool '%s' executed successfully", tool_name)
+            logger.info("Result from MCP tool '%s': %s", tool_name, result)
+            return result
+            
+        except Exception as e:
+            logger.error("Failed to invoke MCP tool '%s': %s", tool_name, str(e))
+            raise Exception(f"MCP tool invocation failed: {str(e)}") from e

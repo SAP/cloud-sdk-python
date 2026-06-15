@@ -19,7 +19,6 @@ class BindingData:
         uaa: JSON string containing XSUAA authentication credentials
     """
 
-    instance_name: str
     uri: str
     uaa: str
 
@@ -78,11 +77,14 @@ class BindingData:
                 f"UAA credentials missing required fields: {', '.join(sorted(missing_fields))}"
             )
 
-    def to_credentials(self) -> DMSCredentials:
+    def to_credentials(self, instance_name: str) -> DMSCredentials:
         """Convert the binding data to DMSCredentials.
 
         Parses the UAA JSON and constructs a DMSCredentials object with the necessary information
         for authenticating and connecting to the DMS service.
+
+        Args:
+            instance_name: The logical instance name for these credentials.
 
         Returns:
             DMSCredentials: The credentials extracted from the binding data
@@ -91,7 +93,7 @@ class BindingData:
         token_url = uaa_data["url"].rstrip("/") + "/oauth/token"
 
         return DMSCredentials(
-            instance_name=self.instance_name,
+            instance_name=instance_name,
             uri=self.uri,
             client_id=uaa_data["clientid"],
             client_secret=uaa_data["clientsecret"],
@@ -114,7 +116,7 @@ def load_sdm_config_from_env_or_mount(instance: Optional[str] = None) -> DMSCred
     """
     inst = instance or "default"
     binding = BindingData(
-        uri="", uaa="", instance_name=""
+        uri="", uaa=""
     )  # Initialize with empty values; will be populated by resolver
 
     try:
@@ -129,7 +131,7 @@ def load_sdm_config_from_env_or_mount(instance: Optional[str] = None) -> DMSCred
         )
 
         binding.validate()
-        return binding.to_credentials()
+        return binding.to_credentials(inst)
 
     except Exception as e:
         # Rely on the central secret resolver to provide aggregated, generic guidance

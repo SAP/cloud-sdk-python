@@ -1,7 +1,7 @@
 """Tests for create_client factory function."""
 
 import pytest
-from unittest.mock import patch, Mock
+from unittest.mock import patch, Mock, MagicMock
 
 from sap_cloud_sdk.core.auditlog_ng import create_client, AuditClient
 from sap_cloud_sdk.core.auditlog_ng.config import AuditLogNGConfig
@@ -185,3 +185,312 @@ class TestCreateClient:
             Operation.AUDITLOG_CREATE_CLIENT,
             False,
         )
+
+
+# ---------------------------------------------------------------------------
+# Destination-based resolution
+# ---------------------------------------------------------------------------
+
+def _make_mock_destination(
+    url="audit.example.com:443",
+    deployment_id="dep-1",
+    deployment_region=None,
+    namespace="ns-1",
+):
+    """Return a mock Destination with the given property values."""
+    props = {}
+    if deployment_id is not None:
+        props["deploymentId"] = deployment_id
+    if deployment_region is not None:
+        props["deploymentRegion"] = deployment_region
+    if namespace is not None:
+        props["namespace"] = namespace
+
+    dest = MagicMock()
+    dest.url = url
+    dest.properties = props
+    return dest
+
+
+@patch("sap_cloud_sdk.core.auditlog_ng.client._create_log_exporter")
+@patch("sap_cloud_sdk.core.auditlog_ng.client.LoggerProvider")
+class TestCreateClientFromDestination:
+
+    # ------------------------------------------------------------------
+    # Happy path — all three args required to enter the destination path
+    # ------------------------------------------------------------------
+
+    def test_destination_happy_path(self, mock_provider_cls, mock_exporter_fn):
+        """Resolved destination with deploymentId sets endpoint/deployment_id/namespace."""
+        mock_provider = Mock()
+        mock_provider.get_logger.return_value = Mock()
+        mock_provider_cls.return_value = mock_provider
+
+        dest = _make_mock_destination(
+            url="audit.example.com:443",
+            deployment_id="dep-1",
+            namespace="ns-1",
+        )
+        dest_client = MagicMock()
+        dest_client.get_destination.return_value = dest
+
+        with patch(
+            "sap_cloud_sdk.destination.create_client",
+            return_value=dest_client,
+        ):
+            client = create_client(
+                destination_name="my-audit-dest",
+                destination_instance="my-instance",
+                fragment_name="prod",
+                insecure=True,
+            )
+
+        assert isinstance(client, AuditClient)
+        assert client._config.endpoint == "audit.example.com:443"
+        assert client._config.deployment_id == "dep-1"
+        assert client._config.namespace == "ns-1"
+
+    def test_destination_create_client_called_without_instance(self, mock_provider_cls, mock_exporter_fn):
+        """destination_instance is accepted but _dest_create_client() is called without args."""
+        mock_provider = Mock()
+        mock_provider.get_logger.return_value = Mock()
+        mock_provider_cls.return_value = mock_provider
+
+        dest = _make_mock_destination()
+        dest_client = MagicMock()
+        dest_client.get_destination.return_value = dest
+
+        with patch(
+            "sap_cloud_sdk.destination.create_client",
+            return_value=dest_client,
+        ) as mock_dest_factory:
+            create_client(
+                destination_name="my-audit-dest",
+                destination_instance="my-instance",
+                fragment_name="prod",
+                insecure=True,
+            )
+
+        mock_dest_factory.assert_called_once_with()
+
+    def test_destination_fragment_name_forwarded(self, mock_provider_cls, mock_exporter_fn):
+        """fragment_name is always wrapped in ConsumptionOptions and forwarded to get_destination."""
+        mock_provider = Mock()
+        mock_provider.get_logger.return_value = Mock()
+        mock_provider_cls.return_value = mock_provider
+
+        dest = _make_mock_destination()
+        dest_client = MagicMock()
+        dest_client.get_destination.return_value = dest
+
+        with patch(
+            "sap_cloud_sdk.destination.create_client",
+            return_value=dest_client,
+        ):
+            create_client(
+                destination_name="my-audit-dest",
+                destination_instance="my-instance",
+                fragment_name="prod",
+                insecure=True,
+            )
+
+        call_kwargs = dest_client.get_destination.call_args.kwargs
+        options = call_kwargs.get("options")
+        assert options is not None
+        assert options.fragment_name == "prod"
+
+    def test_destination_name_without_instance_and_fragment_falls_through_to_explicit_args_guard(
+        self, mock_provider_cls, mock_exporter_fn
+    ):
+        """When destination_instance or fragment_name is missing, the destination path
+        is not entered and the explicit-args guard raises."""
+        with pytest.raises(ValueError, match="endpoint, deployment_id, and namespace are required"):
+            create_client(destination_name="my-audit-dest")
+
+    def test_destination_name_without_fragment_falls_through_to_explicit_args_guard(
+        self, mock_provider_cls, mock_exporter_fn
+    ):
+        """destination_instance alone (no fragment_name) still falls through."""
+        with pytest.raises(ValueError, match="endpoint, deployment_id, and namespace are required"):
+            create_client(destination_name="my-audit-dest", destination_instance="inst")
+
+    def test_destination_name_without_instance_falls_through_to_explicit_args_guard(
+        self, mock_provider_cls, mock_exporter_fn
+    ):
+        """fragment_name alone (no destination_instance) still falls through."""
+        with pytest.raises(ValueError, match="endpoint, deployment_id, and namespace are required"):
+            create_client(destination_name="my-audit-dest", fragment_name="prod")
+
+    # ------------------------------------------------------------------
+    # deploymentRegion fallback
+    # ------------------------------------------------------------------
+
+    def test_fallback_deployment_region_when_deployment_id_missing(
+        self, mock_provider_cls, mock_exporter_fn
+    ):
+        """When deploymentId is absent, deploymentRegion is used as deployment_id."""
+        mock_provider = Mock()
+        mock_provider.get_logger.return_value = Mock()
+        mock_provider_cls.return_value = mock_provider
+
+        dest = _make_mock_destination(
+            deployment_id=None,
+            deployment_region="eu10",
+        )
+        dest_client = MagicMock()
+        dest_client.get_destination.return_value = dest
+
+        with patch(
+            "sap_cloud_sdk.destination.create_client",
+            return_value=dest_client,
+        ):
+            client = create_client(
+                destination_name="my-audit-dest",
+                destination_instance="my-instance",
+                fragment_name="prod",
+                insecure=True,
+            )
+
+        assert client._config.deployment_id == "eu10"
+
+    def test_fallback_deployment_region_when_deployment_id_empty(
+        self, mock_provider_cls, mock_exporter_fn
+    ):
+        """When deploymentId is an empty string, deploymentRegion is used instead."""
+        mock_provider = Mock()
+        mock_provider.get_logger.return_value = Mock()
+        mock_provider_cls.return_value = mock_provider
+
+        dest = _make_mock_destination(
+            deployment_id="",
+            deployment_region="eu20",
+        )
+        dest_client = MagicMock()
+        dest_client.get_destination.return_value = dest
+
+        with patch(
+            "sap_cloud_sdk.destination.create_client",
+            return_value=dest_client,
+        ):
+            client = create_client(
+                destination_name="my-audit-dest",
+                destination_instance="my-instance",
+                fragment_name="prod",
+                insecure=True,
+            )
+
+        assert client._config.deployment_id == "eu20"
+
+    # ------------------------------------------------------------------
+    # Missing required destination properties
+    # ------------------------------------------------------------------
+
+    def test_missing_both_deployment_props_raises(
+        self, mock_provider_cls, mock_exporter_fn
+    ):
+        """Raises ValueError when neither deploymentId nor deploymentRegion is present."""
+        dest = _make_mock_destination(deployment_id=None, deployment_region=None)
+        dest_client = MagicMock()
+        dest_client.get_destination.return_value = dest
+
+        with patch(
+            "sap_cloud_sdk.destination.create_client",
+            return_value=dest_client,
+        ):
+            with pytest.raises(ValueError, match="deploymentId.*deploymentRegion"):
+                create_client(
+                    destination_name="my-audit-dest",
+                    destination_instance="my-instance",
+                    fragment_name="prod",
+                )
+
+    def test_missing_namespace_raises(self, mock_provider_cls, mock_exporter_fn):
+        """Raises ValueError when the namespace property is absent."""
+        dest = _make_mock_destination(namespace=None)
+        dest_client = MagicMock()
+        dest_client.get_destination.return_value = dest
+
+        with patch(
+            "sap_cloud_sdk.destination.create_client",
+            return_value=dest_client,
+        ):
+            with pytest.raises(ValueError, match="namespace"):
+                create_client(
+                    destination_name="my-audit-dest",
+                    destination_instance="my-instance",
+                    fragment_name="prod",
+                )
+
+    def test_missing_url_propagates_as_endpoint_required(self, mock_provider_cls, mock_exporter_fn):
+        """When the destination URL is None, AuditLogNGConfig raises 'endpoint is required'."""
+        dest = _make_mock_destination(url=None)
+        dest_client = MagicMock()
+        dest_client.get_destination.return_value = dest
+
+        with patch(
+            "sap_cloud_sdk.destination.create_client",
+            return_value=dest_client,
+        ):
+            with pytest.raises(ValueError, match="endpoint is required"):
+                create_client(
+                    destination_name="my-audit-dest",
+                    destination_instance="my-instance",
+                    fragment_name="prod",
+                )
+
+    def test_destination_not_found_raises(self, mock_provider_cls, mock_exporter_fn):
+        """Raises ValueError when get_destination returns None."""
+        dest_client = MagicMock()
+        dest_client.get_destination.return_value = None
+
+        with patch(
+            "sap_cloud_sdk.destination.create_client",
+            return_value=dest_client,
+        ):
+            with pytest.raises(ValueError, match="not found"):
+                create_client(
+                    destination_name="missing-dest",
+                    destination_instance="my-instance",
+                    fragment_name="prod",
+                )
+
+    # ------------------------------------------------------------------
+    # No-destination path is fully preserved (regression)
+    # ------------------------------------------------------------------
+
+    def test_no_destination_explicit_args_still_works(
+        self, mock_provider_cls, mock_exporter_fn
+    ):
+        """Existing keyword-arg path is unaffected when destination_name is absent."""
+        mock_provider = Mock()
+        mock_provider.get_logger.return_value = Mock()
+        mock_provider_cls.return_value = mock_provider
+
+        client = create_client(
+            endpoint="localhost:4317",
+            deployment_id="dep-1",
+            namespace="ns-1",
+            insecure=True,
+        )
+
+        assert isinstance(client, AuditClient)
+        assert client._config.endpoint == "localhost:4317"
+
+    def test_no_destination_config_object_still_works(
+        self, mock_provider_cls, mock_exporter_fn
+    ):
+        """Existing config-object path is unaffected when destination_name is absent."""
+        mock_provider = Mock()
+        mock_provider.get_logger.return_value = Mock()
+        mock_provider_cls.return_value = mock_provider
+
+        config = AuditLogNGConfig(
+            endpoint="localhost:4317",
+            deployment_id="dep-1",
+            namespace="ns-1",
+            insecure=True,
+        )
+
+        client = create_client(config=config)
+
+        assert isinstance(client, AuditClient)

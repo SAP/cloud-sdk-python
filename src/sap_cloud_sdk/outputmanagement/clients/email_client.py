@@ -283,7 +283,7 @@ class EmailClient:
         to_emails: List[str],
         business_document: Dict[str, Any],
         cc_email: Optional[str] = None,
-        attachment_url: Optional[str] = None,
+        attachment_urls: Optional[List[str]] = None,
         mcp_tool: Any = None,
         sender_provider_subaccount_id: Optional[str] = None
     ) -> Dict[str, Any]:
@@ -352,7 +352,7 @@ class EmailClient:
                 business_document=business_document,
                 cc=[cc_email] if cc_email else None,
                 template_language="en",
-                attachment_urls=[attachment_url] if attachment_url else None
+                attachment_urls=attachment_urls
             )
             
             logger.info("Output request created successfully")

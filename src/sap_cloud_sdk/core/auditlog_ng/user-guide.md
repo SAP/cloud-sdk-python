@@ -12,6 +12,7 @@ The Auditlog NG client sends audit log events as OpenTelemetry (OTLP) LogRecords
 - **mTLS** (mutual TLS with client certificates)
 - **Insecure** mode (local testing / no-auth)
 - **Binary protobuf** and **JSON** serialization formats
+- **Destination-based configuration** — resolve connection parameters automatically from a named SAP Destination (SPII-based deployments)
 
 ---
 
@@ -36,7 +37,31 @@ The client depends on generated protobuf classes.
 
 ## Configuration
 
-All constructor parameters for `AuditClient`:
+`create_client` supports three mutually exclusive ways to provide configuration, evaluated in this order:
+
+1. **Explicit config object** — pass a pre-built `AuditLogNGConfig` via `config=`.
+2. **Destination-based resolution** — pass `destination_name` and `destination_instance`; connection parameters are resolved from the named SAP Destination automatically.
+3. **Explicit keyword arguments** — pass `endpoint`, `deployment_id`, and `namespace` directly.
+
+### Destination-based configuration parameters
+
+| Parameter              | Type   | Required | Description |
+|------------------------|--------|----------|-------------|
+| `destination_name`     | `str`  | ✅ Yes   | Name of the SAP Destination to resolve. |
+| `destination_instance` | `str`  | ✅ Yes   | Destination service binding instance name. |
+| `fragment_name`        | `str`  | ❌ No    | Destination fragment merged before resolution (for tenant-specific overrides). |
+
+The destination must expose these custom properties:
+
+| Property           | Required | Description |
+|--------------------|----------|-------------|
+| `deploymentId`     | ✅ Yes (or `deploymentRegion`) | Deployment identifier. Falls back to `deploymentRegion` when absent or empty. |
+| `deploymentRegion` | ✅ Fallback | Used as `deployment_id` when `deploymentId` is missing or empty. |
+| `namespace`        | ✅ Yes   | Audit log namespace (e.g. `sap.als`). |
+
+The destination `url` is used as the OTLP gRPC endpoint. The lookup is always performed at subaccount level.
+
+### Explicit configuration parameters for `AuditClient`:
 
 | Parameter       | Type    | Required | Default        | Description                                                                                           |
 |-----------------|---------|----------|----------------|-------------------------------------------------------------------------------------------------------|
@@ -80,7 +105,30 @@ from sap_cloud_sdk.core.auditlog_ng.gen.sap.auditlog.auditevent.v2 import audite
 
 ### Step 2: Initialize the Client
 
-**With mTLS (production):**
+**From a Destination (SPII-based deployments):**
+
+```python
+client = create_client(
+    destination_name="my_destination",
+    destination_instance="my-destination-binding",
+    # fragment_name="prod-fragment",  # optional: merge a tenant-specific fragment
+)
+```
+
+The SDK resolves `endpoint`, `deployment_id`, and `namespace` from the destination automatically.
+You can still pass connection options alongside the destination parameters:
+
+```python
+client = create_client(
+    destination_name="my_destination",
+    destination_instance="my-destination-binding",
+    fragment_name="prod-fragment",
+    service_name="my-agent",
+    batch=True,
+)
+```
+
+**With mTLS (explicit configuration):**
 
 ```python
 client = create_client(

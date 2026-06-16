@@ -62,7 +62,7 @@ def _get_config_from_destination(
     destination_name: str,
     destination_instance: str,
     fragment_name: Optional[str] = None,
-) -> dict:
+) -> dict[str, str]:
     """Resolve endpoint, deployment_id and namespace from a named Destination.
 
     The destination must expose these custom properties:

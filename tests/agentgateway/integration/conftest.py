@@ -21,9 +21,13 @@ def agw_client() -> AgentGatewayClient:
     """Create an AgentGatewayClient from environment variables."""
     _setup_cloud_mode()
 
-    tenant_subdomain = os.environ.get("TENANT_SUBDOMAIN")
+    tenant_subdomain = os.environ.get("CLOUD_SDK_CFG_AGW_DEFAULT_TENANT_SUBDOMAIN")
     if not tenant_subdomain:
-        pytest.fail("TENANT_SUBDOMAIN environment variable is not set")
+        pytest.fail("CLOUD_SDK_CFG_AGW_DEFAULT_TENANT_SUBDOMAIN environment variable is not set")
+
+    landscape = os.environ.get("CLOUD_SDK_CFG_AGW_DEFAULT_LANDSCAPE")
+    if landscape:
+        os.environ.setdefault("APPFND_CONHOS_LANDSCAPE", landscape)
 
     try:
         return create_client(tenant_subdomain=tenant_subdomain)

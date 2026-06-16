@@ -7,6 +7,7 @@ import pytest
 from dotenv import load_dotenv
 
 from sap_cloud_sdk.agentgateway import create_client, AgentGatewayClient
+from sap_cloud_sdk.agentgateway.exceptions import MCPServerNotFoundError
 
 
 def _setup_cloud_mode():
@@ -23,7 +24,7 @@ def agw_client() -> AgentGatewayClient:
 
     tenant_subdomain = os.environ.get("CLOUD_SDK_CFG_AGW_DEFAULT_TENANT_SUBDOMAIN")
     if not tenant_subdomain:
-        pytest.fail("CLOUD_SDK_CFG_AGW_DEFAULT_TENANT_SUBDOMAIN environment variable is not set")
+        pytest.skip("CLOUD_SDK_CFG_AGW_DEFAULT_TENANT_SUBDOMAIN is not set — skipping AGW integration tests")
 
     landscape = os.environ.get("CLOUD_SDK_CFG_AGW_DEFAULT_LANDSCAPE")
     if landscape:
@@ -31,6 +32,8 @@ def agw_client() -> AgentGatewayClient:
 
     try:
         return create_client(tenant_subdomain=tenant_subdomain)
+    except MCPServerNotFoundError as e:
+        pytest.skip(f"AGW not subscribed for this tenant — skipping AGW integration tests: {e}")
     except Exception as e:
         pytest.fail(f"Failed to create Agent Gateway client for integration tests: {e}")
 

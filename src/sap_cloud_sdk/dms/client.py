@@ -110,9 +110,7 @@ class DMSClient:
             read_timeout=read_timeout,
         )
         self._telemetry_source: Optional[Module] = None
-        logger.debug(
-            "DMSClient initialized for instance '%s'", credentials.instance_name
-        )
+        logger.debug("DMSClient initialized")
 
     @record_metrics(Module.DMS, Operation.DMS_ONBOARD_REPOSITORY)
     def onboard_repository(

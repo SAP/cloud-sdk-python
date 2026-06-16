@@ -96,6 +96,18 @@ CLOUD_SDK_CFG_DATA_ANONYMIZATION_DEFAULT_DESTINATION_NAME=your-client-certificat
 
 The destination must be configured with `ClientCertificateAuthentication` and reference a certificate bundle containing the client certificate and private key.
 
+### DMS Integration Tests
+
+For DMS (Document Management Service) integration tests, configure the following variables in `.env_integration_tests`:
+
+```bash
+# DMS Configuration
+CLOUD_SDK_CFG_SDM_DEFAULT_URI=https://your-sdm-api-uri-here
+CLOUD_SDK_CFG_SDM_DEFAULT_UAA='{"url":"https://your-auth-url","clientid":"your-client-id","clientsecret":"your-client-secret","identityzone":"your-identity-zone"}'
+```
+
+**Note**: The test fixture automatically onboards test repositories (standard and version-enabled) at session start and cleans them up on teardown. No pre-existing repositories are required.
+
 ### ADMS Integration Tests
 
 For ADMS (Advanced Document Management Service) integration tests, configure the following variables in `.env_integration_tests`:
@@ -145,6 +157,7 @@ uv run pytest tests/core/integration/auditlog -v
 uv run pytest tests/core/integration/data_anonymization -v
 uv run pytest tests/objectstore/integration/ -v
 uv run pytest tests/destination/integration/ -v
+uv run pytest tests/dms/integration/ -v
 uv run pytest tests/agent_memory/integration/ -v
 uv run pytest tests/adms/integration/ -v
 uv run pytest tests/agentgateway/integration/ -v

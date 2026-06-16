@@ -250,8 +250,8 @@ class TestCreateClientFromDestination:
         assert client._config.deployment_id == "dep-1"
         assert client._config.namespace == "ns-1"
 
-    def test_destination_create_client_called_without_instance(self, mock_provider_cls, mock_exporter_fn):
-        """destination_instance is accepted but _dest_create_client() is called without args."""
+    def test_destination_create_client_called_with_instance(self, mock_provider_cls, mock_exporter_fn):
+        """destination_instance is forwarded as instance= to _dest_create_client()."""
         mock_provider = Mock()
         mock_provider.get_logger.return_value = Mock()
         mock_provider_cls.return_value = mock_provider
@@ -271,7 +271,7 @@ class TestCreateClientFromDestination:
                 insecure=True,
             )
 
-        mock_dest_factory.assert_called_once_with()
+        mock_dest_factory.assert_called_once_with(instance="my-instance")
 
     def test_destination_fragment_name_forwarded(self, mock_provider_cls, mock_exporter_fn):
         """fragment_name is always wrapped in ConsumptionOptions and forwarded to get_destination."""
@@ -307,12 +307,32 @@ class TestCreateClientFromDestination:
         with pytest.raises(ValueError, match="endpoint, deployment_id, and namespace are required"):
             create_client(destination_name="my-audit-dest")
 
-    def test_destination_name_without_fragment_falls_through_to_explicit_args_guard(
+    def test_destination_name_without_fragment_uses_destination_path(
         self, mock_provider_cls, mock_exporter_fn
     ):
-        """destination_instance alone (no fragment_name) still falls through."""
-        with pytest.raises(ValueError, match="endpoint, deployment_id, and namespace are required"):
-            create_client(destination_name="my-audit-dest", destination_instance="inst")
+        """destination_name + destination_instance without fragment_name still enters the
+        destination path; get_destination is called with options=None."""
+        mock_provider = Mock()
+        mock_provider.get_logger.return_value = Mock()
+        mock_provider_cls.return_value = mock_provider
+
+        dest = _make_mock_destination()
+        dest_client = MagicMock()
+        dest_client.get_destination.return_value = dest
+
+        with patch(
+            "sap_cloud_sdk.destination.create_client",
+            return_value=dest_client,
+        ):
+            client = create_client(
+                destination_name="my-audit-dest",
+                destination_instance="inst",
+                insecure=True,
+            )
+
+        assert isinstance(client, AuditClient)
+        call_kwargs = dest_client.get_destination.call_args.kwargs
+        assert call_kwargs.get("options") is None
 
     def test_destination_name_without_instance_falls_through_to_explicit_args_guard(
         self, mock_provider_cls, mock_exporter_fn

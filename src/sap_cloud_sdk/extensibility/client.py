@@ -498,20 +498,23 @@ class ExtensibilityClient:
 
         # 3. Execute workflow
         message_body = message.model_dump(mode="json") if message is not None else {}
+        execute_arguments = {
+            "workflowId": hook.n8n_workflow_config.workflow_id,
+            "inputs": {
+                "type": "webhook",
+                "webhookData": {
+                    "method": hook.n8n_workflow_config.method,
+                    "query": {},
+                    "body": message_body,
+                    "headers": headers or {},
+                },
+            },
+        }
         try:
             result_str = await agw_client.call_mcp_tool(
                 execute_tool,
                 user_token=user_token or None,
-                workflowId=hook.n8n_workflow_config.workflow_id,
-                inputs={
-                    "type": "webhook",
-                    "webhookData": {
-                        "method": hook.n8n_workflow_config.method,
-                        "query": {},
-                        "body": message_body,
-                        "headers": headers or {},
-                    },
-                },
+                **execute_arguments,
             )
         except Exception as exc:
             raise TransportError(
@@ -558,12 +561,15 @@ class ExtensibilityClient:
             await asyncio.sleep(_HOOK_POLL_INTERVAL)
 
             try:
+                get_execution_arguments = {
+                    "workflowId": hook.n8n_workflow_config.workflow_id,
+                    "executionId": str(execution_id),
+                    "includeData": True,
+                }
                 result_str = await agw_client.call_mcp_tool(
                     get_exec_tool,
                     user_token=user_token or None,
-                    workflowId=hook.n8n_workflow_config.workflow_id,
-                    executionId=str(execution_id),
-                    includeData=True,
+                    **get_execution_arguments,
                 )
             except Exception as exc:
                 raise TransportError(

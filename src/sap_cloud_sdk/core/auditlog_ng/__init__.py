@@ -6,7 +6,8 @@ Supports mTLS (client certificates) and insecure (no-auth) modes.
 The create_client() function accepts an AuditLogNGConfig and returns a
 ready-to-use AuditClient.
 
-Usage — explicit config::
+Usage:
+    explicit config:
 
     from sap_cloud_sdk.core.auditlog_ng import create_client, AuditLogNGConfig
 
@@ -19,7 +20,8 @@ Usage — explicit config::
     )
     client = create_client(config=config)
 
-Usage — resolve from a Destination::
+Usage:
+    resolve from a Destination:
 
     from sap_cloud_sdk.core.auditlog_ng import create_client
 
@@ -35,6 +37,7 @@ Usage — resolve from a Destination::
 """
 
 from typing import Optional
+from enum import Enum
 
 from sap_cloud_sdk.core.auditlog_ng.client import AuditClient
 from sap_cloud_sdk.core.auditlog_ng.config import (
@@ -53,14 +56,16 @@ from sap_cloud_sdk.core.telemetry import (
     record_error_metric as _record_error_metric,
 )
 
-_DESTINATION_PROP_DEPLOYMENT_ID = "deploymentId"
-_DESTINATION_PROP_DEPLOYMENT_REGION = "deploymentRegion"
-_DESTINATION_PROP_NAMESPACE = "namespace"
+
+class _DestinationProperties(Enum):
+    DEPLOYMENT_ID = "deploymentId"
+    DEPLOYMENT_REGION = "deploymentRegion"
+    NAMESPACE = "namespace"
 
 
 def _get_config_from_destination(
     destination_name: str,
-    destination_instance: str,
+    destination_instance: Optional[str] = "default",
     fragment_name: Optional[str] = None,
 ) -> dict[str, str]:
     """Resolve endpoint, deployment_id and namespace from a named Destination.
@@ -96,7 +101,14 @@ def _get_config_from_destination(
     )
 
     dest_client = _dest_create_client(instance=destination_instance)
-    options = ConsumptionOptions(fragment_name=fragment_name) if fragment_name else None
+    options = (
+        ConsumptionOptions(
+            fragment_name=fragment_name, fragment_level=ConsumptionLevel.SUBACCOUNT
+        )
+        if fragment_name
+        else None
+    )
+
     destination = dest_client.get_destination(
         name=destination_name, options=options, level=ConsumptionLevel.SUBACCOUNT
     )
@@ -107,21 +119,21 @@ def _get_config_from_destination(
     endpoint = destination.url
     props = destination.properties
 
-    deployment_id = props.get(_DESTINATION_PROP_DEPLOYMENT_ID) or ""
+    deployment_id = props.get(_DestinationProperties.DEPLOYMENT_ID.value) or ""
     if not deployment_id:
-        deployment_id = props.get(_DESTINATION_PROP_DEPLOYMENT_REGION) or ""
+        deployment_id = props.get(_DestinationProperties.DEPLOYMENT_REGION.value) or ""
     if not deployment_id:
         raise ValueError(
             f"Destination '{destination_name}' must provide either the "
-            f"'{_DESTINATION_PROP_DEPLOYMENT_ID}' or "
-            f"'{_DESTINATION_PROP_DEPLOYMENT_REGION}' property"
+            f"'{_DestinationProperties.DEPLOYMENT_ID.value}' or "
+            f"'{_DestinationProperties.DEPLOYMENT_REGION.value}' property"
         )
 
-    namespace = props.get(_DESTINATION_PROP_NAMESPACE) or ""
+    namespace = props.get(_DestinationProperties.NAMESPACE.value) or ""
     if not namespace:
         raise ValueError(
             f"Destination '{destination_name}' must provide the "
-            f"'{_DESTINATION_PROP_NAMESPACE}' property"
+            f"'{_DestinationProperties.NAMESPACE.value}' property"
         )
 
     return {
@@ -164,9 +176,6 @@ def create_client(
        The Destination module resolves the named destination at subaccount level
        and extracts ``endpoint``, ``deployment_id`` (with fallback to
        ``deploymentRegion``), and ``namespace`` from its properties.
-       The remaining keyword arguments (``cert_file``, ``key_file``, ``ca_file``,
-       ``insecure``, ``service_name``, ``batch``, ``compression``, ``schema_url``)
-       are still forwarded to the resulting :class:`AuditLogNGConfig`.
 
     3. **Explicit keyword arguments** — pass ``endpoint``, ``deployment_id``,
        and ``namespace`` directly.
@@ -204,7 +213,7 @@ def create_client(
     try:
         if config is None:
             try:
-                if destination_name and destination_instance:
+                if destination_name:
                     resolved = _get_config_from_destination(
                         destination_name=destination_name,
                         destination_instance=destination_instance,

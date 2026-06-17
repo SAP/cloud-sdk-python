@@ -48,7 +48,7 @@ The client depends on generated protobuf classes.
 | Parameter              | Type   | Required | Description |
 |------------------------|--------|----------|-------------|
 | `destination_name`     | `str`  | ✅ Yes   | Name of the SAP Destination to resolve. |
-| `destination_instance` | `str`  | ✅ Yes   | Destination service binding instance name. |
+| `destination_instance` | `str`  | ❌ No    | Destination service binding instance name. |
 | `fragment_name`        | `str`  | ❌ No    | Destination fragment merged before resolution (for tenant-specific overrides). |
 
 The destination must expose these custom properties:
@@ -59,13 +59,13 @@ The destination must expose these custom properties:
 | `deploymentRegion` | ✅ Fallback | Used as `deployment_id` when `deploymentId` is missing or empty. |
 | `namespace`        | ✅ Yes   | Audit log namespace (e.g. `sap.als`). |
 
-The destination `url` is used as the OTLP gRPC endpoint. The lookup is always performed at subaccount level.
+The destination `url` is used as the OTLP endpoint. The lookup is always performed at subaccount level.
 
 ### Explicit configuration parameters for `AuditClient`:
 
 | Parameter       | Type    | Required | Default        | Description                                                                                           |
 |-----------------|---------|----------|----------------|-------------------------------------------------------------------------------------------------------|
-| `endpoint`      | `str`   | ✅ Yes   | —              | OTLP gRPC endpoint of the Audit Log Service (`host:port`)                                             |
+| `endpoint`      | `str`   | ✅ Yes   | —              | OTLP endpoint of the Audit Log Service (`host:port`)                                             |
 | `deployment_id` | `str`   | ✅ Yes   | —              | Deployment/region identifier. Validated: only `[a-zA-Z0-9._-/~]` allowed. Raises `ValueError` if invalid. |
 | `namespace`     | `str`   | ✅ Yes   | —              | Audit log namespace (e.g. `sap.als`). Same character-set validation as `deployment_id`.               |
 | `cert_file`     | `str`   | ❌ No    | `None`         | Path to the mTLS client certificate file (PEM). Required together with `key_file` for mTLS.           |

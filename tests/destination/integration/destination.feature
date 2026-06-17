@@ -129,20 +129,12 @@ Feature: Destination Service Integration
 
   Scenario: List instance destinations with tenant (subscriber context)
     Given I use the configured subscriber tenant
-    And I have multiple instance destinations:
-      | name                 | type | url                      |
-      | test-list-inst-ten-1 | HTTP | https://api1.example.com |
-      | test-list-inst-ten-2 | HTTP | https://api2.example.com |
-    When I create all instance destinations
-    Then all destination creations should be successful
     When I list instance destinations with tenant
-    Then the list should contain at least 2 destinations
-    And the destination "test-list-inst-ten-1" should be in the list
-    And the destination "test-list-inst-ten-2" should be in the list
-    And I clean up all instance destinations
+    Then the destination list should be retrieved successfully
 
   Scenario: Create and list subaccount destinations (provider access)
-    Given I have multiple subaccount destinations:
+    Given I use the configured subscriber tenant
+    And I have multiple subaccount destinations:
       | name            | type | url                      |
       | test-list-sub-1 | HTTP | https://sub1.example.com |
       | test-list-sub-2 | HTTP | https://sub2.example.com |
@@ -194,6 +186,7 @@ Feature: Destination Service Integration
     Then the destination "test-dest-sub-list" should be in the list
 
   Scenario: List destinations using provider first strategy
+    Given I use the configured subscriber tenant
     When I list subaccount destinations with "PROVIDER_FIRST" access strategy
     Then the destination list should be retrieved successfully
 

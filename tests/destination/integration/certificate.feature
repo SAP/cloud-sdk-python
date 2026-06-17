@@ -104,7 +104,8 @@ Feature: Destination Service Integration - Certificates
     And I clean up all subaccount certificates
 
   Scenario: Create and list subaccount certificates (provider access)
-    Given I have multiple subaccount certificates:
+    Given I use the configured subscriber tenant
+    And I have multiple subaccount certificates:
       | name                 | type |
       | test-cert-list-1.pem | PEM  |
       | test-cert-list-2.pem | PEM  |
@@ -141,6 +142,7 @@ Feature: Destination Service Integration - Certificates
     Then the certificate "test-cert-sub-list.pem" should be in the list
 
   Scenario: List certificates using provider first strategy
+    Given I use the configured subscriber tenant
     When I list subaccount certificates with "PROVIDER_FIRST" access strategy
     Then the certificate list should be retrieved successfully
 

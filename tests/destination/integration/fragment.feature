@@ -98,7 +98,8 @@ Feature: Destination Service Integration - Fragments
     And I clean up all subaccount fragments
 
   Scenario: Create and list subaccount fragments (provider access)
-    Given I have multiple subaccount fragments:
+    Given I use the configured subscriber tenant
+    And I have multiple subaccount fragments:
       | name             | property1 | value1 |
       | test-frag-list-1 | prop1     | val1   |
       | test-frag-list-2 | prop2     | val2   |
@@ -133,6 +134,7 @@ Feature: Destination Service Integration - Fragments
     Then the fragment "test-frag-sub-list" should be in the list
 
   Scenario: List fragments using provider first strategy
+    Given I use the configured subscriber tenant
     When I list subaccount fragments with "PROVIDER_FIRST" access strategy
     Then the fragment list should be retrieved successfully
 

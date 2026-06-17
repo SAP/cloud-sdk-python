@@ -61,7 +61,7 @@ CLOUD_SDK_CFG_AGW_DEFAULT_TENANT_SUBDOMAIN=your-tenant-subdomain-here
 
 # User JWT for token exchange scenarios (get_user_auth)
 # If not set, user auth scenarios are automatically skipped
-AGW_USER_TOKEN=your-user-jwt-here
+CLOUD_SDK_CFG_AGW_DEFAULT_USER_TOKEN=your-user-jwt-here
 ```
 
 ### Agent Memory Integration Tests

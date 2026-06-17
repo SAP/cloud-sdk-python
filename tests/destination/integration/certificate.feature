@@ -148,11 +148,6 @@ Feature: Destination Service Integration - Certificates
 
   Scenario: List certificates using provider only strategy
     Given I use the configured subscriber tenant
-    And I have a certificate named "test-cert-sub-list.pem"
-    And the certificate has type "PEM"
-    And the certificate has valid PEM content
-    When I create the certificate at subaccount level for subscriber
-    Then the certificate creation should be successful
     When I list subaccount certificates with "PROVIDER_ONLY" access strategy
     Then the certificate "test-cert-sub-list.pem" should not be in the list
 

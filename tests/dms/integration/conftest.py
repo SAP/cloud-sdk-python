@@ -1,4 +1,5 @@
 from sap_cloud_sdk.dms import create_client
+from sap_cloud_sdk.dms.exceptions import DMSError
 from sap_cloud_sdk.dms.model import InternalRepoRequest
 import pytest
 import logging
@@ -33,22 +34,25 @@ def _setup_test_repositories(dms_client):
     created_repos = []
 
     logger.info("Onboarding test repositories")
-    repo = dms_client.onboard_repository(
-        InternalRepoRequest(
-            displayName=f"{_SDK_TEST_REPO_PREFIX}standard",
-            description="Auto-created by SDK integration tests",
+    try:
+        repo = dms_client.onboard_repository(
+            InternalRepoRequest(
+                displayName=f"{_SDK_TEST_REPO_PREFIX}standard",
+                description="Auto-created by SDK integration tests",
+            )
         )
-    )
-    created_repos.append(repo.id)
+        created_repos.append(repo.id)
 
-    repo = dms_client.onboard_repository(
-        InternalRepoRequest(
-            displayName=f"{_SDK_TEST_REPO_PREFIX}versioned",
-            description="Auto-created by SDK integration tests (versioning)",
-            isVersionEnabled=True,
+        repo = dms_client.onboard_repository(
+            InternalRepoRequest(
+                displayName=f"{_SDK_TEST_REPO_PREFIX}versioned",
+                description="Auto-created by SDK integration tests (versioning)",
+                isVersionEnabled=True,
+            )
         )
-    )
-    created_repos.append(repo.id)
+        created_repos.append(repo.id)
+    except DMSError as e:
+        pytest.skip(f"DMS ECM repository connection not available — skipping DMS integration tests: {e}")
 
     yield
 

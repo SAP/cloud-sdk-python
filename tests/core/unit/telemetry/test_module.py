@@ -17,6 +17,7 @@ class TestModule:
         assert Module.DESTINATION.value == "destination"
         assert Module.OBJECTSTORE.value == "objectstore"
         assert Module.DMS.value == "dms"
+        assert Module.PRINT.value == "print"
 
     def test_module_str_representation(self):
         """Test that Module enum converts to string correctly."""
@@ -27,6 +28,7 @@ class TestModule:
         assert str(Module.DESTINATION) == "destination"
         assert str(Module.OBJECTSTORE) == "objectstore"
         assert str(Module.DMS) == "dms"
+        assert str(Module.PRINT) == "print"
 
     def test_module_is_string_enum(self):
         """Test that Module enum inherits from str."""
@@ -53,17 +55,20 @@ class TestModule:
     def test_all_modules_present(self):
         """Test that all expected modules are present."""
         all_modules = list(Module)
-        assert len(all_modules) == 12
+        assert len(all_modules) == 13
         assert Module.ADMS in all_modules
+        assert Module.AGENT_MEMORY in all_modules
+        assert Module.AGENTGATEWAY in all_modules
         assert Module.AICORE in all_modules
         assert Module.AUDITLOG in all_modules
         assert Module.AUDITLOG_NG in all_modules
         assert Module.DATA_ANONYMIZATION in all_modules
         assert Module.DESTINATION in all_modules
+        assert Module.DMS in all_modules
         assert Module.EXTENSIBILITY in all_modules
         assert Module.OBJECTSTORE in all_modules
-        assert Module.DMS in all_modules
-        assert Module.AGENT_MEMORY in all_modules
+        assert Module.PRINT in all_modules
+        assert Module.TELEMETRY in all_modules
 
     def test_module_iteration(self):
         """Test iterating over Module enum."""
@@ -76,3 +81,4 @@ class TestModule:
         assert "objectstore" in module_values
         assert "dms" in module_values
         assert "extensibility" in module_values
+        assert "print" in module_values

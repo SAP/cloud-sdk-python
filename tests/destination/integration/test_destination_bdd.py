@@ -258,12 +258,6 @@ def destination_service_auth_failure(context):
     context.use_auth_failure_client = True
 
 
-@given(parsers.parse('I use tenant "{tenant}"'))
-def use_tenant(context, tenant):
-    """Set the tenant to use for subscriber access."""
-    context.tenant = tenant
-
-
 @given("I use the configured subscriber tenant")
 def use_configured_subscriber_tenant(context):
     """Set the tenant from the CLOUD_SDK_CFG_DESTINATION_DEFAULT_TENANT_SUBDOMAIN environment variable."""

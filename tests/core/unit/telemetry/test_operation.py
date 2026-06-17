@@ -150,6 +150,15 @@ class TestOperation:
         assert Operation.DMS_APPEND_CONTENT_STREAM.value == "cmis_append_content_stream"
         assert Operation.DMS_CMIS_QUERY.value == "cmis_query"
 
+    def test_print_operations(self):
+        """Test Print operation values."""
+        assert Operation.PRINT_CREATE_CLIENT.value == "print_create_client"
+        assert Operation.PRINT_LIST_QUEUES.value == "list_queues"
+        assert Operation.PRINT_CREATE_QUEUE.value == "create_queue"
+        assert Operation.PRINT_GET_PROFILES.value == "get_print_profiles"
+        assert Operation.PRINT_UPLOAD_DOCUMENT.value == "upload_document"
+        assert Operation.PRINT_CREATE_TASK.value == "create_print_task"
+
     def test_operation_str_representation(self):
         """Test that Operation enum converts to string correctly."""
         assert str(Operation.AUDITLOG_LOG) == "log"
@@ -196,11 +205,12 @@ class TestOperation:
         assert any("FRAGMENT" in op.name for op in all_operations)
         assert any("OBJECTSTORE" in op.name for op in all_operations)
         assert any("AICORE" in op.name for op in all_operations)
+        assert any("PRINT" in op.name for op in all_operations)
 
     def test_operation_count(self):
         """Test that we have the expected number of operations."""
         all_operations = list(Operation)
         # 3 auditlog + 11 destination + 10 certificate + 10 fragment + 8 objectstore
         # + 2 extensibility + 2 aicore + 23 dms + 4 agentgateway + 13 agent_memory
-        # + 5 data_anonymization + 52 adms = 143
-        assert len(all_operations) == 143
+        # + 5 data_anonymization + 52 adms + 6 print = 149
+        assert len(all_operations) == 149

@@ -420,6 +420,7 @@ class ExtensibilityClient:
         Operation.EXTENSIBILITY_CALL_HOOK,
     )
     async def call_hook(
+        self,
         hook: Hook,
         user_token: Optional[str] = None,
         message: Optional[Any] = None,

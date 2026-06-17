@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from sap_cloud_sdk.extensibility import call_hook, create_client
+from sap_cloud_sdk.extensibility import create_client
 from sap_cloud_sdk.extensibility.client import (
     ExtensibilityClient,
     _EXECUTE_WORKFLOW_TOOL_NAME,
@@ -334,27 +334,44 @@ def _make_agw_client(tools: list, tool_responses: list) -> MagicMock:
 
 
 # ---------------------------------------------------------------------------
-# Tests for standalone call_hook()
+# Tests for ExtensibilityClient.call_hook
 # ---------------------------------------------------------------------------
 
 
 class TestCallHook:
-    """Tests for the standalone call_hook() module-level function."""
+    """Tests for ExtensibilityClient.call_hook (async, AGW-based)."""
+
+    def _make_client(self, agw: MagicMock) -> ExtensibilityClient:
+        """Build an ExtensibilityClient with a mock transport and patched AGW factory."""
+        client = ExtensibilityClient(MagicMock())
+        # Stash the agw on the instance for the patcher closure to return.
+        client._test_agw = agw  # type: ignore[attr-defined]
+        return client
 
     @pytest.mark.asyncio
     async def test_execute_tool_not_found_raises(self):
         """Raises TransportError when execute_workflow tool is absent."""
         agw = _make_agw_client(tools=[], tool_responses=[])
-        with pytest.raises(TransportError, match=_EXECUTE_WORKFLOW_TOOL_NAME):
-            await call_hook(hook=_make_hook(), agw_client=agw)
+        client = self._make_client(agw)
+        with patch(
+            "sap_cloud_sdk.extensibility.client.create_agw_client",
+            return_value=agw,
+        ):
+            with pytest.raises(TransportError, match=_EXECUTE_WORKFLOW_TOOL_NAME):
+                await client.call_hook(hook=_make_hook(), tenant_subdomain="t")
 
     @pytest.mark.asyncio
     async def test_get_exec_tool_not_found_raises(self):
         """Raises TransportError when get_execution tool is absent."""
         tools = [_make_n8n_tool(_EXECUTE_WORKFLOW_TOOL_NAME)]
         agw = _make_agw_client(tools=tools, tool_responses=[])
-        with pytest.raises(TransportError, match=_GET_EXECUTION_TOOL_NAME):
-            await call_hook(hook=_make_hook(), agw_client=agw)
+        client = self._make_client(agw)
+        with patch(
+            "sap_cloud_sdk.extensibility.client.create_agw_client",
+            return_value=agw,
+        ):
+            with pytest.raises(TransportError, match=_GET_EXECUTION_TOOL_NAME):
+                await client.call_hook(hook=_make_hook(), tenant_subdomain="t")
 
     @pytest.mark.asyncio
     async def test_composite_key_ignores_wrong_server(self):
@@ -364,8 +381,13 @@ class TestCallHook:
             _make_other_server_tool(_GET_EXECUTION_TOOL_NAME),
         ]
         agw = _make_agw_client(tools=tools, tool_responses=[])
-        with pytest.raises(TransportError, match=_EXECUTE_WORKFLOW_TOOL_NAME):
-            await call_hook(hook=_make_hook(), agw_client=agw)
+        client = self._make_client(agw)
+        with patch(
+            "sap_cloud_sdk.extensibility.client.create_agw_client",
+            return_value=agw,
+        ):
+            with pytest.raises(TransportError, match=_EXECUTE_WORKFLOW_TOOL_NAME):
+                await client.call_hook(hook=_make_hook(), tenant_subdomain="t")
 
     @pytest.mark.asyncio
     async def test_composite_key_picks_correct_tool_among_duplicates(self):
@@ -380,7 +402,12 @@ class TestCallHook:
             tools=tools,
             tool_responses=[_success_payload()],
         )
-        result = await call_hook(hook=_make_hook(), agw_client=agw)
+        client = self._make_client(agw)
+        with patch(
+            "sap_cloud_sdk.extensibility.client.create_agw_client",
+            return_value=agw,
+        ):
+            result = await client.call_hook(hook=_make_hook(), tenant_subdomain="t")
         assert result is not None
         # call_mcp_tool must have been called with the N8N tool, not the other one
         called_tool = agw.call_mcp_tool.call_args[0][0]
@@ -397,7 +424,12 @@ class TestCallHook:
             tools=tools,
             tool_responses=[_success_payload()],
         )
-        result = await call_hook(hook=_make_hook(), agw_client=agw)
+        client = self._make_client(agw)
+        with patch(
+            "sap_cloud_sdk.extensibility.client.create_agw_client",
+            return_value=agw,
+        ):
+            result = await client.call_hook(hook=_make_hook(), tenant_subdomain="t")
         assert result is not None
         assert result.message_id == "msg-1"
         agw.call_mcp_tool.assert_called_once()
@@ -413,8 +445,15 @@ class TestCallHook:
             tools=tools,
             tool_responses=[_running_payload(), _poll_success_payload()],
         )
-        with patch("sap_cloud_sdk.extensibility.client.asyncio.sleep", new_callable=AsyncMock):
-            result = await call_hook(hook=_make_hook(), agw_client=agw)
+        client = self._make_client(agw)
+        with patch(
+            "sap_cloud_sdk.extensibility.client.create_agw_client",
+            return_value=agw,
+        ), patch(
+            "sap_cloud_sdk.extensibility.client.asyncio.sleep",
+            new_callable=AsyncMock,
+        ):
+            result = await client.call_hook(hook=_make_hook(), tenant_subdomain="t")
         assert result is not None
         assert result.message_id == "msg-2"
         assert agw.call_mcp_tool.call_count == 2
@@ -428,8 +467,13 @@ class TestCallHook:
         ]
         terminal_payload = json.dumps({"status": "error", "error": "workflow crashed"})
         agw = _make_agw_client(tools=tools, tool_responses=[terminal_payload])
-        with pytest.raises(TransportError, match="workflow crashed"):
-            await call_hook(hook=_make_hook(), agw_client=agw)
+        client = self._make_client(agw)
+        with patch(
+            "sap_cloud_sdk.extensibility.client.create_agw_client",
+            return_value=agw,
+        ):
+            with pytest.raises(TransportError, match="workflow crashed"):
+                await client.call_hook(hook=_make_hook(), tenant_subdomain="t")
 
     @pytest.mark.asyncio
     async def test_terminal_status_from_poll_raises(self):
@@ -443,9 +487,16 @@ class TestCallHook:
             tools=tools,
             tool_responses=[_running_payload(), poll_terminal],
         )
-        with patch("sap_cloud_sdk.extensibility.client.asyncio.sleep", new_callable=AsyncMock):
+        client = self._make_client(agw)
+        with patch(
+            "sap_cloud_sdk.extensibility.client.create_agw_client",
+            return_value=agw,
+        ), patch(
+            "sap_cloud_sdk.extensibility.client.asyncio.sleep",
+            new_callable=AsyncMock,
+        ):
             with pytest.raises(TransportError, match="node failed"):
-                await call_hook(hook=_make_hook(), agw_client=agw)
+                await client.call_hook(hook=_make_hook(), tenant_subdomain="t")
 
     @pytest.mark.asyncio
     async def test_timeout_raises(self):
@@ -459,11 +510,18 @@ class TestCallHook:
             tools=tools,
             tool_responses=[_running_payload()] + [_running_payload()] * 100,
         )
+        client = self._make_client(agw)
         # Use a hook with timeout=0 so monotonic deadline is immediately exceeded
         hook = _make_hook(timeout=0)
-        with patch("sap_cloud_sdk.extensibility.client.asyncio.sleep", new_callable=AsyncMock):
+        with patch(
+            "sap_cloud_sdk.extensibility.client.create_agw_client",
+            return_value=agw,
+        ), patch(
+            "sap_cloud_sdk.extensibility.client.asyncio.sleep",
+            new_callable=AsyncMock,
+        ):
             with pytest.raises(TransportError, match="timed out"):
-                await call_hook(hook=hook, agw_client=agw)
+                await client.call_hook(hook=hook, tenant_subdomain="t")
 
     @pytest.mark.asyncio
     async def test_agw_call_mcp_tool_exception_raises_transport_error(self):
@@ -475,8 +533,13 @@ class TestCallHook:
         agw = MagicMock()
         agw.list_mcp_tools = AsyncMock(return_value=tools)
         agw.call_mcp_tool = AsyncMock(side_effect=RuntimeError("network error"))
-        with pytest.raises(TransportError, match="network error"):
-            await call_hook(hook=_make_hook(), agw_client=agw)
+        client = self._make_client(agw)
+        with patch(
+            "sap_cloud_sdk.extensibility.client.create_agw_client",
+            return_value=agw,
+        ):
+            with pytest.raises(TransportError, match="network error"):
+                await client.call_hook(hook=_make_hook(), tenant_subdomain="t")
 
     @pytest.mark.asyncio
     async def test_workflow_id_passed_to_execute_tool(self):
@@ -486,6 +549,13 @@ class TestCallHook:
             _make_n8n_tool(_GET_EXECUTION_TOOL_NAME),
         ]
         agw = _make_agw_client(tools=tools, tool_responses=[_success_payload("wf-xyz")])
-        await call_hook(hook=_make_hook(workflow_id="wf-xyz"), agw_client=agw)
+        client = self._make_client(agw)
+        with patch(
+            "sap_cloud_sdk.extensibility.client.create_agw_client",
+            return_value=agw,
+        ):
+            await client.call_hook(
+                hook=_make_hook(workflow_id="wf-xyz"), tenant_subdomain="t"
+            )
         kwargs = agw.call_mcp_tool.call_args[1]
         assert kwargs["workflowId"] == "wf-xyz"

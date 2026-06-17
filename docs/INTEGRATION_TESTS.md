@@ -119,6 +119,11 @@ CLOUD_SDK_CFG_DESTINATION_DEFAULT_CLIENTSECRET=your-destination-client-secret-he
 CLOUD_SDK_CFG_DESTINATION_DEFAULT_URL=https://your-destination-auth-url-here
 CLOUD_SDK_CFG_DESTINATION_DEFAULT_URI=https://your-destination-configuration-uri-here
 CLOUD_SDK_CFG_DESTINATION_DEFAULT_IDENTITYZONE=your-identity-zone-here
+
+# Optional: subscriber tenant subdomain for multi-tenant scenarios
+# When set, scenarios using SUBSCRIBER_FIRST, SUBSCRIBER_ONLY, and PROVIDER_FIRST are executed.
+# When not set, those scenarios are automatically skipped.
+CLOUD_SDK_CFG_DESTINATION_DEFAULT_TENANT_SUBDOMAIN=your-subscriber-tenant-subdomain-here
 ```
 
 ### DMS Integration Tests

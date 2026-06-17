@@ -54,10 +54,10 @@ CLOUD_SDK_CFG_DESTINATION_DEFAULT_URI=https://your-destination-configuration-uri
 CLOUD_SDK_CFG_DESTINATION_DEFAULT_IDENTITYZONE=your-identity-zone-here
 
 # Landscape suffix used to resolve the IAS destination name
-APPFND_CONHOS_LANDSCAPE=your-landscape-here
+CLOUD_SDK_CFG_AGW_DEFAULT_LANDSCAPE=your-landscape-here
 
 # Tenant subdomain for multi-tenant lookup
-TENANT_SUBDOMAIN=your-tenant-subdomain-here
+CLOUD_SDK_CFG_AGW_DEFAULT_TENANT_SUBDOMAIN=your-tenant-subdomain-here
 
 # User JWT for token exchange scenarios (get_user_auth)
 # If not set, user auth scenarios are automatically skipped
@@ -121,6 +121,18 @@ CLOUD_SDK_CFG_DESTINATION_DEFAULT_URI=https://your-destination-configuration-uri
 CLOUD_SDK_CFG_DESTINATION_DEFAULT_IDENTITYZONE=your-identity-zone-here
 ```
 
+### DMS Integration Tests
+
+For DMS (Document Management Service) integration tests, configure the following variables in `.env_integration_tests`:
+
+```bash
+# DMS Configuration
+CLOUD_SDK_CFG_SDM_DEFAULT_URI=https://your-sdm-api-uri-here
+CLOUD_SDK_CFG_SDM_DEFAULT_UAA='{"url":"https://your-auth-url","clientid":"your-client-id","clientsecret":"your-client-secret","identityzone":"your-identity-zone"}'
+```
+
+**Note**: The test fixture automatically onboards test repositories (standard and version-enabled) at session start and cleans them up on teardown. No pre-existing repositories are required.
+
 ### ObjectStore Integration Tests
 
 For ObjectStore integration tests, configure the following variables in `.env_integration_tests`:
@@ -147,6 +159,7 @@ uv run pytest tests/agent_memory/integration/ -v
 uv run pytest tests/core/integration/auditlog -v
 uv run pytest tests/core/integration/data_anonymization -v
 uv run pytest tests/destination/integration/ -v
+uv run pytest tests/dms/integration/ -v
 uv run pytest tests/objectstore/integration/ -v
 ```
 

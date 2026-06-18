@@ -31,7 +31,11 @@ class TestCreateClient:
 
     @patch("sap_cloud_sdk.core.auditlog_ng.client._create_log_exporter")
     @patch("sap_cloud_sdk.core.auditlog_ng.client.LoggerProvider")
-    def test_create_client_with_keyword_args(self, mock_provider_cls, mock_exporter_fn):
+    @patch(
+        "sap_cloud_sdk.core.auditlog_ng._get_config_from_destination",
+        return_value={},
+    )
+    def test_create_client_with_keyword_args(self, _mock_dest, mock_provider_cls, mock_exporter_fn):
         mock_provider = Mock()
         mock_provider.get_logger.return_value = Mock()
         mock_provider_cls.return_value = mock_provider
@@ -47,7 +51,7 @@ class TestCreateClient:
 
     @patch(
         "sap_cloud_sdk.core.auditlog_ng._get_config_from_destination",
-        return_value=None,
+        return_value={},
     )
     def test_create_client_missing_endpoint_raises(self, _mock_dest):
         with pytest.raises(ValueError, match="endpoint, deployment_id, and namespace are required"):
@@ -72,7 +76,7 @@ class TestCreateClient:
     )
     @patch(
         "sap_cloud_sdk.core.auditlog_ng._get_config_from_destination",
-        return_value=None,
+        return_value={},
     )
     def test_create_client_config_errors_record_error_metric(self, _mock_dest, kwargs, match):
         with patch(
@@ -95,7 +99,7 @@ class TestCreateClient:
 
     @patch(
         "sap_cloud_sdk.core.auditlog_ng._get_config_from_destination",
-        return_value=None,
+        return_value={},
     )
     def test_create_client_missing_deployment_id_raises(self, _mock_dest):
         with pytest.raises(ValueError, match="endpoint, deployment_id, and namespace are required"):
@@ -103,7 +107,7 @@ class TestCreateClient:
 
     @patch(
         "sap_cloud_sdk.core.auditlog_ng._get_config_from_destination",
-        return_value=None,
+        return_value={},
     )
     def test_create_client_missing_namespace_raises(self, _mock_dest):
         with pytest.raises(ValueError, match="endpoint, deployment_id, and namespace are required"):
@@ -111,7 +115,7 @@ class TestCreateClient:
 
     @patch(
         "sap_cloud_sdk.core.auditlog_ng._get_config_from_destination",
-        return_value=None,
+        return_value={},
     )
     def test_create_client_no_args_raises(self, _mock_dest):
         with pytest.raises(ValueError, match="endpoint, deployment_id, and namespace are required"):
@@ -119,7 +123,7 @@ class TestCreateClient:
 
     @patch(
         "sap_cloud_sdk.core.auditlog_ng._get_config_from_destination",
-        return_value=None,
+        return_value={},
     )
     def test_create_client_invalid_deployment_id_raises(self, _mock_dest):
         with pytest.raises(ValueError, match="deployment_id"):
@@ -133,7 +137,7 @@ class TestCreateClient:
     @patch("sap_cloud_sdk.core.auditlog_ng.client.LoggerProvider")
     @patch(
         "sap_cloud_sdk.core.auditlog_ng._get_config_from_destination",
-        return_value=None,
+        return_value={},
     )
     def test_create_client_unexpected_exception_wraps_in_client_creation_error(
         self, _mock_dest, mock_provider_cls, mock_exporter_fn
@@ -167,7 +171,11 @@ class TestCreateClient:
 
     @patch("sap_cloud_sdk.core.auditlog_ng.client._create_log_exporter")
     @patch("sap_cloud_sdk.core.auditlog_ng.client.LoggerProvider")
-    def test_config_keyword_args_are_forwarded(self, mock_provider_cls, mock_exporter_fn):
+    @patch(
+        "sap_cloud_sdk.core.auditlog_ng._get_config_from_destination",
+        return_value={},
+    )
+    def test_config_keyword_args_are_forwarded(self, _mock_dest, mock_provider_cls, mock_exporter_fn):
         mock_provider = Mock()
         mock_provider.get_logger.return_value = Mock()
         mock_provider_cls.return_value = mock_provider
@@ -245,8 +253,44 @@ def _make_mock_destination(
 class TestCreateClientFromDestination:
 
     # ------------------------------------------------------------------
-    # Happy path — all three args required to enter the destination path
+    # Happy path — destination resolution is always attempted
     # ------------------------------------------------------------------
+
+    def test_destination_always_attempted_with_defaults(
+        self, mock_provider_cls, mock_exporter_fn
+    ):
+        """_get_config_from_destination is always called, even with no explicit args.
+
+        With defaults destination_name='AuditLogV3_Destination' and
+        destination_instance='default', create_client() always attempts
+        destination resolution before falling back to explicit args.
+        """
+        mock_provider = Mock()
+        mock_provider.get_logger.return_value = Mock()
+        mock_provider_cls.return_value = mock_provider
+
+        dest = _make_mock_destination(
+            url="audit.default.com:443",
+            deployment_id="dep-default",
+            namespace="ns-default",
+        )
+        dest_client = MagicMock()
+        dest_client.get_destination.return_value = dest
+
+        with patch(
+            "sap_cloud_sdk.destination.create_client",
+            return_value=dest_client,
+        ) as mock_dest_factory:
+            client = create_client(insecure=True)
+
+        mock_dest_factory.assert_called_once_with(instance="default")
+        dest_client.get_destination.assert_called_once()
+        call_kwargs = dest_client.get_destination.call_args.kwargs
+        assert call_kwargs["name"] == "AuditLogV3_Destination"
+        assert isinstance(client, AuditClient)
+        assert client._config.endpoint == "audit.default.com:443"
+        assert client._config.deployment_id == "dep-default"
+        assert client._config.namespace == "ns-default"
 
     def test_destination_happy_path(self, mock_provider_cls, mock_exporter_fn):
         """Resolved destination with deploymentId sets endpoint/deployment_id/namespace."""
@@ -548,14 +592,14 @@ class TestCreateClientFromDestination:
     def test_no_destination_explicit_args_still_works(
         self, mock_provider_cls, mock_exporter_fn
     ):
-        """Existing keyword-arg path is unaffected when destination resolution returns None."""
+        """Existing keyword-arg path is unaffected when destination resolution returns empty dict."""
         mock_provider = Mock()
         mock_provider.get_logger.return_value = Mock()
         mock_provider_cls.return_value = mock_provider
 
         with patch(
             "sap_cloud_sdk.core.auditlog_ng._get_config_from_destination",
-            return_value=None,
+            return_value={},
         ):
             client = create_client(
                 endpoint="localhost:4317",
@@ -570,7 +614,7 @@ class TestCreateClientFromDestination:
     def test_no_destination_config_object_still_works(
         self, mock_provider_cls, mock_exporter_fn
     ):
-        """Existing config-object path is unaffected when destination_name is absent."""
+        """Existing config-object path is unaffected; destination resolution is skipped when config is given."""
         mock_provider = Mock()
         mock_provider.get_logger.return_value = Mock()
         mock_provider_cls.return_value = mock_provider

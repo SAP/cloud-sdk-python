@@ -74,7 +74,10 @@ def mcp_tool_to_langchain(
 
     # Build args schema from input_schema
     properties = mcp_tool.input_schema.get("properties", {})
-    fields: dict[str, Any] = {k: (str, ...) for k in properties}
+    required = set(mcp_tool.input_schema.get("required", []))
+    fields: dict[str, Any] = {
+        k: (str, ...) if k in required else (str | None, None) for k in properties
+    }
     args_schema = create_model(f"{mcp_tool.name}_args", **fields) if fields else None
 
     return StructuredTool.from_function(

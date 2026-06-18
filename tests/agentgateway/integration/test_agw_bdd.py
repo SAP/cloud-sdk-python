@@ -4,12 +4,12 @@ Run against a live BTP tenant:
 
     CLOUD_SDK_CFG_AGW_DEFAULT_TENANT_SUBDOMAIN=<tenant-subdomain> \\
     CLOUD_SDK_CFG_AGW_DEFAULT_LANDSCAPE=<landscape> \\
+    CLOUD_SDK_CFG_AGW_DEFAULT_USER_TOKEN=<user-jwt> \\
     CLOUD_SDK_CFG_DESTINATION_DEFAULT_CLIENTID=... \\
     CLOUD_SDK_CFG_DESTINATION_DEFAULT_CLIENTSECRET=... \\
     CLOUD_SDK_CFG_DESTINATION_DEFAULT_URL=... \\
     CLOUD_SDK_CFG_DESTINATION_DEFAULT_URI=... \\
     CLOUD_SDK_CFG_DESTINATION_DEFAULT_IDENTITYZONE=... \\
-    AGW_USER_TOKEN=<user-jwt> \\
     pytest tests/agentgateway/integration/ -v
 """
 
@@ -72,9 +72,9 @@ def agent_gateway_client_available(agw_client: AgentGatewayClient):
 @given("I have a valid user token")
 def have_valid_user_token(context: ScenarioContext):
     """Load user token from environment variable."""
-    token = os.environ.get("AGW_USER_TOKEN", "")
+    token = os.environ.get("CLOUD_SDK_CFG_AGW_DEFAULT_USER_TOKEN", "")
     if not token:
-        pytest.skip("AGW_USER_TOKEN is not set — skipping user auth scenario")
+        pytest.skip("CLOUD_SDK_CFG_AGW_DEFAULT_USER_TOKEN is not set — skipping user auth scenario")
     context.user_token = token
 
 

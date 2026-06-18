@@ -64,8 +64,8 @@ class _DestinationProperties(Enum):
 
 
 def _get_config_from_destination(
-    destination_name: str,
-    destination_instance: Optional[str] = "default",
+    destination_name: Optional[str],
+    destination_instance: Optional[str],
     fragment_name: Optional[str] = None,
 ) -> dict[str, str]:
     """Resolve endpoint, deployment_id and namespace from a named Destination.
@@ -75,7 +75,7 @@ def _get_config_from_destination(
     - ``deploymentId`` (or ``deploymentRegion`` as fallback when absent/empty)
     - ``namespace``
 
-    The destination ``url`` is used as the OTLP gRPC endpoint.
+    The destination ``url`` is used as the OTLP endpoint.
     The lookup is always performed at ``ConsumptionLevel.SUBACCOUNT``.
 
     Args:
@@ -86,11 +86,14 @@ def _get_config_from_destination(
             before resolution. Wrapped in ``ConsumptionOptions`` when provided.
 
     Returns:
-        dict with keys ``endpoint``, ``deployment_id``, ``namespace``.
+        dict with keys ``endpoint``, ``deployment_id``, ``namespace``
+        when destination is found.
 
-    Raises:
-        ValueError: If the destination is not found or required properties
-            are missing.
+    Returns:
+        None: If destination is not found.
+
+    Return:
+        ValueError: If required properties are missing.
     """
     # Lazy import — keeps destination an optional dependency; importing auditlog_ng
     # in environments without the destination package continues to work.
@@ -114,7 +117,7 @@ def _get_config_from_destination(
     )
 
     if destination is None:
-        raise ValueError(f"Destination '{destination_name}' was not found")
+        return {}
 
     endpoint = destination.url
     props = destination.properties
@@ -147,8 +150,8 @@ def create_client(
     *,
     config: Optional[AuditLogNGConfig] = None,
     # Destination-based resolution
-    destination_name: Optional[str] = None,
-    destination_instance: Optional[str] = None,
+    destination_name: Optional[str] = "AuditLogV3_Destination",
+    destination_instance: Optional[str] = "default",
     fragment_name: Optional[str] = None,
     # Explicit connection parameters
     endpoint: Optional[str] = None,
@@ -213,12 +216,12 @@ def create_client(
     try:
         if config is None:
             try:
-                if destination_name:
-                    resolved = _get_config_from_destination(
-                        destination_name=destination_name,
-                        destination_instance=destination_instance,
-                        fragment_name=fragment_name,
-                    )
+                resolved = _get_config_from_destination(
+                    destination_name=destination_name,
+                    destination_instance=destination_instance,
+                    fragment_name=fragment_name,
+                )
+                if resolved:
                     endpoint = resolved["endpoint"]
                     deployment_id = resolved["deployment_id"]
                     namespace = resolved["namespace"]
@@ -226,7 +229,7 @@ def create_client(
                     if not endpoint or not deployment_id or not namespace:
                         raise ValueError(
                             "endpoint, deployment_id, and namespace are required "
-                            "when config is not provided"
+                            "when config or valid destination is not provided"
                         )
 
                 config = AuditLogNGConfig(

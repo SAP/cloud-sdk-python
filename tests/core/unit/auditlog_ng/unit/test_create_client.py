@@ -45,7 +45,11 @@ class TestCreateClient:
 
         assert isinstance(client, AuditClient)
 
-    def test_create_client_missing_endpoint_raises(self):
+    @patch(
+        "sap_cloud_sdk.core.auditlog_ng._get_config_from_destination",
+        return_value=None,
+    )
+    def test_create_client_missing_endpoint_raises(self, _mock_dest):
         with pytest.raises(ValueError, match="endpoint, deployment_id, and namespace are required"):
             create_client(deployment_id="dep-1", namespace="ns-1")
 
@@ -66,7 +70,11 @@ class TestCreateClient:
             ),
         ],
     )
-    def test_create_client_config_errors_record_error_metric(self, kwargs, match):
+    @patch(
+        "sap_cloud_sdk.core.auditlog_ng._get_config_from_destination",
+        return_value=None,
+    )
+    def test_create_client_config_errors_record_error_metric(self, _mock_dest, kwargs, match):
         with patch(
             "sap_cloud_sdk.core.auditlog_ng._record_error_metric"
         ) as mock_error_metric:
@@ -85,19 +93,35 @@ class TestCreateClient:
             Operation.AUDITLOG_CREATE_CLIENT,
         )
 
-    def test_create_client_missing_deployment_id_raises(self):
+    @patch(
+        "sap_cloud_sdk.core.auditlog_ng._get_config_from_destination",
+        return_value=None,
+    )
+    def test_create_client_missing_deployment_id_raises(self, _mock_dest):
         with pytest.raises(ValueError, match="endpoint, deployment_id, and namespace are required"):
             create_client(endpoint="localhost:4317", namespace="ns-1")
 
-    def test_create_client_missing_namespace_raises(self):
+    @patch(
+        "sap_cloud_sdk.core.auditlog_ng._get_config_from_destination",
+        return_value=None,
+    )
+    def test_create_client_missing_namespace_raises(self, _mock_dest):
         with pytest.raises(ValueError, match="endpoint, deployment_id, and namespace are required"):
             create_client(endpoint="localhost:4317", deployment_id="dep-1")
 
-    def test_create_client_no_args_raises(self):
+    @patch(
+        "sap_cloud_sdk.core.auditlog_ng._get_config_from_destination",
+        return_value=None,
+    )
+    def test_create_client_no_args_raises(self, _mock_dest):
         with pytest.raises(ValueError, match="endpoint, deployment_id, and namespace are required"):
             create_client()
 
-    def test_create_client_invalid_deployment_id_raises(self):
+    @patch(
+        "sap_cloud_sdk.core.auditlog_ng._get_config_from_destination",
+        return_value=None,
+    )
+    def test_create_client_invalid_deployment_id_raises(self, _mock_dest):
         with pytest.raises(ValueError, match="deployment_id"):
             create_client(
                 endpoint="localhost:4317",
@@ -107,8 +131,12 @@ class TestCreateClient:
 
     @patch("sap_cloud_sdk.core.auditlog_ng.client._create_log_exporter")
     @patch("sap_cloud_sdk.core.auditlog_ng.client.LoggerProvider")
+    @patch(
+        "sap_cloud_sdk.core.auditlog_ng._get_config_from_destination",
+        return_value=None,
+    )
     def test_create_client_unexpected_exception_wraps_in_client_creation_error(
-        self, mock_provider_cls, mock_exporter_fn
+        self, _mock_dest, mock_provider_cls, mock_exporter_fn
     ):
         mock_provider_cls.side_effect = RuntimeError("Unexpected failure")
 
@@ -324,7 +352,7 @@ class TestCreateClientFromDestination:
                 insecure=True,
             )
 
-        mock_dest_factory.assert_called_once_with(instance=None)
+        mock_dest_factory.assert_called_once_with(instance="default")
         assert isinstance(client, AuditClient)
 
     def test_destination_name_without_fragment_uses_destination_path(
@@ -358,7 +386,7 @@ class TestCreateClientFromDestination:
         self, mock_provider_cls, mock_exporter_fn
     ):
         """destination_name with fragment_name but no destination_instance enters the
-        destination path, calling _dest_create_client with instance=None."""
+        destination path, calling _dest_create_client with instance='default'."""
         mock_provider = Mock()
         mock_provider.get_logger.return_value = Mock()
         mock_provider_cls.return_value = mock_provider
@@ -377,7 +405,7 @@ class TestCreateClientFromDestination:
                 insecure=True,
             )
 
-        mock_dest_factory.assert_called_once_with(instance=None)
+        mock_dest_factory.assert_called_once_with(instance="default")
         assert isinstance(client, AuditClient)
 
     # ------------------------------------------------------------------
@@ -498,7 +526,7 @@ class TestCreateClientFromDestination:
                 )
 
     def test_destination_not_found_raises(self, mock_provider_cls, mock_exporter_fn):
-        """Raises ValueError when get_destination returns None."""
+        """Raises ValueError when get_destination returns None and no explicit args are given."""
         dest_client = MagicMock()
         dest_client.get_destination.return_value = None
 
@@ -506,7 +534,7 @@ class TestCreateClientFromDestination:
             "sap_cloud_sdk.destination.create_client",
             return_value=dest_client,
         ):
-            with pytest.raises(ValueError, match="not found"):
+            with pytest.raises(ValueError, match="endpoint, deployment_id, and namespace are required"):
                 create_client(
                     destination_name="missing-dest",
                     destination_instance="my-instance",
@@ -520,17 +548,21 @@ class TestCreateClientFromDestination:
     def test_no_destination_explicit_args_still_works(
         self, mock_provider_cls, mock_exporter_fn
     ):
-        """Existing keyword-arg path is unaffected when destination_name is absent."""
+        """Existing keyword-arg path is unaffected when destination resolution returns None."""
         mock_provider = Mock()
         mock_provider.get_logger.return_value = Mock()
         mock_provider_cls.return_value = mock_provider
 
-        client = create_client(
-            endpoint="localhost:4317",
-            deployment_id="dep-1",
-            namespace="ns-1",
-            insecure=True,
-        )
+        with patch(
+            "sap_cloud_sdk.core.auditlog_ng._get_config_from_destination",
+            return_value=None,
+        ):
+            client = create_client(
+                endpoint="localhost:4317",
+                deployment_id="dep-1",
+                namespace="ns-1",
+                insecure=True,
+            )
 
         assert isinstance(client, AuditClient)
         assert client._config.endpoint == "localhost:4317"

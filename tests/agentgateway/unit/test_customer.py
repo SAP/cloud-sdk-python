@@ -15,7 +15,8 @@ from sap_cloud_sdk.agentgateway._customer import (
     _build_mcp_url,
     _CREDENTIALS_PATH_ENV,
     _SERVICE_BINDING_ROOT_ENV,
-    _BINDING_NAME,
+    _BINDING_TYPE,
+    _BINDING_TYPE_FILE,
     _CREDENTIALS_FILE,
     _DEFAULT_BINDING_ROOT,
 )
@@ -37,6 +38,15 @@ from sap_cloud_sdk.agentgateway.exceptions import AgentGatewaySDKError
 class TestDetectCustomerAgentCredentials:
     """Tests for customer agent credential detection."""
 
+    def _make_binding(self, parent, name="my-binding"):
+        """Create a servicebinding.io-compliant binding directory under parent."""
+        binding_dir = parent / name
+        binding_dir.mkdir(parents=True, exist_ok=True)
+        (binding_dir / _BINDING_TYPE_FILE).write_text(_BINDING_TYPE)
+        creds_file = binding_dir / _CREDENTIALS_FILE
+        creds_file.write_text('{"clientid": "test"}')
+        return creds_file
+
     def test_detect_from_env_var_path(self, tmp_path):
         """Detect credentials from path specified in environment variable."""
         creds_file = tmp_path / "credentials.json"
@@ -46,20 +56,16 @@ class TestDetectCustomerAgentCredentials:
             result = detect_customer_agent_credentials()
             assert result == str(creds_file)
 
-    def test_detect_from_env_var_path_file_not_exists(self):
+    def test_detect_from_env_var_path_file_not_exists(self, tmp_path):
         """Return None when env var path doesn't exist."""
-        with patch.dict(os.environ, {_CREDENTIALS_PATH_ENV: "/nonexistent/path"}, clear=False):
-            os.environ.pop(_SERVICE_BINDING_ROOT_ENV, None)
-            with patch("os.path.isfile", return_value=False):
-                result = detect_customer_agent_credentials()
-                assert result is None
+        env = {_CREDENTIALS_PATH_ENV: "/nonexistent/path", _SERVICE_BINDING_ROOT_ENV: str(tmp_path)}
+        with patch.dict(os.environ, env, clear=False):
+            result = detect_customer_agent_credentials()
+            assert result is None
 
     def test_detect_from_service_binding_root(self, tmp_path):
-        """Detect credentials via SERVICE_BINDING_ROOT/integration-credentials/credentials."""
-        binding_dir = tmp_path / _BINDING_NAME
-        binding_dir.mkdir()
-        creds_file = binding_dir / _CREDENTIALS_FILE
-        creds_file.write_text('{"clientid": "test"}')
+        """Detect credentials by scanning SERVICE_BINDING_ROOT for a binding with matching type file."""
+        creds_file = self._make_binding(tmp_path)
 
         env = {_SERVICE_BINDING_ROOT_ENV: str(tmp_path)}
         with patch.dict(os.environ, env, clear=False):
@@ -68,66 +74,64 @@ class TestDetectCustomerAgentCredentials:
             assert result == str(creds_file)
 
     def test_detect_from_default_path(self, tmp_path):
-        """Detect credentials from default Kyma path when SERVICE_BINDING_ROOT is not set."""
-        default_creds = os.path.join(_DEFAULT_BINDING_ROOT, _BINDING_NAME, _CREDENTIALS_FILE)
+        """Detect credentials from default /bindings root when SERVICE_BINDING_ROOT is not set."""
+        creds_file = self._make_binding(tmp_path)
 
         with patch.dict(os.environ, {}, clear=False):
             os.environ.pop(_CREDENTIALS_PATH_ENV, None)
             os.environ.pop(_SERVICE_BINDING_ROOT_ENV, None)
-
-            with patch("os.path.isfile") as mock_isfile:
-                mock_isfile.side_effect = lambda p: p == default_creds
-
-                result = detect_customer_agent_credentials()
-                assert result == default_creds
-
-    def test_service_binding_root_takes_priority_over_default(self, tmp_path):
-        """SERVICE_BINDING_ROOT path is checked before the hardcoded /bindings fallback."""
-        sbr_dir = tmp_path / "sbr"
-        binding_dir = sbr_dir / _BINDING_NAME
-        binding_dir.mkdir(parents=True)
-        creds_file = binding_dir / _CREDENTIALS_FILE
-        creds_file.write_text('{"clientid": "sbr"}')
-
-        default_creds = os.path.join(_DEFAULT_BINDING_ROOT, _BINDING_NAME, _CREDENTIALS_FILE)
-
-        env = {_SERVICE_BINDING_ROOT_ENV: str(sbr_dir)}
-        with patch.dict(os.environ, env, clear=False):
-            os.environ.pop(_CREDENTIALS_PATH_ENV, None)
-            # Both paths exist, SERVICE_BINDING_ROOT should win
-            with patch("os.path.isfile") as mock_isfile:
-                mock_isfile.side_effect = lambda p: p in (str(creds_file), default_creds)
-
+            with patch("sap_cloud_sdk.agentgateway._customer._DEFAULT_BINDING_ROOT", str(tmp_path)):
                 result = detect_customer_agent_credentials()
                 assert result == str(creds_file)
 
-    def test_no_credentials_returns_none(self):
-        """Return None when no credentials are found."""
-        with patch.dict(os.environ, {}, clear=False):
-            os.environ.pop(_CREDENTIALS_PATH_ENV, None)
-            os.environ.pop(_SERVICE_BINDING_ROOT_ENV, None)
+    def test_skips_binding_with_wrong_type(self, tmp_path):
+        """Ignore binding directories whose type file does not match."""
+        wrong_dir = tmp_path / "other-binding"
+        wrong_dir.mkdir()
+        (wrong_dir / _BINDING_TYPE_FILE).write_text("something-else")
+        (wrong_dir / _CREDENTIALS_FILE).write_text('{"clientid": "wrong"}')
 
-            with patch("os.path.isfile", return_value=False):
-                result = detect_customer_agent_credentials()
-                assert result is None
+        env = {_SERVICE_BINDING_ROOT_ENV: str(tmp_path)}
+        with patch.dict(os.environ, env, clear=False):
+            os.environ.pop(_CREDENTIALS_PATH_ENV, None)
+            result = detect_customer_agent_credentials()
+            assert result is None
+
+    def test_service_binding_root_takes_priority_over_default(self, tmp_path):
+        """SERVICE_BINDING_ROOT is checked before the hardcoded /bindings fallback."""
+        sbr_dir = tmp_path / "sbr"
+        sbr_dir.mkdir()
+        creds_file = self._make_binding(sbr_dir)
+
+        with patch.dict(os.environ, {_SERVICE_BINDING_ROOT_ENV: str(sbr_dir)}, clear=False):
+            os.environ.pop(_CREDENTIALS_PATH_ENV, None)
+            result = detect_customer_agent_credentials()
+            assert result == str(creds_file)
+
+    def test_no_credentials_returns_none(self, tmp_path):
+        """Return None when no binding with matching type is found."""
+        env = {_SERVICE_BINDING_ROOT_ENV: str(tmp_path)}
+        with patch.dict(os.environ, env, clear=False):
+            os.environ.pop(_CREDENTIALS_PATH_ENV, None)
+            result = detect_customer_agent_credentials()
+            assert result is None
 
     def test_env_var_takes_priority_over_service_binding_root(self, tmp_path):
         """AGW_CREDENTIALS_PATH env var takes priority over SERVICE_BINDING_ROOT."""
         creds_file = tmp_path / "custom_credentials.json"
         creds_file.write_text('{"clientid": "custom"}')
 
-        sbr_creds = os.path.join(str(tmp_path), _BINDING_NAME, _CREDENTIALS_FILE)
+        sbr_dir = tmp_path / "sbr"
+        sbr_dir.mkdir()
+        self._make_binding(sbr_dir)
 
         env = {
             _CREDENTIALS_PATH_ENV: str(creds_file),
-            _SERVICE_BINDING_ROOT_ENV: str(tmp_path),
+            _SERVICE_BINDING_ROOT_ENV: str(sbr_dir),
         }
         with patch.dict(os.environ, env, clear=False):
-            with patch("os.path.isfile") as mock_isfile:
-                mock_isfile.side_effect = lambda p: p in (str(creds_file), sbr_creds)
-
-                result = detect_customer_agent_credentials()
-                assert result == str(creds_file)
+            result = detect_customer_agent_credentials()
+            assert result == str(creds_file)
 
 
 # ============================================================
@@ -150,7 +154,7 @@ class TestLoadCustomerCredentials:
             "integrationDependencies": [
                 {
                     "ordId": "sap.test:apiResource:demo:v1",
-                    "data": {"globalTenantId": "123"},
+                    "globalTenantId": "123",
                 },
             ],
         }
@@ -210,11 +214,11 @@ class TestLoadCustomerCredentials:
             "integrationDependencies": [
                 {
                     "ordId": "sap.mcpbuilder:apiResource:cost-center:v1",
-                    "data": {"globalTenantId": "250695"},
+                    "globalTenantId": "250695",
                 },
                 {
                     "ordId": "sap.flights:mcpServer:v1",
-                    "data": {"globalTenantId": "892451733"},
+                    "globalTenantId": "892451733",
                 },
             ],
         }
@@ -260,7 +264,7 @@ class TestLoadCustomerCredentials:
             "privateKey": "-----BEGIN PRIVATE KEY-----\ntest\n-----END PRIVATE KEY-----",
             "gatewayUrl": "https://agw.example.com",
             "integrationDependencies": [
-                {"ordId": "missing-data-field"},  # Missing 'data' key
+                {"ordId": "missing-global-tenant-id-field"},  # Missing 'globalTenantId' key
             ],
         }
         creds_file.write_text(json.dumps(creds_data))

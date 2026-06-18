@@ -32,9 +32,10 @@ logger = logging.getLogger(__name__)
 # Environment variable to override default credential path (points directly to credentials file)
 _CREDENTIALS_PATH_ENV = "AGW_CREDENTIALS_PATH"
 
-# servicebinding.io: credentials are mounted at $SERVICE_BINDING_ROOT/integration-credentials/credentials
+# servicebinding.io: scan $SERVICE_BINDING_ROOT for a binding whose 'type' file equals the expected type
 _SERVICE_BINDING_ROOT_ENV = "SERVICE_BINDING_ROOT"
-_BINDING_NAME = "integration-credentials"
+_BINDING_TYPE = "integration-credentials"
+_BINDING_TYPE_FILE = "type"
 _CREDENTIALS_FILE = "credentials"
 
 # Kyma default when SERVICE_BINDING_ROOT is not set
@@ -63,7 +64,6 @@ class _CredentialFields:
     GATEWAY_URL = "gatewayUrl"
     INTEGRATION_DEPENDENCIES = "integrationDependencies"
     ORD_ID = "ordId"
-    DATA = "data"
     GLOBAL_TENANT_ID = "globalTenantId"
 
 
@@ -72,8 +72,8 @@ def detect_customer_agent_credentials() -> str | None:
 
     Checks for credential file in the following order:
     1. Path specified in AGW_CREDENTIALS_PATH env var (explicit override, points to file directly)
-    2. $SERVICE_BINDING_ROOT/integration-credentials/credentials (servicebinding.io spec)
-    3. /bindings/integration-credentials/credentials (Kyma default when SERVICE_BINDING_ROOT unset)
+    2. $SERVICE_BINDING_ROOT (or /bindings if unset): scans all subdirectories for one whose
+       'type' file contains 'integration-credentials', then reads 'credentials' from that directory
 
     Returns:
         Path to credentials file if found, None otherwise.
@@ -84,19 +84,22 @@ def detect_customer_agent_credentials() -> str | None:
         logger.debug("Customer credentials found at env var path: %s", path_from_env)
         return path_from_env
 
-    # 2. servicebinding.io: $SERVICE_BINDING_ROOT/integration-credentials/credentials
-    sbr = os.environ.get(_SERVICE_BINDING_ROOT_ENV)
-    if sbr:
-        path = os.path.join(sbr, _BINDING_NAME, _CREDENTIALS_FILE)
-        if os.path.isfile(path):
-            logger.debug("Customer credentials found at SERVICE_BINDING_ROOT path: %s", path)
-            return path
-
-    # 3. Kyma default: /bindings/integration-credentials/credentials
-    default_path = os.path.join(_DEFAULT_BINDING_ROOT, _BINDING_NAME, _CREDENTIALS_FILE)
-    if os.path.isfile(default_path):
-        logger.debug("Customer credentials found at default path: %s", default_path)
-        return default_path
+    # 2. servicebinding.io: scan $SERVICE_BINDING_ROOT for a binding whose 'type' file equals _BINDING_TYPE
+    sbr = os.environ.get(_SERVICE_BINDING_ROOT_ENV, _DEFAULT_BINDING_ROOT)
+    if sbr and os.path.isdir(sbr):
+        for entry in os.scandir(sbr):
+            if not entry.is_dir():
+                continue
+            type_file = os.path.join(entry.path, _BINDING_TYPE_FILE)
+            if not os.path.isfile(type_file):
+                continue
+            with open(type_file) as f:
+                if f.read().strip() != _BINDING_TYPE:
+                    continue
+            credentials_path = os.path.join(entry.path, _CREDENTIALS_FILE)
+            if os.path.isfile(credentials_path):
+                logger.debug("Customer credentials found via servicebinding.io type scan: %s", credentials_path)
+                return credentials_path
 
     return None
 
@@ -141,16 +144,14 @@ def load_customer_credentials(path: str) -> CustomerCredentials:
     if _CredentialFields.INTEGRATION_DEPENDENCIES not in data:
         raise AgentGatewaySDKError(
             "Credentials file missing required field: integrationDependencies. "
-            'Expected format: [{"ordId": "...", "data": {"globalTenantId": "..."}}]'
+            'Expected format: [{"ordId": "...", "globalTenantId": "..."}]'
         )
 
     try:
         integration_deps = [
             IntegrationDependency(
                 ord_id=dep[_CredentialFields.ORD_ID],
-                global_tenant_id=dep[_CredentialFields.DATA][
-                    _CredentialFields.GLOBAL_TENANT_ID
-                ],
+                global_tenant_id=dep[_CredentialFields.GLOBAL_TENANT_ID],
             )
             for dep in data[_CredentialFields.INTEGRATION_DEPENDENCIES]
         ]
@@ -161,7 +162,7 @@ def load_customer_credentials(path: str) -> CustomerCredentials:
     except (KeyError, TypeError) as e:
         raise AgentGatewaySDKError(
             f"Failed to parse integrationDependencies: {e}. "
-            'Expected format: [{"ordId": "...", "data": {"globalTenantId": "..."}}]'
+            'Expected format: [{"ordId": "...", "globalTenantId": "..."}]'
         )
 
     return CustomerCredentials(

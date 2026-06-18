@@ -98,6 +98,9 @@ class TestMcpToolToLangchain:
 
         result = mcp_tool_to_langchain(tool, AsyncMock(return_value="result"), lambda: "token")
 
+        from pydantic import BaseModel
+
+        assert result.args_schema is not None and isinstance(result.args_schema, type) and issubclass(result.args_schema, BaseModel)
         fields = result.args_schema.model_fields
         assert fields["eventid"].is_required(), "eventid should be required"
         assert not fields["showdeclinedreason"].is_required(), "showdeclinedreason should be optional"

@@ -87,7 +87,7 @@ class GetAllRequestBuilder(Generic[T]):
     def execute(self) -> list[T]:
         """Execute the request and return all matching entities."""
         path = _entity_set_path(self._entity_type)
-        data = self._transport.get(path, params=self._query.to_params())
+        data = self._transport.request("GET", path, params=self._query.to_params())
         return deserialize_collection(data, self._entity_type)
 
     def iterate_pages(self) -> Iterator[list[T]]:
@@ -99,11 +99,8 @@ class GetAllRequestBuilder(Generic[T]):
             from urllib.parse import urlencode
             first_url += "?" + urlencode(params)
 
-        def _fetch(url: str) -> dict[str, Any]:
-            return self._transport.get(url.replace(self._transport._base_url + "/", ""))
-
         iterator = ODataPageIterator(
-            fetch_page=lambda url: self._transport._request("GET", _strip_base(url, self._transport._base_url)),
+            fetch_page=lambda url: self._transport.request("GET", _strip_base(url, self._transport._base_url)),
             entity_type=self._entity_type,
             first_url=first_url,
         )
@@ -148,7 +145,7 @@ class GetByKeyRequestBuilder(Generic[T]):
     def execute(self) -> T:
         """Fetch the entity, raising :exc:`ODataNotFoundError` if absent."""
         path = _entity_set_path(self._entity_type) + _build_key_segment(self._key)
-        data = self._transport.get(path, params=self._query.to_params())
+        data = self._transport.request("GET", path, params=self._query.to_params())
         return deserialize_single(data, self._entity_type)
 
 
@@ -166,7 +163,7 @@ class CreateRequestBuilder(Generic[T]):
         entity_type = type(self._entity)
         path = _entity_set_path(entity_type)
         body = self._entity.to_dict() if hasattr(self._entity, "to_dict") else dataclasses.asdict(self._entity)  # type: ignore[arg-type]
-        data = self._transport.post(path, body)
+        data = self._transport.request("POST", path, json=body)
         return deserialize_single(data, entity_type)
 
 
@@ -201,10 +198,11 @@ class UpdateRequestBuilder(Generic[T]):
         key = {k: getattr(self._entity, k) for k in key_fields}
         path = _entity_set_path(entity_type) + _build_key_segment(key)
         body = self._entity.to_dict() if hasattr(self._entity, "to_dict") else dataclasses.asdict(self._entity)  # type: ignore[arg-type]
-        if self._use_put:
-            data = self._transport.put(path, body, etag=self._etag)
-        else:
-            data = self._transport.patch(path, body, etag=self._etag)
+        method = "PUT" if self._use_put else "PATCH"
+        extra: dict[str, str] = {}
+        if self._etag is not None:
+            extra["If-Match"] = self._etag
+        data = self._transport.request(method, path, json=body, headers=extra or None)
         if not data:
             return self._entity
         return deserialize_single(data, entity_type)
@@ -228,4 +226,7 @@ class DeleteRequestBuilder(Generic[T]):
     def execute(self) -> None:
         """Delete the entity."""
         path = _entity_set_path(self._entity_type) + _build_key_segment(self._key)
-        self._transport.delete(path, etag=self._etag)
+        extra: dict[str, str] = {}
+        if self._etag is not None:
+            extra["If-Match"] = self._etag
+        self._transport.request("DELETE", path, headers=extra or None)

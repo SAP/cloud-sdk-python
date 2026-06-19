@@ -8,6 +8,12 @@ from typing import Any
 import requests
 from requests.exceptions import RequestException
 
+from sap_cloud_sdk.core.odata._constants import (
+    CSRF_HEADER,
+    DEFAULT_HEADERS,
+    MUTATING_METHODS,
+    REQUEST_TIMEOUT,
+)
 from sap_cloud_sdk.core.odata._csrf import CsrfTokenProvider
 from sap_cloud_sdk.core.odata.exceptions import (
     ODataAuthError,
@@ -16,10 +22,6 @@ from sap_cloud_sdk.core.odata.exceptions import (
 )
 
 logger = logging.getLogger(__name__)
-
-_CSRF_HEADER = "X-CSRF-Token"
-_MUTATING_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
-_REQUEST_TIMEOUT = 30
 
 
 class ODataHttpTransport:
@@ -87,14 +89,14 @@ class ODataHttpTransport:
         """
         extra = dict(headers or {})
 
-        if method.upper() in _MUTATING_METHODS and self._csrf is not None:
-            extra[_CSRF_HEADER] = self._csrf.get()
+        if method.upper() in MUTATING_METHODS and self._csrf is not None:
+            extra[CSRF_HEADER] = self._csrf.get()
             try:
                 return self._execute(method, path, params=params, json=json, extra_headers=extra)
             except ODataAuthError as exc:
                 if exc.status_code == 403:
                     self._csrf.invalidate()
-                    extra[_CSRF_HEADER] = self._csrf.get()
+                    extra[CSRF_HEADER] = self._csrf.get()
                     return self._execute(method, path, params=params, json=json, extra_headers=extra)
                 raise
 
@@ -118,12 +120,7 @@ class ODataHttpTransport:
         extra_headers: dict[str, str] | None = None,
     ) -> dict[str, Any]:
         url = self.absolute_url(path)
-        req_headers: dict[str, str] = {
-            "Accept": "application/json",
-            "Content-Type": "application/json",
-        }
-        if extra_headers:
-            req_headers.update(extra_headers)
+        req_headers = {**DEFAULT_HEADERS, **(extra_headers or {})}
 
         logger.debug("%s %s params=%s", method, url, params)
         try:
@@ -133,7 +130,7 @@ class ODataHttpTransport:
                 headers=req_headers,
                 params=params,
                 json=json,
-                timeout=_REQUEST_TIMEOUT,
+                timeout=REQUEST_TIMEOUT,
             )
         except RequestException as exc:
             raise ODataRequestError.__new__(ODataRequestError) from exc

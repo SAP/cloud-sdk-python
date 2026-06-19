@@ -7,14 +7,11 @@ from typing import TYPE_CHECKING
 
 import requests as _requests
 
+from sap_cloud_sdk.core.odata._constants import CSRF_FETCH_TIMEOUT, CSRF_FETCH_VALUE, CSRF_HEADER
 from sap_cloud_sdk.core.odata.exceptions import ODataCsrfError
 
 if TYPE_CHECKING:
     from ._transport import ODataHttpTransport
-
-_CSRF_HEADER = "X-CSRF-Token"
-_CSRF_FETCH_VALUE = "Fetch"
-_FETCH_TIMEOUT = 10
 
 
 class CsrfTokenProvider:
@@ -57,13 +54,13 @@ class CsrfTokenProvider:
         try:
             resp = self._transport._session.get(
                 url,
-                headers={_CSRF_HEADER: _CSRF_FETCH_VALUE},
-                timeout=_FETCH_TIMEOUT,
+                headers={CSRF_HEADER: CSRF_FETCH_VALUE},
+                timeout=CSRF_FETCH_TIMEOUT,
             )
         except _requests.RequestException as exc:
             raise ODataCsrfError(f"CSRF fetch failed: {exc}") from exc
 
-        token = resp.headers.get(_CSRF_HEADER, "")
+        token = resp.headers.get(CSRF_HEADER, "")
         if not token:
             raise ODataCsrfError(
                 f"Service did not return a CSRF token (HTTP {resp.status_code})"

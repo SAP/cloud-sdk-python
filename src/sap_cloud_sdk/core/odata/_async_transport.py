@@ -8,6 +8,14 @@ from typing import Any
 
 import httpx
 
+from sap_cloud_sdk.core.odata._constants import (
+    CSRF_FETCH_TIMEOUT,
+    CSRF_FETCH_VALUE,
+    CSRF_HEADER,
+    DEFAULT_HEADERS,
+    MUTATING_METHODS,
+    REQUEST_TIMEOUT,
+)
 from sap_cloud_sdk.core.odata.exceptions import (
     ODataAuthError,
     ODataCsrfError,
@@ -16,12 +24,6 @@ from sap_cloud_sdk.core.odata.exceptions import (
 )
 
 logger = logging.getLogger(__name__)
-
-_CSRF_HEADER = "X-CSRF-Token"
-_CSRF_FETCH_VALUE = "Fetch"
-_CSRF_FETCH_TIMEOUT = 10
-_MUTATING_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
-_REQUEST_TIMEOUT = 30
 
 
 class AsyncODataHttpTransport:
@@ -86,14 +88,14 @@ class AsyncODataHttpTransport:
         """
         extra = dict(headers or {})
 
-        if method.upper() in _MUTATING_METHODS and self._csrf_enabled:
-            extra[_CSRF_HEADER] = await self._get_csrf_token()
+        if method.upper() in MUTATING_METHODS and self._csrf_enabled:
+            extra[CSRF_HEADER] = await self._get_csrf_token()
             try:
                 return await self._execute(method, path, params=params, json=json, extra_headers=extra)
             except ODataAuthError as exc:
                 if exc.status_code == 403:
                     await self._invalidate_csrf_token()
-                    extra[_CSRF_HEADER] = await self._get_csrf_token()
+                    extra[CSRF_HEADER] = await self._get_csrf_token()
                     return await self._execute(method, path, params=params, json=json, extra_headers=extra)
                 raise
 
@@ -126,13 +128,13 @@ class AsyncODataHttpTransport:
         try:
             resp = await self._client.get(
                 url,
-                headers={_CSRF_HEADER: _CSRF_FETCH_VALUE},
-                timeout=_CSRF_FETCH_TIMEOUT,
+                headers={CSRF_HEADER: CSRF_FETCH_VALUE},
+                timeout=CSRF_FETCH_TIMEOUT,
             )
         except httpx.RequestError as exc:
             raise ODataCsrfError(f"Async CSRF fetch failed: {exc}") from exc
 
-        token = resp.headers.get(_CSRF_HEADER, "")
+        token = resp.headers.get(CSRF_HEADER, "")
         if not token:
             raise ODataCsrfError(
                 f"Service did not return a CSRF token (HTTP {resp.status_code})"
@@ -149,12 +151,7 @@ class AsyncODataHttpTransport:
         extra_headers: dict[str, str] | None = None,
     ) -> dict[str, Any]:
         url = self.absolute_url(path)
-        req_headers: dict[str, str] = {
-            "Accept": "application/json",
-            "Content-Type": "application/json",
-        }
-        if extra_headers:
-            req_headers.update(extra_headers)
+        req_headers = {**DEFAULT_HEADERS, **(extra_headers or {})}
 
         logger.debug("%s %s params=%s", method, url, params)
         try:
@@ -164,7 +161,7 @@ class AsyncODataHttpTransport:
                 headers=req_headers,
                 params=params,
                 json=json,
-                timeout=_REQUEST_TIMEOUT,
+                timeout=REQUEST_TIMEOUT,
             )
         except httpx.RequestError as exc:
             raise ODataCsrfError(f"Request failed: {exc}") from exc

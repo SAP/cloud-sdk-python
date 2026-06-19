@@ -6,6 +6,15 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import TYPE_CHECKING
 
+from sap_cloud_sdk.core.odata._constants import (
+    QUERY_EXPAND,
+    QUERY_FILTER,
+    QUERY_ORDERBY,
+    QUERY_SELECT,
+    QUERY_SKIP,
+    QUERY_TOP,
+)
+
 if TYPE_CHECKING:
     from ._filter import FilterExpression
 
@@ -120,19 +129,19 @@ class StructuredQuery:
     def to_params(self) -> dict[str, str]:
         params: dict[str, str] = {}
         if self._select:
-            params["$select"] = ",".join(self._select)
+            params[QUERY_SELECT] = ",".join(self._select)
         if self._filter is not None:
-            params["$filter"] = str(self._filter)
+            params[QUERY_FILTER] = str(self._filter)
         if self._orderby:
-            params["$orderby"] = ",".join(
+            params[QUERY_ORDERBY] = ",".join(
                 f"{f} {d.value}" for f, d in self._orderby
             )
         if self._top is not None:
-            params["$top"] = str(self._top)
+            params[QUERY_TOP] = str(self._top)
         if self._skip is not None:
-            params["$skip"] = str(self._skip)
+            params[QUERY_SKIP] = str(self._skip)
         if self._expand:
-            params["$expand"] = ",".join(self._expand)
+            params[QUERY_EXPAND] = ",".join(self._expand)
         for k, v in self._custom:
             params[k] = v
         return params

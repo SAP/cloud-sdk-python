@@ -5,6 +5,7 @@ from __future__ import annotations
 import dataclasses
 from typing import Any, TypeVar
 
+from sap_cloud_sdk.core.odata._constants import RESPONSE_NEXT_LINK, RESPONSE_VALUE
 from sap_cloud_sdk.core.odata.exceptions import ODataDeserializationError
 
 T = TypeVar("T")
@@ -22,7 +23,7 @@ def deserialize_single(data: dict[str, Any], entity_type: type[T]) -> T:
             f"{entity_type!r} is not a dataclass — cannot deserialize"
         )
     try:
-        payload = data.get("value", data) if isinstance(data.get("value"), dict) else data
+        payload = data.get(RESPONSE_VALUE, data) if isinstance(data.get(RESPONSE_VALUE), dict) else data
         known = {f.name for f in dataclasses.fields(entity_type)}  # type: ignore[arg-type]
         kwargs = {k: v for k, v in payload.items() if k in known}
         return entity_type(**kwargs)  # type: ignore[call-arg]
@@ -43,7 +44,7 @@ def deserialize_collection(data: dict[str, Any], entity_type: type[T]) -> list[T
             f"{entity_type!r} is not a dataclass — cannot deserialize"
         )
     try:
-        items: list[dict[str, Any]] = data.get("value", [])
+        items: list[dict[str, Any]] = data.get(RESPONSE_VALUE, [])
         return [deserialize_single(item, entity_type) for item in items]
     except ODataDeserializationError:
         raise
@@ -55,4 +56,4 @@ def deserialize_collection(data: dict[str, Any], entity_type: type[T]) -> list[T
 
 def next_link(data: dict[str, Any]) -> str | None:
     """Extract ``@odata.nextLink`` from a collection response, or ``None``."""
-    return data.get("@odata.nextLink")
+    return data.get(RESPONSE_NEXT_LINK)

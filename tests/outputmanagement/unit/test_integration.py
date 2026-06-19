@@ -6,8 +6,8 @@
 import pytest
 from unittest.mock import Mock, patch, MagicMock
 
-from sap_cloud_sdk.outputmanagement.client import OutputManagementClient
-from sap_cloud_sdk.outputmanagement.client_provider import OutputManagementClientProvider
+from sap_cloud_sdk.outputmanagement.client import OutputManagementServiceClient
+from sap_cloud_sdk.outputmanagement.client_provider import OutputManagementServiceClientProvider
 from sap_cloud_sdk.outputmanagement.config.destination_credential_config import (
     DestinationCredentialConfig,
 )
@@ -17,8 +17,8 @@ from sap_cloud_sdk.outputmanagement.models import (
     OutputResponse,
 )
 from sap_cloud_sdk.outputmanagement.exceptions import (
-    OutputManagementError,
-    OutputManagementValidationError,
+    OutputManagementException,
+    ValidationException,
 )
 
 
@@ -134,11 +134,11 @@ class TestOutputManagementIntegration:
     def test_error_handling_workflow(self):
         """Test error handling in workflow."""
         # Test that exceptions can be raised and caught
-        with pytest.raises(OutputManagementError):
-            raise OutputManagementError("General error")
+        with pytest.raises(OutputManagementException):
+            raise OutputManagementException("General error")
         
-        with pytest.raises(OutputManagementValidationError):
-            raise OutputManagementValidationError("Validation error")
+        with pytest.raises(ValidationException):
+            raise ValidationException("Validation error")
 
     def test_dataclass_immutability_workflow(self):
         """Test that dataclass instances work as expected."""

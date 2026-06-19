@@ -27,24 +27,28 @@ class TestOutputManagementModule:
     def test_constants_import(self):
         """Test that constants can be imported."""
         from sap_cloud_sdk.outputmanagement.constants import (
-            DEFAULT_DESTINATION_NAME,
-            OUTPUT_MANAGEMENT_SERVICE_PATH,
-            EMAIL_SERVICE_PATH,
+            Constants,
+            FileFormat,
+            Channel,
+            Status,
         )
-        assert DEFAULT_DESTINATION_NAME is not None
-        assert OUTPUT_MANAGEMENT_SERVICE_PATH is not None
-        assert EMAIL_SERVICE_PATH is not None
+        assert Constants.API_OUTPUT_CONTROL is not None
+        assert FileFormat.PDF is not None
+        assert Channel.EMAIL is not None
+        assert Status.PENDING is not None
 
     def test_exceptions_import(self):
         """Test that exceptions can be imported."""
         from sap_cloud_sdk.outputmanagement.exceptions import (
-            OutputManagementError,
-            OutputManagementValidationError,
-            OutputManagementClientError,
+            OutputManagementException,
+            ValidationException,
+            AuthenticationException,
+            NetworkException,
         )
-        assert OutputManagementError is not None
-        assert OutputManagementValidationError is not None
-        assert OutputManagementClientError is not None
+        assert OutputManagementException is not None
+        assert ValidationException is not None
+        assert AuthenticationException is not None
+        assert NetworkException is not None
 
     def test_models_import(self):
         """Test that models can be imported."""

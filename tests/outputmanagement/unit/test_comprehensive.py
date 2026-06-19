@@ -13,9 +13,9 @@ from sap_cloud_sdk.outputmanagement.models import (
     PreGeneratedAttachment,
 )
 from sap_cloud_sdk.outputmanagement.exceptions import (
-    OutputManagementError,
-    OutputManagementValidationError,
-    OutputManagementClientError,
+    OutputManagementException,
+    ValidationException,
+    AuthenticationException,
 )
 
 
@@ -176,27 +176,27 @@ class TestExceptionScenarios:
         try:
             raise ValueError("Inner error")
         except ValueError as e:
-            error = OutputManagementError(f"Outer error: {str(e)}")
-            assert "Inner error" in str(error)
-            assert "Outer error" in str(error)
+            error = OutputManagementException(f"Outer error: {str(e)}")
+            assert "Inner error" in error.message
+            assert "Outer error" in error.message
 
     def test_multiple_exception_types(self):
         """Test catching different exception types."""
         errors = [
-            OutputManagementError("General error"),
-            OutputManagementValidationError("Validation error"),
-            OutputManagementClientError("Client error"),
+            OutputManagementException("General error"),
+            ValidationException("Validation error"),
+            AuthenticationException("Authentication error"),
         ]
         
         for error in errors:
-            assert isinstance(error, OutputManagementError)
+            assert isinstance(error, OutputManagementException)
             assert isinstance(error, Exception)
 
     def test_exception_repr(self):
         """Test exception representation."""
-        error = OutputManagementError("Test error")
+        error = OutputManagementException("Test error")
         repr_str = repr(error)
-        assert "OutputManagementError" in repr_str or "Test error" in repr_str
+        assert "OutputManagementException" in repr_str or "Test error" in repr_str
 
 
 class TestModelComparisons:

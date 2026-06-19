@@ -18,6 +18,7 @@ from sap_cloud_sdk.core.odata.exceptions import (
 logger = logging.getLogger(__name__)
 
 _CSRF_HEADER = "X-CSRF-Token"
+_MUTATING_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
 _REQUEST_TIMEOUT = 30
 
 
@@ -42,7 +43,7 @@ class ODataHttpTransport:
             base_url="https://example.com/odata/v4/",
             session=oauth_session,
         )
-        data = transport.get("BusinessPartnerSet", params={"$top": "10"})
+        data = transport.request("GET", "BusinessPartnerSet", params={"$top": "10"})
     """
 
     def __init__(
@@ -57,56 +58,47 @@ class ODataHttpTransport:
             CsrfTokenProvider(self) if csrf_enabled else None
         )
 
-    # ------------------------------------------------------------------
-    # Public verbs
-    # ------------------------------------------------------------------
-
-    def get(
-        self, path: str, params: dict[str, Any] | None = None
-    ) -> dict[str, Any]:
-        """Execute a GET request and return the parsed JSON body."""
-        return self._request("GET", path, params=params)
-
-    def post(self, path: str, body: dict[str, Any]) -> dict[str, Any]:
-        """Execute a POST with a CSRF token and return the parsed JSON body."""
-        return self._send_with_csrf("POST", path, json=body)
-
-    def patch(
+    def request(
         self,
+        method: str,
         path: str,
-        body: dict[str, Any],
-        etag: str | None = None,
+        *,
+        params: dict[str, Any] | None = None,
+        json: Any | None = None,
+        headers: dict[str, str] | None = None,
     ) -> dict[str, Any]:
-        """Execute a PATCH (partial update) with a CSRF token.
+        """Execute an OData request and return the parsed JSON body.
+
+        CSRF tokens are fetched and attached automatically for mutating methods
+        (POST, PUT, PATCH, DELETE) when ``csrf_enabled`` is ``True``.  On a
+        403 response the cached token is invalidated and the request is retried
+        once with a fresh token.
 
         Args:
+            method: HTTP method (``"GET"``, ``"POST"``, ``"PATCH"``, etc.).
             path: Entity path relative to the service base URL.
-            body: Partial entity dict to send as the request body.
-            etag: If provided, sent as ``If-Match`` for optimistic locking.
+            params: OData query parameters (``$filter``, ``$top``, …).
+            json: Request body serialised as JSON.
+            headers: Extra headers merged on top of the defaults
+                (``Accept: application/json``, ``Content-Type: application/json``).
+
+        Returns:
+            Parsed JSON response body, or ``{}`` for 204 / empty responses.
         """
-        extra: dict[str, str] = {}
-        if etag is not None:
-            extra["If-Match"] = etag
-        return self._send_with_csrf("PATCH", path, json=body, extra_headers=extra)
+        extra = dict(headers or {})
 
-    def put(
-        self,
-        path: str,
-        body: dict[str, Any],
-        etag: str | None = None,
-    ) -> dict[str, Any]:
-        """Execute a PUT (full replacement) with a CSRF token."""
-        extra: dict[str, str] = {}
-        if etag is not None:
-            extra["If-Match"] = etag
-        return self._send_with_csrf("PUT", path, json=body, extra_headers=extra)
+        if method.upper() in _MUTATING_METHODS and self._csrf is not None:
+            extra[_CSRF_HEADER] = self._csrf.get()
+            try:
+                return self._execute(method, path, params=params, json=json, extra_headers=extra)
+            except ODataAuthError as exc:
+                if exc.status_code == 403:
+                    self._csrf.invalidate()
+                    extra[_CSRF_HEADER] = self._csrf.get()
+                    return self._execute(method, path, params=params, json=json, extra_headers=extra)
+                raise
 
-    def delete(self, path: str, etag: str | None = None) -> None:
-        """Execute a DELETE with a CSRF token."""
-        extra: dict[str, str] = {}
-        if etag is not None:
-            extra["If-Match"] = etag
-        self._send_with_csrf("DELETE", path, extra_headers=extra)
+        return self._execute(method, path, params=params, json=json, extra_headers=extra)
 
     def absolute_url(self, path: str) -> str:
         """Return the full URL for *path* relative to the service base."""
@@ -116,31 +108,7 @@ class ODataHttpTransport:
     # Internal
     # ------------------------------------------------------------------
 
-    def _send_with_csrf(
-        self,
-        method: str,
-        path: str,
-        *,
-        json: Any | None = None,
-        extra_headers: dict[str, str] | None = None,
-    ) -> dict[str, Any]:
-        assert self._csrf is not None or True  # csrf may be disabled
-        csrf_headers: dict[str, str] = {}
-        if self._csrf is not None:
-            csrf_headers[_CSRF_HEADER] = self._csrf.get()
-
-        merged = {**(extra_headers or {}), **csrf_headers}
-        try:
-            return self._request(method, path, json=json, extra_headers=merged)
-        except ODataAuthError as exc:
-            if exc.status_code == 403 and self._csrf is not None:
-                self._csrf.invalidate()
-                csrf_headers[_CSRF_HEADER] = self._csrf.get()
-                merged = {**(extra_headers or {}), **csrf_headers}
-                return self._request(method, path, json=json, extra_headers=merged)
-            raise
-
-    def _request(
+    def _execute(
         self,
         method: str,
         path: str,
@@ -150,19 +118,19 @@ class ODataHttpTransport:
         extra_headers: dict[str, str] | None = None,
     ) -> dict[str, Any]:
         url = self.absolute_url(path)
-        headers: dict[str, str] = {
+        req_headers: dict[str, str] = {
             "Accept": "application/json",
             "Content-Type": "application/json",
         }
         if extra_headers:
-            headers.update(extra_headers)
+            req_headers.update(extra_headers)
 
         logger.debug("%s %s params=%s", method, url, params)
         try:
             resp = self._session.request(
                 method=method,
                 url=url,
-                headers=headers,
+                headers=req_headers,
                 params=params,
                 json=json,
                 timeout=_REQUEST_TIMEOUT,

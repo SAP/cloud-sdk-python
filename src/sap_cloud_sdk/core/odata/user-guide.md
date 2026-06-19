@@ -9,7 +9,39 @@ from sap_cloud_sdk.core.odata._transport import ODataHttpTransport
 from sap_cloud_sdk.core.odata._request_builders import GetAllRequestBuilder
 from sap_cloud_sdk.core.odata._filter import FilterExpression
 from sap_cloud_sdk.core.odata._query import StructuredQuery, OrderDirection
+from sap_cloud_sdk.core.odata._factory import odata_transport_from_destination
 from sap_cloud_sdk.core.odata.exceptions import ODataError, ODataNotFoundError
+```
+
+## Destination integration
+
+`odata_transport_from_destination` builds an `ODataHttpTransport` from a resolved BTP Destination.  The destination's auth tokens and ERP headers are pre-baked into the underlying session, so no manual header management is needed.
+
+```python
+from sap_cloud_sdk.destination import create_client
+from sap_cloud_sdk.core.odata._factory import odata_transport_from_destination
+from sap_cloud_sdk.core.odata._request_builders import GetAllRequestBuilder
+
+dest_client = create_client()
+destination = dest_client.get_destination("S4HANA_OData")
+
+transport = odata_transport_from_destination(destination)
+results = GetAllRequestBuilder(transport, BusinessPartner).top(10).execute()
+```
+
+When the destination URL points to the host root rather than the OData service root, pass `odata_path`:
+
+```python
+transport = odata_transport_from_destination(
+    destination,
+    odata_path="sap/opu/odata4/svc/API_BUSINESS_PARTNER/",
+)
+```
+
+Set `csrf_enabled=False` for services that do not require CSRF tokens:
+
+```python
+transport = odata_transport_from_destination(destination, csrf_enabled=False)
 ```
 
 ## Transport
@@ -47,7 +79,7 @@ async with AsyncODataHttpTransport(
     base_url="https://host/sap/opu/odata4/svc/",
     client=httpx.AsyncClient(headers={"Authorization": "Bearer <token>"}),
 ) as transport:
-    data = await transport.get("EntitySet", params={"$top": "10"})
+    data = await transport.request("GET", "EntitySet", params={"$top": "10"})
 ```
 
 ## Request Builders
@@ -182,7 +214,7 @@ for entity in builder.iterate_entities():
 from sap_cloud_sdk.core.odata._pagination import ODataPageIterator
 
 iterator = ODataPageIterator(
-    fetch_page=lambda url: transport.get(url.removeprefix(transport._base_url + "/")),
+    fetch_page=lambda url: transport.request("GET", url.removeprefix(transport._base_url + "/")),
     entity_type=BusinessPartner,
     first_url=transport.absolute_url("BusinessPartnerSet?$top=100"),
 )

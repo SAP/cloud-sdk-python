@@ -20,6 +20,7 @@ logger = logging.getLogger(__name__)
 _CSRF_HEADER = "X-CSRF-Token"
 _CSRF_FETCH_VALUE = "Fetch"
 _CSRF_FETCH_TIMEOUT = 10
+_MUTATING_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
 _REQUEST_TIMEOUT = 30
 
 
@@ -30,7 +31,7 @@ class AsyncODataHttpTransport:
     but uses ``httpx.AsyncClient``.  Use as an async context manager::
 
         async with AsyncODataHttpTransport(base_url, client) as t:
-            data = await t.get("BusinessPartnerSet")
+            data = await t.request("GET", "BusinessPartnerSet")
 
     Args:
         base_url: Root URL of the OData service.
@@ -57,47 +58,46 @@ class AsyncODataHttpTransport:
     async def __aexit__(self, *args: Any) -> None:
         await self._client.aclose()
 
-    # ------------------------------------------------------------------
-    # Public verbs
-    # ------------------------------------------------------------------
-
-    async def get(
-        self, path: str, params: dict[str, Any] | None = None
-    ) -> dict[str, Any]:
-        """Execute a GET and return the parsed JSON body."""
-        return await self._request("GET", path, params=params)
-
-    async def post(self, path: str, body: dict[str, Any]) -> dict[str, Any]:
-        """Execute a POST with CSRF and return the parsed JSON body."""
-        return await self._send_with_csrf("POST", path, json=body)
-
-    async def patch(
+    async def request(
         self,
+        method: str,
         path: str,
-        body: dict[str, Any],
-        etag: str | None = None,
+        *,
+        params: dict[str, Any] | None = None,
+        json: Any | None = None,
+        headers: dict[str, str] | None = None,
     ) -> dict[str, Any]:
-        extra: dict[str, str] = {}
-        if etag is not None:
-            extra["If-Match"] = etag
-        return await self._send_with_csrf("PATCH", path, json=body, extra_headers=extra)
+        """Execute an OData request and return the parsed JSON body.
 
-    async def put(
-        self,
-        path: str,
-        body: dict[str, Any],
-        etag: str | None = None,
-    ) -> dict[str, Any]:
-        extra: dict[str, str] = {}
-        if etag is not None:
-            extra["If-Match"] = etag
-        return await self._send_with_csrf("PUT", path, json=body, extra_headers=extra)
+        CSRF tokens are fetched and attached automatically for mutating methods
+        (POST, PUT, PATCH, DELETE) when ``csrf_enabled`` is ``True``.  On a
+        403 response the cached token is invalidated and the request is retried
+        once with a fresh token.
 
-    async def delete(self, path: str, etag: str | None = None) -> None:
-        extra: dict[str, str] = {}
-        if etag is not None:
-            extra["If-Match"] = etag
-        await self._send_with_csrf("DELETE", path, extra_headers=extra)
+        Args:
+            method: HTTP method (``"GET"``, ``"POST"``, ``"PATCH"``, etc.).
+            path: Entity path relative to the service base URL.
+            params: OData query parameters.
+            json: Request body serialised as JSON.
+            headers: Extra headers merged on top of the defaults.
+
+        Returns:
+            Parsed JSON response body, or ``{}`` for 204 / empty responses.
+        """
+        extra = dict(headers or {})
+
+        if method.upper() in _MUTATING_METHODS and self._csrf_enabled:
+            extra[_CSRF_HEADER] = await self._get_csrf_token()
+            try:
+                return await self._execute(method, path, params=params, json=json, extra_headers=extra)
+            except ODataAuthError as exc:
+                if exc.status_code == 403:
+                    await self._invalidate_csrf_token()
+                    extra[_CSRF_HEADER] = await self._get_csrf_token()
+                    return await self._execute(method, path, params=params, json=json, extra_headers=extra)
+                raise
+
+        return await self._execute(method, path, params=params, json=json, extra_headers=extra)
 
     def absolute_url(self, path: str) -> str:
         return self._base_url + "/" + path.lstrip("/")
@@ -105,29 +105,6 @@ class AsyncODataHttpTransport:
     # ------------------------------------------------------------------
     # Internal
     # ------------------------------------------------------------------
-
-    async def _send_with_csrf(
-        self,
-        method: str,
-        path: str,
-        *,
-        json: Any | None = None,
-        extra_headers: dict[str, str] | None = None,
-    ) -> dict[str, Any]:
-        csrf_headers: dict[str, str] = {}
-        if self._csrf_enabled:
-            csrf_headers[_CSRF_HEADER] = await self._get_csrf_token()
-
-        merged = {**(extra_headers or {}), **csrf_headers}
-        try:
-            return await self._request(method, path, json=json, extra_headers=merged)
-        except ODataAuthError as exc:
-            if exc.status_code == 403 and self._csrf_enabled:
-                await self._invalidate_csrf_token()
-                csrf_headers[_CSRF_HEADER] = await self._get_csrf_token()
-                merged = {**(extra_headers or {}), **csrf_headers}
-                return await self._request(method, path, json=json, extra_headers=merged)
-            raise
 
     async def _get_csrf_token(self) -> str:
         async with self._csrf_lock:
@@ -162,7 +139,7 @@ class AsyncODataHttpTransport:
             )
         return token
 
-    async def _request(
+    async def _execute(
         self,
         method: str,
         path: str,
@@ -172,19 +149,19 @@ class AsyncODataHttpTransport:
         extra_headers: dict[str, str] | None = None,
     ) -> dict[str, Any]:
         url = self.absolute_url(path)
-        headers: dict[str, str] = {
+        req_headers: dict[str, str] = {
             "Accept": "application/json",
             "Content-Type": "application/json",
         }
         if extra_headers:
-            headers.update(extra_headers)
+            req_headers.update(extra_headers)
 
         logger.debug("%s %s params=%s", method, url, params)
         try:
             resp = await self._client.request(
                 method=method,
                 url=url,
-                headers=headers,
+                headers=req_headers,
                 params=params,
                 json=json,
                 timeout=_REQUEST_TIMEOUT,

@@ -1,7 +1,7 @@
 """Unit tests for ODataHttpTransport."""
 
 from typing import Any
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 import requests
@@ -38,105 +38,114 @@ def transport(session):
     )
 
 
-class TestODataHttpTransportGet:
-    def test_get_builds_correct_url(self, transport, session):
+class TestRequest:
+    def test_builds_correct_url(self, transport, session):
         session.request.return_value = _mock_response(200, {})
-        transport.get("EntitySet")
-        call = session.request.call_args
-        assert call[1]["url"] == "https://example.com/odata/v4/EntitySet"
+        transport.request("GET", "EntitySet")
+        assert session.request.call_args[1]["url"] == "https://example.com/odata/v4/EntitySet"
 
-    def test_get_passes_params(self, transport, session):
+    def test_passes_params(self, transport, session):
         session.request.return_value = _mock_response(200, {})
-        transport.get("EntitySet", params={"$top": "5"})
-        call = session.request.call_args
-        assert call[1]["params"] == {"$top": "5"}
+        transport.request("GET", "EntitySet", params={"$top": "5"})
+        assert session.request.call_args[1]["params"] == {"$top": "5"}
 
-    def test_get_sets_accept_header(self, transport, session):
+    def test_sets_accept_header(self, transport, session):
         session.request.return_value = _mock_response(200, {})
-        transport.get("EntitySet")
-        headers = session.request.call_args[1]["headers"]
-        assert headers["Accept"] == "application/json"
+        transport.request("GET", "EntitySet")
+        assert session.request.call_args[1]["headers"]["Accept"] == "application/json"
 
-    def test_get_returns_parsed_json(self, transport, session):
+    def test_returns_parsed_json(self, transport, session):
         session.request.return_value = _mock_response(200, {"value": [{"ID": "1"}]})
-        data = transport.get("EntitySet")
-        assert data == {"value": [{"ID": "1"}]}
+        assert transport.request("GET", "EntitySet") == {"value": [{"ID": "1"}]}
 
-    def test_get_404_raises_not_found(self, transport, session):
+    def test_404_raises_not_found(self, transport, session):
         session.request.return_value = _mock_response(404)
         with pytest.raises(ODataNotFoundError):
-            transport.get("EntitySet")
+            transport.request("GET", "EntitySet")
 
-    def test_get_401_raises_auth_error(self, transport, session):
+    def test_401_raises_auth_error(self, transport, session):
         session.request.return_value = _mock_response(401)
         with pytest.raises(ODataAuthError):
-            transport.get("EntitySet")
+            transport.request("GET", "EntitySet")
 
-    def test_get_500_raises_request_error(self, transport, session):
+    def test_500_raises_request_error(self, transport, session):
         session.request.return_value = _mock_response(500)
         with pytest.raises(ODataRequestError):
-            transport.get("EntitySet")
+            transport.request("GET", "EntitySet")
 
-    def test_get_204_returns_empty_dict(self, transport, session):
+    def test_204_returns_empty_dict(self, transport, session):
         resp = _mock_response(204)
         resp.content = b""
         session.request.return_value = resp
-        assert transport.get("EntitySet") == {}
+        assert transport.request("GET", "EntitySet") == {}
+
+    def test_extra_headers_merged(self, transport, session):
+        session.request.return_value = _mock_response(200, {})
+        transport.request("GET", "EntitySet", headers={"sap-language": "en"})
+        assert session.request.call_args[1]["headers"]["sap-language"] == "en"
+
+    def test_passes_method_verbatim(self, transport, session):
+        session.request.return_value = _mock_response(201, {"ID": "1"})
+        transport.request("POST", "EntitySet", json={"Name": "X"})
+        assert session.request.call_args[1]["method"] == "POST"
 
 
-class TestODataHttpTransportCsrf:
-    def test_csrf_fetched_on_post(self, session):
-        # CSRF fetch returns the token in a response header
+class TestCsrf:
+    def test_csrf_attached_on_post(self, session):
         csrf_resp = MagicMock(spec=requests.Response)
         csrf_resp.status_code = 200
         csrf_resp.headers = {"X-CSRF-Token": "csrf-tok"}
-
-        post_resp = _mock_response(201, {"ID": "1"})
         session.get.return_value = csrf_resp
-        session.request.return_value = post_resp
+        session.request.return_value = _mock_response(201, {"ID": "1"})
 
         transport = ODataHttpTransport(
             base_url="https://example.com/odata/v4/",
             session=session,
             csrf_enabled=True,
         )
-        transport.post("EntitySet", {"Name": "X"})
+        transport.request("POST", "EntitySet", json={"Name": "X"})
 
-        headers = session.request.call_args[1]["headers"]
-        assert headers["X-CSRF-Token"] == "csrf-tok"
+        assert session.request.call_args[1]["headers"]["X-CSRF-Token"] == "csrf-tok"
+
+    def test_no_csrf_on_get(self, session):
+        session.request.return_value = _mock_response(200, {})
+
+        transport = ODataHttpTransport(
+            base_url="https://example.com/odata/v4/",
+            session=session,
+            csrf_enabled=True,
+        )
+        transport.request("GET", "EntitySet")
+
+        assert "X-CSRF-Token" not in session.request.call_args[1]["headers"]
+        session.get.assert_not_called()
 
     def test_csrf_retry_on_403(self, session):
-        csrf_resp = MagicMock(spec=requests.Response)
-        csrf_resp.status_code = 200
-        csrf_resp.headers = {"X-CSRF-Token": "tok1"}
-
+        csrf_resp1 = MagicMock(spec=requests.Response)
+        csrf_resp1.status_code = 200
+        csrf_resp1.headers = {"X-CSRF-Token": "tok1"}
         csrf_resp2 = MagicMock(spec=requests.Response)
         csrf_resp2.status_code = 200
         csrf_resp2.headers = {"X-CSRF-Token": "tok2"}
 
-        forbidden = _mock_response(403)
-        success = _mock_response(201, {"ID": "1"})
-
-        session.get.side_effect = [csrf_resp, csrf_resp2]
-        session.request.side_effect = [forbidden, success]
+        session.get.side_effect = [csrf_resp1, csrf_resp2]
+        session.request.side_effect = [_mock_response(403), _mock_response(201, {"ID": "1"})]
 
         transport = ODataHttpTransport(
             base_url="https://example.com/odata/v4/",
             session=session,
             csrf_enabled=True,
         )
-        transport.post("EntitySet", {"Name": "X"})
+        transport.request("POST", "EntitySet", json={"Name": "X"})
 
         assert session.request.call_count == 2
 
 
 class TestAbsoluteUrl:
     def test_builds_url_with_trailing_slash(self):
-        session = MagicMock(spec=requests.Session)
-        t = ODataHttpTransport("https://host/svc/", session, csrf_enabled=False)
+        t = ODataHttpTransport("https://host/svc/", MagicMock(), csrf_enabled=False)
         assert t.absolute_url("EntitySet") == "https://host/svc/EntitySet"
 
     def test_strips_leading_slash_from_path(self):
-        session = MagicMock(spec=requests.Session)
-        t = ODataHttpTransport("https://host/svc", session, csrf_enabled=False)
+        t = ODataHttpTransport("https://host/svc", MagicMock(), csrf_enabled=False)
         assert t.absolute_url("/EntitySet") == "https://host/svc/EntitySet"

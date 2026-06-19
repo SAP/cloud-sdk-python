@@ -23,7 +23,11 @@ def deserialize_single(data: dict[str, Any], entity_type: type[T]) -> T:
             f"{entity_type!r} is not a dataclass — cannot deserialize"
         )
     try:
-        payload = data.get(RESPONSE_VALUE, data) if isinstance(data.get(RESPONSE_VALUE), dict) else data
+        payload = (
+            data.get(RESPONSE_VALUE, data)
+            if isinstance(data.get(RESPONSE_VALUE), dict)
+            else data
+        )
         known = {f.name for f in dataclasses.fields(entity_type)}  # type: ignore[arg-type]
         kwargs = {k: v for k, v in payload.items() if k in known}
         return entity_type(**kwargs)  # type: ignore[call-arg]

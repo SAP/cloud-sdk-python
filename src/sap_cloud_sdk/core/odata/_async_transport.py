@@ -91,15 +91,21 @@ class AsyncODataHttpTransport:
         if method.upper() in MUTATING_METHODS and self._csrf_enabled:
             extra[CSRF_HEADER] = await self._get_csrf_token()
             try:
-                return await self._execute(method, path, params=params, json=json, extra_headers=extra)
+                return await self._execute(
+                    method, path, params=params, json=json, extra_headers=extra
+                )
             except ODataAuthError as exc:
                 if exc.status_code == 403:
                     await self._invalidate_csrf_token()
                     extra[CSRF_HEADER] = await self._get_csrf_token()
-                    return await self._execute(method, path, params=params, json=json, extra_headers=extra)
+                    return await self._execute(
+                        method, path, params=params, json=json, extra_headers=extra
+                    )
                 raise
 
-        return await self._execute(method, path, params=params, json=json, extra_headers=extra)
+        return await self._execute(
+            method, path, params=params, json=json, extra_headers=extra
+        )
 
     def absolute_url(self, path: str) -> str:
         return self._base_url + "/" + path.lstrip("/")

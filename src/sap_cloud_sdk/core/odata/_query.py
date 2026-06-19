@@ -133,9 +133,7 @@ class StructuredQuery:
         if self._filter is not None:
             params[QUERY_FILTER] = str(self._filter)
         if self._orderby:
-            params[QUERY_ORDERBY] = ",".join(
-                f"{f} {d.value}" for f, d in self._orderby
-            )
+            params[QUERY_ORDERBY] = ",".join(f"{f} {d.value}" for f, d in self._orderby)
         if self._top is not None:
             params[QUERY_TOP] = str(self._top)
         if self._skip is not None:

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import dataclasses
-from typing import Any, Generic, Iterator, TypeVar, TYPE_CHECKING
+from typing import Any, Generic, Iterator, TypeVar, TYPE_CHECKING, cast
 
 from sap_cloud_sdk.core.odata._constants import (
     DELETE,
@@ -14,7 +14,10 @@ from sap_cloud_sdk.core.odata._constants import (
     PUT,
 )
 from sap_cloud_sdk.core.odata._query import OrderDirection, StructuredQuery
-from sap_cloud_sdk.core.odata._response import deserialize_collection, deserialize_single
+from sap_cloud_sdk.core.odata._response import (
+    deserialize_collection,
+    deserialize_single,
+)
 from sap_cloud_sdk.core.odata._pagination import ODataPageIterator
 
 if TYPE_CHECKING:
@@ -57,9 +60,7 @@ class GetAllRequestBuilder(Generic[T]):
         )
     """
 
-    def __init__(
-        self, transport: "ODataHttpTransport", entity_type: type[T]
-    ) -> None:
+    def __init__(self, transport: "ODataHttpTransport", entity_type: type[T]) -> None:
         self._transport = transport
         self._entity_type = entity_type
         self._query = StructuredQuery()
@@ -105,10 +106,13 @@ class GetAllRequestBuilder(Generic[T]):
         params = self._query.to_params()
         if params:
             from urllib.parse import urlencode
+
             first_url += "?" + urlencode(params)
 
         iterator = ODataPageIterator(
-            fetch_page=lambda url: self._transport.request(GET, _strip_base(url, self._transport._base_url)),
+            fetch_page=lambda url: self._transport.request(
+                GET, _strip_base(url, self._transport._base_url)
+            ),
             entity_type=self._entity_type,
             first_url=first_url,
         )
@@ -124,7 +128,7 @@ def _strip_base(url: str, base_url: str) -> str:
     """Strip *base_url* prefix from *url* to get a relative path."""
     prefix = base_url + "/"
     if url.startswith(prefix):
-        return url[len(prefix):]
+        return url[len(prefix) :]
     return url
 
 
@@ -160,9 +164,7 @@ class GetByKeyRequestBuilder(Generic[T]):
 class CreateRequestBuilder(Generic[T]):
     """Builder for OData entity creation (POST)."""
 
-    def __init__(
-        self, transport: "ODataHttpTransport", entity: T
-    ) -> None:
+    def __init__(self, transport: "ODataHttpTransport", entity: T) -> None:
         self._transport = transport
         self._entity = entity
 
@@ -170,7 +172,8 @@ class CreateRequestBuilder(Generic[T]):
         """Create the entity and return the server response as the same type."""
         entity_type = type(self._entity)
         path = _entity_set_path(entity_type)
-        body = self._entity.to_dict() if hasattr(self._entity, "to_dict") else dataclasses.asdict(self._entity)  # type: ignore[arg-type]
+        e: Any = cast(Any, self._entity)
+        body = e.to_dict() if hasattr(e, "to_dict") else dataclasses.asdict(e)
         data = self._transport.request(POST, path, json=body)
         return deserialize_single(data, entity_type)
 
@@ -205,7 +208,8 @@ class UpdateRequestBuilder(Generic[T]):
             )
         key = {k: getattr(self._entity, k) for k in key_fields}
         path = _entity_set_path(entity_type) + _build_key_segment(key)
-        body = self._entity.to_dict() if hasattr(self._entity, "to_dict") else dataclasses.asdict(self._entity)  # type: ignore[arg-type]
+        e: Any = cast(Any, self._entity)
+        body = e.to_dict() if hasattr(e, "to_dict") else dataclasses.asdict(e)
         method = PUT if self._use_put else PATCH
         extra: dict[str, str] = {}
         if self._etag is not None:

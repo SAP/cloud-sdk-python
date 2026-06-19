@@ -18,6 +18,7 @@ from sap_cloud_sdk.core.odata._constants import (
 )
 from sap_cloud_sdk.core.odata.exceptions import (
     ODataAuthError,
+    ODataConnectionError,
     ODataCsrfError,
     ODataNotFoundError,
     ODataRequestError,
@@ -170,7 +171,7 @@ class AsyncODataHttpTransport:
                 timeout=REQUEST_TIMEOUT,
             )
         except httpx.RequestError as exc:
-            raise ODataCsrfError(f"Request failed: {exc}") from exc
+            raise ODataConnectionError(f"Request failed: {exc}") from exc
 
         self._raise_for_status(resp)
 

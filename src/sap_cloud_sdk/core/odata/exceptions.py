@@ -37,5 +37,9 @@ class ODataDeserializationError(ODataError):
     """Failed to deserialize an OData response payload."""
 
 
+class ODataConnectionError(ODataError):
+    """Network-level error reaching an OData service (no HTTP response received)."""
+
+
 class ODataCsrfError(ODataError):
     """Failed to fetch or validate a CSRF token."""

@@ -201,5 +201,12 @@ class Operation(str, Enum):
     AGENT_MEMORY_GET_RETENTION_CONFIG = "get_retention_config"
     AGENT_MEMORY_UPDATE_RETENTION_CONFIG = "update_retention_config"
 
+    # OData Operations
+    ODATA_GET_ALL = "odata_get_all"
+    ODATA_GET_BY_KEY = "odata_get_by_key"
+    ODATA_CREATE = "odata_create"
+    ODATA_UPDATE = "odata_update"
+    ODATA_DELETE = "odata_delete"
+
     def __str__(self) -> str:
         return self.value

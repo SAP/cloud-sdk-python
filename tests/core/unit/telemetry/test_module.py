@@ -55,7 +55,7 @@ class TestModule:
     def test_all_modules_present(self):
         """Test that all expected modules are present."""
         all_modules = list(Module)
-        assert len(all_modules) == 13
+        assert len(all_modules) == 14
         assert Module.ADMS in all_modules
         assert Module.AGENT_MEMORY in all_modules
         assert Module.AGENTGATEWAY in all_modules
@@ -67,6 +67,7 @@ class TestModule:
         assert Module.DMS in all_modules
         assert Module.EXTENSIBILITY in all_modules
         assert Module.OBJECTSTORE in all_modules
+        assert Module.ODATA in all_modules
         assert Module.PRINT in all_modules
         assert Module.TELEMETRY in all_modules
 

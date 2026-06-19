@@ -92,15 +92,21 @@ class ODataHttpTransport:
         if method.upper() in MUTATING_METHODS and self._csrf is not None:
             extra[CSRF_HEADER] = self._csrf.get()
             try:
-                return self._execute(method, path, params=params, json=json, extra_headers=extra)
+                return self._execute(
+                    method, path, params=params, json=json, extra_headers=extra
+                )
             except ODataAuthError as exc:
                 if exc.status_code == 403:
                     self._csrf.invalidate()
                     extra[CSRF_HEADER] = self._csrf.get()
-                    return self._execute(method, path, params=params, json=json, extra_headers=extra)
+                    return self._execute(
+                        method, path, params=params, json=json, extra_headers=extra
+                    )
                 raise
 
-        return self._execute(method, path, params=params, json=json, extra_headers=extra)
+        return self._execute(
+            method, path, params=params, json=json, extra_headers=extra
+        )
 
     def absolute_url(self, path: str) -> str:
         """Return the full URL for *path* relative to the service base."""

@@ -2,10 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    import requests
+from typing import Any
 
 
 class ODataError(Exception):
@@ -15,8 +12,8 @@ class ODataError(Exception):
 class ODataRequestError(ODataError):
     """HTTP-level error from an OData service (non-2xx response)."""
 
-    def __init__(self, response: "requests.Response") -> None:
-        self.status_code = response.status_code
+    def __init__(self, response: Any) -> None:
+        self.status_code: int = response.status_code
         self.response = response
         try:
             body = response.json()

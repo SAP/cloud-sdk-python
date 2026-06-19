@@ -7,7 +7,11 @@ from typing import TYPE_CHECKING
 
 import requests as _requests
 
-from sap_cloud_sdk.core.odata._constants import CSRF_FETCH_TIMEOUT, CSRF_FETCH_VALUE, CSRF_HEADER
+from sap_cloud_sdk.core.odata._constants import (
+    CSRF_FETCH_TIMEOUT,
+    CSRF_FETCH_VALUE,
+    CSRF_HEADER,
+)
 from sap_cloud_sdk.core.odata.exceptions import ODataCsrfError
 
 if TYPE_CHECKING:

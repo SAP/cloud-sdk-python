@@ -56,6 +56,57 @@ The `set_aicore_config()` function:
 2. **Configures environment variables** for LiteLLM to use AI Core
 3. **Normalizes URLs** by adding required suffixes (`/oauth/token` for auth, `/v2` for base URL)
 4. **Sets resource group** (defaults to "default" if not specified)
+5. **Activates content filtering** — Azure Content Safety + prompt shield enabled by default *(new in 0.28.0)*
+
+---
+
+## Content Filtering (enabled by default from 0.28.0)
+
+`set_aicore_config()` automatically activates content filtering for all model calls.
+No additional code is required.
+
+**Default thresholds:**
+
+| Category | Default | Meaning |
+|---|---|---|
+| Hate, Violence, Sexual, Self-harm | `4` | Block medium+ severity |
+| Prompt shield | `true` | Block jailbreak + indirect injection attempts |
+
+To override thresholds via environment variables (set before calling `set_aicore_config()`):
+
+```bash
+ORCH_FILTER_SELF_HARM=0    # strict — block any detected self-harm content
+ORCH_FILTER_VIOLENCE=2
+ORCH_FILTER_ENABLED=false  # disable filtering entirely
+```
+
+To override programmatically (call after `set_aicore_config()`):
+
+```python
+from sap_cloud_sdk.orchestration import set_filtering
+set_filtering(self_harm=0, violence=0)
+```
+
+To catch blocked requests:
+
+```python
+from sap_cloud_sdk.orchestration import ContentFilteredError
+from sap_cloud_sdk.orchestration._litellm_patch import extract_filter_blocked
+
+try:
+    response = completion(model="sap/anthropic--claude-4.5-sonnet", messages=[...])
+except ContentFilteredError as e:
+    print("Blocked by content safety policy.")
+except Exception as e:
+    blocked = extract_filter_blocked(e)
+    if blocked:
+        print("Blocked by content safety policy.")
+    raise
+```
+
+See the [Orchestration user guide](../orchestration/user-guide.md) for full documentation.
+
+---
 
 ### Credentials Loaded
 

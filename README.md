@@ -16,6 +16,7 @@ The Python SDK offers a clean, type-safe API following Python best practices whi
 - **AI Core Integration**
 - **Audit Log Service**
 - **Audit Log NG**
+- **Content Filtering & Prompt Shield** *(enabled by default from 0.28.0)*
 - **Destination Service**
 - **Document Management Service**
 - **Extensibility**
@@ -25,6 +26,12 @@ The Python SDK offers a clean, type-safe API following Python best practices whi
 - **Telemetry & Observability**
 - **Data Anonymization Service**
 - **Print Service**
+
+> **Breaking change in 0.28.0:** `set_aicore_config()` now automatically enables
+> Azure Content Safety filtering and prompt shield for all SAP AI Core model calls.
+> No code change is required. To disable: set `ORCH_FILTER_ENABLED=false` or call
+> `set_filtering(enabled=False)` after `set_aicore_config()`.
+> See the [Orchestration user guide](src/sap_cloud_sdk/orchestration/user-guide.md).
 
 ## Requirements and Setup
 

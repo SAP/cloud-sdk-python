@@ -145,5 +145,16 @@ def set_aicore_config(instance_name: str = "aicore-instance") -> None:
     # Log configuration completion (excluding sensitive information)
     logger.info("AI Core configuration has been set successfully")
 
+    # Activate content filtering for all sap/* LiteLLM model calls.
+    # Lazy import avoids circular dependency between aicore and orchestration.
+    # Filtering is ON by default (threshold 4, prompt_shield=True).
+    # Set ORCH_FILTER_ENABLED=false to disable, or call set_filtering() to override.
+    try:
+        from sap_cloud_sdk.orchestration._litellm_patch import _install
+        from sap_cloud_sdk.orchestration._models import FilteringModuleConfig
+        _install(FilteringModuleConfig.from_env())
+    except Exception as e:
+        logger.warning("Could not activate orchestration filtering: %s", e)
+
 
 __all__ = ["set_aicore_config"]

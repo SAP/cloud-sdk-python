@@ -201,5 +201,8 @@ class Operation(str, Enum):
     AGENT_MEMORY_GET_RETENTION_CONFIG = "get_retention_config"
     AGENT_MEMORY_UPDATE_RETENTION_CONFIG = "update_retention_config"
 
+    # Orchestration Operations
+    ORCHESTRATION_SET_FILTERING = "set_filtering"
+
     def __str__(self) -> str:
         return self.value

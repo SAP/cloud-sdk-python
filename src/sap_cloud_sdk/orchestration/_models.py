@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass, field
-from typing import Literal
+from typing import Literal, cast
 
 _TRUTHY = frozenset({"true", "1", "yes"})
 _VALID_SEVERITIES = frozenset({0, 2, 4, 6})
@@ -27,7 +27,7 @@ def _env_severity(key: str, default: int = 4) -> Literal[0, 2, 4, 6]:
         raise ValueError(f"{key} must be one of 0/2/4/6, got {raw!r}") from e
     if val not in _VALID_SEVERITIES:
         raise ValueError(f"{key} must be one of 0/2/4/6, got {val}")
-    return val  # type: ignore[return-value]
+    return cast(Literal[0, 2, 4, 6], val)
 
 
 @dataclass

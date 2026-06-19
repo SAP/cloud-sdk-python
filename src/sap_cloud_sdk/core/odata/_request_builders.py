@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import dataclasses
 from typing import Any, Generic, Iterator, TypeVar, TYPE_CHECKING, cast
+from urllib.parse import urlencode
 
 from sap_cloud_sdk.core.odata._constants import (
     DELETE,
@@ -13,12 +14,14 @@ from sap_cloud_sdk.core.odata._constants import (
     POST,
     PUT,
 )
+from sap_cloud_sdk.core.odata._filter import _format_value
 from sap_cloud_sdk.core.odata._query import OrderDirection, StructuredQuery
 from sap_cloud_sdk.core.odata._response import (
     deserialize_collection,
     deserialize_single,
 )
 from sap_cloud_sdk.core.odata._pagination import ODataPageIterator
+from sap_cloud_sdk.core.telemetry import Module, Operation, record_metrics
 
 if TYPE_CHECKING:
     from sap_cloud_sdk.core.odata._filter import FilterExpression
@@ -38,8 +41,6 @@ def _entity_set_path(entity_type: type) -> str:
 
 def _build_key_segment(key: dict[str, Any]) -> str:
     """Serialise *key* dict to an OData key segment, e.g. ``(ID='x',Ver=1)``."""
-    from sap_cloud_sdk.core.odata._filter import _format_value
-
     if len(key) == 1:
         return f"({_format_value(next(iter(key.values())))})"
     parts = ",".join(f"{k}={_format_value(v)}" for k, v in key.items())
@@ -93,6 +94,7 @@ class GetAllRequestBuilder(Generic[T]):
         self._query = self._query.expand(*nav_properties)
         return self
 
+    @record_metrics(Module.ODATA, Operation.ODATA_GET_ALL)
     def execute(self) -> list[T]:
         """Execute the request and return all matching entities."""
         path = _entity_set_path(self._entity_type)
@@ -105,8 +107,6 @@ class GetAllRequestBuilder(Generic[T]):
         first_url = self._transport.absolute_url(path)
         params = self._query.to_params()
         if params:
-            from urllib.parse import urlencode
-
             first_url += "?" + urlencode(params)
 
         iterator = ODataPageIterator(
@@ -154,6 +154,7 @@ class GetByKeyRequestBuilder(Generic[T]):
         self._query = self._query.expand(*nav_properties)
         return self
 
+    @record_metrics(Module.ODATA, Operation.ODATA_GET_BY_KEY)
     def execute(self) -> T:
         """Fetch the entity, raising :exc:`ODataNotFoundError` if absent."""
         path = _entity_set_path(self._entity_type) + _build_key_segment(self._key)
@@ -168,6 +169,7 @@ class CreateRequestBuilder(Generic[T]):
         self._transport = transport
         self._entity = entity
 
+    @record_metrics(Module.ODATA, Operation.ODATA_CREATE)
     def execute(self) -> T:
         """Create the entity and return the server response as the same type."""
         entity_type = type(self._entity)
@@ -197,6 +199,7 @@ class UpdateRequestBuilder(Generic[T]):
         self._use_put = True
         return self
 
+    @record_metrics(Module.ODATA, Operation.ODATA_UPDATE)
     def execute(self) -> T:
         """Send the update and return the server response."""
         entity_type = type(self._entity)
@@ -235,6 +238,7 @@ class DeleteRequestBuilder(Generic[T]):
         self._key = key
         self._etag = etag
 
+    @record_metrics(Module.ODATA, Operation.ODATA_DELETE)
     def execute(self) -> None:
         """Delete the entity."""
         path = _entity_set_path(self._entity_type) + _build_key_segment(self._key)

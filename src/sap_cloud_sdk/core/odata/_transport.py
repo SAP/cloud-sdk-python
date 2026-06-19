@@ -17,6 +17,7 @@ from sap_cloud_sdk.core.odata._constants import (
 from sap_cloud_sdk.core.odata._csrf import CsrfTokenProvider
 from sap_cloud_sdk.core.odata.exceptions import (
     ODataAuthError,
+    ODataConnectionError,
     ODataNotFoundError,
     ODataRequestError,
 )
@@ -139,7 +140,7 @@ class ODataHttpTransport:
                 timeout=REQUEST_TIMEOUT,
             )
         except RequestException as exc:
-            raise ODataRequestError.__new__(ODataRequestError) from exc
+            raise ODataConnectionError(str(exc)) from exc
 
         self._raise_for_status(resp)
 

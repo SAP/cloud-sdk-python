@@ -118,6 +118,8 @@ class TestFilteringModuleConfigFromEnv:
         monkeypatch.setenv("ORCH_FILTER_SELF_HARM", "0")
         monkeypatch.setenv("ORCH_FILTER_HATE", "2")
         cfg = FilteringModuleConfig.from_env()
+        assert cfg is not None
+        assert cfg.input_filter is not None
         assert cfg.input_filter.self_harm == 0
         assert cfg.input_filter.hate == 2
 
@@ -125,6 +127,7 @@ class TestFilteringModuleConfigFromEnv:
         self._clear_env(monkeypatch)
         monkeypatch.setenv("ORCH_FILTER_DIRECTIONS", "input")
         cfg = FilteringModuleConfig.from_env()
+        assert cfg is not None
         assert cfg.input_filter is not None
         assert cfg.output_filter is None
 
@@ -132,6 +135,7 @@ class TestFilteringModuleConfigFromEnv:
         self._clear_env(monkeypatch)
         monkeypatch.setenv("ORCH_FILTER_DIRECTIONS", "output")
         cfg = FilteringModuleConfig.from_env()
+        assert cfg is not None
         assert cfg.input_filter is None
         assert cfg.output_filter is not None
         assert cfg.prompt_shield is None  # prompt_shield is input-only
@@ -140,6 +144,8 @@ class TestFilteringModuleConfigFromEnv:
         self._clear_env(monkeypatch)
         monkeypatch.setenv("ORCH_FILTER_PROMPT_SHIELD", "false")
         cfg = FilteringModuleConfig.from_env()
+        assert cfg is not None
+        assert cfg.prompt_shield is not None
         assert cfg.prompt_shield.enabled is False
 
     def test_invalid_severity_raises(self, monkeypatch):

@@ -73,7 +73,10 @@ def set_filtering(
         return
 
     # No args at all — just re-apply env-based config (respects ORCH_FILTER_ENABLED)
-    if all(v is None for v in [hate, violence, sexual, self_harm, prompt_shield, directions, enabled]):
+    if all(
+        v is None
+        for v in [hate, violence, sexual, self_harm, prompt_shield, directions, enabled]
+    ):
         _install(FilteringModuleConfig.from_env())
         return
 
@@ -81,7 +84,9 @@ def set_filtering(
     base = FilteringModuleConfig.from_env() or FilteringModuleConfig()
 
     # Build effective threshold — override only the provided args.
-    def _effective_filter(existing: ContentFilterConfig | None) -> ContentFilterConfig | None:
+    def _effective_filter(
+        existing: ContentFilterConfig | None,
+    ) -> ContentFilterConfig | None:
         if existing is None and directions is not None and "input" not in directions:
             return None
         src = existing or ContentFilterConfig()
@@ -92,8 +97,16 @@ def set_filtering(
             self_harm=self_harm if self_harm is not None else src.self_harm,
         )
 
-    new_input = _effective_filter(base.input_filter) if (directions is None or "input" in (directions or {"input", "output"})) else None
-    new_output = _effective_filter(base.output_filter) if (directions is None or "output" in (directions or {"input", "output"})) else None
+    new_input = (
+        _effective_filter(base.input_filter)
+        if (directions is None or "input" in (directions or {"input", "output"}))
+        else None
+    )
+    new_output = (
+        _effective_filter(base.output_filter)
+        if (directions is None or "output" in (directions or {"input", "output"}))
+        else None
+    )
 
     new_shield = base.prompt_shield
     if prompt_shield is not None:

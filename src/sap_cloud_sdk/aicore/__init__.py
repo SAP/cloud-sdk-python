@@ -152,6 +152,7 @@ def set_aicore_config(instance_name: str = "aicore-instance") -> None:
     try:
         from sap_cloud_sdk.orchestration._litellm_patch import _install
         from sap_cloud_sdk.orchestration._models import FilteringModuleConfig
+
         _install(FilteringModuleConfig.from_env())
     except Exception as e:
         logger.warning("Could not activate orchestration filtering: %s", e)

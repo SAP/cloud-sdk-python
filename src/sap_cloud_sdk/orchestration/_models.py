@@ -19,7 +19,7 @@ def _env_bool(key: str, default: bool = False) -> bool:
     return (raw.strip().lower() in _TRUTHY) if raw is not None else default
 
 
-def _env_severity(key: str, default: int = 4) -> int:
+def _env_severity(key: str, default: int = 4) -> Literal[0, 2, 4, 6]:
     raw = _env(key, str(default))
     try:
         val = int(raw)
@@ -27,7 +27,7 @@ def _env_severity(key: str, default: int = 4) -> int:
         raise ValueError(f"{key} must be one of 0/2/4/6, got {raw!r}") from e
     if val not in _VALID_SEVERITIES:
         raise ValueError(f"{key} must be one of 0/2/4/6, got {val}")
-    return val
+    return val  # type: ignore[return-value]
 
 
 @dataclass
@@ -65,8 +65,12 @@ class FilteringModuleConfig:
     Call ``to_dict()`` to get the wire-format dict for the v2 request body.
     """
 
-    input_filter: ContentFilterConfig | None = field(default_factory=ContentFilterConfig)
-    output_filter: ContentFilterConfig | None = field(default_factory=ContentFilterConfig)
+    input_filter: ContentFilterConfig | None = field(
+        default_factory=ContentFilterConfig
+    )
+    output_filter: ContentFilterConfig | None = field(
+        default_factory=ContentFilterConfig
+    )
     prompt_shield: PromptShieldConfig | None = field(default_factory=PromptShieldConfig)
 
     @classmethod
@@ -121,7 +125,9 @@ class FilteringModuleConfig:
             }
             if self.prompt_shield is not None and self.prompt_shield.enabled:
                 config["prompt_shield"] = True
-            result["input"] = {"filters": [{"type": "azure_content_safety", "config": config}]}
+            result["input"] = {
+                "filters": [{"type": "azure_content_safety", "config": config}]
+            }
 
         if self.output_filter is not None:
             config = {
@@ -130,6 +136,8 @@ class FilteringModuleConfig:
                 "sexual": self.output_filter.sexual,
                 "self_harm": self.output_filter.self_harm,
             }
-            result["output"] = {"filters": [{"type": "azure_content_safety", "config": config}]}
+            result["output"] = {
+                "filters": [{"type": "azure_content_safety", "config": config}]
+            }
 
         return result

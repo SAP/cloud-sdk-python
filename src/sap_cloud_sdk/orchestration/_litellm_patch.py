@@ -96,8 +96,14 @@ class FilteringOrchestrationConfig(GenAIHubOrchestrationConfig):
         if 400 <= status < 500:
             try:
                 err = raw_response.json().get("error", {})
-                if (err.get("location") or "").startswith("Filtering Module - Input Filter"):
-                    data = err.get("intermediate_results", {}).get("input_filtering", {}).get("data", {})
+                if (err.get("location") or "").startswith(
+                    "Filtering Module - Input Filter"
+                ):
+                    data = (
+                        err.get("intermediate_results", {})
+                        .get("input_filtering", {})
+                        .get("data", {})
+                    )
                     raise ContentFilteredError(
                         direction="input",
                         details=data,
@@ -115,7 +121,11 @@ class FilteringOrchestrationConfig(GenAIHubOrchestrationConfig):
                 payload = raw_response.json()
                 choices = (payload.get("final_result") or {}).get("choices") or []
                 if choices and choices[0].get("finish_reason") == "content_filter":
-                    data = payload.get("intermediate_results", {}).get("output_filtering", {}).get("data", {})
+                    data = (
+                        payload.get("intermediate_results", {})
+                        .get("output_filtering", {})
+                        .get("data", {})
+                    )
                     raise ContentFilteredError(
                         direction="output",
                         details=data,
@@ -173,9 +183,15 @@ def extract_filter_blocked(exc: Exception) -> ContentFilteredError | None:
     try:
         payload = json.loads(msg[brace:])
         err = payload.get("error", {})
-        if not (err.get("location") or "").startswith("Filtering Module - Input Filter"):
+        if not (err.get("location") or "").startswith(
+            "Filtering Module - Input Filter"
+        ):
             return None
-        data = err.get("intermediate_results", {}).get("input_filtering", {}).get("data", {})
+        data = (
+            err.get("intermediate_results", {})
+            .get("input_filtering", {})
+            .get("data", {})
+        )
         return ContentFilteredError(
             direction="input",
             details=data,

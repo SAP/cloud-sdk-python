@@ -36,4 +36,6 @@ class ContentFilteredError(OrchestrationError):
         self.direction = direction
         self.details = details
         self.request_id = request_id
-        super().__init__(f"Content filter blocked the {direction} (request_id={request_id})")
+        super().__init__(
+            f"Content filter blocked the {direction} (request_id={request_id})"
+        )

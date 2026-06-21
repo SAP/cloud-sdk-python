@@ -208,7 +208,6 @@ class Operation(str, Enum):
     ODATA_UPDATE = "odata_update"
     ODATA_DELETE = "odata_delete"
 
-    # HTTP Client Operations
     HTTP_CLIENT_DELETE = "http_client_delete"
     HTTP_CLIENT_GET = "http_client_get"
     HTTP_CLIENT_PATCH = "http_client_patch"

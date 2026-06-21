@@ -14,8 +14,13 @@ from sap_cloud_sdk.core.http_client.exceptions import (
     HttpResponseError,
     HttpUnauthorizedError,
 )
-from sap_cloud_sdk.core.odata._constants import DELETE, GET, PATCH, POST, PUT
 from sap_cloud_sdk.core.telemetry import Module, Operation, record_metrics
+
+GET = "GET"
+POST = "POST"
+PUT = "PUT"
+PATCH = "PATCH"
+DELETE = "DELETE"
 
 logger = logging.getLogger(__name__)
 
@@ -228,7 +233,9 @@ class HttpClient:
             HttpResponseError: On any other non-2xx status.
             HttpConnectionError: On network failure.
         """
-        resp = self.request(PATCH, path, json=json, data=data, headers=headers, **kwargs)
+        resp = self.request(
+            PATCH, path, json=json, data=data, headers=headers, **kwargs
+        )
         _raise_for_status(resp)
         return resp
 

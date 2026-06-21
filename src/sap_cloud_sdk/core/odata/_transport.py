@@ -109,6 +109,55 @@ class ODataHttpTransport:
             method, path, params=params, json=json, extra_headers=extra
         )
 
+    def get(
+        self,
+        path: str,
+        *,
+        params: dict[str, Any] | None = None,
+        headers: dict[str, str] | None = None,
+    ) -> dict[str, Any]:
+        """Send a GET request and return the parsed JSON body."""
+        return self.request("GET", path, params=params, headers=headers)
+
+    def post(
+        self,
+        path: str,
+        *,
+        json: Any | None = None,
+        headers: dict[str, str] | None = None,
+    ) -> dict[str, Any]:
+        """Send a POST request and return the parsed JSON body."""
+        return self.request("POST", path, json=json, headers=headers)
+
+    def put(
+        self,
+        path: str,
+        *,
+        json: Any | None = None,
+        headers: dict[str, str] | None = None,
+    ) -> dict[str, Any]:
+        """Send a PUT request and return the parsed JSON body."""
+        return self.request("PUT", path, json=json, headers=headers)
+
+    def patch(
+        self,
+        path: str,
+        *,
+        json: Any | None = None,
+        headers: dict[str, str] | None = None,
+    ) -> dict[str, Any]:
+        """Send a PATCH request and return the parsed JSON body."""
+        return self.request("PATCH", path, json=json, headers=headers)
+
+    def delete(
+        self,
+        path: str,
+        *,
+        headers: dict[str, str] | None = None,
+    ) -> dict[str, Any]:
+        """Send a DELETE request and return the parsed JSON body."""
+        return self.request("DELETE", path, headers=headers)
+
     def absolute_url(self, path: str) -> str:
         """Return the full URL for *path* relative to the service base."""
         return self._base_url + "/" + path.lstrip("/")

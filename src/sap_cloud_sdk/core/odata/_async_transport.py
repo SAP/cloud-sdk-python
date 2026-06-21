@@ -108,6 +108,55 @@ class AsyncODataHttpTransport:
             method, path, params=params, json=json, extra_headers=extra
         )
 
+    async def get(
+        self,
+        path: str,
+        *,
+        params: dict[str, Any] | None = None,
+        headers: dict[str, str] | None = None,
+    ) -> dict[str, Any]:
+        """Send a GET request and return the parsed JSON body."""
+        return await self.request("GET", path, params=params, headers=headers)
+
+    async def post(
+        self,
+        path: str,
+        *,
+        json: Any | None = None,
+        headers: dict[str, str] | None = None,
+    ) -> dict[str, Any]:
+        """Send a POST request and return the parsed JSON body."""
+        return await self.request("POST", path, json=json, headers=headers)
+
+    async def put(
+        self,
+        path: str,
+        *,
+        json: Any | None = None,
+        headers: dict[str, str] | None = None,
+    ) -> dict[str, Any]:
+        """Send a PUT request and return the parsed JSON body."""
+        return await self.request("PUT", path, json=json, headers=headers)
+
+    async def patch(
+        self,
+        path: str,
+        *,
+        json: Any | None = None,
+        headers: dict[str, str] | None = None,
+    ) -> dict[str, Any]:
+        """Send a PATCH request and return the parsed JSON body."""
+        return await self.request("PATCH", path, json=json, headers=headers)
+
+    async def delete(
+        self,
+        path: str,
+        *,
+        headers: dict[str, str] | None = None,
+    ) -> dict[str, Any]:
+        """Send a DELETE request and return the parsed JSON body."""
+        return await self.request("DELETE", path, headers=headers)
+
     def absolute_url(self, path: str) -> str:
         return self._base_url + "/" + path.lstrip("/")
 

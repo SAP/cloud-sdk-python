@@ -220,25 +220,60 @@ class CertificateClient:
 
 ## Calling Target Systems
 
-`DestinationHttpClient` wraps `requests.Session` to call the target system described by a destination. It injects headers automatically so you don't have to handle auth tokens, ERP headers, or custom destination properties manually.
+Use `http_client_for_destination` from `sap_cloud_sdk.core.http_client` to call the target system described by a destination. It wraps a `requests.Session` with the destination's auth tokens, ERP headers, and custom `URL.headers.*` properties pre-baked, so you don't have to manage auth manually.
 
-> **Note:** `DestinationHttpClient` requires a destination fetched via the v2 API (`get_destination()`), which returns pre-fetched auth tokens. It does not support destinations fetched with the deprecated v1 methods.
+> **Note:** Requires a destination fetched via the v2 API (`get_destination()`), which returns pre-fetched auth tokens. Destinations fetched with the deprecated v1 methods do not have `auth_tokens` populated.
 
 ### Basic Usage
 
 ```python
-from sap_cloud_sdk.destination import create_client, DestinationHttpClient
+from sap_cloud_sdk.destination import create_client
+from sap_cloud_sdk.core.http_client import http_client_for_destination
 
 client = create_client(instance="default")
 dest = client.get_destination("my-erp")
 
-http = DestinationHttpClient(dest)
+http = http_client_for_destination(dest)
+response = http.get("/api/resource")
+data = response.json()
+```
+
+### HTTP Methods
+
+`HttpClient` exposes typed convenience methods that raise on non-2xx responses:
+
+```python
+# GET with query parameters
+response = http.get("/api/resource", params={"$top": "10"})
+
+# POST with JSON body
+response = http.post("/api/resource", json={"name": "new item"})
+
+# PUT (full replace)
+response = http.put("/api/resource/1", json={"name": "updated"})
+
+# PATCH (partial update)
+response = http.patch("/api/resource/1", json={"status": "active"})
+
+# DELETE
+response = http.delete("/api/resource/1")
+
+# Low-level request (does NOT raise on non-2xx — caller inspects response)
 response = http.request("GET", "/api/resource")
+```
+
+### Sub-path
+
+If your destination URL points to a host root but your service lives under a sub-path, pass `sub_path`:
+
+```python
+http = http_client_for_destination(dest, sub_path="api/v1")
+response = http.get("/resources")  # calls https://host/api/v1/resources
 ```
 
 ### What headers are pre-baked
 
-When `DestinationHttpClient` is constructed, it reads the destination and pre-bakes the following headers into every request:
+When `http_client_for_destination` builds the client, it calls `dest.get_headers()` which injects:
 
 1. **ERP headers** — `sap-client` and `sap-language` from destination properties (if present)
 2. **`URL.headers.*` properties** — any destination property prefixed with `URL.headers.` becomes a header (e.g. `URL.headers.apiKey = secret` → `apiKey: secret`)
@@ -251,10 +286,8 @@ Auth tokens take precedence over `URL.headers.*` properties if both set the same
 Pass `headers=` to add or override headers for a single request:
 
 ```python
-response = http.request("GET", "/api/resource", headers={"X-Correlation-ID": "abc123"})
+response = http.get("/api/resource", headers={"X-Correlation-ID": "abc123"})
 ```
-
-Per-request headers are merged on top of the pre-baked session headers.
 
 ### Using `get_headers()` directly
 
@@ -265,6 +298,36 @@ import requests
 
 dest = client.get_destination("my-erp")
 response = requests.get(dest.url + "/api/resource", headers=dest.get_headers())
+```
+
+### Exceptions
+
+| Exception | When raised |
+|---|---|
+| `HttpNotFoundError` | HTTP 404 |
+| `HttpUnauthorizedError` | HTTP 401 or 403 |
+| `HttpResponseError` | Any other non-2xx (base class for the above) |
+| `HttpConnectionError` | Network failure — no HTTP response received |
+
+```python
+from sap_cloud_sdk.core.http_client import (
+    http_client_for_destination,
+    HttpNotFoundError,
+    HttpUnauthorizedError,
+    HttpResponseError,
+    HttpConnectionError,
+)
+
+http = http_client_for_destination(dest)
+
+try:
+    response = http.get("/api/resource/123")
+except HttpNotFoundError:
+    print("resource not found")
+except HttpUnauthorizedError:
+    print("check destination auth configuration")
+except HttpConnectionError:
+    print("network unreachable")
 ```
 
 ## Transparent Proxy Support

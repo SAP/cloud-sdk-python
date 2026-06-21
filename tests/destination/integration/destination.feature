@@ -253,7 +253,7 @@ Feature: Destination Service Integration
     And I clean up the instance destination "test-v2-full-options"
     And I clean up the instance fragment "test-v2-full-fragment"
 
-  Scenario: DestinationHttpClient sends an authenticated request using token fetched from BTP
+  Scenario: HttpClient sends an authenticated request using token fetched from BTP
     Given I have a destination named "sdk-test-http-client" of type "HTTP"
     And the destination has URL "https://httpbin.org"
     And the destination has authentication "OAuth2ClientCredentials"
@@ -261,7 +261,7 @@ Feature: Destination Service Integration
     When I create the destination at instance level
     Then the destination creation should be successful
     When I fetch the destination using the v2 API
-    And I create a DestinationHttpClient from the destination
+    And I create an HttpClient from the destination
     And I send a GET request to "/headers"
     Then the response contains an Authorization header
     And I clean up the instance destination "sdk-test-http-client"

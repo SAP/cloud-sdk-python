@@ -21,7 +21,7 @@ def odata_transport_from_destination(
     """Build an :class:`ODataHttpTransport` from a resolved BTP Destination.
 
     The destination's auth tokens and ERP headers are pre-baked into the
-    underlying ``requests.Session`` exactly as ``DestinationHttpClient`` does,
+    underlying ``requests.Session`` exactly as ``http_client_for_destination`` does,
     so the transport inherits whatever authentication the destination carries
     (Bearer, Basic, mTLS, …).
 

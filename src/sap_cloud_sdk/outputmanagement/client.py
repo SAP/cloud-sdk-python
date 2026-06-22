@@ -3,7 +3,9 @@
 import logging
 import requests
 from abc import ABC, abstractmethod
+from typing import Optional
 
+from sap_cloud_sdk.destination import Destination
 from .clients.output_requests_client import OutputRequestsClient
 from .clients.output_requests_client_impl import OutputRequestsClientImpl
 
@@ -35,8 +37,8 @@ class OutputManagementServiceDefaultClient(OutputManagementServiceClient):
     def __init__(
         self,
         base_url: str,
-        destination: any = None,
-        destination_instance: str = None,
+        destination: Optional[Destination] = None,
+        destination_instance: Optional[str] = None,
     ):
         """Initialize client.
 

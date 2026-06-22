@@ -25,7 +25,7 @@ class EmailClient:
         to: List[str],
         business_document: Dict[str, Any],
         cc: Optional[List[str]] = None,
-        template_language: str = "en",
+        template_language: Optional[str] = "en",
         attachment_urls: Optional[List[str]] = None
     ) -> OutputRequest:
         """
@@ -121,8 +121,8 @@ class EmailClient:
         business_document: Dict[str, Any],
         destination_name: str,
         cc: Optional[List[str]] = None,
-        template_language: str = "en",
-        access_strategy: str = "PROVIDER_ONLY",
+        template_language: Optional[str] = "en",
+        access_strategy: Optional[str] = None,
         instance: Optional[str] = None,
         attachment_urls: Optional[List[str]] = None
     ) -> OutputResponse:
@@ -139,7 +139,7 @@ class EmailClient:
             destination_name: Name of the destination for authentication and endpoint
             cc: Optional list of CC email addresses
             template_language: ISO language code for email template (default: "en")
-            access_strategy: Destination access strategy - "PROVIDER_ONLY" or "SUBSCRIBER_ONLY" (default: "PROVIDER_ONLY")
+            access_strategy: Destination access strategy - "PROVIDER_ONLY" or "SUBSCRIBER_ONLY" (defaults to "PROVIDER_ONLY" if not specified)
             instance: Destination service instance name (defaults to "default" if not provided)
             attachment_urls: Optional list of DMS URLs for pre-generated attachments (default: None)
             

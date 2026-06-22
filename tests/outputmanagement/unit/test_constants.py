@@ -9,7 +9,6 @@ from sap_cloud_sdk.outputmanagement.constants import (
     Constants,
     FileFormat,
     Channel,
-    Status,
 )
 
 
@@ -28,15 +27,15 @@ class TestConstants:
 
     def test_header_constants_exist(self):
         """Test that header constants exist."""
-        assert Constants.CONTENT_TYPE is not None
-        assert Constants.APPLICATION_JSON is not None
+        assert Constants.HEADER_CONTENT_TYPE is not None
+        assert Constants.CONTENT_TYPE_JSON is not None
         assert Constants.AUTHORIZATION is not None
         assert Constants.BEARER is not None
 
     def test_header_constants_are_strings(self):
         """Test that header constants are strings."""
-        assert isinstance(Constants.CONTENT_TYPE, str)
-        assert isinstance(Constants.APPLICATION_JSON, str)
+        assert isinstance(Constants.HEADER_CONTENT_TYPE, str)
+        assert isinstance(Constants.CONTENT_TYPE_JSON, str)
         assert isinstance(Constants.AUTHORIZATION, str)
         assert isinstance(Constants.BEARER, str)
 
@@ -58,11 +57,3 @@ class TestConstants:
         assert Channel.INTERNAL_EMAIL.value == "INTERNAL_EMAIL"
         assert Channel.DIRECT_SHARE.value == "DIRECT_SHARE"
         assert Channel.FORM.value == "FORM"
-
-    def test_status_enum(self):
-        """Test Status enum."""
-        assert Status.PENDING.value == "PENDING"
-        assert Status.IN_PROGRESS.value == "IN_PROGRESS"
-        assert Status.COMPLETED.value == "COMPLETED"
-        assert Status.FAILED.value == "FAILED"
-        assert Status.CANCELLED.value == "CANCELLED"

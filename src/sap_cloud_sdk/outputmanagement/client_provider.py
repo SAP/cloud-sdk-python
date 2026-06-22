@@ -74,7 +74,7 @@ class OutputManagementServiceClientProviderBuilder:
         # Get the destination object - it handles authentication automatically
         http_destination = self._destination_credential_config.get_destination()
         
-        # Get the base URL from destinatiozxn
+        # Get the base URL from destination
         base_url = self._destination_credential_config.get_base_url()
         logger.info(f"Retrieved destination base URL: {base_url}")
         

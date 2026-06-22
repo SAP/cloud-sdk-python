@@ -1,18 +1,19 @@
 """Implementation of output requests client."""
 
 import logging
-from typing import Dict, Optional
 import os
-import json
 import uuid
+from typing import Dict, Optional
+
 import requests
+from sap_cloud_sdk.destination import Destination
 
 from .output_requests_client import OutputRequestsClient
+from ..constants import Constants
 from ..models.output_request import OutputRequest
 from ..models.output_response import (
     OutputResponse,
 )
-from ..constants import Constants
 from ..utils.request_validator import RequestValidator
 
 logger = logging.getLogger(__name__)
@@ -30,8 +31,8 @@ class OutputRequestsClientImpl(OutputRequestsClient):
         self,
         http_session: requests.Session,
         base_url: str,
-        destination: any = None,
-        destination_instance: str = None,
+        destination: Optional[Destination] = None,
+        destination_instance: Optional[str] = None,
     ):
         """
         Constructs a new OutputRequestsClientImpl.
@@ -88,9 +89,8 @@ class OutputRequestsClientImpl(OutputRequestsClient):
 
         try:
             request_body = output_request.model_dump(by_alias=True, exclude_none=True)
-            logger.info(f"Request body: {request_body}")
 
-            response = self._execute_request('POST', endpoint, json=request_body, headers=headers)
+            response = self._http_session.request('POST', endpoint, json=request_body, headers=headers)
             status_code = response.status_code
 
             logger.debug(f"Response status: {status_code}")
@@ -326,20 +326,6 @@ class OutputRequestsClientImpl(OutputRequestsClient):
                     pass
         
         return None
-    
-    def _execute_request(self, method: str, endpoint: str, **kwargs):
-        """Execute HTTP request using destination if available, otherwise use session.
-        
-        Args:
-            method: HTTP method (GET, POST, etc.)
-            endpoint: Full endpoint URL
-            **kwargs: Additional arguments to pass to the request
-            
-        Returns:
-            Response object
-        """
-        # Always use regular session - authentication is handled in _get_headers
-        return self._http_session.request(method, endpoint, **kwargs)
     
     def _get_headers(self) -> Dict[str, str]:
         """Get request headers with authentication."""

@@ -30,12 +30,10 @@ class TestOutputManagementModule:
             Constants,
             FileFormat,
             Channel,
-            Status,
         )
         assert Constants.API_OUTPUT_CONTROL is not None
         assert FileFormat.PDF is not None
         assert Channel.EMAIL is not None
-        assert Status.PENDING is not None
 
     def test_exceptions_import(self):
         """Test that exceptions can be imported."""

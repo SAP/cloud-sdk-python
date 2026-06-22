@@ -524,7 +524,7 @@ class ExtensibilityClient:
             result_str = await agw_client.call_mcp_tool(
                 execute_tool,
                 user_token=user_token or None,
-                **execute_arguments,  # type: ignore[arg-type]
+                **execute_arguments,  # type: ignore[arg-type]  # ty: ignore[invalid-argument-type]
             )
         except Exception as exc:
             raise TransportError(
@@ -579,7 +579,7 @@ class ExtensibilityClient:
                 result_str = await agw_client.call_mcp_tool(
                     get_exec_tool,
                     user_token=user_token or None,
-                    **get_execution_arguments,  # type: ignore[arg-type]
+                    **get_execution_arguments,  # type: ignore[arg-type]  # ty: ignore[invalid-argument-type]
                 )
             except Exception as exc:
                 raise TransportError(

@@ -355,7 +355,7 @@ class TestCallHook:
             return_value=agw,
         ):
             with pytest.raises(TransportError, match=_EXECUTE_WORKFLOW_TOOL_NAME):
-                await client.call_hook(hook=_make_hook(), tenant_subdomain="t")
+                await client.call_hook_agw(hook=_make_hook(), tenant_subdomain="t")
 
     @pytest.mark.asyncio
     async def test_get_exec_tool_not_found_raises(self):
@@ -368,7 +368,7 @@ class TestCallHook:
             return_value=agw,
         ):
             with pytest.raises(TransportError, match=_GET_EXECUTION_TOOL_NAME):
-                await client.call_hook(hook=_make_hook(), tenant_subdomain="t")
+                await client.call_hook_agw(hook=_make_hook(), tenant_subdomain="t")
 
     @pytest.mark.asyncio
     async def test_composite_key_ignores_wrong_server(self):
@@ -384,7 +384,7 @@ class TestCallHook:
             return_value=agw,
         ):
             with pytest.raises(TransportError, match=_EXECUTE_WORKFLOW_TOOL_NAME):
-                await client.call_hook(hook=_make_hook(), tenant_subdomain="t")
+                await client.call_hook_agw(hook=_make_hook(), tenant_subdomain="t")
 
     @pytest.mark.asyncio
     async def test_composite_key_picks_correct_tool_among_duplicates(self):
@@ -404,7 +404,7 @@ class TestCallHook:
             "sap_cloud_sdk.extensibility.client.create_agw_client",
             return_value=agw,
         ):
-            result = await client.call_hook(hook=_make_hook(), tenant_subdomain="t")
+            result = await client.call_hook_agw(hook=_make_hook(), tenant_subdomain="t")
         assert result is not None
         # call_mcp_tool must have been called with the N8N tool, not the other one
         called_tool = agw.call_mcp_tool.call_args[0][0]
@@ -426,7 +426,7 @@ class TestCallHook:
             "sap_cloud_sdk.extensibility.client.create_agw_client",
             return_value=agw,
         ):
-            result = await client.call_hook(hook=_make_hook(), tenant_subdomain="t")
+            result = await client.call_hook_agw(hook=_make_hook(), tenant_subdomain="t")
         assert result is not None
         assert result.message_id == "msg-1"
         agw.call_mcp_tool.assert_called_once()
@@ -450,7 +450,7 @@ class TestCallHook:
             "sap_cloud_sdk.extensibility.client.asyncio.sleep",
             new_callable=AsyncMock,
         ):
-            result = await client.call_hook(hook=_make_hook(), tenant_subdomain="t")
+            result = await client.call_hook_agw(hook=_make_hook(), tenant_subdomain="t")
         assert result is not None
         assert result.message_id == "msg-2"
         assert agw.call_mcp_tool.call_count == 2
@@ -470,7 +470,7 @@ class TestCallHook:
             return_value=agw,
         ):
             with pytest.raises(TransportError, match="workflow crashed"):
-                await client.call_hook(hook=_make_hook(), tenant_subdomain="t")
+                await client.call_hook_agw(hook=_make_hook(), tenant_subdomain="t")
 
     @pytest.mark.asyncio
     async def test_terminal_status_from_poll_raises(self):
@@ -493,7 +493,7 @@ class TestCallHook:
             new_callable=AsyncMock,
         ):
             with pytest.raises(TransportError, match="node failed"):
-                await client.call_hook(hook=_make_hook(), tenant_subdomain="t")
+                await client.call_hook_agw(hook=_make_hook(), tenant_subdomain="t")
 
     @pytest.mark.asyncio
     async def test_timeout_raises(self):
@@ -518,7 +518,7 @@ class TestCallHook:
             new_callable=AsyncMock,
         ):
             with pytest.raises(TransportError, match="timed out"):
-                await client.call_hook(hook=hook, tenant_subdomain="t")
+                await client.call_hook_agw(hook=hook, tenant_subdomain="t")
 
     @pytest.mark.asyncio
     async def test_agw_call_mcp_tool_exception_raises_transport_error(self):
@@ -536,7 +536,7 @@ class TestCallHook:
             return_value=agw,
         ):
             with pytest.raises(TransportError, match="network error"):
-                await client.call_hook(hook=_make_hook(), tenant_subdomain="t")
+                await client.call_hook_agw(hook=_make_hook(), tenant_subdomain="t")
 
     @pytest.mark.asyncio
     async def test_workflow_id_passed_to_execute_tool(self):
@@ -551,7 +551,7 @@ class TestCallHook:
             "sap_cloud_sdk.extensibility.client.create_agw_client",
             return_value=agw,
         ):
-            await client.call_hook(
+            await client.call_hook_agw(
                 hook=_make_hook(workflow_id="wf-xyz"), tenant_subdomain="t"
             )
         kwargs = agw.call_mcp_tool.call_args[1]

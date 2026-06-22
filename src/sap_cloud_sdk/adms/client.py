@@ -30,12 +30,30 @@ from sap_cloud_sdk.core.odata._async_transport import AsyncODataHttpTransport
 from sap_cloud_sdk.core.odata._transport import ODataHttpTransport
 
 
-def _sync_transport(config: AdmsConfig, session: requests.Session, get_token: Callable[[], str], path: str) -> ODataHttpTransport:
-    return ODataHttpTransport(base_url=config.service_url.rstrip("/") + path, session=session, get_token=get_token)
+def _sync_transport(
+    config: AdmsConfig,
+    session: requests.Session,
+    get_token: Callable[[], str],
+    path: str,
+) -> ODataHttpTransport:
+    return ODataHttpTransport(
+        base_url=config.service_url.rstrip("/") + path,
+        session=session,
+        get_token=get_token,
+    )
 
 
-def _async_transport(config: AdmsConfig, client: httpx.AsyncClient, get_token: Callable[[], str], path: str) -> AsyncODataHttpTransport:
-    return AsyncODataHttpTransport(base_url=config.service_url.rstrip("/") + path, client=client, get_token=get_token)
+def _async_transport(
+    config: AdmsConfig,
+    client: httpx.AsyncClient,
+    get_token: Callable[[], str],
+    path: str,
+) -> AsyncODataHttpTransport:
+    return AsyncODataHttpTransport(
+        base_url=config.service_url.rstrip("/") + path,
+        client=client,
+        get_token=get_token,
+    )
 
 
 class AdmsClient:
@@ -78,11 +96,17 @@ class AdmsClient:
         Returns:
             New :class:`AdmsClient` configured for user-context calls.
         """
-        get_token: Callable[[], str] = lambda: self._token_fetcher.exchange_token(user_jwt)
+        get_token: Callable[[], str] = lambda: self._token_fetcher.exchange_token(
+            user_jwt
+        )
         return AdmsClient(
             _sync_transport(self._config, self._session, get_token, _SERVICE_PATH),
-            _sync_transport(self._config, self._session, get_token, _ADMIN_SERVICE_PATH),
-            _sync_transport(self._config, self._session, get_token, _CONFIG_SERVICE_PATH),
+            _sync_transport(
+                self._config, self._session, get_token, _ADMIN_SERVICE_PATH
+            ),
+            _sync_transport(
+                self._config, self._session, get_token, _CONFIG_SERVICE_PATH
+            ),
             _config=self._config,
             _session=self._session,
             _token_fetcher=self._token_fetcher,
@@ -146,11 +170,19 @@ class AsyncAdmsClient:
         Returns:
             New :class:`AsyncAdmsClient` for user-context calls.
         """
-        get_token: Callable[[], str] = lambda: self._token_fetcher.exchange_token(user_jwt)
+        get_token: Callable[[], str] = lambda: self._token_fetcher.exchange_token(
+            user_jwt
+        )
         return AsyncAdmsClient(
-            _async_transport(self._config, self._httpx_client, get_token, _SERVICE_PATH),
-            _async_transport(self._config, self._httpx_client, get_token, _ADMIN_SERVICE_PATH),
-            _async_transport(self._config, self._httpx_client, get_token, _CONFIG_SERVICE_PATH),
+            _async_transport(
+                self._config, self._httpx_client, get_token, _SERVICE_PATH
+            ),
+            _async_transport(
+                self._config, self._httpx_client, get_token, _ADMIN_SERVICE_PATH
+            ),
+            _async_transport(
+                self._config, self._httpx_client, get_token, _CONFIG_SERVICE_PATH
+            ),
             _config=self._config,
             _httpx_client=self._httpx_client,
             _token_fetcher=self._token_fetcher,
@@ -186,12 +218,16 @@ def create_client(
         ValueError: If ``instance`` is an empty string.
     """
     if instance is not None and instance == "":
-        raise ValueError("instance must not be an empty string; omit it to use 'default'")
+        raise ValueError(
+            "instance must not be an empty string; omit it to use 'default'"
+        )
     binding = config or load_from_env_or_mount(instance)
     token_fetcher = IasTokenFetcher(config=binding, cache=token_cache)
     session = requests.Session()
     get_token: Callable[[], str] = (
-        (lambda: token_fetcher.exchange_token(user_jwt)) if user_jwt else token_fetcher.get_token
+        (lambda: token_fetcher.exchange_token(user_jwt))
+        if user_jwt
+        else token_fetcher.get_token
     )
     return AdmsClient(
         _sync_transport(binding, session, get_token, _SERVICE_PATH),
@@ -229,12 +265,16 @@ def create_async_client(
         ValueError: If ``instance`` is an empty string.
     """
     if instance is not None and instance == "":
-        raise ValueError("instance must not be an empty string; omit it to use 'default'")
+        raise ValueError(
+            "instance must not be an empty string; omit it to use 'default'"
+        )
     binding = config or load_from_env_or_mount(instance)
     token_fetcher = IasTokenFetcher(config=binding, cache=token_cache)
     httpx_client = http_client or httpx.AsyncClient()
     get_token: Callable[[], str] = (
-        (lambda: token_fetcher.exchange_token(user_jwt)) if user_jwt else token_fetcher.get_token
+        (lambda: token_fetcher.exchange_token(user_jwt))
+        if user_jwt
+        else token_fetcher.get_token
     )
     return AsyncAdmsClient(
         _async_transport(binding, httpx_client, get_token, _SERVICE_PATH),

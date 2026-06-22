@@ -74,8 +74,8 @@ def bo_type_id(adms_client: AdmsClient) -> str:
     Reads the first available type from the ConfigurationService; creates
     a test type if none exist.
     """
-    base = adms_client._http._config.service_url.rstrip("/")
-    bearer = adms_client._http._token_fetcher.get_token()
+    base = adms_client._config.service_url.rstrip("/")
+    bearer = adms_client._token_fetcher.get_token()
 
     resp = _requests.get(
         f"{base}/odata/v4/ConfigurationService/BusinessObjectNodeType",

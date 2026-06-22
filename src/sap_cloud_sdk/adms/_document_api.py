@@ -86,7 +86,10 @@ class _DocumentApi:
         Raises:
             DocumentNotFoundError: If no relation with this ID exists.
         """
-        path = build_relation_key_path(document_relation_id, is_active_entity) + "/Document"
+        path = (
+            build_relation_key_path(document_relation_id, is_active_entity)
+            + "/Document"
+        )
         return Document.from_dict(self._http.get(path))
 
     @record_metrics(Module.ADMS, Operation.ADMS_DOCUMENTS_GET_DOWNLOAD_URL)
@@ -157,12 +160,14 @@ class _DocumentApi:
             Full updated :class:`~sap_cloud_sdk.adms._models.Document`.
         """
         self._http.post(
-            build_relation_key_path(document_relation_id, is_active_entity) + "/UpdateDocument",
+            build_relation_key_path(document_relation_id, is_active_entity)
+            + "/UpdateDocument",
             json={"Document": update_input.to_odata_dict()},
         )
         return Document.from_dict(
             self._http.get(
-                build_relation_key_path(document_relation_id, is_active_entity) + "/Document"
+                build_relation_key_path(document_relation_id, is_active_entity)
+                + "/Document"
             )
         )
 
@@ -186,7 +191,9 @@ class _DocumentApi:
         Returns:
             Updated :class:`~sap_cloud_sdk.adms._models.Document`.
         """
-        payload: dict = {"DocumentContentVersion": {"DocContentVersionID": doc_content_version_id}}
+        payload: dict = {
+            "DocumentContentVersion": {"DocContentVersionID": doc_content_version_id}
+        }
         if comment is not None:
             payload["DocumentContentVersion"]["DocContentVersionComment"] = comment
         return Document.from_dict(
@@ -263,7 +270,10 @@ class _AsyncDocumentApi:
         is_active_entity: bool = True,
     ) -> Document:
         """Async variant of :meth:`_DocumentApi.get` — same semantics."""
-        path = build_relation_key_path(document_relation_id, is_active_entity) + "/Document"
+        path = (
+            build_relation_key_path(document_relation_id, is_active_entity)
+            + "/Document"
+        )
         return Document.from_dict(await self._http.get(path))
 
     @record_metrics(Module.ADMS, Operation.ADMS_DOCUMENTS_GET_DOWNLOAD_URL)
@@ -307,12 +317,14 @@ class _AsyncDocumentApi:
     ) -> Document:
         """Async variant of :meth:`_DocumentApi.update` — same semantics."""
         await self._http.post(
-            build_relation_key_path(document_relation_id, is_active_entity) + "/UpdateDocument",
+            build_relation_key_path(document_relation_id, is_active_entity)
+            + "/UpdateDocument",
             json={"Document": update.to_odata_dict()},
         )
         return Document.from_dict(
             await self._http.get(
-                build_relation_key_path(document_relation_id, is_active_entity) + "/Document"
+                build_relation_key_path(document_relation_id, is_active_entity)
+                + "/Document"
             )
         )
 
@@ -341,7 +353,9 @@ class _AsyncDocumentApi:
         comment: str | None = None,
     ) -> Document:
         """Async variant of :meth:`_DocumentApi.restore_content_version` — same semantics."""
-        payload: dict = {"DocumentContentVersion": {"DocContentVersionID": doc_content_version_id}}
+        payload: dict = {
+            "DocumentContentVersion": {"DocContentVersionID": doc_content_version_id}
+        }
         if comment is not None:
             payload["DocumentContentVersion"]["DocContentVersionComment"] = comment
         return Document.from_dict(

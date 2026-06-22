@@ -117,8 +117,8 @@ def mock_config() -> AdmsConfig:
 @pytest.fixture
 def mock_token_fetcher(mock_config) -> IasTokenFetcher:
     fetcher = IasTokenFetcher(config=mock_config)
-    fetcher.get_token = MagicMock(return_value="test-token")  # type: ignore[method-assign]
-    fetcher.exchange_token = MagicMock(return_value="user-token")  # type: ignore[method-assign]
+    fetcher.get_token = MagicMock(return_value="test-token")  # type: ignore[method-assign]  # ty: ignore[invalid-assignment]
+    fetcher.exchange_token = MagicMock(return_value="user-token")  # type: ignore[method-assign]  # ty: ignore[invalid-assignment]
     return fetcher
 
 
@@ -1366,6 +1366,3 @@ class TestJobPollingWorkflow:
 
         assert output.job_status == JobStatus.COMPLETED
         assert http.get.call_count == 3
-
-
-

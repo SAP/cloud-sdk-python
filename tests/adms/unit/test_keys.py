@@ -54,7 +54,7 @@ class TestQuoteOdataGuidKey:
 
     def test_none_raises(self):
         with pytest.raises((ValueError, AttributeError, TypeError)):
-            quote_odata_guid_key(None)  # type: ignore[arg-type]
+            quote_odata_guid_key(None)  # type: ignore[arg-type]  # ty: ignore[invalid-argument-type]
 
 
 class TestEntityKeyPathBuilders:

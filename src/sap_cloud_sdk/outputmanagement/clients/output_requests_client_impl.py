@@ -1,12 +1,20 @@
 """Implementation of output requests client."""
 
+import base64
 import logging
 import os
+import tempfile
 import uuid
 from typing import Dict, Optional
 
 import requests
-from sap_cloud_sdk.destination import Destination
+from cryptography.hazmat.primitives.serialization import (
+    pkcs12,
+    Encoding,
+    PrivateFormat,
+    NoEncryption,
+)
+from sap_cloud_sdk.destination import Destination, create_certificate_client, AccessStrategy
 
 from .output_requests_client import OutputRequestsClient
 from ..constants import Constants
@@ -181,11 +189,6 @@ class OutputRequestsClientImpl(OutputRequestsClient):
             
             # Get certificate from Cloud SDK Destination Service
             try:
-                from sap_cloud_sdk.destination import create_certificate_client, AccessStrategy
-                import tempfile
-                import base64
-                from cryptography.hazmat.primitives.serialization import pkcs12, Encoding, PrivateFormat, NoEncryption
-                
                 # Resolve instance name: use provided value or default to "default" (following DMS pattern)
                 inst = self._destination_instance or "default"
                 logger.info(f"✓ Creating certificate client for instance '{inst}'")

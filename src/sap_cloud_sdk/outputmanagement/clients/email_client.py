@@ -1,14 +1,23 @@
 """Email client for simplified email sending via SAP Ariba Output Service."""
 
-from typing import Optional, List, Dict, Any
+import logging
+from typing import Optional, List, Dict, Any, TYPE_CHECKING
+
 from ..models.output_request import OutputRequest
 from ..models.output_request_data import OutputRequestData
 from ..models.output_management_info import OutputManagementInfo
 from ..models.email_configuration import EmailConfiguration
 from ..models.output_response import OutputResponse, ErrorResponse
+from ..models.attachment_config import AttachmentConfig
+from ..models.pre_generated_attachment import PreGeneratedAttachment
 from ..config.destination_credential_config import DestinationCredentialConfig
 from ..constants import Channel
 from ..utils.request_validator import RequestValidator
+
+if TYPE_CHECKING:
+    from ..client_provider import OutputManagementServiceClientProviderBuilder
+
+logger = logging.getLogger(__name__)
 
 
 class EmailClient:
@@ -67,9 +76,6 @@ class EmailClient:
         # Build attachment config if URLs are provided
         attachment_config = None
         if attachment_urls:
-            from ..models.attachment_config import AttachmentConfig
-            from ..models.pre_generated_attachment import PreGeneratedAttachment
-            
             # Convert URLs to PreGeneratedAttachment objects
             pre_gen_attachments = [
                 PreGeneratedAttachment(url=url, source="DMS")
@@ -217,10 +223,8 @@ class EmailClient:
             )
         
         try:
-            # Import here to avoid circular import at module initialization
+            # Import here to avoid circular import (client.py -> email_client.py -> client_provider.py -> client.py)
             from ..client_provider import OutputManagementServiceClientProviderBuilder
-            import logging
-            logger = logging.getLogger(__name__)
             
             # Resolve instance name for logging
             inst = instance or "default"

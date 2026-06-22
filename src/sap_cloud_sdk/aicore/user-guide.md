@@ -103,30 +103,80 @@ AICORE_FILTER_VIOLENCE=0
 
 ### Override programmatically
 
-Use `set_filtering()` to override thresholds at runtime, after `set_aicore_config()`:
+Build a `ContentFiltering` and pass it to `set_filtering()`:
 
 ```python
-from sap_cloud_sdk.aicore import set_filtering, Severity
+from sap_cloud_sdk.aicore import (
+    AzureContentFilter,
+    ContentFiltering,
+    InputFiltering,
+    OutputFiltering,
+    Severity,
+    set_filtering,
+)
 
-# Tighten two categories
-set_filtering(self_harm=Severity.STRICT, violence=Severity.STRICT)
+set_filtering(ContentFiltering(
+    input_filtering=InputFiltering(filters=[
+        AzureContentFilter(
+            hate=Severity.STRICT,
+            violence=Severity.STRICT,
+            sexual=Severity.STRICT,
+            self_harm=Severity.STRICT,
+            prompt_shield=True,
+        ),
+    ]),
+    output_filtering=OutputFiltering(filters=[
+        AzureContentFilter(
+            hate=Severity.MEDIUM,
+            violence=Severity.MEDIUM,
+            sexual=Severity.MEDIUM,
+            self_harm=Severity.MEDIUM,
+        ),
+    ]),
+))
+```
 
-# Re-apply env-based config (after changing env vars)
+To re-apply env-based config (e.g. after changing `AICORE_FILTER_*`):
+
+```python
 set_filtering()
 ```
 
-`set_filtering()` arguments:
+The `ContentFiltering` class mirrors the shape used by
+`generative-ai-hub-sdk` (`ContentFiltering` / `InputFiltering` /
+`OutputFiltering`) so call-site code migrates by changing the threshold
+enum from `AzureThreshold` to `Severity` and the import paths.
 
-| Argument | Type | Description |
-|---|---|---|
-| `hate` | `Severity \| None` | Override hate threshold |
-| `violence` | `Severity \| None` | Override violence threshold |
-| `sexual` | `Severity \| None` | Override sexual threshold |
-| `self_harm` | `Severity \| None` | Override self-harm threshold |
-| `prompt_shield` | `bool \| None` | Enable/disable prompt shield |
-| `directions` | `set[Literal["input", "output"]] \| None` | Override active directions |
+### Multiple filter providers
 
-Unspecified arguments retain their current values (from env or defaults).
+A direction can stack multiple filters. The server applies them in order;
+the first to reject wins.
+
+```python
+from sap_cloud_sdk.aicore import (
+    AzureContentFilter,
+    ContentFiltering,
+    InputFiltering,
+    LlamaGuard38bFilter,
+    set_filtering,
+)
+
+set_filtering(ContentFiltering(
+    input_filtering=InputFiltering(filters=[
+        AzureContentFilter(prompt_shield=True),
+        LlamaGuard38bFilter(hate=True, violent_crimes=True),
+    ]),
+))
+```
+
+`LlamaGuard38bFilter` takes 14 boolean category toggles (`hate`,
+`violent_crimes`, `sex_crimes`, `self_harm`, etc.). All default to
+`False`; set a category to `True` to block matching content. The
+implementation follows the SAP AI Core orchestration v2 spec for
+`llama_guard_3_8b` and is wire-format-equivalent to the
+`generative-ai-hub-sdk` reference. Live coverage in this SDK validates
+the `AzureContentFilter` path; LlamaGuard is validated by unit tests
+against the documented wire format.
 
 ### Disable filtering
 
@@ -179,20 +229,30 @@ except Exception as e:
 ### Migration from prior versions
 
 If your agent previously imported from `sap_cloud_sdk.orchestration` (an
-in-flight name during 0.28 development), update to:
+in-flight name during 0.28 development) or used the keyword form
+`set_filtering(hate=...)`, update to:
 
 ```python
-# Before:
+# Before (orchestration namespace, kwarg form):
 from sap_cloud_sdk.orchestration import set_filtering, ContentFilteredError
-from sap_cloud_sdk.orchestration._litellm_patch import extract_filter_blocked
 
-# After:
-from sap_cloud_sdk.aicore import set_filtering, ContentFilteredError, extract_filter_blocked
+set_filtering(hate=0, violence=0)
+
+# After (aicore namespace with class API):
+from sap_cloud_sdk.aicore import (
+    AzureContentFilter, ContentFiltering, InputFiltering,
+    Severity, ContentFilteredError, set_filtering,
+)
+
+set_filtering(ContentFiltering(
+    input_filtering=InputFiltering(filters=[
+        AzureContentFilter(hate=Severity.STRICT, violence=Severity.STRICT),
+    ]),
+))
 ```
 
 Env vars also renamed: `ORCH_FILTER_*` → `AICORE_FILTER_*`. The
-`set_filtering(enabled=False)` parameter was removed; call `disable_filtering()`
-instead.
+`set_filtering(enabled=False)` form was replaced by `disable_filtering()`.
 
 ---
 

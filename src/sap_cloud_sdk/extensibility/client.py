@@ -476,7 +476,7 @@ class ExtensibilityClient:
         agw_client = create_agw_client(tenant_subdomain)
 
         # 2. Discover MCP tools — AGW resolves N8N GTID and handles auth internally
-        # TODO: Cache the list of mcp tools for performance.
+        # TODO: cache the list of mcp tools for performance.
         tools = await agw_client.list_mcp_tools(user_token=user_token or None)
 
         execute_tool = next(

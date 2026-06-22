@@ -8,14 +8,10 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import httpx
 import pytest
 
-from sap_cloud_sdk.adms import create_client
+from sap_cloud_sdk.adms import create_client, StructuredQuery
+from sap_cloud_sdk.core.odata import FilterExpression
 from sap_cloud_sdk.adms._ias_fetcher import IasTokenFetcher
 from sap_cloud_sdk.adms._http import AdmsHttp, AsyncAdmsHttp
-from sap_cloud_sdk.adms._query_options import (
-    ConfigQueryOptions,
-    DocumentQueryOptions,
-    RelationQueryOptions,
-)
 from sap_cloud_sdk.adms._models import (
     AllowedDomain,
     BaseType,
@@ -832,7 +828,7 @@ class TestDocumentApiGetAll:
     def test_get_all_passes_filter(self):
         http = _doc_http(get_data={"value": []})
         api = _DocumentApi(http)
-        api.get_all(DocumentQueryOptions(filter="DocumentTypeID eq 'INV'"))
+        api.get_all(StructuredQuery().filter(FilterExpression.field("DocumentTypeID").eq("INV")))
 
         _, kwargs = http.get.call_args
         assert kwargs["params"]["$filter"] == "DocumentTypeID eq 'INV'"
@@ -840,7 +836,7 @@ class TestDocumentApiGetAll:
     def test_get_all_passes_select(self):
         http = _doc_http(get_data={"value": []})
         api = _DocumentApi(http)
-        api.get_all(DocumentQueryOptions(select=["DocumentID", "DocumentName"]))
+        api.get_all(StructuredQuery().select("DocumentID", "DocumentName"))
 
         _, kwargs = http.get.call_args
         assert kwargs["params"]["$select"] == "DocumentID,DocumentName"
@@ -850,7 +846,7 @@ class TestDocumentApiGetAll:
         # $expand must contain both that value AND "Document".
         http = _doc_http(get_data={"value": []})
         api = _DocumentApi(http)
-        api.get_all(DocumentQueryOptions(expand=["DocumentContentVersion"]))
+        api.get_all(StructuredQuery().expand("DocumentContentVersion"))
 
         _, kwargs = http.get.call_args
         expand_parts = kwargs["params"]["$expand"].split(",")
@@ -860,16 +856,16 @@ class TestDocumentApiGetAll:
     def test_get_all_passes_top_and_skip(self):
         http = _doc_http(get_data={"value": []})
         api = _DocumentApi(http)
-        api.get_all(DocumentQueryOptions(top=20, skip=10))
+        api.get_all(StructuredQuery().top(20).skip(10))
 
         _, kwargs = http.get.call_args
-        assert kwargs["params"]["$top"] == 20
-        assert kwargs["params"]["$skip"] == 10
+        assert kwargs["params"]["$top"] == "20"
+        assert kwargs["params"]["$skip"] == "10"
 
     def test_get_all_passes_orderby(self):
         http = _doc_http(get_data={"value": []})
         api = _DocumentApi(http)
-        api.get_all(DocumentQueryOptions(orderby="DocumentName asc"))
+        api.get_all(StructuredQuery().custom("$orderby", "DocumentName asc"))
 
         _, kwargs = http.get.call_args
         assert kwargs["params"]["$orderby"] == "DocumentName asc"
@@ -935,17 +931,16 @@ class TestDocumentRelationApiGet:
         api = _DocumentRelationApi(http)
 
         api.get_all(
-            RelationQueryOptions(
-                filter="HostBusinessObjectNodeID eq 'PO-001'",
-                expand=["Document"],
-                top=10,
-            )
+            StructuredQuery()
+            .filter(FilterExpression.field("HostBusinessObjectNodeID").eq("PO-001"))
+            .expand("Document")
+            .top(10)
         )
 
         params = http.get.call_args[1]["params"]
         assert params["$filter"] == "HostBusinessObjectNodeID eq 'PO-001'"
         assert params["$expand"] == "Document"
-        assert params["$top"] == 10
+        assert params["$top"] == "10"
 
     def test_get_single_relation(self):
         http = _rel_http(get_data=_rel_dict("99999999-9999-9999-9999-999999999999"))
@@ -1167,7 +1162,7 @@ class TestConfigurationApiAllowedDomain:
         http = _cfg_sync_http(get_data={"value": []})
         api = _ConfigurationApi(http)
         api.get_all_allowed_domains(
-            ConfigQueryOptions(filter="AllowedDomainProtocol eq 'https'")
+            StructuredQuery().filter(FilterExpression.field("AllowedDomainProtocol").eq("https"))
         )
 
         _, kwargs = http.get.call_args
@@ -1176,11 +1171,11 @@ class TestConfigurationApiAllowedDomain:
     def test_get_all_passes_top_and_skip(self):
         http = _cfg_sync_http(get_data={"value": []})
         api = _ConfigurationApi(http)
-        api.get_all_allowed_domains(ConfigQueryOptions(top=10, skip=5))
+        api.get_all_allowed_domains(StructuredQuery().top(10).skip(5))
 
         _, kwargs = http.get.call_args
-        assert kwargs["params"]["$top"] == 10
-        assert kwargs["params"]["$skip"] == 5
+        assert kwargs["params"]["$top"] == "10"
+        assert kwargs["params"]["$skip"] == "5"
 
     def test_get_all_empty_params_when_no_args(self):
         http = _cfg_sync_http(get_data={"value": []})

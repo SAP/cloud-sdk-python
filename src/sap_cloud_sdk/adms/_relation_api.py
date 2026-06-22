@@ -17,8 +17,8 @@ from sap_cloud_sdk.adms._models import (
     DraftActivateInput,
     DraftInput,
 )
-from sap_cloud_sdk.adms._query_options import ConfigQueryOptions, RelationQueryOptions
 from sap_cloud_sdk.adms.config import _SERVICE_PATH
+from sap_cloud_sdk.core.odata._query import StructuredQuery
 from sap_cloud_sdk.core.telemetry import Module, Operation, record_metrics
 
 
@@ -34,19 +34,19 @@ class _DocumentRelationApi:
     @record_metrics(Module.ADMS, Operation.ADMS_RELATIONS_GET_ALL)
     def get_all(
         self,
-        options: RelationQueryOptions | None = None,
+        options: StructuredQuery | None = None,
     ) -> list[DocumentRelation]:
         """Query DocumentRelations with OData V4 query options.
 
         Args:
-            options: :class:`RelationQueryOptions` with the OData parameters
-                (``filter``, ``select``, ``expand``, ``top``, ``skip``).
-                Note: ``$orderby`` is not supported by this entity set.
+            options: :class:`~sap_cloud_sdk.core.odata.StructuredQuery` with
+                OData parameters. Note: ``$orderby`` is not supported by this
+                entity set.
 
         Returns:
             List of :class:`~sap_cloud_sdk.adms._models.DocumentRelation`.
         """
-        params = options.to_query_params() if options else {}
+        params = options.to_params() if options else {}
         resp = self._http.get(
             "DocumentRelation", params=params, service_base=_SERVICE_PATH
         )
@@ -294,27 +294,27 @@ class _DocumentRelationApi:
 
     @record_metrics(Module.ADMS, Operation.ADMS_CHANGELOG_GET_ALL)
     def get_change_logs(
-        self, options: ConfigQueryOptions | None = None
+        self, options: StructuredQuery | None = None
     ) -> list[ChangeLog]:
         """Fetch the audit change log for all document management operations.
 
         Returns:
             List of :class:`~sap_cloud_sdk.adms._models.ChangeLog` entries.
         """
-        params = options.to_query_params() if options else {}
+        params = options.to_params() if options else {}
         resp = self._http.get("ChangeLog", params=params, service_base=_SERVICE_PATH)
         return [ChangeLog.from_dict(item) for item in resp.json().get("value", [])]
 
     @record_metrics(Module.ADMS, Operation.ADMS_BO_CHANGELOG_GET_ALL)
     def get_bo_node_change_logs(
-        self, options: ConfigQueryOptions | None = None
+        self, options: StructuredQuery | None = None
     ) -> list[BusinessObjectNodeChangeLog]:
         """Fetch the change log joined with business object node context.
 
         Returns:
             List of :class:`~sap_cloud_sdk.adms._models.BusinessObjectNodeChangeLog`.
         """
-        params = options.to_query_params() if options else {}
+        params = options.to_params() if options else {}
         resp = self._http.get(
             "BusinessObjectNodeChangeLog", params=params, service_base=_SERVICE_PATH
         )
@@ -336,10 +336,10 @@ class _AsyncDocumentRelationApi:
     @record_metrics(Module.ADMS, Operation.ADMS_RELATIONS_GET_ALL)
     async def get_all(
         self,
-        options: RelationQueryOptions | None = None,
+        options: StructuredQuery | None = None,
     ) -> list[DocumentRelation]:
         """Async variant of :meth:`_DocumentRelationApi.get_all` — same semantics."""
-        params = options.to_query_params() if options else {}
+        params = options.to_params() if options else {}
         resp = await self._http.get(
             "DocumentRelation", params=params, service_base=_SERVICE_PATH
         )
@@ -514,10 +514,10 @@ class _AsyncDocumentRelationApi:
 
     @record_metrics(Module.ADMS, Operation.ADMS_CHANGELOG_GET_ALL)
     async def get_change_logs(
-        self, options: ConfigQueryOptions | None = None
+        self, options: StructuredQuery | None = None
     ) -> list[ChangeLog]:
         """Async variant of :meth:`_DocumentRelationApi.get_change_logs` — same semantics."""
-        params = options.to_query_params() if options else {}
+        params = options.to_params() if options else {}
         resp = await self._http.get(
             "ChangeLog", params=params, service_base=_SERVICE_PATH
         )
@@ -525,10 +525,10 @@ class _AsyncDocumentRelationApi:
 
     @record_metrics(Module.ADMS, Operation.ADMS_BO_CHANGELOG_GET_ALL)
     async def get_bo_node_change_logs(
-        self, options: ConfigQueryOptions | None = None
+        self, options: StructuredQuery | None = None
     ) -> list[BusinessObjectNodeChangeLog]:
         """Async variant of :meth:`_DocumentRelationApi.get_bo_node_change_logs` — same semantics."""
-        params = options.to_query_params() if options else {}
+        params = options.to_params() if options else {}
         resp = await self._http.get(
             "BusinessObjectNodeChangeLog", params=params, service_base=_SERVICE_PATH
         )

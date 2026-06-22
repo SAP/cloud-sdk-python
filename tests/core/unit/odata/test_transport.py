@@ -9,6 +9,7 @@ import requests
 from sap_cloud_sdk.core.odata._transport import ODataHttpTransport
 from sap_cloud_sdk.core.odata.exceptions import (
     ODataAuthError,
+    ODataConnectionError,
     ODataNotFoundError,
     ODataRequestError,
 )
@@ -89,6 +90,21 @@ class TestRequest:
         transport.request("POST", "EntitySet", json={"Name": "X"})
         assert session.request.call_args[1]["method"] == "POST"
 
+    def test_connection_error_raises_odata_connection_error(self, transport, session):
+        session.request.side_effect = requests.RequestException("timeout")
+        with pytest.raises(ODataConnectionError):
+            transport.request("GET", "EntitySet")
+
+    def test_403_without_csrf_raises_auth_error(self, session):
+        session.request.return_value = _mock_response(403)
+        transport = ODataHttpTransport(
+            base_url="https://example.com/odata/v4/",
+            session=session,
+            csrf_enabled=False,
+        )
+        with pytest.raises(ODataAuthError):
+            transport.request("GET", "EntitySet")
+
 
 class TestCsrf:
     def test_csrf_attached_on_post(self, session):
@@ -139,6 +155,27 @@ class TestCsrf:
         transport.request("POST", "EntitySet", json={"Name": "X"})
 
         assert session.request.call_count == 2
+
+    def test_csrf_retry_uses_fresh_token(self, session):
+        csrf_resp1 = MagicMock(spec=requests.Response)
+        csrf_resp1.status_code = 200
+        csrf_resp1.headers = {"X-CSRF-Token": "tok1"}
+        csrf_resp2 = MagicMock(spec=requests.Response)
+        csrf_resp2.status_code = 200
+        csrf_resp2.headers = {"X-CSRF-Token": "tok2"}
+
+        session.get.side_effect = [csrf_resp1, csrf_resp2]
+        session.request.side_effect = [_mock_response(403), _mock_response(201, {"ID": "1"})]
+
+        transport = ODataHttpTransport(
+            base_url="https://example.com/odata/v4/",
+            session=session,
+            csrf_enabled=True,
+        )
+        transport.request("POST", "EntitySet", json={"Name": "X"})
+
+        second_call_headers = session.request.call_args_list[1][1]["headers"]
+        assert second_call_headers["X-CSRF-Token"] == "tok2"
 
 
 class TestAbsoluteUrl:

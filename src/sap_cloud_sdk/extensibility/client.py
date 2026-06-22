@@ -414,7 +414,6 @@ class ExtensibilityClient:
             f"Last status: {last_status!r}"
         )
 
-
     @record_metrics(
         Module.EXTENSIBILITY,
         Operation.EXTENSIBILITY_CALL_HOOK,
@@ -425,7 +424,7 @@ class ExtensibilityClient:
         user_token: Optional[str] = None,
         message: Optional[Any] = None,
         headers: Optional[dict] = None,
-        tenant_subdomain: Optional[str] = None
+        tenant_subdomain: Optional[str] = None,
     ) -> Optional[Message]:
         """Call a hook via Agent Gateway MCP tool invocation.
 
@@ -482,8 +481,10 @@ class ExtensibilityClient:
 
         execute_tool = next(
             (
-                t for t in tools
-                if t.name == _EXECUTE_WORKFLOW_TOOL_NAME and t.server_name == _N8N_MCP_SERVER_NAME
+                t
+                for t in tools
+                if t.name == _EXECUTE_WORKFLOW_TOOL_NAME
+                and t.server_name == _N8N_MCP_SERVER_NAME
             ),
             None,
         )
@@ -495,8 +496,10 @@ class ExtensibilityClient:
 
         get_exec_tool = next(
             (
-                t for t in tools
-                if t.name == _GET_EXECUTION_TOOL_NAME and t.server_name == _N8N_MCP_SERVER_NAME
+                t
+                for t in tools
+                if t.name == _GET_EXECUTION_TOOL_NAME
+                and t.server_name == _N8N_MCP_SERVER_NAME
             ),
             None,
         )

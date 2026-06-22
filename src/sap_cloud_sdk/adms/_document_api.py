@@ -2,18 +2,14 @@
 
 from __future__ import annotations
 
-from sap_cloud_sdk.adms._http import (
-    AdmsHttp,
-    AsyncAdmsHttp,
-    build_relation_key_path,
-    quote_odata_string_key,
-)
+from sap_cloud_sdk.adms._keys import build_relation_key_path, quote_odata_string_key
+from sap_cloud_sdk.core.odata._transport import ODataHttpTransport
+from sap_cloud_sdk.core.odata._async_transport import AsyncODataHttpTransport
 from sap_cloud_sdk.adms._models import (
     Document,
     ScanStatus,
     UpdateDocumentInput,
 )
-from sap_cloud_sdk.adms.config import _SERVICE_PATH
 from sap_cloud_sdk.adms.exceptions import ScanNotCleanError
 from sap_cloud_sdk.core.odata._query import StructuredQuery
 from sap_cloud_sdk.core.telemetry import Module, Operation, record_metrics
@@ -25,7 +21,7 @@ class _DocumentApi:
     Access via :attr:`AdmsClient.documents`.
     """
 
-    def __init__(self, http: AdmsHttp) -> None:
+    def __init__(self, http: ODataHttpTransport) -> None:
         self._http = http
 
     @record_metrics(Module.ADMS, Operation.ADMS_DOCUMENTS_GET_ALL)
@@ -41,12 +37,6 @@ class _DocumentApi:
         and returns the unique set of Documents found across all relations,
         preserving first-seen order.
 
-        ``$filter``, ``$top``, ``$skip``, and ``$orderby`` in *options* are
-        applied to the underlying ``DocumentRelation`` query (not to the
-        Document entity itself).  ``$select`` and ``$expand`` are forwarded
-        as-is; if you need to expand additional navigation properties on
-        DocumentRelation alongside ``Document``, include them in the query.
-
         Args:
             options: :class:`~sap_cloud_sdk.core.odata.StructuredQuery` with
                 OData parameters. If ``None``, all relations are fetched and
@@ -56,7 +46,6 @@ class _DocumentApi:
             Unique :class:`~sap_cloud_sdk.adms._models.Document` instances,
             ordered by first occurrence across relations.
         """
-        # Build params that always includes Document in $expand.
         rel_params: dict = options.to_params() if options else {}
         existing_expand = str(rel_params.get("$expand", ""))
         if existing_expand:
@@ -65,12 +54,10 @@ class _DocumentApi:
         else:
             rel_params["$expand"] = "Document"
 
-        resp = self._http.get(
-            "DocumentRelation", params=rel_params, service_base=_SERVICE_PATH
-        )
+        resp = self._http.get("DocumentRelation", params=rel_params)
         seen: set[str] = set()
         docs: list[Document] = []
-        for rel_data in resp.json().get("value", []):
+        for rel_data in resp.get("value", []):
             doc_data = rel_data.get("Document")
             if not doc_data:
                 continue
@@ -99,12 +86,8 @@ class _DocumentApi:
         Raises:
             DocumentNotFoundError: If no relation with this ID exists.
         """
-        path = (
-            build_relation_key_path(document_relation_id, is_active_entity)
-            + "/Document"
-        )
-        resp = self._http.get(path, service_base=_SERVICE_PATH)
-        return Document.from_dict(resp.json())
+        path = build_relation_key_path(document_relation_id, is_active_entity) + "/Document"
+        return Document.from_dict(self._http.get(path))
 
     @record_metrics(Module.ADMS, Operation.ADMS_DOCUMENTS_GET_DOWNLOAD_URL)
     def get_download_url(
@@ -131,11 +114,7 @@ class _DocumentApi:
             DocumentNotFoundError: If the relation/document cannot be found.
         """
         rel_key = build_relation_key_path(document_relation_id, is_active_entity)
-        expanded = self._http.get(
-            f"{rel_key}?$expand=Document",
-            service_base=_SERVICE_PATH,
-        )
-        data = expanded.json()
+        data = self._http.get(f"{rel_key}?$expand=Document")
         doc_data = data.get("Document") or {}
         state_raw = doc_data.get("DocumentState", ScanStatus.PENDING.value)
         try:
@@ -154,8 +133,7 @@ class _DocumentApi:
             f"{rel_key}/DownloadDocument("
             f"DocContentVersionID={quote_odata_string_key(doc_content_version_id)})"
         )
-        resp = self._http.get(fn_key, service_base=_SERVICE_PATH)
-        return resp.json().get("value", "")
+        return self._http.get(fn_key).get("value", "")
 
     @record_metrics(Module.ADMS, Operation.ADMS_DOCUMENTS_UPDATE)
     def update(
@@ -178,19 +156,15 @@ class _DocumentApi:
         Returns:
             Full updated :class:`~sap_cloud_sdk.adms._models.Document`.
         """
-        path = (
-            build_relation_key_path(document_relation_id, is_active_entity)
-            + "/UpdateDocument"
+        self._http.post(
+            build_relation_key_path(document_relation_id, is_active_entity) + "/UpdateDocument",
+            json={"Document": update_input.to_odata_dict()},
         )
-        payload = {"Document": update_input.to_odata_dict()}
-        self._http.post(path, json=payload, service_base=_SERVICE_PATH)
-        # UpdateDocument returns only changed fields — fetch the full entity.
-        full_path = (
-            build_relation_key_path(document_relation_id, is_active_entity)
-            + "/Document"
+        return Document.from_dict(
+            self._http.get(
+                build_relation_key_path(document_relation_id, is_active_entity) + "/Document"
+            )
         )
-        resp = self._http.get(full_path, service_base=_SERVICE_PATH)
-        return Document.from_dict(resp.json())
 
     @record_metrics(Module.ADMS, Operation.ADMS_DOCUMENTS_RESTORE_CONTENT_VERSION)
     def restore_content_version(
@@ -212,19 +186,16 @@ class _DocumentApi:
         Returns:
             Updated :class:`~sap_cloud_sdk.adms._models.Document`.
         """
-        path = (
-            build_relation_key_path(document_relation_id, is_active_entity)
-            + "/RestoreDocumentContentVersion"
-        )
-        payload: dict = {
-            "DocumentContentVersion": {
-                "DocContentVersionID": doc_content_version_id,
-            }
-        }
+        payload: dict = {"DocumentContentVersion": {"DocContentVersionID": doc_content_version_id}}
         if comment is not None:
             payload["DocumentContentVersion"]["DocContentVersionComment"] = comment
-        resp = self._http.post(path, json=payload, service_base=_SERVICE_PATH)
-        return Document.from_dict(resp.json())
+        return Document.from_dict(
+            self._http.post(
+                build_relation_key_path(document_relation_id, is_active_entity)
+                + "/RestoreDocumentContentVersion",
+                json=payload,
+            )
+        )
 
     @record_metrics(Module.ADMS, Operation.ADMS_DOCUMENTS_DELETE_CONTENT_VERSION)
     def delete_content_version(
@@ -241,14 +212,10 @@ class _DocumentApi:
             doc_content_version_id: Version to delete.
             is_active_entity: Active vs draft entity flag.
         """
-        path = (
-            build_relation_key_path(document_relation_id, is_active_entity)
-            + "/DeleteDocumentContentVersion"
-        )
         self._http.post(
-            path,
+            build_relation_key_path(document_relation_id, is_active_entity)
+            + "/DeleteDocumentContentVersion",
             json={"DocContentVersionID": doc_content_version_id},
-            service_base=_SERVICE_PATH,
         )
 
 
@@ -258,7 +225,7 @@ class _AsyncDocumentApi:
     Access via :attr:`AsyncAdmsClient.documents`.
     """
 
-    def __init__(self, http: AsyncAdmsHttp) -> None:
+    def __init__(self, http: AsyncODataHttpTransport) -> None:
         self._http = http
 
     @record_metrics(Module.ADMS, Operation.ADMS_DOCUMENTS_GET_ALL)
@@ -267,7 +234,7 @@ class _AsyncDocumentApi:
         options: StructuredQuery | None = None,
     ) -> list[Document]:
         """Async variant of :meth:`_DocumentApi.get_all` — same semantics."""
-        rel_params: dict = _resolve_query_params(options)
+        rel_params: dict = options.to_params() if options else {}
         existing_expand = str(rel_params.get("$expand", ""))
         if existing_expand:
             if "Document" not in existing_expand.split(","):
@@ -275,12 +242,10 @@ class _AsyncDocumentApi:
         else:
             rel_params["$expand"] = "Document"
 
-        resp = await self._http.get(
-            "DocumentRelation", params=rel_params, service_base=_SERVICE_PATH
-        )
+        resp = await self._http.get("DocumentRelation", params=rel_params)
         seen: set[str] = set()
         docs: list[Document] = []
-        for rel_data in resp.json().get("value", []):
+        for rel_data in resp.get("value", []):
             doc_data = rel_data.get("Document")
             if not doc_data:
                 continue
@@ -298,12 +263,8 @@ class _AsyncDocumentApi:
         is_active_entity: bool = True,
     ) -> Document:
         """Async variant of :meth:`_DocumentApi.get` — same semantics."""
-        path = (
-            build_relation_key_path(document_relation_id, is_active_entity)
-            + "/Document"
-        )
-        resp = await self._http.get(path, service_base=_SERVICE_PATH)
-        return Document.from_dict(resp.json())
+        path = build_relation_key_path(document_relation_id, is_active_entity) + "/Document"
+        return Document.from_dict(await self._http.get(path))
 
     @record_metrics(Module.ADMS, Operation.ADMS_DOCUMENTS_GET_DOWNLOAD_URL)
     async def get_download_url(
@@ -315,11 +276,7 @@ class _AsyncDocumentApi:
     ) -> str:
         """Async download URL fetch with scan-state gate."""
         rel_key = build_relation_key_path(document_relation_id, is_active_entity)
-        expanded = await self._http.get(
-            f"{rel_key}?$expand=Document",
-            service_base=_SERVICE_PATH,
-        )
-        data = expanded.json()
+        data = await self._http.get(f"{rel_key}?$expand=Document")
         doc_data = data.get("Document") or {}
         state_raw = doc_data.get("DocumentState", ScanStatus.PENDING.value)
         try:
@@ -338,8 +295,7 @@ class _AsyncDocumentApi:
             f"{rel_key}/DownloadDocument("
             f"DocContentVersionID={quote_odata_string_key(doc_content_version_id)})"
         )
-        resp = await self._http.get(fn_key, service_base=_SERVICE_PATH)
-        return resp.json().get("value", "")
+        return (await self._http.get(fn_key)).get("value", "")
 
     @record_metrics(Module.ADMS, Operation.ADMS_DOCUMENTS_UPDATE)
     async def update(
@@ -350,18 +306,15 @@ class _AsyncDocumentApi:
         is_active_entity: bool = True,
     ) -> Document:
         """Async variant of :meth:`_DocumentApi.update` — same semantics."""
-        path = (
-            build_relation_key_path(document_relation_id, is_active_entity)
-            + "/UpdateDocument"
+        await self._http.post(
+            build_relation_key_path(document_relation_id, is_active_entity) + "/UpdateDocument",
+            json={"Document": update.to_odata_dict()},
         )
-        payload = {"Document": update.to_odata_dict()}
-        await self._http.post(path, json=payload, service_base=_SERVICE_PATH)
-        full_path = (
-            build_relation_key_path(document_relation_id, is_active_entity)
-            + "/Document"
+        return Document.from_dict(
+            await self._http.get(
+                build_relation_key_path(document_relation_id, is_active_entity) + "/Document"
+            )
         )
-        resp = await self._http.get(full_path, service_base=_SERVICE_PATH)
-        return Document.from_dict(resp.json())
 
     @record_metrics(Module.ADMS, Operation.ADMS_DOCUMENTS_DELETE_CONTENT_VERSION)
     async def delete_content_version(
@@ -372,14 +325,10 @@ class _AsyncDocumentApi:
         is_active_entity: bool = True,
     ) -> None:
         """Async variant of :meth:`_DocumentApi.delete_content_version` — same semantics."""
-        path = (
-            build_relation_key_path(document_relation_id, is_active_entity)
-            + "/DeleteDocumentContentVersion"
-        )
         await self._http.post(
-            path,
+            build_relation_key_path(document_relation_id, is_active_entity)
+            + "/DeleteDocumentContentVersion",
             json={"DocContentVersionID": doc_content_version_id},
-            service_base=_SERVICE_PATH,
         )
 
     @record_metrics(Module.ADMS, Operation.ADMS_DOCUMENTS_RESTORE_CONTENT_VERSION)
@@ -392,16 +341,13 @@ class _AsyncDocumentApi:
         comment: str | None = None,
     ) -> Document:
         """Async variant of :meth:`_DocumentApi.restore_content_version` — same semantics."""
-        path = (
-            build_relation_key_path(document_relation_id, is_active_entity)
-            + "/RestoreDocumentContentVersion"
-        )
-        payload: dict = {
-            "DocumentContentVersion": {
-                "DocContentVersionID": doc_content_version_id,
-            }
-        }
+        payload: dict = {"DocumentContentVersion": {"DocContentVersionID": doc_content_version_id}}
         if comment is not None:
             payload["DocumentContentVersion"]["DocContentVersionComment"] = comment
-        resp = await self._http.post(path, json=payload, service_base=_SERVICE_PATH)
-        return Document.from_dict(resp.json())
+        return Document.from_dict(
+            await self._http.post(
+                build_relation_key_path(document_relation_id, is_active_entity)
+                + "/RestoreDocumentContentVersion",
+                json=payload,
+            )
+        )

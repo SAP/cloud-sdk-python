@@ -2,6 +2,22 @@
 
 from __future__ import annotations
 
+from sap_cloud_sdk.core.odata.exceptions import (
+    ODataNotFoundError as DocumentNotFoundError,
+    ODataRequestError as HttpError,
+)
+
+__all__ = [
+    "AdmsError",
+    "AdmsOperationError",
+    "AuthError",
+    "ClientCreationError",
+    "ConfigError",
+    "DocumentNotFoundError",
+    "HttpError",
+    "ScanNotCleanError",
+]
+
 
 class AdmsError(Exception):
     """Base exception for all ADMS module errors."""
@@ -21,34 +37,8 @@ class ConfigError(AdmsError):
     pass
 
 
-class HttpError(AdmsError):
-    """Raised for HTTP-related errors communicating with the ADMS service.
-
-    Attributes:
-        status_code: HTTP status code returned by the service, if available.
-        message: Human-readable error message.
-        response_text: Raw response payload for diagnostics, if available.
-    """
-
-    def __init__(
-        self,
-        message: str,
-        status_code: int | None = None,
-        response_text: str | None = None,
-    ) -> None:
-        super().__init__(message)
-        self.status_code = status_code
-        self.response_text = response_text
-
-
 class AdmsOperationError(AdmsError):
     """Raised when an ADMS API operation (CRUD, action, function) fails."""
-
-    pass
-
-
-class DocumentNotFoundError(AdmsOperationError):
-    """Raised when a requested Document or DocumentRelation is not found (HTTP 404)."""
 
     pass
 

@@ -55,10 +55,13 @@ class CsrfTokenProvider:
 
     def _fetch(self) -> str:
         url = self._transport._base_url + "/"
+        fetch_headers: dict[str, str] = {CSRF_HEADER: CSRF_FETCH_VALUE}
+        if self._transport._get_token is not None:
+            fetch_headers["Authorization"] = f"Bearer {self._transport._get_token()}"
         try:
             resp = self._transport._session.get(
                 url,
-                headers={CSRF_HEADER: CSRF_FETCH_VALUE},
+                headers=fetch_headers,
                 timeout=CSRF_FETCH_TIMEOUT,
             )
         except _requests.RequestException as exc:

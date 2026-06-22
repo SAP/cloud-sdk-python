@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Any
+from typing import Any, Callable
 
 import requests
 from requests.exceptions import RequestException
@@ -54,9 +54,11 @@ class ODataHttpTransport:
         base_url: str,
         session: requests.Session,
         csrf_enabled: bool = True,
+        get_token: Callable[[], str] | None = None,
     ) -> None:
         self._base_url = base_url.rstrip("/")
         self._session = session
+        self._get_token = get_token
         self._csrf: CsrfTokenProvider | None = (
             CsrfTokenProvider(self) if csrf_enabled else None
         )
@@ -177,6 +179,8 @@ class ODataHttpTransport:
     ) -> dict[str, Any]:
         url = self.absolute_url(path)
         req_headers = {**DEFAULT_HEADERS, **(extra_headers or {})}
+        if self._get_token is not None:
+            req_headers["Authorization"] = f"Bearer {self._get_token()}"
 
         logger.debug("%s %s params=%s", method, url, params)
         try:

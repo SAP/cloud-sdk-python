@@ -186,3 +186,73 @@ class TestAbsoluteUrl:
     def test_strips_leading_slash_from_path(self):
         t = ODataHttpTransport("https://host/svc", MagicMock(), csrf_enabled=False)
         assert t.absolute_url("/EntitySet") == "https://host/svc/EntitySet"
+
+
+class TestGetToken:
+    def test_token_injected_as_bearer_header(self, session):
+        session.request.return_value = _mock_response(200, {})
+        transport = ODataHttpTransport(
+            base_url="https://example.com/odata/v4/",
+            session=session,
+            csrf_enabled=False,
+            get_token=lambda: "my-token",
+        )
+        transport.request("GET", "EntitySet")
+        headers = session.request.call_args[1]["headers"]
+        assert headers["Authorization"] == "Bearer my-token"
+
+    def test_token_called_per_request(self, session):
+        session.request.return_value = _mock_response(200, {})
+        calls = []
+        def counter():
+            calls.append(1)
+            return "t"
+        transport = ODataHttpTransport(
+            base_url="https://example.com/odata/v4/",
+            session=session,
+            csrf_enabled=False,
+            get_token=counter,
+        )
+        transport.request("GET", "A")
+        transport.request("GET", "B")
+        assert len(calls) == 2
+
+    def test_token_overrides_session_auth(self, session):
+        session.headers = {"Authorization": "Bearer stale"}
+        session.request.return_value = _mock_response(200, {})
+        transport = ODataHttpTransport(
+            base_url="https://example.com/odata/v4/",
+            session=session,
+            csrf_enabled=False,
+            get_token=lambda: "fresh",
+        )
+        transport.request("GET", "EntitySet")
+        headers = session.request.call_args[1]["headers"]
+        assert headers["Authorization"] == "Bearer fresh"
+
+    def test_no_get_token_no_auth_injected(self, session):
+        session.request.return_value = _mock_response(200, {})
+        transport = ODataHttpTransport(
+            base_url="https://example.com/odata/v4/",
+            session=session,
+            csrf_enabled=False,
+        )
+        transport.request("GET", "EntitySet")
+        headers = session.request.call_args[1]["headers"]
+        assert "Authorization" not in headers
+
+    def test_csrf_fetch_includes_bearer_when_get_token_set(self, session):
+        csrf_resp = MagicMock(spec=requests.Response)
+        csrf_resp.status_code = 200
+        csrf_resp.headers = {"X-CSRF-Token": "csrf-tok"}
+        session.get.return_value = csrf_resp
+        session.request.return_value = _mock_response(201, {"ID": "1"})
+        transport = ODataHttpTransport(
+            base_url="https://example.com/odata/v4/",
+            session=session,
+            get_token=lambda: "bearer-xyz",
+            csrf_enabled=True,
+        )
+        transport.request("POST", "EntitySet", json={})
+        csrf_headers = session.get.call_args[1]["headers"]
+        assert csrf_headers["Authorization"] == "Bearer bearer-xyz"

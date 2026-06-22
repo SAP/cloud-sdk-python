@@ -2,29 +2,27 @@
 
 from __future__ import annotations
 
-from sap_cloud_sdk.adms._http import (
-    AdmsHttp,
-    AsyncAdmsHttp,
-    build_job_status_key_path,
-)
+from sap_cloud_sdk.adms._keys import build_job_status_key_path
+from sap_cloud_sdk.core.odata._transport import ODataHttpTransport
+from sap_cloud_sdk.core.odata._async_transport import AsyncODataHttpTransport
 from sap_cloud_sdk.adms._models import (
     DeleteUserDataJobParameters,
     JobOutput,
     JobType,
     ZipDownloadJobParameters,
 )
-from sap_cloud_sdk.adms.config import _ADMIN_SERVICE_PATH, _SERVICE_PATH
 from sap_cloud_sdk.core.telemetry import Module, Operation, record_metrics
 
 
 class _JobApi:
-    """Async job operations for the ADMS module.
+    """Job operations for the ADMS module.
 
     Access via :attr:`AdmsClient.jobs`.
     """
 
-    def __init__(self, http: AdmsHttp) -> None:
+    def __init__(self, http: _AdmsTransport, admin_http: ODataHttpTransport) -> None:
         self._http = http
+        self._admin_http = admin_http
 
     @record_metrics(Module.ADMS, Operation.ADMS_JOBS_START_ZIP_DOWNLOAD)
     def start_zip_download(self, params: ZipDownloadJobParameters) -> JobOutput:
@@ -42,8 +40,7 @@ class _JobApi:
                 "JobParameters": params.to_odata_dict(),
             }
         }
-        resp = self._http.post("StartJob", json=payload, service_base=_SERVICE_PATH)
-        return JobOutput.from_dict(resp.json())
+        return JobOutput.from_dict(self._http.post("StartJob", json=payload))
 
     @record_metrics(Module.ADMS, Operation.ADMS_JOBS_START_DELETE_USER_DATA)
     def start_delete_user_data(self, params: DeleteUserDataJobParameters) -> JobOutput:
@@ -61,10 +58,7 @@ class _JobApi:
                 "JobParameters": params.to_odata_dict(),
             }
         }
-        resp = self._http.post(
-            "StartJob", json=payload, service_base=_ADMIN_SERVICE_PATH
-        )
-        return JobOutput.from_dict(resp.json())
+        return JobOutput.from_dict(self._admin_http.post("StartJob", json=payload))
 
     @record_metrics(Module.ADMS, Operation.ADMS_JOBS_GET_STATUS)
     def get_status(
@@ -83,10 +77,8 @@ class _JobApi:
         Returns:
             Current :class:`~sap_cloud_sdk.adms._models.JobOutput`.
         """
-        service = _ADMIN_SERVICE_PATH if use_admin_service else _SERVICE_PATH
-        path = build_job_status_key_path(job_id)
-        resp = self._http.get(path, service_base=service)
-        return JobOutput.from_dict(resp.json())
+        transport = self._admin_http if use_admin_service else self._http
+        return JobOutput.from_dict(transport.get(build_job_status_key_path(job_id)))
 
 
 class _AsyncJobApi:
@@ -95,8 +87,9 @@ class _AsyncJobApi:
     Access via :attr:`AsyncAdmsClient.jobs`.
     """
 
-    def __init__(self, http: AsyncAdmsHttp) -> None:
+    def __init__(self, http: _AsyncAdmsTransport, admin_http: AsyncODataHttpTransport) -> None:
         self._http = http
+        self._admin_http = admin_http
 
     @record_metrics(Module.ADMS, Operation.ADMS_JOBS_START_ZIP_DOWNLOAD)
     async def start_zip_download(self, params: ZipDownloadJobParameters) -> JobOutput:
@@ -107,15 +100,10 @@ class _AsyncJobApi:
                 "JobParameters": params.to_odata_dict(),
             }
         }
-        resp = await self._http.post(
-            "StartJob", json=payload, service_base=_SERVICE_PATH
-        )
-        return JobOutput.from_dict(resp.json())
+        return JobOutput.from_dict(await self._http.post("StartJob", json=payload))
 
     @record_metrics(Module.ADMS, Operation.ADMS_JOBS_START_DELETE_USER_DATA)
-    async def start_delete_user_data(
-        self, params: DeleteUserDataJobParameters
-    ) -> JobOutput:
+    async def start_delete_user_data(self, params: DeleteUserDataJobParameters) -> JobOutput:
         """Start a ``DELETE_USER_DATA`` job via AdminService (async)."""
         payload = {
             "JobInput": {
@@ -123,10 +111,7 @@ class _AsyncJobApi:
                 "JobParameters": params.to_odata_dict(),
             }
         }
-        resp = await self._http.post(
-            "StartJob", json=payload, service_base=_ADMIN_SERVICE_PATH
-        )
-        return JobOutput.from_dict(resp.json())
+        return JobOutput.from_dict(await self._admin_http.post("StartJob", json=payload))
 
     @record_metrics(Module.ADMS, Operation.ADMS_JOBS_GET_STATUS)
     async def get_status(
@@ -135,17 +120,6 @@ class _AsyncJobApi:
         *,
         use_admin_service: bool = False,
     ) -> JobOutput:
-        """Poll the status of a running job (async).
-
-        Args:
-            job_id: The ``job_id`` from :meth:`start_zip_download` or
-                :meth:`start_delete_user_data`.
-            use_admin_service: Set ``True`` when polling a ``DELETE_USER_DATA`` job.
-
-        Returns:
-            Current :class:`~sap_cloud_sdk.adms._models.JobOutput`.
-        """
-        service = _ADMIN_SERVICE_PATH if use_admin_service else _SERVICE_PATH
-        path = build_job_status_key_path(job_id)
-        resp = await self._http.get(path, service_base=service)
-        return JobOutput.from_dict(resp.json())
+        """Poll the status of a running job (async)."""
+        transport = self._admin_http if use_admin_service else self._http
+        return JobOutput.from_dict(await transport.get(build_job_status_key_path(job_id)))

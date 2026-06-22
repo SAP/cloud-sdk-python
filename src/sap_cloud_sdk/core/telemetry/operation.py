@@ -141,6 +141,9 @@ class Operation(str, Enum):
     # AI Core Operations
     AICORE_SET_CONFIG = "set_aicore_config"
     AICORE_AUTO_INSTRUMENT = "auto_instrument"
+    AICORE_SET_FILTERING = "set_filtering"
+    AICORE_DISABLE_FILTERING = "disable_filtering"
+    AICORE_EXTRACT_FILTER_BLOCKED = "extract_filter_blocked"
 
     # Print Operations
     PRINT_LIST_QUEUES = "list_queues"
@@ -200,9 +203,6 @@ class Operation(str, Enum):
     AGENT_MEMORY_LIST_MESSAGES = "list_messages"
     AGENT_MEMORY_GET_RETENTION_CONFIG = "get_retention_config"
     AGENT_MEMORY_UPDATE_RETENTION_CONFIG = "update_retention_config"
-
-    # Orchestration Operations
-    ORCHESTRATION_SET_FILTERING = "set_filtering"
 
     def __str__(self) -> str:
         return self.value

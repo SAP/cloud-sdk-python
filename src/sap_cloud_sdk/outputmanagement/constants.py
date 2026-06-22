@@ -8,7 +8,7 @@ class Constants:
 
     # API Endpoints
     API_OUTPUT_CONTROL = "/api/output-control-api/v1/"
-    
+
     # Headers
     AUTHORIZATION = "Authorization"
     BEARER = "Bearer"

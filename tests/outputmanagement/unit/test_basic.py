@@ -67,7 +67,7 @@ class TestOutputManagementModule:
             OutputRequestsClient,
         )
         from sap_cloud_sdk.outputmanagement.clients.email_client import EmailClient
-        
+
         assert OutputRequestsClient is not None
         assert EmailClient is not None
 

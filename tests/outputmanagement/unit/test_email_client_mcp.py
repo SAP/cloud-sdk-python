@@ -69,7 +69,7 @@ class TestEmailClientMCP:
 
         assert result is not None
         mock_mcp_tool.ainvoke.assert_called_once()
-        
+
         # Verify CC was included in the payload
         call_args = mock_mcp_tool.ainvoke.call_args[0][0]
         assert "body" in call_args
@@ -94,7 +94,7 @@ class TestEmailClientMCP:
 
         assert result is not None
         mock_mcp_tool.ainvoke.assert_called_once()
-        
+
         # Verify attachments were included in the payload
         call_args = mock_mcp_tool.ainvoke.call_args[0][0]
         assert "body" in call_args
@@ -115,12 +115,12 @@ class TestEmailClientMCP:
 
         assert result is not None
         mock_mcp_tool.ainvoke.assert_called_once()
-        
+
         # Verify traceparent format (W3C Trace Context)
         call_args = mock_mcp_tool.ainvoke.call_args[0][0]
         assert "traceparent" in call_args
         traceparent = call_args["traceparent"]
-        
+
         # Format: 00-{trace_id}-{parent_id}-01
         parts = traceparent.split("-")
         assert len(parts) == 4
@@ -143,7 +143,7 @@ class TestEmailClientMCP:
 
         assert result is not None
         mock_mcp_tool.ainvoke.assert_called_once()
-        
+
         # Verify sender_provider_subaccount_id was included
         call_args = mock_mcp_tool.ainvoke.call_args[0][0]
         assert "sender_provider_subaccount_id" in call_args
@@ -163,7 +163,7 @@ class TestEmailClientMCP:
 
         assert result is not None
         mock_mcp_tool.ainvoke.assert_called_once()
-        
+
         # Verify sender_provider_subaccount_id from env was used
         call_args = mock_mcp_tool.ainvoke.call_args[0][0]
         assert "sender_provider_subaccount_id" in call_args
@@ -211,33 +211,33 @@ class TestEmailClientMCP:
 
         assert result is not None
         mock_mcp_tool.ainvoke.assert_called_once()
-        
+
         # Verify complete payload structure
         call_args = mock_mcp_tool.ainvoke.call_args[0][0]
-        
+
         # Top-level keys
         assert "body" in call_args
         assert "traceparent" in call_args
         assert "sender_provider_subaccount_id" in call_args
-        
+
         # Body structure (CloudEvents format)
         body = call_args["body"]
         assert "source" in body
         assert "type" in body
         assert "data" in body
-        
+
         # Data structure
         data = body["data"]
         assert "OutputManagement" in data
         assert "BusinessDocument" in data
-        
+
         # Output management structure
         output_mgmt = data["OutputManagement"]
         assert "businessDocumentType" in output_mgmt
         assert "businessDocumentId" in output_mgmt
         assert "channels" in output_mgmt
         assert "emailConfiguration" in output_mgmt
-        
+
         # Email configuration
         email_config = output_mgmt["emailConfiguration"]
         assert email_config["to"] == ["finance@company.com", "accounting@company.com"]
@@ -264,7 +264,7 @@ class TestEmailClientMCP:
 
         assert result is not None
         mock_mcp_tool.ainvoke.assert_called_once()
-        
+
         # Verify all recipients were included
         call_args = mock_mcp_tool.ainvoke.call_args[0][0]
         email_config = call_args["body"]["data"]["OutputManagement"]["emailConfiguration"]
@@ -318,7 +318,7 @@ class TestEmailClientMCP:
 
         assert result is not None
         mock_mcp_tool.ainvoke.assert_called_once()
-        
+
         # Verify business document was preserved
         call_args = mock_mcp_tool.ainvoke.call_args[0][0]
         business_doc = call_args["body"]["data"]["BusinessDocument"]
@@ -348,14 +348,14 @@ class TestEmailClientMCP:
 
         # Verify two calls were made
         assert mock_mcp_tool.ainvoke.call_count == 2
-        
+
         # Get trace IDs from both calls
         call1_args = mock_mcp_tool.ainvoke.call_args_list[0][0][0]
         call2_args = mock_mcp_tool.ainvoke.call_args_list[1][0][0]
-        
+
         traceparent1 = call1_args["traceparent"]
         traceparent2 = call2_args["traceparent"]
-        
+
         # Verify they are different
         assert traceparent1 != traceparent2
 
@@ -372,13 +372,13 @@ class TestEmailClientMCP:
 
         assert result is not None
         mock_mcp_tool.ainvoke.assert_called_once()
-        
+
         # Verify optional fields are not present or None
         call_args = mock_mcp_tool.ainvoke.call_args[0][0]
         email_config = call_args["body"]["data"]["OutputManagement"]["emailConfiguration"]
-        
+
         # CC should not be present when not provided
         assert "cc" not in email_config or email_config.get("cc") is None
-        
+
         # Attachment should not be present when not provided
         assert "attachment" not in email_config or email_config.get("attachment") is None

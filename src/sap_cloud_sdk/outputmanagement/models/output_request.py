@@ -11,11 +11,11 @@ from .output_request_data import OutputRequestData
 class OutputRequest(BaseModel):
     """
     Represents an Output Management request following the CloudEvents 1.0 specification.
-    
+
     This is the main request object that encapsulates all information required to trigger
     document generation and delivery through the Output Management service. It follows the
     CloudEvents specification for event-driven architectures.
-    
+
     Attributes:
         spec_version: CloudEvents specification version (default: "1.0")
         id: Unique ID for this event (auto-generated UUID if not provided)
@@ -27,7 +27,7 @@ class OutputRequest(BaseModel):
         xsapsisgwdestapp: SAP system gateway destination application identifier (optional)
         xsapsisgwdestappid: SAP system gateway destination application ID (optional)
         xsapsisgwbackendid: SAP system gateway backend ID (optional)
-        
+
     Example:
         ```python
         from sap_cloud_sdk.outputmanagement.models.output_request import OutputRequest
@@ -35,22 +35,22 @@ class OutputRequest(BaseModel):
         from sap_cloud_sdk.outputmanagement.models.output_management_info import OutputManagementInfo
         from sap_cloud_sdk.outputmanagement.models.email_configuration import EmailConfiguration
         from sap_cloud_sdk.outputmanagement.constants import Channel
-        
+
         # Create email configuration
         email_config = EmailConfiguration(
-            email_notification_template_key="PO_NOTIFICATION",
-            email_template_language="en",
+            emailNotificationTemplateKey="PO_NOTIFICATION",
+            emailTemplateLanguage="en",
             to=["recipient@example.com"]
         )
-        
+
         # Create output management info
         output_mgmt = OutputManagementInfo(
-            business_document_type="com.sap.procurement.PurchaseOrder",
-            business_document_id="PO-123",
+            businessDocumentType="com.sap.procurement.PurchaseOrder",
+            businessDocumentId="PO-123",
             channels=[Channel.INTERNAL_EMAIL],
-            email_configuration=email_config
+            emailConfiguration=email_config
         )
-        
+
         # Create business document
         business_doc = {
             "PurchaseOrder": {
@@ -58,13 +58,13 @@ class OutputRequest(BaseModel):
                 "vendor": "ABC Corp"
             }
         }
-        
+
         # Create request data
         data = OutputRequestData(
-            output_management=output_mgmt,
-            business_document=business_doc
+            OutputManagement=output_mgmt,
+            BusinessDocument=business_doc
         )
-        
+
         # Create output request
         request = OutputRequest(
             source="/eu12/sap.procurement/tenant-123",
@@ -79,50 +79,50 @@ class OutputRequest(BaseModel):
         alias="specversion",
         description="CloudEvents specification version (should be '1.0')"
     )
-    
+
     id: str = Field(
         default_factory=lambda: str(uuid.uuid4()),
         description="Unique ID for this event (UUID). Producers must ensure source + id is unique."
     )
-    
+
     source: str = Field(
         ...,
         min_length=1,
         description="Identifies where this event originated from (e.g., '/eu12/sap.nexus.px/8d4bb3fa')"
     )
-    
+
     time: str = Field(
         default_factory=lambda: datetime.utcnow().isoformat() + "Z",
         description="Timestamp when the output request was triggered (ISO 8601 format)"
     )
-    
+
     type: str = Field(
         ...,
         min_length=1,
         description="Type of event (e.g., 'sap.nexus.px.purchaseorder.PurchaseOrder.Created.v1')"
     )
-    
+
     data_content_type: str = Field(
         default="application/json",
         alias="datacontenttype",
         description="Content type of the event's data (must be 'application/json')"
     )
-    
+
     data: OutputRequestData = Field(
         ...,
         description="Contains OutputManagement and BusinessDocument nodes"
     )
-    
+
     xsapsisgwdestapp: Optional[str] = Field(
         None,
         description="SAP system gateway destination application identifier"
     )
-    
+
     xsapsisgwdestappid: Optional[str] = Field(
         None,
         description="SAP system gateway destination application ID"
     )
-    
+
     xsapsisgwbackendid: Optional[str] = Field(
         None,
         description="SAP system gateway backend ID"
@@ -137,7 +137,7 @@ class OutputRequest(BaseModel):
 class OutputRequestBuilder:
     """
     Builder for constructing OutputRequest objects.
-    
+
     This builder provides a fluent API for creating OutputRequest instances with proper validation.
     """
 
@@ -207,10 +207,10 @@ class OutputRequestBuilder:
     def build(self) -> OutputRequest:
         """
         Build OutputRequest instance.
-        
+
         Returns:
             OutputRequest instance
-            
+
         Raises:
             ValueError: If required fields are missing
         """

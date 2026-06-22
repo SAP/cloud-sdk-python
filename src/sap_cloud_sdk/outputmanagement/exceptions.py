@@ -66,4 +66,3 @@ class DestinationAccessException(OutputManagementException):
     """Exception for destination access errors."""
 
     pass
-

@@ -90,10 +90,10 @@ class TestOutputManagementExceptions:
         """Test that exceptions can be raised and caught."""
         with pytest.raises(OutputManagementException):
             raise OutputManagementException("Test")
-        
+
         with pytest.raises(ValidationException):
             raise ValidationException("Test")
-        
+
         with pytest.raises(AuthenticationException):
             raise AuthenticationException("Test")
 

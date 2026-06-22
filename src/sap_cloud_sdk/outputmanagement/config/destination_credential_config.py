@@ -24,7 +24,7 @@ class DestinationCredentialConfig(BaseModel):
         ```
     """
     destination_name: str = Field(
-        ..., 
+        ...,
         description="Name of the destination in SAP BTP Destination Service"
     )
     access_strategy: Optional[str] = Field(
@@ -68,11 +68,11 @@ class DestinationCredentialConfig(BaseModel):
             Exception: If destination retrieval fails
         """
         from ...destination import create_client, AccessStrategy
-        
+
         # Resolve instance name: use provided value or default to "default"
         inst = self.instance or "default"
         logger.info(f"Retrieving destination '{self.destination_name}' from instance '{inst}'")
-        
+
         try:
             client = create_client(instance=inst)
         except Exception as e:

@@ -1,6 +1,7 @@
 """Client provider and builder."""
 
 import logging
+from typing import Optional
 
 from .client import (
     OutputManagementServiceClient,
@@ -37,7 +38,7 @@ class OutputManagementServiceClientProviderBuilder:
 
     def __init__(self):
         """Initialize builder."""
-        self._destination_credential_config: DestinationCredentialConfig = None
+        self._destination_credential_config: Optional[DestinationCredentialConfig] = None
 
     def with_destination_credentials(
         self, config: DestinationCredentialConfig
@@ -70,14 +71,14 @@ class OutputManagementServiceClientProviderBuilder:
 
         # For destination credentials, use SAP Cloud SDK
         logger.info("Using destination credential configuration")
-        
+
         # Get the destination object - it handles authentication automatically
         http_destination = self._destination_credential_config.get_destination()
-        
+
         # Get the base URL from destination
         base_url = self._destination_credential_config.get_base_url()
         logger.info(f"Retrieved destination base URL: {base_url}")
-        
+
         # Build client with destination object and instance name
         # The destination object handles auth automatically
         # Use the same instance for both destination fetch and certificate retrieval
@@ -90,5 +91,3 @@ class OutputManagementServiceClientProviderBuilder:
         logger.info("Built Output Management Service client provider")
 
         return OutputManagementServiceClientProvider(client)
-
-

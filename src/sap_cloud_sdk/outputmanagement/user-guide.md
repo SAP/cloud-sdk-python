@@ -301,13 +301,13 @@ try:
         business_document={},  # Invalid: empty document
         destination_name="ARIBA_OUTPUT_SERVICE"
     )
-    
+
     if response.error:
         if response.error.code == "INVALID_REQUEST":
             print(f"Validation failed: {response.error.message}")
         else:
             print(f"Request failed: {response.error.message}")
-            
+
 except Exception as e:
     print(f"Unexpected error: {str(e)}")
 ```
@@ -324,10 +324,10 @@ try:
         business_document={"Document": {"id": "123"}},
         destination_name="ARIBA_OUTPUT_SERVICE"
     )
-    
+
     if response.error:
         error_code = response.error.code
-        
+
         if error_code == "AUTHENTICATION_FAILED":
             print("Authentication failed. Check your destination configuration.")
         elif error_code == "DESTINATION_NOT_FOUND":
@@ -336,7 +336,7 @@ try:
             print("Network error. Check connectivity to the service.")
         else:
             print(f"Error: {response.error.message}")
-            
+
 except Exception as e:
     print(f"Fatal error: {str(e)}")
 ```
@@ -369,10 +369,10 @@ def send_order_confirmation(order):
     # Validate input
     if not order.customer_email:
         raise ValueError("Customer email is required")
-    
+
     if not order.order_id:
         raise ValueError("Order ID is required")
-    
+
     # Send email
     client = EmailClient()
     response = client.send_email(
@@ -386,7 +386,7 @@ def send_order_confirmation(order):
         },
         destination_name="ARIBA_OUTPUT_SERVICE"
     )
-    
+
     return response
 ```
 
@@ -420,7 +420,7 @@ Always handle errors and provide meaningful feedback:
 ```python
 def send_notification_with_retry(template_key, recipients, document, max_retries=3):
     client = EmailClient()
-    
+
     for attempt in range(max_retries):
         try:
             response = client.send_email(
@@ -429,24 +429,24 @@ def send_notification_with_retry(template_key, recipients, document, max_retries
                 business_document=document,
                 destination_name="ARIBA_OUTPUT_SERVICE"
             )
-            
+
             if response.error:
                 if response.error.code in ["NETWORK_ERROR", "SERVICE_UNAVAILABLE"]:
                     if attempt < max_retries - 1:
                         print(f"Retrying... (attempt {attempt + 1}/{max_retries})")
                         continue
-                
+
                 print(f"Failed to send email: {response.error.message}")
                 return None
-            
+
             return response.output_request_id
-            
+
         except Exception as e:
             if attempt < max_retries - 1:
                 print(f"Error occurred, retrying... (attempt {attempt + 1}/{max_retries})")
                 continue
             raise
-    
+
     return None
 ```
 
@@ -549,7 +549,7 @@ output_request = client.create_output_request(
 ```python
 def send_order_confirmation(order):
     client = EmailClient()
-    
+
     response = client.send_email(
         notification_template_key="ORDER_CONFIRMATION",
         to=[order.customer_email],
@@ -572,7 +572,7 @@ def send_order_confirmation(order):
         },
         destination_name="ARIBA_OUTPUT_SERVICE"
     )
-    
+
     return response
 ```
 
@@ -581,7 +581,7 @@ def send_order_confirmation(order):
 ```python
 def send_invoice_with_pdf(invoice, pdf_dms_url):
     client = EmailClient()
-    
+
     response = client.send_email(
         notification_template_key="INVOICE_WITH_PDF",
         to=[invoice.customer_email],
@@ -598,7 +598,7 @@ def send_invoice_with_pdf(invoice, pdf_dms_url):
         destination_name="ARIBA_OUTPUT_SERVICE",
         attachment_urls=[pdf_dms_url]
     )
-    
+
     return response
 ```
 
@@ -607,7 +607,7 @@ def send_invoice_with_pdf(invoice, pdf_dms_url):
 ```python
 def send_bulk_notification(recipients, notification_data):
     client = EmailClient()
-    
+
     response = client.send_email(
         notification_template_key="BULK_NOTIFICATION",
         to=recipients,
@@ -621,7 +621,7 @@ def send_bulk_notification(recipients, notification_data):
         },
         destination_name="ARIBA_OUTPUT_SERVICE"
     )
-    
+
     return response
 ```
 
@@ -680,5 +680,5 @@ For issues or questions:
 
 ---
 
-**Version:** 1.0.0  
+**Version:** 1.0.0
 **Last Updated:** 2024-01-15

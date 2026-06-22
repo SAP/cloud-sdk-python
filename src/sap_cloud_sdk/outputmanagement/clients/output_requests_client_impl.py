@@ -5,7 +5,7 @@ import logging
 import os
 import tempfile
 import uuid
-from typing import Dict, Optional
+from typing import Any, Dict, Optional
 
 import requests
 from cryptography.hazmat.primitives.serialization import (
@@ -30,7 +30,7 @@ logger = logging.getLogger(__name__)
 class OutputRequestsClientImpl(OutputRequestsClient):
     """
     Implementation of OutputRequestsClient for managing output requests.
-    
+
     This implementation provides HTTP-based communication with the Output Management service
     for submitting, tracking, and retrieving output requests and generated documents.
     """
@@ -44,7 +44,7 @@ class OutputRequestsClientImpl(OutputRequestsClient):
     ):
         """
         Constructs a new OutputRequestsClientImpl.
-        
+
         Args:
             http_session: The requests Session for making HTTP requests
             base_url: The base URL of the Output Management service
@@ -55,7 +55,7 @@ class OutputRequestsClientImpl(OutputRequestsClient):
         self._base_url = base_url.rstrip("/")
         self._destination = destination
         self._destination_instance = destination_instance
-        
+
         # Get sender-provider-subaccount-id from environment variable
         self._sender_provider_subaccount_id = os.getenv("APPFND_CONHOS_SUBACCOUNTID")
         if self._sender_provider_subaccount_id:
@@ -89,11 +89,11 @@ class OutputRequestsClientImpl(OutputRequestsClient):
         headers = self._get_headers()
         headers[Constants.HEADER_CONTENT_TYPE] = Constants.CONTENT_TYPE_JSON
         headers[Constants.HEADER_ACCEPT] = Constants.CONTENT_TYPE_JSON
-        
+
         # Add sender-provider-subaccount-id header if available
         if self._sender_provider_subaccount_id:
             headers[Constants.HEADER_SENDER_PROVIDER_SUBACCOUNT_ID] = self._sender_provider_subaccount_id
-            logger.debug(f"Added sender-provider-subaccount-id header")
+            logger.debug("Added sender-provider-subaccount-id header")
 
         try:
             request_body = output_request.model_dump(by_alias=True, exclude_none=True)
@@ -107,7 +107,7 @@ class OutputRequestsClientImpl(OutputRequestsClient):
                 response_data = response.json()
                 request_id = response_data.get("requestId")
                 logger.info(f"Request submitted successfully with ID: {request_id}")
-                return OutputResponse(output_request_id=request_id, error=None)
+                return OutputResponse(outputRequestId=request_id, error=None)
 
             # Handle error responses
             response_body = response.text
@@ -132,49 +132,49 @@ class OutputRequestsClientImpl(OutputRequestsClient):
 
     def _fetch_oauth_token_from_destination(self) -> Optional[str]:
         """Fetch OAuth token using destination's OAuth configuration with mTLS.
-        
+
         Uses SAP Cloud SDK to retrieve certificates from the Destination Service.
-        
+
         Returns:
             OAuth access token or None if fetch fails
         """
         if not self._destination or not hasattr(self._destination, 'properties'):
             return None
-            
+
         props = self._destination.properties
         if not isinstance(props, dict):
             return None
-        
+
         # Log destination properties for debugging
         logger.debug(f"Destination properties keys: {list(props.keys())}")
-        
+
         # Extract OAuth configuration from destination properties
         token_url = props.get('tokenServiceURL')
         client_id = props.get('client_id') or props.get('clientId') or props.get('tokenService.body.client_id')
         grant_type = props.get('tokenService.body.grant_type', 'client_credentials')
         app_tid = props.get('tokenService.body.app_tid')
-        
+
         # Certificate name to lookup in Destination Service
         # The certificate must be uploaded to Destination Service first using:
         # certificate_client.create_certificate(Certificate(name="my-cert.p12", content=base64_content, type="PKCS12"))
         cert_name = props.get('tokenService.KeyStoreLocation')
         cert_password = props.get('tokenService.KeyStorePassword')
-        
+
         if not token_url or not client_id:
             logger.error(f"Missing OAuth config: tokenServiceURL={token_url}, clientId={client_id}")
             return None
-        
+
         if not cert_name:
             logger.error("✗ No certificate name in destination properties (tokenService.certificate)")
             logger.error("✗ Please upload your keystore to Destination Service and reference it")
             logger.error("✗ Example: certificate_client.create_certificate(Certificate(name='my-cert.p12', content=base64_content, type='PKCS12'))")
             return None
-        
+
         # Track temp files for cleanup
         temp_files_created = False
         cert_file = None
         key_file = None
-        
+
         try:
             # Build OAuth token request
             token_data = {
@@ -183,16 +183,16 @@ class OutputRequestsClientImpl(OutputRequestsClient):
             }
             if app_tid:
                 token_data['app_tid'] = app_tid
-            
+
             logger.info(f"Fetching OAuth token from {token_url} using mTLS")
             logger.info(f"✓ Using certificate from Destination Service: {cert_name}")
-            
+
             # Get certificate from Cloud SDK Destination Service
             try:
                 # Resolve instance name: use provided value or default to "default" (following DMS pattern)
                 inst = self._destination_instance or "default"
                 logger.info(f"✓ Creating certificate client for instance '{inst}'")
-                
+
                 try:
                     certificate_client = create_certificate_client(instance=inst)
                     logger.info(f"✓ Certificate client created successfully for instance '{inst}'")
@@ -200,38 +200,38 @@ class OutputRequestsClientImpl(OutputRequestsClient):
                     logger.error(f"✗ Failed to create certificate client for instance '{inst}': {e}")
                     logger.error("✗ Ensure the Destination Service is properly bound and configured")
                     return None
-                
+
                 logger.info(f"✓ Retrieving certificate '{cert_name}' from Destination Service")
                 cert = certificate_client.get_subaccount_certificate(cert_name, access_strategy=AccessStrategy.PROVIDER_ONLY)
-                
+
                 # Check if certificate was found
                 if cert is None:
                     logger.error(f"✗ Certificate '{cert_name}' not found in Destination Service")
                     logger.error("✗ Please ensure the certificate is uploaded to Destination Service")
                     logger.error("✗ Example: certificate_client.create_certificate(Certificate(name='my-cert.p12', content=base64_content, type='PKCS12'))")
                     return None
-                
+
                 logger.info(f"✓ Retrieved certificate '{cert.name}' (type: {cert.type})")
-                
+
                 # Decode base64 content
                 cert_binary = base64.b64decode(cert.content)
                 logger.debug(f"✓ Decoded certificate content ({len(cert_binary)} bytes)")
-                
+
                 # Parse certificate - try PKCS12 format first (most common for mTLS)
                 password = cert_password.encode('utf-8') if cert_password else None
-                
+
                 try:
                     private_key, certificate, additional_certs = pkcs12.load_key_and_certificates(
                         cert_binary,
                         password
                     )
-                    
+
                     if not (certificate and private_key):
                         logger.error("✗ No certificate or key found in PKCS12")
                         return None
-                    
+
                     logger.info("✓ Successfully parsed certificate and extracted keys")
-                    
+
                     # Write certificate to temp file (include chain)
                     cert_fd, cert_file = tempfile.mkstemp(suffix='.pem')
                     with os.fdopen(cert_fd, 'wb') as f:
@@ -239,7 +239,7 @@ class OutputRequestsClientImpl(OutputRequestsClient):
                         if additional_certs:
                             for c in additional_certs:
                                 f.write(c.public_bytes(Encoding.PEM))
-                    
+
                     # Write private key to temp file
                     key_fd, key_file = tempfile.mkstemp(suffix='.key')
                     with os.fdopen(key_fd, 'wb') as f:
@@ -248,14 +248,14 @@ class OutputRequestsClientImpl(OutputRequestsClient):
                             format=PrivateFormat.TraditionalOpenSSL,
                             encryption_algorithm=NoEncryption()
                         ))
-                    
+
                     temp_files_created = True
-                    
+
                 except Exception as e:
                     logger.error(f"✗ Failed to parse certificate: {e}")
                     logger.error("✗ Certificate must be in PKCS12 format (.p12/.pfx) containing both certificate and private key")
                     return None
-                
+
             except ImportError as e:
                 logger.error("✗ sap-cloud-sdk or cryptography library not installed")
                 logger.error("✗ Install with: pip install sap-cloud-sdk cryptography")
@@ -264,26 +264,26 @@ class OutputRequestsClientImpl(OutputRequestsClient):
             except Exception as e:
                 logger.error(f"✗ Failed to retrieve/process certificate '{cert_name}': {e}", exc_info=True)
                 return None
-            
+
             # Make token request with mTLS
             if not(cert_file and key_file):
                 logger.error("✗ No client certificates available")
                 return None
-            
-            request_kwargs = {
+
+            request_kwargs: Dict[str, Any] = {
                 'data': token_data,
                 'headers': {'Content-Type': 'application/x-www-form-urlencoded'},
                 'timeout': 30,
                 'verify': True,
                 'cert': (cert_file, key_file)
             }
-            
+
             logger.info("✓ Configuring mTLS with certificate files")
             logger.debug(f"  Cert file: {cert_file}")
             logger.debug(f"  Key file: {key_file}")
-            
+
             response = requests.post(token_url, **request_kwargs)
-            
+
             # Clean up temp files
             if temp_files_created:
                 try:
@@ -293,7 +293,7 @@ class OutputRequestsClientImpl(OutputRequestsClient):
                     logger.debug("✓ Cleaned up temporary certificate files")
                 except Exception as e:
                     logger.warning(f"⚠ Failed to cleanup temp files: {e}")
-            
+
             # Handle response
             if response.status_code == 200:
                 token_response = response.json()
@@ -313,9 +313,9 @@ class OutputRequestsClientImpl(OutputRequestsClient):
                     logger.error(f"✗ OAuth error: {error_type} - {error_desc}")
                 except:
                     logger.error(f"✗ Token fetch failed with status {response.status_code}: {response.text}")
-                
+
                 logger.error("✗ mTLS authentication failed - check certificates and credentials")
-                
+
         except Exception as e:
             logger.error(f"✗ Exception fetching OAuth token: {e}", exc_info=True)
             # Clean up temp files even on exception
@@ -327,20 +327,20 @@ class OutputRequestsClientImpl(OutputRequestsClient):
                         os.unlink(key_file)
                 except:
                     pass
-        
+
         return None
-    
+
     def _get_headers(self) -> Dict[str, str]:
         """Get request headers with authentication."""
         headers = {}
-        
+
         # Add trace parent header for distributed tracing
         headers[Constants.HEADER_TRACE_PARENT] = self._generate_trace_id()
-        
+
         # If using destination, get auth token from it
         if self._destination:
             logger.debug(f"Using destination for authentication. Destination type: {type(self._destination)}")
-            
+
             # Try to fetch OAuth token using destination's OAuth configuration
             token = self._fetch_oauth_token_from_destination()
             if token:
@@ -351,20 +351,20 @@ class OutputRequestsClientImpl(OutputRequestsClient):
                 logger.error("✗ NO Authorization header - request will fail")
         else:
             logger.error("✗ No destination available for authentication")
-        
+
         return headers
 
     @staticmethod
     def _generate_trace_id() -> str:
         """
         Generate traceparent header in W3C Trace Context format.
-        
+
         Format: version-trace-id-parent-id-trace-flags
         - version: 2 hex digits (00)
         - trace-id: 32 hex digits (16 bytes)
         - parent-id: 16 hex digits (8 bytes)
         - trace-flags: 2 hex digits (01 = sampled)
-        
+
         Returns:
             Traceparent header value in format: 00-{trace_id}-{parent_id}-01
         """
@@ -376,10 +376,10 @@ class OutputRequestsClientImpl(OutputRequestsClient):
     def _is_retryable(status_code: int) -> bool:
         """
         Checks if the HTTP status code represents a retryable error.
-        
+
         Args:
             status_code: The HTTP status code
-            
+
         Returns:
             True if the status code is 5xx (server error) or 429 (Too Many Requests)
         """
@@ -389,12 +389,12 @@ class OutputRequestsClientImpl(OutputRequestsClient):
     def _map_status_code_to_error(status_code: int) -> Optional[str]:
         """
         Maps HTTP error status codes to appropriate error types.
-        
+
         Note: This method returns None for unhandled status codes.
-        
+
         Args:
             status_code: The HTTP error status code
-            
+
         Returns:
             The corresponding error type, or None if not mapped
         """
@@ -406,7 +406,7 @@ class OutputRequestsClientImpl(OutputRequestsClient):
             404: "RESOURCE_NOT_FOUND",
             409: "CONFLICT",
             429: "INVALID_REQUEST",  # Too Many Requests
-            
+
             # Server errors (5xx)
             500: "INTERNAL_SERVER_ERROR",
             502: "INTERNAL_SERVER_ERROR",  # Bad Gateway
@@ -420,8 +420,6 @@ class OutputRequestsClientImpl(OutputRequestsClient):
         """Create an OutputResponse with error information."""
         from ..models.output_response import ErrorResponse
         return OutputResponse(
-            output_request_id=None,
+            outputRequestId=None,
             error=ErrorResponse(message=str(message), code=error_type)
         )
-
-

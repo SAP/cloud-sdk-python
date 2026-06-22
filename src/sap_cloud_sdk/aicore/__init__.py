@@ -13,7 +13,17 @@ from sap_cloud_sdk.core.secret_resolver import resolve_base_mount
 from sap_cloud_sdk.core.telemetry.metrics_decorator import record_metrics
 from sap_cloud_sdk.core.telemetry.module import Module
 from sap_cloud_sdk.core.telemetry.operation import Operation
-
+from .filtering import (
+    ContentFilteredError,
+    ContentFilterConfig,
+    FilteringModuleConfig,
+    OrchestrationError,
+    PromptShieldConfig,
+    Severity,
+    disable_filtering,
+    extract_filter_blocked,
+    set_filtering,
+)
 logger = logging.getLogger(__name__)
 
 
@@ -102,15 +112,24 @@ def _get_aicore_base_url(instance_name: str = "aicore-instance") -> str:
 
 @record_metrics(Module.AICORE, Operation.AICORE_SET_CONFIG)
 def set_aicore_config(instance_name: str = "aicore-instance") -> None:
-    """
-    Load secrets from files or environment variables and set them as environment variables.
-    This ensures they are available to the LiteLLM library.
+    """Load AI Core credentials and activate content filtering.
 
-    File mappings based on Kubernetes secret structure:
-    - clientid -> AICORE_CLIENT_ID
-    - clientsecret -> AICORE_CLIENT_SECRET
-    - url -> AICORE_AUTH_URL
-    - serviceurls (JSON with AI_API_URL) -> AICORE_BASE_URL
+    Loads secrets from files or environment variables and sets them as
+    process env vars so ``litellm`` picks them up.
+
+    File mappings based on the Kubernetes secret structure:
+        clientid → AICORE_CLIENT_ID
+        clientsecret → AICORE_CLIENT_SECRET
+        url → AICORE_AUTH_URL
+        serviceurls (JSON with AI_API_URL) → AICORE_BASE_URL
+
+    After credentials are loaded, content filtering is activated on every
+    ``sap/*`` LiteLLM call at the configured thresholds (default: severity
+    ``MEDIUM`` on all categories + prompt shield enabled). Override via
+    ``AICORE_FILTER_*`` env vars set *before* calling this function, or
+    call :func:`set_filtering` afterward. Use :func:`disable_filtering`
+    to turn filtering off at runtime, or set ``AICORE_FILTER_ENABLED=false``
+    to keep it off entirely.
     """
     # Load secrets
     client_id = _get_secret("AICORE_CLIENT_ID", "clientid", instance_name=instance_name)
@@ -146,16 +165,21 @@ def set_aicore_config(instance_name: str = "aicore-instance") -> None:
     logger.info("AI Core configuration has been set successfully")
 
     # Activate content filtering for all sap/* LiteLLM model calls.
-    # Lazy import avoids circular dependency between aicore and orchestration.
-    # Filtering is ON by default (threshold 4, prompt_shield=True).
-    # Set ORCH_FILTER_ENABLED=false to disable, or call set_filtering() to override.
-    try:
-        from sap_cloud_sdk.orchestration._litellm_patch import _install
-        from sap_cloud_sdk.orchestration._models import FilteringModuleConfig
-
-        _install(FilteringModuleConfig.from_env())
-    except Exception as e:
-        logger.warning("Could not activate orchestration filtering: %s", e)
+    # AICORE_FILTER_ENABLED=false disables; AICORE_FILTER_* tune thresholds.
+    # Errors propagate — filtering misconfiguration should surface at startup
+    # rather than be swallowed silently.
+    set_filtering()
 
 
-__all__ = ["set_aicore_config"]
+__all__ = [
+    "set_aicore_config",
+    "set_filtering",
+    "disable_filtering",
+    "Severity",
+    "ContentFilteredError",
+    "OrchestrationError",
+    "ContentFilterConfig",
+    "PromptShieldConfig",
+    "FilteringModuleConfig",
+    "extract_filter_blocked",
+]

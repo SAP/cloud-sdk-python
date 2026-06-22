@@ -433,13 +433,20 @@ class ExtensibilityClient:
         ``execute_workflow``, then polls ``get_execution`` every 500 ms until the
         execution succeeds, fails, or ``hook.timeout`` seconds elapse.
 
-        Auth and endpoint resolution are handled internally by the AGW client —
-        no manual token or URL configuration is required.
+        Auth and endpoint resolution are handled internally by an AGW client
+        created from ``tenant_subdomain`` — no manual token or URL configuration
+        is required.
 
         Args:
             hook: Hook configuration (workflow ID, method, timeout).
-            agw_client: Configured Agent Gateway client used for tool discovery
-                and invocation.
+            user_token: Optional user token forwarded to the Agent Gateway client
+                for MCP tool discovery and invocation.
+            message: Optional A2A ``Message`` payload serialised into the webhook
+                body sent to the n8n workflow.
+            headers: Optional HTTP headers included in the webhook data passed to
+                the n8n workflow.
+            tenant_subdomain: Tenant subdomain used to instantiate the Agent
+                Gateway client. Pass ``None`` to use the default subdomain.
 
         Returns:
             Parsed ``Message`` from the last executed workflow node, or ``None``
@@ -451,15 +458,18 @@ class ExtensibilityClient:
 
         Example:
             ```python
-            from sap_cloud_sdk.extensibility import call_hook
-            from sap_cloud_sdk.agentgateway import create_client as create_agw_client
+            from sap_cloud_sdk.extensibility import create_client
 
-            agw_client = create_agw_client(tenant_subdomain="my-tenant")
+            client = create_client("sap.ai:agent:myAgent:v1")
+            impl = client.get_extension_capability_implementation(tenant="tenant-abc")
 
-            result = await call_hook(
-                hook=impl.hooks[0],
-                agw_client=agw_client,
-            )
+            if impl.hooks:
+                result = await client.call_hook(
+                    hook=impl.hooks[0],
+                    user_token="my-user-token",
+                    message=my_message,
+                    tenant_subdomain="my-tenant",
+                )
             ```
         """
         # 1. Create AGW client for the given tenant subdomain.

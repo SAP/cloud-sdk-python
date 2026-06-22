@@ -62,49 +62,137 @@ The `set_aicore_config()` function:
 
 ## Content Filtering (enabled by default from 0.28.0)
 
-`set_aicore_config()` automatically activates content filtering for all model calls.
-No additional code is required.
+`set_aicore_config()` automatically activates content filtering for all `sap/*`
+model calls. No additional code is required. Filtering applies Azure Content
+Safety to input and output plus Prompt Shield (jailbreak + indirect injection
+detection) on input.
 
-**Default thresholds:**
+### Default policy
 
 | Category | Default | Meaning |
 |---|---|---|
-| Hate, Violence, Sexual, Self-harm | `4` | Block medium+ severity |
-| Prompt shield | `true` | Block jailbreak + indirect injection attempts |
+| Hate | `Severity.MEDIUM` (4) | Block medium+ severity |
+| Violence | `Severity.MEDIUM` (4) | Block medium+ severity |
+| Sexual | `Severity.MEDIUM` (4) | Block medium+ severity |
+| Self-harm | `Severity.MEDIUM` (4) | Block medium+ severity |
+| Prompt shield | enabled | Block jailbreak + indirect injection attempts (input-only) |
 
-To override thresholds via environment variables (set before calling `set_aicore_config()`):
+Severity scale: `Severity.STRICT` (0, block any detected content), `Severity.LOW` (2),
+`Severity.MEDIUM` (4, default), `Severity.OFF` (6, disabled).
+
+### Override via environment variables
+
+Set these **before** calling `set_aicore_config()`:
+
+| Variable | Default | Description |
+|---|---|---|
+| `AICORE_FILTER_ENABLED` | `true` | Set `false` to disable filtering entirely |
+| `AICORE_FILTER_DIRECTIONS` | `input,output` | Comma-list: `input`, `output`, or both |
+| `AICORE_FILTER_HATE` | `4` | Azure severity threshold (0/2/4/6) |
+| `AICORE_FILTER_VIOLENCE` | `4` | Azure severity threshold |
+| `AICORE_FILTER_SEXUAL` | `4` | Azure severity threshold |
+| `AICORE_FILTER_SELF_HARM` | `4` | Azure severity threshold |
+| `AICORE_FILTER_PROMPT_SHIELD` | `true` | Enable/disable prompt shield |
+
+Example — strict self-harm and violence:
 
 ```bash
-ORCH_FILTER_SELF_HARM=0    # strict — block any detected self-harm content
-ORCH_FILTER_VIOLENCE=2
-ORCH_FILTER_ENABLED=false  # disable filtering entirely
+AICORE_FILTER_SELF_HARM=0
+AICORE_FILTER_VIOLENCE=0
 ```
 
-To override programmatically (call after `set_aicore_config()`):
+### Override programmatically
+
+Use `set_filtering()` to override thresholds at runtime, after `set_aicore_config()`:
 
 ```python
-from sap_cloud_sdk.orchestration import set_filtering
-set_filtering(self_harm=0, violence=0)
+from sap_cloud_sdk.aicore import set_filtering, Severity
+
+# Tighten two categories
+set_filtering(self_harm=Severity.STRICT, violence=Severity.STRICT)
+
+# Re-apply env-based config (after changing env vars)
+set_filtering()
 ```
 
-To catch blocked requests:
+`set_filtering()` arguments:
+
+| Argument | Type | Description |
+|---|---|---|
+| `hate` | `Severity \| None` | Override hate threshold |
+| `violence` | `Severity \| None` | Override violence threshold |
+| `sexual` | `Severity \| None` | Override sexual threshold |
+| `self_harm` | `Severity \| None` | Override self-harm threshold |
+| `prompt_shield` | `bool \| None` | Enable/disable prompt shield |
+| `directions` | `set[Literal["input", "output"]] \| None` | Override active directions |
+
+Unspecified arguments retain their current values (from env or defaults).
+
+### Disable filtering
+
+To turn filtering off at runtime, call `disable_filtering()`:
 
 ```python
-from sap_cloud_sdk.orchestration import ContentFilteredError
-from sap_cloud_sdk.orchestration._litellm_patch import extract_filter_blocked
+from sap_cloud_sdk.aicore import disable_filtering
+
+disable_filtering()
+```
+
+Or disable entirely via env (before `set_aicore_config()`):
+
+```bash
+AICORE_FILTER_ENABLED=false
+```
+
+### Handle blocked requests
+
+When the filter rejects a request, the SDK raises `ContentFilteredError` (for
+rejections that reach `transform_response`) or wraps it inside LiteLLM's
+`APIConnectionError` (for input-filter 400s caught by `raise_for_status()`).
+`extract_filter_blocked()` unwraps the second case.
+
+```python
+from sap_cloud_sdk.aicore import ContentFilteredError, extract_filter_blocked
+from litellm import completion
 
 try:
-    response = completion(model="sap/anthropic--claude-4.5-sonnet", messages=[...])
+    response = completion(
+        model="sap/anthropic--claude-4.5-sonnet",
+        messages=[{"role": "user", "content": "Hello!"}],
+    )
 except ContentFilteredError as e:
-    print("Blocked by content safety policy.")
+    # e.direction: "input" or "output"
+    # e.details: severity scores (safe to log — does not contain the prompt)
+    # e.request_id: for debugging
+    return "Your request was blocked by content safety policy."
 except Exception as e:
-    blocked = extract_filter_blocked(e)
+    blocked = extract_filter_blocked(e)   # unwraps LiteLLM-wrapped 400
     if blocked:
-        print("Blocked by content safety policy.")
+        return "Your request was blocked by content safety policy."
     raise
 ```
 
-See the [Orchestration user guide](../orchestration/user-guide.md) for full documentation.
+`ContentFilteredError` exposes three attributes — `direction`, `details`,
+`request_id`. The `details` field contains severity scalars from the server,
+**not** the original prompt or completion content. Safe to log.
+
+### Migration from prior versions
+
+If your agent previously imported from `sap_cloud_sdk.orchestration` (an
+in-flight name during 0.28 development), update to:
+
+```python
+# Before:
+from sap_cloud_sdk.orchestration import set_filtering, ContentFilteredError
+from sap_cloud_sdk.orchestration._litellm_patch import extract_filter_blocked
+
+# After:
+from sap_cloud_sdk.aicore import set_filtering, ContentFilteredError, extract_filter_blocked
+```
+
+Env vars also renamed: `ORCH_FILTER_*` → `AICORE_FILTER_*`. The
+`set_filtering(enabled=False)` parameter was removed; call `disable_filtering()`
+instead.
 
 ---
 

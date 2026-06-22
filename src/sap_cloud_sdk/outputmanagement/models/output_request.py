@@ -1,7 +1,7 @@
 """Output request model following CloudEvents 1.0 specification."""
 
 from typing import Optional
-from datetime import datetime
+from datetime import datetime, timezone
 from pydantic import BaseModel, Field
 import uuid
 
@@ -92,7 +92,7 @@ class OutputRequest(BaseModel):
     )
 
     time: str = Field(
-        default_factory=lambda: datetime.utcnow().isoformat() + "Z",
+        default_factory=lambda: datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
         description="Timestamp when the output request was triggered (ISO 8601 format)"
     )
 
@@ -222,12 +222,12 @@ class OutputRequestBuilder:
             raise ValueError("data is required")
 
         return OutputRequest(
-            spec_version=self._spec_version,
+            specversion=self._spec_version,
             id=self._id or str(uuid.uuid4()),
             source=self._source,
-            time=self._time or datetime.utcnow().isoformat() + "Z",
+            time=self._time or datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
             type=self._type,
-            data_content_type=self._data_content_type,
+            datacontenttype=self._data_content_type,
             data=self._data,
             xsapsisgwdestapp=self._xsapsisgwdestapp,
             xsapsisgwdestappid=self._xsapsisgwdestappid,

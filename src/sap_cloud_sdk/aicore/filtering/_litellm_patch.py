@@ -99,7 +99,14 @@ class FilteringOrchestrationConfig(GenAIHubOrchestrationConfig):
         # content-filtering.md L130-162: error.location identifies the filter module.
         if 400 <= status < 500:
             try:
-                err = raw_response.json().get("error", {})
+                body = raw_response.json()
+            except ValueError:
+                # Response wasn't JSON (gateway error page, plain-text 5xx,
+                # truncated body, etc.) — not a filter rejection, fall through
+                # to LiteLLM's default handling.
+                body = None
+            if body is not None:
+                err = body.get("error", {})
                 if (err.get("location") or "").startswith(
                     "Filtering Module - Input Filter"
                 ):
@@ -113,16 +120,16 @@ class FilteringOrchestrationConfig(GenAIHubOrchestrationConfig):
                         details=data,
                         request_id=err.get("request_id"),
                     )
-            except ContentFilteredError:
-                raise
-            except Exception:
-                pass
 
         # Output-filter rejection (HTTP 200 + finish_reason == "content_filter").
         # content-filtering.md L234-303: message.content is "" (empty, not absent).
         if status == 200:
             try:
                 payload = raw_response.json()
+            except ValueError:
+                # Response wasn't JSON — pass through to LiteLLM.
+                payload = None
+            if payload is not None:
                 choices = (payload.get("final_result") or {}).get("choices") or []
                 if choices and choices[0].get("finish_reason") == "content_filter":
                     data = (
@@ -135,10 +142,6 @@ class FilteringOrchestrationConfig(GenAIHubOrchestrationConfig):
                         details=data,
                         request_id=payload.get("request_id"),
                     )
-            except ContentFilteredError:
-                raise
-            except Exception:
-                pass
 
         return super().transform_response(
             model=model,

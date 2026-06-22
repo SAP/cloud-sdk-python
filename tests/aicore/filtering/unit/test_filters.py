@@ -72,7 +72,7 @@ class TestAzureContentFilter:
     def test_kwarg_only(self):
         """Positional construction must fail — all params are keyword-only."""
         with pytest.raises(TypeError):
-            AzureContentFilter(0, 0, 0, 0)  # type: ignore[misc]
+            AzureContentFilter(0, 0, 0, 0)  # type: ignore[misc]  # ty: ignore[too-many-positional-arguments]
 
     def test_config_values_are_plain_int_not_severity(self):
         """The dict values must be ``int`` so JSON serialisation is unambiguous."""
@@ -128,7 +128,7 @@ class TestLlamaGuard38bFilter:
 
     def test_kwarg_only(self):
         with pytest.raises(TypeError):
-            LlamaGuard38bFilter(True)  # type: ignore[misc]
+            LlamaGuard38bFilter(True)  # type: ignore[misc]  # ty: ignore[too-many-positional-arguments]
 
     def test_inherits_from_content_filter(self):
         assert isinstance(LlamaGuard38bFilter(), ContentFilter)

@@ -27,12 +27,6 @@ The Python SDK offers a clean, type-safe API following Python best practices whi
 - **Data Anonymization Service**
 - **Print Service**
 
-> **Breaking change in 0.28.0:** `set_aicore_config()` now automatically enables
-> Azure Content Safety filtering and prompt shield for all SAP AI Core model calls.
-> No code change is required. To disable: set `AICORE_FILTER_ENABLED=false` or call
-> `disable_filtering()` after `set_aicore_config()`.
-> See the [Content filtering section](src/sap_cloud_sdk/aicore/user-guide.md#content-filtering) of the AI Core user guide.
-
 ## Requirements and Setup
 
 - **Python**: 3.11 or higher

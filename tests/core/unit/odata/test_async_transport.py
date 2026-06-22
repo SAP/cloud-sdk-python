@@ -239,3 +239,61 @@ class TestContextManager:
         async with transport:
             pass
         client.aclose.assert_called_once()
+
+
+class TestGetToken:
+    @pytest.mark.asyncio
+    async def test_sync_token_injected_as_bearer_header(self, client):
+        client.request.return_value = _mock_response(200, {})
+        transport = AsyncODataHttpTransport(
+            base_url="https://example.com/odata/v4/",
+            client=client,
+            csrf_enabled=False,
+            get_token=lambda: "my-token",
+        )
+        await transport.request("GET", "EntitySet")
+        headers = client.request.call_args[1]["headers"]
+        assert headers["Authorization"] == "Bearer my-token"
+
+    @pytest.mark.asyncio
+    async def test_async_token_callable_is_awaited(self, client):
+        client.request.return_value = _mock_response(200, {})
+        async def async_token():
+            return "async-token"
+        transport = AsyncODataHttpTransport(
+            base_url="https://example.com/odata/v4/",
+            client=client,
+            csrf_enabled=False,
+            get_token=async_token,
+        )
+        await transport.request("GET", "EntitySet")
+        headers = client.request.call_args[1]["headers"]
+        assert headers["Authorization"] == "Bearer async-token"
+
+    @pytest.mark.asyncio
+    async def test_no_get_token_no_auth_injected(self, client):
+        client.request.return_value = _mock_response(200, {})
+        transport = AsyncODataHttpTransport(
+            base_url="https://example.com/odata/v4/",
+            client=client,
+            csrf_enabled=False,
+        )
+        await transport.request("GET", "EntitySet")
+        headers = client.request.call_args[1]["headers"]
+        assert "Authorization" not in headers
+
+    @pytest.mark.asyncio
+    async def test_csrf_fetch_includes_bearer_when_get_token_set(self, client):
+        csrf_resp = MagicMock(spec=httpx.Response)
+        csrf_resp.headers = {"X-CSRF-Token": "csrf-tok"}
+        client.get = AsyncMock(return_value=csrf_resp)
+        client.request.return_value = _mock_response(201, {"ID": "1"})
+        transport = AsyncODataHttpTransport(
+            base_url="https://example.com/odata/v4/",
+            client=client,
+            csrf_enabled=True,
+            get_token=lambda: "bearer-xyz",
+        )
+        await transport.request("POST", "EntitySet", json={})
+        csrf_headers = client.get.call_args[1]["headers"]
+        assert csrf_headers["Authorization"] == "Bearer bearer-xyz"

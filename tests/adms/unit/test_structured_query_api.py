@@ -3,26 +3,19 @@
 from unittest.mock import MagicMock
 
 import pytest
-import requests
 
 from sap_cloud_sdk.adms._configuration_api import _ConfigurationApi
 from sap_cloud_sdk.adms._document_api import _DocumentApi
 from sap_cloud_sdk.adms._relation_api import _DocumentRelationApi
+from sap_cloud_sdk.core.odata._transport import ODataHttpTransport
 from sap_cloud_sdk.core.odata._filter import FilterExpression
 from sap_cloud_sdk.core.odata._query import StructuredQuery
 
 
-def _make_resp(json_data: dict | None = None):
-    resp = MagicMock(spec=requests.Response)
-    resp.status_code = 200
-    resp.json.return_value = json_data or {"value": []}
-    return resp
-
-
 @pytest.fixture
 def mock_http():
-    http = MagicMock()
-    http.get.return_value = _make_resp({"value": []})
+    http = MagicMock(spec=ODataHttpTransport)
+    http.get.return_value = {"value": []}
     return http
 
 
@@ -73,7 +66,6 @@ class TestStructuredQueryInRelationApi:
 
 class TestStructuredQueryInDocumentApi:
     def test_get_all_with_structured_query_appends_document_expand(self, mock_http):
-        mock_http.get.return_value = _make_resp({"value": []})
         api = _DocumentApi(mock_http)
         q = StructuredQuery().top(10)
         api.get_all(q)
@@ -82,7 +74,6 @@ class TestStructuredQueryInDocumentApi:
         assert "Document" in kwargs["params"]["$expand"]
 
     def test_get_all_preserves_existing_expand(self, mock_http):
-        mock_http.get.return_value = _make_resp({"value": []})
         api = _DocumentApi(mock_http)
         q = StructuredQuery().expand("Lock")
         api.get_all(q)
@@ -92,7 +83,6 @@ class TestStructuredQueryInDocumentApi:
         assert "Document" in expand
 
     def test_get_all_no_options_adds_document_expand(self, mock_http):
-        mock_http.get.return_value = _make_resp({"value": []})
         api = _DocumentApi(mock_http)
         api.get_all()
         _, kwargs = mock_http.get.call_args

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from typing import Any
+from typing import Any, Awaitable, Callable
 
 import httpx
 
@@ -48,10 +48,12 @@ class AsyncODataHttpTransport:
         base_url: str,
         client: httpx.AsyncClient,
         csrf_enabled: bool = True,
+        get_token: Callable[[], str | Awaitable[str]] | None = None,
     ) -> None:
         self._base_url = base_url.rstrip("/")
         self._client = client
         self._csrf_enabled = csrf_enabled
+        self._get_token = get_token
         self._csrf_token: str | None = None
         self._csrf_lock = asyncio.Lock()
 
@@ -164,6 +166,13 @@ class AsyncODataHttpTransport:
     # Internal
     # ------------------------------------------------------------------
 
+    async def _resolve_token(self) -> str | None:
+        if self._get_token is None:
+            return None
+        if asyncio.iscoroutinefunction(self._get_token):
+            return await self._get_token()
+        return await asyncio.to_thread(self._get_token)
+
     async def _get_csrf_token(self) -> str:
         async with self._csrf_lock:
             if self._csrf_token is not None:
@@ -181,21 +190,25 @@ class AsyncODataHttpTransport:
 
     async def _fetch_csrf_token(self) -> str:
         url = self._base_url + "/"
+        fetch_headers: dict[str, str] = {CSRF_HEADER: CSRF_FETCH_VALUE}
+        token = await self._resolve_token()
+        if token is not None:
+            fetch_headers["Authorization"] = f"Bearer {token}"
         try:
             resp = await self._client.get(
                 url,
-                headers={CSRF_HEADER: CSRF_FETCH_VALUE},
+                headers=fetch_headers,
                 timeout=CSRF_FETCH_TIMEOUT,
             )
         except httpx.RequestError as exc:
             raise ODataCsrfError(f"Async CSRF fetch failed: {exc}") from exc
 
-        token = resp.headers.get(CSRF_HEADER, "")
-        if not token:
+        csrf = resp.headers.get(CSRF_HEADER, "")
+        if not csrf:
             raise ODataCsrfError(
                 f"Service did not return a CSRF token (HTTP {resp.status_code})"
             )
-        return token
+        return csrf
 
     async def _execute(
         self,
@@ -208,6 +221,9 @@ class AsyncODataHttpTransport:
     ) -> dict[str, Any]:
         url = self.absolute_url(path)
         req_headers = {**DEFAULT_HEADERS, **(extra_headers or {})}
+        resolved_token = await self._resolve_token()
+        if resolved_token is not None:
+            req_headers["Authorization"] = f"Bearer {resolved_token}"
 
         logger.debug("%s %s params=%s", method, url, params)
         try:

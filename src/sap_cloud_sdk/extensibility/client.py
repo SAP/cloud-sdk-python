@@ -419,7 +419,7 @@ class ExtensibilityClient:
         Module.EXTENSIBILITY,
         Operation.EXTENSIBILITY_CALL_HOOK,
     )
-    async def call_hook(
+    async def call_hook_agw(
         self,
         hook: Hook,
         user_token: Optional[str] = None,
@@ -464,7 +464,7 @@ class ExtensibilityClient:
             impl = client.get_extension_capability_implementation(tenant="tenant-abc")
 
             if impl.hooks:
-                result = await client.call_hook(
+                result = await client.call_hook_agw(
                     hook=impl.hooks[0],
                     user_token="my-user-token",
                     message=my_message,

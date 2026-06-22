@@ -1,4 +1,4 @@
-"""Exceptions for the orchestration module."""
+"""Exceptions for the aicore.filtering module."""
 
 from __future__ import annotations
 
@@ -6,7 +6,12 @@ from typing import Any, Literal
 
 
 class OrchestrationError(Exception):
-    """Base exception for orchestration module errors."""
+    """Base exception for SAP AI Core orchestration-module errors.
+
+    The orchestration *API surface* (filtering, future grounding/masking) lives
+    under ``sap_cloud_sdk.aicore.filtering``. This base class is the catchable
+    parent for any orchestration-module error the SDK surfaces.
+    """
 
 
 class ContentFilteredError(OrchestrationError):

@@ -163,11 +163,11 @@ def _install(cfg: Any) -> None:  # cfg: FilteringModuleConfig | None
     global _active_cfg
     _active_cfg = cfg
     if cfg is None:
-        litellm.GenAIHubOrchestrationConfig = _ORIGINAL_CONFIG  # type: ignore[attr-defined]
-        logger.debug("orchestration filtering disabled")
+        litellm.GenAIHubOrchestrationConfig = _ORIGINAL_CONFIG
+        logger.debug("content filtering disabled")
     else:
-        litellm.GenAIHubOrchestrationConfig = FilteringOrchestrationConfig  # type: ignore[attr-defined]
-        logger.info("orchestration filtering active (FilteringOrchestrationConfig)")
+        litellm.GenAIHubOrchestrationConfig = FilteringOrchestrationConfig
+        logger.info("content filtering active (FilteringOrchestrationConfig)")
 
 
 @record_metrics(Module.AICORE, Operation.AICORE_EXTRACT_FILTER_BLOCKED)

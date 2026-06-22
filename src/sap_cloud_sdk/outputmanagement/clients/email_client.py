@@ -54,23 +54,12 @@ class EmailClient:
         Returns:
             OutputRequest: Fully constructed output request ready to send
         """
-        # Extract document type and ID from business document
+        # Extract document type from business document
         # Assuming the first key in business_document is the document type
         doc_type_key = next(iter(business_document.keys()))
-        doc_content = business_document[doc_type_key]
         
-        # Try to extract document ID from common field names
-        doc_id = None
-        for id_field in ['id', 'orderId', 'invoiceNumber', 'documentId', 'number']:
-            if id_field in doc_content:
-                doc_id = str(doc_content[id_field])
-                break
-        
-        # If no ID found, use template key as fallback
-        if not doc_id:
-            doc_id = f"{notification_template_key}-{id(business_document)}"
-        
-        # Generate business document type from the key
+        # Generate business document ID and type
+        doc_id = doc_type_key
         business_document_type = f"com.sap.{doc_type_key.lower()}"
         
         # Build attachment config if URLs are provided

@@ -6,8 +6,11 @@ from unittest.mock import MagicMock, patch
 
 import httpx
 
-from sap_cloud_sdk.aicore.filtering._models import (
-    FilteringModuleConfig,
+from sap_cloud_sdk.aicore.filtering._filters import AzureContentFilter
+from sap_cloud_sdk.aicore.filtering._modules import (
+    ContentFiltering,
+    InputFiltering,
+    OutputFiltering,
 )
 from sap_cloud_sdk.aicore.filtering._litellm_patch import (
     FilteringOrchestrationConfig,
@@ -136,14 +139,14 @@ class TestTransformRequest:
         for k in list(__import__("os").environ):
             if k.startswith("AICORE_FILTER"):
                 monkeypatch.delenv(k, raising=False)
-        body = self._call(FilteringModuleConfig.from_env())
+        body = self._call(ContentFiltering.from_env())
         assert "filtering" in body["config"]["modules"]
 
     def test_both_directions_present_by_default(self, monkeypatch):
         for k in list(__import__("os").environ):
             if k.startswith("AICORE_FILTER"):
                 monkeypatch.delenv(k, raising=False)
-        body = self._call(FilteringModuleConfig.from_env())
+        body = self._call(ContentFiltering.from_env())
         filtering = body["config"]["modules"]["filtering"]
         assert "input" in filtering
         assert "output" in filtering
@@ -156,7 +159,7 @@ class TestTransformRequest:
         for k in list(__import__("os").environ):
             if k.startswith("AICORE_FILTER"):
                 monkeypatch.delenv(k, raising=False)
-        body = self._call(FilteringModuleConfig.from_env())
+        body = self._call(ContentFiltering.from_env())
         in_cfg = body["config"]["modules"]["filtering"]["input"]["filters"][0]["config"]
         assert in_cfg.get("prompt_shield") is True
 
@@ -248,10 +251,16 @@ class TestExtractFilterBlocked:
 
 
 class TestInstall:
+    def _default_cfg(self) -> ContentFiltering:
+        return ContentFiltering(
+            input_filtering=InputFiltering(filters=[AzureContentFilter()]),
+            output_filtering=OutputFiltering(filters=[AzureContentFilter()]),
+        )
+
     def test_install_patches_litellm(self):
         import litellm
 
-        cfg = FilteringModuleConfig()
+        cfg = self._default_cfg()
         _install(cfg)
         assert litellm.GenAIHubOrchestrationConfig is FilteringOrchestrationConfig
         _install(None)  # restore
@@ -259,14 +268,14 @@ class TestInstall:
     def test_install_none_restores_original(self):
         import litellm
 
-        _install(FilteringModuleConfig())
+        _install(self._default_cfg())
         _install(None)
         assert litellm.GenAIHubOrchestrationConfig is _ORIGINAL_CONFIG
 
     def test_install_idempotent(self):
         import litellm
 
-        cfg = FilteringModuleConfig()
+        cfg = self._default_cfg()
         _install(cfg)
         _install(cfg)  # second call — no error
         assert litellm.GenAIHubOrchestrationConfig is FilteringOrchestrationConfig

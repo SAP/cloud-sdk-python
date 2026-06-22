@@ -41,7 +41,7 @@ logger = logging.getLogger(__name__)
 # Keep the original so _install(None) can restore it.
 _ORIGINAL_CONFIG = litellm.GenAIHubOrchestrationConfig
 
-_active_cfg: Any = None  # FilteringModuleConfig | None, stored at module level
+_active_cfg: Any = None  # ContentFiltering | None, stored at module level
 
 
 class FilteringOrchestrationConfig(GenAIHubOrchestrationConfig):
@@ -155,7 +155,7 @@ class FilteringOrchestrationConfig(GenAIHubOrchestrationConfig):
         )
 
 
-def _install(cfg: Any) -> None:  # cfg: FilteringModuleConfig | None
+def _install(cfg: Any) -> None:  # cfg: ContentFiltering | None
     """Patch litellm.GenAIHubOrchestrationConfig. Idempotent.
 
     cfg=None restores the original config and disables filtering.

@@ -121,6 +121,7 @@ class TestContentFilteringFromEnv:
         monkeypatch.setenv("AICORE_FILTER_HATE", "2")
         cfg = ContentFiltering.from_env()
         assert cfg is not None
+        assert cfg.input_filtering is not None
         in_filter = cfg.input_filtering.filters[0]
         assert in_filter.config["self_harm"] == 0
         assert in_filter.config["hate"] == 2
@@ -146,6 +147,7 @@ class TestContentFilteringFromEnv:
         monkeypatch.setenv("AICORE_FILTER_PROMPT_SHIELD", "false")
         cfg = ContentFiltering.from_env()
         assert cfg is not None
+        assert cfg.input_filtering is not None
         in_filter = cfg.input_filtering.filters[0]
         assert "prompt_shield" not in in_filter.config
 

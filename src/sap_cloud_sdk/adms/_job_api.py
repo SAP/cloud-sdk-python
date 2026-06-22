@@ -20,7 +20,9 @@ class _JobApi:
     Access via :attr:`AdmsClient.jobs`.
     """
 
-    def __init__(self, http: _AdmsTransport, admin_http: ODataHttpTransport) -> None:
+    def __init__(
+        self, http: ODataHttpTransport, admin_http: ODataHttpTransport
+    ) -> None:
         self._http = http
         self._admin_http = admin_http
 
@@ -87,7 +89,9 @@ class _AsyncJobApi:
     Access via :attr:`AsyncAdmsClient.jobs`.
     """
 
-    def __init__(self, http: _AsyncAdmsTransport, admin_http: AsyncODataHttpTransport) -> None:
+    def __init__(
+        self, http: AsyncODataHttpTransport, admin_http: AsyncODataHttpTransport
+    ) -> None:
         self._http = http
         self._admin_http = admin_http
 
@@ -103,7 +107,9 @@ class _AsyncJobApi:
         return JobOutput.from_dict(await self._http.post("StartJob", json=payload))
 
     @record_metrics(Module.ADMS, Operation.ADMS_JOBS_START_DELETE_USER_DATA)
-    async def start_delete_user_data(self, params: DeleteUserDataJobParameters) -> JobOutput:
+    async def start_delete_user_data(
+        self, params: DeleteUserDataJobParameters
+    ) -> JobOutput:
         """Start a ``DELETE_USER_DATA`` job via AdminService (async)."""
         payload = {
             "JobInput": {
@@ -111,7 +117,9 @@ class _AsyncJobApi:
                 "JobParameters": params.to_odata_dict(),
             }
         }
-        return JobOutput.from_dict(await self._admin_http.post("StartJob", json=payload))
+        return JobOutput.from_dict(
+            await self._admin_http.post("StartJob", json=payload)
+        )
 
     @record_metrics(Module.ADMS, Operation.ADMS_JOBS_GET_STATUS)
     async def get_status(
@@ -122,4 +130,6 @@ class _AsyncJobApi:
     ) -> JobOutput:
         """Poll the status of a running job (async)."""
         transport = self._admin_http if use_admin_service else self._http
-        return JobOutput.from_dict(await transport.get(build_job_status_key_path(job_id)))
+        return JobOutput.from_dict(
+            await transport.get(build_job_status_key_path(job_id))
+        )

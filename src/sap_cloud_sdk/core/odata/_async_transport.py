@@ -170,8 +170,10 @@ class AsyncODataHttpTransport:
         if self._get_token is None:
             return None
         if asyncio.iscoroutinefunction(self._get_token):
-            return await self._get_token()
-        return await asyncio.to_thread(self._get_token)
+            result = await self._get_token()
+        else:
+            result = await asyncio.to_thread(self._get_token)
+        return str(result)
 
     async def _get_csrf_token(self) -> str:
         async with self._csrf_lock:

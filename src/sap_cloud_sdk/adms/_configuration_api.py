@@ -49,26 +49,19 @@ class _ConfigurationApi:
     ) -> list[AllowedDomain]:
         """Return all allowed-domain entries visible to the current tenant."""
         params = options.to_params() if options else {}
-        resp = self._http.get(
-            "AllowedDomain", params=params
-        )
+        resp = self._http.get("AllowedDomain", params=params)
         return [AllowedDomain.from_dict(item) for item in resp.get("value", [])]
 
     @record_metrics(Module.ADMS, Operation.ADMS_CONFIG_CREATE_ALLOWED_DOMAIN)
     def create_allowed_domain(self, payload: CreateAllowedDomainInput) -> AllowedDomain:
         """Register a new hostname/protocol combination in the allow-list."""
-        resp = self._http.post(
-            "AllowedDomain",
-            json=payload.to_odata_dict()
-        )
+        resp = self._http.post("AllowedDomain", json=payload.to_odata_dict())
         return AllowedDomain.from_dict(resp)
 
     @record_metrics(Module.ADMS, Operation.ADMS_CONFIG_GET_ALLOWED_DOMAIN)
     def get_allowed_domain(self, allowed_domain_id: str) -> AllowedDomain:
         """Fetch a single AllowedDomain by its UUID."""
-        resp = self._http.get(
-            build_allowed_domain_key_path(allowed_domain_id)
-        )
+        resp = self._http.get(build_allowed_domain_key_path(allowed_domain_id))
         return AllowedDomain.from_dict(resp)
 
     @record_metrics(Module.ADMS, Operation.ADMS_CONFIG_UPDATE_ALLOWED_DOMAIN)
@@ -78,16 +71,14 @@ class _ConfigurationApi:
         """Update an existing AllowedDomain entry (PATCH — only sent fields change)."""
         resp = self._http.patch(
             build_allowed_domain_key_path(allowed_domain_id),
-            json=payload.to_odata_dict()
+            json=payload.to_odata_dict(),
         )
         return AllowedDomain.from_dict(resp)
 
     @record_metrics(Module.ADMS, Operation.ADMS_CONFIG_DELETE_ALLOWED_DOMAIN)
     def delete_allowed_domain(self, allowed_domain_id: str) -> None:
         """Remove an entry from the domain allow-list."""
-        self._http.delete(
-            build_allowed_domain_key_path(allowed_domain_id)
-        )
+        self._http.delete(build_allowed_domain_key_path(allowed_domain_id))
 
     @record_metrics(Module.ADMS, Operation.ADMS_CONFIG_GET_ALL_DOCUMENT_TYPES)
     def get_all_document_types(
@@ -96,26 +87,19 @@ class _ConfigurationApi:
     ) -> list[DocumentType]:
         """Return all document type classifications."""
         params = options.to_params() if options else {}
-        resp = self._http.get(
-            "DocumentType", params=params
-        )
+        resp = self._http.get("DocumentType", params=params)
         return [DocumentType.from_dict(item) for item in resp.get("value", [])]
 
     @record_metrics(Module.ADMS, Operation.ADMS_CONFIG_CREATE_DOCUMENT_TYPE)
     def create_document_type(self, payload: CreateDocumentTypeInput) -> DocumentType:
         """Create a new document type classification."""
-        resp = self._http.post(
-            "DocumentType",
-            json=payload.to_odata_dict()
-        )
+        resp = self._http.post("DocumentType", json=payload.to_odata_dict())
         return DocumentType.from_dict(resp)
 
     @record_metrics(Module.ADMS, Operation.ADMS_CONFIG_GET_DOCUMENT_TYPE)
     def get_document_type(self, document_type_id: str) -> DocumentType:
         """Fetch a single DocumentType by its ID."""
-        resp = self._http.get(
-            build_document_type_key_path(document_type_id)
-        )
+        resp = self._http.get(build_document_type_key_path(document_type_id))
         return DocumentType.from_dict(resp)
 
     @record_metrics(Module.ADMS, Operation.ADMS_CONFIG_UPDATE_DOCUMENT_TYPE)
@@ -124,17 +108,14 @@ class _ConfigurationApi:
     ) -> DocumentType:
         """Update an existing DocumentType (PATCH — only sent fields change)."""
         resp = self._http.patch(
-            build_document_type_key_path(document_type_id),
-            json=payload.to_odata_dict()
+            build_document_type_key_path(document_type_id), json=payload.to_odata_dict()
         )
         return DocumentType.from_dict(resp)
 
     @record_metrics(Module.ADMS, Operation.ADMS_CONFIG_DELETE_DOCUMENT_TYPE)
     def delete_document_type(self, document_type_id: str) -> None:
         """Delete a document type classification."""
-        self._http.delete(
-            build_document_type_key_path(document_type_id)
-        )
+        self._http.delete(build_document_type_key_path(document_type_id))
 
     @record_metrics(Module.ADMS, Operation.ADMS_CONFIG_GET_ALL_BUSINESS_OBJECT_TYPES)
     def get_all_business_object_types(
@@ -143,12 +124,9 @@ class _ConfigurationApi:
     ) -> list[BusinessObjectNodeType]:
         """Return all registered business object node types."""
         params = options.to_params() if options else {}
-        resp = self._http.get(
-            "BusinessObjectNodeType", params=params
-        )
+        resp = self._http.get("BusinessObjectNodeType", params=params)
         return [
-            BusinessObjectNodeType.from_dict(item)
-            for item in resp.get("value", [])
+            BusinessObjectNodeType.from_dict(item) for item in resp.get("value", [])
         ]
 
     @record_metrics(Module.ADMS, Operation.ADMS_CONFIG_CREATE_BUSINESS_OBJECT_TYPE)
@@ -156,10 +134,7 @@ class _ConfigurationApi:
         self, payload: CreateBusinessObjectNodeTypeInput
     ) -> BusinessObjectNodeType:
         """Register a new business object node type."""
-        resp = self._http.post(
-            "BusinessObjectNodeType",
-            json=payload.to_odata_dict()
-        )
+        resp = self._http.post("BusinessObjectNodeType", json=payload.to_odata_dict())
         return BusinessObjectNodeType.from_dict(resp)
 
     @record_metrics(Module.ADMS, Operation.ADMS_CONFIG_GET_BUSINESS_OBJECT_TYPE)
@@ -185,7 +160,7 @@ class _ConfigurationApi:
             build_business_object_node_type_key_path(
                 business_object_node_type_unique_id
             ),
-            json=payload.to_odata_dict()
+            json=payload.to_odata_dict(),
         )
         return BusinessObjectNodeType.from_dict(resp)
 
@@ -207,10 +182,7 @@ class _ConfigurationApi:
     ) -> list[DocumentTypeBusinessObjectTypeMap]:
         """Return all DocumentType ↔ BusinessObjectNodeType mappings."""
         params = options.to_params() if options else {}
-        resp = self._http.get(
-            "DocumentTypeBusinessObjectTypeMap",
-            params=params
-        )
+        resp = self._http.get("DocumentTypeBusinessObjectTypeMap", params=params)
         return [
             DocumentTypeBusinessObjectTypeMap.from_dict(item)
             for item in resp.get("value", [])
@@ -222,8 +194,7 @@ class _ConfigurationApi:
     ) -> DocumentTypeBusinessObjectTypeMap:
         """Create a DocumentType ↔ BusinessObjectNodeType mapping."""
         resp = self._http.post(
-            "DocumentTypeBusinessObjectTypeMap",
-            json=payload.to_odata_dict()
+            "DocumentTypeBusinessObjectTypeMap", json=payload.to_odata_dict()
         )
         return DocumentTypeBusinessObjectTypeMap.from_dict(resp)
 
@@ -249,7 +220,7 @@ class _ConfigurationApi:
         """Mark a DocumentType ↔ BusinessObjectNodeType mapping as the default."""
         self._http.post(
             f"{build_doctype_botype_map_key_path(document_type_bo_type_map_id)}/markDefault",
-            json={}
+            json={},
         )
 
     # ── FileExtensionPolicy ────────────────────────────────────────────────────
@@ -260,22 +231,15 @@ class _ConfigurationApi:
     ) -> list[FileExtensionPolicy]:
         """Return all file extension allow/block policies."""
         params = options.to_params() if options else {}
-        resp = self._http.get(
-            "FileExtensionPolicy", params=params
-        )
-        return [
-            FileExtensionPolicy.from_dict(item) for item in resp.get("value", [])
-        ]
+        resp = self._http.get("FileExtensionPolicy", params=params)
+        return [FileExtensionPolicy.from_dict(item) for item in resp.get("value", [])]
 
     @record_metrics(Module.ADMS, Operation.ADMS_CONFIG_CREATE_FILE_EXT_POLICY)
     def create_file_extension_policy(
         self, payload: CreateFileExtensionPolicyInput
     ) -> FileExtensionPolicy:
         """Create a file extension allow/block policy."""
-        resp = self._http.post(
-            "FileExtensionPolicy",
-            json=payload.to_odata_dict()
-        )
+        resp = self._http.post("FileExtensionPolicy", json=payload.to_odata_dict())
         return FileExtensionPolicy.from_dict(resp)
 
     @record_metrics(Module.ADMS, Operation.ADMS_CONFIG_GET_FILE_EXT_POLICY)
@@ -303,22 +267,15 @@ class _ConfigurationApi:
     ) -> list[ApplicationTenant]:
         """Return all application tenant configurations."""
         params = options.to_params() if options else {}
-        resp = self._http.get(
-            "ApplicationTenant", params=params
-        )
-        return [
-            ApplicationTenant.from_dict(item) for item in resp.get("value", [])
-        ]
+        resp = self._http.get("ApplicationTenant", params=params)
+        return [ApplicationTenant.from_dict(item) for item in resp.get("value", [])]
 
     @record_metrics(Module.ADMS, Operation.ADMS_CONFIG_CREATE_APP_TENANT)
     def create_application_tenant(
         self, payload: CreateApplicationTenantInput
     ) -> ApplicationTenant:
         """Create an application tenant configuration."""
-        resp = self._http.post(
-            "ApplicationTenant",
-            json=payload.to_odata_dict()
-        )
+        resp = self._http.post("ApplicationTenant", json=payload.to_odata_dict())
         return ApplicationTenant.from_dict(resp)
 
     @record_metrics(Module.ADMS, Operation.ADMS_CONFIG_GET_APP_TENANT)
@@ -353,9 +310,7 @@ class _AsyncConfigurationApi:
     ) -> list[AllowedDomain]:
         """Async variant of :meth:`_ConfigurationApi.get_all_allowed_domains` — same semantics."""
         params = options.to_params() if options else {}
-        resp = await self._http.get(
-            "AllowedDomain", params=params
-        )
+        resp = await self._http.get("AllowedDomain", params=params)
         return [AllowedDomain.from_dict(item) for item in resp.get("value", [])]
 
     @record_metrics(Module.ADMS, Operation.ADMS_CONFIG_CREATE_ALLOWED_DOMAIN)
@@ -363,18 +318,13 @@ class _AsyncConfigurationApi:
         self, payload: CreateAllowedDomainInput
     ) -> AllowedDomain:
         """Async variant of :meth:`_ConfigurationApi.create_allowed_domain` — same semantics."""
-        resp = await self._http.post(
-            "AllowedDomain",
-            json=payload.to_odata_dict()
-        )
+        resp = await self._http.post("AllowedDomain", json=payload.to_odata_dict())
         return AllowedDomain.from_dict(resp)
 
     @record_metrics(Module.ADMS, Operation.ADMS_CONFIG_GET_ALLOWED_DOMAIN)
     async def get_allowed_domain(self, allowed_domain_id: str) -> AllowedDomain:
         """Async variant of :meth:`_ConfigurationApi.get_allowed_domain` — same semantics."""
-        resp = await self._http.get(
-            build_allowed_domain_key_path(allowed_domain_id)
-        )
+        resp = await self._http.get(build_allowed_domain_key_path(allowed_domain_id))
         return AllowedDomain.from_dict(resp)
 
     @record_metrics(Module.ADMS, Operation.ADMS_CONFIG_UPDATE_ALLOWED_DOMAIN)
@@ -384,16 +334,14 @@ class _AsyncConfigurationApi:
         """Async variant of :meth:`_ConfigurationApi.update_allowed_domain` — same semantics."""
         resp = await self._http.patch(
             build_allowed_domain_key_path(allowed_domain_id),
-            json=payload.to_odata_dict()
+            json=payload.to_odata_dict(),
         )
         return AllowedDomain.from_dict(resp)
 
     @record_metrics(Module.ADMS, Operation.ADMS_CONFIG_DELETE_ALLOWED_DOMAIN)
     async def delete_allowed_domain(self, allowed_domain_id: str) -> None:
         """Async variant of :meth:`_ConfigurationApi.delete_allowed_domain` — same semantics."""
-        await self._http.delete(
-            build_allowed_domain_key_path(allowed_domain_id)
-        )
+        await self._http.delete(build_allowed_domain_key_path(allowed_domain_id))
 
     @record_metrics(Module.ADMS, Operation.ADMS_CONFIG_GET_ALL_DOCUMENT_TYPES)
     async def get_all_document_types(
@@ -402,9 +350,7 @@ class _AsyncConfigurationApi:
     ) -> list[DocumentType]:
         """Async variant of :meth:`_ConfigurationApi.get_all_document_types` — same semantics."""
         params = options.to_params() if options else {}
-        resp = await self._http.get(
-            "DocumentType", params=params
-        )
+        resp = await self._http.get("DocumentType", params=params)
         return [DocumentType.from_dict(item) for item in resp.get("value", [])]
 
     @record_metrics(Module.ADMS, Operation.ADMS_CONFIG_CREATE_DOCUMENT_TYPE)
@@ -412,18 +358,13 @@ class _AsyncConfigurationApi:
         self, payload: CreateDocumentTypeInput
     ) -> DocumentType:
         """Async variant of :meth:`_ConfigurationApi.create_document_type` — same semantics."""
-        resp = await self._http.post(
-            "DocumentType",
-            json=payload.to_odata_dict()
-        )
+        resp = await self._http.post("DocumentType", json=payload.to_odata_dict())
         return DocumentType.from_dict(resp)
 
     @record_metrics(Module.ADMS, Operation.ADMS_CONFIG_GET_DOCUMENT_TYPE)
     async def get_document_type(self, document_type_id: str) -> DocumentType:
         """Async variant of :meth:`_ConfigurationApi.get_document_type` — same semantics."""
-        resp = await self._http.get(
-            build_document_type_key_path(document_type_id)
-        )
+        resp = await self._http.get(build_document_type_key_path(document_type_id))
         return DocumentType.from_dict(resp)
 
     @record_metrics(Module.ADMS, Operation.ADMS_CONFIG_UPDATE_DOCUMENT_TYPE)
@@ -432,17 +373,14 @@ class _AsyncConfigurationApi:
     ) -> DocumentType:
         """Async variant of :meth:`_ConfigurationApi.update_document_type` — same semantics."""
         resp = await self._http.patch(
-            build_document_type_key_path(document_type_id),
-            json=payload.to_odata_dict()
+            build_document_type_key_path(document_type_id), json=payload.to_odata_dict()
         )
         return DocumentType.from_dict(resp)
 
     @record_metrics(Module.ADMS, Operation.ADMS_CONFIG_DELETE_DOCUMENT_TYPE)
     async def delete_document_type(self, document_type_id: str) -> None:
         """Async variant of :meth:`_ConfigurationApi.delete_document_type` — same semantics."""
-        await self._http.delete(
-            build_document_type_key_path(document_type_id)
-        )
+        await self._http.delete(build_document_type_key_path(document_type_id))
 
     @record_metrics(Module.ADMS, Operation.ADMS_CONFIG_GET_ALL_BUSINESS_OBJECT_TYPES)
     async def get_all_business_object_types(
@@ -451,12 +389,9 @@ class _AsyncConfigurationApi:
     ) -> list[BusinessObjectNodeType]:
         """Async variant of :meth:`_ConfigurationApi.get_all_business_object_types` — same semantics."""
         params = options.to_params() if options else {}
-        resp = await self._http.get(
-            "BusinessObjectNodeType", params=params
-        )
+        resp = await self._http.get("BusinessObjectNodeType", params=params)
         return [
-            BusinessObjectNodeType.from_dict(item)
-            for item in resp.get("value", [])
+            BusinessObjectNodeType.from_dict(item) for item in resp.get("value", [])
         ]
 
     @record_metrics(Module.ADMS, Operation.ADMS_CONFIG_CREATE_BUSINESS_OBJECT_TYPE)
@@ -465,8 +400,7 @@ class _AsyncConfigurationApi:
     ) -> BusinessObjectNodeType:
         """Async variant of :meth:`_ConfigurationApi.create_business_object_type` — same semantics."""
         resp = await self._http.post(
-            "BusinessObjectNodeType",
-            json=payload.to_odata_dict()
+            "BusinessObjectNodeType", json=payload.to_odata_dict()
         )
         return BusinessObjectNodeType.from_dict(resp)
 
@@ -493,7 +427,7 @@ class _AsyncConfigurationApi:
             build_business_object_node_type_key_path(
                 business_object_node_type_unique_id
             ),
-            json=payload.to_odata_dict()
+            json=payload.to_odata_dict(),
         )
         return BusinessObjectNodeType.from_dict(resp)
 
@@ -515,10 +449,7 @@ class _AsyncConfigurationApi:
     ) -> list[DocumentTypeBusinessObjectTypeMap]:
         """Async variant of :meth:`_ConfigurationApi.get_type_mappings` — same semantics."""
         params = options.to_params() if options else {}
-        resp = await self._http.get(
-            "DocumentTypeBusinessObjectTypeMap",
-            params=params
-        )
+        resp = await self._http.get("DocumentTypeBusinessObjectTypeMap", params=params)
         return [
             DocumentTypeBusinessObjectTypeMap.from_dict(item)
             for item in resp.get("value", [])
@@ -530,8 +461,7 @@ class _AsyncConfigurationApi:
     ) -> DocumentTypeBusinessObjectTypeMap:
         """Async variant of :meth:`_ConfigurationApi.create_type_mapping` — same semantics."""
         resp = await self._http.post(
-            "DocumentTypeBusinessObjectTypeMap",
-            json=payload.to_odata_dict()
+            "DocumentTypeBusinessObjectTypeMap", json=payload.to_odata_dict()
         )
         return DocumentTypeBusinessObjectTypeMap.from_dict(resp)
 
@@ -557,7 +487,7 @@ class _AsyncConfigurationApi:
         """Async variant of :meth:`_ConfigurationApi.mark_default` — same semantics."""
         await self._http.post(
             f"{build_doctype_botype_map_key_path(document_type_bo_type_map_id)}/markDefault",
-            json={}
+            json={},
         )
 
     @record_metrics(Module.ADMS, Operation.ADMS_CONFIG_GET_ALL_FILE_EXT_POLICIES)
@@ -566,12 +496,8 @@ class _AsyncConfigurationApi:
     ) -> list[FileExtensionPolicy]:
         """Async variant of :meth:`_ConfigurationApi.get_all_file_extension_policies` — same semantics."""
         params = options.to_params() if options else {}
-        resp = await self._http.get(
-            "FileExtensionPolicy", params=params
-        )
-        return [
-            FileExtensionPolicy.from_dict(item) for item in resp.get("value", [])
-        ]
+        resp = await self._http.get("FileExtensionPolicy", params=params)
+        return [FileExtensionPolicy.from_dict(item) for item in resp.get("value", [])]
 
     @record_metrics(Module.ADMS, Operation.ADMS_CONFIG_CREATE_FILE_EXT_POLICY)
     async def create_file_extension_policy(
@@ -579,8 +505,7 @@ class _AsyncConfigurationApi:
     ) -> FileExtensionPolicy:
         """Async variant of :meth:`_ConfigurationApi.create_file_extension_policy` — same semantics."""
         resp = await self._http.post(
-            "FileExtensionPolicy",
-            json=payload.to_odata_dict()
+            "FileExtensionPolicy", json=payload.to_odata_dict()
         )
         return FileExtensionPolicy.from_dict(resp)
 
@@ -607,22 +532,15 @@ class _AsyncConfigurationApi:
     ) -> list[ApplicationTenant]:
         """Async variant of :meth:`_ConfigurationApi.get_all_application_tenants` — same semantics."""
         params = options.to_params() if options else {}
-        resp = await self._http.get(
-            "ApplicationTenant", params=params
-        )
-        return [
-            ApplicationTenant.from_dict(item) for item in resp.get("value", [])
-        ]
+        resp = await self._http.get("ApplicationTenant", params=params)
+        return [ApplicationTenant.from_dict(item) for item in resp.get("value", [])]
 
     @record_metrics(Module.ADMS, Operation.ADMS_CONFIG_CREATE_APP_TENANT)
     async def create_application_tenant(
         self, payload: CreateApplicationTenantInput
     ) -> ApplicationTenant:
         """Async variant of :meth:`_ConfigurationApi.create_application_tenant` — same semantics."""
-        resp = await self._http.post(
-            "ApplicationTenant",
-            json=payload.to_odata_dict()
-        )
+        resp = await self._http.post("ApplicationTenant", json=payload.to_odata_dict())
         return ApplicationTenant.from_dict(resp)
 
     @record_metrics(Module.ADMS, Operation.ADMS_CONFIG_GET_APP_TENANT)

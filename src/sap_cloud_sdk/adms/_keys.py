@@ -1,6 +1,9 @@
 """OData V4 entity-key path builders for ADMS entity sets."""
 
-from sap_cloud_sdk.core.odata._filter import quote_odata_guid_key, quote_odata_string_key
+from sap_cloud_sdk.core.odata._filter import (
+    quote_odata_guid_key,
+    quote_odata_string_key,
+)
 
 
 def build_relation_key_path(document_relation_id: str, is_active_entity: bool) -> str:

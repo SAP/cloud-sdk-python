@@ -32,5 +32,5 @@ Feature: Content filtering integration with SAP AI Core Orchestration v2
     When I send the jailbreak test prompt
     Then a ContentFilteredError is raised
     And the error direction is "input"
-    And the error details mention prompt_shield or jailbreak
+    And the error details report a prompt attack
     And the error has a non-empty request_id

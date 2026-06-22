@@ -9,9 +9,6 @@ have defaults and don't live in service bindings.
 from __future__ import annotations
 
 import os
-from typing import TypeVar
-
-T = TypeVar("T", bound=int)
 
 _TRUTHY = frozenset({"true", "1", "yes"})
 
@@ -32,16 +29,15 @@ def read_env_bool(key: str, default: bool = False) -> bool:
     return (raw.strip().lower() in _TRUTHY) if raw is not None else default
 
 
-def read_env_choice(key: str, choices: set[T], default: T) -> T:
+def read_env_choice(key: str, choices: set[int], default: int) -> int:
     """Read an int env var, validate membership in ``choices``.
 
     Returns ``default`` when the variable is absent. Raises ``ValueError`` if
     the value cannot be parsed as ``int`` or is not in ``choices``.
 
     Used for severity thresholds: ``read_env_choice('AICORE_FILTER_HATE',
-    {0, 2, 4, 6}, default=4)``. The ``T`` type variable is bound to ``int``
-    so callers can pass ``set[Severity]`` (an ``IntEnum`` subclass) and get
-    the matching enum value back; ``T`` also accepts plain ``int``.
+    {0, 2, 4, 6}, default=4)``. Callers that want an enum wrap the int
+    result themselves (e.g. ``Severity(read_env_choice(...))``).
     """
     raw = os.environ.get(key)
     if raw is None:
@@ -52,4 +48,4 @@ def read_env_choice(key: str, choices: set[T], default: T) -> T:
         raise ValueError(f"{key} must be one of {sorted(choices)}, got {raw!r}") from e
     if value not in choices:
         raise ValueError(f"{key} must be one of {sorted(choices)}, got {value}")
-    return value  # type: ignore[return-value]
+    return value

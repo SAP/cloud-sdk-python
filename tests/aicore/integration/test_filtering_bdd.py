@@ -210,13 +210,23 @@ def error_details_contain(ctx: ScenarioContext, keyword: str):
     assert keyword.lower() in str(ctx.error.details).lower()
 
 
-@then("the error details mention prompt_shield or jailbreak")
-def error_details_prompt_shield(ctx: ScenarioContext):
-    """Assert the error details mention prompt_shield or jailbreak (either keyword the server may emit)."""
+@then("the error details report a prompt attack")
+def error_details_prompt_attack(ctx: ScenarioContext):
+    """Assert the error details show Prompt Shield detected an attack.
+
+    Azure's wire format for a Prompt Shield rejection is::
+
+        {"azure_content_safety": {"user_prompt_analysis": {"attack_detected": True}}}
+
+    We assert the structured ``attack_detected`` flag rather than a string
+    substring so the test is robust to wording changes in Azure's response.
+    """
     assert isinstance(ctx.error, ContentFilteredError)
-    details = str(ctx.error.details).lower()
-    assert "prompt_shield" in details or "jailbreak" in details, (
-        f"expected prompt_shield/jailbreak evidence in details, got {ctx.error.details!r}"
+    azure = ctx.error.details.get("azure_content_safety") or {}
+    user_prompt = azure.get("user_prompt_analysis") or {}
+    assert user_prompt.get("attack_detected") is True, (
+        f"expected azure_content_safety.user_prompt_analysis.attack_detected=True, "
+        f"got {ctx.error.details!r}"
     )
 
 

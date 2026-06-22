@@ -7,6 +7,7 @@ from enum import IntEnum
 
 from sap_cloud_sdk.core.env import read_env_bool, read_env_choice, read_env_str
 
+
 class Severity(IntEnum):
     """Azure Content Safety severity threshold for filter rejection.
 
@@ -81,10 +82,18 @@ class FilteringModuleConfig:
         directions = {d.strip() for d in directions_raw.split(",") if d.strip()}
 
         thresholds = ContentFilterConfig(
-            hate=Severity(read_env_choice("AICORE_FILTER_HATE", _VALID_SEVERITIES, default=4)),
-            violence=Severity(read_env_choice("AICORE_FILTER_VIOLENCE", _VALID_SEVERITIES, default=4)),
-            sexual=Severity(read_env_choice("AICORE_FILTER_SEXUAL", _VALID_SEVERITIES, default=4)),
-            self_harm=Severity(read_env_choice("AICORE_FILTER_SELF_HARM", _VALID_SEVERITIES, default=4)),
+            hate=Severity(
+                read_env_choice("AICORE_FILTER_HATE", _VALID_SEVERITIES, default=4)
+            ),
+            violence=Severity(
+                read_env_choice("AICORE_FILTER_VIOLENCE", _VALID_SEVERITIES, default=4)
+            ),
+            sexual=Severity(
+                read_env_choice("AICORE_FILTER_SEXUAL", _VALID_SEVERITIES, default=4)
+            ),
+            self_harm=Severity(
+                read_env_choice("AICORE_FILTER_SELF_HARM", _VALID_SEVERITIES, default=4)
+            ),
         )
         prompt_shield = PromptShieldConfig(
             enabled=read_env_bool("AICORE_FILTER_PROMPT_SHIELD", default=True)

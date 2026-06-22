@@ -68,8 +68,10 @@ class TestFilteringModuleConfigToDict:
         """Wire format stays {hate: 4} not {hate: 'MEDIUM'}."""
         cfg = FilteringModuleConfig(
             input_filter=ContentFilterConfig(
-                hate=Severity.STRICT, violence=Severity.MEDIUM,
-                sexual=Severity.LOW, self_harm=Severity.OFF,
+                hate=Severity.STRICT,
+                violence=Severity.MEDIUM,
+                sexual=Severity.LOW,
+                self_harm=Severity.OFF,
             ),
             output_filter=None,
             prompt_shield=None,
@@ -92,8 +94,10 @@ class TestFilteringModuleConfigToDict:
     def test_severity_zero_serialized_not_omitted(self):
         cfg = FilteringModuleConfig(
             input_filter=ContentFilterConfig(
-                hate=Severity.STRICT, violence=Severity.STRICT,
-                sexual=Severity.STRICT, self_harm=Severity.STRICT,
+                hate=Severity.STRICT,
+                violence=Severity.STRICT,
+                sexual=Severity.STRICT,
+                self_harm=Severity.STRICT,
             ),
             output_filter=None,
         )
@@ -103,13 +107,17 @@ class TestFilteringModuleConfigToDict:
         assert in_cfg["violence"] == 0
 
     def test_none_input_filter_omits_input_key(self):
-        cfg = FilteringModuleConfig(input_filter=None, output_filter=ContentFilterConfig())
+        cfg = FilteringModuleConfig(
+            input_filter=None, output_filter=ContentFilterConfig()
+        )
         result = cfg.to_dict()
         assert "input" not in result
         assert "output" in result
 
     def test_none_output_filter_omits_output_key(self):
-        cfg = FilteringModuleConfig(input_filter=ContentFilterConfig(), output_filter=None)
+        cfg = FilteringModuleConfig(
+            input_filter=ContentFilterConfig(), output_filter=None
+        )
         result = cfg.to_dict()
         assert "input" in result
         assert "output" not in result

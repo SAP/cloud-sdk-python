@@ -11,7 +11,6 @@ from sap_cloud_sdk.aicore.filtering._litellm_patch import (
     _install,
 )
 from sap_cloud_sdk.aicore.filtering._models import (
-    FilteringModuleConfig,
     Severity,
 )
 
@@ -39,12 +38,14 @@ class TestSetFiltering:
         _clear_aicore_env(monkeypatch)
         set_filtering(self_harm=Severity.STRICT)
         from sap_cloud_sdk.aicore.filtering import _litellm_patch
+
         assert _litellm_patch._active_cfg.input_filter.self_harm == Severity.STRICT
 
     def test_other_thresholds_unchanged_on_partial_override(self, monkeypatch):
         _clear_aicore_env(monkeypatch)
         set_filtering(self_harm=Severity.STRICT)
         from sap_cloud_sdk.aicore.filtering import _litellm_patch
+
         assert _litellm_patch._active_cfg.input_filter.hate == Severity.MEDIUM
 
     def test_idempotent(self, monkeypatch):
@@ -58,6 +59,7 @@ class TestSetFiltering:
         monkeypatch.setenv("AICORE_FILTER_ENABLED", "false")
         set_filtering()  # should stay disabled — env says no
         from sap_cloud_sdk.aicore.filtering import _litellm_patch
+
         assert _litellm_patch._active_cfg is None
 
     def test_explicit_threshold_ignores_enabled_false_env(self, monkeypatch):

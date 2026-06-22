@@ -6,7 +6,9 @@ from unittest.mock import MagicMock, patch
 
 import httpx
 
-from sap_cloud_sdk.aicore.filtering._models import ContentFilterConfig, FilteringModuleConfig, PromptShieldConfig
+from sap_cloud_sdk.aicore.filtering._models import (
+    FilteringModuleConfig,
+)
 from sap_cloud_sdk.aicore.filtering._litellm_patch import (
     FilteringOrchestrationConfig,
     _install,
@@ -26,6 +28,7 @@ def restore_litellm_config():
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _stub_response(status: int, body: dict) -> httpx.Response:
     return httpx.Response(status, json=body)
 
@@ -39,38 +42,63 @@ INPUT_FILTER_BODY = {
         "intermediate_results": {
             "templating": [{"content": "bad prompt", "role": "user"}],
             "input_filtering": {
-                "data": {"azure_content_safety": {"Hate": 0, "Violence": 4, "SelfHarm": 0, "Sexual": 0}}
-            }
-        }
+                "data": {
+                    "azure_content_safety": {
+                        "Hate": 0,
+                        "Violence": 4,
+                        "SelfHarm": 0,
+                        "Sexual": 0,
+                    }
+                }
+            },
+        },
     }
 }
 
 OUTPUT_FILTER_BODY = {
     "request_id": "req-xyz",
     "intermediate_results": {
-        "output_filtering": {"data": {"choices": [{"index": 0, "azure_content_safety": {"Sexual": 2}}]}}
+        "output_filtering": {
+            "data": {"choices": [{"index": 0, "azure_content_safety": {"Sexual": 2}}]}
+        }
     },
     "final_result": {
-        "id": "x", "model": "m",
-        "choices": [{"index": 0, "message": {"role": "assistant", "content": ""}, "finish_reason": "content_filter"}],
-        "usage": {"completion_tokens": 0, "prompt_tokens": 10, "total_tokens": 10}
-    }
+        "id": "x",
+        "model": "m",
+        "choices": [
+            {
+                "index": 0,
+                "message": {"role": "assistant", "content": ""},
+                "finish_reason": "content_filter",
+            }
+        ],
+        "usage": {"completion_tokens": 0, "prompt_tokens": 10, "total_tokens": 10},
+    },
 }
 
 SUCCESS_BODY = {
     "request_id": "req-ok",
     "intermediate_results": {},
     "final_result": {
-        "id": "x", "object": "chat.completion", "model": "claude-sonnet-4-5",
-        "choices": [{"index": 0, "message": {"role": "assistant", "content": "Hello!"}, "finish_reason": "stop"}],
-        "usage": {"completion_tokens": 5, "prompt_tokens": 10, "total_tokens": 15}
-    }
+        "id": "x",
+        "object": "chat.completion",
+        "model": "claude-sonnet-4-5",
+        "choices": [
+            {
+                "index": 0,
+                "message": {"role": "assistant", "content": "Hello!"},
+                "finish_reason": "stop",
+            }
+        ],
+        "usage": {"completion_tokens": 5, "prompt_tokens": 10, "total_tokens": 15},
+    },
 }
 
 
 # ---------------------------------------------------------------------------
 # transform_request tests
 # ---------------------------------------------------------------------------
+
 
 class TestTransformRequest:
     @staticmethod
@@ -80,7 +108,11 @@ class TestTransformRequest:
                 "modules": {
                     "prompt_templating": {
                         "prompt": {"template": [{"role": "user", "content": "hello"}]},
-                        "model": {"name": "anthropic--claude-4.5-sonnet", "params": {}, "version": "latest"},
+                        "model": {
+                            "name": "anthropic--claude-4.5-sonnet",
+                            "params": {},
+                            "version": "latest",
+                        },
                     }
                 }
             }
@@ -133,9 +165,11 @@ class TestTransformRequest:
 # transform_response tests
 # ---------------------------------------------------------------------------
 
+
 class TestTransformResponse:
     def _call_transform_response(self, response: httpx.Response):
         from litellm.types.utils import ModelResponse
+
         with patch(
             "sap_cloud_sdk.aicore.filtering._litellm_patch.GenAIHubOrchestrationConfig.transform_response",
             return_value=ModelResponse(),
@@ -172,7 +206,9 @@ class TestTransformResponse:
         assert result is not None
 
     def test_non_filter_4xx_delegates_to_super(self):
-        body = {"error": {"code": 422, "message": "bad model", "location": "Model Module"}}
+        body = {
+            "error": {"code": 422, "message": "bad model", "location": "Model Module"}
+        }
         result = self._call_transform_response(_stub_response(422, body))
         assert result is not None  # no ContentFilteredError raised
 
@@ -180,6 +216,7 @@ class TestTransformResponse:
 # ---------------------------------------------------------------------------
 # extract_filter_blocked tests
 # ---------------------------------------------------------------------------
+
 
 class TestExtractFilterBlocked:
     def _make_exc(self, payload: dict) -> Exception:
@@ -209,9 +246,11 @@ class TestExtractFilterBlocked:
 # _install tests
 # ---------------------------------------------------------------------------
 
+
 class TestInstall:
     def test_install_patches_litellm(self):
         import litellm
+
         cfg = FilteringModuleConfig()
         _install(cfg)
         assert litellm.GenAIHubOrchestrationConfig is FilteringOrchestrationConfig
@@ -219,12 +258,14 @@ class TestInstall:
 
     def test_install_none_restores_original(self):
         import litellm
+
         _install(FilteringModuleConfig())
         _install(None)
         assert litellm.GenAIHubOrchestrationConfig is _ORIGINAL_CONFIG
 
     def test_install_idempotent(self):
         import litellm
+
         cfg = FilteringModuleConfig()
         _install(cfg)
         _install(cfg)  # second call — no error

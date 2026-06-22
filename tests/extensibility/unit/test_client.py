@@ -343,10 +343,7 @@ class TestCallHook:
 
     def _make_client(self, agw: MagicMock) -> ExtensibilityClient:
         """Build an ExtensibilityClient with a mock transport and patched AGW factory."""
-        client = ExtensibilityClient(MagicMock())
-        # Stash the agw on the instance for the patcher closure to return.
-        client._test_agw = agw  # type: ignore[attr-defined]
-        return client
+        return ExtensibilityClient(MagicMock())
 
     @pytest.mark.asyncio
     async def test_execute_tool_not_found_raises(self):

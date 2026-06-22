@@ -4,8 +4,7 @@ from __future__ import annotations
 
 from sap_cloud_sdk.core.env import read_env_bool, read_env_choice, read_env_str
 
-from ._filters import AzureContentFilter, ContentFilter
-from ._models import Severity
+from ._filters import AzureContentFilter, ContentFilter, Severity
 
 _VALID_SEVERITIES: set[int] = {s.value for s in Severity}
 

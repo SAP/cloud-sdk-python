@@ -16,7 +16,6 @@ The Python SDK offers a clean, type-safe API following Python best practices whi
 - **AI Core Integration**
 - **Audit Log Service**
 - **Audit Log NG**
-- **Content Filtering & Prompt Shield** *(enabled by default from 0.28.0)*
 - **Destination Service**
 - **Document Management Service**
 - **Extensibility**

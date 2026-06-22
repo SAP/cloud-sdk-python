@@ -1,8 +1,34 @@
-"""Content-filter provider classes for SAP AI Core Orchestration v2."""
+"""Content-filter provider classes and the Severity enum.
+
+This module owns:
+
+- ``Severity`` — Azure Content Safety threshold enum, consumed by
+  :class:`AzureContentFilter`.
+- ``ContentFilter`` — abstract base for provider implementations.
+- ``AzureContentFilter`` / ``LlamaGuard38bFilter`` — concrete providers.
+
+Direction containers (:class:`InputFiltering`, :class:`OutputFiltering`,
+:class:`ContentFiltering`) live in :mod:`._modules`.
+"""
 
 from __future__ import annotations
 
-from ._models import Severity
+from enum import IntEnum
+
+
+class Severity(IntEnum):
+    """Azure Content Safety severity threshold for filter rejection.
+
+    Lower values are stricter. ``STRICT`` blocks any detected content;
+    ``OFF`` disables the filter. ``IntEnum`` so members serialise as their
+    int value (``json.dumps(Severity.MEDIUM) == "4"``) — the wire format
+    is unchanged from the previous ``Literal[0, 2, 4, 6]`` typing.
+    """
+
+    STRICT = 0
+    LOW = 2
+    MEDIUM = 4
+    OFF = 6
 
 
 class ContentFilter:

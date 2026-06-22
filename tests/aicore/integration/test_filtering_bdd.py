@@ -36,7 +36,10 @@ from litellm import completion
 from pytest_bdd import given, parsers, scenarios, then, when
 
 from sap_cloud_sdk.aicore import (
+    AzureContentFilter,
     ContentFilteredError,
+    ContentFiltering,
+    InputFiltering,
     Severity,
     disable_filtering,
     extract_filter_blocked,
@@ -110,17 +113,31 @@ def filtering_default():
 def filtering_strict():
     """Given filtering is enabled with STRICT severity on all categories."""
     set_filtering(
-        hate=Severity.STRICT,
-        violence=Severity.STRICT,
-        sexual=Severity.STRICT,
-        self_harm=Severity.STRICT,
+        ContentFiltering(
+            input_filtering=InputFiltering(
+                filters=[
+                    AzureContentFilter(
+                        hate=Severity.STRICT,
+                        violence=Severity.STRICT,
+                        sexual=Severity.STRICT,
+                        self_harm=Severity.STRICT,
+                    )
+                ]
+            )
+        )
     )
 
 
 @given("filtering is enabled with prompt_shield on")
 def filtering_prompt_shield():
     """Given filtering is enabled with prompt_shield on."""
-    set_filtering(prompt_shield=True)
+    set_filtering(
+        ContentFiltering(
+            input_filtering=InputFiltering(
+                filters=[AzureContentFilter(prompt_shield=True)]
+            )
+        )
+    )
 
 
 # ---------------- When (send prompt) ----------------

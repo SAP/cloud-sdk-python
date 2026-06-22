@@ -117,6 +117,34 @@ class TestGetAllRequestBuilder:
         assert params["$top"] == "5"
         assert params["$filter"] == "Name eq 'Acme'"
 
+    def test_iterate_pages_yields_pages(self):
+        responses = [
+            {"value": [{"PartnerID": "1", "Name": "A"}], "@odata.nextLink": "https://host/svc/BusinessPartnerSet?$skip=1"},
+            {"value": [{"PartnerID": "2", "Name": "B"}]},
+        ]
+        session = MagicMock(spec=requests.Session)
+        session.request.side_effect = [_mock_response(200, r) for r in responses]
+        transport = _make_transport(session)
+
+        pages = list(GetAllRequestBuilder(transport, _Partner).iterate_pages())
+
+        assert len(pages) == 2
+        assert pages[0] == [_Partner(PartnerID="1", Name="A")]
+        assert pages[1] == [_Partner(PartnerID="2", Name="B")]
+
+    def test_iterate_entities_flattens_pages(self):
+        responses = [
+            {"value": [{"PartnerID": "1", "Name": "A"}], "@odata.nextLink": "https://host/svc/BusinessPartnerSet?$skip=1"},
+            {"value": [{"PartnerID": "2", "Name": "B"}]},
+        ]
+        session = MagicMock(spec=requests.Session)
+        session.request.side_effect = [_mock_response(200, r) for r in responses]
+        transport = _make_transport(session)
+
+        entities = list(GetAllRequestBuilder(transport, _Partner).iterate_entities())
+
+        assert entities == [_Partner(PartnerID="1", Name="A"), _Partner(PartnerID="2", Name="B")]
+
 
 # ---------------------------------------------------------------------------
 # GetByKeyRequestBuilder
@@ -200,6 +228,27 @@ class TestUpdateRequestBuilder:
         headers = session.request.call_args[1]["headers"]
         assert headers["If-Match"] == '"W/123"'
 
+    def test_non_empty_response_deserialized(self):
+        session = MagicMock(spec=requests.Session)
+        session.request.return_value = _mock_response(200, {"PartnerID": "1", "Name": "ServerSide"})
+        transport = _make_transport(session)
+
+        entity = _Partner(PartnerID="1", Name="Updated")
+        result = UpdateRequestBuilder(transport, entity).execute()
+
+        assert result == _Partner(PartnerID="1", Name="ServerSide")
+
+    def test_missing_key_fields_raises_value_error(self):
+        @dataclass
+        class _NoKey:
+            Name: str = ""
+
+        session = MagicMock(spec=requests.Session)
+        transport = _make_transport(session)
+
+        with pytest.raises(ValueError, match="_key_fields"):
+            UpdateRequestBuilder(transport, _NoKey()).execute()
+
 
 # ---------------------------------------------------------------------------
 # DeleteRequestBuilder
@@ -219,3 +268,15 @@ class TestDeleteRequestBuilder:
         assert session.request.call_args[1]["method"] == "DELETE"
         url = session.request.call_args[1]["url"]
         assert "BusinessPartnerSet" in url
+
+    def test_etag_sent_in_if_match_header(self):
+        session = MagicMock(spec=requests.Session)
+        resp = _mock_response(204)
+        resp.content = b""
+        session.request.return_value = resp
+        transport = _make_transport(session)
+
+        DeleteRequestBuilder(transport, _Partner, {"PartnerID": "1"}, etag='"W/456"').execute()
+
+        headers = session.request.call_args[1]["headers"]
+        assert headers["If-Match"] == '"W/456"'

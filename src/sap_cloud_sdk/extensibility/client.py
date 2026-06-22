@@ -223,34 +223,34 @@ class ExtensibilityClient:
         hook_config: HookConfig,
     ) -> Optional[Message]:
         """Call a hook's MCP endpoint and poll until completion.
-    
+
         Executes the workflow via ``execute-workflow``, then polls
         ``get-execution`` every 500 ms until the execution succeeds, fails,
         or ``hook.timeout`` seconds elapse.
-    
+
         This method is transport-agnostic: regardless of how extension
         metadata was fetched (backend, local file, or no-op),
         the actual hook invocation is always a direct HTTP call to the
         URL embedded in the :class:`Hook` object.
-    
+
         Args:
             hook: Hook configuration (workflow ID, method, timeout).
             hook_config: Hook invocation configuration (endpoint URL, auth token, optional payload).
-    
+
         Returns:
             Parsed ``Message`` from the last executed workflow node, or ``None``
             if the hook completed successfully but produced no message.
-    
+
         Raises:
             TransportError: On HTTP errors, terminal execution failures, or timeout.
-    
+
         Example:
             ```python
             from sap_cloud_sdk.extensibility import create_client
-    
+
             client = create_client("sap.ai:agent:myAgent:v1")
             impl = client.get_extension_capability_implementation(tenant="tenant-abc")
-    
+
             if impl.hooks:
                 hook = impl.hooks[0]
                 result = client.call_hook(
@@ -265,13 +265,13 @@ class ExtensibilityClient:
         """
         headers = {**_JSONRPC_HEADERS}
         inject(headers)
-    
+
         message_payload: dict[str, Any] = {}
         if hook_config.payload is not None:
             model_dump = getattr(hook_config.payload, "model_dump", None)
             if callable(model_dump):
                 message_payload = cast(dict[str, Any], model_dump(exclude_none=True))
-    
+
         # 1. Execute workflow
         execute_workflow_arguments = {
             "workflowId": hook.n8n_workflow_config.workflow_id,
@@ -285,7 +285,7 @@ class ExtensibilityClient:
                 },
             },
         }
-    
+
         try:
             with httpx.Client(
                 headers={"Authorization": f"Bearer {hook_config.auth_token}"},
@@ -304,16 +304,16 @@ class ExtensibilityClient:
             raise TransportError(
                 f"HTTP request to hook MCP endpoint failed: {exc}"
             ) from exc
-    
+
         try:
             data = _extract_tool_result(_parse_response(tool_resp))
         except TransportError:
             raise
         except Exception as exc:
             raise TransportError(f"Could not parse hook response: {exc}") from exc
-    
+
         status = data.get("status", "")
-    
+
         # 2. Fail fast on terminal statuses from execute-workflow
         if status in _EXECUTE_TERMINAL_STATUSES:
             error_msg = data.get("error", "")
@@ -321,7 +321,7 @@ class ExtensibilityClient:
                 f"Workflow execution failed with status {status!r}"
                 + (f": {error_msg}" if error_msg else "")
             )
-    
+
         # 3. Return immediately if execution completed synchronously
         if status == "success":
             try:
@@ -339,7 +339,7 @@ class ExtensibilityClient:
                 raise TransportError(
                     f"Failed to extract response from last executed node: {exc}"
                 ) from exc
-    
+
         # 4. Poll get-execution for running/new/waiting/started
         execution_id = data.get("executionId")
         get_execution_arguments = {
@@ -347,12 +347,12 @@ class ExtensibilityClient:
             "executionId": str(execution_id),
             "includeData": True,
         }
-    
+
         deadline = time.monotonic() + hook.timeout
         last_status = status
         while time.monotonic() < deadline:
             time.sleep(_HOOK_POLL_INTERVAL)
-    
+
             try:
                 with httpx.Client(
                     headers={"Authorization": f"Bearer {hook_config.auth_token}"},
@@ -371,18 +371,18 @@ class ExtensibilityClient:
                 raise TransportError(
                     f"HTTP request to hook MCP endpoint failed: {exc}"
                 ) from exc
-    
+
             try:
                 data = _extract_tool_result(_parse_response(tool_resp))
             except TransportError:
                 raise
             except Exception as exc:
                 raise TransportError(f"Could not parse hook response: {exc}") from exc
-    
+
             last_status = data.get("execution", {}).get("status", "") or data.get(
                 "status", ""
             )
-    
+
             if last_status == "success":
                 try:
                     result_data = data.get("data", {}).get("resultData", {})
@@ -399,16 +399,16 @@ class ExtensibilityClient:
                     raise TransportError(
                         f"Failed to extract response from last executed node: {exc}"
                     ) from exc
-    
+
             if last_status in _EXECUTION_TERMINAL_STATUSES:
                 error_msg = data.get("error", "")
                 raise TransportError(
                     f"Workflow execution failed with status {last_status!r}"
                     + (f": {error_msg}" if error_msg else "")
                 )
-    
+
             # Continue polling for: running, waiting, new, unknown
-    
+
         raise TransportError(
             f"Workflow execution timed out after {hook.timeout}s. "
             f"Last status: {last_status!r}"

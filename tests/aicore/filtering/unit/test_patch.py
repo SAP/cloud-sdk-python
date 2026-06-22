@@ -1,4 +1,4 @@
-"""Unit tests for orchestration._litellm_patch."""
+"""Unit tests for aicore.filtering._litellm_patch."""
 
 import json
 import pytest
@@ -6,14 +6,14 @@ from unittest.mock import MagicMock, patch
 
 import httpx
 
-from sap_cloud_sdk.orchestration._models import ContentFilterConfig, FilteringModuleConfig, PromptShieldConfig
-from sap_cloud_sdk.orchestration._litellm_patch import (
+from sap_cloud_sdk.aicore.filtering._models import ContentFilterConfig, FilteringModuleConfig, PromptShieldConfig
+from sap_cloud_sdk.aicore.filtering._litellm_patch import (
     FilteringOrchestrationConfig,
     _install,
     _ORIGINAL_CONFIG,
     extract_filter_blocked,
 )
-from sap_cloud_sdk.orchestration.exceptions import ContentFilteredError
+from sap_cloud_sdk.aicore.filtering.exceptions import ContentFilteredError
 
 
 @pytest.fixture(autouse=True)
@@ -89,7 +89,7 @@ class TestTransformRequest:
     def _call(self, filtering):
         _install(filtering)
         with patch(
-            "sap_cloud_sdk.orchestration._litellm_patch.GenAIHubOrchestrationConfig.transform_request",
+            "sap_cloud_sdk.aicore.filtering._litellm_patch.GenAIHubOrchestrationConfig.transform_request",
             return_value=self._fresh_base_body(),
         ):
             return FilteringOrchestrationConfig().transform_request(
@@ -102,14 +102,14 @@ class TestTransformRequest:
 
     def test_filtering_injected_when_active(self, monkeypatch):
         for k in list(__import__("os").environ):
-            if k.startswith("ORCH_FILTER"):
+            if k.startswith("AICORE_FILTER"):
                 monkeypatch.delenv(k, raising=False)
         body = self._call(FilteringModuleConfig.from_env())
         assert "filtering" in body["config"]["modules"]
 
     def test_both_directions_present_by_default(self, monkeypatch):
         for k in list(__import__("os").environ):
-            if k.startswith("ORCH_FILTER"):
+            if k.startswith("AICORE_FILTER"):
                 monkeypatch.delenv(k, raising=False)
         body = self._call(FilteringModuleConfig.from_env())
         filtering = body["config"]["modules"]["filtering"]
@@ -122,7 +122,7 @@ class TestTransformRequest:
 
     def test_prompt_shield_on_input(self, monkeypatch):
         for k in list(__import__("os").environ):
-            if k.startswith("ORCH_FILTER"):
+            if k.startswith("AICORE_FILTER"):
                 monkeypatch.delenv(k, raising=False)
         body = self._call(FilteringModuleConfig.from_env())
         in_cfg = body["config"]["modules"]["filtering"]["input"]["filters"][0]["config"]
@@ -137,7 +137,7 @@ class TestTransformResponse:
     def _call_transform_response(self, response: httpx.Response):
         from litellm.types.utils import ModelResponse
         with patch(
-            "sap_cloud_sdk.orchestration._litellm_patch.GenAIHubOrchestrationConfig.transform_response",
+            "sap_cloud_sdk.aicore.filtering._litellm_patch.GenAIHubOrchestrationConfig.transform_response",
             return_value=ModelResponse(),
         ):
             return FilteringOrchestrationConfig().transform_response(

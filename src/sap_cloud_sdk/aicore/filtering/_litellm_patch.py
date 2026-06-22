@@ -30,6 +30,10 @@ import litellm
 from litellm.llms.sap.chat.transformation import GenAIHubOrchestrationConfig
 from litellm.types.utils import ModelResponse
 
+from sap_cloud_sdk.core.telemetry.metrics_decorator import record_metrics
+from sap_cloud_sdk.core.telemetry.module import Module
+from sap_cloud_sdk.core.telemetry.operation import Operation
+
 from .exceptions import ContentFilteredError
 
 logger = logging.getLogger(__name__)
@@ -166,6 +170,7 @@ def _install(cfg: Any) -> None:  # cfg: FilteringModuleConfig | None
         logger.info("orchestration filtering active (FilteringOrchestrationConfig)")
 
 
+@record_metrics(Module.AICORE, Operation.AICORE_EXTRACT_FILTER_BLOCKED)
 def extract_filter_blocked(exc: Exception) -> ContentFilteredError | None:
     """Parse a LiteLLM APIConnectionError for an input-filter rejection.
 
@@ -175,6 +180,9 @@ def extract_filter_blocked(exc: Exception) -> ContentFilteredError | None:
     the exception message string. This function extracts it.
 
     Returns None if the exception is not a content-filter rejection.
+
+    A telemetry event is emitted on every call, including calls where the
+    exception was not a content-filter rejection (returns ``None``).
     """
     msg = str(exc)
     brace = msg.find("{")

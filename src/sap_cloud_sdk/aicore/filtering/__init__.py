@@ -1,10 +1,12 @@
-"""SAP AI Core Orchestration — content filtering and prompt shield.
+"""SAP AI Core content filtering — Azure Content Safety + Prompt Shield.
 
-Filtering is **enabled by default** when ``set_aicore_config()`` is called.
-No additional code is required. To override thresholds, use ``set_filtering()``
-or set ``ORCH_FILTER_*`` environment variables.
+Filtering is **enabled by default** when :func:`sap_cloud_sdk.aicore.set_aicore_config`
+is called. No additional code is required. To override thresholds, use
+:func:`set_filtering`; to turn filtering off at runtime, use
+:func:`disable_filtering`; alternatively set ``AICORE_FILTER_*`` environment
+variables before :func:`set_aicore_config`.
 
-See user-guide.md for full documentation.
+See :mod:`sap_cloud_sdk.aicore` user guide for the documented public API.
 """
 
 from __future__ import annotations
@@ -17,13 +19,20 @@ from sap_cloud_sdk.core.telemetry.module import Module
 from sap_cloud_sdk.core.telemetry.operation import Operation
 
 from ._litellm_patch import _install, extract_filter_blocked
-from ._models import ContentFilterConfig, FilteringModuleConfig, PromptShieldConfig
+from ._models import (
+    ContentFilterConfig,
+    FilteringModuleConfig,
+    PromptShieldConfig,
+    Severity,
+)
 from .exceptions import ContentFilteredError, OrchestrationError
 
 logger = logging.getLogger(__name__)
 
 __all__ = [
     "set_filtering",
+    "disable_filtering",
+    "Severity",
     "ContentFilterConfig",
     "PromptShieldConfig",
     "FilteringModuleConfig",
@@ -33,57 +42,57 @@ __all__ = [
 ]
 
 
-@record_metrics(Module.ORCHESTRATION, Operation.ORCHESTRATION_SET_FILTERING)
+@record_metrics(Module.AICORE, Operation.AICORE_SET_FILTERING)
 def set_filtering(
     *,
-    hate: Literal[0, 2, 4, 6] | None = None,
-    violence: Literal[0, 2, 4, 6] | None = None,
-    sexual: Literal[0, 2, 4, 6] | None = None,
-    self_harm: Literal[0, 2, 4, 6] | None = None,
+    hate: Severity | None = None,
+    violence: Severity | None = None,
+    sexual: Severity | None = None,
+    self_harm: Severity | None = None,
     prompt_shield: bool | None = None,
     directions: set[Literal["input", "output"]] | None = None,
-    enabled: bool | None = None,
 ) -> None:
     """Override content filtering thresholds programmatically.
 
-    Filtering is already activated by ``set_aicore_config()`` — this function
-    is only needed to override specific thresholds at runtime. Any argument
-    not provided retains its current value (from env vars or defaults).
+    Filtering is already activated by :func:`set_aicore_config` — this
+    function is only needed to override specific thresholds at runtime.
+    Any argument left as ``None`` retains its current value (from env
+    vars or defaults).
+
+    To turn filtering off, call :func:`disable_filtering` instead.
 
     Args:
-        hate: Azure Content Safety hate severity. 0=strict, 2=low+, 4=medium+ (default), 6=off.
-        violence: Azure Content Safety violence severity.
-        sexual: Azure Content Safety sexual severity.
-        self_harm: Azure Content Safety self-harm severity.
-        prompt_shield: Enable/disable jailbreak + indirect injection detection (input-only).
-        directions: Set of directions to filter. Default is ``{"input", "output"}``.
-        enabled: Set ``False`` to disable filtering entirely.
+        hate: Hate severity threshold.
+        violence: Violence severity threshold.
+        sexual: Sexual severity threshold.
+        self_harm: Self-harm severity threshold.
+        prompt_shield: Enable/disable jailbreak + indirect injection
+            detection (input-only).
+        directions: Set of directions to filter. Default is
+            ``{"input", "output"}``.
 
     Examples:
         Tighten two thresholds::
 
-            set_filtering(self_harm=0, violence=0)
+            set_filtering(self_harm=Severity.STRICT, violence=Severity.STRICT)
 
-        Disable filtering entirely::
+        Re-apply env-var config after changing variables::
 
-            set_filtering(enabled=False)
+            set_filtering()
     """
-    if enabled is False:
-        _install(None)
-        return
-
-    # No args at all — just re-apply env-based config (respects ORCH_FILTER_ENABLED)
+    # No args at all — re-apply env-based config (respects AICORE_FILTER_ENABLED)
     if all(
         v is None
-        for v in [hate, violence, sexual, self_harm, prompt_shield, directions, enabled]
+        for v in [hate, violence, sexual, self_harm, prompt_shield, directions]
     ):
         _install(FilteringModuleConfig.from_env())
         return
 
-    # Some args provided — start from env-based config then override
+    # Some args provided — start from env-based config then override.
+    # If env says disabled, fall back to a defaults config so the
+    # programmatic override wins.
     base = FilteringModuleConfig.from_env() or FilteringModuleConfig()
 
-    # Build effective threshold — override only the provided args.
     def _effective_filter(
         existing: ContentFilterConfig | None,
     ) -> ContentFilterConfig | None:
@@ -118,3 +127,13 @@ def set_filtering(
         prompt_shield=new_shield,
     )
     _install(cfg)
+
+
+@record_metrics(Module.AICORE, Operation.AICORE_DISABLE_FILTERING)
+def disable_filtering() -> None:
+    """Disable content filtering for SAP AI Core model calls.
+
+    Restores the original ``litellm.GenAIHubOrchestrationConfig``.
+    Idempotent — safe to call when filtering is already disabled.
+    """
+    _install(None)

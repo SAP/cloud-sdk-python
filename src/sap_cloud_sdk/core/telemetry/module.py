@@ -6,6 +6,7 @@ from enum import Enum
 class Module(str, Enum):
     """SDK module identifiers for telemetry."""
 
+    ADMS = "adms"
     AGENT_MEMORY = "agent_memory"
     AGENTGATEWAY = "agentgateway"
     AICORE = "aicore"
@@ -16,6 +17,7 @@ class Module(str, Enum):
     DMS = "dms"
     EXTENSIBILITY = "extensibility"
     OBJECTSTORE = "objectstore"
+    PRINT = "print"
     TELEMETRY = "telemetry"
 
     def __str__(self) -> str:

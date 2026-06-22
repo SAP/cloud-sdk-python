@@ -78,6 +78,34 @@ class TestMcpToolToLangchain:
         assert result.name == "simple_tool"
         assert result.args_schema is not None
 
+    def test_optional_fields_not_required_in_args_schema(self):
+        """Fields absent from 'required' must be optional in the generated Pydantic model."""
+        tool = MCPTool(
+            name="get_supplier_bid",
+            server_name="ariba",
+            description="Gets all supplier bids for the specified event",
+            input_schema={
+                "type": "object",
+                "required": ["eventid"],
+                "properties": {
+                    "eventid": {"description": "Unique identifier of the event"},
+                    "showdeclinedreason": {"description": "Show supplier decline reason"},
+                    "datafetchmode": {"description": "Level of detail for the response"},
+                },
+            },
+            url="https://example.com/mcp",
+        )
+
+        result = mcp_tool_to_langchain(tool, AsyncMock(return_value="result"), lambda: "token")
+
+        from pydantic import BaseModel
+
+        assert result.args_schema is not None and isinstance(result.args_schema, type) and issubclass(result.args_schema, BaseModel)
+        fields = result.args_schema.model_fields
+        assert fields["eventid"].is_required(), "eventid should be required"
+        assert not fields["showdeclinedreason"].is_required(), "showdeclinedreason should be optional"
+        assert not fields["datafetchmode"].is_required(), "datafetchmode should be optional"
+
     def test_handles_input_schema_without_properties(self):
         """Handle MCPTool with input schema but no properties."""
         tool = MCPTool(

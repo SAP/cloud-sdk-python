@@ -26,17 +26,52 @@ uv sync --all-extras
 
 Integration tests require specific environment variables to be configured. These are managed through the `.env_integration_tests` file in the project root.
 
-### ObjectStore Integration Tests
+### ADMS Integration Tests
 
-For ObjectStore integration tests, configure the following variables in `.env_integration_tests`:
+For ADMS (Advanced Document Management Service) integration tests, configure the following variables in `.env_integration_tests`:
 
 ```bash
-# ObjectStore Configuration
-CLOUD_SDK_CFG_OBJECTSTORE_DEFAULT_HOST=your-host-here
-CLOUD_SDK_CFG_OBJECTSTORE_DEFAULT_ACCESS_KEY_ID=your-access-key-id-here
-CLOUD_SDK_CFG_OBJECTSTORE_DEFAULT_SECRET_ACCESS_KEY=your-secret-access-key-kere
-CLOUD_SDK_CFG_OBJECTSTORE_DEFAULT_BUCKET=your-bucket-here
-CLOUD_SDK_CFG_OBJECTSTORE_DEFAULT_SSL_ENABLED=false
+# ADMS Configuration
+CLOUD_SDK_CFG_ADMS_DEFAULT_URL=https://your-tenant.accounts.ondemand.com
+CLOUD_SDK_CFG_ADMS_DEFAULT_URI=https://your-adm-instance.cfapps.eu20.hana.ondemand.com
+CLOUD_SDK_CFG_ADMS_DEFAULT_CLIENTID=your-ias-client-id
+CLOUD_SDK_CFG_ADMS_DEFAULT_CLIENTSECRET=your-ias-client-secret
+CLOUD_SDK_CFG_ADMS_DEFAULT_RESOURCE=urn:sap:identity:application:provider:name:your-app
+```
+
+`CLOUD_SDK_CFG_ADMS_DEFAULT_URI` points the tests at the target ADM service. The other `CLOUD_SDK_CFG_ADMS_DEFAULT_*` variables hold the IAS service-binding credentials used by the SDK to fetch Bearer tokens. Tests are skipped automatically when any of these are missing.
+
+### Agent Gateway Integration Tests
+
+Agent Gateway integration tests use the LoB agent flow via the Destination Service. Configure the following variables in `.env_integration_tests`:
+
+```bash
+# Destination Service (required by the LoB agent flow)
+CLOUD_SDK_CFG_DESTINATION_DEFAULT_CLIENTID=your-destination-client-id-here
+CLOUD_SDK_CFG_DESTINATION_DEFAULT_CLIENTSECRET=your-destination-client-secret-here
+CLOUD_SDK_CFG_DESTINATION_DEFAULT_URL=https://your-destination-auth-url-here
+CLOUD_SDK_CFG_DESTINATION_DEFAULT_URI=https://your-destination-configuration-uri-here
+CLOUD_SDK_CFG_DESTINATION_DEFAULT_IDENTITYZONE=your-identity-zone-here
+
+# Landscape suffix used to resolve the IAS destination name
+CLOUD_SDK_CFG_AGW_DEFAULT_LANDSCAPE=your-landscape-here
+
+# Tenant subdomain for multi-tenant lookup
+CLOUD_SDK_CFG_AGW_DEFAULT_TENANT_SUBDOMAIN=your-tenant-subdomain-here
+
+# User JWT for token exchange scenarios (get_user_auth)
+# If not set, user auth scenarios are automatically skipped
+CLOUD_SDK_CFG_AGW_DEFAULT_USER_TOKEN=your-user-jwt-here
+```
+
+### Agent Memory Integration Tests
+
+For Agent Memory integration tests, configure the following variables in `.env_integration_tests`:
+
+```bash
+# Agent Memory Configuration
+CLOUD_SDK_CFG_HANA_AGENT_MEMORY_DEFAULT_APPLICATION_URL=https://your-agent-memory-api-url
+CLOUD_SDK_CFG_HANA_AGENT_MEMORY_DEFAULT_UAA='{"url":"https://your-auth-url","clientid":"your-client-id","clientsecret":"your-client-secret"}'
 ```
 
 ### AuditLog Integration Tests
@@ -50,29 +85,6 @@ CLOUD_SDK_CFG_AUDITLOG_DEFAULT_UAA='{"url":"https://your-auth-url","clientid":"y
 ```
 
 **Note**: AuditLog integration tests are cloud-only and require real SAP Audit Log Service credentials. The secret resolver automatically loads configuration from `/etc/secrets/appfnd` or environment variables - no manual configuration parsing needed in test code.
-
-### Destination Integration Tests
-
-For Destination integration tests, configure the following variables in `.env_integration_tests`:
-
-```bash
-# Destination Configuration
-CLOUD_SDK_CFG_DESTINATION_DEFAULT_CLIENTID=your-destination-client-id-here
-CLOUD_SDK_CFG_DESTINATION_DEFAULT_CLIENTSECRET=your-destination-client-secret-here
-CLOUD_SDK_CFG_DESTINATION_DEFAULT_URL=https://your-destination-auth-url-here
-CLOUD_SDK_CFG_DESTINATION_DEFAULT_URI=https://your-destination-configuration-uri-here
-CLOUD_SDK_CFG_DESTINATION_DEFAULT_IDENTITYZONE=your-identity-zone-here
-```
-
-### Agent Memory Integration Tests
-
-For Agent Memory integration tests, configure the following variables in `.env_integration_tests`:
-
-```bash
-# Agent Memory Configuration
-CLOUD_SDK_CFG_HANA_AGENT_MEMORY_DEFAULT_APPLICATION_URL=https://your-agent-memory-api-url
-CLOUD_SDK_CFG_HANA_AGENT_MEMORY_DEFAULT_UAA='{"url":"https://your-auth-url","clientid":"your-client-id","clientsecret":"your-client-secret"}'
-```
 
 ### Data Anonymization Integration Tests
 
@@ -96,27 +108,47 @@ CLOUD_SDK_CFG_DATA_ANONYMIZATION_DEFAULT_DESTINATION_NAME=your-client-certificat
 
 The destination must be configured with `ClientCertificateAuthentication` and reference a certificate bundle containing the client certificate and private key.
 
-### Agent Gateway Integration Tests
+### Destination Integration Tests
 
-Agent Gateway integration tests use the LoB agent flow via the Destination Service. Configure the following variables in `.env_integration_tests`:
+For Destination integration tests, configure the following variables in `.env_integration_tests`:
 
 ```bash
-# Destination Service (required by the LoB agent flow)
+# Destination Configuration
 CLOUD_SDK_CFG_DESTINATION_DEFAULT_CLIENTID=your-destination-client-id-here
 CLOUD_SDK_CFG_DESTINATION_DEFAULT_CLIENTSECRET=your-destination-client-secret-here
 CLOUD_SDK_CFG_DESTINATION_DEFAULT_URL=https://your-destination-auth-url-here
 CLOUD_SDK_CFG_DESTINATION_DEFAULT_URI=https://your-destination-configuration-uri-here
 CLOUD_SDK_CFG_DESTINATION_DEFAULT_IDENTITYZONE=your-identity-zone-here
 
-# Landscape suffix used to resolve the IAS destination name
-APPFND_CONHOS_LANDSCAPE=your-landscape-here
+# Optional: subscriber tenant subdomain for multi-tenant scenarios
+# When set, scenarios using SUBSCRIBER_FIRST, SUBSCRIBER_ONLY, and PROVIDER_FIRST are executed.
+# When not set, those scenarios are automatically skipped.
+CLOUD_SDK_CFG_DESTINATION_DEFAULT_TENANT_SUBDOMAIN=your-subscriber-tenant-subdomain-here
+```
 
-# Tenant subdomain for multi-tenant lookup
-TENANT_SUBDOMAIN=your-tenant-subdomain-here
+### DMS Integration Tests
 
-# User JWT for token exchange scenarios (get_user_auth)
-# If not set, user auth scenarios are automatically skipped
-AGW_USER_TOKEN=your-user-jwt-here
+For DMS (Document Management Service) integration tests, configure the following variables in `.env_integration_tests`:
+
+```bash
+# DMS Configuration
+CLOUD_SDK_CFG_SDM_DEFAULT_URI=https://your-sdm-api-uri-here
+CLOUD_SDK_CFG_SDM_DEFAULT_UAA='{"url":"https://your-auth-url","clientid":"your-client-id","clientsecret":"your-client-secret","identityzone":"your-identity-zone"}'
+```
+
+**Note**: The test fixture automatically onboards test repositories (standard and version-enabled) at session start and cleans them up on teardown. No pre-existing repositories are required.
+
+### ObjectStore Integration Tests
+
+For ObjectStore integration tests, configure the following variables in `.env_integration_tests`:
+
+```bash
+# ObjectStore Configuration
+CLOUD_SDK_CFG_OBJECTSTORE_DEFAULT_HOST=your-host-here
+CLOUD_SDK_CFG_OBJECTSTORE_DEFAULT_ACCESS_KEY_ID=your-access-key-id-here
+CLOUD_SDK_CFG_OBJECTSTORE_DEFAULT_SECRET_ACCESS_KEY=your-secret-access-key-kere
+CLOUD_SDK_CFG_OBJECTSTORE_DEFAULT_BUCKET=your-bucket-here
+CLOUD_SDK_CFG_OBJECTSTORE_DEFAULT_SSL_ENABLED=false
 ```
 
 ## Running Integration Tests
@@ -126,12 +158,14 @@ AGW_USER_TOKEN=your-user-jwt-here
 uv run pytest tests/ -m integration -v
 
 # Run specific module integration tests
+uv run pytest tests/adms/integration/ -v
+uv run pytest tests/agentgateway/integration/ -v
+uv run pytest tests/agent_memory/integration/ -v
 uv run pytest tests/core/integration/auditlog -v
 uv run pytest tests/core/integration/data_anonymization -v
-uv run pytest tests/objectstore/integration/ -v
 uv run pytest tests/destination/integration/ -v
-uv run pytest tests/agent_memory/integration/ -v
-uv run pytest tests/agentgateway/integration/ -v
+uv run pytest tests/dms/integration/ -v
+uv run pytest tests/objectstore/integration/ -v
 ```
 
 ### BDD Scenarios

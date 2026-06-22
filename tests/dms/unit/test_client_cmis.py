@@ -100,7 +100,6 @@ _ACL_RESPONSE = {
 def client():
     """Create a DMSClient with a mocked HttpInvoker."""
     creds = DMSCredentials(
-        instance_name="test-instance",
         uri="https://api.example.com",
         client_id="test-client",
         client_secret="test-secret",

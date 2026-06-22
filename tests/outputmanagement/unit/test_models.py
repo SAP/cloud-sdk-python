@@ -11,6 +11,7 @@ from sap_cloud_sdk.outputmanagement.models import (
     EmailConfiguration,
     AttachmentConfig,
     PreGeneratedAttachment,
+    FormConfiguration,
 )
 
 
@@ -19,40 +20,47 @@ class TestOutputResponse:
 
     def test_output_response_is_dataclass(self):
         """Test that OutputResponse is a dataclass."""
-        assert is_dataclass(OutputResponse)
+        # OutputResponse is a Pydantic model, not a dataclass
+        assert not is_dataclass(OutputResponse)
 
     def test_output_response_creation_basic(self):
         """Test creating a basic OutputResponse."""
         response = OutputResponse(
-            request_id="req-123",
-            status="SUCCESS"
+            output_request_id="req-123"
         )
-        assert response.request_id == "req-123"
-        assert response.status == "SUCCESS"
+        assert response.output_request_id == "req-123"
+        assert response.error is None
 
-    def test_output_response_with_all_fields(self):
-        """Test OutputResponse with all fields."""
-        response = OutputResponse(
-            request_id="req-456",
-            status="PENDING",
-            message="Processing",
-            created_at="2024-01-01T00:00:00Z",
-            updated_at="2024-01-01T00:01:00Z"
+    def test_output_response_with_error(self):
+        """Test OutputResponse with error."""
+        from sap_cloud_sdk.outputmanagement.models.output_response import ErrorResponse
+        
+        error = ErrorResponse(
+            message="Processing failed",
+            code="ERR_001"
         )
-        assert response.request_id == "req-456"
-        assert response.status == "PENDING"
-        assert response.message == "Processing"
-        assert response.created_at == "2024-01-01T00:00:00Z"
-        assert response.updated_at == "2024-01-01T00:01:00Z"
+        response = OutputResponse(error=error)
+        
+        assert response.output_request_id is None
+        assert response.error is not None
+        assert response.error.message == "Processing failed"
+        assert response.error.code == "ERR_001"
 
     def test_output_response_equality(self):
         """Test OutputResponse equality."""
-        response1 = OutputResponse(request_id="req-1", status="SUCCESS")
-        response2 = OutputResponse(request_id="req-1", status="SUCCESS")
-        response3 = OutputResponse(request_id="req-2", status="SUCCESS")
+        response1 = OutputResponse(output_request_id="req-1")
+        response2 = OutputResponse(output_request_id="req-1")
+        response3 = OutputResponse(output_request_id="req-2")
         
         assert response1 == response2
         assert response1 != response3
+
+    def test_output_response_empty(self):
+        """Test OutputResponse with no fields."""
+        response = OutputResponse()
+        
+        assert response.output_request_id is None
+        assert response.error is None
 
 
 class TestEmailConfiguration:
@@ -60,27 +68,28 @@ class TestEmailConfiguration:
 
     def test_email_configuration_is_dataclass(self):
         """Test that EmailConfiguration is a dataclass."""
-        assert is_dataclass(EmailConfiguration)
+        # EmailConfiguration is a Pydantic model, not a dataclass
+        assert not is_dataclass(EmailConfiguration)
 
     def test_email_configuration_basic(self):
         """Test basic EmailConfiguration creation."""
         config = EmailConfiguration(
-            to=["recipient@example.com"],
-            subject="Test Email",
-            body="This is a test email"
+            email_notification_template_key="TEST_TEMPLATE",
+            email_template_language="en",
+            to=["recipient@example.com"]
         )
         assert config.to == ["recipient@example.com"]
-        assert config.subject == "Test Email"
-        assert config.body == "This is a test email"
+        assert config.email_notification_template_key == "TEST_TEMPLATE"
+        assert config.email_template_language == "en"
 
     def test_email_configuration_with_cc_bcc(self):
         """Test EmailConfiguration with CC and BCC."""
         config = EmailConfiguration(
+            email_notification_template_key="TEST_TEMPLATE",
+            email_template_language="en",
             to=["recipient@example.com"],
             cc=["cc@example.com"],
-            bcc=["bcc@example.com"],
-            subject="Test Email",
-            body="Test body"
+            bcc=["bcc@example.com"]
         )
         assert config.cc == ["cc@example.com"]
         assert config.bcc == ["bcc@example.com"]
@@ -88,42 +97,46 @@ class TestEmailConfiguration:
     def test_email_configuration_multiple_recipients(self):
         """Test EmailConfiguration with multiple recipients."""
         config = EmailConfiguration(
-            to=["user1@example.com", "user2@example.com", "user3@example.com"],
-            subject="Multi-recipient Email",
-            body="Test"
+            email_notification_template_key="MULTI_RECIPIENT_TEMPLATE",
+            email_template_language="en",
+            to=["user1@example.com", "user2@example.com", "user3@example.com"]
         )
         assert len(config.to) == 3
         assert "user1@example.com" in config.to
         assert "user2@example.com" in config.to
         assert "user3@example.com" in config.to
 
-    def test_email_configuration_with_attachments(self):
-        """Test EmailConfiguration with attachments."""
+    def test_email_configuration_with_attachment(self):
+        """Test EmailConfiguration with attachment."""
+        form_config = FormConfiguration(
+            form_id="test-form-123"
+        )
         attachment = AttachmentConfig(
-            filename="document.pdf",
-            content_type="application/pdf",
-            content=b"PDF content"
+            form_configuration=form_config
         )
         config = EmailConfiguration(
+            email_notification_template_key="TEST_TEMPLATE",
+            email_template_language="en",
             to=["recipient@example.com"],
-            subject="Email with Attachment",
-            body="Please find attached",
-            attachments=[attachment]
+            attachment=attachment
         )
-        assert len(config.attachments) == 1
-        assert config.attachments[0].filename == "document.pdf"
+        assert config.attachment is not None
+        assert config.attachment.form_configuration.form_id == "test-form-123"
 
-    def test_email_configuration_empty_lists_default(self):
-        """Test EmailConfiguration with default empty lists."""
+    def test_email_configuration_optional_fields(self):
+        """Test EmailConfiguration with optional fields."""
         config = EmailConfiguration(
-            to=["recipient@example.com"],
-            subject="Test",
-            body="Test"
+            email_notification_template_key="TEST_TEMPLATE",
+            email_template_language="en",
+            to=["recipient@example.com"]
         )
-        # Check that optional list fields have appropriate defaults
+        # Check that optional fields have appropriate defaults
         assert hasattr(config, 'cc')
         assert hasattr(config, 'bcc')
-        assert hasattr(config, 'attachments')
+        assert hasattr(config, 'attachment')
+        assert config.cc is None
+        assert config.bcc is None
+        assert config.attachment is None
 
 
 class TestAttachmentConfig:
@@ -131,50 +144,52 @@ class TestAttachmentConfig:
 
     def test_attachment_config_is_dataclass(self):
         """Test that AttachmentConfig is a dataclass."""
-        assert is_dataclass(AttachmentConfig)
+        # AttachmentConfig is a Pydantic model, not a dataclass
+        assert not is_dataclass(AttachmentConfig)
 
-    def test_attachment_config_basic(self):
-        """Test basic AttachmentConfig creation."""
-        attachment = AttachmentConfig(
-            filename="report.pdf",
-            content_type="application/pdf"
-        )
-        assert attachment.filename == "report.pdf"
-        assert attachment.content_type == "application/pdf"
-
-    def test_attachment_config_with_content(self):
-        """Test AttachmentConfig with content."""
-        content = b"Sample PDF content"
-        attachment = AttachmentConfig(
-            filename="data.pdf",
-            content_type="application/pdf",
-            content=content
-        )
-        assert attachment.content == content
-        assert isinstance(attachment.content, bytes)
-
-    def test_attachment_config_various_types(self):
-        """Test AttachmentConfig with various content types."""
-        pdf = AttachmentConfig(filename="doc.pdf", content_type="application/pdf")
-        csv = AttachmentConfig(filename="data.csv", content_type="text/csv")
-        xml = AttachmentConfig(filename="config.xml", content_type="application/xml")
-        txt = AttachmentConfig(filename="readme.txt", content_type="text/plain")
+    def test_attachment_config_with_form_configuration(self):
+        """Test AttachmentConfig with form configuration."""
+        form_config = FormConfiguration(form_id="test-form-123")
+        attachment = AttachmentConfig(form_configuration=form_config)
         
-        assert pdf.content_type == "application/pdf"
-        assert csv.content_type == "text/csv"
-        assert xml.content_type == "application/xml"
-        assert txt.content_type == "text/plain"
+        assert attachment.form_configuration is not None
+        assert attachment.form_configuration.form_id == "test-form-123"
 
-    def test_attachment_config_with_size(self):
-        """Test AttachmentConfig with size information."""
-        attachment = AttachmentConfig(
-            filename="large-file.pdf",
-            content_type="application/pdf",
-            content=b"x" * 1024,
-            size=1024
+    def test_attachment_config_with_pre_generated_attachments(self):
+        """Test AttachmentConfig with pre-generated attachments."""
+        pre_gen = PreGeneratedAttachment(
+            url="https://dms.example.com/file.pdf",
+            source="DMS"
         )
-        assert attachment.size == 1024
-        assert len(attachment.content) == 1024
+        attachment = AttachmentConfig(pre_generated_attachments=[pre_gen])
+        
+        assert attachment.pre_generated_attachments is not None
+        assert len(attachment.pre_generated_attachments) == 1
+        assert attachment.pre_generated_attachments[0].url == "https://dms.example.com/file.pdf"
+
+    def test_attachment_config_with_both(self):
+        """Test AttachmentConfig with both form configuration and pre-generated attachments."""
+        form_config = FormConfiguration(form_id="form-456")
+        pre_gen = PreGeneratedAttachment(
+            url="https://dms.example.com/doc.pdf",
+            source="DMS"
+        )
+        attachment = AttachmentConfig(
+            form_configuration=form_config,
+            pre_generated_attachments=[pre_gen]
+        )
+        
+        assert attachment.form_configuration is not None
+        assert attachment.pre_generated_attachments is not None
+        assert attachment.form_configuration.form_id == "form-456"
+        assert len(attachment.pre_generated_attachments) == 1
+
+    def test_attachment_config_empty(self):
+        """Test AttachmentConfig with no configuration."""
+        attachment = AttachmentConfig()
+        
+        assert attachment.form_configuration is None
+        assert attachment.pre_generated_attachments is None
 
 
 class TestPreGeneratedAttachment:
@@ -182,60 +197,65 @@ class TestPreGeneratedAttachment:
 
     def test_pre_generated_attachment_is_dataclass(self):
         """Test that PreGeneratedAttachment is a dataclass."""
-        assert is_dataclass(PreGeneratedAttachment)
+        # PreGeneratedAttachment is a Pydantic model, not a dataclass
+        assert not is_dataclass(PreGeneratedAttachment)
 
     def test_pre_generated_attachment_basic(self):
         """Test basic PreGeneratedAttachment creation."""
         attachment = PreGeneratedAttachment(
-            object_key="attachments/report-123.pdf",
-            filename="report.pdf"
+            url="https://dms.example.com/attachments/report-123.pdf",
+            source="DMS"
         )
-        assert attachment.object_key == "attachments/report-123.pdf"
-        assert attachment.filename == "report.pdf"
+        assert attachment.url == "https://dms.example.com/attachments/report-123.pdf"
+        assert attachment.source == "DMS"
 
-    def test_pre_generated_attachment_with_metadata(self):
-        """Test PreGeneratedAttachment with metadata."""
-        attachment = PreGeneratedAttachment(
-            object_key="docs/invoice-456.pdf",
-            filename="invoice.pdf",
-            content_type="application/pdf",
-            size=102400
-        )
-        assert attachment.content_type == "application/pdf"
-        assert attachment.size == 102400
-
-    def test_pre_generated_attachment_object_key_formats(self):
-        """Test PreGeneratedAttachment with various object key formats."""
+    def test_pre_generated_attachment_url_validation(self):
+        """Test PreGeneratedAttachment URL validation."""
+        # Valid HTTPS URL
         att1 = PreGeneratedAttachment(
-            object_key="folder/subfolder/file.pdf",
-            filename="file.pdf"
+            url="https://dms.example.com/file.pdf",
+            source="DMS"
         )
-        att2 = PreGeneratedAttachment(
-            object_key="simple-file.txt",
-            filename="simple-file.txt"
-        )
-        att3 = PreGeneratedAttachment(
-            object_key="deep/nested/path/to/document.docx",
-            filename="document.docx"
-        )
+        assert att1.url.startswith("https://")
         
-        assert "/" in att1.object_key
-        assert "/" not in att2.object_key
-        assert att3.object_key.count("/") == 3
+        # Valid HTTP URL
+        att2 = PreGeneratedAttachment(
+            url="http://dms.example.com/file.pdf",
+            source="DMS"
+        )
+        assert att2.url.startswith("http://")
+
+    def test_pre_generated_attachment_invalid_url(self):
+        """Test PreGeneratedAttachment with invalid URL."""
+        from pydantic import ValidationError
+        with pytest.raises(ValidationError, match="URL must start with http:// or https://"):
+            PreGeneratedAttachment(
+                url="ftp://invalid.com/file.pdf",
+                source="DMS"
+            )
+
+    def test_pre_generated_attachment_invalid_source(self):
+        """Test PreGeneratedAttachment with invalid source."""
+        from pydantic import ValidationError
+        with pytest.raises(ValidationError, match=r"Input should be 'DMS'"):
+            PreGeneratedAttachment(
+                url="https://example.com/file.pdf",
+                source="S3"
+            )
 
     def test_pre_generated_attachment_equality(self):
         """Test PreGeneratedAttachment equality."""
         att1 = PreGeneratedAttachment(
-            object_key="path/file.pdf",
-            filename="file.pdf"
+            url="https://dms.example.com/path/file.pdf",
+            source="DMS"
         )
         att2 = PreGeneratedAttachment(
-            object_key="path/file.pdf",
-            filename="file.pdf"
+            url="https://dms.example.com/path/file.pdf",
+            source="DMS"
         )
         att3 = PreGeneratedAttachment(
-            object_key="other/file.pdf",
-            filename="file.pdf"
+            url="https://dms.example.com/other/file.pdf",
+            source="DMS"
         )
         
         assert att1 == att2

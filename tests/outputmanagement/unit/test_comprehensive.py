@@ -4,14 +4,15 @@
 """Comprehensive tests for output management module."""
 
 import pytest
-from dataclasses import asdict, fields
 
 from sap_cloud_sdk.outputmanagement.models import (
     OutputResponse,
     EmailConfiguration,
     AttachmentConfig,
     PreGeneratedAttachment,
+    FormConfiguration,
 )
+from sap_cloud_sdk.outputmanagement.models.output_response import ErrorResponse
 from sap_cloud_sdk.outputmanagement.exceptions import (
     OutputManagementException,
     ValidationException,
@@ -19,51 +20,49 @@ from sap_cloud_sdk.outputmanagement.exceptions import (
 )
 
 
-class TestDataclassFeatures:
-    """Test dataclass-specific features of models."""
+class TestPydanticModelFeatures:
+    """Test Pydantic model features."""
 
     def test_output_response_fields(self):
         """Test OutputResponse has expected fields."""
-        response = OutputResponse(request_id="test", status="SUCCESS")
-        field_names = {f.name for f in fields(response)}
+        response = OutputResponse(output_request_id="test")
         
-        assert "request_id" in field_names
-        assert "status" in field_names
+        assert hasattr(response, "output_request_id")
+        assert hasattr(response, "error")
+        assert response.output_request_id == "test"
 
     def test_email_configuration_fields(self):
         """Test EmailConfiguration has expected fields."""
         config = EmailConfiguration(
-            to=["test@example.com"],
-            subject="Test",
-            body="Test"
+            email_notification_template_key="TEST_TEMPLATE",
+            email_template_language="en",
+            to=["test@example.com"]
         )
-        field_names = {f.name for f in fields(config)}
         
-        assert "to" in field_names
-        assert "subject" in field_names
-        assert "body" in field_names
+        assert hasattr(config, "to")
+        assert hasattr(config, "email_notification_template_key")
+        assert hasattr(config, "email_template_language")
+        assert config.to == ["test@example.com"]
 
     def test_attachment_config_fields(self):
         """Test AttachmentConfig has expected fields."""
-        attachment = AttachmentConfig(
-            filename="test.pdf",
-            content_type="application/pdf"
-        )
-        field_names = {f.name for f in fields(attachment)}
+        form_config = FormConfiguration(form_id="test-form")
+        attachment = AttachmentConfig(form_configuration=form_config)
         
-        assert "filename" in field_names
-        assert "content_type" in field_names
+        assert hasattr(attachment, "form_configuration")
+        assert hasattr(attachment, "pre_generated_attachments")
+        assert attachment.form_configuration.form_id == "test-form"
 
     def test_pre_generated_attachment_fields(self):
         """Test PreGeneratedAttachment has expected fields."""
         attachment = PreGeneratedAttachment(
-            object_key="path/file.pdf",
-            filename="file.pdf"
+            url="https://dms.example.com/path/file.pdf",
+            source="DMS"
         )
-        field_names = {f.name for f in fields(attachment)}
         
-        assert "object_key" in field_names
-        assert "filename" in field_names
+        assert hasattr(attachment, "url")
+        assert hasattr(attachment, "source")
+        assert attachment.url == "https://dms.example.com/path/file.pdf"
 
 
 class TestModelValidation:
@@ -73,99 +72,84 @@ class TestModelValidation:
         """Test that email configuration requires recipients."""
         # Should be able to create with recipients
         config = EmailConfiguration(
-            to=["user@example.com"],
-            subject="Test",
-            body="Test"
+            email_notification_template_key="TEST_TEMPLATE",
+            email_template_language="en",
+            to=["user@example.com"]
         )
         assert len(config.to) > 0
 
-    def test_attachment_requires_filename(self):
-        """Test that attachment requires filename."""
-        attachment = AttachmentConfig(
-            filename="document.pdf",
-            content_type="application/pdf"
-        )
-        assert attachment.filename is not None
-        assert len(attachment.filename) > 0
+    def test_attachment_with_form_configuration(self):
+        """Test that attachment can have form configuration."""
+        form_config = FormConfiguration(form_id="document-form")
+        attachment = AttachmentConfig(form_configuration=form_config)
+        
+        assert attachment.form_configuration is not None
+        assert attachment.form_configuration.form_id == "document-form"
 
-    def test_output_response_requires_request_id(self):
-        """Test that output response requires request ID."""
-        response = OutputResponse(
-            request_id="req-123",
-            status="SUCCESS"
-        )
-        assert response.request_id is not None
-        assert len(response.request_id) > 0
+    def test_output_response_with_request_id(self):
+        """Test that output response can have request ID."""
+        response = OutputResponse(output_request_id="req-123")
+        
+        assert response.output_request_id is not None
+        assert len(response.output_request_id) > 0
 
 
 class TestEdgeCases:
     """Test edge cases and boundary conditions."""
 
-    def test_email_with_empty_body(self):
-        """Test email configuration with empty body."""
-        config = EmailConfiguration(
-            to=["user@example.com"],
-            subject="Test",
-            body=""
-        )
-        assert config.body == ""
-
-    def test_email_with_long_subject(self):
-        """Test email configuration with very long subject."""
-        long_subject = "A" * 1000
-        config = EmailConfiguration(
-            to=["user@example.com"],
-            subject=long_subject,
-            body="Test"
-        )
-        assert len(config.subject) == 1000
-
-    def test_attachment_with_large_content(self):
-        """Test attachment with large content."""
-        large_content = b"X" * (1024 * 1024)  # 1MB
-        attachment = AttachmentConfig(
-            filename="large-file.bin",
-            content_type="application/octet-stream",
-            content=large_content
-        )
-        assert len(attachment.content) == 1024 * 1024
-
     def test_email_with_many_recipients(self):
         """Test email with many recipients."""
         many_recipients = [f"user{i}@example.com" for i in range(100)]
         config = EmailConfiguration(
-            to=many_recipients,
-            subject="Mass Email",
-            body="Test"
+            email_notification_template_key="MASS_EMAIL_TEMPLATE",
+            email_template_language="en",
+            to=many_recipients
         )
         assert len(config.to) == 100
 
-    def test_email_with_special_characters(self):
-        """Test email with special characters in subject and body."""
+    def test_email_with_special_characters_in_template_key(self):
+        """Test email with special characters in template key."""
         config = EmailConfiguration(
-            to=["user@example.com"],
-            subject="Test: Special chars !@#$%^&*()",
-            body="Body with unicode: 你好 مرحبا שלום"
+            email_notification_template_key="TEST_TEMPLATE_2024",
+            email_template_language="en",
+            to=["user@example.com"]
         )
-        assert "!@#$%^&*()" in config.subject
-        assert "你好" in config.body
+        assert "2024" in config.email_notification_template_key
 
-    def test_attachment_with_unicode_filename(self):
-        """Test attachment with unicode filename."""
-        attachment = AttachmentConfig(
-            filename="文档.pdf",
-            content_type="application/pdf"
-        )
-        assert "文档" in attachment.filename
+    def test_output_response_with_error(self):
+        """Test output response with error."""
+        error = ErrorResponse(message="Processing failed")
+        response = OutputResponse(error=error)
+        
+        assert response.output_request_id is None
+        assert response.error is not None
+        assert response.error.message == "Processing failed"
 
-    def test_output_response_with_none_message(self):
-        """Test output response with None message."""
-        response = OutputResponse(
-            request_id="req-123",
-            status="PENDING",
-            message=None
+    def test_output_response_empty(self):
+        """Test output response with no fields."""
+        response = OutputResponse()
+        
+        assert response.output_request_id is None
+        assert response.error is None
+
+    def test_pre_generated_attachment_url_validation(self):
+        """Test PreGeneratedAttachment URL validation."""
+        # Valid URL
+        attachment = PreGeneratedAttachment(
+            url="https://dms.example.com/file.pdf",
+            source="DMS"
         )
-        assert response.message is None
+        assert attachment.url.startswith("https://")
+
+    def test_attachment_config_with_multiple_pre_generated(self):
+        """Test AttachmentConfig with multiple pre-generated attachments."""
+        attachments = [
+            PreGeneratedAttachment(url="https://dms.example.com/file1.pdf", source="DMS"),
+            PreGeneratedAttachment(url="https://dms.example.com/file2.pdf", source="DMS"),
+        ]
+        config = AttachmentConfig(pre_generated_attachments=attachments)
+        
+        assert len(config.pre_generated_attachments) == 2
 
 
 class TestExceptionScenarios:
@@ -202,43 +186,28 @@ class TestExceptionScenarios:
 class TestModelComparisons:
     """Test model comparison operations."""
 
-    def test_output_response_equality_with_different_fields(self):
-        """Test output response equality with different optional fields."""
-        response1 = OutputResponse(
-            request_id="req-1",
-            status="SUCCESS",
-            message="Done"
-        )
-        response2 = OutputResponse(
-            request_id="req-1",
-            status="SUCCESS",
-            message="Done"
-        )
-        response3 = OutputResponse(
-            request_id="req-1",
-            status="SUCCESS",
-            message="Different message"
-        )
+    def test_output_response_equality(self):
+        """Test output response equality."""
+        response1 = OutputResponse(output_request_id="req-1")
+        response2 = OutputResponse(output_request_id="req-1")
+        response3 = OutputResponse(output_request_id="req-2")
         
         assert response1 == response2
         assert response1 != response3
 
-    def test_attachment_equality(self):
-        """Test attachment equality."""
-        att1 = AttachmentConfig(
-            filename="file.pdf",
-            content_type="application/pdf",
-            content=b"content"
+    def test_pre_generated_attachment_equality(self):
+        """Test PreGeneratedAttachment equality."""
+        att1 = PreGeneratedAttachment(
+            url="https://dms.example.com/file.pdf",
+            source="DMS"
         )
-        att2 = AttachmentConfig(
-            filename="file.pdf",
-            content_type="application/pdf",
-            content=b"content"
+        att2 = PreGeneratedAttachment(
+            url="https://dms.example.com/file.pdf",
+            source="DMS"
         )
-        att3 = AttachmentConfig(
-            filename="other.pdf",
-            content_type="application/pdf",
-            content=b"content"
+        att3 = PreGeneratedAttachment(
+            url="https://dms.example.com/other.pdf",
+            source="DMS"
         )
         
         assert att1 == att2
@@ -246,125 +215,109 @@ class TestModelComparisons:
 
 
 class TestModelSerialization:
-    """Test model serialization capabilities."""
+    """Test model serialization capabilities using Pydantic's model_dump."""
 
     def test_output_response_to_dict(self):
         """Test converting OutputResponse to dictionary."""
-        response = OutputResponse(
-            request_id="req-123",
-            status="SUCCESS",
-            message="Done"
-        )
-        response_dict = asdict(response)
+        response = OutputResponse(output_request_id="req-123")
+        response_dict = response.model_dump()
         
         assert isinstance(response_dict, dict)
-        assert response_dict["request_id"] == "req-123"
-        assert response_dict["status"] == "SUCCESS"
-        assert response_dict["message"] == "Done"
+        assert response_dict["output_request_id"] == "req-123"
 
     def test_email_configuration_to_dict(self):
         """Test converting EmailConfiguration to dictionary."""
         config = EmailConfiguration(
-            to=["user@example.com"],
-            subject="Test",
-            body="Test body"
+            email_notification_template_key="TEST_TEMPLATE",
+            email_template_language="en",
+            to=["user@example.com"]
         )
-        config_dict = asdict(config)
+        config_dict = config.model_dump()
         
         assert isinstance(config_dict, dict)
         assert config_dict["to"] == ["user@example.com"]
-        assert config_dict["subject"] == "Test"
+        assert config_dict["email_notification_template_key"] == "TEST_TEMPLATE"
 
-    def test_attachment_to_dict(self):
-        """Test converting AttachmentConfig to dictionary."""
-        attachment = AttachmentConfig(
-            filename="file.pdf",
-            content_type="application/pdf",
-            content=b"content"
+    def test_pre_generated_attachment_to_dict(self):
+        """Test converting PreGeneratedAttachment to dictionary."""
+        attachment = PreGeneratedAttachment(
+            url="https://dms.example.com/file.pdf",
+            source="DMS"
         )
-        att_dict = asdict(attachment)
+        att_dict = attachment.model_dump()
         
         assert isinstance(att_dict, dict)
-        assert att_dict["filename"] == "file.pdf"
-        assert att_dict["content_type"] == "application/pdf"
+        assert att_dict["url"] == "https://dms.example.com/file.pdf"
+        assert att_dict["source"] == "DMS"
 
 
 class TestRealWorldScenarios:
     """Test real-world usage scenarios."""
 
-    def test_invoice_email_scenario(self):
-        """Test sending an invoice email scenario."""
-        invoice_pdf = AttachmentConfig(
-            filename="invoice_2024_001.pdf",
-            content_type="application/pdf",
-            content=b"Invoice PDF content",
-            size=50000
+    def test_email_with_form_attachment_scenario(self):
+        """Test sending an email with form-generated PDF attachment."""
+        form_config = FormConfiguration(
+            form_id="invoice_form_2024",
+            form_data={"invoice_number": "2024-001", "amount": 50000}
         )
+        
+        attachment = AttachmentConfig(form_configuration=form_config)
         
         email = EmailConfiguration(
+            email_notification_template_key="INVOICE_NOTIFICATION",
+            email_template_language="en",
             to=["customer@company.com"],
             cc=["accounting@company.com"],
-            subject="Invoice #2024-001 - Payment Due",
-            body="Dear Customer,\n\nPlease find attached invoice #2024-001.\n\nPayment is due within 30 days.\n\nBest regards,\nAccounting Team",
-            attachments=[invoice_pdf]
+            attachment=attachment
         )
         
-        assert "Invoice" in email.subject
-        assert len(email.attachments) == 1
-        assert email.attachments[0].size == 50000
+        assert email.attachment is not None
+        assert email.attachment.form_configuration.form_id == "invoice_form_2024"
 
     def test_report_generation_scenario(self):
         """Test report generation scenario."""
-        response = OutputResponse(
-            request_id="report-2024-q1",
-            status="PROCESSING",
-            message="Generating quarterly report"
-        )
+        response = OutputResponse(output_request_id="report-2024-q1")
         
-        assert response.request_id.startswith("report-")
-        assert response.status == "PROCESSING"
+        assert response.output_request_id.startswith("report-")
 
     def test_bulk_email_scenario(self):
         """Test bulk email sending scenario."""
         recipients = [f"employee{i}@company.com" for i in range(1, 51)]
         
         email = EmailConfiguration(
-            to=recipients,
-            subject="Company Newsletter - January 2024",
-            body="Dear Team,\n\nPlease find this month's newsletter...",
+            email_notification_template_key="NEWSLETTER_TEMPLATE",
+            email_template_language="en",
+            to=recipients
         )
         
         assert len(email.to) == 50
-        assert "Newsletter" in email.subject
 
-    def test_multi_attachment_report_scenario(self):
-        """Test report with multiple attachments scenario."""
+    def test_email_with_dms_attachments_scenario(self):
+        """Test email with multiple DMS attachments."""
         attachments = [
-            AttachmentConfig(
-                filename="summary.pdf",
-                content_type="application/pdf",
-                content=b"Summary PDF"
+            PreGeneratedAttachment(
+                url="https://dms.example.com/summary.pdf",
+                source="DMS"
             ),
-            AttachmentConfig(
-                filename="data.xlsx",
-                content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                content=b"Excel data"
+            PreGeneratedAttachment(
+                url="https://dms.example.com/data.xlsx",
+                source="DMS"
             ),
-            AttachmentConfig(
-                filename="notes.txt",
-                content_type="text/plain",
-                content=b"Additional notes"
+            PreGeneratedAttachment(
+                url="https://dms.example.com/notes.txt",
+                source="DMS"
             ),
         ]
         
+        attachment_config = AttachmentConfig(pre_generated_attachments=attachments)
+        
         email = EmailConfiguration(
+            email_notification_template_key="REPORT_PACKAGE_TEMPLATE",
+            email_template_language="en",
             to=["manager@company.com"],
-            subject="Monthly Report Package",
-            body="Please find the complete monthly report package attached.",
-            attachments=attachments
+            attachment=attachment_config
         )
         
-        assert len(email.attachments) == 3
-        assert any(att.filename.endswith(".pdf") for att in email.attachments)
-        assert any(att.filename.endswith(".xlsx") for att in email.attachments)
-        assert any(att.filename.endswith(".txt") for att in email.attachments)
+        assert email.attachment is not None
+        assert len(email.attachment.pre_generated_attachments) == 3
+        assert all(att.source == "DMS" for att in email.attachment.pre_generated_attachments)

@@ -16,13 +16,13 @@ class TestOutputManagementModule:
 
     def test_client_import(self):
         """Test that client can be imported."""
-        from sap_cloud_sdk.outputmanagement.client import OutputManagementClient
-        assert OutputManagementClient is not None
+        from sap_cloud_sdk.outputmanagement.client import OutputManagementServiceClient
+        assert OutputManagementServiceClient is not None
 
     def test_client_provider_import(self):
         """Test that client provider can be imported."""
-        from sap_cloud_sdk.outputmanagement.client_provider import OutputManagementClientProvider
-        assert OutputManagementClientProvider is not None
+        from sap_cloud_sdk.outputmanagement.client_provider import OutputManagementServiceClientProvider
+        assert OutputManagementServiceClientProvider is not None
 
     def test_constants_import(self):
         """Test that constants can be imported."""

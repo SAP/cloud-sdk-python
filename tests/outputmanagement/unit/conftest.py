@@ -12,22 +12,19 @@ def sample_email_config():
     from sap_cloud_sdk.outputmanagement.models import EmailConfiguration
     
     return EmailConfiguration(
-        to=["recipient@example.com"],
-        subject="Test Email",
-        body="This is a test email body"
+        email_notification_template_key="TEST_TEMPLATE",
+        email_template_language="en",
+        to=["recipient@example.com"]
     )
 
 
 @pytest.fixture
 def sample_attachment():
     """Provide a sample attachment for testing."""
-    from sap_cloud_sdk.outputmanagement.models import AttachmentConfig
+    from sap_cloud_sdk.outputmanagement.models import AttachmentConfig, FormConfiguration
     
-    return AttachmentConfig(
-        filename="test-document.pdf",
-        content_type="application/pdf",
-        content=b"Sample PDF content"
-    )
+    form_config = FormConfiguration(form_id="test-form")
+    return AttachmentConfig(form_configuration=form_config)
 
 
 @pytest.fixture
@@ -35,11 +32,7 @@ def sample_output_response():
     """Provide a sample output response for testing."""
     from sap_cloud_sdk.outputmanagement.models import OutputResponse
     
-    return OutputResponse(
-        request_id="test-req-123",
-        status="SUCCESS",
-        message="Test output generated successfully"
-    )
+    return OutputResponse(output_request_id="test-req-123")
 
 
 @pytest.fixture
@@ -48,10 +41,8 @@ def sample_pre_generated_attachment():
     from sap_cloud_sdk.outputmanagement.models import PreGeneratedAttachment
     
     return PreGeneratedAttachment(
-        object_key="attachments/test-file.pdf",
-        filename="test-file.pdf",
-        content_type="application/pdf",
-        size=1024
+        url="https://dms.example.com/attachments/test-file.pdf",
+        source="DMS"
     )
 
 

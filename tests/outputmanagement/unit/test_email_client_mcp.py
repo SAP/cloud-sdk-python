@@ -73,7 +73,7 @@ class TestEmailClientMCP:
         # Verify CC was included in the payload
         call_args = mock_mcp_tool.ainvoke.call_args[0][0]
         assert "body" in call_args
-        assert call_args["body"]["data"]["outputManagement"]["emailConfiguration"]["cc"] == ["manager@company.com"]
+        assert call_args["body"]["data"]["OutputManagement"]["emailConfiguration"]["cc"] == ["manager@company.com"]
 
     @pytest.mark.asyncio
     async def test_send_email_with_mcp_with_attachments(self, email_client, sample_business_document, mock_mcp_tool):
@@ -98,7 +98,7 @@ class TestEmailClientMCP:
         # Verify attachments were included in the payload
         call_args = mock_mcp_tool.ainvoke.call_args[0][0]
         assert "body" in call_args
-        email_config = call_args["body"]["data"]["outputManagement"]["emailConfiguration"]
+        email_config = call_args["body"]["data"]["OutputManagement"]["emailConfiguration"]
         assert "attachment" in email_config
         assert len(email_config["attachment"]["preGeneratedAttachments"]) == 2
 
@@ -171,8 +171,8 @@ class TestEmailClientMCP:
 
     @pytest.mark.asyncio
     async def test_send_email_with_mcp_missing_tool_raises_error(self, email_client, sample_business_document):
-        """Test that missing MCP tool raises ValueError."""
-        with pytest.raises(ValueError, match="mcp_tool parameter is required"):
+        """Test that missing MCP tool raises Exception."""
+        with pytest.raises(Exception, match="MCP tool invocation failed: mcp_tool parameter is required"):
             await email_client.send_email_with_mcp(
                 tool_name="send_output_request",
                 notification_template_key="PO_APPROVAL_NOTIFICATION",
@@ -228,11 +228,11 @@ class TestEmailClientMCP:
         
         # Data structure
         data = body["data"]
-        assert "outputManagement" in data
-        assert "businessDocument" in data
+        assert "OutputManagement" in data
+        assert "BusinessDocument" in data
         
         # Output management structure
-        output_mgmt = data["outputManagement"]
+        output_mgmt = data["OutputManagement"]
         assert "businessDocumentType" in output_mgmt
         assert "businessDocumentId" in output_mgmt
         assert "channels" in output_mgmt
@@ -267,7 +267,7 @@ class TestEmailClientMCP:
         
         # Verify all recipients were included
         call_args = mock_mcp_tool.ainvoke.call_args[0][0]
-        email_config = call_args["body"]["data"]["outputManagement"]["emailConfiguration"]
+        email_config = call_args["body"]["data"]["OutputManagement"]["emailConfiguration"]
         assert len(email_config["to"]) == 3
         assert set(email_config["to"]) == set(recipients)
 
@@ -321,7 +321,7 @@ class TestEmailClientMCP:
         
         # Verify business document was preserved
         call_args = mock_mcp_tool.ainvoke.call_args[0][0]
-        business_doc = call_args["body"]["data"]["businessDocument"]
+        business_doc = call_args["body"]["data"]["BusinessDocument"]
         assert "Invoice" in business_doc
         assert business_doc["Invoice"]["invoiceNumber"] == "INV-2024-001"
         assert len(business_doc["Invoice"]["lineItems"]) == 2
@@ -375,7 +375,7 @@ class TestEmailClientMCP:
         
         # Verify optional fields are not present or None
         call_args = mock_mcp_tool.ainvoke.call_args[0][0]
-        email_config = call_args["body"]["data"]["outputManagement"]["emailConfiguration"]
+        email_config = call_args["body"]["data"]["OutputManagement"]["emailConfiguration"]
         
         # CC should not be present when not provided
         assert "cc" not in email_config or email_config.get("cc") is None

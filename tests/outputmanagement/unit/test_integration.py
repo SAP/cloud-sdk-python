@@ -15,7 +15,10 @@ from sap_cloud_sdk.outputmanagement.models import (
     EmailConfiguration,
     AttachmentConfig,
     OutputResponse,
+    FormConfiguration,
+    PreGeneratedAttachment,
 )
+from sap_cloud_sdk.outputmanagement.models.output_response import ErrorResponse
 from sap_cloud_sdk.outputmanagement.exceptions import (
     OutputManagementException,
     ValidationException,
@@ -27,104 +30,102 @@ class TestOutputManagementIntegration:
 
     def test_end_to_end_email_workflow(self):
         """Test complete email sending workflow."""
-        # Create email configuration
-        attachment = AttachmentConfig(
-            filename="report.pdf",
-            content_type="application/pdf",
-            content=b"PDF content"
-        )
+        # Create form configuration for attachment
+        form_config = FormConfiguration(form_id="monthly-report-form")
+        attachment = AttachmentConfig(form_configuration=form_config)
         
         email_config = EmailConfiguration(
+            email_notification_template_key="MONTHLY_REPORT_TEMPLATE",
+            email_template_language="en",
             to=["recipient@example.com"],
             cc=["cc@example.com"],
-            subject="Monthly Report",
-            body="Please find the monthly report attached.",
-            attachments=[attachment]
+            attachment=attachment
         )
         
         # Verify configuration is created correctly
         assert email_config.to == ["recipient@example.com"]
         assert email_config.cc == ["cc@example.com"]
-        assert email_config.subject == "Monthly Report"
-        assert len(email_config.attachments) == 1
-        assert email_config.attachments[0].filename == "report.pdf"
+        assert email_config.email_notification_template_key == "MONTHLY_REPORT_TEMPLATE"
+        assert email_config.attachment is not None
+        assert email_config.attachment.form_configuration.form_id == "monthly-report-form"
 
     def test_end_to_end_output_request_workflow(self):
         """Test complete output request workflow."""
         # Create output response
-        response = OutputResponse(
-            request_id="req-12345",
-            status="SUCCESS",
-            message="Output generated successfully"
-        )
+        response = OutputResponse(output_request_id="req-12345")
         
         # Verify response
-        assert response.request_id == "req-12345"
-        assert response.status == "SUCCESS"
-        assert response.message == "Output generated successfully"
+        assert response.output_request_id == "req-12345"
+        assert response.error is None
 
     def test_configuration_creation_workflow(self):
         """Test configuration creation workflow."""
-        # Test with destination name
+        # Test with destination name only
         config1 = DestinationCredentialConfig(
             destination_name="output-management-dest"
         )
         assert config1.destination_name == "output-management-dest"
+        assert config1.access_strategy is None
+        assert config1.instance is None
         
-        # Test with URL and credentials
+        # Test with destination name and access strategy
         config2 = DestinationCredentialConfig(
-            url="https://api.example.com",
-            username="testuser",
-            password="testpass"
+            destination_name="output-management-dest",
+            access_strategy="PROVIDER_ONLY"
         )
-        assert config2.url == "https://api.example.com"
-        assert config2.username == "testuser"
-        assert config2.password == "testpass"
+        assert config2.destination_name == "output-management-dest"
+        assert config2.access_strategy == "PROVIDER_ONLY"
+        
+        # Test with destination name and instance
+        config3 = DestinationCredentialConfig(
+            destination_name="output-management-dest",
+            instance="custom-instance"
+        )
+        assert config3.destination_name == "output-management-dest"
+        assert config3.instance == "custom-instance"
 
     def test_multiple_attachments_workflow(self):
-        """Test workflow with multiple attachments."""
-        attachments = [
-            AttachmentConfig(
-                filename="report1.pdf",
-                content_type="application/pdf",
-                content=b"PDF 1"
+        """Test workflow with multiple DMS attachments."""
+        dms_attachments = [
+            PreGeneratedAttachment(
+                url="https://dms.example.com/report1.pdf",
+                source="DMS"
             ),
-            AttachmentConfig(
-                filename="data.csv",
-                content_type="text/csv",
-                content=b"CSV data"
+            PreGeneratedAttachment(
+                url="https://dms.example.com/data.csv",
+                source="DMS"
             ),
-            AttachmentConfig(
-                filename="summary.txt",
-                content_type="text/plain",
-                content=b"Summary text"
+            PreGeneratedAttachment(
+                url="https://dms.example.com/summary.txt",
+                source="DMS"
             ),
         ]
         
+        attachment_config = AttachmentConfig(pre_generated_attachments=dms_attachments)
+        
         email_config = EmailConfiguration(
+            email_notification_template_key="MULTI_ATTACHMENT_TEMPLATE",
+            email_template_language="en",
             to=["recipient@example.com"],
-            subject="Multiple Attachments",
-            body="Please find multiple files attached.",
-            attachments=attachments
+            attachment=attachment_config
         )
         
-        assert len(email_config.attachments) == 3
-        assert email_config.attachments[0].content_type == "application/pdf"
-        assert email_config.attachments[1].content_type == "text/csv"
-        assert email_config.attachments[2].content_type == "text/plain"
+        assert email_config.attachment is not None
+        assert len(email_config.attachment.pre_generated_attachments) == 3
+        assert all(att.source == "DMS" for att in email_config.attachment.pre_generated_attachments)
 
     def test_multiple_recipients_workflow(self):
         """Test workflow with multiple recipients."""
         email_config = EmailConfiguration(
+            email_notification_template_key="TEAM_UPDATE_TEMPLATE",
+            email_template_language="en",
             to=[
                 "user1@example.com",
                 "user2@example.com",
                 "user3@example.com"
             ],
             cc=["manager@example.com"],
-            bcc=["archive@example.com"],
-            subject="Team Update",
-            body="Important team update"
+            bcc=["archive@example.com"]
         )
         
         assert len(email_config.to) == 3
@@ -140,85 +141,63 @@ class TestOutputManagementIntegration:
         with pytest.raises(ValidationException):
             raise ValidationException("Validation error")
 
-    def test_dataclass_immutability_workflow(self):
-        """Test that dataclass instances work as expected."""
-        response1 = OutputResponse(request_id="req-1", status="SUCCESS")
-        response2 = OutputResponse(request_id="req-1", status="SUCCESS")
-        response3 = OutputResponse(request_id="req-2", status="SUCCESS")
+    def test_pydantic_model_workflow(self):
+        """Test that Pydantic model instances work as expected."""
+        response1 = OutputResponse(output_request_id="req-1")
+        response2 = OutputResponse(output_request_id="req-1")
+        response3 = OutputResponse(output_request_id="req-2")
         
         # Test equality
         assert response1 == response2
         assert response1 != response3
         
         # Test that we can access fields
-        assert response1.request_id == "req-1"
-        assert response1.status == "SUCCESS"
+        assert response1.output_request_id == "req-1"
 
     def test_complex_email_scenario(self):
         """Test complex email scenario with all features."""
-        # Create multiple attachments
-        pdf_attachment = AttachmentConfig(
-            filename="invoice.pdf",
-            content_type="application/pdf",
-            content=b"Invoice PDF content",
-            size=1024
-        )
+        # Create DMS attachments
+        dms_attachments = [
+            PreGeneratedAttachment(
+                url="https://dms.example.com/invoice.pdf",
+                source="DMS"
+            ),
+            PreGeneratedAttachment(
+                url="https://dms.example.com/details.csv",
+                source="DMS"
+            ),
+        ]
         
-        csv_attachment = AttachmentConfig(
-            filename="details.csv",
-            content_type="text/csv",
-            content=b"Detail,Value\nItem1,100\nItem2,200",
-            size=512
-        )
+        attachment_config = AttachmentConfig(pre_generated_attachments=dms_attachments)
         
         # Create email with all features
         email_config = EmailConfiguration(
+            email_notification_template_key="INVOICE_TEMPLATE",
+            email_template_language="en",
             to=["customer@example.com", "billing@example.com"],
             cc=["manager@example.com"],
             bcc=["archive@example.com", "audit@example.com"],
-            subject="Invoice #12345 - Payment Due",
-            body="Dear Customer,\n\nPlease find your invoice attached.\n\nBest regards,\nBilling Team",
-            attachments=[pdf_attachment, csv_attachment]
+            attachment=attachment_config
         )
         
         # Verify all components
         assert len(email_config.to) == 2
         assert len(email_config.cc) == 1
         assert len(email_config.bcc) == 2
-        assert len(email_config.attachments) == 2
-        assert "Invoice" in email_config.subject
-        assert "Dear Customer" in email_config.body
+        assert email_config.attachment is not None
+        assert len(email_config.attachment.pre_generated_attachments) == 2
 
     def test_output_response_lifecycle(self):
-        """Test output response through different states."""
-        # Pending state
-        pending = OutputResponse(
-            request_id="req-100",
-            status="PENDING",
-            message="Request submitted"
-        )
-        assert pending.status == "PENDING"
-        
-        # Processing state
-        processing = OutputResponse(
-            request_id="req-100",
-            status="PROCESSING",
-            message="Generating output"
-        )
-        assert processing.status == "PROCESSING"
-        
+        """Test output response with success and error states."""
         # Success state
-        success = OutputResponse(
-            request_id="req-100",
-            status="SUCCESS",
-            message="Output generated successfully"
-        )
-        assert success.status == "SUCCESS"
+        success = OutputResponse(output_request_id="req-100")
+        assert success.output_request_id == "req-100"
+        assert success.error is None
         
         # Error state
-        error = OutputResponse(
-            request_id="req-100",
-            status="ERROR",
-            message="Failed to generate output"
-        )
-        assert error.status == "ERROR"
+        error_response = ErrorResponse(message="Failed to generate output", code="ERR_001")
+        error = OutputResponse(error=error_response)
+        assert error.output_request_id is None
+        assert error.error is not None
+        assert error.error.message == "Failed to generate output"
+        assert error.error.code == "ERR_001"

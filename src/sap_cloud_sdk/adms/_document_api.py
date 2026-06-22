@@ -13,9 +13,9 @@ from sap_cloud_sdk.adms._models import (
     ScanStatus,
     UpdateDocumentInput,
 )
-from sap_cloud_sdk.adms._query_options import DocumentQueryOptions
 from sap_cloud_sdk.adms.config import _SERVICE_PATH
 from sap_cloud_sdk.adms.exceptions import ScanNotCleanError
+from sap_cloud_sdk.core.odata._query import StructuredQuery
 from sap_cloud_sdk.core.telemetry import Module, Operation, record_metrics
 
 
@@ -31,7 +31,7 @@ class _DocumentApi:
     @record_metrics(Module.ADMS, Operation.ADMS_DOCUMENTS_GET_ALL)
     def get_all(
         self,
-        options: DocumentQueryOptions | None = None,
+        options: StructuredQuery | None = None,
     ) -> list[Document]:
         """List all Documents accessible to the caller.
 
@@ -45,22 +45,19 @@ class _DocumentApi:
         applied to the underlying ``DocumentRelation`` query (not to the
         Document entity itself).  ``$select`` and ``$expand`` are forwarded
         as-is; if you need to expand additional navigation properties on
-        DocumentRelation alongside ``Document``, include them in
-        ``options.expand``.
+        DocumentRelation alongside ``Document``, include them in the query.
 
         Args:
-            options: :class:`DocumentQueryOptions` with OData parameters.
-                If ``None``, all relations are fetched and their documents
-                returned deduplicated.
+            options: :class:`~sap_cloud_sdk.core.odata.StructuredQuery` with
+                OData parameters. If ``None``, all relations are fetched and
+                their documents returned deduplicated.
 
         Returns:
             Unique :class:`~sap_cloud_sdk.adms._models.Document` instances,
             ordered by first occurrence across relations.
         """
-        # Build RelationQueryOptions that always includes Document in $expand.
-        rel_params: dict[str, str | int] = {}
-        if options:
-            rel_params = options.to_query_params()
+        # Build params that always includes Document in $expand.
+        rel_params: dict = options.to_params() if options else {}
         existing_expand = str(rel_params.get("$expand", ""))
         if existing_expand:
             if "Document" not in existing_expand.split(","):
@@ -267,12 +264,10 @@ class _AsyncDocumentApi:
     @record_metrics(Module.ADMS, Operation.ADMS_DOCUMENTS_GET_ALL)
     async def get_all(
         self,
-        options: DocumentQueryOptions | None = None,
+        options: StructuredQuery | None = None,
     ) -> list[Document]:
         """Async variant of :meth:`_DocumentApi.get_all` — same semantics."""
-        rel_params: dict[str, str | int] = {}
-        if options:
-            rel_params = options.to_query_params()
+        rel_params: dict = _resolve_query_params(options)
         existing_expand = str(rel_params.get("$expand", ""))
         if existing_expand:
             if "Document" not in existing_expand.split(","):

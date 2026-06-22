@@ -2,7 +2,36 @@
 
 from __future__ import annotations
 
+import uuid
 from typing import Any
+
+
+def quote_odata_string_key(value: str) -> str:
+    """Quote and escape a string value for use in an OData V4 entity key segment.
+
+    OData V4 §5.1.1.6.2 requires single-quoted string literals with embedded
+    single quotes doubled.
+
+    Example::
+
+        path = f"Documents(DocID={quote_odata_string_key(doc_id)})"
+    """
+    return "'" + value.replace("'", "''") + "'"
+
+
+def quote_odata_guid_key(value: str) -> str:
+    """Validate and serialise an ``Edm.Guid`` value for an OData V4 key segment.
+
+    OData V4 §5.1.1.6.2 represents ``Edm.Guid`` keys *without* single quotes.
+    Injection protection comes from UUID validation rather than escaping.
+
+    Raises:
+        ValueError: If *value* is not a well-formed UUID.
+    """
+    try:
+        return str(uuid.UUID(value))
+    except (ValueError, AttributeError, TypeError) as exc:
+        raise ValueError(f"invalid OData Edm.Guid key: {value!r}") from exc
 
 
 def _format_value(value: Any) -> str:

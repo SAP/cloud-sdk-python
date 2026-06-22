@@ -16,7 +16,6 @@ from __future__ import annotations
 
 import asyncio
 import threading
-import uuid
 from typing import Any
 
 import httpx
@@ -30,6 +29,7 @@ from sap_cloud_sdk.adms.exceptions import DocumentNotFoundError, HttpError
 from sap_cloud_sdk.adms._async_http import AsyncHttpClient
 from sap_cloud_sdk.adms._async_http import HttpError as CoreHttpError
 from sap_cloud_sdk.adms._async_http import NotFoundError as CoreNotFoundError
+from sap_cloud_sdk.core.odata._filter import quote_odata_guid_key, quote_odata_string_key
 
 _CSRF_FETCH_HEADER = "X-CSRF-Token"
 _CSRF_FETCH_VALUE = "Fetch"
@@ -44,45 +44,6 @@ _REQUEST_TIMEOUT_SECONDS = 30
 # Cap on ``response_text`` carried on error exceptions — see
 # ``_async_client._RESPONSE_TEXT_TRUNCATION_LIMIT`` for rationale.
 _RESPONSE_TEXT_TRUNCATION_LIMIT = 500
-
-
-def quote_odata_string_key(value: str) -> str:
-    """Quote and escape a string value for use in an OData V4 entity key segment.
-
-    OData V4 §5.1.1.6.2 requires single-quoted string literals with embedded
-    single quotes doubled.  Without escaping, a value like ``O'Brien`` (or a
-    deliberately crafted ``'); ...``) breaks the URL or alters query intent.
-
-    Example::
-
-        path = f"Documents(DocID={quote_odata_string_key(doc_id)})"
-    """
-    return "'" + value.replace("'", "''") + "'"
-
-
-def quote_odata_guid_key(value: str) -> str:
-    """Validate and serialise an ``Edm.Guid`` value for an OData V4 key segment.
-
-    OData V4 §5.1.1.6.2 represents ``Edm.Guid`` keys *without* single quotes
-    (those are reserved for ``Edm.String``).  String-quoting a Guid would
-    cause SAP CAP / strict OData servers to reject the request as a type
-    mismatch.  Injection protection on Guid keys therefore comes from
-    *validation*, not escaping: any value that does not parse as a UUID is
-    rejected before interpolation, so an attacker cannot smuggle path
-    separators or query operators through this argument.
-
-    Example::
-
-        path = f"DocumentRelation(DocumentRelationID={quote_odata_guid_key(rel_id)},"
-               f"IsActiveEntity=true)"
-
-    Raises:
-        ValueError: If *value* is not a well-formed UUID.
-    """
-    try:
-        return str(uuid.UUID(value))
-    except (ValueError, AttributeError, TypeError) as exc:
-        raise ValueError(f"invalid OData Edm.Guid key: {value!r}") from exc
 
 
 # ---------------------------------------------------------------------------

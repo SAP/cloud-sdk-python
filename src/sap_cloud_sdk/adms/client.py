@@ -15,28 +15,23 @@ This module composes them into the high-level :class:`AdmsClient` /
 
 Usage::
 
-    from sap_cloud_sdk.adms import (
-        create_client,
-        create_async_client,
-        RelationQueryOptions,
-    )
+    from sap_cloud_sdk.adms import create_client, create_async_client, StructuredQuery
+    from sap_cloud_sdk.core.odata import FilterExpression
 
     # Sync (service-to-service)
     client = create_client()
     relations = client.relations.get_all(
-        RelationQueryOptions(
-            filter="HostBusinessObjectNodeID eq 'PO-4500012345'",
-            expand=["Document"],
-        )
+        StructuredQuery()
+        .filter(FilterExpression.field("HostBusinessObjectNodeID").eq("PO-4500012345"))
+        .expand("Document")
     )
 
     # Async (FastAPI / LangGraph)
     async with create_async_client() as client:
         relations = await client.relations.get_all(
-            RelationQueryOptions(
-                filter="HostBusinessObjectNodeID eq 'PO-4500012345'",
-                expand=["Document"],
-            )
+            StructuredQuery()
+            .filter(FilterExpression.field("HostBusinessObjectNodeID").eq("PO-4500012345"))
+            .expand("Document")
         )
 """
 

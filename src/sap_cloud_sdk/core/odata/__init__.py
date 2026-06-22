@@ -2,7 +2,11 @@
 
 from sap_cloud_sdk.core.odata._async_transport import AsyncODataHttpTransport
 from sap_cloud_sdk.core.odata._factory import odata_transport_from_destination
-from sap_cloud_sdk.core.odata._filter import FilterExpression
+from sap_cloud_sdk.core.odata._filter import (
+    FilterExpression,
+    quote_odata_guid_key,
+    quote_odata_string_key,
+)
 from sap_cloud_sdk.core.odata._models import ODataEntity
 from sap_cloud_sdk.core.odata._pagination import ODataPageIterator
 from sap_cloud_sdk.core.odata._query import OrderDirection, StructuredQuery
@@ -45,4 +49,6 @@ __all__ = [
     "StructuredQuery",
     "UpdateRequestBuilder",
     "odata_transport_from_destination",
+    "quote_odata_guid_key",
+    "quote_odata_string_key",
 ]

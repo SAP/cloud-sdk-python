@@ -11,6 +11,7 @@ from sap_cloud_sdk.adms._http import (
     build_doctype_botype_map_key_path,
     build_document_type_key_path,
 )
+from sap_cloud_sdk.core.odata._filter import quote_odata_guid_key as _quote_guid
 from sap_cloud_sdk.adms._models import (
     AllowedDomain,
     ApplicationTenant,
@@ -28,8 +29,8 @@ from sap_cloud_sdk.adms._models import (
     UpdateBusinessObjectNodeTypeInput,
     UpdateDocumentTypeInput,
 )
-from sap_cloud_sdk.adms._query_options import ConfigQueryOptions
 from sap_cloud_sdk.adms.config import _CONFIG_SERVICE_PATH
+from sap_cloud_sdk.core.odata._query import StructuredQuery
 from sap_cloud_sdk.core.telemetry import Module, Operation, record_metrics
 
 
@@ -45,10 +46,10 @@ class _ConfigurationApi:
     @record_metrics(Module.ADMS, Operation.ADMS_CONFIG_GET_ALL_ALLOWED_DOMAINS)
     def get_all_allowed_domains(
         self,
-        options: ConfigQueryOptions | None = None,
+        options: StructuredQuery | None = None,
     ) -> list[AllowedDomain]:
         """Return all allowed-domain entries visible to the current tenant."""
-        params = options.to_query_params() if options else {}
+        params = options.to_params() if options else {}
         resp = self._http.get(
             "AllowedDomain", params=params, service_base=_CONFIG_SERVICE_PATH
         )
@@ -96,10 +97,10 @@ class _ConfigurationApi:
     @record_metrics(Module.ADMS, Operation.ADMS_CONFIG_GET_ALL_DOCUMENT_TYPES)
     def get_all_document_types(
         self,
-        options: ConfigQueryOptions | None = None,
+        options: StructuredQuery | None = None,
     ) -> list[DocumentType]:
         """Return all document type classifications."""
-        params = options.to_query_params() if options else {}
+        params = options.to_params() if options else {}
         resp = self._http.get(
             "DocumentType", params=params, service_base=_CONFIG_SERVICE_PATH
         )
@@ -147,10 +148,10 @@ class _ConfigurationApi:
     @record_metrics(Module.ADMS, Operation.ADMS_CONFIG_GET_ALL_BUSINESS_OBJECT_TYPES)
     def get_all_business_object_types(
         self,
-        options: ConfigQueryOptions | None = None,
+        options: StructuredQuery | None = None,
     ) -> list[BusinessObjectNodeType]:
         """Return all registered business object node types."""
-        params = options.to_query_params() if options else {}
+        params = options.to_params() if options else {}
         resp = self._http.get(
             "BusinessObjectNodeType", params=params, service_base=_CONFIG_SERVICE_PATH
         )
@@ -215,10 +216,10 @@ class _ConfigurationApi:
     @record_metrics(Module.ADMS, Operation.ADMS_CONFIG_GET_ALL_DOCTYPE_BOTYPE_MAPS)
     def get_type_mappings(
         self,
-        options: ConfigQueryOptions | None = None,
+        options: StructuredQuery | None = None,
     ) -> list[DocumentTypeBusinessObjectTypeMap]:
         """Return all DocumentType ↔ BusinessObjectNodeType mappings."""
-        params = options.to_query_params() if options else {}
+        params = options.to_params() if options else {}
         resp = self._http.get(
             "DocumentTypeBusinessObjectTypeMap",
             params=params,
@@ -273,10 +274,10 @@ class _ConfigurationApi:
 
     @record_metrics(Module.ADMS, Operation.ADMS_CONFIG_GET_ALL_FILE_EXT_POLICIES)
     def get_all_file_extension_policies(
-        self, options: ConfigQueryOptions | None = None
+        self, options: StructuredQuery | None = None
     ) -> list[FileExtensionPolicy]:
         """Return all file extension allow/block policies."""
-        params = options.to_query_params() if options else {}
+        params = options.to_params() if options else {}
         resp = self._http.get(
             "FileExtensionPolicy", params=params, service_base=_CONFIG_SERVICE_PATH
         )
@@ -319,10 +320,10 @@ class _ConfigurationApi:
 
     @record_metrics(Module.ADMS, Operation.ADMS_CONFIG_GET_ALL_APP_TENANTS)
     def get_all_application_tenants(
-        self, options: ConfigQueryOptions | None = None
+        self, options: StructuredQuery | None = None
     ) -> list[ApplicationTenant]:
         """Return all application tenant configurations."""
-        params = options.to_query_params() if options else {}
+        params = options.to_params() if options else {}
         resp = self._http.get(
             "ApplicationTenant", params=params, service_base=_CONFIG_SERVICE_PATH
         )
@@ -360,13 +361,6 @@ class _ConfigurationApi:
         )
 
 
-def _quote_guid(value: str) -> str:
-    """Wrap a UUID value in the OData Edm.Guid format for key segments."""
-    from sap_cloud_sdk.adms._http import quote_odata_guid_key
-
-    return quote_odata_guid_key(value)
-
-
 class _AsyncConfigurationApi:
     """Async version of :class:`_ConfigurationApi`.
 
@@ -379,10 +373,10 @@ class _AsyncConfigurationApi:
     @record_metrics(Module.ADMS, Operation.ADMS_CONFIG_GET_ALL_ALLOWED_DOMAINS)
     async def get_all_allowed_domains(
         self,
-        options: ConfigQueryOptions | None = None,
+        options: StructuredQuery | None = None,
     ) -> list[AllowedDomain]:
         """Async variant of :meth:`_ConfigurationApi.get_all_allowed_domains` — same semantics."""
-        params = options.to_query_params() if options else {}
+        params = options.to_params() if options else {}
         resp = await self._http.get(
             "AllowedDomain", params=params, service_base=_CONFIG_SERVICE_PATH
         )
@@ -432,10 +426,10 @@ class _AsyncConfigurationApi:
     @record_metrics(Module.ADMS, Operation.ADMS_CONFIG_GET_ALL_DOCUMENT_TYPES)
     async def get_all_document_types(
         self,
-        options: ConfigQueryOptions | None = None,
+        options: StructuredQuery | None = None,
     ) -> list[DocumentType]:
         """Async variant of :meth:`_ConfigurationApi.get_all_document_types` — same semantics."""
-        params = options.to_query_params() if options else {}
+        params = options.to_params() if options else {}
         resp = await self._http.get(
             "DocumentType", params=params, service_base=_CONFIG_SERVICE_PATH
         )
@@ -485,10 +479,10 @@ class _AsyncConfigurationApi:
     @record_metrics(Module.ADMS, Operation.ADMS_CONFIG_GET_ALL_BUSINESS_OBJECT_TYPES)
     async def get_all_business_object_types(
         self,
-        options: ConfigQueryOptions | None = None,
+        options: StructuredQuery | None = None,
     ) -> list[BusinessObjectNodeType]:
         """Async variant of :meth:`_ConfigurationApi.get_all_business_object_types` — same semantics."""
-        params = options.to_query_params() if options else {}
+        params = options.to_params() if options else {}
         resp = await self._http.get(
             "BusinessObjectNodeType", params=params, service_base=_CONFIG_SERVICE_PATH
         )
@@ -553,10 +547,10 @@ class _AsyncConfigurationApi:
     @record_metrics(Module.ADMS, Operation.ADMS_CONFIG_GET_ALL_DOCTYPE_BOTYPE_MAPS)
     async def get_type_mappings(
         self,
-        options: ConfigQueryOptions | None = None,
+        options: StructuredQuery | None = None,
     ) -> list[DocumentTypeBusinessObjectTypeMap]:
         """Async variant of :meth:`_ConfigurationApi.get_type_mappings` — same semantics."""
-        params = options.to_query_params() if options else {}
+        params = options.to_params() if options else {}
         resp = await self._http.get(
             "DocumentTypeBusinessObjectTypeMap",
             params=params,
@@ -609,10 +603,10 @@ class _AsyncConfigurationApi:
 
     @record_metrics(Module.ADMS, Operation.ADMS_CONFIG_GET_ALL_FILE_EXT_POLICIES)
     async def get_all_file_extension_policies(
-        self, options: ConfigQueryOptions | None = None
+        self, options: StructuredQuery | None = None
     ) -> list[FileExtensionPolicy]:
         """Async variant of :meth:`_ConfigurationApi.get_all_file_extension_policies` — same semantics."""
-        params = options.to_query_params() if options else {}
+        params = options.to_params() if options else {}
         resp = await self._http.get(
             "FileExtensionPolicy", params=params, service_base=_CONFIG_SERVICE_PATH
         )
@@ -653,10 +647,10 @@ class _AsyncConfigurationApi:
 
     @record_metrics(Module.ADMS, Operation.ADMS_CONFIG_GET_ALL_APP_TENANTS)
     async def get_all_application_tenants(
-        self, options: ConfigQueryOptions | None = None
+        self, options: StructuredQuery | None = None
     ) -> list[ApplicationTenant]:
         """Async variant of :meth:`_ConfigurationApi.get_all_application_tenants` — same semantics."""
-        params = options.to_query_params() if options else {}
+        params = options.to_params() if options else {}
         resp = await self._http.get(
             "ApplicationTenant", params=params, service_base=_CONFIG_SERVICE_PATH
         )

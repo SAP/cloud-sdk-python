@@ -1,6 +1,6 @@
 """Public content-filtering API for SAP AI Core Orchestration v2.
 
-Everything a caller needs to configure filtering lives here:
+Everything related to filtering lives in this single module:
 
 - ``Severity`` enum (threshold values).
 - Filter providers: ``ContentFilter`` (base), ``AzureContentFilter``,
@@ -8,25 +8,75 @@ Everything a caller needs to configure filtering lives here:
 - Direction containers: ``InputFiltering``, ``OutputFiltering``,
   ``ContentFiltering``.
 - Entry points: ``set_filtering()``, ``disable_filtering()``.
+- LiteLLM patch: ``FilteringOrchestrationConfig``, ``_install()``.
+- Exception parser: ``extract_filter_blocked()``.
 
-The package's ``__init__`` re-exports these names so users can import flat
-from :mod:`sap_cloud_sdk.aicore`; this module is the source of truth for
-the public surface.
+The package's ``__init__`` re-exports the public names so users can import
+flat from :mod:`sap_cloud_sdk.aicore`; this module is the source of truth.
 
-Internal-only pieces — ``_litellm_patch`` (LiteLLM monkeypatch and
-``_install``) and ``exceptions`` (error types) — live in sibling files.
+Internal-only error types live in :mod:`.exceptions`.
 """
 
 from __future__ import annotations
 
+import json
+import logging
+import os
 from enum import IntEnum
+from typing import Any
 
-from sap_cloud_sdk.core.env import read_env_bool, read_env_choice, read_env_str
+import litellm
+from litellm.llms.sap.chat.transformation import GenAIHubOrchestrationConfig
+from litellm.types.utils import ModelResponse
+
 from sap_cloud_sdk.core.telemetry.metrics_decorator import record_metrics
 from sap_cloud_sdk.core.telemetry.module import Module
 from sap_cloud_sdk.core.telemetry.operation import Operation
 
-from ._litellm_patch import _install
+from .exceptions import ContentFilteredError
+
+logger = logging.getLogger(__name__)
+
+
+# ---------------------------------------------------------------------------
+# Typed env-var helpers (used by ContentFiltering.from_env)
+# ---------------------------------------------------------------------------
+
+_TRUTHY = frozenset({"true", "1", "yes"})
+
+
+def _read_env_str(key: str, default: str = "") -> str:
+    """Read a string env var. Trims whitespace. Returns ``default`` if absent."""
+    raw = os.environ.get(key)
+    return raw.strip() if raw is not None else default
+
+
+def _read_env_bool(key: str, default: bool = False) -> bool:
+    """Read a boolean env var.
+
+    ``true``/``1``/``yes`` (case-insensitive) are True; anything else is False.
+    Returns ``default`` if the variable is absent.
+    """
+    raw = os.environ.get(key)
+    return (raw.strip().lower() in _TRUTHY) if raw is not None else default
+
+
+def _read_env_choice(key: str, choices: set[int], default: int) -> int:
+    """Read an int env var, validate membership in ``choices``.
+
+    Returns ``default`` when the variable is absent. Raises ``ValueError`` if
+    the value cannot be parsed as ``int`` or is not in ``choices``.
+    """
+    raw = os.environ.get(key)
+    if raw is None:
+        return default
+    try:
+        value = int(raw.strip())
+    except ValueError as e:
+        raise ValueError(f"{key} must be one of {sorted(choices)}, got {raw!r}") from e
+    if value not in choices:
+        raise ValueError(f"{key} must be one of {sorted(choices)}, got {value}")
+    return value
 
 
 # ---------------------------------------------------------------------------
@@ -261,25 +311,25 @@ class ContentFiltering:
             AICORE_FILTER_SELF_HARM     (int 0/2/4/6, default 4)
             AICORE_FILTER_PROMPT_SHIELD (bool, default true) — input-only
         """
-        if not read_env_bool("AICORE_FILTER_ENABLED", default=True):
+        if not _read_env_bool("AICORE_FILTER_ENABLED", default=True):
             return None
 
-        directions_raw = read_env_str("AICORE_FILTER_DIRECTIONS", "input,output")
+        directions_raw = _read_env_str("AICORE_FILTER_DIRECTIONS", "input,output")
         directions = {d.strip() for d in directions_raw.split(",") if d.strip()}
 
         hate = Severity(
-            read_env_choice("AICORE_FILTER_HATE", _VALID_SEVERITIES, default=4)
+            _read_env_choice("AICORE_FILTER_HATE", _VALID_SEVERITIES, default=4)
         )
         violence = Severity(
-            read_env_choice("AICORE_FILTER_VIOLENCE", _VALID_SEVERITIES, default=4)
+            _read_env_choice("AICORE_FILTER_VIOLENCE", _VALID_SEVERITIES, default=4)
         )
         sexual = Severity(
-            read_env_choice("AICORE_FILTER_SEXUAL", _VALID_SEVERITIES, default=4)
+            _read_env_choice("AICORE_FILTER_SEXUAL", _VALID_SEVERITIES, default=4)
         )
         self_harm = Severity(
-            read_env_choice("AICORE_FILTER_SELF_HARM", _VALID_SEVERITIES, default=4)
+            _read_env_choice("AICORE_FILTER_SELF_HARM", _VALID_SEVERITIES, default=4)
         )
-        prompt_shield = read_env_bool("AICORE_FILTER_PROMPT_SHIELD", default=True)
+        prompt_shield = _read_env_bool("AICORE_FILTER_PROMPT_SHIELD", default=True)
 
         input_filtering: InputFiltering | None = None
         if "input" in directions:
@@ -312,6 +362,164 @@ class ContentFiltering:
             input_filtering=input_filtering,
             output_filtering=output_filtering,
         )
+
+
+# ---------------------------------------------------------------------------
+# LiteLLM transport patch
+# ---------------------------------------------------------------------------
+#
+# Patches ``litellm.GenAIHubOrchestrationConfig`` with a subclass that:
+# - Injects ``modules.filtering`` into every v2 completion request body
+# - Detects filter rejections in responses and raises ``ContentFilteredError``
+#
+# The patch is applied by ``_install(cfg)`` and undone by ``_install(None)``.
+# It is idempotent — calling it multiple times with the same config is safe.
+#
+# Two filter rejection shapes (from the v2 API) are handled:
+# - Input rejection: HTTP 4xx, ``error.location`` startswith
+#   ``"Filtering Module - Input Filter"`` (content-filtering.md L130-162)
+# - Output rejection: HTTP 200, ``finish_reason == "content_filter"``,
+#   empty ``message.content`` (content-filtering.md L234-303)
+#
+# LiteLLM's ``raise_for_status()`` turns 4xx responses into
+# ``httpx.HTTPStatusError`` before ``transform_response`` is reached,
+# so input-filter 400s arrive wrapped in a ``litellm.APIConnectionError``
+# with the JSON embedded in the exception message.
+# ``extract_filter_blocked()`` handles that case.
+
+# Keep the original so _install(None) can restore it.
+_ORIGINAL_CONFIG = litellm.GenAIHubOrchestrationConfig
+
+_active_cfg: Any = None  # ContentFiltering | None, stored at module level
+
+
+class FilteringOrchestrationConfig(GenAIHubOrchestrationConfig):
+    """GenAIHubOrchestrationConfig subclass that injects content filtering."""
+
+    def transform_request(
+        self,
+        model: str,
+        messages: list,
+        optional_params: dict,
+        litellm_params: dict,
+        headers: dict,
+    ) -> dict:
+        body = super().transform_request(
+            model=model,
+            messages=messages,
+            optional_params=optional_params,
+            litellm_params=litellm_params,
+            headers=headers,
+        )
+
+        if _active_cfg is None:
+            return body
+
+        filtering_dict = _active_cfg.to_dict()
+        if not filtering_dict:
+            return body
+
+        modules = body["config"]["modules"]
+        if isinstance(modules, list):
+            # Fallback mode (list of configs) — inject into primary config only.
+            modules[0]["filtering"] = filtering_dict
+        else:
+            modules["filtering"] = filtering_dict
+
+        return body
+
+    def transform_response(
+        self,
+        model: str,
+        raw_response: Any,
+        model_response: ModelResponse,
+        logging_obj: Any,
+        request_data: dict,
+        messages: list,
+        optional_params: dict,
+        litellm_params: dict,
+        encoding: Any,
+        api_key: str | None = None,
+        json_mode: bool | None = None,
+    ) -> ModelResponse:
+        status = raw_response.status_code
+
+        # Input-filter rejection (HTTP 4xx).
+        # content-filtering.md L130-162: error.location identifies the filter module.
+        if 400 <= status < 500:
+            try:
+                body = raw_response.json()
+            except ValueError:
+                # Response wasn't JSON (gateway error page, plain-text 5xx,
+                # truncated body, etc.) — not a filter rejection, fall through
+                # to LiteLLM's default handling.
+                body = None
+            if body is not None:
+                err = body.get("error", {})
+                if (err.get("location") or "").startswith(
+                    "Filtering Module - Input Filter"
+                ):
+                    data = (
+                        err.get("intermediate_results", {})
+                        .get("input_filtering", {})
+                        .get("data", {})
+                    )
+                    raise ContentFilteredError(
+                        direction="input",
+                        details=data,
+                        request_id=err.get("request_id"),
+                    )
+
+        # Output-filter rejection (HTTP 200 + finish_reason == "content_filter").
+        # content-filtering.md L234-303: message.content is "" (empty, not absent).
+        if status == 200:
+            try:
+                payload = raw_response.json()
+            except ValueError:
+                # Response wasn't JSON — pass through to LiteLLM.
+                payload = None
+            if payload is not None:
+                choices = (payload.get("final_result") or {}).get("choices") or []
+                if choices and choices[0].get("finish_reason") == "content_filter":
+                    data = (
+                        payload.get("intermediate_results", {})
+                        .get("output_filtering", {})
+                        .get("data", {})
+                    )
+                    raise ContentFilteredError(
+                        direction="output",
+                        details=data,
+                        request_id=payload.get("request_id"),
+                    )
+
+        return super().transform_response(
+            model=model,
+            raw_response=raw_response,
+            model_response=model_response,
+            logging_obj=logging_obj,
+            request_data=request_data,
+            messages=messages,
+            optional_params=optional_params,
+            litellm_params=litellm_params,
+            encoding=encoding,
+            api_key=api_key,
+            json_mode=json_mode,
+        )
+
+
+def _install(cfg: Any) -> None:  # cfg: ContentFiltering | None
+    """Patch litellm.GenAIHubOrchestrationConfig. Idempotent.
+
+    cfg=None restores the original config and disables filtering.
+    """
+    global _active_cfg
+    _active_cfg = cfg
+    if cfg is None:
+        litellm.GenAIHubOrchestrationConfig = _ORIGINAL_CONFIG
+        logger.debug("content filtering disabled")
+    else:
+        litellm.GenAIHubOrchestrationConfig = FilteringOrchestrationConfig
+        logger.info("content filtering active (FilteringOrchestrationConfig)")
 
 
 # ---------------------------------------------------------------------------
@@ -363,3 +571,42 @@ def disable_filtering() -> None:
     Idempotent — safe to call when filtering is already disabled.
     """
     _install(None)
+
+
+@record_metrics(Module.AICORE, Operation.AICORE_EXTRACT_FILTER_BLOCKED)
+def extract_filter_blocked(exc: Exception) -> ContentFilteredError | None:
+    """Parse a LiteLLM APIConnectionError for an input-filter rejection.
+
+    When Azure Content Safety blocks the input, LiteLLM's ``raise_for_status()``
+    converts the 400 into an ``httpx.HTTPStatusError``, which is then wrapped
+    into a ``litellm.APIConnectionError`` with the original JSON embedded in
+    the exception message string. This function extracts it.
+
+    Returns None if the exception is not a content-filter rejection.
+
+    A telemetry event is emitted on every call, including calls where the
+    exception was not a content-filter rejection (returns ``None``).
+    """
+    msg = str(exc)
+    brace = msg.find("{")
+    if brace == -1:
+        return None
+    try:
+        payload = json.loads(msg[brace:])
+        err = payload.get("error", {})
+        if not (err.get("location") or "").startswith(
+            "Filtering Module - Input Filter"
+        ):
+            return None
+        data = (
+            err.get("intermediate_results", {})
+            .get("input_filtering", {})
+            .get("data", {})
+        )
+        return ContentFilteredError(
+            direction="input",
+            details=data,
+            request_id=err.get("request_id"),
+        )
+    except Exception:
+        return None

@@ -1,4 +1,4 @@
-"""Unit tests for aicore.filtering._litellm_patch."""
+"""Unit tests for the LiteLLM patch (FilteringOrchestrationConfig, _install, extract_filter_blocked)."""
 
 import json
 import pytest
@@ -9,11 +9,9 @@ import httpx
 from sap_cloud_sdk.aicore.filtering.filters import (
     AzureContentFilter,
     ContentFiltering,
+    FilteringOrchestrationConfig,
     InputFiltering,
     OutputFiltering,
-)
-from sap_cloud_sdk.aicore.filtering._litellm_patch import (
-    FilteringOrchestrationConfig,
     _install,
     _ORIGINAL_CONFIG,
     extract_filter_blocked,
@@ -124,7 +122,7 @@ class TestTransformRequest:
     def _call(self, filtering):
         _install(filtering)
         with patch(
-            "sap_cloud_sdk.aicore.filtering._litellm_patch.GenAIHubOrchestrationConfig.transform_request",
+            "sap_cloud_sdk.aicore.filtering.filters.GenAIHubOrchestrationConfig.transform_request",
             return_value=self._fresh_base_body(),
         ):
             return FilteringOrchestrationConfig().transform_request(
@@ -174,7 +172,7 @@ class TestTransformResponse:
         from litellm.types.utils import ModelResponse
 
         with patch(
-            "sap_cloud_sdk.aicore.filtering._litellm_patch.GenAIHubOrchestrationConfig.transform_response",
+            "sap_cloud_sdk.aicore.filtering.filters.GenAIHubOrchestrationConfig.transform_response",
             return_value=ModelResponse(),
         ):
             return FilteringOrchestrationConfig().transform_response(

@@ -13,7 +13,7 @@ from sap_cloud_sdk.aicore.filtering import (
     disable_filtering,
     set_filtering,
 )
-from sap_cloud_sdk.aicore.filtering._litellm_patch import (
+from sap_cloud_sdk.aicore.filtering.filters import (
     _ORIGINAL_CONFIG,
     FilteringOrchestrationConfig,
     _install,
@@ -54,9 +54,9 @@ class TestSetFiltering:
             )
         )
         set_filtering(cfg)
-        from sap_cloud_sdk.aicore.filtering import _litellm_patch
+        from sap_cloud_sdk.aicore.filtering import filters as _filters_mod
 
-        active = _litellm_patch._active_cfg
+        active = _filters_mod._active_cfg
         assert active is not None
         assert active.input_filtering.filters[0].config["self_harm"] == 0
 
@@ -71,9 +71,9 @@ class TestSetFiltering:
         _clear_aicore_env(monkeypatch)
         monkeypatch.setenv("AICORE_FILTER_ENABLED", "false")
         set_filtering()
-        from sap_cloud_sdk.aicore.filtering import _litellm_patch
+        from sap_cloud_sdk.aicore.filtering import filters as _filters_mod
 
-        assert _litellm_patch._active_cfg is None
+        assert _filters_mod._active_cfg is None
 
     def test_explicit_config_ignores_enabled_false_env(self, monkeypatch):
         # Policy: an explicit ContentFiltering object always activates filtering,
@@ -102,9 +102,9 @@ class TestSetFiltering:
             )
         )
         set_filtering(cfg)
-        from sap_cloud_sdk.aicore.filtering import _litellm_patch
+        from sap_cloud_sdk.aicore.filtering import filters as _filters_mod
 
-        filters = _litellm_patch._active_cfg.input_filtering.filters
+        filters = _filters_mod._active_cfg.input_filtering.filters
         assert len(filters) == 2
         assert filters[0].provider == "azure_content_safety"
         assert filters[1].provider == "llama_guard_3_8b"
@@ -128,8 +128,8 @@ class TestDisableFiltering:
         # disable_filtering() before any set_filtering() is a clean no-op:
         # litellm config stays at the original AND _active_cfg stays cleared.
         _clear_aicore_env(monkeypatch)
-        from sap_cloud_sdk.aicore.filtering import _litellm_patch
+        from sap_cloud_sdk.aicore.filtering import filters as _filters_mod
 
         disable_filtering()
         assert litellm.GenAIHubOrchestrationConfig is _ORIGINAL_CONFIG
-        assert _litellm_patch._active_cfg is None
+        assert _filters_mod._active_cfg is None

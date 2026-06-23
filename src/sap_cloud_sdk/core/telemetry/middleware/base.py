@@ -1,21 +1,11 @@
-"""Public base class for explicit middleware adapters (deprecated path)."""
+"""Abstract base class for telemetry middleware adapters."""
 
 from abc import ABC, abstractmethod
 from typing import Any, Dict
-from typing_extensions import deprecated
 
 
-@deprecated(
-    "TelemetryMiddleware is deprecated and will be removed in the next major version. "
-    "Call auto_instrument() without middlewares= instead."
-)
 class TelemetryMiddleware(ABC):
-    """Abstract base for explicit HTTP framework middleware.
-
-    .. deprecated::
-        Use ``auto_instrument()`` without ``middlewares=`` instead.
-        ``TelemetryMiddleware`` and the explicit ``middlewares=`` parameter will
-        be removed in the next major version.
+    """Abstract base for HTTP framework middleware that extracts telemetry attributes.
 
     Implementations register with their application via ``register()``, extract
     per-request attributes into a ContextVar during each request, and expose them
@@ -29,4 +19,9 @@ class TelemetryMiddleware(ABC):
 
     @abstractmethod
     def get_attributes(self) -> Dict[str, Any]:
-        """Return middleware-extracted attributes for the current request context."""
+        """Return middleware-extracted attributes for the current request context.
+
+        Returns:
+            Dict of attribute key-value pairs set during the current request,
+            or an empty dict when called outside a request context.
+        """

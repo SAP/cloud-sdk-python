@@ -3,7 +3,6 @@
 import logging
 from contextvars import ContextVar
 from typing import Any, Dict
-from typing_extensions import deprecated
 
 from sap_cloud_sdk.core.telemetry.constants import (
     ATTR_SAP_TRIGGER_TYPE,
@@ -39,16 +38,28 @@ class _IASMiddleware(BaseHTTPMiddleware):
             self._attrs_var.reset(token)
 
 
-@deprecated(
-    "StarletteIASTelemetryMiddleware is deprecated and will be removed in the next major version. "
-    "Call auto_instrument() before creating your Starlette app instead — "
-    "IAS middleware is registered automatically."
-)
 class StarletteIASTelemetryMiddleware(TelemetryMiddleware):
-    """Starlette middleware that extracts IAS JWT claims as telemetry attributes.
+    """Starlette/FastAPI middleware that extracts IAS JWT claims as telemetry attributes.
+
+    Reads the ``Authorization: Bearer <token>`` header on each request,
+    parses it as an IAS JWT, and exposes the following as span attributes:
+      - ``sap.tenancy.tenant_id`` from the ``sap_gtid`` claim
+      - ``user.id``               from the ``user_uuid`` claim
 
     If the header is absent or the token cannot be parsed, no attributes are set
     and the request continues normally.
+
+    Each instance owns its own ContextVar to prevent cross-talk when multiple
+    middleware instances are registered on the same app.
+
+    Usage::
+
+        from starlette.applications import Starlette
+        from sap_cloud_sdk.core.telemetry import auto_instrument
+        from sap_cloud_sdk.core.telemetry.middleware import StarletteIASTelemetryMiddleware
+
+        app = Starlette(...)
+        auto_instrument(middlewares=[StarletteIASTelemetryMiddleware(app=app)])
     """
 
     def __init__(self, app: Any) -> None:

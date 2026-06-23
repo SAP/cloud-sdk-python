@@ -1,4 +1,4 @@
-"""Internal: zero-config IAS telemetry instrumentation for Starlette.
+"""Internal: zero-config IAS telemetry instrumentation for Starlette and FastAPI.
 
 Patches ``starlette.applications.Starlette`` via class substitution so that
 any app created after ``auto_instrument()`` automatically gets the IAS JWT
@@ -7,13 +7,17 @@ middleware — no ``app=`` reference required from the user.
 Composes safely with the OpenTelemetry Kubernetes operator: whichever patch
 runs first becomes the base class of the other, so both ``add_middleware``
 calls fire via ``super().__init__()`` regardless of ordering.
+
+This is an internal SDK module — not part of the public API.
 """
 
 import logging
 from contextvars import ContextVar
 from typing import Any, Dict
 
-from sap_cloud_sdk.core.telemetry.middleware._framework_instrumentor import FrameworkInstrumentor
+from sap_cloud_sdk.core.telemetry.middleware._framework_instrumentor import (
+    FrameworkInstrumentor,
+)
 from sap_cloud_sdk.core.telemetry.middleware._registry import _register
 from sap_cloud_sdk.core.telemetry.middleware.starlette_a2a import (
     StarletteIASTelemetryMiddleware,
@@ -26,6 +30,8 @@ _attrs_var: ContextVar[Dict[str, Any]] = ContextVar("_sap_ias_attrs", default={}
 
 @_register
 class _StarletteIASInstrumentor(FrameworkInstrumentor):
+    """Instruments Starlette and FastAPI with IAS JWT telemetry middleware."""
+
     _original: Any = None
     supersedes = StarletteIASTelemetryMiddleware
 

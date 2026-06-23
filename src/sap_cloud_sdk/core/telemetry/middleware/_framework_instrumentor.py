@@ -1,54 +1,43 @@
-"""Internal base class for framework auto-instrumentation adapters."""
+"""Internal: auto-instrumentation adapter base class.
+
+This is an internal SDK module — not part of the public API. Contributors
+who want to add zero-config instrumentation for additional frameworks
+should subclass ``FrameworkInstrumentor`` here and register it via the
+``_registry`` module.
+"""
 
 import logging
 from abc import ABC, abstractmethod
-from typing import Any, Dict, TYPE_CHECKING
+from typing import Any, Dict, Optional, Type
 
-if TYPE_CHECKING:
-    from sap_cloud_sdk.core.telemetry.middleware.base import TelemetryMiddleware
+from sap_cloud_sdk.core.telemetry.middleware.base import TelemetryMiddleware
 
 logger = logging.getLogger(__name__)
 
 
 class FrameworkInstrumentor(ABC):
-    """Auto-instrumentation adapter for a specific web framework.
-
-    Internal to the SDK — not part of the public API.
+    """Internal auto-instrumentation adapter for a specific web framework.
 
     Subclasses patch the framework at the class level so that any application
-    created after ``instrument()`` is called automatically gets IAS telemetry
-    middleware — no ``app=`` reference required.
+    created after ``instrument()`` is called automatically gets the IAS
+    telemetry middleware.
 
-    The idempotency guard lives here so subclasses never need to implement it.
-    Subclasses implement ``_do_instrument`` / ``_do_uninstrument`` only.
+    The idempotency guard lives in the base class so subclasses never need
+    to implement it. Subclasses implement ``_do_instrument`` and
+    ``_do_uninstrument`` only.
 
-    To add support for a new framework, create a new module under
-    ``sap_cloud_sdk.core.telemetry.middleware`` (prefixed with ``_``) and
-    decorate the class with ``@_register``::
-
-        from sap_cloud_sdk.core.telemetry.middleware._registry import _register
-        from sap_cloud_sdk.core.telemetry.middleware._framework_instrumentor import FrameworkInstrumentor
-
-        @_register
-        class _DjangoIASInstrumentor(FrameworkInstrumentor):
-            @classmethod
-            def is_available(cls) -> bool:
-                try:
-                    import django  # noqa: F401
-                    return True
-                except ImportError:
-                    return False
-
-            def _do_instrument(self) -> None: ...
-            def _do_uninstrument(self) -> None: ...
-            def get_attributes(self) -> Dict[str, Any]: ...
+    To enable overlap detection against a manually-passed
+    ``TelemetryMiddleware``, set ``supersedes`` to the corresponding
+    middleware class. ``auto_instrument()`` will then skip this instrumentor
+    if the user passes an instance of that middleware via ``middlewares=``.
     """
 
     _instrumented: bool = False
     _processor_registered: bool = False
-    supersedes: "type[TelemetryMiddleware] | None" = None
+    supersedes: Optional[Type[TelemetryMiddleware]] = None
 
     def instrument(self) -> None:
+        """Patch the framework. Idempotent — safe to call multiple times."""
         if self.__class__._instrumented:
             logger.debug("%s already instrumented, skipping", type(self).__name__)
             return
@@ -57,6 +46,7 @@ class FrameworkInstrumentor(ABC):
         logger.info("Instrumented %s", type(self).__name__)
 
     def uninstrument(self) -> None:
+        """Restore the framework to its original state. Idempotent."""
         if not self.__class__._instrumented:
             return
         self._do_uninstrument()
@@ -70,10 +60,13 @@ class FrameworkInstrumentor(ABC):
         return False
 
     @abstractmethod
-    def _do_instrument(self) -> None: ...
+    def _do_instrument(self) -> None:
+        """Perform the actual framework patch."""
 
     @abstractmethod
-    def _do_uninstrument(self) -> None: ...
+    def _do_uninstrument(self) -> None:
+        """Restore the framework to its pre-patch state."""
 
     @abstractmethod
-    def get_attributes(self) -> Dict[str, Any]: ...
+    def get_attributes(self) -> Dict[str, Any]:
+        """Return IAS attributes extracted from the current request context."""

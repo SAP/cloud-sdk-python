@@ -1,6 +1,5 @@
 import logging
 import os
-import warnings
 from collections.abc import Mapping
 
 from sap_cloud_sdk.core.telemetry.middleware.base import TelemetryMiddleware
@@ -44,10 +43,7 @@ def auto_instrument(
     middlewares: list[TelemetryMiddleware] | None = None,
 ):
     """
-    Initialize meta-instrumentation for GenAI tracing.
-
-    Should be called before importing your Starlette/FastAPI app so that
-    IAS JWT telemetry middleware is registered automatically.
+    Initialize meta-instrumentation for GenAI tracing. Should be initialized before any AI frameworks.
 
     Traces are exported to the OTEL collector endpoint configured in environment with
     OTEL_EXPORTER_OTLP_ENDPOINT, or printed to console when OTEL_TRACES_EXPORTER=console.
@@ -56,19 +52,13 @@ def auto_instrument(
         disable_batch: If True, uses SimpleSpanProcessor (synchronous, lower throughput).
                        Defaults to False, which uses BatchSpanProcessor (asynchronous,
                        recommended for production workloads).
-        middlewares: Deprecated. Pass explicit TelemetryMiddleware instances.
-                     Use auto_instrument() without this parameter instead — IAS middleware
-                     is now registered automatically for supported frameworks.
-                     Will be removed in the next major version.
+        middlewares: Optional list of TelemetryMiddleware instances. When provided,
+                     each middleware is registered with its application and a
+                     MiddlewareSpanProcessor is added so that headers extracted by
+                     the middlewares appear as attributes on every span.
+                     Must be called before the ASGI application begins serving
+                     requests so that register() runs before the first request.
     """
-    if middlewares is not None:
-        warnings.warn(
-            "The middlewares= parameter of auto_instrument() is deprecated and will be "
-            "removed in the next major version. Call auto_instrument() without it — "
-            "IAS middleware is now registered automatically for supported frameworks.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
     otel_endpoint = os.getenv(ENV_OTLP_ENDPOINT, "")
     console_traces = os.getenv(ENV_TRACES_EXPORTER, "").lower() == "console"
 
@@ -183,27 +173,29 @@ def _auto_instrument_frameworks(
         )
         return
 
-    manual_types = {type(m) for m in (middlewares or [])}
+    manual_middlewares = list(middlewares or [])
 
+    def _is_superseded(instr) -> bool:
+        cls = instr.__class__.supersedes
+        return cls is not None and any(isinstance(m, cls) for m in manual_middlewares)
+
+    candidates = _get_available()
     instrumentors = [
-        i for i in _get_available()
-        if not i.__class__._processor_registered
-        and not (i.__class__.supersedes and i.__class__.supersedes in manual_types)
+        i for i in candidates
+        if not i.__class__._processor_registered and not _is_superseded(i)
     ]
-
-    skipped = [
-        i for i in _get_available()
-        if i.__class__.supersedes and i.__class__.supersedes in manual_types
-    ]
-    for i in skipped:
-        logger.warning(
-            "%s skipped: an explicit middlewares= entry already covers this framework. "
-            "Remove the explicit middleware to avoid duplicate IAS span attributes.",
-            type(i).__name__,
-        )
 
     if not instrumentors:
         return
+
+    for i in candidates:
+        if _is_superseded(i):
+            logger.warning(
+                "%s skipped: an instance of %s is already provided via middlewares=. "
+                "Remove the explicit middleware to avoid duplicate IAS span attributes.",
+                type(i).__name__,
+                i.__class__.supersedes.__name__,
+            )
 
     for instr in instrumentors:
         instr.instrument()

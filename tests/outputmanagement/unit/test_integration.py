@@ -6,23 +6,19 @@
 import pytest
 from unittest.mock import Mock, patch, MagicMock
 
-from sap_cloud_sdk.outputmanagement.client import OutputManagementServiceClient
-from sap_cloud_sdk.outputmanagement.client_provider import OutputManagementServiceClientProvider
-from sap_cloud_sdk.outputmanagement.config.destination_credential_config import (
+from sap_cloud_sdk.outputmanagement import (
+    OutputManagementClient,
     DestinationCredentialConfig,
-)
-from sap_cloud_sdk.outputmanagement.models import (
     EmailConfiguration,
     AttachmentConfig,
     OutputResponse,
     FormConfiguration,
     PreGeneratedAttachment,
-)
-from sap_cloud_sdk.outputmanagement.models.output_response import ErrorResponse
-from sap_cloud_sdk.outputmanagement.exceptions import (
     OutputManagementException,
     ValidationException,
 )
+from sap_cloud_sdk.outputmanagement._service_client import OutputManagementServiceClient
+from sap_cloud_sdk.outputmanagement._models import ErrorResponse
 
 
 class TestOutputManagementIntegration:

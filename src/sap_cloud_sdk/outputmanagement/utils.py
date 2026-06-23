@@ -12,12 +12,12 @@ Since: 1.0.0
 """
 
 from typing import Optional, List
-from .._models import (
+from ._models import (
     OutputRequest,
     EmailConfiguration,
     DirectShareConfiguration,
 )
-from ..constants import Channel
+from .constants import Channel
 
 
 class RequestValidator:

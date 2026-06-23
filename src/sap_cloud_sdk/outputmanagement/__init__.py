@@ -16,6 +16,7 @@ from ._models import (
     OutputRequestData,
     DirectShareConfiguration,
     FormConfiguration,
+    PreGeneratedAttachment,
 )
 from .config import DestinationCredentialConfig
 from .constants import FileFormat, Channel
@@ -141,6 +142,7 @@ __all__ = [
     "OutputRequestData",
     "DirectShareConfiguration",
     "FormConfiguration",
+    "PreGeneratedAttachment",
     # Configuration
     "DestinationCredentialConfig",
     # Constants/Enums

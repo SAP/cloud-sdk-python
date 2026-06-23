@@ -6,13 +6,14 @@
 import pytest
 from dataclasses import is_dataclass
 
-from sap_cloud_sdk.outputmanagement.models import (
+from sap_cloud_sdk.outputmanagement import (
     OutputResponse,
     EmailConfiguration,
     AttachmentConfig,
     PreGeneratedAttachment,
     FormConfiguration,
 )
+from sap_cloud_sdk.outputmanagement._models import ErrorResponse
 
 
 class TestOutputResponse:
@@ -33,8 +34,6 @@ class TestOutputResponse:
 
     def test_output_response_with_error(self):
         """Test OutputResponse with error."""
-        from sap_cloud_sdk.outputmanagement.models.output_response import ErrorResponse
-
         error = ErrorResponse(
             message="Processing failed",
             code="ERR_001"

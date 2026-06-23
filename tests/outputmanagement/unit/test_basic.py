@@ -15,72 +15,77 @@ class TestOutputManagementModule:
         assert outputmanagement is not None
 
     def test_client_import(self):
-        """Test that client can be imported."""
-        from sap_cloud_sdk.outputmanagement.client import OutputManagementServiceClient
+        """Test that unified client can be imported."""
+        from sap_cloud_sdk.outputmanagement import OutputManagementClient
+        assert OutputManagementClient is not None
+
+    def test_service_client_import(self):
+        """Test that service client can be imported."""
+        from sap_cloud_sdk.outputmanagement._service_client import OutputManagementServiceClient
         assert OutputManagementServiceClient is not None
 
-    def test_client_provider_import(self):
-        """Test that client provider can be imported."""
-        from sap_cloud_sdk.outputmanagement.client_provider import OutputManagementServiceClientProvider
-        assert OutputManagementServiceClientProvider is not None
+    def test_create_client_import(self):
+        """Test that create_client factory function can be imported."""
+        from sap_cloud_sdk.outputmanagement import create_client
+        assert create_client is not None
 
     def test_constants_import(self):
         """Test that constants can be imported."""
-        from sap_cloud_sdk.outputmanagement.constants import (
-            Constants,
-            FileFormat,
-            Channel,
-        )
+        from sap_cloud_sdk.outputmanagement import FileFormat, Channel
+        from sap_cloud_sdk.outputmanagement.constants import Constants
+        
         assert Constants.API_OUTPUT_CONTROL is not None
         assert FileFormat.PDF is not None
-        assert Channel.EMAIL is not None
+        assert Channel.INTERNAL_EMAIL is not None
 
     def test_exceptions_import(self):
         """Test that exceptions can be imported."""
-        from sap_cloud_sdk.outputmanagement.exceptions import (
+        from sap_cloud_sdk.outputmanagement import (
             OutputManagementException,
             ValidationException,
             AuthenticationException,
             NetworkException,
+            DestinationNotFoundException,
+            DestinationAccessException,
         )
         assert OutputManagementException is not None
         assert ValidationException is not None
         assert AuthenticationException is not None
         assert NetworkException is not None
+        assert DestinationNotFoundException is not None
+        assert DestinationAccessException is not None
 
     def test_models_import(self):
         """Test that models can be imported."""
-        from sap_cloud_sdk.outputmanagement.models import (
+        from sap_cloud_sdk.outputmanagement import (
+            OutputRequest,
+            OutputRequestBuilder,
             OutputResponse,
             EmailConfiguration,
             AttachmentConfig,
             PreGeneratedAttachment,
+            OutputManagementInfo,
+            OutputRequestData,
+            DirectShareConfiguration,
+            FormConfiguration,
         )
+        assert OutputRequest is not None
+        assert OutputRequestBuilder is not None
         assert OutputResponse is not None
         assert EmailConfiguration is not None
         assert AttachmentConfig is not None
         assert PreGeneratedAttachment is not None
-
-    def test_clients_import(self):
-        """Test that clients can be imported."""
-        from sap_cloud_sdk.outputmanagement.clients.output_requests_client import (
-            OutputRequestsClient,
-        )
-        from sap_cloud_sdk.outputmanagement.clients.email_client import EmailClient
-
-        assert OutputRequestsClient is not None
-        assert EmailClient is not None
+        assert OutputManagementInfo is not None
+        assert OutputRequestData is not None
+        assert DirectShareConfiguration is not None
+        assert FormConfiguration is not None
 
     def test_config_import(self):
         """Test that config can be imported."""
-        from sap_cloud_sdk.outputmanagement.config.destination_credential_config import (
-            DestinationCredentialConfig,
-        )
+        from sap_cloud_sdk.outputmanagement import DestinationCredentialConfig
         assert DestinationCredentialConfig is not None
 
     def test_utils_import(self):
         """Test that utils can be imported."""
-        from sap_cloud_sdk.outputmanagement.utils.request_validator import (
-            RequestValidator,
-        )
+        from sap_cloud_sdk.outputmanagement.utils import RequestValidator
         assert RequestValidator is not None

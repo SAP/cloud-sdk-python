@@ -5,19 +5,17 @@
 
 import pytest
 
-from sap_cloud_sdk.outputmanagement.models import (
+from sap_cloud_sdk.outputmanagement import (
     OutputResponse,
     EmailConfiguration,
     AttachmentConfig,
     PreGeneratedAttachment,
     FormConfiguration,
-)
-from sap_cloud_sdk.outputmanagement.models.output_response import ErrorResponse
-from sap_cloud_sdk.outputmanagement.exceptions import (
     OutputManagementException,
     ValidationException,
     AuthenticationException,
 )
+from sap_cloud_sdk.outputmanagement._models import ErrorResponse
 
 
 class TestPydanticModelFeatures:

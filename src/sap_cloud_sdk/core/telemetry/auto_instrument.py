@@ -87,6 +87,8 @@ def auto_instrument(
     if middlewares:
         _register_middleware_processors(middlewares)
 
+    _auto_instrument_frameworks(middlewares)
+
     logger.info("Cloud auto instrumentation initialized successfully")
 
 
@@ -153,6 +155,57 @@ def _register_middleware_processors(middlewares: list[TelemetryMiddleware]) -> N
     provider.add_span_processor(MiddlewareSpanProcessor(middlewares))
     logger.info(
         "Registered MiddlewareSpanProcessor for %d middleware(s)", len(middlewares)
+    )
+
+
+def _auto_instrument_frameworks(
+    middlewares: list[TelemetryMiddleware] | None = None,
+) -> None:
+    from sap_cloud_sdk.core.telemetry.middleware.registry import get_available
+    from sap_cloud_sdk.core.telemetry.middleware.span_processor import (
+        MiddlewareSpanProcessor,
+    )
+
+    provider = trace.get_tracer_provider()
+    if not isinstance(provider, TracerProvider):
+        logger.warning(
+            "Unknown TracerProvider type. Skipping framework auto-instrumentation"
+        )
+        return
+
+    manual_keys = {m.framework_key for m in (middlewares or []) if m.framework_key}
+
+    instrumentors = [
+        i for i in get_available()
+        if not i.__class__._processor_registered
+        and i.framework_key not in manual_keys
+    ]
+
+    if not instrumentors:
+        return
+
+    skipped = [
+        i for i in get_available()
+        if i.framework_key in manual_keys
+    ]
+    for i in skipped:
+        logger.warning(
+            "%s skipped: framework '%s' is already covered by an explicit middlewares= entry. "
+            "Remove the explicit middleware or do not pass it to avoid duplicate IAS span attributes.",
+            type(i).__name__,
+            i.framework_key,
+        )
+
+    for instr in instrumentors:
+        instr.instrument()
+
+    provider.add_span_processor(MiddlewareSpanProcessor(instrumentors))
+    for instr in instrumentors:
+        instr.__class__._processor_registered = True
+    logger.info(
+        "Auto-instrumented %d framework(s): %s",
+        len(instrumentors),
+        ", ".join(type(i).__name__ for i in instrumentors),
     )
 
 

@@ -18,7 +18,6 @@ from typing import Any, Dict
 from sap_cloud_sdk.core.telemetry.middleware._framework_instrumentor import (
     FrameworkInstrumentor,
 )
-from sap_cloud_sdk.core.telemetry.middleware._registry import _register
 from sap_cloud_sdk.core.telemetry.middleware.starlette_a2a import (
     StarletteIASTelemetryMiddleware,
 )
@@ -28,7 +27,6 @@ logger = logging.getLogger(__name__)
 _attrs_var: ContextVar[Dict[str, Any]] = ContextVar("_sap_ias_attrs", default={})
 
 
-@_register
 class _StarletteIASInstrumentor(FrameworkInstrumentor):
     """Instruments Starlette and FastAPI with IAS JWT telemetry middleware."""
 

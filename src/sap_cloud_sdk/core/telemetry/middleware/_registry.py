@@ -1,8 +1,8 @@
-"""Internal registry for FrameworkInstrumentor subclasses.
+"""Internal discovery for FrameworkInstrumentor subclasses.
 
-Instrumentors self-register via the ``@_register`` decorator. ``auto_instrument()``
-calls ``_get_available()`` to discover and activate all installed frameworks
-without needing to know about any specific framework.
+Lists every known internal instrumentor in one place — adding a new framework
+is a single try/except block in ``_discover_instrumentors``. No decorators,
+no import-time side effects.
 
 This is an internal SDK module — not part of the public API.
 """
@@ -19,24 +19,25 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-_registry: list[type[FrameworkInstrumentor]] = []
 
+def _discover_instrumentors() -> list[type[FrameworkInstrumentor]]:
+    """Return every internal instrumentor class whose module imports cleanly.
 
-def _register(cls: type[FrameworkInstrumentor]) -> type[FrameworkInstrumentor]:
-    """Register a FrameworkInstrumentor subclass for auto-discovery.
-
-    Use as a class decorator on internal instrumentor classes only.
+    Add a new framework by appending one try/except block here.
     """
-    _registry.append(cls)
-    return cls
+    classes: list[type[FrameworkInstrumentor]] = []
+
+    try:
+        from sap_cloud_sdk.core.telemetry.middleware._starlette_instrumentor import (
+            _StarletteIASInstrumentor,
+        )
+        classes.append(_StarletteIASInstrumentor)
+    except ImportError:
+        logger.debug("_StarletteIASInstrumentor unavailable (starlette not installed)")
+
+    return classes
 
 
 def _get_available() -> list[FrameworkInstrumentor]:
-    """Return one instance of each registered instrumentor whose framework is installed."""
-    available = []
-    for cls in _registry:
-        if cls.is_available():
-            available.append(cls())
-        else:
-            logger.debug("%s skipped (framework not installed)", cls.__name__)
-    return available
+    """Return one instance of each discovered instrumentor whose framework is installed."""
+    return [cls() for cls in _discover_instrumentors() if cls.is_available()]

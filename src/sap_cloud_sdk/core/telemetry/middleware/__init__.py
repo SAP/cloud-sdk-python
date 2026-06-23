@@ -19,9 +19,3 @@ try:
     __all__ += ["StarletteIASTelemetryMiddleware"]
 except ImportError:
     pass
-
-try:
-    # Side-effect import: triggers @_register so the instrumentor is discoverable.
-    import sap_cloud_sdk.core.telemetry.middleware._starlette_instrumentor  # noqa: F401
-except ImportError:
-    pass

@@ -65,35 +65,31 @@ class EmailConfiguration(BaseModel):
         ...,
         alias="emailNotificationTemplateKey",
         min_length=1,
-        description="ANS template identifier for email body and subject"
+        description="ANS template identifier for email body and subject",
     )
 
     email_template_language: str = Field(
         ...,
         alias="emailTemplateLanguage",
         min_length=1,
-        description="ISO language code for the email template (e.g., 'en', 'de', 'fr')"
+        description="ISO language code for the email template (e.g., 'en', 'de', 'fr')",
     )
 
     to: List[str] = Field(
-        ...,
-        min_length=1,
-        description="List of recipient email addresses"
+        ..., min_length=1, description="List of recipient email addresses"
     )
 
     cc: Optional[List[str]] = Field(
-        None,
-        description="List of CC recipient email addresses"
+        None, description="List of CC recipient email addresses"
     )
 
     bcc: Optional[List[str]] = Field(
-        None,
-        description="List of BCC recipient email addresses"
+        None, description="List of BCC recipient email addresses"
     )
 
     attachment: Optional[AttachmentConfig] = Field(
         None,
-        description="Optional attachment configuration for PDF generation and pre-generated attachments"
+        description="Optional attachment configuration for PDF generation and pre-generated attachments",
     )
 
     @field_validator("to", "cc", "bcc")
@@ -108,5 +104,6 @@ class EmailConfiguration(BaseModel):
 
     class Config:
         """Pydantic configuration."""
+
         populate_by_name = True
         str_strip_whitespace = True

@@ -27,14 +27,12 @@ class PreGeneratedAttachment(BaseModel):
     """
 
     url: str = Field(
-        ...,
-        min_length=1,
-        description="The URL to access the pre-generated attachment"
+        ..., min_length=1, description="The URL to access the pre-generated attachment"
     )
 
     source: Literal["DMS"] = Field(
         ...,
-        description="The source system of the attachment (currently only 'DMS' is supported)"
+        description="The source system of the attachment (currently only 'DMS' is supported)",
     )
 
     @field_validator("url")
@@ -62,5 +60,6 @@ class PreGeneratedAttachment(BaseModel):
 
     class Config:
         """Pydantic configuration."""
+
         populate_by_name = True
         str_strip_whitespace = True

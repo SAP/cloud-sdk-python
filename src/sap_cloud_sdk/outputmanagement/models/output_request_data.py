@@ -70,15 +70,16 @@ class OutputRequestData(BaseModel):
     output_management: OutputManagementInfo = Field(
         ...,
         alias="OutputManagement",
-        description="Information required by Output Management to orchestrate the output"
+        description="Information required by Output Management to orchestrate the output",
     )
 
     business_document: Dict[str, Any] = Field(
         ...,
         alias="BusinessDocument",
-        description="The business document as a JSON object"
+        description="The business document as a JSON object",
     )
 
     class Config:
         """Pydantic configuration."""
+
         populate_by_name = True

@@ -38,7 +38,9 @@ class OutputManagementServiceClientProviderBuilder:
 
     def __init__(self):
         """Initialize builder."""
-        self._destination_credential_config: Optional[DestinationCredentialConfig] = None
+        self._destination_credential_config: Optional[DestinationCredentialConfig] = (
+            None
+        )
 
     def with_destination_credentials(
         self, config: DestinationCredentialConfig

@@ -35,7 +35,7 @@ class EmailClient:
         business_document: Dict[str, Any],
         cc: Optional[List[str]] = None,
         template_language: Optional[str] = "en",
-        attachment_urls: Optional[List[str]] = None
+        attachment_urls: Optional[List[str]] = None,
     ) -> OutputRequest:
         """
         Create an OutputRequest object from the provided parameters.
@@ -67,8 +67,7 @@ class EmailClient:
         if attachment_urls:
             # Convert URLs to PreGeneratedAttachment objects
             pre_gen_attachments = [
-                PreGeneratedAttachment(url=url, source="DMS")
-                for url in attachment_urls
+                PreGeneratedAttachment(url=url, source="DMS") for url in attachment_urls
             ]
 
             attachment_config = AttachmentConfig(
@@ -83,7 +82,7 @@ class EmailClient:
             emailTemplateLanguage=lang,
             to=to,
             cc=cc,
-            attachment=attachment_config
+            attachment=attachment_config,
         )
 
         # Build output management info
@@ -92,13 +91,12 @@ class EmailClient:
             businessDocumentId=doc_id,
             isPriority=False,
             channels=[Channel.INTERNAL_EMAIL],
-            emailConfiguration=email_config
+            emailConfiguration=email_config,
         )
 
         # Build request data (OutputManagement + BusinessDocument)
         data = OutputRequestData(
-            OutputManagement=output_mgmt,
-            BusinessDocument=business_document
+            OutputManagement=output_mgmt, BusinessDocument=business_document
         )
 
         # Build output request (CloudEvents structure)
@@ -106,7 +104,7 @@ class EmailClient:
         output_request = OutputRequest(
             source=f"/region/sap/{doc_type_key}",
             type=f"{business_document_type}.notification.created.v1",
-            data=data
+            data=data,
         )
 
         return output_request
@@ -121,7 +119,7 @@ class EmailClient:
         template_language: Optional[str] = "en",
         access_strategy: Optional[str] = None,
         instance: Optional[str] = None,
-        attachment_urls: Optional[List[str]] = None
+        attachment_urls: Optional[List[str]] = None,
     ) -> OutputResponse:
         """
         Send an email using the SAP Ariba Output Service.
@@ -194,15 +192,12 @@ class EmailClient:
             to=to,
             business_document=business_document,
             template_language=lang,
-            cc=cc
+            cc=cc,
         )
         if validation_error:
             return OutputResponse(
                 outputRequestId=None,
-                error=ErrorResponse(
-                    message=validation_error,
-                    code="INVALID_REQUEST"
-                )
+                error=ErrorResponse(message=validation_error, code="INVALID_REQUEST"),
             )
 
         # Validate destination_name
@@ -211,8 +206,8 @@ class EmailClient:
                 outputRequestId=None,
                 error=ErrorResponse(
                     message="destination_name cannot be null or empty",
-                    code="INVALID_REQUEST"
-                )
+                    code="INVALID_REQUEST",
+                ),
             )
 
         try:
@@ -221,7 +216,9 @@ class EmailClient:
 
             # Resolve instance name for logging
             inst = instance or "default"
-            logger.info(f"Sending email via destination '{destination_name}' using instance '{inst}'")
+            logger.info(
+                f"Sending email via destination '{destination_name}' using instance '{inst}'"
+            )
 
             # Create the output request using the extracted method
             output_request = self.create_output_request(
@@ -230,13 +227,17 @@ class EmailClient:
                 business_document=business_document,
                 cc=cc,
                 template_language=template_language,
-                attachment_urls=attachment_urls
+                attachment_urls=attachment_urls,
             )
 
             if attachment_urls:
-                logger.debug(f"Created output request for template '{notification_template_key}' with {len(attachment_urls)} DMS attachment(s)")
+                logger.debug(
+                    f"Created output request for template '{notification_template_key}' with {len(attachment_urls)} DMS attachment(s)"
+                )
             else:
-                logger.debug(f"Created output request for template '{notification_template_key}'")
+                logger.debug(
+                    f"Created output request for template '{notification_template_key}'"
+                )
 
             # Validate the output request using RequestValidator
             validation_error = RequestValidator.validate(output_request)
@@ -245,17 +246,18 @@ class EmailClient:
                 return OutputResponse(
                     outputRequestId=None,
                     error=ErrorResponse(
-                        message=validation_error,
-                        code="INVALID_REQUEST"
-                    )
+                        message=validation_error, code="INVALID_REQUEST"
+                    ),
                 )
 
             # Create destination config with access strategy and instance
-            logger.debug(f"Creating destination config with access_strategy='{access_strategy}', instance='{inst}'")
+            logger.debug(
+                f"Creating destination config with access_strategy='{access_strategy}', instance='{inst}'"
+            )
             destination_config = DestinationCredentialConfig(
                 destination_name=destination_name,
                 access_strategy=access_strategy,
-                instance=instance
+                instance=instance,
             )
 
             # Build the client provider using the existing builder
@@ -271,7 +273,9 @@ class EmailClient:
             return output_requests_client.send_output_request(output_request)
 
         except Exception as e:
-            raise Exception(f"Failed to send email via destination '{destination_name}': {str(e)}") from e
+            raise Exception(
+                f"Failed to send email via destination '{destination_name}': {str(e)}"
+            ) from e
 
     async def send_email_with_mcp(
         self,
@@ -282,7 +286,7 @@ class EmailClient:
         cc_email: Optional[str] = None,
         attachment_urls: Optional[List[str]] = None,
         mcp_tool: Any = None,
-        sender_provider_subaccount_id: Optional[str] = None
+        sender_provider_subaccount_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         Create an output request and invoke MCP tool with traceparent and sender_provider_subaccount_id.
@@ -349,7 +353,7 @@ class EmailClient:
                 business_document=business_document,
                 cc=[cc_email] if cc_email else None,
                 template_language="en",
-                attachment_urls=attachment_urls
+                attachment_urls=attachment_urls,
             )
 
             logger.info("Output request created successfully")
@@ -358,15 +362,23 @@ class EmailClient:
             payload = output_request.model_dump(by_alias=True, exclude_none=True)
 
             # Get sender_provider_subaccount_id from parameter or environment variable
-            subaccount_id = sender_provider_subaccount_id or os.getenv("APPFND_CONHOS_SUBACCOUNTID")
+            subaccount_id = sender_provider_subaccount_id or os.getenv(
+                "APPFND_CONHOS_SUBACCOUNTID"
+            )
 
             if not subaccount_id:
-                logger.warning("sender_provider_subaccount_id not provided and APPFND_CONHOS_SUBACCOUNTID env var not set")
+                logger.warning(
+                    "sender_provider_subaccount_id not provided and APPFND_CONHOS_SUBACCOUNTID env var not set"
+                )
 
-            logger.info("Invoking MCP tool '%s' with body, traceparent, and sender_provider_subaccount_id", tool_name)
+            logger.info(
+                "Invoking MCP tool '%s' with body, traceparent, and sender_provider_subaccount_id",
+                tool_name,
+            )
 
             # Generate traceparent for distributed tracing
             import uuid
+
             trace_id = uuid.uuid4().hex  # 32 hex chars
             parent_id = uuid.uuid4().hex[:16]  # 16 hex chars
             traceparent = f"00-{trace_id}-{parent_id}-01"
@@ -375,11 +387,13 @@ class EmailClient:
             invocation_payload = {
                 "body": payload,
                 "traceparent": traceparent,
-                "sender_provider_subaccount_id": subaccount_id
+                "sender_provider_subaccount_id": subaccount_id,
             }
 
             # Log the payload before invoking
-            logger.info("MCP tool '%s' invocation payload: %s", tool_name, invocation_payload)
+            logger.info(
+                "MCP tool '%s' invocation payload: %s", tool_name, invocation_payload
+            )
 
             # Validate that mcp_tool is provided
             if mcp_tool is None:

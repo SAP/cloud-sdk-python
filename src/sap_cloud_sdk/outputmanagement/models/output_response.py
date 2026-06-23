@@ -9,7 +9,9 @@ class ErrorResponse(BaseModel):
 
     message: str = Field(..., description="Error message")
     code: Optional[str] = Field(None, description="Error code")
-    details: Optional[Dict[str, Any]] = Field(None, description="Additional error details")
+    details: Optional[Dict[str, Any]] = Field(
+        None, description="Additional error details"
+    )
 
     class Config:
         """Pydantic configuration."""
@@ -27,9 +29,11 @@ class OutputResponse(BaseModel):
     output_request_id: Optional[str] = Field(
         None,
         alias="outputRequestId",
-        description="The unique identifier for the output request"
+        description="The unique identifier for the output request",
     )
-    error: Optional[ErrorResponse] = Field(None, description="Error encountered during processing")
+    error: Optional[ErrorResponse] = Field(
+        None, description="Error encountered during processing"
+    )
 
     class Config:
         """Pydantic configuration."""

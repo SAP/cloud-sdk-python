@@ -52,54 +52,49 @@ class OutputManagementInfo(BaseModel):
         ...,
         alias="businessDocumentType",
         min_length=1,
-        description="Type of the business document (e.g., 'com.sap.procurement.PurchaseOrder')"
+        description="Type of the business document (e.g., 'com.sap.procurement.PurchaseOrder')",
     )
 
     business_document_id: str = Field(
         ...,
         alias="businessDocumentId",
         min_length=1,
-        description="ID of the business document (e.g., 'PO00551100')"
+        description="ID of the business document (e.g., 'PO00551100')",
     )
 
     is_priority: bool = Field(
-        False,
-        alias="isPriority",
-        description="Indicates if this is a priority request"
+        False, alias="isPriority", description="Indicates if this is a priority request"
     )
 
     user_id: Optional[str] = Field(
         None,
         alias="userId",
-        description="User ID who triggered the output request (e.g., 'user@sap.com')"
+        description="User ID who triggered the output request (e.g., 'user@sap.com')",
     )
 
     channels: List[Channel] = Field(
-        ...,
-        min_length=1,
-        description="List of channels for output delivery"
+        ..., min_length=1, description="List of channels for output delivery"
     )
 
     direct_share_configuration: Optional[DirectShareConfiguration] = Field(
         None,
         alias="directShareConfiguration",
-        description="Configuration for direct share channel"
+        description="Configuration for direct share channel",
     )
 
     email_configuration: Optional[EmailConfiguration] = Field(
         None,
         alias="emailConfiguration",
-        description="Configuration for internal email channel"
+        description="Configuration for internal email channel",
     )
 
     cig_data_center: Optional[str] = Field(
-        None,
-        alias="cigDataCenter",
-        description="CIG Data Center information"
+        None, alias="cigDataCenter", description="CIG Data Center information"
     )
 
     class Config:
         """Pydantic configuration."""
+
         populate_by_name = True
         str_strip_whitespace = True
         use_enum_values = True

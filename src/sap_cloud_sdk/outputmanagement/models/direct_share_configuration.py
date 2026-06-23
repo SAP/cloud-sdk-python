@@ -14,9 +14,7 @@ class DirectShareConfiguration(BaseModel):
         expiration_days: Optional number of days until expiration
     """
 
-    user_ids: List[str] = Field(
-        ..., min_length=1, description="User IDs to share with"
-    )
+    user_ids: List[str] = Field(..., min_length=1, description="User IDs to share with")
     group_ids: Optional[List[str]] = Field(None, description="Group IDs to share with")
     message: Optional[str] = Field(None, description="Message to include")
     expiration_days: Optional[int] = Field(

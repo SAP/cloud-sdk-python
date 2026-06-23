@@ -14,7 +14,11 @@ from cryptography.hazmat.primitives.serialization import (
     PrivateFormat,
     NoEncryption,
 )
-from sap_cloud_sdk.destination import Destination, create_certificate_client, AccessStrategy
+from sap_cloud_sdk.destination import (
+    Destination,
+    create_certificate_client,
+    AccessStrategy,
+)
 
 from .output_requests_client import OutputRequestsClient
 from ..constants import Constants
@@ -59,7 +63,9 @@ class OutputRequestsClientImpl(OutputRequestsClient):
         # Get sender-provider-subaccount-id from environment variable
         self._sender_provider_subaccount_id = os.getenv("APPFND_CONHOS_SUBACCOUNTID")
         if self._sender_provider_subaccount_id:
-            logger.info(f"Loaded SENDER_PROVIDER_SUBACCOUNT_ID: {self._sender_provider_subaccount_id}")
+            logger.info(
+                f"Loaded SENDER_PROVIDER_SUBACCOUNT_ID: {self._sender_provider_subaccount_id}"
+            )
         else:
             logger.debug("SENDER_PROVIDER_SUBACCOUNT_ID environment variable not set")
 
@@ -70,8 +76,7 @@ class OutputRequestsClientImpl(OutputRequestsClient):
         if output_request is None:
             logger.error("OutputRequest cannot be None")
             return self._create_output_error_response(
-                "INVALID_REQUEST",
-                "OutputRequest cannot be None"
+                "INVALID_REQUEST", "OutputRequest cannot be None"
             )
 
         # Validate the output request
@@ -79,8 +84,7 @@ class OutputRequestsClientImpl(OutputRequestsClient):
         if validation_error:
             logger.error(f"Validation failed: {validation_error}")
             return self._create_output_error_response(
-                "INVALID_REQUEST",
-                validation_error
+                "INVALID_REQUEST", validation_error
             )
 
         endpoint = f"{self._base_url}{Constants.API_OUTPUT_CONTROL}outputRequest"
@@ -92,13 +96,17 @@ class OutputRequestsClientImpl(OutputRequestsClient):
 
         # Add sender-provider-subaccount-id header if available
         if self._sender_provider_subaccount_id:
-            headers[Constants.HEADER_SENDER_PROVIDER_SUBACCOUNT_ID] = self._sender_provider_subaccount_id
+            headers[Constants.HEADER_SENDER_PROVIDER_SUBACCOUNT_ID] = (
+                self._sender_provider_subaccount_id
+            )
             logger.debug("Added sender-provider-subaccount-id header")
 
         try:
             request_body = output_request.model_dump(by_alias=True, exclude_none=True)
 
-            response = self._http_session.request('POST', endpoint, json=request_body, headers=headers)
+            response = self._http_session.request(
+                "POST", endpoint, json=request_body, headers=headers
+            )
             status_code = response.status_code
 
             logger.debug(f"Response status: {status_code}")
@@ -112,22 +120,27 @@ class OutputRequestsClientImpl(OutputRequestsClient):
             # Handle error responses
             response_body = response.text
             if self._is_retryable(status_code):
-                logger.error(f"Retryable error with status: {status_code}, body: {response_body}")
+                logger.error(
+                    f"Retryable error with status: {status_code}, body: {response_body}"
+                )
             else:
-                logger.error(f"Non-retryable error with status: {status_code}, body: {response_body}")
+                logger.error(
+                    f"Non-retryable error with status: {status_code}, body: {response_body}"
+                )
 
             error_type = self._map_status_code_to_error(status_code)
             if error_type:
                 return self._create_output_error_response(error_type, status_code)
             else:
-                logger.warning(f"Unhandled status code: {status_code}. Using original status code and message.")
+                logger.warning(
+                    f"Unhandled status code: {status_code}. Using original status code and message."
+                )
                 return self._create_output_error_response(status_code, response_body)
 
         except Exception as e:
             logger.error(f"Exception occurred: {e}", exc_info=True)
             return self._create_output_error_response(
-                "OUTPUT_REQUEST_FAILED",
-                f"Failed to send output request: {str(e)}"
+                "OUTPUT_REQUEST_FAILED", f"Failed to send output request: {str(e)}"
             )
 
     def _fetch_oauth_token_from_destination(self) -> Optional[str]:
@@ -138,7 +151,7 @@ class OutputRequestsClientImpl(OutputRequestsClient):
         Returns:
             OAuth access token or None if fetch fails
         """
-        if not self._destination or not hasattr(self._destination, 'properties'):
+        if not self._destination or not hasattr(self._destination, "properties"):
             return None
 
         props = self._destination.properties
@@ -149,25 +162,37 @@ class OutputRequestsClientImpl(OutputRequestsClient):
         logger.debug(f"Destination properties keys: {list(props.keys())}")
 
         # Extract OAuth configuration from destination properties
-        token_url = props.get('tokenServiceURL')
-        client_id = props.get('client_id') or props.get('clientId') or props.get('tokenService.body.client_id')
-        grant_type = props.get('tokenService.body.grant_type', 'client_credentials')
-        app_tid = props.get('tokenService.body.app_tid')
+        token_url = props.get("tokenServiceURL")
+        client_id = (
+            props.get("client_id")
+            or props.get("clientId")
+            or props.get("tokenService.body.client_id")
+        )
+        grant_type = props.get("tokenService.body.grant_type", "client_credentials")
+        app_tid = props.get("tokenService.body.app_tid")
 
         # Certificate name to lookup in Destination Service
         # The certificate must be uploaded to Destination Service first using:
         # certificate_client.create_certificate(Certificate(name="my-cert.p12", content=base64_content, type="PKCS12"))
-        cert_name = props.get('tokenService.KeyStoreLocation')
-        cert_password = props.get('tokenService.KeyStorePassword')
+        cert_name = props.get("tokenService.KeyStoreLocation")
+        cert_password = props.get("tokenService.KeyStorePassword")
 
         if not token_url or not client_id:
-            logger.error(f"Missing OAuth config: tokenServiceURL={token_url}, clientId={client_id}")
+            logger.error(
+                f"Missing OAuth config: tokenServiceURL={token_url}, clientId={client_id}"
+            )
             return None
 
         if not cert_name:
-            logger.error("✗ No certificate name in destination properties (tokenService.certificate)")
-            logger.error("✗ Please upload your keystore to Destination Service and reference it")
-            logger.error("✗ Example: certificate_client.create_certificate(Certificate(name='my-cert.p12', content=base64_content, type='PKCS12'))")
+            logger.error(
+                "✗ No certificate name in destination properties (tokenService.certificate)"
+            )
+            logger.error(
+                "✗ Please upload your keystore to Destination Service and reference it"
+            )
+            logger.error(
+                "✗ Example: certificate_client.create_certificate(Certificate(name='my-cert.p12', content=base64_content, type='PKCS12'))"
+            )
             return None
 
         # Track temp files for cleanup
@@ -177,12 +202,9 @@ class OutputRequestsClientImpl(OutputRequestsClient):
 
         try:
             # Build OAuth token request
-            token_data = {
-                'grant_type': grant_type,
-                'client_id': client_id
-            }
+            token_data = {"grant_type": grant_type, "client_id": client_id}
             if app_tid:
-                token_data['app_tid'] = app_tid
+                token_data["app_tid"] = app_tid
 
             logger.info(f"Fetching OAuth token from {token_url} using mTLS")
             logger.info(f"✓ Using certificate from Destination Service: {cert_name}")
@@ -195,35 +217,54 @@ class OutputRequestsClientImpl(OutputRequestsClient):
 
                 try:
                     certificate_client = create_certificate_client(instance=inst)
-                    logger.info(f"✓ Certificate client created successfully for instance '{inst}'")
+                    logger.info(
+                        f"✓ Certificate client created successfully for instance '{inst}'"
+                    )
                 except Exception as e:
-                    logger.error(f"✗ Failed to create certificate client for instance '{inst}': {e}")
-                    logger.error("✗ Ensure the Destination Service is properly bound and configured")
+                    logger.error(
+                        f"✗ Failed to create certificate client for instance '{inst}': {e}"
+                    )
+                    logger.error(
+                        "✗ Ensure the Destination Service is properly bound and configured"
+                    )
                     return None
 
-                logger.info(f"✓ Retrieving certificate '{cert_name}' from Destination Service")
-                cert = certificate_client.get_subaccount_certificate(cert_name, access_strategy=AccessStrategy.PROVIDER_ONLY)
+                logger.info(
+                    f"✓ Retrieving certificate '{cert_name}' from Destination Service"
+                )
+                cert = certificate_client.get_subaccount_certificate(
+                    cert_name, access_strategy=AccessStrategy.PROVIDER_ONLY
+                )
 
                 # Check if certificate was found
                 if cert is None:
-                    logger.error(f"✗ Certificate '{cert_name}' not found in Destination Service")
-                    logger.error("✗ Please ensure the certificate is uploaded to Destination Service")
-                    logger.error("✗ Example: certificate_client.create_certificate(Certificate(name='my-cert.p12', content=base64_content, type='PKCS12'))")
+                    logger.error(
+                        f"✗ Certificate '{cert_name}' not found in Destination Service"
+                    )
+                    logger.error(
+                        "✗ Please ensure the certificate is uploaded to Destination Service"
+                    )
+                    logger.error(
+                        "✗ Example: certificate_client.create_certificate(Certificate(name='my-cert.p12', content=base64_content, type='PKCS12'))"
+                    )
                     return None
 
-                logger.info(f"✓ Retrieved certificate '{cert.name}' (type: {cert.type})")
+                logger.info(
+                    f"✓ Retrieved certificate '{cert.name}' (type: {cert.type})"
+                )
 
                 # Decode base64 content
                 cert_binary = base64.b64decode(cert.content)
-                logger.debug(f"✓ Decoded certificate content ({len(cert_binary)} bytes)")
+                logger.debug(
+                    f"✓ Decoded certificate content ({len(cert_binary)} bytes)"
+                )
 
                 # Parse certificate - try PKCS12 format first (most common for mTLS)
-                password = cert_password.encode('utf-8') if cert_password else None
+                password = cert_password.encode("utf-8") if cert_password else None
 
                 try:
-                    private_key, certificate, additional_certs = pkcs12.load_key_and_certificates(
-                        cert_binary,
-                        password
+                    private_key, certificate, additional_certs = (
+                        pkcs12.load_key_and_certificates(cert_binary, password)
                     )
 
                     if not (certificate and private_key):
@@ -233,27 +274,31 @@ class OutputRequestsClientImpl(OutputRequestsClient):
                     logger.info("✓ Successfully parsed certificate and extracted keys")
 
                     # Write certificate to temp file (include chain)
-                    cert_fd, cert_file = tempfile.mkstemp(suffix='.pem')
-                    with os.fdopen(cert_fd, 'wb') as f:
+                    cert_fd, cert_file = tempfile.mkstemp(suffix=".pem")
+                    with os.fdopen(cert_fd, "wb") as f:
                         f.write(certificate.public_bytes(Encoding.PEM))
                         if additional_certs:
                             for c in additional_certs:
                                 f.write(c.public_bytes(Encoding.PEM))
 
                     # Write private key to temp file
-                    key_fd, key_file = tempfile.mkstemp(suffix='.key')
-                    with os.fdopen(key_fd, 'wb') as f:
-                        f.write(private_key.private_bytes(
-                            encoding=Encoding.PEM,
-                            format=PrivateFormat.TraditionalOpenSSL,
-                            encryption_algorithm=NoEncryption()
-                        ))
+                    key_fd, key_file = tempfile.mkstemp(suffix=".key")
+                    with os.fdopen(key_fd, "wb") as f:
+                        f.write(
+                            private_key.private_bytes(
+                                encoding=Encoding.PEM,
+                                format=PrivateFormat.TraditionalOpenSSL,
+                                encryption_algorithm=NoEncryption(),
+                            )
+                        )
 
                     temp_files_created = True
 
                 except Exception as e:
                     logger.error(f"✗ Failed to parse certificate: {e}")
-                    logger.error("✗ Certificate must be in PKCS12 format (.p12/.pfx) containing both certificate and private key")
+                    logger.error(
+                        "✗ Certificate must be in PKCS12 format (.p12/.pfx) containing both certificate and private key"
+                    )
                     return None
 
             except ImportError as e:
@@ -262,20 +307,23 @@ class OutputRequestsClientImpl(OutputRequestsClient):
                 logger.error(f"✗ ImportError details: {e}")
                 return None
             except Exception as e:
-                logger.error(f"✗ Failed to retrieve/process certificate '{cert_name}': {e}", exc_info=True)
+                logger.error(
+                    f"✗ Failed to retrieve/process certificate '{cert_name}': {e}",
+                    exc_info=True,
+                )
                 return None
 
             # Make token request with mTLS
-            if not(cert_file and key_file):
+            if not (cert_file and key_file):
                 logger.error("✗ No client certificates available")
                 return None
 
             request_kwargs: Dict[str, Any] = {
-                'data': token_data,
-                'headers': {'Content-Type': 'application/x-www-form-urlencoded'},
-                'timeout': 30,
-                'verify': True,
-                'cert': (cert_file, key_file)
+                "data": token_data,
+                "headers": {"Content-Type": "application/x-www-form-urlencoded"},
+                "timeout": 30,
+                "verify": True,
+                "cert": (cert_file, key_file),
             }
 
             logger.info("✓ Configuring mTLS with certificate files")
@@ -297,24 +345,36 @@ class OutputRequestsClientImpl(OutputRequestsClient):
             # Handle response
             if response.status_code == 200:
                 token_response = response.json()
-                access_token = token_response.get('access_token')
+                access_token = token_response.get("access_token")
                 if access_token:
-                    logger.info(f"✓ Successfully fetched OAuth token (length: {len(access_token)})")
+                    logger.info(
+                        f"✓ Successfully fetched OAuth token (length: {len(access_token)})"
+                    )
                     return access_token
                 else:
-                    logger.error(f"✗ No access_token in response: {list(token_response.keys())}")
+                    logger.error(
+                        f"✗ No access_token in response: {list(token_response.keys())}"
+                    )
             else:
                 # Parse OAuth error response
                 try:
                     error_response = response.json()
-                    error_type = error_response.get('error', 'unknown')
-                    error_desc = error_response.get('error_description', 'No description')
-                    logger.error(f"✗ Token fetch failed with status {response.status_code}")
+                    error_type = error_response.get("error", "unknown")
+                    error_desc = error_response.get(
+                        "error_description", "No description"
+                    )
+                    logger.error(
+                        f"✗ Token fetch failed with status {response.status_code}"
+                    )
                     logger.error(f"✗ OAuth error: {error_type} - {error_desc}")
                 except:
-                    logger.error(f"✗ Token fetch failed with status {response.status_code}: {response.text}")
+                    logger.error(
+                        f"✗ Token fetch failed with status {response.status_code}: {response.text}"
+                    )
 
-                logger.error("✗ mTLS authentication failed - check certificates and credentials")
+                logger.error(
+                    "✗ mTLS authentication failed - check certificates and credentials"
+                )
 
         except Exception as e:
             logger.error(f"✗ Exception fetching OAuth token: {e}", exc_info=True)
@@ -339,7 +399,9 @@ class OutputRequestsClientImpl(OutputRequestsClient):
 
         # If using destination, get auth token from it
         if self._destination:
-            logger.debug(f"Using destination for authentication. Destination type: {type(self._destination)}")
+            logger.debug(
+                f"Using destination for authentication. Destination type: {type(self._destination)}"
+            )
 
             # Try to fetch OAuth token using destination's OAuth configuration
             token = self._fetch_oauth_token_from_destination()
@@ -406,7 +468,6 @@ class OutputRequestsClientImpl(OutputRequestsClient):
             404: "RESOURCE_NOT_FOUND",
             409: "CONFLICT",
             429: "INVALID_REQUEST",  # Too Many Requests
-
             # Server errors (5xx)
             500: "INTERNAL_SERVER_ERROR",
             502: "INTERNAL_SERVER_ERROR",  # Bad Gateway
@@ -419,7 +480,8 @@ class OutputRequestsClientImpl(OutputRequestsClient):
     def _create_output_error_response(error_type, message) -> OutputResponse:
         """Create an OutputResponse with error information."""
         from ..models.output_response import ErrorResponse
+
         return OutputResponse(
             outputRequestId=None,
-            error=ErrorResponse(message=str(message), code=error_type)
+            error=ErrorResponse(message=str(message), code=error_type),
         )

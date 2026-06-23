@@ -56,7 +56,7 @@ class RequestValidator:
             return "'source' cannot be null or empty"
 
         # CloudEvents spec: source format should be /region/application/tenant (3 parts separated by /)
-        source_parts = [part for part in source.split('/') if part]
+        source_parts = [part for part in source.split("/") if part]
         if len(source_parts) != 3:
             return "'source' does not conform to cloud event spec. Expected format: /region/application/tenant"
 
@@ -71,7 +71,7 @@ class RequestValidator:
 
         # CloudEvents spec: type format should have at least 4 parts separated by dots
         # Example: sap.nexus.px.purchaseorder.PurchaseOrder.Created.v1
-        type_parts = event_type.split('.')
+        type_parts = event_type.split(".")
         if len(type_parts) < 4:
             return "'type' does not conform to cloud event spec. Expected format: domain.application.module.event"
 
@@ -99,8 +99,12 @@ class RequestValidator:
         business_document_type = output_management.business_document_type
         channels = output_management.channels
 
-        if (not business_document_type or not business_document_type.strip()) and \
-           channels and len(channels) > 0 and Channel.DIRECT_SHARE not in channels:
+        if (
+            (not business_document_type or not business_document_type.strip())
+            and channels
+            and len(channels) > 0
+            and Channel.DIRECT_SHARE not in channels
+        ):
             return "Business document type cannot be null or empty"
 
         # Validate channels if present
@@ -114,7 +118,9 @@ class RequestValidator:
 
             if has_direct_share:
                 direct_share_config = output_management.direct_share_configuration
-                direct_share_error = DirectShareConfigValidator.validate(direct_share_config)
+                direct_share_error = DirectShareConfigValidator.validate(
+                    direct_share_config
+                )
                 if direct_share_error is not None:
                     return direct_share_error
 
@@ -155,7 +161,7 @@ class RequestValidator:
         to: List[str],
         business_document: dict,
         template_language: str,
-        cc: Optional[List[str]] = None
+        cc: Optional[List[str]] = None,
     ) -> Optional[str]:
         """
         Validates email-specific parameters for EmailClient.

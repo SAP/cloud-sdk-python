@@ -77,59 +77,58 @@ class OutputRequest(BaseModel):
     spec_version: str = Field(
         default="1.0",
         alias="specversion",
-        description="CloudEvents specification version (should be '1.0')"
+        description="CloudEvents specification version (should be '1.0')",
     )
 
     id: str = Field(
         default_factory=lambda: str(uuid.uuid4()),
-        description="Unique ID for this event (UUID). Producers must ensure source + id is unique."
+        description="Unique ID for this event (UUID). Producers must ensure source + id is unique.",
     )
 
     source: str = Field(
         ...,
         min_length=1,
-        description="Identifies where this event originated from (e.g., '/eu12/sap.nexus.px/8d4bb3fa')"
+        description="Identifies where this event originated from (e.g., '/eu12/sap.nexus.px/8d4bb3fa')",
     )
 
     time: str = Field(
-        default_factory=lambda: datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
-        description="Timestamp when the output request was triggered (ISO 8601 format)"
+        default_factory=lambda: (
+            datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+        ),
+        description="Timestamp when the output request was triggered (ISO 8601 format)",
     )
 
     type: str = Field(
         ...,
         min_length=1,
-        description="Type of event (e.g., 'sap.nexus.px.purchaseorder.PurchaseOrder.Created.v1')"
+        description="Type of event (e.g., 'sap.nexus.px.purchaseorder.PurchaseOrder.Created.v1')",
     )
 
     data_content_type: str = Field(
         default="application/json",
         alias="datacontenttype",
-        description="Content type of the event's data (must be 'application/json')"
+        description="Content type of the event's data (must be 'application/json')",
     )
 
     data: OutputRequestData = Field(
-        ...,
-        description="Contains OutputManagement and BusinessDocument nodes"
+        ..., description="Contains OutputManagement and BusinessDocument nodes"
     )
 
     xsapsisgwdestapp: Optional[str] = Field(
-        None,
-        description="SAP system gateway destination application identifier"
+        None, description="SAP system gateway destination application identifier"
     )
 
     xsapsisgwdestappid: Optional[str] = Field(
-        None,
-        description="SAP system gateway destination application ID"
+        None, description="SAP system gateway destination application ID"
     )
 
     xsapsisgwbackendid: Optional[str] = Field(
-        None,
-        description="SAP system gateway backend ID"
+        None, description="SAP system gateway backend ID"
     )
 
     class Config:
         """Pydantic configuration."""
+
         populate_by_name = True
         str_strip_whitespace = True
 
@@ -225,7 +224,8 @@ class OutputRequestBuilder:
             specversion=self._spec_version,
             id=self._id or str(uuid.uuid4()),
             source=self._source,
-            time=self._time or datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+            time=self._time
+            or datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
             type=self._type,
             datacontenttype=self._data_content_type,
             data=self._data,

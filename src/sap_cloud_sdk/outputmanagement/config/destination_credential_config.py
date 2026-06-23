@@ -1,8 +1,12 @@
 """Destination credential configuration for Output Management Service."""
+
 from typing import Optional
 from pydantic import BaseModel, Field, field_validator
 import logging
+
 logger = logging.getLogger(__name__)
+
+
 class DestinationCredentialConfig(BaseModel):
     """Configuration for accessing Output Management Service via SAP BTP Destination.
     This class provides a simple configuration wrapper for destination-based access.
@@ -23,18 +27,19 @@ class DestinationCredentialConfig(BaseModel):
         client = OutputManagementServiceClientProvider.create_from_destination(config)
         ```
     """
+
     destination_name: str = Field(
-        ...,
-        description="Name of the destination in SAP BTP Destination Service"
+        ..., description="Name of the destination in SAP BTP Destination Service"
     )
     access_strategy: Optional[str] = Field(
         default=None,
-        description="Access strategy: 'PROVIDER_ONLY' or 'SUBSCRIBER_ONLY' (optional)"
+        description="Access strategy: 'PROVIDER_ONLY' or 'SUBSCRIBER_ONLY' (optional)",
     )
     instance: Optional[str] = Field(
         default=None,
-        description="Destination service instance name (defaults to 'default' if not provided)"
+        description="Destination service instance name (defaults to 'default' if not provided)",
     )
+
     @field_validator("destination_name")
     @classmethod
     def validate_destination_name(cls, v: str) -> str:
@@ -42,6 +47,7 @@ class DestinationCredentialConfig(BaseModel):
         if not v or not v.strip():
             raise ValueError("Destination name cannot be empty")
         return v.strip()
+
     @field_validator("access_strategy")
     @classmethod
     def validate_access_strategy(cls, v: Optional[str]) -> Optional[str]:
@@ -54,10 +60,13 @@ class DestinationCredentialConfig(BaseModel):
                     "Must be 'PROVIDER_ONLY' or 'SUBSCRIBER_ONLY'"
                 )
         return v
+
     class Config:
         """Pydantic configuration."""
+
         frozen = True
         str_strip_whitespace = True
+
     def get_destination(self):
         """Retrieve the destination from SAP BTP Destination Service.
         Uses relative import to access sap_cloud_sdk.destination module.
@@ -71,12 +80,16 @@ class DestinationCredentialConfig(BaseModel):
 
         # Resolve instance name: use provided value or default to "default"
         inst = self.instance or "default"
-        logger.info(f"Retrieving destination '{self.destination_name}' from instance '{inst}'")
+        logger.info(
+            f"Retrieving destination '{self.destination_name}' from instance '{inst}'"
+        )
 
         try:
             client = create_client(instance=inst)
         except Exception as e:
-            logger.error(f"Failed to create destination client for instance '{inst}': {e}")
+            logger.error(
+                f"Failed to create destination client for instance '{inst}': {e}"
+            )
             raise ValueError(
                 f"Failed to create destination client for instance '{inst}'. "
                 f"Ensure the Destination Service is properly bound and configured."
@@ -87,8 +100,7 @@ class DestinationCredentialConfig(BaseModel):
             else:
                 strategy = AccessStrategy.SUBSCRIBER_ONLY
             destination = client.get_subaccount_destination(
-                name=self.destination_name,
-                access_strategy=strategy
+                name=self.destination_name, access_strategy=strategy
             )
             if destination is None:
                 raise ValueError(
@@ -99,22 +111,29 @@ class DestinationCredentialConfig(BaseModel):
         else:
             destination = client.get_instance_destination(name=self.destination_name)
             if destination is None:
-                destination = client.get_subaccount_destination(name=self.destination_name)
+                destination = client.get_subaccount_destination(
+                    name=self.destination_name
+                )
             if destination is None:
                 raise ValueError(f"Destination '{self.destination_name}' not found")
             logger.info(f"Retrieved destination '{self.destination_name}'")
         return destination
+
     def get_base_url(self) -> str:
         """Get the base URL from the destination."""
         destination = self.get_destination()
-        if hasattr(destination, 'url'):
+        if hasattr(destination, "url"):
             url = destination.url
-        elif hasattr(destination, 'get_url'):
+        elif hasattr(destination, "get_url"):
             url = destination.get_url()
-        elif hasattr(destination, 'get_uri'):
+        elif hasattr(destination, "get_uri"):
             url = destination.get_uri()
         else:
-            raise ValueError(f"Cannot extract URL from destination '{self.destination_name}'")
+            raise ValueError(
+                f"Cannot extract URL from destination '{self.destination_name}'"
+            )
         if not url:
-            raise ValueError(f"Destination '{self.destination_name}' does not have a URL")
-        return url.rstrip('/')
+            raise ValueError(
+                f"Destination '{self.destination_name}' does not have a URL"
+            )
+        return url.rstrip("/")

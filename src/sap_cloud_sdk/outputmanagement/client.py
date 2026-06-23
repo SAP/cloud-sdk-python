@@ -24,7 +24,6 @@ class OutputManagementServiceClient(ABC):
         """
         pass
 
-
     @abstractmethod
     def close(self) -> None:
         """Close the client and release resources."""
@@ -67,7 +66,6 @@ class OutputManagementServiceDefaultClient(OutputManagementServiceClient):
     def get_output_requests_client(self) -> OutputRequestsClient:
         """Get output requests client."""
         return self._output_requests_client
-
 
     def close(self) -> None:
         """Close the client and release resources."""

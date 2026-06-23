@@ -37,7 +37,6 @@ class OutputManagementException(Exception):
         return " | ".join(parts)
 
 
-
 class AuthenticationException(OutputManagementException):
     """Exception for authentication failures."""
 

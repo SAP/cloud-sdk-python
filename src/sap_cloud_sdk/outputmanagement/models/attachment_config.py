@@ -62,16 +62,17 @@ class AttachmentConfig(BaseModel):
     form_configuration: Optional[FormConfiguration] = Field(
         None,
         alias="formConfiguration",
-        description="Form configuration for PDF generation"
+        description="Form configuration for PDF generation",
     )
 
     pre_generated_attachments: Optional[List[PreGeneratedAttachment]] = Field(
         None,
         alias="preGeneratedAttachments",
-        description="List of pre-generated attachments from external sources like DMS"
+        description="List of pre-generated attachments from external sources like DMS",
     )
 
     class Config:
         """Pydantic configuration."""
+
         populate_by_name = True
         str_strip_whitespace = True

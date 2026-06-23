@@ -440,7 +440,7 @@ from sap_cloud_sdk.outputmanagement import create_client
 
 try:
     client = create_client(destination_name="ARIBA_OUTPUT_SERVICE")
-    
+
     response = client.send_email(
         notification_template_key="NOTIFICATION",
         to=["user@example.com"],
@@ -481,7 +481,7 @@ for order in orders:
         to=[order.customer_email],
         business_document={"Order": order.to_dict()}
     )
-    
+
     if response.error:
         print(f"Failed to send email for order {order.id}: {response.error.message}")
     else:
@@ -505,7 +505,7 @@ def send_order_confirmation(order):
 
     # Create client and send
     client = create_client(destination_name="ARIBA_OUTPUT_SERVICE")
-    
+
     response = client.send_email(
         notification_template_key="ORDER_CONFIRMATION",
         to=[order.customer_email],
@@ -761,7 +761,7 @@ from sap_cloud_sdk.outputmanagement import create_client
 
 def send_order_confirmation(order):
     client = create_client(destination_name="ARIBA_OUTPUT_SERVICE")
-    
+
     response = client.send_email(
         notification_template_key="ORDER_CONFIRMATION",
         to=[order.customer_email],
@@ -794,7 +794,7 @@ from sap_cloud_sdk.outputmanagement import create_client
 
 def send_invoice_with_pdf(invoice, pdf_dms_url):
     client = create_client(destination_name="ARIBA_OUTPUT_SERVICE")
-    
+
     response = client.send_email(
         notification_template_key="INVOICE_WITH_PDF",
         to=[invoice.customer_email],
@@ -821,7 +821,7 @@ from sap_cloud_sdk.outputmanagement import create_client
 
 def send_bulk_notification(recipients, notification_data):
     client = create_client(destination_name="ARIBA_OUTPUT_SERVICE")
-    
+
     response = client.send_email(
         notification_template_key="BULK_NOTIFICATION",
         to=recipients,
@@ -894,16 +894,16 @@ from sap_cloud_sdk.outputmanagement import (
 
 try:
     client = create_client(destination_name="ARIBA_OUTPUT_SERVICE")
-    
+
     response = client.send_email(
         notification_template_key="NOTIFICATION",
         to=["user@example.com"],
         business_document={"Document": {"id": "123"}}
     )
-    
+
     if response.error:
         print(f"Error: {response.error.message}")
-        
+
 except ValidationException as e:
     print(f"Validation error: {e.message}")
 except AuthenticationException as e:
@@ -955,5 +955,5 @@ For issues or questions:
 
 ---
 
-**Version:** 3.0.0  
+**Version:** 3.0.0
 **Last Updated:** 2026-06-23

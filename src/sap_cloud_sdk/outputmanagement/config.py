@@ -4,6 +4,8 @@ from typing import Optional
 from pydantic import BaseModel, Field, field_validator
 import logging
 
+from sap_cloud_sdk.destination import create_client, AccessStrategy
+
 logger = logging.getLogger(__name__)
 
 
@@ -69,15 +71,13 @@ class DestinationCredentialConfig(BaseModel):
 
     def get_destination(self):
         """Retrieve the destination from SAP BTP Destination Service.
-        Uses relative import to access sap_cloud_sdk.destination module.
+        Uses top-level import to access sap_cloud_sdk.destination module.
         Returns:
             Destination object with URL, authentication, and properties
         Raises:
             ValueError: If destination is not found
             Exception: If destination retrieval fails
         """
-        from ...destination import create_client, AccessStrategy
-
         # Resolve instance name: use provided value or default to "default"
         inst = self.instance or "default"
         logger.info(

@@ -9,7 +9,7 @@ import pytest
 @pytest.fixture
 def sample_email_config():
     """Provide a sample email configuration for testing."""
-    from sap_cloud_sdk.outputmanagement.models import EmailConfiguration
+    from sap_cloud_sdk.outputmanagement import EmailConfiguration
 
     return EmailConfiguration(
         emailNotificationTemplateKey="TEST_TEMPLATE",
@@ -21,7 +21,7 @@ def sample_email_config():
 @pytest.fixture
 def sample_attachment():
     """Provide a sample attachment for testing."""
-    from sap_cloud_sdk.outputmanagement.models import AttachmentConfig, FormConfiguration
+    from sap_cloud_sdk.outputmanagement import AttachmentConfig, FormConfiguration
 
     form_config = FormConfiguration(form_id="test-form")
     return AttachmentConfig(formConfiguration=form_config)
@@ -30,7 +30,7 @@ def sample_attachment():
 @pytest.fixture
 def sample_output_response():
     """Provide a sample output response for testing."""
-    from sap_cloud_sdk.outputmanagement.models import OutputResponse
+    from sap_cloud_sdk.outputmanagement import OutputResponse
 
     return OutputResponse(outputRequestId="test-req-123")
 
@@ -38,7 +38,7 @@ def sample_output_response():
 @pytest.fixture
 def sample_pre_generated_attachment():
     """Provide a sample pre-generated attachment for testing."""
-    from sap_cloud_sdk.outputmanagement.models import PreGeneratedAttachment
+    from sap_cloud_sdk.outputmanagement import PreGeneratedAttachment
 
     return PreGeneratedAttachment(
         url="https://dms.example.com/attachments/test-file.pdf",
@@ -49,9 +49,7 @@ def sample_pre_generated_attachment():
 @pytest.fixture
 def sample_destination_config():
     """Provide a sample destination configuration for testing."""
-    from sap_cloud_sdk.outputmanagement.config.destination_credential_config import (
-        DestinationCredentialConfig,
-    )
+    from sap_cloud_sdk.outputmanagement import DestinationCredentialConfig
 
     return DestinationCredentialConfig(
         destination_name="test-output-management"

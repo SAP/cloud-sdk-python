@@ -33,7 +33,7 @@ class TestOutputManagementModule:
         """Test that constants can be imported."""
         from sap_cloud_sdk.outputmanagement import FileFormat, Channel
         from sap_cloud_sdk.outputmanagement.constants import Constants
-        
+
         assert Constants.API_OUTPUT_CONTROL is not None
         assert FileFormat.PDF is not None
         assert Channel.INTERNAL_EMAIL is not None

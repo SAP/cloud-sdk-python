@@ -76,7 +76,7 @@ def mcp_tool_to_langchain(
     properties = mcp_tool.input_schema.get("properties", {})
     required = set(mcp_tool.input_schema.get("required", []))
     fields: dict[str, Any] = {
-        k: (str, ...) if k in required else (str, Field(default=None)) for k in properties
+        k: (str, ...) if k in required else (str | None, Field(default=None)) for k in properties
     }
     args_schema = create_model(f"{mcp_tool.name}_args", **fields) if fields else None
 

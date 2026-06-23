@@ -2,177 +2,106 @@
 
 import pytest
 from unittest.mock import AsyncMock
+from pydantic import BaseModel
 
 from sap_cloud_sdk.agentgateway import MCPTool
 from sap_cloud_sdk.agentgateway.converters import mcp_tool_to_langchain
 
 
-class TestMcpToolToLangchain:
-    """Tests for mcp_tool_to_langchain converter."""
+def _make_tool(*, required=("eventid",), optional=("showdeclinedreason", "datafetchmode")):
+    properties = {k: {"type": "string"} for k in (*required, *optional)}
+    return MCPTool(
+        name="get_supplier_bid",
+        server_name="ariba",
+        description="Gets all supplier bids for the specified event",
+        input_schema={"type": "object", "required": list(required), "properties": properties},
+        url="https://example.com/mcp",
+    )
 
-    def test_creates_structured_tool(self):
-        """Create LangChain StructuredTool from MCPTool."""
-        tool = MCPTool(
-            name="create_order",
-            server_name="s4hana",
-            description="Create a purchase order",
-            input_schema={
-                "type": "object",
-                "properties": {"order_id": {"type": "string"}},
-            },
-            url="https://example.com/mcp",
-        )
 
-        call_tool = AsyncMock(return_value="result")
-        get_user_token = lambda: "user-jwt"
+class TestMcpToolToLangchainStructure:
+    """Tests that the converter produces a correctly structured LangChain StructuredTool."""
 
-        result = mcp_tool_to_langchain(tool, call_tool, get_user_token)
+    def test_tool_metadata_matches_mcp_tool(self):
+        """name, description, and coroutine are taken from the MCPTool."""
+        lc_tool = mcp_tool_to_langchain(_make_tool(), AsyncMock(return_value="ok"), lambda: "token")
 
-        assert result.name == "create_order"
-        assert result.description == "Create a purchase order"
-        assert result.coroutine is not None
+        assert lc_tool.name == "get_supplier_bid"
+        assert lc_tool.description == "Gets all supplier bids for the specified event"
+        assert lc_tool.coroutine is not None
 
-    def test_creates_args_schema_from_input_schema(self):
-        """Create args schema from MCPTool input schema properties."""
-        tool = MCPTool(
-            name="test_tool",
-            server_name="server",
-            description="Test tool",
-            input_schema={
-                "type": "object",
-                "properties": {
-                    "param1": {"type": "string"},
-                    "param2": {"type": "integer"},
-                },
-            },
-            url="https://example.com/mcp",
-        )
+    def test_args_schema_is_pydantic_model_with_all_properties(self):
+        """args_schema is a Pydantic BaseModel that includes every property from input_schema."""
+        lc_tool = mcp_tool_to_langchain(_make_tool(), AsyncMock(return_value="ok"), lambda: "token")
 
-        call_tool = AsyncMock(return_value="result")
+        assert lc_tool.args_schema is not None
+        assert isinstance(lc_tool.args_schema, type) and issubclass(lc_tool.args_schema, BaseModel)
+        fields = lc_tool.args_schema.model_fields
+        assert "eventid" in fields
+        assert "showdeclinedreason" in fields
+        assert "datafetchmode" in fields
 
-        result = mcp_tool_to_langchain(tool, call_tool, lambda: "token")
+    def test_required_fields_are_required_in_args_schema(self):
+        """Fields listed in 'required' must be required in the Pydantic model."""
+        lc_tool = mcp_tool_to_langchain(_make_tool(), AsyncMock(return_value="ok"), lambda: "token")
 
-        assert result.args_schema is not None
-        from pydantic import BaseModel
+        assert lc_tool.args_schema.model_fields["eventid"].is_required()
 
-        assert isinstance(result.args_schema, type) and issubclass(
-            result.args_schema, BaseModel
-        )
-        schema_fields = result.args_schema.model_fields
-        assert "param1" in schema_fields
-        assert "param2" in schema_fields
+    def test_optional_fields_are_not_required_in_args_schema(self):
+        """Fields absent from 'required' must be optional in the Pydantic model."""
+        lc_tool = mcp_tool_to_langchain(_make_tool(), AsyncMock(return_value="ok"), lambda: "token")
 
-    def test_handles_empty_input_schema(self):
-        """Handle MCPTool with empty input schema."""
+        fields = lc_tool.args_schema.model_fields
+        assert not fields["showdeclinedreason"].is_required()
+        assert not fields["datafetchmode"].is_required()
+
+    def test_empty_input_schema_produces_valid_tool(self):
+        """MCPTool with no properties at all still produces a usable StructuredTool."""
         tool = MCPTool(
             name="simple_tool",
             server_name="server",
-            description="Simple tool with no params",
+            description="No params",
             input_schema={},
             url="https://example.com/mcp",
         )
+        lc_tool = mcp_tool_to_langchain(tool, AsyncMock(return_value="ok"), lambda: "token")
 
-        call_tool = AsyncMock(return_value="result")
+        assert lc_tool.name == "simple_tool"
+        assert lc_tool.args_schema is not None
 
-        result = mcp_tool_to_langchain(tool, call_tool, lambda: "token")
-
-        assert result.name == "simple_tool"
-        assert result.args_schema is not None
-
-    def test_optional_fields_not_required_in_args_schema(self):
-        """Fields absent from 'required' must be optional in the generated Pydantic model."""
+    def test_input_schema_without_properties_key(self):
+        """MCPTool with a type-only schema (no 'properties' key) produces a valid tool."""
         tool = MCPTool(
-            name="get_supplier_bid",
-            server_name="ariba",
-            description="Gets all supplier bids for the specified event",
-            input_schema={
-                "type": "object",
-                "required": ["eventid"],
-                "properties": {
-                    "eventid": {"description": "Unique identifier of the event"},
-                    "showdeclinedreason": {"description": "Show supplier decline reason"},
-                    "datafetchmode": {"description": "Level of detail for the response"},
-                },
-            },
-            url="https://example.com/mcp",
-        )
-
-        result = mcp_tool_to_langchain(tool, AsyncMock(return_value="result"), lambda: "token")
-
-        from pydantic import BaseModel
-
-        assert result.args_schema is not None and isinstance(result.args_schema, type) and issubclass(result.args_schema, BaseModel)
-        fields = result.args_schema.model_fields
-        assert fields["eventid"].is_required(), "eventid should be required"
-        assert not fields["showdeclinedreason"].is_required(), "showdeclinedreason should be optional"
-        assert not fields["datafetchmode"].is_required(), "datafetchmode should be optional"
-
-    def test_handles_input_schema_without_properties(self):
-        """Handle MCPTool with input schema but no properties."""
-        tool = MCPTool(
-            name="tool",
+            name="typed_tool",
             server_name="server",
-            description="Tool",
+            description="Type only",
             input_schema={"type": "object"},
             url="https://example.com/mcp",
         )
+        lc_tool = mcp_tool_to_langchain(tool, AsyncMock(return_value="ok"), lambda: "token")
 
-        call_tool = AsyncMock(return_value="result")
-
-        result = mcp_tool_to_langchain(tool, call_tool, lambda: "token")
-
-        assert result.args_schema is not None
+        assert lc_tool.args_schema is not None
 
 
 class TestMcpToolToLangchainInvocation:
-    """End-to-end invocation tests for mcp_tool_to_langchain."""
+    """End-to-end invocation tests: verify what actually reaches call_tool."""
 
     @pytest.mark.asyncio
     async def test_required_param_forwarded(self):
-        """Required parameters are forwarded to call_tool."""
-        tool = MCPTool(
-            name="get_supplier_bid",
-            server_name="ariba",
-            description="Gets supplier bids",
-            input_schema={
-                "type": "object",
-                "required": ["eventid"],
-                "properties": {
-                    "eventid": {"type": "string"},
-                    "showdeclinedreason": {"type": "string"},
-                },
-            },
-            url="https://example.com/mcp",
-        )
+        """Required parameters supplied by the LLM are forwarded to call_tool."""
         call_tool = AsyncMock(return_value="ok")
-        lc_tool = mcp_tool_to_langchain(tool, call_tool, lambda: "token")
+        lc_tool = mcp_tool_to_langchain(_make_tool(), call_tool, lambda: "token")
 
         await lc_tool.arun({"eventid": "E001"})
 
         call_tool.assert_awaited_once()
-        kwargs = call_tool.call_args.kwargs
-        assert kwargs["eventid"] == "E001"
+        assert call_tool.call_args.kwargs["eventid"] == "E001"
 
     @pytest.mark.asyncio
     async def test_optional_params_omitted_when_not_supplied(self):
-        """Optional parameters not supplied by the LLM must not be forwarded as None."""
-        tool = MCPTool(
-            name="get_supplier_bid",
-            server_name="ariba",
-            description="Gets supplier bids",
-            input_schema={
-                "type": "object",
-                "required": ["eventid"],
-                "properties": {
-                    "eventid": {"type": "string"},
-                    "showdeclinedreason": {"type": "string"},
-                    "datafetchmode": {"type": "string"},
-                },
-            },
-            url="https://example.com/mcp",
-        )
+        """Optional parameters absent from the LLM response must not reach call_tool as None."""
         call_tool = AsyncMock(return_value="ok")
-        lc_tool = mcp_tool_to_langchain(tool, call_tool, lambda: "token")
+        lc_tool = mcp_tool_to_langchain(_make_tool(), call_tool, lambda: "token")
 
         await lc_tool.arun({"eventid": "E001"})
 
@@ -181,26 +110,23 @@ class TestMcpToolToLangchainInvocation:
         assert "datafetchmode" not in kwargs
 
     @pytest.mark.asyncio
-    async def test_optional_param_forwarded_when_supplied(self):
-        """Optional parameters that the LLM does supply are forwarded."""
-        tool = MCPTool(
-            name="get_supplier_bid",
-            server_name="ariba",
-            description="Gets supplier bids",
-            input_schema={
-                "type": "object",
-                "required": ["eventid"],
-                "properties": {
-                    "eventid": {"type": "string"},
-                    "showdeclinedreason": {"type": "string"},
-                },
-            },
-            url="https://example.com/mcp",
-        )
+    async def test_optional_params_omitted_when_llm_sends_none(self):
+        """Optional parameters explicitly set to None by the LLM must not reach call_tool."""
         call_tool = AsyncMock(return_value="ok")
-        lc_tool = mcp_tool_to_langchain(tool, call_tool, lambda: "token")
+        lc_tool = mcp_tool_to_langchain(_make_tool(), call_tool, lambda: "token")
+
+        await lc_tool.arun({"eventid": "E001", "showdeclinedreason": None, "datafetchmode": None})
+
+        kwargs = call_tool.call_args.kwargs
+        assert "showdeclinedreason" not in kwargs
+        assert "datafetchmode" not in kwargs
+
+    @pytest.mark.asyncio
+    async def test_optional_param_forwarded_when_supplied(self):
+        """Optional parameters with a real value supplied by the LLM are forwarded."""
+        call_tool = AsyncMock(return_value="ok")
+        lc_tool = mcp_tool_to_langchain(_make_tool(), call_tool, lambda: "token")
 
         await lc_tool.arun({"eventid": "E001", "showdeclinedreason": "true"})
 
-        kwargs = call_tool.call_args.kwargs
-        assert kwargs["showdeclinedreason"] == "true"
+        assert call_tool.call_args.kwargs["showdeclinedreason"] == "true"

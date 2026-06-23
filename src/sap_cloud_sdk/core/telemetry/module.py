@@ -16,6 +16,7 @@ class Module(str, Enum):
     DESTINATION = "destination"
     DMS = "dms"
     EXTENSIBILITY = "extensibility"
+    HTTP_CLIENT = "http_client"
     OBJECTSTORE = "objectstore"
     ODATA = "odata"
     PRINT = "print"

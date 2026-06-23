@@ -48,7 +48,7 @@ from sap_cloud_sdk.destination.utils._pagination import (
 )
 from sap_cloud_sdk.destination.config import load_from_env_or_mount, DestinationConfig
 from sap_cloud_sdk.destination._http import TokenProvider, DestinationHttp
-from sap_cloud_sdk.destination._destination_http_client import DestinationHttpClient
+from sap_cloud_sdk.core.http_client import HttpClient, http_client_for_destination
 from sap_cloud_sdk.destination.client import DestinationClient
 from sap_cloud_sdk.destination.fragment_client import FragmentClient
 from sap_cloud_sdk.destination.certificate_client import CertificateClient
@@ -236,7 +236,8 @@ __all__ = [
     "LocalDevDestinationClient",
     "LocalDevFragmentClient",
     "LocalDevCertificateClient",
-    "DestinationHttpClient",
+    "HttpClient",
+    "http_client_for_destination",
     # Exceptions
     "DestinationError",
     "ClientCreationError",

@@ -137,7 +137,9 @@ class Authentication(Enum):
     OAUTH2_TOKEN_EXCHANGE = "OAuth2TokenExchange"
     OAUTH2_AUTHORIZATION_CODE = "OAuth2AuthorizationCode"
     OAUTH2_TECHNICAL_USER_PROPAGATION = "OAuth2TechnicalUserPropagation"
+    SAP_ASSERTION_SSO = "SAPAssertionSSO"
     SAML_ASSERTION = "SAMLAssertion"
+    TOKEN_FORWARDING = "TokenForwarding"
 
 
 def _parse_destination_type(value: Any) -> DestinationType | str | None:

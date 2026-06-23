@@ -8,7 +8,6 @@ Initial version: no retries and no explicit timeouts.
 from __future__ import annotations
 
 from typing import Any, Dict, Optional
-from enum import Enum
 
 import requests
 from requests import Response
@@ -22,16 +21,6 @@ from sap_cloud_sdk.destination.exceptions import HttpError
 # API version constants
 API_V1 = "v1"
 API_V2 = "v2"
-
-
-class HttpMethod(Enum):
-    """HTTP method enumeration for request verb selection."""
-
-    GET = "GET"
-    POST = "POST"
-    PUT = "PUT"
-    PATCH = "PATCH"
-    DELETE = "DELETE"
 
 
 class TokenProvider:
@@ -117,7 +106,7 @@ class DestinationHttp:
 
     def _request(
         self,
-        method: HttpMethod | str,
+        method: str,
         path: str,
         *,
         params: Optional[Dict[str, Any]] = None,
@@ -131,14 +120,9 @@ class DestinationHttp:
         if extra_headers:
             headers.update(extra_headers)
 
-        # Normalize method to string
-        method_str = (
-            method.value if isinstance(method, HttpMethod) else str(method).upper()
-        )
-
         try:
             resp = self._session.request(
-                method=method_str,
+                method=method.upper(),
                 url=url,
                 headers=headers,
                 params=params,
@@ -157,7 +141,7 @@ class DestinationHttp:
             text = "<failed to read response body>"
 
         raise HttpError(
-            f"HTTP {resp.status_code} for {method_str} {url}",
+            f"HTTP {resp.status_code} for {method.upper()} {url}",
             status_code=resp.status_code,
             response_text=text,
         )
@@ -187,7 +171,7 @@ class DestinationHttp:
             HttpError: If the request fails or returns a non-2xx status.
         """
         return self._request(
-            HttpMethod.GET,
+            "GET",
             path,
             params=params,
             extra_headers=headers,
@@ -217,7 +201,7 @@ class DestinationHttp:
             HttpError: If the request fails or returns a non-2xx status.
         """
         return self._request(
-            HttpMethod.POST,
+            "POST",
             path,
             json=body,
             extra_headers=headers,
@@ -247,7 +231,7 @@ class DestinationHttp:
             HttpError: If the request fails or returns a non-2xx status.
         """
         return self._request(
-            HttpMethod.PUT,
+            "PUT",
             path,
             json=body,
             extra_headers=headers,
@@ -277,7 +261,7 @@ class DestinationHttp:
             HttpError: If the request fails or returns a non-2xx status.
         """
         return self._request(
-            HttpMethod.PATCH,
+            "PATCH",
             path,
             json=body,
             extra_headers=headers,
@@ -305,7 +289,7 @@ class DestinationHttp:
             HttpError: If the request fails or returns a non-2xx status.
         """
         return self._request(
-            HttpMethod.DELETE,
+            "DELETE",
             path,
             extra_headers=headers,
             tenant_subdomain=tenant_subdomain,

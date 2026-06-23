@@ -122,6 +122,12 @@ def call_list_mcp_tools(context: ScenarioContext, agw_client: AgentGatewayClient
     context.tools = run(agw_client.list_mcp_tools())
 
 
+@when("I call list_mcp_tools with the user token")
+def call_list_mcp_tools_with_user_token(context: ScenarioContext, agw_client: AgentGatewayClient):
+    """Call list_mcp_tools with user token and store the result."""
+    context.tools = run(agw_client.list_mcp_tools(user_token=context.user_token))
+
+
 @when(parsers.parse('I call call_mcp_tool with "{tool_name}" and the user token'))
 def call_call_mcp_tool(
     context: ScenarioContext, agw_client: AgentGatewayClient, tool_name: str

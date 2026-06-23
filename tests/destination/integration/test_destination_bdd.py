@@ -18,7 +18,7 @@ from sap_cloud_sdk.destination import (
     ConsumptionOptions,
     PatchLabels,
 )
-from sap_cloud_sdk.destination._destination_http_client import DestinationHttpClient
+from sap_cloud_sdk.core.http_client import HttpClient, http_client_for_destination
 from sap_cloud_sdk.destination.exceptions import (
     HttpError,
     DestinationOperationError,
@@ -59,7 +59,7 @@ class ScenarioContext:
         self.updated_certificate_content: Optional[str] = None
         self.tenant: Optional[str] = None
         self.retrieved_labels: List[Label] = []
-        self.http_client: Optional[DestinationHttpClient] = None
+        self.http_client: Optional[HttpClient] = None
         self.http_response = None
 
 
@@ -1597,9 +1597,9 @@ def fetch_destination_v2(context, destination_client):
     context.retrieved_destination = destination_client.get_destination(context.destination.name)
 
 
-@when("I create a DestinationHttpClient from the destination")
+@when("I create an HttpClient from the destination")
 def create_http_client(context):
-    context.http_client = DestinationHttpClient(context.retrieved_destination)
+    context.http_client = http_client_for_destination(context.retrieved_destination)
 
 
 @when(parsers.parse('I send a GET request to "{path}"'))

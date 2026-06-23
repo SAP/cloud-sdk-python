@@ -87,7 +87,7 @@ def auto_instrument(
     if middlewares:
         _register_middleware_processors(middlewares)
 
-    _auto_instrument_frameworks(middlewares)
+    _auto_instrument_frameworks()
 
     logger.info("Cloud auto instrumentation initialized successfully")
 
@@ -158,9 +158,7 @@ def _register_middleware_processors(middlewares: list[TelemetryMiddleware]) -> N
     )
 
 
-def _auto_instrument_frameworks(
-    middlewares: list[TelemetryMiddleware] | None = None,
-) -> None:
+def _auto_instrument_frameworks() -> None:
     from sap_cloud_sdk.core.telemetry.middleware._registry import _get_available
     from sap_cloud_sdk.core.telemetry.middleware.span_processor import (
         MiddlewareSpanProcessor,
@@ -173,29 +171,11 @@ def _auto_instrument_frameworks(
         )
         return
 
-    manual_middlewares = list(middlewares or [])
-
-    def _is_superseded(instr) -> bool:
-        cls = instr.__class__.supersedes
-        return cls is not None and any(isinstance(m, cls) for m in manual_middlewares)
-
-    candidates = _get_available()
     instrumentors = [
-        i for i in candidates
-        if not i.__class__._processor_registered and not _is_superseded(i)
+        i for i in _get_available() if not i.__class__._processor_registered
     ]
-
     if not instrumentors:
         return
-
-    for i in candidates:
-        if _is_superseded(i):
-            logger.warning(
-                "%s skipped: an instance of %s is already provided via middlewares=. "
-                "Remove the explicit middleware to avoid duplicate IAS span attributes.",
-                type(i).__name__,
-                i.__class__.supersedes.__name__,
-            )
 
     for instr in instrumentors:
         instr.instrument()

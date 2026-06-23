@@ -10,9 +10,6 @@ from sap_cloud_sdk.core.telemetry.middleware._starlette_instrumentor import (
     _StarletteIASInstrumentor,
     _attrs_var,
 )
-from sap_cloud_sdk.core.telemetry.middleware.starlette_a2a import (
-    StarletteIASTelemetryMiddleware,
-)
 
 _PATCH_PARSE = "sap_cloud_sdk.core.telemetry.middleware.starlette_a2a.parse_token"
 
@@ -183,8 +180,3 @@ class TestUninstrumentGuards:
         instr.instrument()
         instr.uninstrument()
         assert not _StarletteIASInstrumentor._processor_registered
-
-
-class TestSupersedes:
-    def test_supersedes_points_to_manual_middleware(self):
-        assert _StarletteIASInstrumentor.supersedes is StarletteIASTelemetryMiddleware

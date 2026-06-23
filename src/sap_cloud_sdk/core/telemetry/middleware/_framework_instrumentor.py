@@ -1,16 +1,11 @@
 """Internal: auto-instrumentation adapter base class.
 
-This is an internal SDK module — not part of the public API. Contributors
-who want to add zero-config instrumentation for additional frameworks
-should subclass ``FrameworkInstrumentor`` here and register it via the
-``_registry`` module.
+This is an internal SDK module — not part of the public API.
 """
 
 import logging
 from abc import ABC, abstractmethod
-from typing import Any, Dict, Optional, Type
-
-from sap_cloud_sdk.core.telemetry.middleware.base import TelemetryMiddleware
+from typing import Any, Dict
 
 logger = logging.getLogger(__name__)
 
@@ -22,19 +17,12 @@ class FrameworkInstrumentor(ABC):
     created after ``instrument()`` is called automatically gets the IAS
     telemetry middleware.
 
-    The idempotency guard lives in the base class so subclasses never need
-    to implement it. Subclasses implement ``_do_instrument`` and
-    ``_do_uninstrument`` only.
-
-    To enable overlap detection against a manually-passed
-    ``TelemetryMiddleware``, set ``supersedes`` to the corresponding
-    middleware class. ``auto_instrument()`` will then skip this instrumentor
-    if the user passes an instance of that middleware via ``middlewares=``.
+    The idempotency guard lives in the base class. Subclasses implement
+    ``_do_instrument`` and ``_do_uninstrument`` only.
     """
 
     _instrumented: bool = False
     _processor_registered: bool = False
-    supersedes: Optional[Type[TelemetryMiddleware]] = None
 
     def instrument(self) -> None:
         """Patch the framework. Idempotent — safe to call multiple times."""

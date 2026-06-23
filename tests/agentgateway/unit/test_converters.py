@@ -1,5 +1,6 @@
 """Unit tests for MCP tool converters."""
 
+import pytest
 from unittest.mock import AsyncMock
 
 from sap_cloud_sdk.agentgateway import MCPTool
@@ -121,3 +122,85 @@ class TestMcpToolToLangchain:
         result = mcp_tool_to_langchain(tool, call_tool, lambda: "token")
 
         assert result.args_schema is not None
+
+
+class TestMcpToolToLangchainInvocation:
+    """End-to-end invocation tests for mcp_tool_to_langchain."""
+
+    @pytest.mark.asyncio
+    async def test_required_param_forwarded(self):
+        """Required parameters are forwarded to call_tool."""
+        tool = MCPTool(
+            name="get_supplier_bid",
+            server_name="ariba",
+            description="Gets supplier bids",
+            input_schema={
+                "type": "object",
+                "required": ["eventid"],
+                "properties": {
+                    "eventid": {"type": "string"},
+                    "showdeclinedreason": {"type": "string"},
+                },
+            },
+            url="https://example.com/mcp",
+        )
+        call_tool = AsyncMock(return_value="ok")
+        lc_tool = mcp_tool_to_langchain(tool, call_tool, lambda: "token")
+
+        await lc_tool.arun({"eventid": "E001"})
+
+        call_tool.assert_awaited_once()
+        kwargs = call_tool.call_args.kwargs
+        assert kwargs["eventid"] == "E001"
+
+    @pytest.mark.asyncio
+    async def test_optional_params_omitted_when_not_supplied(self):
+        """Optional parameters not supplied by the LLM must not be forwarded as None."""
+        tool = MCPTool(
+            name="get_supplier_bid",
+            server_name="ariba",
+            description="Gets supplier bids",
+            input_schema={
+                "type": "object",
+                "required": ["eventid"],
+                "properties": {
+                    "eventid": {"type": "string"},
+                    "showdeclinedreason": {"type": "string"},
+                    "datafetchmode": {"type": "string"},
+                },
+            },
+            url="https://example.com/mcp",
+        )
+        call_tool = AsyncMock(return_value="ok")
+        lc_tool = mcp_tool_to_langchain(tool, call_tool, lambda: "token")
+
+        await lc_tool.arun({"eventid": "E001"})
+
+        kwargs = call_tool.call_args.kwargs
+        assert "showdeclinedreason" not in kwargs
+        assert "datafetchmode" not in kwargs
+
+    @pytest.mark.asyncio
+    async def test_optional_param_forwarded_when_supplied(self):
+        """Optional parameters that the LLM does supply are forwarded."""
+        tool = MCPTool(
+            name="get_supplier_bid",
+            server_name="ariba",
+            description="Gets supplier bids",
+            input_schema={
+                "type": "object",
+                "required": ["eventid"],
+                "properties": {
+                    "eventid": {"type": "string"},
+                    "showdeclinedreason": {"type": "string"},
+                },
+            },
+            url="https://example.com/mcp",
+        )
+        call_tool = AsyncMock(return_value="ok")
+        lc_tool = mcp_tool_to_langchain(tool, call_tool, lambda: "token")
+
+        await lc_tool.arun({"eventid": "E001", "showdeclinedreason": "true"})
+
+        kwargs = call_tool.call_args.kwargs
+        assert kwargs["showdeclinedreason"] == "true"

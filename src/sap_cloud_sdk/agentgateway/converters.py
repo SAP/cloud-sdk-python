@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, Callable
 
-from pydantic import create_model
+from pydantic import Field, create_model
 
 from sap_cloud_sdk.agentgateway._models import MCPTool
 
@@ -69,14 +69,14 @@ def mcp_tool_to_langchain(
         return await call_tool(
             mcp_tool,
             user_token=get_user_token,
-            **kwargs,
+            **{k: v for k, v in kwargs.items() if v is not None},
         )
 
     # Build args schema from input_schema
     properties = mcp_tool.input_schema.get("properties", {})
     required = set(mcp_tool.input_schema.get("required", []))
     fields: dict[str, Any] = {
-        k: (str, ...) if k in required else (str | None, None) for k in properties
+        k: (str, ...) if k in required else (str, Field(default=None)) for k in properties
     }
     args_schema = create_model(f"{mcp_tool.name}_args", **fields) if fields else None
 

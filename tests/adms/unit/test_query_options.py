@@ -83,7 +83,7 @@ class TestRelationQueryOptions:
         # $orderby is reserved for DocumentQueryOptions — RelationQueryOptions
         # must not silently accept it as a kwarg.
         with pytest.raises(TypeError):
-            RelationQueryOptions(orderby="CreatedAt desc")  # type: ignore[call-arg]
+            RelationQueryOptions(orderby="CreatedAt desc")  # type: ignore[call-arg]  # ty: ignore[unknown-argument]
 
 
 class TestDocumentQueryOptions:

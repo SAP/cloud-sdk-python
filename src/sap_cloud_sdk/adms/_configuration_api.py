@@ -3,15 +3,12 @@ document types, business object node types, type mappings)."""
 
 from __future__ import annotations
 
-from sap_cloud_sdk.adms._keys import (
-    build_allowed_domain_key_path,
-    build_business_object_node_type_key_path,
-    build_doctype_botype_map_key_path,
-    build_document_type_key_path,
-)
+import uuid
+
+from sap_cloud_sdk.core.odata._entity_key import EntityKey
+from sap_cloud_sdk.core.odata._request_builders import GetByKeyRequestBuilder
 from sap_cloud_sdk.core.odata._transport import ODataHttpTransport
 from sap_cloud_sdk.core.odata._async_transport import AsyncODataHttpTransport
-from sap_cloud_sdk.core.odata._filter import quote_odata_guid_key as _quote_guid
 from sap_cloud_sdk.adms._models import (
     AllowedDomain,
     ApplicationTenant,
@@ -61,8 +58,9 @@ class _ConfigurationApi:
     @record_metrics(Module.ADMS, Operation.ADMS_CONFIG_GET_ALLOWED_DOMAIN)
     def get_allowed_domain(self, allowed_domain_id: str) -> AllowedDomain:
         """Fetch a single AllowedDomain by its UUID."""
-        resp = self._http.get(build_allowed_domain_key_path(allowed_domain_id))
-        return AllowedDomain.from_dict(resp)
+        return GetByKeyRequestBuilder(
+            self._http, AllowedDomain, {"AllowedDomainID": uuid.UUID(allowed_domain_id)}
+        ).execute()
 
     @record_metrics(Module.ADMS, Operation.ADMS_CONFIG_UPDATE_ALLOWED_DOMAIN)
     def update_allowed_domain(
@@ -70,7 +68,9 @@ class _ConfigurationApi:
     ) -> AllowedDomain:
         """Update an existing AllowedDomain entry (PATCH — only sent fields change)."""
         resp = self._http.patch(
-            build_allowed_domain_key_path(allowed_domain_id),
+            str(
+                EntityKey("AllowedDomain", AllowedDomainID=uuid.UUID(allowed_domain_id))
+            ),
             json=payload.to_odata_dict(),
         )
         return AllowedDomain.from_dict(resp)
@@ -78,7 +78,11 @@ class _ConfigurationApi:
     @record_metrics(Module.ADMS, Operation.ADMS_CONFIG_DELETE_ALLOWED_DOMAIN)
     def delete_allowed_domain(self, allowed_domain_id: str) -> None:
         """Remove an entry from the domain allow-list."""
-        self._http.delete(build_allowed_domain_key_path(allowed_domain_id))
+        self._http.delete(
+            str(
+                EntityKey("AllowedDomain", AllowedDomainID=uuid.UUID(allowed_domain_id))
+            )
+        )
 
     @record_metrics(Module.ADMS, Operation.ADMS_CONFIG_GET_ALL_DOCUMENT_TYPES)
     def get_all_document_types(
@@ -99,8 +103,9 @@ class _ConfigurationApi:
     @record_metrics(Module.ADMS, Operation.ADMS_CONFIG_GET_DOCUMENT_TYPE)
     def get_document_type(self, document_type_id: str) -> DocumentType:
         """Fetch a single DocumentType by its ID."""
-        resp = self._http.get(build_document_type_key_path(document_type_id))
-        return DocumentType.from_dict(resp)
+        return GetByKeyRequestBuilder(
+            self._http, DocumentType, {"DocumentTypeID": document_type_id}
+        ).execute()
 
     @record_metrics(Module.ADMS, Operation.ADMS_CONFIG_UPDATE_DOCUMENT_TYPE)
     def update_document_type(
@@ -108,14 +113,17 @@ class _ConfigurationApi:
     ) -> DocumentType:
         """Update an existing DocumentType (PATCH — only sent fields change)."""
         resp = self._http.patch(
-            build_document_type_key_path(document_type_id), json=payload.to_odata_dict()
+            str(EntityKey("DocumentType", DocumentTypeID=document_type_id)),
+            json=payload.to_odata_dict(),
         )
         return DocumentType.from_dict(resp)
 
     @record_metrics(Module.ADMS, Operation.ADMS_CONFIG_DELETE_DOCUMENT_TYPE)
     def delete_document_type(self, document_type_id: str) -> None:
         """Delete a document type classification."""
-        self._http.delete(build_document_type_key_path(document_type_id))
+        self._http.delete(
+            str(EntityKey("DocumentType", DocumentTypeID=document_type_id))
+        )
 
     @record_metrics(Module.ADMS, Operation.ADMS_CONFIG_GET_ALL_BUSINESS_OBJECT_TYPES)
     def get_all_business_object_types(
@@ -142,12 +150,11 @@ class _ConfigurationApi:
         self, business_object_node_type_unique_id: str
     ) -> BusinessObjectNodeType:
         """Fetch a single BusinessObjectNodeType by its unique ID."""
-        resp = self._http.get(
-            build_business_object_node_type_key_path(
-                business_object_node_type_unique_id
-            )
-        )
-        return BusinessObjectNodeType.from_dict(resp)
+        return GetByKeyRequestBuilder(
+            self._http,
+            BusinessObjectNodeType,
+            {"BusinessObjectNodeTypeUniqueID": business_object_node_type_unique_id},
+        ).execute()
 
     @record_metrics(Module.ADMS, Operation.ADMS_CONFIG_UPDATE_BUSINESS_OBJECT_TYPE)
     def update_business_object_type(
@@ -157,8 +164,11 @@ class _ConfigurationApi:
     ) -> BusinessObjectNodeType:
         """Update an existing BusinessObjectNodeType (PATCH)."""
         resp = self._http.patch(
-            build_business_object_node_type_key_path(
-                business_object_node_type_unique_id
+            str(
+                EntityKey(
+                    "BusinessObjectNodeType",
+                    BusinessObjectNodeTypeUniqueID=business_object_node_type_unique_id,
+                )
             ),
             json=payload.to_odata_dict(),
         )
@@ -170,8 +180,11 @@ class _ConfigurationApi:
     ) -> None:
         """Delete a business object node type registration."""
         self._http.delete(
-            build_business_object_node_type_key_path(
-                business_object_node_type_unique_id
+            str(
+                EntityKey(
+                    "BusinessObjectNodeType",
+                    BusinessObjectNodeTypeUniqueID=business_object_node_type_unique_id,
+                )
             )
         )
 
@@ -203,23 +216,35 @@ class _ConfigurationApi:
         self, document_type_bo_type_map_id: str
     ) -> DocumentTypeBusinessObjectTypeMap:
         """Fetch a single DocumentType ↔ BusinessObjectNodeType mapping by its UUID."""
-        resp = self._http.get(
-            build_doctype_botype_map_key_path(document_type_bo_type_map_id)
-        )
-        return DocumentTypeBusinessObjectTypeMap.from_dict(resp)
+        return GetByKeyRequestBuilder(
+            self._http,
+            DocumentTypeBusinessObjectTypeMap,
+            {"DocumentTypeBOTypeMapID": uuid.UUID(document_type_bo_type_map_id)},
+        ).execute()
 
     @record_metrics(Module.ADMS, Operation.ADMS_CONFIG_DELETE_DOCTYPE_BOTYPE_MAP)
     def delete_type_mapping(self, document_type_bo_type_map_id: str) -> None:
         """Delete a DocumentType ↔ BusinessObjectNodeType mapping."""
         self._http.delete(
-            build_doctype_botype_map_key_path(document_type_bo_type_map_id)
+            str(
+                EntityKey(
+                    "DocumentTypeBusinessObjectTypeMap",
+                    DocumentTypeBOTypeMapID=uuid.UUID(document_type_bo_type_map_id),
+                )
+            )
         )
 
     @record_metrics(Module.ADMS, Operation.ADMS_CONFIG_MARK_DEFAULT)
     def mark_default(self, document_type_bo_type_map_id: str) -> None:
         """Mark a DocumentType ↔ BusinessObjectNodeType mapping as the default."""
         self._http.post(
-            f"{build_doctype_botype_map_key_path(document_type_bo_type_map_id)}/markDefault",
+            str(
+                EntityKey(
+                    "DocumentTypeBusinessObjectTypeMap",
+                    DocumentTypeBOTypeMapID=uuid.UUID(document_type_bo_type_map_id),
+                )
+            )
+            + "/markDefault",
             json={},
         )
 
@@ -247,16 +272,20 @@ class _ConfigurationApi:
         self, file_extension_policy_id: str
     ) -> FileExtensionPolicy:
         """Fetch a single FileExtensionPolicy by its UUID."""
-        resp = self._http.get(
-            f"FileExtensionPolicy(FileExtensionPolicyID={_quote_guid(file_extension_policy_id)})"
-        )
-        return FileExtensionPolicy.from_dict(resp)
+        return GetByKeyRequestBuilder(
+            self._http,
+            FileExtensionPolicy,
+            {"FileExtensionPolicyID": uuid.UUID(file_extension_policy_id)},
+        ).execute()
 
     @record_metrics(Module.ADMS, Operation.ADMS_CONFIG_DELETE_FILE_EXT_POLICY)
     def delete_file_extension_policy(self, file_extension_policy_id: str) -> None:
         """Delete a file extension policy."""
         self._http.delete(
-            f"FileExtensionPolicy(FileExtensionPolicyID={_quote_guid(file_extension_policy_id)})"
+            "FileExtensionPolicy"
+            + EntityKey.segment(
+                FileExtensionPolicyID=uuid.UUID(file_extension_policy_id)
+            )
         )
 
     # ── ApplicationTenant ─────────────────────────────────────────────────────
@@ -281,10 +310,11 @@ class _ConfigurationApi:
     @record_metrics(Module.ADMS, Operation.ADMS_CONFIG_GET_APP_TENANT)
     def get_application_tenant(self, application_tenant_id: str) -> ApplicationTenant:
         """Fetch a single ApplicationTenant by its ID."""
-        resp = self._http.get(
-            f"ApplicationTenant(ApplicationTenantID='{application_tenant_id}')"
-        )
-        return ApplicationTenant.from_dict(resp)
+        return GetByKeyRequestBuilder(
+            self._http,
+            ApplicationTenant,
+            {"ApplicationTenantID": application_tenant_id},
+        ).execute()
 
     @record_metrics(Module.ADMS, Operation.ADMS_CONFIG_DELETE_APP_TENANT)
     def delete_application_tenant(self, application_tenant_id: str) -> None:
@@ -324,7 +354,11 @@ class _AsyncConfigurationApi:
     @record_metrics(Module.ADMS, Operation.ADMS_CONFIG_GET_ALLOWED_DOMAIN)
     async def get_allowed_domain(self, allowed_domain_id: str) -> AllowedDomain:
         """Async variant of :meth:`_ConfigurationApi.get_allowed_domain` — same semantics."""
-        resp = await self._http.get(build_allowed_domain_key_path(allowed_domain_id))
+        resp = await self._http.get(
+            str(
+                EntityKey("AllowedDomain", AllowedDomainID=uuid.UUID(allowed_domain_id))
+            )
+        )
         return AllowedDomain.from_dict(resp)
 
     @record_metrics(Module.ADMS, Operation.ADMS_CONFIG_UPDATE_ALLOWED_DOMAIN)
@@ -333,7 +367,9 @@ class _AsyncConfigurationApi:
     ) -> AllowedDomain:
         """Async variant of :meth:`_ConfigurationApi.update_allowed_domain` — same semantics."""
         resp = await self._http.patch(
-            build_allowed_domain_key_path(allowed_domain_id),
+            str(
+                EntityKey("AllowedDomain", AllowedDomainID=uuid.UUID(allowed_domain_id))
+            ),
             json=payload.to_odata_dict(),
         )
         return AllowedDomain.from_dict(resp)
@@ -341,7 +377,11 @@ class _AsyncConfigurationApi:
     @record_metrics(Module.ADMS, Operation.ADMS_CONFIG_DELETE_ALLOWED_DOMAIN)
     async def delete_allowed_domain(self, allowed_domain_id: str) -> None:
         """Async variant of :meth:`_ConfigurationApi.delete_allowed_domain` — same semantics."""
-        await self._http.delete(build_allowed_domain_key_path(allowed_domain_id))
+        await self._http.delete(
+            str(
+                EntityKey("AllowedDomain", AllowedDomainID=uuid.UUID(allowed_domain_id))
+            )
+        )
 
     @record_metrics(Module.ADMS, Operation.ADMS_CONFIG_GET_ALL_DOCUMENT_TYPES)
     async def get_all_document_types(
@@ -364,7 +404,9 @@ class _AsyncConfigurationApi:
     @record_metrics(Module.ADMS, Operation.ADMS_CONFIG_GET_DOCUMENT_TYPE)
     async def get_document_type(self, document_type_id: str) -> DocumentType:
         """Async variant of :meth:`_ConfigurationApi.get_document_type` — same semantics."""
-        resp = await self._http.get(build_document_type_key_path(document_type_id))
+        resp = await self._http.get(
+            str(EntityKey("DocumentType", DocumentTypeID=document_type_id))
+        )
         return DocumentType.from_dict(resp)
 
     @record_metrics(Module.ADMS, Operation.ADMS_CONFIG_UPDATE_DOCUMENT_TYPE)
@@ -373,14 +415,17 @@ class _AsyncConfigurationApi:
     ) -> DocumentType:
         """Async variant of :meth:`_ConfigurationApi.update_document_type` — same semantics."""
         resp = await self._http.patch(
-            build_document_type_key_path(document_type_id), json=payload.to_odata_dict()
+            str(EntityKey("DocumentType", DocumentTypeID=document_type_id)),
+            json=payload.to_odata_dict(),
         )
         return DocumentType.from_dict(resp)
 
     @record_metrics(Module.ADMS, Operation.ADMS_CONFIG_DELETE_DOCUMENT_TYPE)
     async def delete_document_type(self, document_type_id: str) -> None:
         """Async variant of :meth:`_ConfigurationApi.delete_document_type` — same semantics."""
-        await self._http.delete(build_document_type_key_path(document_type_id))
+        await self._http.delete(
+            str(EntityKey("DocumentType", DocumentTypeID=document_type_id))
+        )
 
     @record_metrics(Module.ADMS, Operation.ADMS_CONFIG_GET_ALL_BUSINESS_OBJECT_TYPES)
     async def get_all_business_object_types(
@@ -410,8 +455,11 @@ class _AsyncConfigurationApi:
     ) -> BusinessObjectNodeType:
         """Async variant of :meth:`_ConfigurationApi.get_business_object_type` — same semantics."""
         resp = await self._http.get(
-            build_business_object_node_type_key_path(
-                business_object_node_type_unique_id
+            str(
+                EntityKey(
+                    "BusinessObjectNodeType",
+                    BusinessObjectNodeTypeUniqueID=business_object_node_type_unique_id,
+                )
             )
         )
         return BusinessObjectNodeType.from_dict(resp)
@@ -424,8 +472,11 @@ class _AsyncConfigurationApi:
     ) -> BusinessObjectNodeType:
         """Async variant of :meth:`_ConfigurationApi.update_business_object_type` — same semantics."""
         resp = await self._http.patch(
-            build_business_object_node_type_key_path(
-                business_object_node_type_unique_id
+            str(
+                EntityKey(
+                    "BusinessObjectNodeType",
+                    BusinessObjectNodeTypeUniqueID=business_object_node_type_unique_id,
+                )
             ),
             json=payload.to_odata_dict(),
         )
@@ -437,8 +488,11 @@ class _AsyncConfigurationApi:
     ) -> None:
         """Async variant of :meth:`_ConfigurationApi.delete_business_object_type` — same semantics."""
         await self._http.delete(
-            build_business_object_node_type_key_path(
-                business_object_node_type_unique_id
+            str(
+                EntityKey(
+                    "BusinessObjectNodeType",
+                    BusinessObjectNodeTypeUniqueID=business_object_node_type_unique_id,
+                )
             )
         )
 
@@ -471,7 +525,12 @@ class _AsyncConfigurationApi:
     ) -> DocumentTypeBusinessObjectTypeMap:
         """Async variant of :meth:`_ConfigurationApi.get_type_mapping` — same semantics."""
         resp = await self._http.get(
-            build_doctype_botype_map_key_path(document_type_bo_type_map_id)
+            str(
+                EntityKey(
+                    "DocumentTypeBusinessObjectTypeMap",
+                    DocumentTypeBOTypeMapID=uuid.UUID(document_type_bo_type_map_id),
+                )
+            )
         )
         return DocumentTypeBusinessObjectTypeMap.from_dict(resp)
 
@@ -479,14 +538,25 @@ class _AsyncConfigurationApi:
     async def delete_type_mapping(self, document_type_bo_type_map_id: str) -> None:
         """Async variant of :meth:`_ConfigurationApi.delete_type_mapping` — same semantics."""
         await self._http.delete(
-            build_doctype_botype_map_key_path(document_type_bo_type_map_id)
+            str(
+                EntityKey(
+                    "DocumentTypeBusinessObjectTypeMap",
+                    DocumentTypeBOTypeMapID=uuid.UUID(document_type_bo_type_map_id),
+                )
+            )
         )
 
     @record_metrics(Module.ADMS, Operation.ADMS_CONFIG_MARK_DEFAULT)
     async def mark_default(self, document_type_bo_type_map_id: str) -> None:
         """Async variant of :meth:`_ConfigurationApi.mark_default` — same semantics."""
         await self._http.post(
-            f"{build_doctype_botype_map_key_path(document_type_bo_type_map_id)}/markDefault",
+            str(
+                EntityKey(
+                    "DocumentTypeBusinessObjectTypeMap",
+                    DocumentTypeBOTypeMapID=uuid.UUID(document_type_bo_type_map_id),
+                )
+            )
+            + "/markDefault",
             json={},
         )
 
@@ -515,7 +585,10 @@ class _AsyncConfigurationApi:
     ) -> FileExtensionPolicy:
         """Async variant of :meth:`_ConfigurationApi.get_file_extension_policy` — same semantics."""
         resp = await self._http.get(
-            f"FileExtensionPolicy(FileExtensionPolicyID={_quote_guid(file_extension_policy_id)})"
+            "FileExtensionPolicy"
+            + EntityKey.segment(
+                FileExtensionPolicyID=uuid.UUID(file_extension_policy_id)
+            )
         )
         return FileExtensionPolicy.from_dict(resp)
 
@@ -523,7 +596,10 @@ class _AsyncConfigurationApi:
     async def delete_file_extension_policy(self, file_extension_policy_id: str) -> None:
         """Async variant of :meth:`_ConfigurationApi.delete_file_extension_policy` — same semantics."""
         await self._http.delete(
-            f"FileExtensionPolicy(FileExtensionPolicyID={_quote_guid(file_extension_policy_id)})"
+            "FileExtensionPolicy"
+            + EntityKey.segment(
+                FileExtensionPolicyID=uuid.UUID(file_extension_policy_id)
+            )
         )
 
     @record_metrics(Module.ADMS, Operation.ADMS_CONFIG_GET_ALL_APP_TENANTS)

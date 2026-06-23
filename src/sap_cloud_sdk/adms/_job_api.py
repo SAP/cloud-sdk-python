@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from sap_cloud_sdk.adms._keys import build_job_status_key_path
+from sap_cloud_sdk.core.odata._entity_key import EntityKey
 from sap_cloud_sdk.core.odata._transport import ODataHttpTransport
 from sap_cloud_sdk.core.odata._async_transport import AsyncODataHttpTransport
 from sap_cloud_sdk.adms._models import (
@@ -80,7 +80,9 @@ class _JobApi:
             Current :class:`~sap_cloud_sdk.adms._models.JobOutput`.
         """
         transport = self._admin_http if use_admin_service else self._http
-        return JobOutput.from_dict(transport.get(build_job_status_key_path(job_id)))
+        return JobOutput.from_dict(
+            transport.get(str(EntityKey("JobStatus", JobID=job_id)))
+        )
 
 
 class _AsyncJobApi:
@@ -131,5 +133,5 @@ class _AsyncJobApi:
         """Poll the status of a running job (async)."""
         transport = self._admin_http if use_admin_service else self._http
         return JobOutput.from_dict(
-            await transport.get(build_job_status_key_path(job_id))
+            await transport.get(str(EntityKey("JobStatus", JobID=job_id)))
         )

@@ -86,7 +86,10 @@ class TestDeserializeCollection:
             ]
         }
         result = deserialize_collection(data, _Partner)
-        assert result == [_Partner(PartnerID="1", Name="A"), _Partner(PartnerID="2", Name="B")]
+        assert result == [
+            _Partner(PartnerID="1", Name="A"),
+            _Partner(PartnerID="2", Name="B"),
+        ]
 
     def test_empty_value_list(self):
         assert deserialize_collection({"value": []}, _Partner) == []

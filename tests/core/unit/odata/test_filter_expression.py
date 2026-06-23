@@ -66,14 +66,16 @@ class TestFieldRef:
 class TestFilterExpressionComposition:
     def test_and_(self):
         f = (
-            FilterExpression.field("Price").gt(100)
+            FilterExpression.field("Price")
+            .gt(100)
             .and_(FilterExpression.field("Category").eq("Books"))
         )
         assert str(f) == "(Price gt 100) and (Category eq 'Books')"
 
     def test_or_(self):
         f = (
-            FilterExpression.field("Status").eq("A")
+            FilterExpression.field("Status")
+            .eq("A")
             .or_(FilterExpression.field("Status").eq("B"))
         )
         assert str(f) == "(Status eq 'A') or (Status eq 'B')"
@@ -84,7 +86,8 @@ class TestFilterExpressionComposition:
 
     def test_chained_and_or(self):
         f = (
-            FilterExpression.field("A").eq(1)
+            FilterExpression.field("A")
+            .eq(1)
             .and_(FilterExpression.field("B").eq(2))
             .or_(FilterExpression.field("C").eq(3))
         )

@@ -15,7 +15,9 @@ from sap_cloud_sdk.core.odata.exceptions import (
 )
 
 
-def _mock_response(status_code: int = 200, json_data: Any = None, headers: dict | None = None) -> MagicMock:
+def _mock_response(
+    status_code: int = 200, json_data: Any = None, headers: dict | None = None
+) -> MagicMock:
     resp = MagicMock(spec=requests.Response)
     resp.status_code = status_code
     resp.ok = 200 <= status_code < 300
@@ -43,7 +45,10 @@ class TestRequest:
     def test_builds_correct_url(self, transport, session):
         session.request.return_value = _mock_response(200, {})
         transport.request("GET", "EntitySet")
-        assert session.request.call_args[1]["url"] == "https://example.com/odata/v4/EntitySet"
+        assert (
+            session.request.call_args[1]["url"]
+            == "https://example.com/odata/v4/EntitySet"
+        )
 
     def test_passes_params(self, transport, session):
         session.request.return_value = _mock_response(200, {})
@@ -145,7 +150,10 @@ class TestCsrf:
         csrf_resp2.headers = {"X-CSRF-Token": "tok2"}
 
         session.get.side_effect = [csrf_resp1, csrf_resp2]
-        session.request.side_effect = [_mock_response(403), _mock_response(201, {"ID": "1"})]
+        session.request.side_effect = [
+            _mock_response(403),
+            _mock_response(201, {"ID": "1"}),
+        ]
 
         transport = ODataHttpTransport(
             base_url="https://example.com/odata/v4/",
@@ -165,7 +173,10 @@ class TestCsrf:
         csrf_resp2.headers = {"X-CSRF-Token": "tok2"}
 
         session.get.side_effect = [csrf_resp1, csrf_resp2]
-        session.request.side_effect = [_mock_response(403), _mock_response(201, {"ID": "1"})]
+        session.request.side_effect = [
+            _mock_response(403),
+            _mock_response(201, {"ID": "1"}),
+        ]
 
         transport = ODataHttpTransport(
             base_url="https://example.com/odata/v4/",
@@ -204,9 +215,11 @@ class TestGetToken:
     def test_token_called_per_request(self, session):
         session.request.return_value = _mock_response(200, {})
         calls = []
+
         def counter():
             calls.append(1)
             return "t"
+
         transport = ODataHttpTransport(
             base_url="https://example.com/odata/v4/",
             session=session,

@@ -1,6 +1,7 @@
 """Shared OData v4 abstractions for the SAP Cloud SDK."""
 
 from sap_cloud_sdk.core.odata._async_transport import AsyncODataHttpTransport
+from sap_cloud_sdk.core.odata._entity_key import EntityKey
 from sap_cloud_sdk.core.odata._factory import odata_transport_from_destination
 from sap_cloud_sdk.core.odata._filter import (
     FilterExpression,
@@ -16,6 +17,7 @@ from sap_cloud_sdk.core.odata._request_builders import (
     GetAllRequestBuilder,
     GetByKeyRequestBuilder,
     UpdateRequestBuilder,
+    build_key_segment,
 )
 from sap_cloud_sdk.core.odata._transport import ODataHttpTransport
 from sap_cloud_sdk.core.odata.exceptions import (
@@ -30,8 +32,10 @@ from sap_cloud_sdk.core.odata.exceptions import (
 
 __all__ = [
     "AsyncODataHttpTransport",
+    "build_key_segment",
     "CreateRequestBuilder",
     "DeleteRequestBuilder",
+    "EntityKey",
     "FilterExpression",
     "GetAllRequestBuilder",
     "GetByKeyRequestBuilder",

@@ -34,6 +34,7 @@ class TestExceptionHierarchy:
     def test_http_error_stores_status_code(self):
         # ODataRequestError takes a response object with status_code and json()
         from unittest.mock import MagicMock
+
         resp = MagicMock()
         resp.status_code = 400
         resp.json.return_value = {}

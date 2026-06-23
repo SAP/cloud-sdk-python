@@ -47,9 +47,7 @@ class TestToParams:
 
     def test_order_by_desc(self):
         params = (
-            StructuredQuery()
-            .order_by("CreatedAt", OrderDirection.DESC)
-            .to_params()
+            StructuredQuery().order_by("CreatedAt", OrderDirection.DESC).to_params()
         )
         assert params["$orderby"] == "CreatedAt desc"
 

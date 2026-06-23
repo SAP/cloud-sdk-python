@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
-from sap_cloud_sdk.adms._keys import build_relation_key_path
+import uuid
+
+from sap_cloud_sdk.core.odata._entity_key import EntityKey
+from sap_cloud_sdk.core.odata._request_builders import GetByKeyRequestBuilder
 from sap_cloud_sdk.core.odata._transport import ODataHttpTransport
 from sap_cloud_sdk.core.odata._async_transport import AsyncODataHttpTransport
 from sap_cloud_sdk.adms._models import (
@@ -68,11 +71,17 @@ class _DocumentRelationApi:
         Raises:
             DocumentNotFoundError: If the relation does not exist.
         """
-        params: dict = {}
+        builder = GetByKeyRequestBuilder(
+            self._http,
+            DocumentRelation,
+            {
+                "DocumentRelationID": uuid.UUID(document_relation_id),
+                "IsActiveEntity": is_active_entity,
+            },
+        )
         if expand:
-            params["$expand"] = ",".join(expand)
-        path = build_relation_key_path(document_relation_id, is_active_entity)
-        return DocumentRelation.from_dict(self._http.get(path, params=params))
+            builder = builder.expand(*expand)
+        return builder.execute()
 
     @record_metrics(Module.ADMS, Operation.ADMS_RELATIONS_CREATE)
     def create(self, input: CreateDocumentRelationInput) -> DocumentRelation:
@@ -114,8 +123,14 @@ class _DocumentRelationApi:
         """
         return Document.from_dict(
             self._http.post(
-                build_relation_key_path(document_relation_id, is_active_entity)
-                + "/GenerateDocumentUploadURLs",
+                str(
+                    EntityKey(
+                        "DocumentRelation",
+                        DocumentRelationID=uuid.UUID(document_relation_id),
+                        IsActiveEntity=is_active_entity,
+                    )
+                    / "GenerateDocumentUploadURLs"
+                ),
                 json={
                     "DocumentIsMultipart": is_multipart,
                     "DocumentNoOfParts": no_of_parts,
@@ -132,8 +147,14 @@ class _DocumentRelationApi:
     ) -> None:
         """Signal completion of a multipart upload."""
         self._http.post(
-            build_relation_key_path(document_relation_id, is_active_entity)
-            + "/CompleteMultipartUpload",
+            str(
+                EntityKey(
+                    "DocumentRelation",
+                    DocumentRelationID=uuid.UUID(document_relation_id),
+                    IsActiveEntity=is_active_entity,
+                )
+                / "CompleteMultipartUpload"
+            ),
             json={},
         )
 
@@ -141,8 +162,14 @@ class _DocumentRelationApi:
     def lock(self, document_relation_id: str, *, is_active_entity: bool = True) -> None:
         """Lock a document and its relation to prevent concurrent modifications."""
         self._http.post(
-            build_relation_key_path(document_relation_id, is_active_entity)
-            + "/LockDocumentAndRelation",
+            str(
+                EntityKey(
+                    "DocumentRelation",
+                    DocumentRelationID=uuid.UUID(document_relation_id),
+                    IsActiveEntity=is_active_entity,
+                )
+                / "LockDocumentAndRelation"
+            ),
             json={},
         )
 
@@ -152,8 +179,14 @@ class _DocumentRelationApi:
     ) -> None:
         """Unlock a previously locked document and relation."""
         self._http.post(
-            build_relation_key_path(document_relation_id, is_active_entity)
-            + "/UnlockDocumentAndRelation",
+            str(
+                EntityKey(
+                    "DocumentRelation",
+                    DocumentRelationID=uuid.UUID(document_relation_id),
+                    IsActiveEntity=is_active_entity,
+                )
+                / "UnlockDocumentAndRelation"
+            ),
             json={},
         )
 
@@ -163,7 +196,13 @@ class _DocumentRelationApi:
     ) -> None:
         """Soft-delete a DocumentRelation (and its linked document)."""
         self._http.delete(
-            build_relation_key_path(document_relation_id, is_active_entity)
+            str(
+                EntityKey(
+                    "DocumentRelation",
+                    DocumentRelationID=uuid.UUID(document_relation_id),
+                    IsActiveEntity=is_active_entity,
+                )
+            )
         )
 
     @record_metrics(Module.ADMS, Operation.ADMS_RELATIONS_CREATE_DRAFT)
@@ -267,8 +306,14 @@ class _AsyncDocumentRelationApi:
         params: dict = {}
         if expand:
             params["$expand"] = ",".join(expand)
-        path = build_relation_key_path(document_relation_id, is_active_entity)
-        return DocumentRelation.from_dict(await self._http.get(path, params=params))
+        path = EntityKey(
+            "DocumentRelation",
+            DocumentRelationID=uuid.UUID(document_relation_id),
+            IsActiveEntity=is_active_entity,
+        )
+        return DocumentRelation.from_dict(
+            await self._http.get(str(path), params=params)
+        )
 
     @record_metrics(Module.ADMS, Operation.ADMS_RELATIONS_CREATE)
     async def create(self, input: CreateDocumentRelationInput) -> DocumentRelation:
@@ -292,8 +337,14 @@ class _AsyncDocumentRelationApi:
         """Async variant of :meth:`_DocumentRelationApi.generate_upload_urls` — same semantics."""
         return Document.from_dict(
             await self._http.post(
-                build_relation_key_path(document_relation_id, is_active_entity)
-                + "/GenerateDocumentUploadURLs",
+                str(
+                    EntityKey(
+                        "DocumentRelation",
+                        DocumentRelationID=uuid.UUID(document_relation_id),
+                        IsActiveEntity=is_active_entity,
+                    )
+                    / "GenerateDocumentUploadURLs"
+                ),
                 json={
                     "DocumentIsMultipart": is_multipart,
                     "DocumentNoOfParts": no_of_parts,
@@ -307,8 +358,14 @@ class _AsyncDocumentRelationApi:
     ) -> None:
         """Async variant of :meth:`_DocumentRelationApi.complete_multipart_upload` — same semantics."""
         await self._http.post(
-            build_relation_key_path(document_relation_id, is_active_entity)
-            + "/CompleteMultipartUpload",
+            str(
+                EntityKey(
+                    "DocumentRelation",
+                    DocumentRelationID=uuid.UUID(document_relation_id),
+                    IsActiveEntity=is_active_entity,
+                )
+                / "CompleteMultipartUpload"
+            ),
             json={},
         )
 
@@ -318,8 +375,14 @@ class _AsyncDocumentRelationApi:
     ) -> None:
         """Async variant of :meth:`_DocumentRelationApi.lock` — same semantics."""
         await self._http.post(
-            build_relation_key_path(document_relation_id, is_active_entity)
-            + "/LockDocumentAndRelation",
+            str(
+                EntityKey(
+                    "DocumentRelation",
+                    DocumentRelationID=uuid.UUID(document_relation_id),
+                    IsActiveEntity=is_active_entity,
+                )
+                / "LockDocumentAndRelation"
+            ),
             json={},
         )
 
@@ -329,8 +392,14 @@ class _AsyncDocumentRelationApi:
     ) -> None:
         """Async variant of :meth:`_DocumentRelationApi.unlock` — same semantics."""
         await self._http.post(
-            build_relation_key_path(document_relation_id, is_active_entity)
-            + "/UnlockDocumentAndRelation",
+            str(
+                EntityKey(
+                    "DocumentRelation",
+                    DocumentRelationID=uuid.UUID(document_relation_id),
+                    IsActiveEntity=is_active_entity,
+                )
+                / "UnlockDocumentAndRelation"
+            ),
             json={},
         )
 
@@ -340,7 +409,13 @@ class _AsyncDocumentRelationApi:
     ) -> None:
         """Async variant of :meth:`_DocumentRelationApi.delete` — same semantics."""
         await self._http.delete(
-            build_relation_key_path(document_relation_id, is_active_entity)
+            str(
+                EntityKey(
+                    "DocumentRelation",
+                    DocumentRelationID=uuid.UUID(document_relation_id),
+                    IsActiveEntity=is_active_entity,
+                )
+            )
         )
 
     @record_metrics(Module.ADMS, Operation.ADMS_RELATIONS_CREATE_DRAFT)

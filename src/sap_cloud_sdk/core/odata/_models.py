@@ -26,7 +26,7 @@ class ODataEntity:
     """
 
     _entity_set: ClassVar[str] = ""
-    _key_fields: ClassVar[list[str]] = []
+    _key_fields: ClassVar[tuple[str, ...]] = ()
 
     def to_dict(self) -> dict[str, Any]:
         """Return a JSON-serialisable dict of this entity's fields."""

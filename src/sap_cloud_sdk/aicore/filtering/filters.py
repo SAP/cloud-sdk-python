@@ -608,5 +608,10 @@ def extract_filter_blocked(exc: Exception) -> ContentFilteredError | None:
             details=data,
             request_id=err.get("request_id"),
         )
-    except Exception:
+    except (ValueError, KeyError, TypeError, AttributeError):
+        # JSON parsing failure (ValueError from json.loads), missing dict key
+        # (KeyError), wrong shape (TypeError from .get on non-dict), or attribute
+        # access on a non-object (AttributeError) — all mean the exception
+        # message isn't a content-filter rejection. Let other exception types
+        # (logic bugs in ContentFilteredError construction) surface.
         return None

@@ -12,6 +12,27 @@ class TestOperation:
         assert Operation.AUDITLOG_LOG_BATCH.value == "log_batch"
         assert Operation.AUDITLOG_CREATE_CLIENT.value == "create_client"
 
+    def test_data_anonymization_operations(self):
+        """Test Data Anonymization operation values."""
+        assert (
+            Operation.DATA_ANONYMIZATION_CREATE_CLIENT.value
+            == "create_data_anonymization_client"
+        )
+        assert (
+            Operation.DATA_ANONYMIZATION_ANONYMIZE_TEXT.value == "anonymize_text"
+        )
+        assert (
+            Operation.DATA_ANONYMIZATION_ANONYMIZE_FILE.value == "anonymize_file"
+        )
+        assert (
+            Operation.DATA_ANONYMIZATION_PSEUDONYMIZE_TEXT.value
+            == "pseudonymize_text"
+        )
+        assert (
+            Operation.DATA_ANONYMIZATION_PSEUDONYMIZE_FILE.value
+            == "pseudonymize_file"
+        )
+
     def test_destination_operations(self):
         """Test Destination operation values."""
         assert (
@@ -129,19 +150,27 @@ class TestOperation:
         assert Operation.DMS_APPEND_CONTENT_STREAM.value == "cmis_append_content_stream"
         assert Operation.DMS_CMIS_QUERY.value == "cmis_query"
 
+    def test_print_operations(self):
+        """Test Print operation values."""
+        assert Operation.PRINT_CREATE_CLIENT.value == "print_create_client"
+        assert Operation.PRINT_LIST_QUEUES.value == "list_queues"
+        assert Operation.PRINT_CREATE_QUEUE.value == "create_queue"
+        assert Operation.PRINT_GET_PROFILES.value == "get_print_profiles"
+        assert Operation.PRINT_UPLOAD_DOCUMENT.value == "upload_document"
+        assert Operation.PRINT_CREATE_TASK.value == "create_print_task"
+
     def test_operation_str_representation(self):
         """Test that Operation enum converts to string correctly."""
         assert str(Operation.AUDITLOG_LOG) == "log"
-        assert (
-            str(Operation.DESTINATION_GET_INSTANCE_DESTINATION)
-            == "get_instance_destination"
-        )
+        assert str(Operation.DATA_ANONYMIZATION_ANONYMIZE_TEXT)  == "anonymize_text"
+        assert str(Operation.DESTINATION_GET_INSTANCE_DESTINATION) == "get_instance_destination"
         assert str(Operation.OBJECTSTORE_PUT_OBJECT) == "put_object"
         assert str(Operation.AICORE_AUTO_INSTRUMENT) == "auto_instrument"
 
     def test_operation_is_string_enum(self):
         """Test that Operation enum inherits from str."""
         assert isinstance(Operation.AUDITLOG_LOG, str)
+        assert isinstance(Operation.DATA_ANONYMIZATION_ANONYMIZE_TEXT, str)
         assert isinstance(Operation.DESTINATION_CREATE_DESTINATION, str)
         assert isinstance(Operation.OBJECTSTORE_GET_OBJECT, str)
 
@@ -169,16 +198,19 @@ class TestOperation:
         all_operations = list(Operation)
         # Verify we have operations from all modules
         assert any("AUDITLOG" in op.name for op in all_operations)
+        assert any("DATA_ANONYMIZATION" in op.name for op in all_operations)
         assert any("DESTINATION" in op.name for op in all_operations)
         assert any("CERTIFICATE" in op.name for op in all_operations)
         assert any("EXTENSIBILITY" in op.name for op in all_operations)
         assert any("FRAGMENT" in op.name for op in all_operations)
         assert any("OBJECTSTORE" in op.name for op in all_operations)
         assert any("AICORE" in op.name for op in all_operations)
+        assert any("PRINT" in op.name for op in all_operations)
 
     def test_operation_count(self):
         """Test that we have the expected number of operations."""
         all_operations = list(Operation)
         # 3 auditlog + 11 destination + 10 certificate + 10 fragment + 8 objectstore
-        # + 2 extensibility + 2 aicore + 23 dms + 2 agentgateway + 13 agent_memory = 84
-        assert len(all_operations) == 84
+        # + 2 extensibility + 2 aicore + 23 dms + 4 agentgateway + 13 agent_memory
+        # + 5 data_anonymization + 52 adms + 6 print = 149
+        assert len(all_operations) == 149

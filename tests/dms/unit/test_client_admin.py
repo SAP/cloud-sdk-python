@@ -72,7 +72,6 @@ def client():
             mock_http = Mock()
             MockHttp.return_value = mock_http
             creds = DMSCredentials(
-                instance_name="test-instance",
                 uri="https://api.example.com",
                 client_id="test-client",
                 client_secret="test-secret",

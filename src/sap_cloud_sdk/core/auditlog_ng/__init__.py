@@ -36,10 +36,13 @@ from sap_cloud_sdk.core.auditlog_ng.exceptions import (
     ValidationError,
 )
 
-from sap_cloud_sdk.core.telemetry import Module, Operation, record_metrics
+from sap_cloud_sdk.core.telemetry import (
+    Module,
+    Operation,
+    record_error_metric as _record_error_metric,
+)
 
 
-@record_metrics(Module.AUDITLOG_NG, Operation.AUDITLOG_CREATE_CLIENT)
 def create_client(
     *,
     config: Optional[AuditLogNGConfig] = None,
@@ -86,24 +89,32 @@ def create_client(
     """
     try:
         if config is None:
-            if not endpoint or not deployment_id or not namespace:
-                raise ValueError(
-                    "endpoint, deployment_id, and namespace are required "
-                    "when config is not provided"
+            try:
+                if not endpoint or not deployment_id or not namespace:
+                    raise ValueError(
+                        "endpoint, deployment_id, and namespace are required "
+                        "when config is not provided"
+                    )
+                config = AuditLogNGConfig(
+                    endpoint=endpoint,
+                    deployment_id=deployment_id,
+                    namespace=namespace,
+                    cert_file=cert_file,
+                    key_file=key_file,
+                    ca_file=ca_file,
+                    insecure=insecure,
+                    service_name=service_name,
+                    batch=batch,
+                    compression=compression,
+                    schema_url=schema_url,
                 )
-            config = AuditLogNGConfig(
-                endpoint=endpoint,
-                deployment_id=deployment_id,
-                namespace=namespace,
-                cert_file=cert_file,
-                key_file=key_file,
-                ca_file=ca_file,
-                insecure=insecure,
-                service_name=service_name,
-                batch=batch,
-                compression=compression,
-                schema_url=schema_url,
-            )
+            except Exception:
+                _record_error_metric(
+                    Module.AUDITLOG_NG,
+                    _telemetry_source,
+                    Operation.AUDITLOG_CREATE_CLIENT,
+                )
+                raise
 
         return AuditClient(config, _telemetry_source=_telemetry_source)
 

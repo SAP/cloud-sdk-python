@@ -19,7 +19,6 @@ class BindingData:
         uaa: JSON string containing XSUAA authentication credentials
     """
 
-    instance_name: str
     uri: str
     uaa: str
 
@@ -91,7 +90,6 @@ class BindingData:
         token_url = uaa_data["url"].rstrip("/") + "/oauth/token"
 
         return DMSCredentials(
-            instance_name=self.instance_name,
             uri=self.uri,
             client_id=uaa_data["clientid"],
             client_secret=uaa_data["clientsecret"],
@@ -114,7 +112,7 @@ def load_sdm_config_from_env_or_mount(instance: Optional[str] = None) -> DMSCred
     """
     inst = instance or "default"
     binding = BindingData(
-        uri="", uaa="", instance_name=""
+        uri="", uaa=""
     )  # Initialize with empty values; will be populated by resolver
 
     try:

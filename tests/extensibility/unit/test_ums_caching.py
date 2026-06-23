@@ -334,4 +334,3 @@ class TestUmsTransportCache:
             assert ("tenant-new", "default") in transport._cache
         finally:
             patcher.stop()
-

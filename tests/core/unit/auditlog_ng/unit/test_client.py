@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 from typing import TypedDict, Unpack
 from unittest.mock import MagicMock, Mock, patch
 
@@ -11,6 +10,7 @@ import pytest
 from sap_cloud_sdk.core.auditlog_ng.client import AuditClient
 from sap_cloud_sdk.core.auditlog_ng.config import AuditLogNGConfig, SCHEMA_URL
 from sap_cloud_sdk.core.auditlog_ng.exceptions import ValidationError
+from sap_cloud_sdk.core.telemetry import Module, Operation
 
 
 class ConfigKwargs(TypedDict, total=False):
@@ -34,7 +34,7 @@ def _make_config(**overrides: Unpack[ConfigKwargs]) -> AuditLogNGConfig:
         "namespace": "namespace-123",
         "insecure": True,
     }
-    defaults.update(overrides)  # ty: ignore[invalid-argument-type]
+    defaults.update(overrides)
     return AuditLogNGConfig(**defaults)
 
 
@@ -67,10 +67,10 @@ def _make_mocked_client(
     )
 
 
-def _make_mock_event(tenant_id="tenant-123", descriptor_name="DataAccess"):
+def _make_mock_event(tenant_id="tenant-123", descriptor_full_name="sap.auditlog.auditevent.v2.DataAccess"):
     event = MagicMock()
     event.common.tenant_id = tenant_id
-    event.DESCRIPTOR.name = descriptor_name
+    event.DESCRIPTOR.full_name = descriptor_full_name
     event.SerializeToString.return_value = b"\x00\x01\x02"
     return event
 
@@ -114,20 +114,60 @@ class TestAuditClientInit:
         assert attrs["sap.ucl.deployment_id"] == "deployment-123"
         assert attrs["sap.ucl.system_namespace"] == "namespace-123"
 
+    @patch("sap_cloud_sdk.core.auditlog_ng.client.GRPCLogExporter")
+    @patch("sap_cloud_sdk.core.auditlog_ng.client.LoggerProvider")
+    def test_init_records_create_client_metric(
+        self, mock_provider_cls, mock_exporter_cls
+    ):
+        config = _make_config()
+
+        with patch(
+            "sap_cloud_sdk.core.telemetry.metrics_decorator.record_request_metric"
+        ) as mock_metric:
+            AuditClient(config)
+
+        mock_metric.assert_called_once_with(
+            Module.AUDITLOG_NG,
+            None,
+            Operation.AUDITLOG_CREATE_CLIENT,
+            False,
+        )
+
+    @patch("sap_cloud_sdk.core.auditlog_ng.client.GRPCLogExporter")
+    @patch("sap_cloud_sdk.core.auditlog_ng.client.LoggerProvider")
+    def test_init_records_error_metric_on_failure(
+        self, mock_provider_cls, mock_exporter_cls
+    ):
+        mock_provider_cls.side_effect = RuntimeError("provider failed")
+        config = _make_config()
+
+        with patch(
+            "sap_cloud_sdk.core.telemetry.metrics_decorator.record_error_metric"
+        ) as mock_error_metric:
+            with pytest.raises(RuntimeError, match="provider failed"):
+                AuditClient(config, _telemetry_source=Module.DMS)
+
+        mock_error_metric.assert_called_once_with(
+            Module.AUDITLOG_NG,
+            Module.DMS,
+            Operation.AUDITLOG_CREATE_CLIENT,
+            False,
+        )
+
 
 class TestAuditClientSend:
     def test_send_binary_success(self):
         client, mock_logger, _, mock_validate, patcher, _ = _make_mocked_client()
         try:
             event = _make_mock_event()
-            event_id = client.send(event, "DataAccess")
+            event_id = client.send(event)
 
             assert isinstance(event_id, str)
             mock_validate.assert_called_once_with(event)
             mock_logger.emit.assert_called_once()
 
             _, kwargs = mock_logger.emit.call_args
-            assert kwargs["event_name"] == "sap.als.AuditEvent.DataAccess.v2"
+            assert kwargs["event_name"] == "sap.auditlog.auditevent.v2.DataAccess"
             assert kwargs["body"] == b"\x00\x01\x02"
             assert (
                 kwargs["attributes"]["sap.auditlogging.mime_type"]
@@ -142,7 +182,7 @@ class TestAuditClientSend:
         client, mock_logger, _, mock_validate, patcher, _ = _make_mocked_client()
         try:
             event = _make_mock_event()
-            event_id = client.send_json(event, "DataAccess")
+            event_id = client.send_json(event)
 
             assert isinstance(event_id, str)
             mock_logger.emit.assert_called_once()
@@ -158,11 +198,11 @@ class TestAuditClientSend:
     def test_send_uses_descriptor_name_when_event_type_missing(self):
         client, mock_logger, _, _, patcher, _ = _make_mocked_client()
         try:
-            event = _make_mock_event(descriptor_name="ConfigurationChange")
+            event = _make_mock_event(descriptor_full_name="sap.auditlog.auditevent.v2.ConfigurationChange")
             client.send(event)
 
             _, kwargs = mock_logger.emit.call_args
-            assert kwargs["event_name"] == "sap.als.AuditEvent.ConfigurationChange.v2"
+            assert kwargs["event_name"] == "sap.auditlog.auditevent.v2.ConfigurationChange"
         finally:
             patcher.stop()
 
@@ -172,13 +212,13 @@ class TestAuditClientSend:
         client.close()
 
         with pytest.raises(RuntimeError, match="Client is closed"):
-            client.send(_make_mock_event(), "DataAccess")
+            client.send(_make_mock_event())
 
     def test_send_invalid_format_raises(self):
         client, _, _, _, patcher, _ = _make_mocked_client()
         try:
             with pytest.raises(ValueError, match="format must be"):
-                client.send(_make_mock_event(), "DataAccess", format="xml")
+                client.send(_make_mock_event(), format="xml")
         finally:
             patcher.stop()
 
@@ -190,7 +230,7 @@ class TestAuditClientSend:
         )
         try:
             with pytest.raises(ValidationError, match="Audit event validation failed"):
-                client.send(_make_mock_event(), "DataAccess")
+                client.send(_make_mock_event())
 
             mock_logger.emit.assert_not_called()
         finally:
@@ -202,7 +242,7 @@ class TestAuditClientSend:
             event = _make_mock_event(tenant_id="bad tenant id")
 
             with pytest.raises(ValueError):
-                client.send(event, "DataAccess")
+                client.send(event)
 
             mock_logger.emit.assert_not_called()
         finally:

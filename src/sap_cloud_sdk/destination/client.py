@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import warnings
 from typing import List, Optional, Callable, TypeVar
 
 from sap_cloud_sdk.core.telemetry import Module, Operation, record_metrics
@@ -196,11 +197,18 @@ class DestinationClient:
                 f"failed to list subaccount destinations: {e}"
             )
 
-    @record_metrics(Module.DESTINATION, Operation.DESTINATION_GET_INSTANCE_DESTINATION)
+    @record_metrics(
+        Module.DESTINATION,
+        Operation.DESTINATION_GET_INSTANCE_DESTINATION,
+        deprecated=True,
+    )
     def get_instance_destination(
         self, name: str, proxy_enabled: Optional[bool] = None
     ) -> Optional[Destination | TransparentProxyDestination]:
         """Get a destination from the service instance scope.
+
+        .. deprecated::
+            Use ``get_destination()`` instead, which automatically retrieves auth tokens via the v2 API.
 
         Args:
             name: Destination name.
@@ -213,6 +221,12 @@ class DestinationClient:
         Raises:
             DestinationOperationError: If an HTTP error occurs or response parsing fails.
         """
+        warnings.warn(
+            "get_instance_destination() is deprecated. "
+            "Use get_destination() instead, which also includes automatic token retrieval.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         try:
             if self._should_use_proxy(proxy_enabled):
                 return TransparentProxyDestination.from_proxy(
@@ -226,7 +240,9 @@ class DestinationClient:
             raise DestinationOperationError(f"failed to get destination '{name}': {e}")
 
     @record_metrics(
-        Module.DESTINATION, Operation.DESTINATION_GET_SUBACCOUNT_DESTINATION
+        Module.DESTINATION,
+        Operation.DESTINATION_GET_SUBACCOUNT_DESTINATION,
+        deprecated=True,
     )
     def get_subaccount_destination(
         self,
@@ -236,6 +252,9 @@ class DestinationClient:
         proxy_enabled: Optional[bool] = None,
     ) -> Optional[Destination | TransparentProxyDestination]:
         """Get a destination from the subaccount scope with an access strategy.
+
+        .. deprecated::
+            Use ``get_destination()`` instead, which automatically retrieves auth tokens via the v2 API.
 
         Access strategies:
             - SUBSCRIBER_ONLY: Fetch only from subscriber context (tenant required)
@@ -257,6 +276,12 @@ class DestinationClient:
             DestinationOperationError: If tenant is missing for subscriber access strategies,
                                        on HTTP errors, or response parsing failures.
         """
+        warnings.warn(
+            "get_subaccount_destination() is deprecated. "
+            "Use get_destination() instead, which also includes automatic token retrieval.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         try:
             if self._should_use_proxy(proxy_enabled) and self._transparent_proxy:
                 return TransparentProxyDestination.from_proxy(

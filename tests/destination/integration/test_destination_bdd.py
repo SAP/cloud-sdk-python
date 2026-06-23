@@ -1,6 +1,7 @@
 """BDD step definitions for Destination integration tests."""
 
 import concurrent.futures
+import os
 from typing import List, Optional
 
 import pytest
@@ -17,6 +18,7 @@ from sap_cloud_sdk.destination import (
     ConsumptionOptions,
     PatchLabels,
 )
+from sap_cloud_sdk.destination._destination_http_client import DestinationHttpClient
 from sap_cloud_sdk.destination.exceptions import (
     HttpError,
     DestinationOperationError,
@@ -57,6 +59,8 @@ class ScenarioContext:
         self.updated_certificate_content: Optional[str] = None
         self.tenant: Optional[str] = None
         self.retrieved_labels: List[Label] = []
+        self.http_client: Optional[DestinationHttpClient] = None
+        self.http_response = None
 
 
 @pytest.fixture
@@ -254,9 +258,12 @@ def destination_service_auth_failure(context):
     context.use_auth_failure_client = True
 
 
-@given(parsers.parse('I use tenant "{tenant}"'))
-def use_tenant(context, tenant):
-    """Set the tenant to use for subscriber access."""
+@given("I use the configured subscriber tenant")
+def use_configured_subscriber_tenant(context):
+    """Set the tenant from the CLOUD_SDK_CFG_DESTINATION_DEFAULT_TENANT_SUBDOMAIN environment variable."""
+    tenant = os.environ.get("CLOUD_SDK_CFG_DESTINATION_DEFAULT_TENANT_SUBDOMAIN")
+    if not tenant:
+        pytest.skip("CLOUD_SDK_CFG_DESTINATION_DEFAULT_TENANT_SUBDOMAIN environment variable not set")
     context.tenant = tenant
 
 
@@ -285,6 +292,13 @@ def create_destination_instance(context, destination_client):
 @when("I create the destination at subaccount level")
 def create_destination_subaccount(context, destination_client):
     """Create destination at subaccount level."""
+    # Try to delete first to avoid 409 conflicts (idempotent cleanup)
+    try:
+        destination_client.delete_destination(context.destination.name, level=Level.SUB_ACCOUNT)
+    except Exception:
+        # Ignore cleanup errors (destination may not exist)
+        pass
+
     try:
         destination_client.create_destination(context.destination, level=Level.SUB_ACCOUNT)
         context.operation_success = True
@@ -1572,3 +1586,38 @@ def certificate_should_have_label(context, key, value):
         lbl.key == key and value in lbl.values
         for lbl in context.retrieved_labels
     ), f"Expected label key='{key}' value='{value}' in {context.retrieved_labels}"
+
+
+# ==================== DESTINATION HTTP CLIENT STEPS ====================
+
+@given("the destination has OAuth2 credentials from environment")
+def destination_has_oauth2_credentials(context):
+    context.destination.properties.update({
+        "clientId":        os.environ["CLOUD_SDK_CFG_DESTINATION_DEFAULT_CLIENTID"],
+        "clientSecret":    os.environ["CLOUD_SDK_CFG_DESTINATION_DEFAULT_CLIENTSECRET"],
+        "tokenServiceURL": os.environ["CLOUD_SDK_CFG_DESTINATION_DEFAULT_URL"] + "/oauth/token",
+    })
+
+
+@when("I fetch the destination using the v2 API")
+def fetch_destination_v2(context, destination_client):
+    context.retrieved_destination = destination_client.get_destination(context.destination.name)
+
+
+@when("I create a DestinationHttpClient from the destination")
+def create_http_client(context):
+    context.http_client = DestinationHttpClient(context.retrieved_destination)
+
+
+@when(parsers.parse('I send a GET request to "{path}"'))
+def send_get_request(context, path):
+    context.http_response = context.http_client.request("GET", path)
+
+
+@then("the response contains an Authorization header")
+def assert_authorization_header_present(context):
+    echoed = context.http_response.json().get("headers", {})
+    assert "Authorization" in echoed, (
+        f"Expected Authorization header in response, got: {list(echoed.keys())}. "
+        "Check that BTP returned an auth token for the destination."
+    )

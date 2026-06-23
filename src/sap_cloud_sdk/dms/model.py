@@ -30,7 +30,6 @@ def _to_dict_drop_none(obj: Any) -> dict[str, Any]:
 class DMSCredentials:
     """Credentials for authenticating with the DMS service."""
 
-    instance_name: str
     uri: str
     client_id: str
     client_secret: str

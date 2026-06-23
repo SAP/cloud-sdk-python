@@ -11,6 +11,13 @@ class Operation(str, Enum):
     AUDITLOG_LOG_BATCH = "log_batch"
     AUDITLOG_CREATE_CLIENT = "create_client"
 
+    # Data Anonymization Operations
+    DATA_ANONYMIZATION_CREATE_CLIENT = "create_data_anonymization_client"
+    DATA_ANONYMIZATION_ANONYMIZE_TEXT = "anonymize_text"
+    DATA_ANONYMIZATION_ANONYMIZE_FILE = "anonymize_file"
+    DATA_ANONYMIZATION_PSEUDONYMIZE_TEXT = "pseudonymize_text"
+    DATA_ANONYMIZATION_PSEUDONYMIZE_FILE = "pseudonymize_file"
+
     # Destination Operations
     DESTINATION_GET_INSTANCE_DESTINATION = "get_instance_destination"
     DESTINATION_GET_SUBACCOUNT_DESTINATION = "get_subaccount_destination"
@@ -69,10 +76,79 @@ class Operation(str, Enum):
         "get_extension_capability_implementation"
     )
     EXTENSIBILITY_CALL_HOOK = "call_hook"
+    # ADMS — DocumentRelation Operations
+    ADMS_RELATIONS_GET_ALL = "relations_get_all"
+    ADMS_RELATIONS_GET = "relations_get"
+    ADMS_RELATIONS_CREATE = "relations_create"
+    ADMS_RELATIONS_DELETE = "relations_delete"
+    ADMS_RELATIONS_GENERATE_UPLOAD_URLS = "relations_generate_upload_urls"
+    ADMS_RELATIONS_COMPLETE_MULTIPART_UPLOAD = "relations_complete_multipart_upload"
+    ADMS_RELATIONS_LOCK = "relations_lock"
+    ADMS_RELATIONS_UNLOCK = "relations_unlock"
+    ADMS_RELATIONS_CREATE_DRAFT = "relations_create_draft"
+    ADMS_RELATIONS_VALIDATE_DRAFT = "relations_validate_draft"
+    ADMS_RELATIONS_ACTIVATE_DRAFT = "relations_activate_draft"
+    ADMS_RELATIONS_DISCARD_DRAFT = "relations_discard_draft"
+
+    # ADMS — Document Operations
+    ADMS_DOCUMENTS_GET_ALL = "documents_get_all"
+    ADMS_DOCUMENTS_GET = "documents_get"
+    ADMS_DOCUMENTS_GET_DOWNLOAD_URL = "documents_get_download_url"
+    ADMS_DOCUMENTS_UPDATE = "documents_update"
+    ADMS_DOCUMENTS_RESTORE_CONTENT_VERSION = "documents_restore_content_version"
+    ADMS_DOCUMENTS_DELETE_CONTENT_VERSION = "documents_delete_content_version"
+
+    # ADMS — Job Operations
+    ADMS_JOBS_START_ZIP_DOWNLOAD = "jobs_start_zip_download"
+    ADMS_JOBS_START_DELETE_USER_DATA = "jobs_start_delete_user_data"
+    ADMS_JOBS_GET_STATUS = "jobs_get_status"
+
+    # ADMS — Configuration Operations
+    ADMS_CONFIG_GET_ALL_ALLOWED_DOMAINS = "config_get_all_allowed_domains"
+    ADMS_CONFIG_CREATE_ALLOWED_DOMAIN = "config_create_allowed_domain"
+    ADMS_CONFIG_DELETE_ALLOWED_DOMAIN = "config_delete_allowed_domain"
+    ADMS_CONFIG_GET_ALL_DOCUMENT_TYPES = "config_get_all_document_types"
+    ADMS_CONFIG_CREATE_DOCUMENT_TYPE = "config_create_document_type"
+    ADMS_CONFIG_DELETE_DOCUMENT_TYPE = "config_delete_document_type"
+    ADMS_CONFIG_GET_ALL_BUSINESS_OBJECT_TYPES = "config_get_all_business_object_types"
+    ADMS_CONFIG_CREATE_BUSINESS_OBJECT_TYPE = "config_create_business_object_type"
+    ADMS_CONFIG_DELETE_BUSINESS_OBJECT_TYPE = "config_delete_business_object_type"
+    ADMS_CONFIG_GET_ALL_DOCTYPE_BOTYPE_MAPS = "config_get_all_doctype_botype_maps"
+    ADMS_CONFIG_CREATE_DOCTYPE_BOTYPE_MAP = "config_create_doctype_botype_map"
+    ADMS_CONFIG_GET_DOCTYPE_BOTYPE_MAP = "config_get_doctype_botype_map"
+    ADMS_CONFIG_DELETE_DOCTYPE_BOTYPE_MAP = "config_delete_doctype_botype_map"
+    ADMS_CONFIG_GET_ALLOWED_DOMAIN = "config_get_allowed_domain"
+    ADMS_CONFIG_UPDATE_ALLOWED_DOMAIN = "config_update_allowed_domain"
+    ADMS_CONFIG_GET_DOCUMENT_TYPE = "config_get_document_type"
+    ADMS_CONFIG_UPDATE_DOCUMENT_TYPE = "config_update_document_type"
+    ADMS_CONFIG_GET_BUSINESS_OBJECT_TYPE = "config_get_business_object_type"
+    ADMS_CONFIG_UPDATE_BUSINESS_OBJECT_TYPE = "config_update_business_object_type"
+    # ADMS — new DocumentService actions
+    ADMS_RELATIONS_DELETE_BO_NODE = "relations_delete_bo_node"
+    ADMS_CHANGELOG_GET_ALL = "changelog_get_all"
+    ADMS_BO_CHANGELOG_GET_ALL = "bo_changelog_get_all"
+    # ADMS — new ConfigurationService entities
+    ADMS_CONFIG_MARK_DEFAULT = "config_mark_default"
+    ADMS_CONFIG_GET_ALL_FILE_EXT_POLICIES = "config_get_all_file_ext_policies"
+    ADMS_CONFIG_CREATE_FILE_EXT_POLICY = "config_create_file_ext_policy"
+    ADMS_CONFIG_GET_FILE_EXT_POLICY = "config_get_file_ext_policy"
+    ADMS_CONFIG_DELETE_FILE_EXT_POLICY = "config_delete_file_ext_policy"
+    ADMS_CONFIG_GET_ALL_APP_TENANTS = "config_get_all_app_tenants"
+    ADMS_CONFIG_CREATE_APP_TENANT = "config_create_app_tenant"
+    ADMS_CONFIG_GET_APP_TENANT = "config_get_app_tenant"
+    ADMS_CONFIG_DELETE_APP_TENANT = "config_delete_app_tenant"
 
     # AI Core Operations
     AICORE_SET_CONFIG = "set_aicore_config"
     AICORE_AUTO_INSTRUMENT = "auto_instrument"
+
+    # Print Operations
+    PRINT_LIST_QUEUES = "list_queues"
+    PRINT_CREATE_QUEUE = "create_queue"
+    PRINT_GET_PROFILES = "get_print_profiles"
+    PRINT_UPLOAD_DOCUMENT = "upload_document"
+    PRINT_CREATE_TASK = "create_print_task"
+    PRINT_CREATE_CLIENT = "print_create_client"
 
     # DMS Operations
     DMS_ONBOARD_REPOSITORY = "onboard_repository"
@@ -107,6 +183,8 @@ class Operation(str, Enum):
     # Agent Gateway Operations
     AGENTGATEWAY_LIST_MCP_TOOLS = "list_mcp_tools"
     AGENTGATEWAY_CALL_MCP_TOOL = "call_mcp_tool"
+    AGENTGATEWAY_GET_SYSTEM_AUTH = "get_system_auth"
+    AGENTGATEWAY_GET_USER_AUTH = "get_user_auth"
 
     # Agent Memory Operations
     AGENT_MEMORY_ADD_MEMORY = "add_memory"

@@ -8,6 +8,13 @@ from sap_cloud_sdk.agentgateway import MCPTool
 from sap_cloud_sdk.agentgateway.converters import mcp_tool_to_langchain
 
 
+def _schema_fields(lc_tool):
+    """Narrow args_schema to BaseModel and return model_fields."""
+    schema = lc_tool.args_schema
+    assert isinstance(schema, type) and issubclass(schema, BaseModel)
+    return schema.model_fields
+
+
 def _make_tool(*, required=("eventid",), optional=("showdeclinedreason", "datafetchmode")):
     properties = {k: {"type": "string"} for k in (*required, *optional)}
     return MCPTool(
@@ -35,8 +42,7 @@ class TestMcpToolToLangchainStructure:
         lc_tool = mcp_tool_to_langchain(_make_tool(), AsyncMock(return_value="ok"), lambda: "token")
 
         assert lc_tool.args_schema is not None
-        assert isinstance(lc_tool.args_schema, type) and issubclass(lc_tool.args_schema, BaseModel)
-        fields = lc_tool.args_schema.model_fields
+        fields = _schema_fields(lc_tool)
         assert "eventid" in fields
         assert "showdeclinedreason" in fields
         assert "datafetchmode" in fields
@@ -45,13 +51,13 @@ class TestMcpToolToLangchainStructure:
         """Fields listed in 'required' must be required in the Pydantic model."""
         lc_tool = mcp_tool_to_langchain(_make_tool(), AsyncMock(return_value="ok"), lambda: "token")
 
-        assert lc_tool.args_schema.model_fields["eventid"].is_required()
+        assert _schema_fields(lc_tool)["eventid"].is_required()
 
     def test_optional_fields_are_not_required_in_args_schema(self):
         """Fields absent from 'required' must be optional in the Pydantic model."""
         lc_tool = mcp_tool_to_langchain(_make_tool(), AsyncMock(return_value="ok"), lambda: "token")
 
-        fields = lc_tool.args_schema.model_fields
+        fields = _schema_fields(lc_tool)
         assert not fields["showdeclinedreason"].is_required()
         assert not fields["datafetchmode"].is_required()
 

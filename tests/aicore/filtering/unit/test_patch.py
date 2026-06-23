@@ -6,8 +6,8 @@ from unittest.mock import MagicMock, patch
 
 import httpx
 
-from sap_cloud_sdk.aicore.filtering._filters import AzureContentFilter
-from sap_cloud_sdk.aicore.filtering._modules import (
+from sap_cloud_sdk.aicore.filtering.filters import (
+    AzureContentFilter,
     ContentFiltering,
     InputFiltering,
     OutputFiltering,

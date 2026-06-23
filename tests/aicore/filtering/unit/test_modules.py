@@ -1,16 +1,14 @@
-"""Unit tests for aicore.filtering._modules direction containers + ContentFiltering."""
+"""Unit tests for the InputFiltering/OutputFiltering/ContentFiltering containers."""
 
 import os
 
 import pytest
 
-from sap_cloud_sdk.aicore.filtering._filters import (
+from sap_cloud_sdk.aicore.filtering.filters import (
     AzureContentFilter,
-    LlamaGuard38bFilter,
-)
-from sap_cloud_sdk.aicore.filtering._modules import (
     ContentFiltering,
     InputFiltering,
+    LlamaGuard38bFilter,
     OutputFiltering,
 )
 

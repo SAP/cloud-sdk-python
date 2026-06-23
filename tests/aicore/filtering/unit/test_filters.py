@@ -1,8 +1,8 @@
-"""Unit tests for aicore.filtering._filters provider classes."""
+"""Unit tests for aicore.filtering.filters — public classes + Severity enum."""
 
 import pytest
 
-from sap_cloud_sdk.aicore.filtering._filters import (
+from sap_cloud_sdk.aicore.filtering.filters import (
     AzureContentFilter,
     ContentFilter,
     LlamaGuard38bFilter,

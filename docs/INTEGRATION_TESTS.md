@@ -62,6 +62,10 @@ CLOUD_SDK_CFG_AGW_DEFAULT_TENANT_SUBDOMAIN=your-tenant-subdomain-here
 # User JWT for token exchange scenarios (get_user_auth)
 # If not set, user auth scenarios are automatically skipped
 CLOUD_SDK_CFG_AGW_DEFAULT_USER_TOKEN=your-user-jwt-here
+
+# Name of a no-argument MCP tool available in your environment (e.g. a health-check tool)
+# If not set, tool call and converter scenarios are automatically skipped
+CLOUD_SDK_CFG_AGW_DEFAULT_SAMPLE_MCP_TOOL=your-sample-mcp-tool-name-here
 ```
 
 ### Agent Memory Integration Tests

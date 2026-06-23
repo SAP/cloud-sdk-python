@@ -21,6 +21,8 @@ def mcp_tool_to_langchain(
     mcp_tool: MCPTool,
     call_tool: Callable,
     get_user_token: Callable[[], str],
+    *,
+    omit_none: bool = True,
 ) -> StructuredTool:
     """Convert MCPTool to LangChain StructuredTool.
 
@@ -31,6 +33,8 @@ def mcp_tool_to_langchain(
         mcp_tool: MCPTool object from list_mcp_tools().
         call_tool: Callable to invoke the MCP tool (e.g., agw_client.call_mcp_tool).
         get_user_token: Callable that returns the user's JWT token.
+        omit_none: If True (default), optional parameters with a None value are not
+            forwarded to call_tool. Set to False to forward None values explicitly.
 
     Returns:
         LangChain StructuredTool that invokes the MCP tool.
@@ -66,10 +70,13 @@ def mcp_tool_to_langchain(
         ) from None
 
     async def run(**kwargs) -> str:
+        resolved = (
+            {k: v for k, v in kwargs.items() if v is not None} if omit_none else kwargs
+        )
         return await call_tool(
             mcp_tool,
             user_token=get_user_token,
-            **{k: v for k, v in kwargs.items() if v is not None},
+            **resolved,
         )
 
     # Build args schema from input_schema

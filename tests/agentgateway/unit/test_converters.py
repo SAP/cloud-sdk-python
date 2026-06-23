@@ -136,3 +136,15 @@ class TestMcpToolToLangchainInvocation:
         await lc_tool.arun({"eventid": "E001", "showdeclinedreason": "true"})
 
         assert call_tool.call_args.kwargs["showdeclinedreason"] == "true"
+
+    @pytest.mark.asyncio
+    async def test_none_values_forwarded_when_omit_none_false(self):
+        """When omit_none=False, None values are forwarded to call_tool as-is."""
+        call_tool = AsyncMock(return_value="ok")
+        lc_tool = mcp_tool_to_langchain(_make_tool(), call_tool, lambda: "token", omit_none=False)
+
+        await lc_tool.arun({"eventid": "E001", "showdeclinedreason": None})
+
+        kwargs = call_tool.call_args.kwargs
+        assert "showdeclinedreason" in kwargs
+        assert kwargs["showdeclinedreason"] is None

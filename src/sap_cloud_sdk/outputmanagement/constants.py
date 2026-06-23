@@ -14,6 +14,7 @@ class Constants:
     BEARER = "Bearer"
     HEADER_CONTENT_TYPE = "Content-Type"
     HEADER_ACCEPT = "Accept"
+    APPFND_CONHOS_SUBACCOUNTID = "APPFND_CONHOS_SUBACCOUNTID"
     HEADER_SENDER_PROVIDER_SUBACCOUNT_ID = "sender-provider-subaccount-id"
     HEADER_TRACE_PARENT = "traceparent"
     CONTENT_TYPE_JSON = "application/json"

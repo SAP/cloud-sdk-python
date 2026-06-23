@@ -28,6 +28,7 @@ dependencies = [
     "opentelemetry-api>=1.42.1",
     "opentelemetry-sdk>=1.42.1",
     "mcp>=1.1.0",
+    "cryptography>=46.0.3",
 ]
 
 [project.optional-dependencies]

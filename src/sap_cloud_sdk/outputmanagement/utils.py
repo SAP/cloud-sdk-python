@@ -12,9 +12,11 @@ Since: 1.0.0
 """
 
 from typing import Optional, List
-from ..models.output_request import OutputRequest
-from ..models.email_configuration import EmailConfiguration
-from ..models.direct_share_configuration import DirectShareConfiguration
+from .._models import (
+    OutputRequest,
+    EmailConfiguration,
+    DirectShareConfiguration,
+)
 from ..constants import Channel
 
 

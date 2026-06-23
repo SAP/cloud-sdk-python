@@ -1704,7 +1704,7 @@ class TestDestinationClientEdgeCases:
         with pytest.raises(DestinationOperationError) as exc_info:
             client.get_subaccount_destination(
                 "test-dest",
-                access_strategy=unknown_strategy,  # ty: ignore[invalid-argument-type]
+                access_strategy=unknown_strategy,
                 tenant="test-tenant"
             )
 
@@ -1802,7 +1802,7 @@ class TestDestinationClientEdgeCases:
 
         with pytest.raises(DestinationOperationError) as exc_info:
             client._apply_access_strategy(
-                access_strategy=unknown_strategy,  # ty: ignore[invalid-argument-type]
+                access_strategy=unknown_strategy,
                 tenant="test-tenant",
                 fetch_func=mock_fetch
             )

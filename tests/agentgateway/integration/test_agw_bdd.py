@@ -173,7 +173,7 @@ def convert_sample_tool_to_langchain(context: ScenarioContext, agw_client: Agent
     context.langchain_tool = mcp_tool_to_langchain(
         tool,
         agw_client.call_mcp_tool,
-        get_user_token=lambda: context.user_token,
+        get_user_token=lambda: context.user_token or "",
     )
 
 
@@ -311,7 +311,7 @@ def convert_tool_to_langchain(
     context.langchain_tool = mcp_tool_to_langchain(
         tool,
         agw_client.call_mcp_tool,
-        get_user_token=lambda: context.user_token,
+        get_user_token=lambda: context.user_token or "",
     )
 
 

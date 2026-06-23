@@ -5,6 +5,7 @@ Run against a live BTP tenant:
     CLOUD_SDK_CFG_AGW_DEFAULT_TENANT_SUBDOMAIN=<tenant-subdomain> \\
     CLOUD_SDK_CFG_AGW_DEFAULT_LANDSCAPE=<landscape> \\
     CLOUD_SDK_CFG_AGW_DEFAULT_USER_TOKEN=<user-jwt> \\
+    CLOUD_SDK_CFG_AGW_DEFAULT_SAMPLE_MCP_TOOL=<tool-name> \\
     CLOUD_SDK_CFG_DESTINATION_DEFAULT_CLIENTID=... \\
     CLOUD_SDK_CFG_DESTINATION_DEFAULT_CLIENTSECRET=... \\
     CLOUD_SDK_CFG_DESTINATION_DEFAULT_URL=... \\
@@ -15,13 +16,14 @@ Run against a live BTP tenant:
 
 import asyncio
 import os
-from typing import Optional
+from typing import Optional, Any
 
 import pytest
 from pytest_bdd import scenarios, given, when, then, parsers
 
 from sap_cloud_sdk.agentgateway import AgentGatewayClient, AuthResult, AgentGatewaySDKError
 from sap_cloud_sdk.agentgateway._models import MCPTool
+from sap_cloud_sdk.agentgateway.converters import mcp_tool_to_langchain
 
 scenarios("agw_auth.feature")
 
@@ -52,6 +54,8 @@ class ScenarioContext:
         self.user_token: Optional[str] = None
         self.tools: Optional[list[MCPTool]] = None
         self.tool_result: Optional[str] = None
+        self.langchain_tool: Optional[Any] = None
+        self.sample_mcp_tool_name: Optional[str] = None
 
 
 @pytest.fixture
@@ -76,6 +80,15 @@ def have_valid_user_token(context: ScenarioContext):
     if not token:
         pytest.skip("CLOUD_SDK_CFG_AGW_DEFAULT_USER_TOKEN is not set — skipping user auth scenario")
     context.user_token = token
+
+
+@given("I have a sample MCP tool name")
+def have_sample_mcp_tool_name(context: ScenarioContext):
+    """Load sample MCP tool name from environment variable."""
+    tool_name = os.environ.get("CLOUD_SDK_CFG_AGW_DEFAULT_SAMPLE_MCP_TOOL", "")
+    if not tool_name:
+        pytest.skip("CLOUD_SDK_CFG_AGW_DEFAULT_SAMPLE_MCP_TOOL is not set — skipping tool scenario")
+    context.sample_mcp_tool_name = tool_name
 
 
 # ==================== WHEN ====================
@@ -119,7 +132,7 @@ def call_get_user_auth_empty_token(context: ScenarioContext, agw_client: AgentGa
 @when("I call list_mcp_tools")
 def call_list_mcp_tools(context: ScenarioContext, agw_client: AgentGatewayClient):
     """Call list_mcp_tools and store the result."""
-    context.tools = run(agw_client.list_mcp_tools())
+    context.tools = run(agw_client.list_mcp_tools(user_token=context.user_token))
 
 
 @when(parsers.parse('I call call_mcp_tool with "{tool_name}" and the user token'))
@@ -133,6 +146,34 @@ def call_call_mcp_tool(
         pytest.fail(f"Tool '{tool_name}' not found in list_mcp_tools result")
     context.tool_result = run(
         agw_client.call_mcp_tool(tool, user_token=context.user_token)
+    )
+
+
+@when("I call call_mcp_tool with the sample MCP tool and the user token")
+def call_call_mcp_tool_sample(context: ScenarioContext, agw_client: AgentGatewayClient):
+    """Find the sample MCP tool and call it."""
+    assert context.tools is not None, "call list_mcp_tools before calling a tool"
+    assert context.sample_mcp_tool_name is not None
+    tool = next((t for t in context.tools if t.name == context.sample_mcp_tool_name), None)
+    if tool is None:
+        pytest.fail(f"Tool '{context.sample_mcp_tool_name}' not found in list_mcp_tools result")
+    context.tool_result = run(
+        agw_client.call_mcp_tool(tool, user_token=context.user_token)
+    )
+
+
+@when("I convert the sample MCP tool to a LangChain StructuredTool")
+def convert_sample_tool_to_langchain(context: ScenarioContext, agw_client: AgentGatewayClient):
+    """Convert the sample MCP tool to a LangChain StructuredTool."""
+    assert context.tools is not None, "call list_mcp_tools before converting a tool"
+    assert context.sample_mcp_tool_name is not None
+    tool = next((t for t in context.tools if t.name == context.sample_mcp_tool_name), None)
+    if tool is None:
+        pytest.fail(f"Tool '{context.sample_mcp_tool_name}' not found in list_mcp_tools result")
+    context.langchain_tool = mcp_tool_to_langchain(
+        tool,
+        agw_client.call_mcp_tool,
+        get_user_token=lambda: context.user_token,
     )
 
 
@@ -237,9 +278,71 @@ def each_tool_has_non_empty_url(context: ScenarioContext):
         )
 
 
+@then("each tool should have a valid input_schema")
+def each_tool_has_valid_input_schema(context: ScenarioContext):
+    """Verify every tool has an input_schema dict with type=object."""
+    assert context.tools is not None
+    for tool in context.tools:
+        assert isinstance(tool.input_schema, dict), (
+            f"Tool '{tool.name}' input_schema is not a dict: {tool.input_schema!r}"
+        )
+        assert tool.input_schema.get("type") == "object", (
+            f"Tool '{tool.name}' input_schema missing type=object: {tool.input_schema}"
+        )
+
+
 @then("the tool result should be a non-empty string")
 def tool_result_is_non_empty_string(context: ScenarioContext):
     """Verify the tool invocation returned a non-empty string."""
     assert context.tool_result is not None
     assert isinstance(context.tool_result, str)
     assert context.tool_result.strip(), "Expected a non-empty tool result"
+
+
+@when(parsers.parse('I convert the "{tool_name}" tool to a LangChain StructuredTool'))
+def convert_tool_to_langchain(
+    context: ScenarioContext, agw_client: AgentGatewayClient, tool_name: str
+):
+    """Convert the named MCPTool to a LangChain StructuredTool."""
+    assert context.tools is not None, "call list_mcp_tools before converting a tool"
+    tool = next((t for t in context.tools if t.name == tool_name), None)
+    if tool is None:
+        pytest.fail(f"Tool '{tool_name}' not found in list_mcp_tools result")
+    context.langchain_tool = mcp_tool_to_langchain(
+        tool,
+        agw_client.call_mcp_tool,
+        get_user_token=lambda: context.user_token,
+    )
+
+
+@then(parsers.parse('the LangChain tool should have name "{expected_name}"'))
+def langchain_tool_has_name(context: ScenarioContext, expected_name: str):
+    """Verify the converted LangChain tool has the expected name."""
+    assert context.langchain_tool is not None
+    assert context.langchain_tool.name == expected_name
+
+
+@then("the LangChain tool should have the sample MCP tool name")
+def langchain_tool_has_sample_name(context: ScenarioContext):
+    """Verify the converted LangChain tool name matches the sample MCP tool name."""
+    assert context.langchain_tool is not None
+    assert context.langchain_tool.name == context.sample_mcp_tool_name
+
+
+@then("the LangChain tool should have a non-empty description")
+def langchain_tool_has_description(context: ScenarioContext):
+    """Verify the converted LangChain tool has a non-empty description."""
+    assert context.langchain_tool is not None
+    assert isinstance(context.langchain_tool.description, str)
+    assert context.langchain_tool.description.strip()
+
+
+@then("the LangChain tool should require no arguments")
+def langchain_tool_requires_no_arguments(context: ScenarioContext):
+    """Verify the converted LangChain tool has no required fields in its args schema."""
+    assert context.langchain_tool is not None
+    schema = context.langchain_tool.args_schema
+    if schema is not None:
+        fields = schema.model_fields
+        required = [name for name, f in fields.items() if f.is_required()]
+        assert required == [], f"Expected no required args, got: {required}"

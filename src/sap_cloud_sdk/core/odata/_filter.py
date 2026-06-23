@@ -38,6 +38,8 @@ def _format_value(value: Any) -> str:
     """Serialise a Python value to an OData v4 literal."""
     if isinstance(value, bool):
         return "true" if value else "false"
+    if isinstance(value, uuid.UUID):
+        return str(value)
     if isinstance(value, str):
         return "'" + value.replace("'", "''") + "'"
     return str(value)

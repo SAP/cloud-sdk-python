@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
-from sap_cloud_sdk.adms._keys import build_relation_key_path, quote_odata_string_key
+import uuid
+
+from sap_cloud_sdk.core.odata._entity_key import EntityKey
 from sap_cloud_sdk.core.odata._transport import ODataHttpTransport
 from sap_cloud_sdk.core.odata._async_transport import AsyncODataHttpTransport
 from sap_cloud_sdk.adms._models import (
@@ -86,9 +88,13 @@ class _DocumentApi:
         Raises:
             DocumentNotFoundError: If no relation with this ID exists.
         """
-        path = (
-            build_relation_key_path(document_relation_id, is_active_entity)
-            + "/Document"
+        path = str(
+            EntityKey(
+                "DocumentRelation",
+                DocumentRelationID=uuid.UUID(document_relation_id),
+                IsActiveEntity=is_active_entity,
+            )
+            / "Document"
         )
         return Document.from_dict(self._http.get(path))
 
@@ -116,7 +122,11 @@ class _DocumentApi:
             ScanNotCleanError: If the document is not in ``CLEAN`` scan state.
             DocumentNotFoundError: If the relation/document cannot be found.
         """
-        rel_key = build_relation_key_path(document_relation_id, is_active_entity)
+        rel_key = EntityKey(
+            "DocumentRelation",
+            DocumentRelationID=uuid.UUID(document_relation_id),
+            IsActiveEntity=is_active_entity,
+        )
         data = self._http.get(f"{rel_key}?$expand=Document")
         doc_data = data.get("Document") or {}
         state_raw = doc_data.get("DocumentState", ScanStatus.PENDING.value)
@@ -132,9 +142,8 @@ class _DocumentApi:
                 f"Downloads are only permitted when state is CLEAN."
             )
 
-        fn_key = (
-            f"{rel_key}/DownloadDocument("
-            f"DocContentVersionID={quote_odata_string_key(doc_content_version_id)})"
+        fn_key = f"{rel_key}/DownloadDocument" + EntityKey.segment(
+            DocContentVersionID=doc_content_version_id
         )
         return self._http.get(fn_key).get("value", "")
 
@@ -160,14 +169,26 @@ class _DocumentApi:
             Full updated :class:`~sap_cloud_sdk.adms._models.Document`.
         """
         self._http.post(
-            build_relation_key_path(document_relation_id, is_active_entity)
-            + "/UpdateDocument",
+            str(
+                EntityKey(
+                    "DocumentRelation",
+                    DocumentRelationID=uuid.UUID(document_relation_id),
+                    IsActiveEntity=is_active_entity,
+                )
+                / "UpdateDocument"
+            ),
             json={"Document": update_input.to_odata_dict()},
         )
         return Document.from_dict(
             self._http.get(
-                build_relation_key_path(document_relation_id, is_active_entity)
-                + "/Document"
+                str(
+                    EntityKey(
+                        "DocumentRelation",
+                        DocumentRelationID=uuid.UUID(document_relation_id),
+                        IsActiveEntity=is_active_entity,
+                    )
+                    / "Document"
+                )
             )
         )
 
@@ -198,8 +219,14 @@ class _DocumentApi:
             payload["DocumentContentVersion"]["DocContentVersionComment"] = comment
         return Document.from_dict(
             self._http.post(
-                build_relation_key_path(document_relation_id, is_active_entity)
-                + "/RestoreDocumentContentVersion",
+                str(
+                    EntityKey(
+                        "DocumentRelation",
+                        DocumentRelationID=uuid.UUID(document_relation_id),
+                        IsActiveEntity=is_active_entity,
+                    )
+                    / "RestoreDocumentContentVersion"
+                ),
                 json=payload,
             )
         )
@@ -220,8 +247,14 @@ class _DocumentApi:
             is_active_entity: Active vs draft entity flag.
         """
         self._http.post(
-            build_relation_key_path(document_relation_id, is_active_entity)
-            + "/DeleteDocumentContentVersion",
+            str(
+                EntityKey(
+                    "DocumentRelation",
+                    DocumentRelationID=uuid.UUID(document_relation_id),
+                    IsActiveEntity=is_active_entity,
+                )
+                / "DeleteDocumentContentVersion"
+            ),
             json={"DocContentVersionID": doc_content_version_id},
         )
 
@@ -270,9 +303,13 @@ class _AsyncDocumentApi:
         is_active_entity: bool = True,
     ) -> Document:
         """Async variant of :meth:`_DocumentApi.get` — same semantics."""
-        path = (
-            build_relation_key_path(document_relation_id, is_active_entity)
-            + "/Document"
+        path = str(
+            EntityKey(
+                "DocumentRelation",
+                DocumentRelationID=uuid.UUID(document_relation_id),
+                IsActiveEntity=is_active_entity,
+            )
+            / "Document"
         )
         return Document.from_dict(await self._http.get(path))
 
@@ -285,7 +322,11 @@ class _AsyncDocumentApi:
         doc_content_version_id: str,
     ) -> str:
         """Async download URL fetch with scan-state gate."""
-        rel_key = build_relation_key_path(document_relation_id, is_active_entity)
+        rel_key = EntityKey(
+            "DocumentRelation",
+            DocumentRelationID=uuid.UUID(document_relation_id),
+            IsActiveEntity=is_active_entity,
+        )
         data = await self._http.get(f"{rel_key}?$expand=Document")
         doc_data = data.get("Document") or {}
         state_raw = doc_data.get("DocumentState", ScanStatus.PENDING.value)
@@ -301,9 +342,8 @@ class _AsyncDocumentApi:
                 f"Downloads are only permitted when state is CLEAN."
             )
 
-        fn_key = (
-            f"{rel_key}/DownloadDocument("
-            f"DocContentVersionID={quote_odata_string_key(doc_content_version_id)})"
+        fn_key = f"{rel_key}/DownloadDocument" + EntityKey.segment(
+            DocContentVersionID=doc_content_version_id
         )
         return (await self._http.get(fn_key)).get("value", "")
 
@@ -317,14 +357,26 @@ class _AsyncDocumentApi:
     ) -> Document:
         """Async variant of :meth:`_DocumentApi.update` — same semantics."""
         await self._http.post(
-            build_relation_key_path(document_relation_id, is_active_entity)
-            + "/UpdateDocument",
+            str(
+                EntityKey(
+                    "DocumentRelation",
+                    DocumentRelationID=uuid.UUID(document_relation_id),
+                    IsActiveEntity=is_active_entity,
+                )
+                / "UpdateDocument"
+            ),
             json={"Document": update.to_odata_dict()},
         )
         return Document.from_dict(
             await self._http.get(
-                build_relation_key_path(document_relation_id, is_active_entity)
-                + "/Document"
+                str(
+                    EntityKey(
+                        "DocumentRelation",
+                        DocumentRelationID=uuid.UUID(document_relation_id),
+                        IsActiveEntity=is_active_entity,
+                    )
+                    / "Document"
+                )
             )
         )
 
@@ -338,8 +390,14 @@ class _AsyncDocumentApi:
     ) -> None:
         """Async variant of :meth:`_DocumentApi.delete_content_version` — same semantics."""
         await self._http.post(
-            build_relation_key_path(document_relation_id, is_active_entity)
-            + "/DeleteDocumentContentVersion",
+            str(
+                EntityKey(
+                    "DocumentRelation",
+                    DocumentRelationID=uuid.UUID(document_relation_id),
+                    IsActiveEntity=is_active_entity,
+                )
+                / "DeleteDocumentContentVersion"
+            ),
             json={"DocContentVersionID": doc_content_version_id},
         )
 
@@ -360,8 +418,14 @@ class _AsyncDocumentApi:
             payload["DocumentContentVersion"]["DocContentVersionComment"] = comment
         return Document.from_dict(
             await self._http.post(
-                build_relation_key_path(document_relation_id, is_active_entity)
-                + "/RestoreDocumentContentVersion",
+                str(
+                    EntityKey(
+                        "DocumentRelation",
+                        DocumentRelationID=uuid.UUID(document_relation_id),
+                        IsActiveEntity=is_active_entity,
+                    )
+                    / "RestoreDocumentContentVersion"
+                ),
                 json=payload,
             )
         )

@@ -29,7 +29,7 @@ from sap_cloud_sdk.core.odata._transport import ODataHttpTransport
 @dataclass
 class _Partner(ODataEntity):
     _entity_set: ClassVar[str] = "BusinessPartnerSet"
-    _key_fields: ClassVar[list[str]] = ["PartnerID"]
+    _key_fields: ClassVar[tuple[str, ...]] = ("PartnerID",)
 
     PartnerID: str = ""
     Name: str = ""
@@ -90,7 +90,9 @@ class TestEntitySetPath:
 class TestGetAllRequestBuilder:
     def test_execute_calls_correct_path(self):
         session = MagicMock(spec=requests.Session)
-        session.request.return_value = _mock_response(200, {"value": [{"PartnerID": "1", "Name": "A"}]})
+        session.request.return_value = _mock_response(
+            200, {"value": [{"PartnerID": "1", "Name": "A"}]}
+        )
         transport = _make_transport(session)
 
         results = GetAllRequestBuilder(transport, _Partner).execute()
@@ -119,7 +121,10 @@ class TestGetAllRequestBuilder:
 
     def test_iterate_pages_yields_pages(self):
         responses = [
-            {"value": [{"PartnerID": "1", "Name": "A"}], "@odata.nextLink": "https://host/svc/BusinessPartnerSet?$skip=1"},
+            {
+                "value": [{"PartnerID": "1", "Name": "A"}],
+                "@odata.nextLink": "https://host/svc/BusinessPartnerSet?$skip=1",
+            },
             {"value": [{"PartnerID": "2", "Name": "B"}]},
         ]
         session = MagicMock(spec=requests.Session)
@@ -134,7 +139,10 @@ class TestGetAllRequestBuilder:
 
     def test_iterate_entities_flattens_pages(self):
         responses = [
-            {"value": [{"PartnerID": "1", "Name": "A"}], "@odata.nextLink": "https://host/svc/BusinessPartnerSet?$skip=1"},
+            {
+                "value": [{"PartnerID": "1", "Name": "A"}],
+                "@odata.nextLink": "https://host/svc/BusinessPartnerSet?$skip=1",
+            },
             {"value": [{"PartnerID": "2", "Name": "B"}]},
         ]
         session = MagicMock(spec=requests.Session)
@@ -143,7 +151,10 @@ class TestGetAllRequestBuilder:
 
         entities = list(GetAllRequestBuilder(transport, _Partner).iterate_entities())
 
-        assert entities == [_Partner(PartnerID="1", Name="A"), _Partner(PartnerID="2", Name="B")]
+        assert entities == [
+            _Partner(PartnerID="1", Name="A"),
+            _Partner(PartnerID="2", Name="B"),
+        ]
 
 
 # ---------------------------------------------------------------------------
@@ -154,7 +165,9 @@ class TestGetAllRequestBuilder:
 class TestGetByKeyRequestBuilder:
     def test_execute_builds_key_in_path(self):
         session = MagicMock(spec=requests.Session)
-        session.request.return_value = _mock_response(200, {"PartnerID": "42", "Name": "X"})
+        session.request.return_value = _mock_response(
+            200, {"PartnerID": "42", "Name": "X"}
+        )
         transport = _make_transport(session)
 
         result = GetByKeyRequestBuilder(
@@ -175,7 +188,9 @@ class TestGetByKeyRequestBuilder:
 class TestCreateRequestBuilder:
     def test_execute_posts_entity_and_returns_result(self):
         session = MagicMock(spec=requests.Session)
-        session.request.return_value = _mock_response(201, {"PartnerID": "new", "Name": "New"})
+        session.request.return_value = _mock_response(
+            201, {"PartnerID": "new", "Name": "New"}
+        )
         transport = _make_transport(session)
 
         entity = _Partner(PartnerID="new", Name="New")
@@ -230,7 +245,9 @@ class TestUpdateRequestBuilder:
 
     def test_non_empty_response_deserialized(self):
         session = MagicMock(spec=requests.Session)
-        session.request.return_value = _mock_response(200, {"PartnerID": "1", "Name": "ServerSide"})
+        session.request.return_value = _mock_response(
+            200, {"PartnerID": "1", "Name": "ServerSide"}
+        )
         transport = _make_transport(session)
 
         entity = _Partner(PartnerID="1", Name="Updated")
@@ -276,7 +293,76 @@ class TestDeleteRequestBuilder:
         session.request.return_value = resp
         transport = _make_transport(session)
 
-        DeleteRequestBuilder(transport, _Partner, {"PartnerID": "1"}, etag='"W/456"').execute()
+        DeleteRequestBuilder(
+            transport, _Partner, {"PartnerID": "1"}, etag='"W/456"'
+        ).execute()
 
         headers = session.request.call_args[1]["headers"]
         assert headers["If-Match"] == '"W/456"'
+
+
+class TestBuildKeySegment:
+    def test_single_string_key(self):
+        assert _build_key_segment({"ID": "abc"}) == "('abc')"
+
+    def test_single_string_key_escapes_quotes(self):
+        assert _build_key_segment({"ID": "O'Brien"}) == "('O''Brien')"
+
+    def test_single_guid_key_unquoted(self):
+        import uuid
+
+        g = uuid.UUID("a1b2c3d4-e5f6-4789-ab12-fedcba987654")
+        result = _build_key_segment({"ID": g})
+        assert result == "(a1b2c3d4-e5f6-4789-ab12-fedcba987654)"
+        assert "'" not in result
+
+    def test_single_bool_key(self):
+        assert _build_key_segment({"Active": True}) == "(true)"
+        assert _build_key_segment({"Active": False}) == "(false)"
+
+    def test_single_int_key(self):
+        assert _build_key_segment({"ID": 42}) == "(42)"
+
+    def test_compound_key(self):
+        import uuid
+
+        g = uuid.UUID("a1b2c3d4-e5f6-4789-ab12-fedcba987654")
+        result = _build_key_segment({"RelID": g, "IsActive": True})
+        assert result == "(RelID=a1b2c3d4-e5f6-4789-ab12-fedcba987654,IsActive=true)"
+
+    def test_injection_attempt_in_string_is_escaped(self):
+        result = _build_key_segment({"ID": "x'); DROP TABLE--"})
+        # Embedded single quotes are doubled — no unescaped sequence that could break out
+        assert result == "('x''); DROP TABLE--')"
+
+    def test_build_key_segment_public_alias(self):
+        from sap_cloud_sdk.core.odata._request_builders import build_key_segment
+
+        assert build_key_segment({"ID": "x"}) == _build_key_segment({"ID": "x"})
+
+
+class TestDeserializeSingleFromDict:
+    """GetByKeyRequestBuilder uses deserialize_single which now dispatches to from_dict."""
+
+    def test_from_dict_classmethod_is_used_when_present(self):
+        @dataclass
+        class _CustomEntity(ODataEntity):
+            _entity_set: ClassVar[str] = "CustomSet"
+
+            id: str = ""
+            name: str = ""
+
+            @classmethod
+            def from_dict(cls, data: dict) -> "_CustomEntity":
+                return cls(id=data.get("ID", ""), name=data.get("Name", ""))
+
+        _CustomEntity._key_fields = ("ID",)
+
+        session = MagicMock(spec=requests.Session)
+        session.request.return_value = _mock_response(200, {"ID": "42", "Name": "Foo"})
+        transport = _make_transport(session)
+        result = GetByKeyRequestBuilder(
+            transport, _CustomEntity, {"ID": "42"}
+        ).execute()
+        assert result.id == "42"
+        assert result.name == "Foo"

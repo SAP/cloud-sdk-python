@@ -39,12 +39,29 @@ def _entity_set_path(entity_type: type) -> str:
     return getattr(entity_type, "_entity_set", None) or entity_type.__name__
 
 
-def _build_key_segment(key: dict[str, Any]) -> str:
-    """Serialise *key* dict to an OData key segment, e.g. ``(ID='x',Ver=1)``."""
+def build_key_segment(key: dict[str, Any]) -> str:
+    """Serialise *key* dict to an OData V4 key segment, e.g. ``(ID='x',Ver=1)``.
+
+    Values are serialised according to their Python type:
+    - ``uuid.UUID`` → unquoted (``Edm.Guid``)
+    - ``str`` → single-quoted with embedded quotes doubled (``Edm.String``)
+    - ``bool`` → ``true`` / ``false``
+    - anything else → ``str(value)``
+
+    Example::
+
+        build_key_segment({"DocumentRelationID": uuid.UUID(rel_id), "IsActiveEntity": True})
+        # "(DocumentRelationID=a1b2c3d4-...,IsActiveEntity=true)"
+    """
     if len(key) == 1:
         return f"({_format_value(next(iter(key.values())))})"
     parts = ",".join(f"{k}={_format_value(v)}" for k, v in key.items())
     return f"({parts})"
+
+
+def _build_key_segment(key: dict[str, Any]) -> str:
+    """Backward-compatible alias for :func:`build_key_segment`."""
+    return build_key_segment(key)
 
 
 class GetAllRequestBuilder(Generic[T]):
@@ -157,7 +174,7 @@ class GetByKeyRequestBuilder(Generic[T]):
     @record_metrics(Module.ODATA, Operation.ODATA_GET_BY_KEY)
     def execute(self) -> T:
         """Fetch the entity, raising :exc:`ODataNotFoundError` if absent."""
-        path = _entity_set_path(self._entity_type) + _build_key_segment(self._key)
+        path = _entity_set_path(self._entity_type) + build_key_segment(self._key)
         data = self._transport.request(GET, path, params=self._query.to_params())
         return deserialize_single(data, self._entity_type)
 
@@ -203,7 +220,9 @@ class UpdateRequestBuilder(Generic[T]):
     def execute(self) -> T:
         """Send the update and return the server response."""
         entity_type = type(self._entity)
-        key_fields: list[str] = getattr(entity_type, "_key_fields", [])
+        key_fields: list[str] | tuple[str, ...] = getattr(
+            entity_type, "_key_fields", []
+        )
         if not key_fields:
             raise ValueError(
                 f"{entity_type.__name__} does not define _key_fields; "
@@ -241,7 +260,7 @@ class DeleteRequestBuilder(Generic[T]):
     @record_metrics(Module.ODATA, Operation.ODATA_DELETE)
     def execute(self) -> None:
         """Delete the entity."""
-        path = _entity_set_path(self._entity_type) + _build_key_segment(self._key)
+        path = _entity_set_path(self._entity_type) + build_key_segment(self._key)
         extra: dict[str, str] = {}
         if self._etag is not None:
             extra[IF_MATCH_HEADER] = self._etag

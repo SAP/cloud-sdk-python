@@ -28,7 +28,9 @@ def _mock_response(
     return resp
 
 
-def _make_transport(client: httpx.AsyncClient, csrf_enabled: bool = False) -> AsyncODataHttpTransport:
+def _make_transport(
+    client: httpx.AsyncClient, csrf_enabled: bool = False
+) -> AsyncODataHttpTransport:
     return AsyncODataHttpTransport(
         base_url="https://example.com/odata/v4/",
         client=client,
@@ -56,7 +58,10 @@ class TestRequest:
         client.request.return_value = _mock_response(200, {})
         transport = _make_transport(client)
         await transport.request("GET", "EntitySet")
-        assert client.request.call_args[1]["url"] == "https://example.com/odata/v4/EntitySet"
+        assert (
+            client.request.call_args[1]["url"]
+            == "https://example.com/odata/v4/EntitySet"
+        )
 
     @pytest.mark.asyncio
     async def test_passes_params(self, client):
@@ -181,7 +186,10 @@ class TestCsrf:
         csrf_resp1 = _mock_response(200, {}, headers={"X-CSRF-Token": "tok1"})
         csrf_resp2 = _mock_response(200, {}, headers={"X-CSRF-Token": "tok2"})
         client.get.side_effect = [csrf_resp1, csrf_resp2]
-        client.request.side_effect = [_mock_response(403), _mock_response(201, {"ID": "1"})]
+        client.request.side_effect = [
+            _mock_response(403),
+            _mock_response(201, {"ID": "1"}),
+        ]
 
         transport = _make_transport(client, csrf_enabled=True)
         await transport.request("POST", "EntitySet", json={"Name": "X"})
@@ -219,7 +227,9 @@ class TestCsrf:
 
 class TestAbsoluteUrl:
     def test_builds_url_with_trailing_slash(self):
-        t = AsyncODataHttpTransport("https://host/svc/", MagicMock(), csrf_enabled=False)
+        t = AsyncODataHttpTransport(
+            "https://host/svc/", MagicMock(), csrf_enabled=False
+        )
         assert t.absolute_url("EntitySet") == "https://host/svc/EntitySet"
 
     def test_strips_leading_slash_from_path(self):
@@ -258,8 +268,10 @@ class TestGetToken:
     @pytest.mark.asyncio
     async def test_async_token_callable_is_awaited(self, client):
         client.request.return_value = _mock_response(200, {})
+
         async def async_token():
             return "async-token"
+
         transport = AsyncODataHttpTransport(
             base_url="https://example.com/odata/v4/",
             client=client,

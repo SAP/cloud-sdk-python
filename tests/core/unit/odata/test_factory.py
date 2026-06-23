@@ -47,7 +47,9 @@ class TestOdataTransportFromDestination:
         assert transport._base_url == "https://host.example.com"
 
     def test_destination_headers_baked_into_session(self):
-        dest = _make_destination(headers={"Authorization": "Bearer abc", "sap-client": "100"})
+        dest = _make_destination(
+            headers={"Authorization": "Bearer abc", "sap-client": "100"}
+        )
         transport = odata_transport_from_destination(dest)
         assert transport._session.headers["Authorization"] == "Bearer abc"
         assert transport._session.headers["sap-client"] == "100"

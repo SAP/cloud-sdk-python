@@ -1,4 +1,4 @@
-"""Tests for StarletteIASInstrumentor."""
+"""Tests for _StarletteIASInstrumentor."""
 
 import pytest
 from unittest.mock import MagicMock, patch, AsyncMock
@@ -6,8 +6,8 @@ from unittest.mock import MagicMock, patch, AsyncMock
 from starlette import applications
 
 from sap_cloud_sdk.core.telemetry.constants import ATTR_SAP_TENANT_ID, ATTR_USER_ID
-from sap_cloud_sdk.core.telemetry.middleware.starlette_instrumentor import (
-    StarletteIASInstrumentor,
+from sap_cloud_sdk.core.telemetry.middleware._starlette_instrumentor import (
+    _StarletteIASInstrumentor,
     _attrs_var,
 )
 
@@ -18,72 +18,72 @@ _PATCH_PARSE = "sap_cloud_sdk.core.telemetry.middleware.starlette_a2a.parse_toke
 def reset_instrumentor():
     """Ensure each test starts and ends with a clean uninstrumented state."""
     original = applications.Starlette
-    StarletteIASInstrumentor._instrumented = False
-    StarletteIASInstrumentor._processor_registered = False
-    StarletteIASInstrumentor._original = None
+    _StarletteIASInstrumentor._instrumented = False
+    _StarletteIASInstrumentor._processor_registered = False
+    _StarletteIASInstrumentor._original = None
     yield
     applications.Starlette = original
-    StarletteIASInstrumentor._instrumented = False
-    StarletteIASInstrumentor._processor_registered = False
-    StarletteIASInstrumentor._original = None
+    _StarletteIASInstrumentor._instrumented = False
+    _StarletteIASInstrumentor._processor_registered = False
+    _StarletteIASInstrumentor._original = None
 
 
 class TestIsAvailable:
     def test_returns_true_when_starlette_installed(self):
-        assert StarletteIASInstrumentor.is_available() is True
+        assert _StarletteIASInstrumentor.is_available() is True
 
     def test_returns_false_when_starlette_missing(self):
         with patch.dict("sys.modules", {"starlette": None}):
-            assert StarletteIASInstrumentor.is_available() is False
+            assert _StarletteIASInstrumentor.is_available() is False
 
 
 class TestInstrumentGuard:
     def test_instrument_patches_starlette_class(self):
         original = applications.Starlette
-        instr = StarletteIASInstrumentor()
+        instr = _StarletteIASInstrumentor()
         instr.instrument()
         assert applications.Starlette is not original
 
     def test_instrument_is_idempotent(self):
-        instr = StarletteIASInstrumentor()
+        instr = _StarletteIASInstrumentor()
         instr.instrument()
         patched = applications.Starlette
         instr.instrument()  # second call
         assert applications.Starlette is patched  # unchanged
 
     def test_instrumented_flag_set_after_instrument(self):
-        instr = StarletteIASInstrumentor()
-        assert not StarletteIASInstrumentor._instrumented
+        instr = _StarletteIASInstrumentor()
+        assert not _StarletteIASInstrumentor._instrumented
         instr.instrument()
-        assert StarletteIASInstrumentor._instrumented
+        assert _StarletteIASInstrumentor._instrumented
 
     def test_uninstrument_restores_original_class(self):
         original = applications.Starlette
-        instr = StarletteIASInstrumentor()
+        instr = _StarletteIASInstrumentor()
         instr.instrument()
         instr.uninstrument()
         assert applications.Starlette is original
 
     def test_uninstrument_clears_flag(self):
-        instr = StarletteIASInstrumentor()
+        instr = _StarletteIASInstrumentor()
         instr.instrument()
         instr.uninstrument()
-        assert not StarletteIASInstrumentor._instrumented
+        assert not _StarletteIASInstrumentor._instrumented
 
     def test_uninstrument_is_idempotent(self):
-        instr = StarletteIASInstrumentor()
+        instr = _StarletteIASInstrumentor()
         instr.uninstrument()  # called without prior instrument() — must not raise
 
 
 class TestPerInstanceGuard:
     def test_app_gets_ias_middleware_on_init(self):
-        instr = StarletteIASInstrumentor()
+        instr = _StarletteIASInstrumentor()
         instr.instrument()
         app = applications.Starlette()
         assert getattr(app, "_sap_ias_done", False) is True
 
     def test_middleware_not_added_twice_on_same_instance(self):
-        instr = StarletteIASInstrumentor()
+        instr = _StarletteIASInstrumentor()
         instr.instrument()
         app = applications.Starlette()
         add_mw_calls_before = app.middleware_stack  # capture after first init
@@ -111,7 +111,7 @@ class TestK8sOperatorComposition:
 
         applications.Starlette = _OtelInstrumented
 
-        instr = StarletteIASInstrumentor()
+        instr = _StarletteIASInstrumentor()
         instr.instrument()
 
         app = applications.Starlette()
@@ -120,7 +120,7 @@ class TestK8sOperatorComposition:
 
     def test_existing_subclass_layers_on_top_of_our_patch(self):
         """Simulates OTel operator running second (Scenario B)."""
-        instr = StarletteIASInstrumentor()
+        instr = _StarletteIASInstrumentor()
         instr.instrument()
 
         current = applications.Starlette
@@ -141,11 +141,11 @@ class TestK8sOperatorComposition:
 
 class TestGetAttributes:
     def test_returns_empty_outside_request(self):
-        instr = StarletteIASInstrumentor()
+        instr = _StarletteIASInstrumentor()
         assert instr.get_attributes() == {}
 
     def test_returns_attrs_set_in_context_var(self):
-        instr = StarletteIASInstrumentor()
+        instr = _StarletteIASInstrumentor()
         token = _attrs_var.set({ATTR_SAP_TENANT_ID: "t1", ATTR_USER_ID: "u1"})
         try:
             assert instr.get_attributes() == {
@@ -159,14 +159,14 @@ class TestGetAttributes:
 class TestUninstrumentGuards:
     def test_uninstrument_with_original_none_does_not_crash(self):
         """Fix 1: _do_uninstrument must not set applications.Starlette = None."""
-        StarletteIASInstrumentor._instrumented = True
-        StarletteIASInstrumentor._original = None
-        instr = StarletteIASInstrumentor()
+        _StarletteIASInstrumentor._instrumented = True
+        _StarletteIASInstrumentor._original = None
+        instr = _StarletteIASInstrumentor()
         instr.uninstrument()  # must not raise or corrupt applications.Starlette
         assert applications.Starlette is not None
 
     def test_uninstrument_does_not_corrupt_starlette_class(self):
-        instr = StarletteIASInstrumentor()
+        instr = _StarletteIASInstrumentor()
         instr.instrument()
         instr.uninstrument()
         # applications.Starlette must be a real callable class
@@ -175,13 +175,13 @@ class TestUninstrumentGuards:
 
     def test_processor_registered_flag_reset_on_uninstrument(self):
         """Fix 3: _processor_registered is cleared when uninstrument() is called."""
-        instr = StarletteIASInstrumentor()
-        StarletteIASInstrumentor._processor_registered = True
+        instr = _StarletteIASInstrumentor()
+        _StarletteIASInstrumentor._processor_registered = True
         instr.instrument()
         instr.uninstrument()
-        assert not StarletteIASInstrumentor._processor_registered
+        assert not _StarletteIASInstrumentor._processor_registered
 
-
-class TestFrameworkKey:
-    def test_framework_key_is_starlette(self):
-        assert StarletteIASInstrumentor.framework_key == "starlette"
+class TestSupersedes:
+    def test_supersedes_starlette_ias_telemetry_middleware(self):
+        from sap_cloud_sdk.core.telemetry.middleware.starlette_a2a import StarletteIASTelemetryMiddleware
+        assert _StarletteIASInstrumentor.supersedes is StarletteIASTelemetryMiddleware

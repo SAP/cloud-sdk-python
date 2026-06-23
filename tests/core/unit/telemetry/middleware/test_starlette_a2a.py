@@ -1,7 +1,9 @@
-"""Tests for StarletteIASTelemetryMiddleware."""
+"""Tests for StarletteIASTelemetryMiddleware (deprecated explicit path)."""
 
 import pytest
 from unittest.mock import MagicMock, AsyncMock, patch
+
+pytestmark = pytest.mark.filterwarnings("ignore::DeprecationWarning")
 
 from sap_cloud_sdk.core.telemetry.constants import ATTR_SAP_TRIGGER_TYPE, ATTR_SAP_TENANT_ID, ATTR_USER_ID
 from sap_cloud_sdk.core.telemetry.middleware.starlette_a2a import (

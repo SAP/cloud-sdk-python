@@ -1,4 +1,4 @@
-"""Zero-config IAS telemetry instrumentation for Starlette and FastAPI.
+"""Internal: zero-config IAS telemetry instrumentation for Starlette.
 
 Patches ``starlette.applications.Starlette`` via class substitution so that
 any app created after ``auto_instrument()`` automatically gets the IAS JWT
@@ -13,24 +13,21 @@ import logging
 from contextvars import ContextVar
 from typing import Any, Dict
 
-from sap_cloud_sdk.core.telemetry.middleware.base import FrameworkInstrumentor
-from sap_cloud_sdk.core.telemetry.middleware.registry import register
+from sap_cloud_sdk.core.telemetry.middleware._framework_instrumentor import FrameworkInstrumentor
+from sap_cloud_sdk.core.telemetry.middleware._registry import _register
+from sap_cloud_sdk.core.telemetry.middleware.starlette_a2a import (
+    StarletteIASTelemetryMiddleware,
+)
 
 logger = logging.getLogger(__name__)
 
 _attrs_var: ContextVar[Dict[str, Any]] = ContextVar("_sap_ias_attrs", default={})
 
 
-@register
-class StarletteIASInstrumentor(FrameworkInstrumentor):
-    """Instruments Starlette and FastAPI with IAS JWT telemetry middleware.
-
-    FastAPI subclasses Starlette and calls ``super().__init__()``, so patching
-    ``starlette.applications.Starlette`` covers both frameworks with one patch.
-    """
-
+@_register
+class _StarletteIASInstrumentor(FrameworkInstrumentor):
     _original: Any = None
-    framework_key = "starlette"
+    supersedes = StarletteIASTelemetryMiddleware
 
     @classmethod
     def is_available(cls) -> bool:
@@ -53,15 +50,15 @@ class StarletteIASInstrumentor(FrameworkInstrumentor):
                     self._sap_ias_done = True
                     self.add_middleware(_IASMiddleware, attrs_var=_attrs_var)
 
-        StarletteIASInstrumentor._original = original
+        _StarletteIASInstrumentor._original = original
         applications.Starlette = _SAPInstrumented
 
     def _do_uninstrument(self) -> None:
-        if StarletteIASInstrumentor._original is None:
+        if _StarletteIASInstrumentor._original is None:
             return
         from starlette import applications
-        applications.Starlette = StarletteIASInstrumentor._original
-        StarletteIASInstrumentor._original = None
+        applications.Starlette = _StarletteIASInstrumentor._original
+        _StarletteIASInstrumentor._original = None
 
     def get_attributes(self) -> Dict[str, Any]:
         return _attrs_var.get()

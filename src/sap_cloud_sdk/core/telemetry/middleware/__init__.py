@@ -1,20 +1,15 @@
 """HTTP framework middleware integration for Cloud SDK telemetry.
 
-Provides middleware adapters that extract request-scoped attributes
-(e.g. A2A session/task headers) and surface them as OpenTelemetry span
-attributes via auto_instrument().
+The explicit middleware path (``TelemetryMiddleware``, ``StarletteIASTelemetryMiddleware``,
+and the ``middlewares=`` parameter of ``auto_instrument()``) is deprecated and will be
+removed in the next major version. Call ``auto_instrument()`` before creating your app
+instead — IAS middleware is registered automatically.
 """
 
-from sap_cloud_sdk.core.telemetry.middleware.base import (
-    FrameworkInstrumentor,
-    TelemetryMiddleware,
-)
-from sap_cloud_sdk.core.telemetry.middleware.registry import register
+from sap_cloud_sdk.core.telemetry.middleware.base import TelemetryMiddleware
 
 __all__ = [
-    "FrameworkInstrumentor",
     "TelemetryMiddleware",
-    "register",
 ]
 
 try:
@@ -26,7 +21,8 @@ try:
 except ImportError:
     pass
 
+# Trigger @_register side-effect for the internal Starlette instrumentor.
 try:
-    import sap_cloud_sdk.core.telemetry.middleware.starlette_instrumentor  # noqa: F401 — triggers @register
+    import sap_cloud_sdk.core.telemetry.middleware._starlette_instrumentor  # noqa: F401
 except ImportError:
     pass

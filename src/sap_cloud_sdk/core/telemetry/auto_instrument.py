@@ -1,5 +1,6 @@
 import logging
 import os
+import warnings
 from collections.abc import Mapping
 
 from sap_cloud_sdk.core.telemetry.middleware.base import TelemetryMiddleware
@@ -43,7 +44,10 @@ def auto_instrument(
     middlewares: list[TelemetryMiddleware] | None = None,
 ):
     """
-    Initialize meta-instrumentation for GenAI tracing. Should be initialized before any AI frameworks.
+    Initialize meta-instrumentation for GenAI tracing.
+
+    Should be called before importing your Starlette/FastAPI app so that
+    IAS JWT telemetry middleware is registered automatically.
 
     Traces are exported to the OTEL collector endpoint configured in environment with
     OTEL_EXPORTER_OTLP_ENDPOINT, or printed to console when OTEL_TRACES_EXPORTER=console.
@@ -52,13 +56,19 @@ def auto_instrument(
         disable_batch: If True, uses SimpleSpanProcessor (synchronous, lower throughput).
                        Defaults to False, which uses BatchSpanProcessor (asynchronous,
                        recommended for production workloads).
-        middlewares: Optional list of TelemetryMiddleware instances. When provided,
-                     each middleware is registered with its application and a
-                     MiddlewareSpanProcessor is added so that headers extracted by
-                     the middlewares appear as attributes on every span.
-                     Must be called before the ASGI application begins serving
-                     requests so that register() runs before the first request.
+        middlewares: Deprecated. Pass explicit TelemetryMiddleware instances.
+                     Use auto_instrument() without this parameter instead — IAS middleware
+                     is now registered automatically for supported frameworks.
+                     Will be removed in the next major version.
     """
+    if middlewares is not None:
+        warnings.warn(
+            "The middlewares= parameter of auto_instrument() is deprecated and will be "
+            "removed in the next major version. Call auto_instrument() without it — "
+            "IAS middleware is now registered automatically for supported frameworks.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
     otel_endpoint = os.getenv(ENV_OTLP_ENDPOINT, "")
     console_traces = os.getenv(ENV_TRACES_EXPORTER, "").lower() == "console"
 
@@ -161,7 +171,7 @@ def _register_middleware_processors(middlewares: list[TelemetryMiddleware]) -> N
 def _auto_instrument_frameworks(
     middlewares: list[TelemetryMiddleware] | None = None,
 ) -> None:
-    from sap_cloud_sdk.core.telemetry.middleware.registry import get_available
+    from sap_cloud_sdk.core.telemetry.middleware._registry import _get_available
     from sap_cloud_sdk.core.telemetry.middleware.span_processor import (
         MiddlewareSpanProcessor,
     )
@@ -173,28 +183,27 @@ def _auto_instrument_frameworks(
         )
         return
 
-    manual_keys = {m.framework_key for m in (middlewares or []) if m.framework_key}
+    manual_types = {type(m) for m in (middlewares or [])}
 
     instrumentors = [
-        i for i in get_available()
+        i for i in _get_available()
         if not i.__class__._processor_registered
-        and i.framework_key not in manual_keys
+        and not (i.__class__.supersedes and i.__class__.supersedes in manual_types)
     ]
 
-    if not instrumentors:
-        return
-
     skipped = [
-        i for i in get_available()
-        if i.framework_key in manual_keys
+        i for i in _get_available()
+        if i.__class__.supersedes and i.__class__.supersedes in manual_types
     ]
     for i in skipped:
         logger.warning(
-            "%s skipped: framework '%s' is already covered by an explicit middlewares= entry. "
-            "Remove the explicit middleware or do not pass it to avoid duplicate IAS span attributes.",
+            "%s skipped: an explicit middlewares= entry already covers this framework. "
+            "Remove the explicit middleware to avoid duplicate IAS span attributes.",
             type(i).__name__,
-            i.framework_key,
         )
+
+    if not instrumentors:
+        return
 
     for instr in instrumentors:
         instr.instrument()

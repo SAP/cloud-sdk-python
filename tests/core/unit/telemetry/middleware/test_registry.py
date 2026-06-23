@@ -2,11 +2,11 @@
 
 import pytest
 
-from sap_cloud_sdk.core.telemetry.middleware.base import FrameworkInstrumentor
-from sap_cloud_sdk.core.telemetry.middleware.registry import (
+from sap_cloud_sdk.core.telemetry.middleware._framework_instrumentor import FrameworkInstrumentor
+from sap_cloud_sdk.core.telemetry.middleware._registry import (
     _registry,
-    get_available,
-    register,
+    _get_available,
+    _register,
 )
 
 
@@ -32,39 +32,39 @@ def _make_instrumentor(available: bool) -> type[FrameworkInstrumentor]:
 
 
 @pytest.fixture()
-def registered_cls():
+def _registered_cls():
     """Register a stub class and guarantee cleanup even if the test fails."""
-    registered = []
+    _registered = []
 
-    def _register(available: bool = True) -> type[FrameworkInstrumentor]:
+    def _do_register(available: bool = True) -> type[FrameworkInstrumentor]:
         cls = _make_instrumentor(available=available)
-        register(cls)
-        registered.append(cls)
+        _register(cls)
+        _registered.append(cls)
         return cls
 
-    yield _register
+    yield _do_register
 
-    for cls in registered:
+    for cls in _registered:
         if cls in _registry:
             _registry.remove(cls)
 
 
 class TestRegister:
-    def test_register_adds_to_registry(self, registered_cls):
-        before = len(_registry) - 1  # registered_cls already added one
-        cls = registered_cls()
+    def test__register_adds_to_registry(self, _registered_cls):
+        before = len(_registry) - 1  # _registered_cls already added one
+        cls = _registered_cls()
         assert cls in _registry
 
-    def test_register_returns_class_unchanged(self, registered_cls):
+    def test__register_returns_class_unchanged(self, _registered_cls):
         cls = _make_instrumentor(available=True)
-        result = register(cls)
+        result = _register(cls)
         assert result is cls
         _registry.remove(cls)
 
-    def test_register_usable_as_decorator(self, registered_cls):
+    def test__register_usable_as_decorator(self, _registered_cls):
         base = _make_instrumentor(available=True)
 
-        @register
+        @_register
         class _Decorated(base):
             pass
 
@@ -73,18 +73,18 @@ class TestRegister:
 
 
 class TestGetAvailable:
-    def test_returns_instance_of_available_instrumentor(self, registered_cls):
-        cls = registered_cls(available=True)
-        result = get_available()
+    def test_returns_instance_of_available_instrumentor(self, _registered_cls):
+        cls = _registered_cls(available=True)
+        result = _get_available()
         assert any(isinstance(i, cls) for i in result)
 
-    def test_skips_unavailable_instrumentor(self, registered_cls):
-        cls = registered_cls(available=False)
-        result = get_available()
+    def test_skips_unavailable_instrumentor(self, _registered_cls):
+        cls = _registered_cls(available=False)
+        result = _get_available()
         assert not any(isinstance(i, cls) for i in result)
 
-    def test_returns_separate_instances_on_each_call(self, registered_cls):
-        cls = registered_cls(available=True)
-        a = [i for i in get_available() if isinstance(i, cls)]
-        b = [i for i in get_available() if isinstance(i, cls)]
+    def test_returns_separate_instances_on_each_call(self, _registered_cls):
+        cls = _registered_cls(available=True)
+        a = [i for i in _get_available() if isinstance(i, cls)]
+        b = [i for i in _get_available() if isinstance(i, cls)]
         assert a[0] is not b[0]

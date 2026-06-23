@@ -1,8 +1,10 @@
-"""Tests for TelemetryMiddleware abstract base class."""
+"""Tests for TelemetryMiddleware abstract base class (deprecated explicit path)."""
 
 import pytest
 
 from sap_cloud_sdk.core.telemetry.middleware.base import TelemetryMiddleware
+
+pytestmark = pytest.mark.filterwarnings("ignore::DeprecationWarning")
 
 
 class TestTelemetryMiddlewareAbstract:

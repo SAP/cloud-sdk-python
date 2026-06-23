@@ -62,6 +62,8 @@ class StarletteIASTelemetryMiddleware(TelemetryMiddleware):
         auto_instrument(middlewares=[StarletteIASTelemetryMiddleware(app=app)])
     """
 
+    framework_key = "starlette"
+
     def __init__(self, app: Any) -> None:
         self.app = app
         self._attrs_var: ContextVar[Dict[str, Any]] = ContextVar(

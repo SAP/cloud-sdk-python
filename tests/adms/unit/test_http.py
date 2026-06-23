@@ -271,7 +271,7 @@ class TestQuoteOdataGuidKey:
         # The signature is str, but defend against accidental int / None
         # callers — should surface as ValueError, not TypeError.
         with pytest.raises(ValueError, match="invalid OData Edm.Guid key"):
-            quote_odata_guid_key(None)  # type: ignore[arg-type]  # ty: ignore[invalid-argument-type]
+            quote_odata_guid_key(None)  # type: ignore[arg-type]
 
 
 class TestAdmsHttpThreadSafety:

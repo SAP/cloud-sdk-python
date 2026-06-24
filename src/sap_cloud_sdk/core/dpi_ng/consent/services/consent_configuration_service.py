@@ -1,0 +1,512 @@
+"""Service client for consentConfigurationExternalServices."""
+
+from __future__ import annotations
+
+import logging
+from typing import Any
+
+from ..client import _ODataClient
+from ._query import _apply_query
+
+logger = logging.getLogger(__name__)
+
+_SVC = "consentConfigurationExternalServices"
+
+
+class ConsentConfigurationService:
+    """Client for consentConfigurationExternalServices - CRUD on reference/configuration data."""
+
+    def __init__(self, client: _ODataClient) -> None:
+        """Bind entity classes from the consentConfigurationExternalServices endpoint."""
+        logger.info("Invoked ConsentConfigurationService.__init__")
+        self._client = client
+        (
+            self.ThirdParty,
+            self.Jurisdiction,
+            self.JurisdictionText,
+            self.Language,
+            self.LanguageDescription,
+            self.SourceInfo,
+            self.Controller,
+            self.DataSubjectType,
+            self.Application,
+            self.MasterDataSource,
+            self.OutboundChannelType,
+        ) = client.get_entity_classes(_SVC)
+        logger.info("Exiting ConsentConfigurationService.__init__")
+
+    # ------ thirdParties ------
+
+    def list_third_parties(self, **query: Any) -> list[Any]:
+        """Return all third-party records, optionally filtered/paged via OData query kwargs."""
+        logger.info("Invoked ConsentConfigurationService.list_third_parties")
+        result = _apply_query(self._client.query(_SVC, self.ThirdParty), query).all()
+        logger.info("Exiting ConsentConfigurationService.list_third_parties")
+        return result
+
+    def get_third_party(self, third_party_id: str) -> Any:
+        """Return a single ThirdParty entity by its UUID."""
+        logger.info("Invoked ConsentConfigurationService.get_third_party")
+        result = self._client.query(_SVC, self.ThirdParty).get(third_party_id)
+        logger.info("Exiting ConsentConfigurationService.get_third_party")
+        return result
+
+    def create_third_party(self, body: dict[str, Any]) -> Any:
+        """Create a new ThirdParty entity and return it."""
+        logger.info("Invoked ConsentConfigurationService.create_third_party")
+        entity = self.ThirdParty()
+        for k, v in body.items():
+            setattr(entity, k, v)
+        self._client.save(entity)
+        logger.info("Exiting ConsentConfigurationService.create_third_party")
+        return entity
+
+    def update_third_party(self, third_party_id: str, body: dict[str, Any]) -> Any:
+        """Fetch a ThirdParty by ID, apply field updates, and PATCH it."""
+        logger.info("Invoked ConsentConfigurationService.update_third_party")
+        entity = self._client.query(_SVC, self.ThirdParty).get(third_party_id)
+        for k, v in body.items():
+            setattr(entity, k, v)
+        self._client.save(entity)
+        logger.info("Exiting ConsentConfigurationService.update_third_party")
+        return entity
+
+    def delete_third_party(self, third_party_id: str) -> None:
+        """Delete a ThirdParty entity by its UUID."""
+        logger.info("Invoked ConsentConfigurationService.delete_third_party")
+        entity = self._client.query(_SVC, self.ThirdParty).get(third_party_id)
+        self._client.delete_entity(entity)
+        logger.info("Exiting ConsentConfigurationService.delete_third_party")
+
+    # ------ jurisdictions ------
+
+    def list_jurisdictions(self, **query: Any) -> list[Any]:
+        """Return all jurisdiction records, optionally filtered/paged."""
+        logger.info("Invoked ConsentConfigurationService.list_jurisdictions")
+        result = _apply_query(self._client.query(_SVC, self.Jurisdiction), query).all()
+        logger.info("Exiting ConsentConfigurationService.list_jurisdictions")
+        return result
+
+    def get_jurisdiction(self, jurisdiction_id: str) -> Any:
+        """Return a single Jurisdiction entity by its UUID."""
+        logger.info("Invoked ConsentConfigurationService.get_jurisdiction")
+        result = self._client.query(_SVC, self.Jurisdiction).get(jurisdiction_id)
+        logger.info("Exiting ConsentConfigurationService.get_jurisdiction")
+        return result
+
+    def create_jurisdiction(self, body: dict[str, Any]) -> Any:
+        """Create a new Jurisdiction entity and return it."""
+        logger.info("Invoked ConsentConfigurationService.create_jurisdiction")
+        entity = self.Jurisdiction()
+        for k, v in body.items():
+            setattr(entity, k, v)
+        self._client.save(entity)
+        logger.info("Exiting ConsentConfigurationService.create_jurisdiction")
+        return entity
+
+    def update_jurisdiction(self, jurisdiction_id: str, body: dict[str, Any]) -> Any:
+        """Fetch a Jurisdiction by ID, apply field updates, and PATCH it."""
+        logger.info("Invoked ConsentConfigurationService.update_jurisdiction")
+        entity = self._client.query(_SVC, self.Jurisdiction).get(jurisdiction_id)
+        for k, v in body.items():
+            setattr(entity, k, v)
+        self._client.save(entity)
+        logger.info("Exiting ConsentConfigurationService.update_jurisdiction")
+        return entity
+
+    def delete_jurisdiction(self, jurisdiction_id: str) -> None:
+        """Delete a Jurisdiction entity by its UUID."""
+        logger.info("Invoked ConsentConfigurationService.delete_jurisdiction")
+        entity = self._client.query(_SVC, self.Jurisdiction).get(jurisdiction_id)
+        self._client.delete_entity(entity)
+        logger.info("Exiting ConsentConfigurationService.delete_jurisdiction")
+
+    # ------ jurisdictionTexts ------
+
+    def list_jurisdiction_texts(self, **query: Any) -> list[Any]:
+        """Return all jurisdiction text records, optionally filtered/paged."""
+        logger.info("Invoked ConsentConfigurationService.list_jurisdiction_texts")
+        result = _apply_query(
+            self._client.query(_SVC, self.JurisdictionText), query
+        ).all()
+        logger.info("Exiting ConsentConfigurationService.list_jurisdiction_texts")
+        return result
+
+    def create_jurisdiction_text(self, body: dict[str, Any]) -> Any:
+        """Create a new JurisdictionText entity and return it."""
+        logger.info("Invoked ConsentConfigurationService.create_jurisdiction_text")
+        entity = self.JurisdictionText()
+        for k, v in body.items():
+            setattr(entity, k, v)
+        self._client.save(entity)
+        logger.info("Exiting ConsentConfigurationService.create_jurisdiction_text")
+        return entity
+
+    def update_jurisdiction_text(
+        self, jurisdiction_id: str, language_code: str, body: dict[str, Any]
+    ) -> Any:
+        """Fetch a JurisdictionText by composite key, apply updates, and PATCH it."""
+        logger.info("Invoked ConsentConfigurationService.update_jurisdiction_text")
+        entity = self._client.query(_SVC, self.JurisdictionText).get(
+            jurisdictionId=jurisdiction_id, languageCode=language_code
+        )
+        for k, v in body.items():
+            setattr(entity, k, v)
+        self._client.save(entity)
+        logger.info("Exiting ConsentConfigurationService.update_jurisdiction_text")
+        return entity
+
+    def delete_jurisdiction_text(
+        self, jurisdiction_id: str, language_code: str
+    ) -> None:
+        """Delete a JurisdictionText by its composite key."""
+        logger.info("Invoked ConsentConfigurationService.delete_jurisdiction_text")
+        entity = self._client.query(_SVC, self.JurisdictionText).get(
+            jurisdictionId=jurisdiction_id, languageCode=language_code
+        )
+        self._client.delete_entity(entity)
+        logger.info("Exiting ConsentConfigurationService.delete_jurisdiction_text")
+
+    # ------ languages ------
+
+    def list_languages(self, **query: Any) -> list[Any]:
+        """Return all language reference records."""
+        logger.info("Invoked ConsentConfigurationService.list_languages")
+        result = _apply_query(self._client.query(_SVC, self.Language), query).all()
+        logger.info("Exiting ConsentConfigurationService.list_languages")
+        return result
+
+    def get_language(self, language_code: str) -> Any:
+        """Return a single Language entity by its code."""
+        logger.info("Invoked ConsentConfigurationService.get_language")
+        result = self._client.query(_SVC, self.Language).get(language_code)
+        logger.info("Exiting ConsentConfigurationService.get_language")
+        return result
+
+    # ------ languageDescriptions ------
+
+    def list_language_descriptions(self, **query: Any) -> list[Any]:
+        """Return all language description records."""
+        logger.info("Invoked ConsentConfigurationService.list_language_descriptions")
+        result = _apply_query(
+            self._client.query(_SVC, self.LanguageDescription), query
+        ).all()
+        logger.info("Exiting ConsentConfigurationService.list_language_descriptions")
+        return result
+
+    def create_language_description(self, body: dict[str, Any]) -> Any:
+        """Create a new LanguageDescription entity and return it."""
+        logger.info("Invoked ConsentConfigurationService.create_language_description")
+        entity = self.LanguageDescription()
+        for k, v in body.items():
+            setattr(entity, k, v)
+        self._client.save(entity)
+        logger.info("Exiting ConsentConfigurationService.create_language_description")
+        return entity
+
+    def update_language_description(
+        self, language_code: str, body: dict[str, Any]
+    ) -> Any:
+        """Fetch a LanguageDescription by code, apply updates, and PATCH it."""
+        logger.info("Invoked ConsentConfigurationService.update_language_description")
+        entity = self._client.query(_SVC, self.LanguageDescription).get(language_code)
+        for k, v in body.items():
+            setattr(entity, k, v)
+        self._client.save(entity)
+        logger.info("Exiting ConsentConfigurationService.update_language_description")
+        return entity
+
+    def delete_language_description(self, language_code: str) -> None:
+        """Delete a LanguageDescription entity by its language code."""
+        logger.info("Invoked ConsentConfigurationService.delete_language_description")
+        entity = self._client.query(_SVC, self.LanguageDescription).get(language_code)
+        self._client.delete_entity(entity)
+        logger.info("Exiting ConsentConfigurationService.delete_language_description")
+
+    # ------ sourceInfos ------
+
+    def list_source_infos(self, **query: Any) -> list[Any]:
+        """Return all source info records, optionally filtered/paged."""
+        logger.info("Invoked ConsentConfigurationService.list_source_infos")
+        result = _apply_query(self._client.query(_SVC, self.SourceInfo), query).all()
+        logger.info("Exiting ConsentConfigurationService.list_source_infos")
+        return result
+
+    def get_source_info(self, source_id: str) -> Any:
+        """Return a single SourceInfo entity by its UUID."""
+        logger.info("Invoked ConsentConfigurationService.get_source_info")
+        result = self._client.query(_SVC, self.SourceInfo).get(source_id)
+        logger.info("Exiting ConsentConfigurationService.get_source_info")
+        return result
+
+    def create_source_info(self, body: dict[str, Any]) -> Any:
+        """Create a new SourceInfo entity and return it."""
+        logger.info("Invoked ConsentConfigurationService.create_source_info")
+        entity = self.SourceInfo()
+        for k, v in body.items():
+            setattr(entity, k, v)
+        self._client.save(entity)
+        logger.info("Exiting ConsentConfigurationService.create_source_info")
+        return entity
+
+    def update_source_info(self, source_id: str, body: dict[str, Any]) -> Any:
+        """Fetch a SourceInfo by ID, apply field updates, and PATCH it."""
+        logger.info("Invoked ConsentConfigurationService.update_source_info")
+        entity = self._client.query(_SVC, self.SourceInfo).get(source_id)
+        for k, v in body.items():
+            setattr(entity, k, v)
+        self._client.save(entity)
+        logger.info("Exiting ConsentConfigurationService.update_source_info")
+        return entity
+
+    def delete_source_info(self, source_id: str) -> None:
+        """Delete a SourceInfo entity by its UUID."""
+        logger.info("Invoked ConsentConfigurationService.delete_source_info")
+        entity = self._client.query(_SVC, self.SourceInfo).get(source_id)
+        self._client.delete_entity(entity)
+        logger.info("Exiting ConsentConfigurationService.delete_source_info")
+
+    # ------ controllers ------
+
+    def list_controllers(self, **query: Any) -> list[Any]:
+        """Return all controller records, optionally filtered/paged."""
+        logger.info("Invoked ConsentConfigurationService.list_controllers")
+        result = _apply_query(self._client.query(_SVC, self.Controller), query).all()
+        logger.info("Exiting ConsentConfigurationService.list_controllers")
+        return result
+
+    def get_controller(self, controller_id: str) -> Any:
+        """Return a single Controller entity by its UUID."""
+        logger.info("Invoked ConsentConfigurationService.get_controller")
+        result = self._client.query(_SVC, self.Controller).get(controller_id)
+        logger.info("Exiting ConsentConfigurationService.get_controller")
+        return result
+
+    def create_controller(self, body: dict[str, Any]) -> Any:
+        """Create a new Controller entity and return it."""
+        logger.info("Invoked ConsentConfigurationService.create_controller")
+        entity = self.Controller()
+        for k, v in body.items():
+            setattr(entity, k, v)
+        self._client.save(entity)
+        logger.info("Exiting ConsentConfigurationService.create_controller")
+        return entity
+
+    def update_controller(self, controller_id: str, body: dict[str, Any]) -> Any:
+        """Fetch a Controller by ID, apply field updates, and PATCH it."""
+        logger.info("Invoked ConsentConfigurationService.update_controller")
+        entity = self._client.query(_SVC, self.Controller).get(controller_id)
+        for k, v in body.items():
+            setattr(entity, k, v)
+        self._client.save(entity)
+        logger.info("Exiting ConsentConfigurationService.update_controller")
+        return entity
+
+    def delete_controller(self, controller_id: str) -> None:
+        """Delete a Controller entity by its UUID."""
+        logger.info("Invoked ConsentConfigurationService.delete_controller")
+        entity = self._client.query(_SVC, self.Controller).get(controller_id)
+        self._client.delete_entity(entity)
+        logger.info("Exiting ConsentConfigurationService.delete_controller")
+
+    # ------ dataSubjectTypes ------
+
+    def list_data_subject_types(self, **query: Any) -> list[Any]:
+        """Return all data subject type records, optionally filtered/paged."""
+        logger.info("Invoked ConsentConfigurationService.list_data_subject_types")
+        result = _apply_query(
+            self._client.query(_SVC, self.DataSubjectType), query
+        ).all()
+        logger.info("Exiting ConsentConfigurationService.list_data_subject_types")
+        return result
+
+    def get_data_subject_type(self, data_subject_type_id: str) -> Any:
+        """Return a single DataSubjectType entity by its UUID."""
+        logger.info("Invoked ConsentConfigurationService.get_data_subject_type")
+        result = self._client.query(_SVC, self.DataSubjectType).get(
+            data_subject_type_id
+        )
+        logger.info("Exiting ConsentConfigurationService.get_data_subject_type")
+        return result
+
+    def create_data_subject_type(self, body: dict[str, Any]) -> Any:
+        """Create a new DataSubjectType entity and return it."""
+        logger.info("Invoked ConsentConfigurationService.create_data_subject_type")
+        entity = self.DataSubjectType()
+        for k, v in body.items():
+            setattr(entity, k, v)
+        self._client.save(entity)
+        logger.info("Exiting ConsentConfigurationService.create_data_subject_type")
+        return entity
+
+    def update_data_subject_type(
+        self, data_subject_type_id: str, body: dict[str, Any]
+    ) -> Any:
+        """Fetch a DataSubjectType by ID, apply field updates, and PATCH it."""
+        logger.info("Invoked ConsentConfigurationService.update_data_subject_type")
+        entity = self._client.query(_SVC, self.DataSubjectType).get(
+            data_subject_type_id
+        )
+        for k, v in body.items():
+            setattr(entity, k, v)
+        self._client.save(entity)
+        logger.info("Exiting ConsentConfigurationService.update_data_subject_type")
+        return entity
+
+    def delete_data_subject_type(self, data_subject_type_id: str) -> None:
+        """Delete a DataSubjectType entity by its UUID."""
+        logger.info("Invoked ConsentConfigurationService.delete_data_subject_type")
+        entity = self._client.query(_SVC, self.DataSubjectType).get(
+            data_subject_type_id
+        )
+        self._client.delete_entity(entity)
+        logger.info("Exiting ConsentConfigurationService.delete_data_subject_type")
+
+    # ------ applications ------
+
+    def list_applications(self, **query: Any) -> list[Any]:
+        """Return all application records, optionally filtered/paged."""
+        logger.info("Invoked ConsentConfigurationService.list_applications")
+        result = _apply_query(self._client.query(_SVC, self.Application), query).all()
+        logger.info("Exiting ConsentConfigurationService.list_applications")
+        return result
+
+    def get_application(self, application_id: str) -> Any:
+        """Return a single Application entity by its UUID."""
+        logger.info("Invoked ConsentConfigurationService.get_application")
+        result = self._client.query(_SVC, self.Application).get(application_id)
+        logger.info("Exiting ConsentConfigurationService.get_application")
+        return result
+
+    def create_application(self, body: dict[str, Any]) -> Any:
+        """Create a new Application entity and return it."""
+        logger.info("Invoked ConsentConfigurationService.create_application")
+        entity = self.Application()
+        for k, v in body.items():
+            setattr(entity, k, v)
+        self._client.save(entity)
+        logger.info("Exiting ConsentConfigurationService.create_application")
+        return entity
+
+    def update_application(self, application_id: str, body: dict[str, Any]) -> Any:
+        """Fetch an Application by ID, apply field updates, and PATCH it."""
+        logger.info("Invoked ConsentConfigurationService.update_application")
+        entity = self._client.query(_SVC, self.Application).get(application_id)
+        for k, v in body.items():
+            setattr(entity, k, v)
+        self._client.save(entity)
+        logger.info("Exiting ConsentConfigurationService.update_application")
+        return entity
+
+    def delete_application(self, application_id: str) -> None:
+        """Delete an Application entity by its UUID."""
+        logger.info("Invoked ConsentConfigurationService.delete_application")
+        entity = self._client.query(_SVC, self.Application).get(application_id)
+        self._client.delete_entity(entity)
+        logger.info("Exiting ConsentConfigurationService.delete_application")
+
+    # ------ masterDataSources ------
+
+    def list_master_data_sources(self, **query: Any) -> list[Any]:
+        """Return all master data source records, optionally filtered/paged."""
+        logger.info("Invoked ConsentConfigurationService.list_master_data_sources")
+        result = _apply_query(
+            self._client.query(_SVC, self.MasterDataSource), query
+        ).all()
+        logger.info("Exiting ConsentConfigurationService.list_master_data_sources")
+        return result
+
+    def get_master_data_source(self, master_data_source_id: str) -> Any:
+        """Return a single MasterDataSource entity by its UUID."""
+        logger.info("Invoked ConsentConfigurationService.get_master_data_source")
+        result = self._client.query(_SVC, self.MasterDataSource).get(
+            master_data_source_id
+        )
+        logger.info("Exiting ConsentConfigurationService.get_master_data_source")
+        return result
+
+    def create_master_data_source(self, body: dict[str, Any]) -> Any:
+        """Create a new MasterDataSource entity and return it."""
+        logger.info("Invoked ConsentConfigurationService.create_master_data_source")
+        entity = self.MasterDataSource()
+        for k, v in body.items():
+            setattr(entity, k, v)
+        self._client.save(entity)
+        logger.info("Exiting ConsentConfigurationService.create_master_data_source")
+        return entity
+
+    def update_master_data_source(
+        self, master_data_source_id: str, body: dict[str, Any]
+    ) -> Any:
+        """Fetch a MasterDataSource by ID, apply field updates, and PATCH it."""
+        logger.info("Invoked ConsentConfigurationService.update_master_data_source")
+        entity = self._client.query(_SVC, self.MasterDataSource).get(
+            master_data_source_id
+        )
+        for k, v in body.items():
+            setattr(entity, k, v)
+        self._client.save(entity)
+        logger.info("Exiting ConsentConfigurationService.update_master_data_source")
+        return entity
+
+    def delete_master_data_source(self, master_data_source_id: str) -> None:
+        """Delete a MasterDataSource entity by its UUID."""
+        logger.info("Invoked ConsentConfigurationService.delete_master_data_source")
+        entity = self._client.query(_SVC, self.MasterDataSource).get(
+            master_data_source_id
+        )
+        self._client.delete_entity(entity)
+        logger.info("Exiting ConsentConfigurationService.delete_master_data_source")
+
+    # ------ outboundChannelTypes ------
+
+    def list_outbound_channel_types(self, **query: Any) -> list[Any]:
+        """Return all outbound channel type records, optionally filtered/paged."""
+        logger.info("Invoked ConsentConfigurationService.list_outbound_channel_types")
+        result = _apply_query(
+            self._client.query(_SVC, self.OutboundChannelType), query
+        ).all()
+        logger.info("Exiting ConsentConfigurationService.list_outbound_channel_types")
+        return result
+
+    def get_outbound_channel_type(self, outbound_channel_type_id: str) -> Any:
+        """Return a single OutboundChannelType entity by its UUID."""
+        logger.info("Invoked ConsentConfigurationService.get_outbound_channel_type")
+        result = self._client.query(_SVC, self.OutboundChannelType).get(
+            outbound_channel_type_id
+        )
+        logger.info("Exiting ConsentConfigurationService.get_outbound_channel_type")
+        return result
+
+    def create_outbound_channel_type(self, body: dict[str, Any]) -> Any:
+        """Create a new OutboundChannelType entity and return it."""
+        logger.info("Invoked ConsentConfigurationService.create_outbound_channel_type")
+        entity = self.OutboundChannelType()
+        for k, v in body.items():
+            setattr(entity, k, v)
+        self._client.save(entity)
+        logger.info("Exiting ConsentConfigurationService.create_outbound_channel_type")
+        return entity
+
+    def update_outbound_channel_type(
+        self, outbound_channel_type_id: str, body: dict[str, Any]
+    ) -> Any:
+        """Fetch an OutboundChannelType by ID, apply field updates, and PATCH it."""
+        logger.info("Invoked ConsentConfigurationService.update_outbound_channel_type")
+        entity = self._client.query(_SVC, self.OutboundChannelType).get(
+            outbound_channel_type_id
+        )
+        for k, v in body.items():
+            setattr(entity, k, v)
+        self._client.save(entity)
+        logger.info("Exiting ConsentConfigurationService.update_outbound_channel_type")
+        return entity
+
+    def delete_outbound_channel_type(self, outbound_channel_type_id: str) -> None:
+        """Delete an OutboundChannelType entity by its UUID."""
+        logger.info("Invoked ConsentConfigurationService.delete_outbound_channel_type")
+        entity = self._client.query(_SVC, self.OutboundChannelType).get(
+            outbound_channel_type_id
+        )
+        self._client.delete_entity(entity)
+        logger.info("Exiting ConsentConfigurationService.delete_outbound_channel_type")

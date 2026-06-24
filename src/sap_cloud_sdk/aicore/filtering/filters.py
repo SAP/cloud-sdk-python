@@ -438,6 +438,27 @@ class OrchestrationPatchConfig(GenAIHubOrchestrationConfig):
             headers=headers,
         )
 
+        # Broadcast the primary's prompt template to every fallback entry.
+        # litellm only builds the primary module's template from ``messages``;
+        # fallback entries get whatever was popped from their dict's
+        # ``"messages"`` key (litellm transformation.py L371), which is ``[]``
+        # for ``FallbackModel.to_dict()``. Without this copy, the server
+        # rejects with "config.modules[N].prompt_templating.prompt.template
+        # should be non-empty".
+        modules = body["config"]["modules"]
+        if isinstance(modules, list) and len(modules) > 1:
+            primary_template = (
+                modules[0]
+                .get("prompt_templating", {})
+                .get("prompt", {})
+                .get("template")
+            )
+            if primary_template:
+                for entry in modules[1:]:
+                    entry.setdefault("prompt_templating", {}).setdefault("prompt", {})[
+                        "template"
+                    ] = primary_template
+
         if _active_cfg is None:
             return body
 

@@ -107,6 +107,44 @@ class TestTransformRequestFallback:
             }
         }
 
+    @staticmethod
+    def _realistic_list_modules_body() -> dict:
+        """Body shape litellm actually produces — primary has a real template,
+        fallback entries have ``template: []`` because litellm only converts
+        the top-level ``messages`` for the primary module. The SDK is
+        responsible for broadcasting the primary's template to every
+        fallback entry; without that the orchestration server rejects with
+        ``config.modules[N].prompt_templating.prompt.template should be
+        non-empty`` (the exact failure that reached integration tests).
+        """
+        primary_template = [{"role": "user", "content": "Reply with 'ok'."}]
+        return {
+            "config": {
+                "modules": [
+                    {
+                        "prompt_templating": {
+                            "prompt": {"template": primary_template},
+                            "model": {
+                                "name": "anthropic--claude-4.5-sonnet",
+                                "params": {},
+                                "version": "latest",
+                            },
+                        }
+                    },
+                    {
+                        "prompt_templating": {
+                            "prompt": {"template": []},
+                            "model": {
+                                "name": "mistral-small",
+                                "params": {},
+                                "version": "latest",
+                            },
+                        }
+                    },
+                ]
+            }
+        }
+
     def test_fallback_injected_into_optional_params_before_super(self):
         _install_fallback(FallbackConfig([FallbackModel(model="sap/mistral-small")]))
         optional_params: dict = {}
@@ -216,6 +254,75 @@ class TestTransformRequestFallback:
         # No filtering installed, so no entry should carry one.
         for entry in body["config"]["modules"]:
             assert "filtering" not in entry
+
+    def test_primary_template_broadcasts_to_fallback_entries(self):
+        # Regression: previously fallback entries went out with
+        # ``prompt.template == []`` and the orchestration server rejected with
+        # ``config.modules[1].prompt_templating.prompt.template should be
+        # non-empty``. The patch now copies the primary's template across.
+        _install_fallback(FallbackConfig([FallbackModel(model="sap/mistral-small")]))
+
+        with patch(
+            "sap_cloud_sdk.aicore.filtering.filters."
+            "GenAIHubOrchestrationConfig.transform_request",
+            return_value=self._realistic_list_modules_body(),
+        ):
+            body = OrchestrationPatchConfig().transform_request(
+                model="sap/anthropic--claude-4.5-sonnet",
+                messages=[{"role": "user", "content": "Reply with 'ok'."}],
+                optional_params={},
+                litellm_params={},
+                headers={},
+            )
+
+        modules = body["config"]["modules"]
+        primary_template = modules[0]["prompt_templating"]["prompt"]["template"]
+        assert primary_template, "primary template should be non-empty"
+        for entry in modules[1:]:
+            assert entry["prompt_templating"]["prompt"]["template"] == primary_template
+
+    def test_template_broadcast_noop_for_single_module_body(self):
+        # No fallback installed → litellm emits a single dict (not a list);
+        # the broadcast must not touch it. (Also: nothing to broadcast to.)
+        with patch(
+            "sap_cloud_sdk.aicore.filtering.filters."
+            "GenAIHubOrchestrationConfig.transform_request",
+            return_value=self._dict_modules_body(),
+        ):
+            body = OrchestrationPatchConfig().transform_request(
+                model="sap/anthropic--claude-4.5-sonnet",
+                messages=[],
+                optional_params={},
+                litellm_params={},
+                headers={},
+            )
+
+        modules = body["config"]["modules"]
+        assert isinstance(modules, dict)
+        # Untouched — same empty template the fixture started with.
+        assert modules["prompt_templating"]["prompt"]["template"] == []
+
+    def test_template_broadcast_skipped_when_primary_template_empty(self):
+        # Defensive: if the primary itself somehow has no template, do not
+        # propagate the empty value (no point) — leave fallback entries alone.
+        _install_fallback(FallbackConfig([FallbackModel(model="sap/mistral-small")]))
+
+        with patch(
+            "sap_cloud_sdk.aicore.filtering.filters."
+            "GenAIHubOrchestrationConfig.transform_request",
+            return_value=self._list_modules_body(),
+        ):
+            body = OrchestrationPatchConfig().transform_request(
+                model="sap/anthropic--claude-4.5-sonnet",
+                messages=[],
+                optional_params={},
+                litellm_params={},
+                headers={},
+            )
+
+        modules = body["config"]["modules"]
+        for entry in modules:
+            assert entry["prompt_templating"]["prompt"]["template"] == []
 
 
 # ---------------------------------------------------------------------------

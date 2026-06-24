@@ -74,21 +74,23 @@ class IntegrationDependency:
 class CustomerCredentials:
     """Credentials for customer agent mTLS authentication.
 
-    Loaded from the credentials file mounted on the pod filesystem.
-    Used internally by the customer agent flow.
+    Loaded from the credentials file mounted on the pod filesystem, or from
+    environment variables when TlsMode.TRANSPARENT is active (in which case
+    certificate and private_key are None — the OpenShell Gateway injects them
+    at the TLS layer).
 
     Attributes:
         token_service_url: IAS token service endpoint URL
         client_id: IAS client ID
-        certificate: PEM-encoded client certificate
-        private_key: PEM-encoded private key
+        certificate: PEM-encoded client certificate. None in transparent mode.
+        private_key: PEM-encoded private key. None in transparent mode.
         gateway_url: Agent Gateway base URL
         integration_dependencies: List of MCP servers with their ord_id and global_tenant_id.
     """
 
     token_service_url: str
     client_id: str
-    certificate: str
-    private_key: str
+    certificate: str | None
+    private_key: str | None
     gateway_url: str
     integration_dependencies: list[IntegrationDependency]

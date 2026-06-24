@@ -3,9 +3,14 @@
 Customer agents read credentials from a file mounted on the pod filesystem.
 This flow is used when credential files are detected.
 
+In transparent TLS mode (TlsMode.TRANSPARENT) the OpenShell Gateway handles
+the mTLS handshake and credential injection. The agent reads only endpoint URLs
+from environment variables and never loads certificate or private key material.
+
 Authentication flow:
-- Tool discovery: mTLS client credentials → system-scoped token
-- Tool invocation: mTLS + jwt-bearer grant → user-scoped token (principal propagation)
+- Standard mode: mTLS client credentials → system-scoped token
+- Transparent mode: plain HTTPS (gateway-injected mTLS) → system-scoped token
+- Tool invocation: jwt-bearer grant → user-scoped token (principal propagation)
 """
 
 import json
@@ -25,6 +30,7 @@ from sap_cloud_sdk.agentgateway._models import (
     MCPTool,
 )
 from sap_cloud_sdk.agentgateway._token_cache import _TokenCache
+from sap_cloud_sdk.agentgateway.config import TlsMode
 from sap_cloud_sdk.agentgateway.exceptions import AgentGatewaySDKError
 
 logger = logging.getLogger(__name__)
@@ -41,6 +47,12 @@ _AGW_RESOURCE_URN = "urn:sap:identity:application:provider:name:agent-gateway"
 # OAuth2 grant types
 _GRANT_TYPE_CLIENT_CREDENTIALS = "client_credentials"
 _GRANT_TYPE_JWT_BEARER = "urn:ietf:params:oauth:grant-type:jwt-bearer"
+
+# Environment variables for transparent mode
+_ENV_CLIENT_ID = "CLIENT_ID"
+_ENV_TOKEN_SERVICE_URL = "TOKEN_SERVICE_URL"
+_ENV_GATEWAY_URL = "GATEWAY_URL"
+_ENV_INTEGRATION_DEPENDENCIES = "INTEGRATION_DEPENDENCIES"
 
 
 def _cache_scope_key(credentials: CustomerCredentials, app_tid: str | None) -> str:
@@ -62,16 +74,30 @@ class _CredentialFields:
     GLOBAL_TENANT_ID = "globalTenantId"
 
 
-def detect_customer_agent_credentials() -> str | None:
+def detect_customer_agent_credentials(
+    tls_mode: TlsMode = TlsMode.STANDARD,
+) -> str | None:
     """Check if customer agent credentials file exists.
 
-    Checks for credential file in the following order:
+    In transparent mode the agent never uses a credentials file — the OpenShell
+    Gateway injects certificates at the TLS layer and the agent reads only
+    endpoint URLs from environment variables. Returns None immediately so the
+    caller falls through to load_customer_credentials_from_env().
+
+    In standard mode checks for a credential file in the following order:
     1. Path specified in AGW_CREDENTIALS_PATH env var
     2. Default mounted path: /etc/ums/credentials/credentials
 
+    Args:
+        tls_mode: TLS handling mode. When TRANSPARENT, skips file detection.
+
     Returns:
-        Path to credentials file if found, None otherwise.
+        Path to credentials file if found (standard mode only), None otherwise.
     """
+    if tls_mode == TlsMode.TRANSPARENT:
+        logger.debug("TLS_MODE=transparent: skipping credentials file detection")
+        return None
+
     # Check env var first (path may be customized)
     path_from_env = os.environ.get(_CREDENTIALS_PATH_ENV)
     if path_from_env and os.path.isfile(path_from_env):
@@ -161,6 +187,63 @@ def load_customer_credentials(path: str) -> CustomerCredentials:
     )
 
 
+def load_customer_credentials_from_env() -> CustomerCredentials:
+    """Load customer credentials from environment variables (transparent mode).
+
+    Used when TlsMode.TRANSPARENT is active and the OpenShell Gateway handles
+    mTLS. Certificate and private key are not required — they are injected at
+    the TLS layer by the gateway.
+
+    Environment variables:
+        CLIENT_ID: IAS client ID (may be a gateway-resolved placeholder at runtime)
+        TOKEN_SERVICE_URL: IAS token service endpoint
+        GATEWAY_URL: Agent Gateway base URL
+        INTEGRATION_DEPENDENCIES: JSON array of {ordId, globalTenantId} objects
+
+    Returns:
+        CustomerCredentials with certificate and private_key set to None.
+
+    Raises:
+        AgentGatewaySDKError: If required environment variables are missing or
+            INTEGRATION_DEPENDENCIES cannot be parsed.
+    """
+    required = [_ENV_CLIENT_ID, _ENV_TOKEN_SERVICE_URL, _ENV_GATEWAY_URL]
+    missing = [v for v in required if not os.environ.get(v)]
+    if missing:
+        raise AgentGatewaySDKError(
+            f"TLS_MODE=transparent requires environment variables: {missing}"
+        )
+
+    raw_deps = os.environ.get(_ENV_INTEGRATION_DEPENDENCIES, "[]")
+    try:
+        deps_data = json.loads(raw_deps)
+        integration_dependencies = [
+            IntegrationDependency(
+                ord_id=dep[_CredentialFields.ORD_ID],
+                global_tenant_id=dep[_CredentialFields.GLOBAL_TENANT_ID],
+            )
+            for dep in deps_data
+        ]
+    except (json.JSONDecodeError, KeyError, TypeError) as e:
+        raise AgentGatewaySDKError(
+            f"Failed to parse INTEGRATION_DEPENDENCIES: {e}. "
+            'Expected format: [{"ordId": "...", "globalTenantId": "..."}]'
+        )
+
+    logger.debug(
+        "Loaded %d integration dependencies from environment", len(integration_dependencies)
+    )
+
+    return CustomerCredentials(
+        token_service_url=os.environ[_ENV_TOKEN_SERVICE_URL],
+        client_id=os.environ[_ENV_CLIENT_ID],
+        certificate=None,
+        private_key=None,
+        gateway_url=os.environ[_ENV_GATEWAY_URL].rstrip("/"),
+        integration_dependencies=integration_dependencies,
+    )
+
+
 def _create_ssl_context(certificate: str, private_key: str) -> ssl.SSLContext:
     """Create SSL context for mTLS from in-memory certificate and key.
 
@@ -210,6 +293,106 @@ def _create_ssl_context(certificate: str, private_key: str) -> ssl.SSLContext:
             os.unlink(cert_file.name)
         if key_file and os.path.exists(key_file.name):
             os.unlink(key_file.name)
+
+
+def _create_http_client_transparent(timeout: float) -> httpx.Client:
+    """Create an HTTP client for transparent TLS mode.
+
+    The OpenShell Gateway handles TLS and mTLS on behalf of the agent, so no
+    SSL context is configured. All HTTPS requests are routed through the proxy
+    set in the HTTPS_PROXY environment variable.
+
+    Args:
+        timeout: HTTP timeout in seconds.
+
+    Returns:
+        httpx.Client without any custom SSL context.
+    """
+    return httpx.Client(timeout=timeout)
+
+
+def _request_token_transparent(
+    credentials: CustomerCredentials,
+    grant_type: str,
+    timeout: float,
+    app_tid: str | None = None,
+    extra_data: dict | None = None,
+) -> dict:
+    """Make a token request in transparent TLS mode.
+
+    The OpenShell Gateway intercepts the HTTPS connection and:
+    1. Injects the client certificate at the TLS layer (mTLS handshake).
+    2. Rewrites the client_id placeholder in the request body.
+
+    The agent sends the OAuth2 POST body without loading any certificate or key.
+
+    Args:
+        credentials: Customer credentials (certificate/private_key are None).
+        grant_type: OAuth2 grant type.
+        timeout: HTTP timeout in seconds.
+        app_tid: BTP Application Tenant ID of subscriber (optional).
+        extra_data: Additional form data for the token request.
+
+    Returns:
+        Token response payload.
+
+    Raises:
+        AgentGatewaySDKError: If token request fails.
+    """
+    data: dict = {
+        "client_id": credentials.client_id,
+        "grant_type": grant_type,
+        "resource": _AGW_RESOURCE_URN,
+    }
+
+    if app_tid:
+        data["app_tid"] = app_tid
+
+    if extra_data:
+        data.update(extra_data)
+
+    logger.debug(
+        "Requesting token (transparent mode) from %s with grant_type=%s",
+        credentials.token_service_url,
+        grant_type,
+    )
+
+    try:
+        with _create_http_client_transparent(timeout) as client:
+            response = client.post(
+                credentials.token_service_url,
+                data=data,
+                headers={
+                    "Content-Type": "application/x-www-form-urlencoded",
+                    "Accept": "application/json",
+                },
+            )
+
+        if response.status_code != 200:
+            logger.error(
+                "Token request failed with status %d: %s",
+                response.status_code,
+                response.text[:500],
+            )
+            raise AgentGatewaySDKError(
+                f"Token request failed with status {response.status_code}: {response.text[:200]}"
+            )
+
+        token_data = response.json()
+        access_token = token_data.get("access_token")
+
+        if not access_token:
+            raise AgentGatewaySDKError(
+                f"Token response missing 'access_token'. Keys: {list(token_data.keys())}"
+            )
+
+        logger.debug(
+            "Token acquired successfully (transparent mode, length: %d)", len(access_token)
+        )
+        return token_data
+
+    except httpx.RequestError as e:
+        raise AgentGatewaySDKError(f"Token request failed: {e}")
 
 
 def _request_token_mtls(
@@ -341,6 +524,53 @@ def get_system_token_mtls(
     return access_token
 
 
+def get_system_token_transparent(
+    credentials: CustomerCredentials,
+    timeout: float,
+    app_tid: str | None = None,
+    token_cache: _TokenCache | None = None,
+) -> str:
+    """Get system-scoped token in transparent TLS mode.
+
+    Equivalent to get_system_token_mtls() but uses _request_token_transparent()
+    so the agent never performs a TLS handshake directly.
+
+    Args:
+        credentials: Customer credentials loaded from environment variables.
+        timeout: HTTP timeout in seconds.
+        app_tid: BTP Application Tenant ID of subscriber (optional).
+        token_cache: Optional token cache.
+
+    Returns:
+        System-scoped access token, fetched or served from cache.
+    """
+    scope_key = _cache_scope_key(credentials, app_tid)
+    if token_cache:
+        cached_token = token_cache.get_system_token(scope_key)
+        if cached_token:
+            logger.debug("Using cached system token for scope '%s'", scope_key)
+            return cached_token
+
+    logger.info("Acquiring system token via transparent mode (gateway-injected mTLS)")
+    token_data = _request_token_transparent(
+        credentials,
+        grant_type=_GRANT_TYPE_CLIENT_CREDENTIALS,
+        timeout=timeout,
+        app_tid=app_tid,
+        extra_data={"response_type": "token"},
+    )
+    access_token = token_data["access_token"]
+
+    if token_cache:
+        token_cache.set_system_token(
+            access_token,
+            token_cache.compute_expires_at(token_data),
+            scope_key,
+        )
+
+    return access_token
+
+
 def exchange_user_token(
     credentials: CustomerCredentials,
     user_token: str,
@@ -373,6 +603,61 @@ def exchange_user_token(
 
     logger.info("Exchanging user token for AGW-scoped token via jwt-bearer grant")
     token_data = _request_token_mtls(
+        credentials,
+        grant_type=_GRANT_TYPE_JWT_BEARER,
+        timeout=timeout,
+        app_tid=app_tid,
+        extra_data={
+            "assertion": user_token,
+            "token_format": "jwt",
+        },
+    )
+    access_token = token_data["access_token"]
+
+    if token_cache:
+        token_cache.set_user_token(
+            user_token,
+            access_token,
+            token_cache.compute_expires_at(token_data),
+            scope_key,
+        )
+
+    return access_token
+
+
+def exchange_user_token_transparent(
+    credentials: CustomerCredentials,
+    user_token: str,
+    timeout: float,
+    app_tid: str | None = None,
+    token_cache: _TokenCache | None = None,
+) -> str:
+    """Exchange user token for AGW-scoped token in transparent TLS mode.
+
+    Equivalent to exchange_user_token() but uses _request_token_transparent()
+    so the agent never performs a TLS handshake directly.
+
+    Args:
+        credentials: Customer credentials loaded from environment variables.
+        user_token: User's JWT token to exchange.
+        timeout: HTTP timeout in seconds.
+        app_tid: BTP Application Tenant ID of subscriber (optional).
+        token_cache: Optional token cache.
+
+    Returns:
+        AGW-scoped access token with user identity, fetched or served from cache.
+    """
+    scope_key = _cache_scope_key(credentials, app_tid)
+    if token_cache:
+        cached_token = token_cache.get_user_token(user_token, scope_key)
+        if cached_token:
+            logger.debug("Using cached exchanged user token for scope '%s'", scope_key)
+            return cached_token
+
+    logger.info(
+        "Exchanging user token for AGW-scoped token via jwt-bearer grant (transparent mode)"
+    )
+    token_data = _request_token_transparent(
         credentials,
         grant_type=_GRANT_TYPE_JWT_BEARER,
         timeout=timeout,

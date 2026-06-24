@@ -8,13 +8,21 @@ from unittest.mock import patch, AsyncMock, MagicMock
 from sap_cloud_sdk.agentgateway._customer import (
     detect_customer_agent_credentials,
     load_customer_credentials,
+    load_customer_credentials_from_env,
     get_system_token_mtls,
+    get_system_token_transparent,
     exchange_user_token,
+    exchange_user_token_transparent,
     get_mcp_tools_customer,
     call_mcp_tool_customer,
     _build_mcp_url,
+    _request_token_transparent,
     _CREDENTIALS_PATH_ENV,
     _CREDENTIALS_DEFAULT_PATH,
+    _ENV_CLIENT_ID,
+    _ENV_TOKEN_SERVICE_URL,
+    _ENV_GATEWAY_URL,
+    _ENV_INTEGRATION_DEPENDENCIES,
 )
 from sap_cloud_sdk.agentgateway._models import (
     CustomerCredentials,
@@ -22,7 +30,7 @@ from sap_cloud_sdk.agentgateway._models import (
     MCPTool,
 )
 from sap_cloud_sdk.agentgateway._token_cache import _TokenCache
-from sap_cloud_sdk.agentgateway.config import ClientConfig
+from sap_cloud_sdk.agentgateway.config import ClientConfig, TlsMode
 from sap_cloud_sdk.agentgateway.exceptions import AgentGatewaySDKError
 
 
@@ -741,3 +749,272 @@ class TestCallMcpToolCustomer:
             )
 
             assert result == ""
+
+
+# ============================================================
+# Test: detect_customer_agent_credentials — transparent mode
+# ============================================================
+
+
+class TestDetectCustomerAgentCredentialsTransparentMode:
+    """Tests for credential detection when TlsMode.TRANSPARENT is active."""
+
+    def test_transparent_mode_returns_none_immediately(self, tmp_path):
+        """In transparent mode, credential file detection is skipped."""
+        creds_file = tmp_path / "credentials.json"
+        creds_file.write_text('{"clientid": "test"}')
+
+        with patch.dict(os.environ, {_CREDENTIALS_PATH_ENV: str(creds_file)}):
+            result = detect_customer_agent_credentials(TlsMode.TRANSPARENT)
+
+        assert result is None
+
+    def test_transparent_mode_ignores_default_path(self):
+        """In transparent mode, default credential path is not checked."""
+        with patch("os.path.isfile", return_value=True):
+            result = detect_customer_agent_credentials(TlsMode.TRANSPARENT)
+
+        assert result is None
+
+    def test_standard_mode_still_detects_file(self, tmp_path):
+        """Standard mode (default) continues to detect credential files."""
+        creds_file = tmp_path / "credentials.json"
+        creds_file.write_text('{"clientid": "test"}')
+
+        with patch.dict(os.environ, {_CREDENTIALS_PATH_ENV: str(creds_file)}):
+            result = detect_customer_agent_credentials(TlsMode.STANDARD)
+
+        assert result == str(creds_file)
+
+
+# ============================================================
+# Test: load_customer_credentials_from_env
+# ============================================================
+
+_TRANSPARENT_ENV = {
+    _ENV_CLIENT_ID: "test-client-id",
+    _ENV_TOKEN_SERVICE_URL: "https://ias.example.com/oauth/token",
+    _ENV_GATEWAY_URL: "https://agw.example.com",
+}
+
+
+class TestLoadCustomerCredentialsFromEnv:
+    """Tests for loading customer credentials from environment variables."""
+
+    def test_loads_required_fields(self):
+        """Loads credentials from the three required environment variables."""
+        with patch.dict(os.environ, _TRANSPARENT_ENV, clear=False):
+            os.environ.pop(_ENV_INTEGRATION_DEPENDENCIES, None)
+            creds = load_customer_credentials_from_env()
+
+        assert creds.client_id == "test-client-id"
+        assert creds.token_service_url == "https://ias.example.com/oauth/token"
+        assert creds.gateway_url == "https://agw.example.com"
+        assert creds.certificate is None
+        assert creds.private_key is None
+        assert creds.integration_dependencies == []
+
+    def test_strips_trailing_slash_from_gateway_url(self):
+        """Trailing slash is stripped from GATEWAY_URL."""
+        env = {**_TRANSPARENT_ENV, _ENV_GATEWAY_URL: "https://agw.example.com/"}
+        with patch.dict(os.environ, env, clear=False):
+            os.environ.pop(_ENV_INTEGRATION_DEPENDENCIES, None)
+            creds = load_customer_credentials_from_env()
+
+        assert creds.gateway_url == "https://agw.example.com"
+
+    def test_parses_integration_dependencies(self):
+        """INTEGRATION_DEPENDENCIES JSON array is parsed correctly."""
+        deps = json.dumps([{"ordId": "sap.app:res:v1", "globalTenantId": "tenant-1"}])
+        env = {**_TRANSPARENT_ENV, _ENV_INTEGRATION_DEPENDENCIES: deps}
+        with patch.dict(os.environ, env, clear=False):
+            creds = load_customer_credentials_from_env()
+
+        assert len(creds.integration_dependencies) == 1
+        assert creds.integration_dependencies[0].ord_id == "sap.app:res:v1"
+        assert creds.integration_dependencies[0].global_tenant_id == "tenant-1"
+
+    def test_missing_client_id_raises(self):
+        """Missing CLIENT_ID raises AgentGatewaySDKError."""
+        env = {
+            _ENV_TOKEN_SERVICE_URL: "https://ias.example.com/oauth/token",
+            _ENV_GATEWAY_URL: "https://agw.example.com",
+        }
+        with patch.dict(os.environ, env, clear=False):
+            os.environ.pop(_ENV_CLIENT_ID, None)
+            with pytest.raises(AgentGatewaySDKError, match="transparent"):
+                load_customer_credentials_from_env()
+
+    def test_missing_token_service_url_raises(self):
+        """Missing TOKEN_SERVICE_URL raises AgentGatewaySDKError."""
+        env = {
+            _ENV_CLIENT_ID: "test-client-id",
+            _ENV_GATEWAY_URL: "https://agw.example.com",
+        }
+        with patch.dict(os.environ, env, clear=False):
+            os.environ.pop(_ENV_TOKEN_SERVICE_URL, None)
+            with pytest.raises(AgentGatewaySDKError, match="transparent"):
+                load_customer_credentials_from_env()
+
+    def test_invalid_integration_dependencies_json_raises(self):
+        """Invalid INTEGRATION_DEPENDENCIES JSON raises AgentGatewaySDKError."""
+        env = {**_TRANSPARENT_ENV, _ENV_INTEGRATION_DEPENDENCIES: "not-json"}
+        with patch.dict(os.environ, env, clear=False):
+            with pytest.raises(AgentGatewaySDKError, match="INTEGRATION_DEPENDENCIES"):
+                load_customer_credentials_from_env()
+
+
+# ============================================================
+# Test: _request_token_transparent
+# ============================================================
+
+
+class TestRequestTokenTransparent:
+    """Tests for token requests in transparent TLS mode."""
+
+    def _make_credentials(self) -> CustomerCredentials:
+        return CustomerCredentials(
+            token_service_url="https://ias.example.com/oauth/token",
+            client_id="test-client-id",
+            certificate=None,
+            private_key=None,
+            gateway_url="https://agw.example.com",
+            integration_dependencies=[],
+        )
+
+    def test_no_ssl_context_used(self):
+        """In transparent mode, httpx.Client is created without verify/ssl_context."""
+        creds = self._make_credentials()
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {"access_token": "token123", "expires_in": 3600}
+
+        with patch("httpx.Client") as mock_client_class:
+            mock_client_instance = MagicMock()
+            mock_client_instance.__enter__ = MagicMock(return_value=mock_client_instance)
+            mock_client_instance.__exit__ = MagicMock(return_value=False)
+            mock_client_instance.post.return_value = mock_response
+            mock_client_class.return_value = mock_client_instance
+
+            result = _request_token_transparent(creds, "client_credentials", 60.0)
+
+        assert result["access_token"] == "token123"
+        call_kwargs = mock_client_class.call_args.kwargs
+        assert "verify" not in call_kwargs, "SSL context must not be passed in transparent mode"
+
+    def test_request_body_contains_client_id(self):
+        """Token request body includes client_id from credentials."""
+        creds = self._make_credentials()
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {"access_token": "token123", "expires_in": 3600}
+
+        with patch("httpx.Client") as mock_client_class:
+            mock_client_instance = MagicMock()
+            mock_client_instance.__enter__ = MagicMock(return_value=mock_client_instance)
+            mock_client_instance.__exit__ = MagicMock(return_value=False)
+            mock_client_instance.post.return_value = mock_response
+            mock_client_class.return_value = mock_client_instance
+
+            _request_token_transparent(creds, "client_credentials", 60.0)
+
+        post_kwargs = mock_client_instance.post.call_args.kwargs
+        assert post_kwargs["data"]["client_id"] == "test-client-id"
+        assert post_kwargs["data"]["grant_type"] == "client_credentials"
+
+    def test_non_200_status_raises(self):
+        """Non-200 response raises AgentGatewaySDKError."""
+        creds = self._make_credentials()
+        mock_response = MagicMock()
+        mock_response.status_code = 401
+        mock_response.text = "Unauthorized"
+
+        with patch("httpx.Client") as mock_client_class:
+            mock_client_instance = MagicMock()
+            mock_client_instance.__enter__ = MagicMock(return_value=mock_client_instance)
+            mock_client_instance.__exit__ = MagicMock(return_value=False)
+            mock_client_instance.post.return_value = mock_response
+            mock_client_class.return_value = mock_client_instance
+
+            with pytest.raises(AgentGatewaySDKError, match="401"):
+                _request_token_transparent(creds, "client_credentials", 60.0)
+
+
+# ============================================================
+# Test: get_system_token_transparent
+# ============================================================
+
+
+class TestGetSystemTokenTransparent:
+    """Tests for system token acquisition in transparent mode."""
+
+    def _make_credentials(self) -> CustomerCredentials:
+        return CustomerCredentials(
+            token_service_url="https://ias.example.com/oauth/token",
+            client_id="test-client-id",
+            certificate=None,
+            private_key=None,
+            gateway_url="https://agw.example.com",
+            integration_dependencies=[],
+        )
+
+    def test_returns_access_token(self):
+        """Returns access token from token response."""
+        creds = self._make_credentials()
+        with patch(
+            "sap_cloud_sdk.agentgateway._customer._request_token_transparent",
+            return_value={"access_token": "system-token", "expires_in": 3600},
+        ):
+            token = get_system_token_transparent(creds, 60.0)
+
+        assert token == "system-token"
+
+    def test_uses_cache_when_available(self):
+        """Returns cached token without making a new request."""
+        creds = self._make_credentials()
+        config = ClientConfig()
+        cache = _TokenCache(config)
+        scope_key = f"customer::{creds.client_id}::"
+        cache.set_system_token("cached-token", float("inf"), scope_key)
+
+        with patch(
+            "sap_cloud_sdk.agentgateway._customer._request_token_transparent"
+        ) as mock_req:
+            token = get_system_token_transparent(creds, 60.0, token_cache=cache)
+
+        assert token == "cached-token"
+        mock_req.assert_not_called()
+
+
+# ============================================================
+# Test: exchange_user_token_transparent
+# ============================================================
+
+
+class TestExchangeUserTokenTransparent:
+    """Tests for user token exchange in transparent mode."""
+
+    def _make_credentials(self) -> CustomerCredentials:
+        return CustomerCredentials(
+            token_service_url="https://ias.example.com/oauth/token",
+            client_id="test-client-id",
+            certificate=None,
+            private_key=None,
+            gateway_url="https://agw.example.com",
+            integration_dependencies=[],
+        )
+
+    def test_returns_exchanged_token(self):
+        """Returns exchanged access token."""
+        creds = self._make_credentials()
+        with patch(
+            "sap_cloud_sdk.agentgateway._customer._request_token_transparent",
+            return_value={"access_token": "user-token", "expires_in": 3600},
+        ) as mock_req:
+            token = exchange_user_token_transparent(creds, "user-jwt", 60.0)
+
+        assert token == "user-token"
+        call_kwargs = mock_req.call_args
+        assert call_kwargs.kwargs["extra_data"]["assertion"] == "user-jwt"
+        assert call_kwargs.kwargs["grant_type"] == "urn:ietf:params:oauth:grant-type:jwt-bearer"
+

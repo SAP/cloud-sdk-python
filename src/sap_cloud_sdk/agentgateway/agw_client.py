@@ -11,14 +11,17 @@ import asyncio
 import logging
 from typing import Callable
 
-from sap_cloud_sdk.agentgateway.config import ClientConfig
+from sap_cloud_sdk.agentgateway.config import ClientConfig, TlsMode
 from sap_cloud_sdk.agentgateway._customer import (
     call_mcp_tool_customer,
     detect_customer_agent_credentials,
     exchange_user_token,
+    exchange_user_token_transparent,
     get_mcp_tools_customer,
     get_system_token_mtls,
+    get_system_token_transparent,
     load_customer_credentials,
+    load_customer_credentials_from_env,
 )
 from sap_cloud_sdk.agentgateway._lob import (
     call_mcp_tool_lob,
@@ -172,7 +175,7 @@ class AgentGatewayClient:
             ```
         """
         try:
-            credentials_path = detect_customer_agent_credentials()
+            credentials_path = detect_customer_agent_credentials(self._config.tls_mode)
             if credentials_path:
                 logger.info(
                     "Customer agent credentials detected at '%s'", credentials_path
@@ -182,6 +185,23 @@ class AgentGatewayClient:
                 token = await loop.run_in_executor(
                     None,
                     get_system_token_mtls,
+                    credentials,
+                    self._config.timeout,
+                    app_tid,
+                    self._token_cache,
+                )
+                return AuthResult(
+                    access_token=token,
+                    gateway_url=credentials.gateway_url,
+                )
+
+            if self._config.tls_mode == TlsMode.TRANSPARENT:
+                logger.info("Customer agent transparent mode detected")
+                credentials = load_customer_credentials_from_env()
+                loop = asyncio.get_running_loop()
+                token = await loop.run_in_executor(
+                    None,
+                    get_system_token_transparent,
                     credentials,
                     self._config.timeout,
                     app_tid,
@@ -249,7 +269,7 @@ class AgentGatewayClient:
                 "user_token is required for token exchange.",
             )
 
-            credentials_path = detect_customer_agent_credentials()
+            credentials_path = detect_customer_agent_credentials(self._config.tls_mode)
             if credentials_path:
                 logger.info(
                     "Customer agent credentials detected at '%s'", credentials_path
@@ -259,6 +279,24 @@ class AgentGatewayClient:
                 token = await loop.run_in_executor(
                     None,
                     exchange_user_token,
+                    credentials,
+                    resolved_user_token,
+                    self._config.timeout,
+                    app_tid,
+                    self._token_cache,
+                )
+                return AuthResult(
+                    access_token=token,
+                    gateway_url=credentials.gateway_url,
+                )
+
+            if self._config.tls_mode == TlsMode.TRANSPARENT:
+                logger.info("Customer agent transparent mode detected")
+                credentials = load_customer_credentials_from_env()
+                loop = asyncio.get_running_loop()
+                token = await loop.run_in_executor(
+                    None,
+                    exchange_user_token_transparent,
                     credentials,
                     resolved_user_token,
                     self._config.timeout,
@@ -333,12 +371,23 @@ class AgentGatewayClient:
         """
         try:
             # Check for customer agent credentials
-            credentials_path = detect_customer_agent_credentials()
+            credentials_path = detect_customer_agent_credentials(self._config.tls_mode)
             if credentials_path:
                 logger.info(
                     "Customer agent credentials detected at '%s'", credentials_path
                 )
                 credentials = load_customer_credentials(credentials_path)
+                if user_token:
+                    auth = await self.get_user_auth(user_token, app_tid)
+                else:
+                    auth = await self.get_system_auth(app_tid=app_tid)
+                return await get_mcp_tools_customer(
+                    credentials, auth.access_token, self._config.timeout
+                )
+
+            if self._config.tls_mode == TlsMode.TRANSPARENT:
+                logger.info("Customer agent transparent mode detected")
+                credentials = load_customer_credentials_from_env()
                 if user_token:
                     auth = await self.get_user_auth(user_token, app_tid)
                 else:
@@ -420,7 +469,7 @@ class AgentGatewayClient:
         """
         try:
             # Check for customer agent credentials
-            credentials_path = detect_customer_agent_credentials()
+            credentials_path = detect_customer_agent_credentials(self._config.tls_mode)
             if credentials_path:
                 logger.info(
                     "Customer agent credentials detected at '%s'", credentials_path
@@ -433,6 +482,21 @@ class AgentGatewayClient:
                     # TODO: IBD workaround - use system token when user_token
                     # is not available. This bypasses principal propagation.
                     # Remove this fallback once IBD supports proper user token flow.
+                    logger.warning(
+                        "No user_token provided - using system token for tool "
+                        "invocation. Principal propagation will NOT work."
+                    )
+                    auth = await self.get_system_auth(app_tid)
+
+                return await call_mcp_tool_customer(
+                    tool, auth.access_token, self._config.timeout, **kwargs
+                )
+
+            if self._config.tls_mode == TlsMode.TRANSPARENT:
+                logger.info("Customer agent transparent mode detected")
+                if user_token:
+                    auth = await self.get_user_auth(user_token, app_tid)
+                else:
                     logger.warning(
                         "No user_token provided - using system token for tool "
                         "invocation. Principal propagation will NOT work."

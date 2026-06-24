@@ -1,12 +1,30 @@
 """Configuration for Agent Gateway client."""
 
-from dataclasses import dataclass
+import os
+from dataclasses import dataclass, field
+from enum import Enum
 
 DEFAULT_TIMEOUT_SECONDS = 60.0
 DEFAULT_FALLBACK_TOKEN_TTL_SECONDS = 300.0
 DEFAULT_TOKEN_EXPIRY_BUFFER_SECONDS = 30.0
 DEFAULT_MAX_SYSTEM_TOKEN_CACHE_SIZE = 32
 DEFAULT_MAX_USER_TOKEN_CACHE_SIZE = 256
+
+_ENV_TLS_MODE = "AGW_TLS_MODE"
+
+
+class TlsMode(Enum):
+    """TLS handling mode for the Agent Gateway client.
+
+    STANDARD: Agent performs the TLS handshake directly using a client
+        certificate loaded from the credentials file (default behaviour).
+    TRANSPARENT: The OpenShell Gateway intercepts the TLS handshake and
+        injects the client certificate at the network layer. The agent
+        never loads certificate or private key material.
+    """
+
+    STANDARD = "standard"
+    TRANSPARENT = "transparent"
 
 
 @dataclass
@@ -22,6 +40,9 @@ class ClientConfig:
             token expiries before a cached token is considered stale.
         max_system_token_cache_size: Maximum number of cached system tokens.
         max_user_token_cache_size: Maximum number of cached user tokens.
+        tls_mode: TLS handling mode. Use TlsMode.TRANSPARENT when the
+            OpenShell Gateway handles mTLS on behalf of the agent.
+            Defaults to TlsMode.STANDARD.
     """
 
     timeout: float = DEFAULT_TIMEOUT_SECONDS
@@ -29,6 +50,7 @@ class ClientConfig:
     token_expiry_buffer_seconds: float = DEFAULT_TOKEN_EXPIRY_BUFFER_SECONDS
     max_system_token_cache_size: int = DEFAULT_MAX_SYSTEM_TOKEN_CACHE_SIZE
     max_user_token_cache_size: int = DEFAULT_MAX_USER_TOKEN_CACHE_SIZE
+    tls_mode: TlsMode = field(default=TlsMode.STANDARD)
 
     def __post_init__(self) -> None:
         if self.token_expiry_buffer_seconds >= self.fallback_token_ttl_seconds:
@@ -36,3 +58,15 @@ class ClientConfig:
                 f"token_expiry_buffer_seconds ({self.token_expiry_buffer_seconds}) "
                 f"must be less than fallback_token_ttl_seconds ({self.fallback_token_ttl_seconds})"
             )
+
+    @staticmethod
+    def from_env() -> "ClientConfig":
+        """Create a ClientConfig with tls_mode resolved from AGW_TLS_MODE env var.
+
+        Returns:
+            ClientConfig with tls_mode set to TRANSPARENT when AGW_TLS_MODE=transparent,
+            otherwise STANDARD.
+        """
+        raw = os.environ.get(_ENV_TLS_MODE, "").lower()
+        tls_mode = TlsMode.TRANSPARENT if raw == TlsMode.TRANSPARENT.value else TlsMode.STANDARD
+        return ClientConfig(tls_mode=tls_mode)

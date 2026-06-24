@@ -322,25 +322,7 @@ class ExtensibilityClient:
                 + (f": {error_msg}" if error_msg else "")
             )
 
-        # 3. Return immediately if execution completed synchronously
-        if status == "success":
-            try:
-                result_data = data.get("data", {}).get("resultData", {})
-                last_node = result_data.get("lastNodeExecuted", "")
-                response_json = (
-                    result_data.get("runData", {})
-                    .get(last_node, [{}])[0]
-                    .get("data", {})
-                    .get("main", [[{}]])[0][0]
-                    .get("json", {})
-                )
-                return Message(**response_json)
-            except (KeyError, IndexError, TypeError, ValidationError) as exc:
-                raise TransportError(
-                    f"Failed to extract response from last executed node: {exc}"
-                ) from exc
-
-        # 4. Poll get-execution for running/new/waiting/started
+        # 3. Poll get-execution for running/new/waiting/started
         execution_id = data.get("executionId")
         get_execution_arguments = {
             "workflowId": hook.n8n_workflow_config.workflow_id,
@@ -414,6 +396,164 @@ class ExtensibilityClient:
             f"Last status: {last_status!r}"
         )
 
+    async def _discover_n8n_tools(self, agw_client: Any, user_token: Optional[str]) -> tuple[Any, Any]:
+        # TODO: cache the list of mcp tools for performance.
+        tools = await agw_client.list_mcp_tools(user_token=user_token or None)
+
+        execute_tool = next(
+            (
+                t
+                for t in tools
+                if t.name == _EXECUTE_WORKFLOW_TOOL_NAME
+                and t.server_name == _N8N_MCP_SERVER_NAME
+            ),
+            None,
+        )
+        if execute_tool is None:
+            raise TransportError(
+                f"MCP tool '{_EXECUTE_WORKFLOW_TOOL_NAME}' on server '{_N8N_MCP_SERVER_NAME}' "
+                "not found via Agent Gateway."
+            )
+
+        get_exec_tool = next(
+            (
+                t
+                for t in tools
+                if t.name == _GET_EXECUTION_TOOL_NAME
+                and t.server_name == _N8N_MCP_SERVER_NAME
+            ),
+            None,
+        )
+        if get_exec_tool is None:
+            raise TransportError(
+                f"MCP tool '{_GET_EXECUTION_TOOL_NAME}' on server '{_N8N_MCP_SERVER_NAME}' "
+                "not found via Agent Gateway."
+            )
+
+        return execute_tool, get_exec_tool
+
+    async def _execute_workflow_via_agw(
+        self,
+        agw_client: Any,
+        execute_tool: Any,
+        hook: Hook,
+        user_token: Optional[str],
+        message: Optional[Any],
+        headers: Optional[dict],
+    ) -> tuple[str, Any]:
+        message_body = message.model_dump(mode="json") if message is not None else {}
+        execute_arguments = {
+            "workflowId": hook.n8n_workflow_config.workflow_id,
+            "inputs": {
+                "type": "webhook",
+                "webhookData": {
+                    "method": hook.n8n_workflow_config.method,
+                    "query": {},
+                    "body": message_body,
+                    "headers": headers or {},
+                },
+            },
+        }
+        try:
+            result_str = await agw_client.call_mcp_tool(
+                execute_tool,
+                user_token=user_token or None,
+                **execute_arguments,  # type: ignore[arg-type]  # ty: ignore[invalid-argument-type]
+            )
+        except Exception as exc:
+            raise TransportError(
+                f"AGW tool call for '{_EXECUTE_WORKFLOW_TOOL_NAME}' failed: {exc}"
+            ) from exc
+
+        try:
+            data = json.loads(result_str)
+        except Exception as exc:
+            raise TransportError(f"Could not parse hook response: {exc}") from exc
+
+        status = data.get("status", "")
+        if status in _EXECUTE_TERMINAL_STATUSES:
+            error_msg = data.get("error", "")
+            raise TransportError(
+                f"Workflow execution failed with status {status!r}"
+                + (f": {error_msg}" if error_msg else "")
+            )
+
+        execution_id = data.get("executionId")
+        return str(execution_id), status
+
+    @staticmethod
+    def _extract_message(data: dict) -> Message:
+        try:
+            result_data = data.get("data", {}).get("resultData", {})
+            last_node = result_data.get("lastNodeExecuted", "")
+            response_json = (
+                result_data.get("runData", {})
+                .get(last_node, [{}])[0]
+                .get("data", {})
+                .get("main", [[{}]])[0][0]
+                .get("json", {})
+            )
+            return Message(**response_json)
+        except (KeyError, IndexError, TypeError, ValidationError) as exc:
+            raise TransportError(
+                f"Failed to extract response from last executed node: {exc}"
+            ) from exc
+
+    async def _poll_hook_execution(
+        self,
+        agw_client: Any,
+        get_exec_tool: Any,
+        hook: Hook,
+        execution_id: str,
+        user_token: Optional[str],
+        initial_status: str,
+    ) -> Optional[Message]:
+        deadline = time.monotonic() + hook.timeout
+        last_status = initial_status
+
+        while time.monotonic() < deadline:
+            await asyncio.sleep(_HOOK_POLL_INTERVAL)
+
+            try:
+                get_execution_arguments = {
+                    "workflowId": hook.n8n_workflow_config.workflow_id,
+                    "executionId": execution_id,
+                    "includeData": True,
+                }
+                result_str = await agw_client.call_mcp_tool(
+                    get_exec_tool,
+                    user_token=user_token or None,
+                    **get_execution_arguments,  # type: ignore[arg-type]  # ty: ignore[invalid-argument-type]
+                )
+            except Exception as exc:
+                raise TransportError(
+                    f"AGW tool call for '{_GET_EXECUTION_TOOL_NAME}' failed: {exc}"
+                ) from exc
+
+            try:
+                data = json.loads(result_str)
+            except Exception as exc:
+                raise TransportError(f"Could not parse hook response: {exc}") from exc
+
+            last_status = data.get("execution", {}).get("status", "") or data.get(
+                "status", ""
+            )
+
+            if last_status == "success":
+                return self._extract_message(data)
+
+            if last_status in _EXECUTION_TERMINAL_STATUSES:
+                error_msg = data.get("error", "")
+                raise TransportError(
+                    f"Workflow execution failed with status {last_status!r}"
+                    + (f": {error_msg}" if error_msg else "")
+                )
+
+        raise TransportError(
+            f"Workflow execution timed out after {hook.timeout}s. "
+            f"Last status: {last_status!r}"
+        )
+
     @record_metrics(
         Module.EXTENSIBILITY,
         Operation.EXTENSIBILITY_CALL_HOOK,
@@ -471,158 +611,11 @@ class ExtensibilityClient:
                 )
             ```
         """
-        # 1. Create AGW client for the given tenant subdomain.
-        agw_client = None
         agw_client = create_agw_client(tenant_subdomain)
-
-        # 2. Discover MCP tools — AGW resolves N8N GTID and handles auth internally
-        # TODO: cache the list of mcp tools for performance.
-        tools = await agw_client.list_mcp_tools(user_token=user_token or None)
-
-        execute_tool = next(
-            (
-                t
-                for t in tools
-                if t.name == _EXECUTE_WORKFLOW_TOOL_NAME
-                and t.server_name == _N8N_MCP_SERVER_NAME
-            ),
-            None,
+        execute_tool, get_exec_tool = await self._discover_n8n_tools(agw_client, user_token)
+        execution_id, status = await self._execute_workflow_via_agw(
+            agw_client, execute_tool, hook, user_token, message, headers
         )
-        if execute_tool is None:
-            raise TransportError(
-                f"MCP tool '{_EXECUTE_WORKFLOW_TOOL_NAME}' on server '{_N8N_MCP_SERVER_NAME}' "
-                "not found via Agent Gateway."
-            )
-
-        get_exec_tool = next(
-            (
-                t
-                for t in tools
-                if t.name == _GET_EXECUTION_TOOL_NAME
-                and t.server_name == _N8N_MCP_SERVER_NAME
-            ),
-            None,
-        )
-        if get_exec_tool is None:
-            raise TransportError(
-                f"MCP tool '{_GET_EXECUTION_TOOL_NAME}' on server '{_N8N_MCP_SERVER_NAME}' "
-                "not found via Agent Gateway."
-            )
-
-        # 3. Execute workflow
-        message_body = message.model_dump(mode="json") if message is not None else {}
-        execute_arguments = {
-            "workflowId": hook.n8n_workflow_config.workflow_id,
-            "inputs": {
-                "type": "webhook",
-                "webhookData": {
-                    "method": hook.n8n_workflow_config.method,
-                    "query": {},
-                    "body": message_body,
-                    "headers": headers or {},
-                },
-            },
-        }
-        try:
-            result_str = await agw_client.call_mcp_tool(
-                execute_tool,
-                user_token=user_token or None,
-                **execute_arguments,  # type: ignore[arg-type]  # ty: ignore[invalid-argument-type]
-            )
-        except Exception as exc:
-            raise TransportError(
-                f"AGW tool call for '{_EXECUTE_WORKFLOW_TOOL_NAME}' failed: {exc}"
-            ) from exc
-
-        try:
-            data = json.loads(result_str)
-        except Exception as exc:
-            raise TransportError(f"Could not parse hook response: {exc}") from exc
-
-        status = data.get("status", "")
-
-        if status in _EXECUTE_TERMINAL_STATUSES:
-            error_msg = data.get("error", "")
-            raise TransportError(
-                f"Workflow execution failed with status {status!r}"
-                + (f": {error_msg}" if error_msg else "")
-            )
-
-        if status == "success":
-            try:
-                result_data = data.get("data", {}).get("resultData", {})
-                last_node = result_data.get("lastNodeExecuted", "")
-                response_json = (
-                    result_data.get("runData", {})
-                    .get(last_node, [{}])[0]
-                    .get("data", {})
-                    .get("main", [[{}]])[0][0]
-                    .get("json", {})
-                )
-                return Message(**response_json)
-            except (KeyError, IndexError, TypeError, ValidationError) as exc:
-                raise TransportError(
-                    f"Failed to extract response from last executed node: {exc}"
-                ) from exc
-
-        # 4. Poll get_execution for running/new/waiting/started
-        execution_id = data.get("executionId")
-        deadline = time.monotonic() + hook.timeout
-        last_status = status
-
-        while time.monotonic() < deadline:
-            await asyncio.sleep(_HOOK_POLL_INTERVAL)
-
-            try:
-                get_execution_arguments = {
-                    "workflowId": hook.n8n_workflow_config.workflow_id,
-                    "executionId": str(execution_id),
-                    "includeData": True,
-                }
-                result_str = await agw_client.call_mcp_tool(
-                    get_exec_tool,
-                    user_token=user_token or None,
-                    **get_execution_arguments,  # type: ignore[arg-type]  # ty: ignore[invalid-argument-type]
-                )
-            except Exception as exc:
-                raise TransportError(
-                    f"AGW tool call for '{_GET_EXECUTION_TOOL_NAME}' failed: {exc}"
-                ) from exc
-
-            try:
-                data = json.loads(result_str)
-            except Exception as exc:
-                raise TransportError(f"Could not parse hook response: {exc}") from exc
-
-            last_status = data.get("execution", {}).get("status", "") or data.get(
-                "status", ""
-            )
-
-            if last_status == "success":
-                try:
-                    result_data = data.get("data", {}).get("resultData", {})
-                    last_node = result_data.get("lastNodeExecuted", "")
-                    response_json = (
-                        result_data.get("runData", {})
-                        .get(last_node, [{}])[0]
-                        .get("data", {})
-                        .get("main", [[{}]])[0][0]
-                        .get("json", {})
-                    )
-                    return Message(**response_json)
-                except (KeyError, IndexError, TypeError, ValidationError) as exc:
-                    raise TransportError(
-                        f"Failed to extract response from last executed node: {exc}"
-                    ) from exc
-
-            if last_status in _EXECUTION_TERMINAL_STATUSES:
-                error_msg = data.get("error", "")
-                raise TransportError(
-                    f"Workflow execution failed with status {last_status!r}"
-                    + (f": {error_msg}" if error_msg else "")
-                )
-
-        raise TransportError(
-            f"Workflow execution timed out after {hook.timeout}s. "
-            f"Last status: {last_status!r}"
+        return await self._poll_hook_execution(
+            agw_client, get_exec_tool, hook, execution_id, user_token, status
         )

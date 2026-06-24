@@ -397,39 +397,45 @@ class TestCallHook:
         ]
         agw = _make_agw_client(
             tools=tools,
-            tool_responses=[_success_payload()],
+            tool_responses=[_running_payload(), _poll_success_payload()],
         )
         client = self._make_client(agw)
         with patch(
             "sap_cloud_sdk.extensibility.client.create_agw_client",
             return_value=agw,
+        ), patch(
+            "sap_cloud_sdk.extensibility.client.asyncio.sleep",
+            new_callable=AsyncMock,
         ):
             result = await client.call_hook_agw(hook=_make_hook(), tenant_subdomain="t")
         assert result is not None
-        # call_mcp_tool must have been called with the N8N tool, not the other one
-        called_tool = agw.call_mcp_tool.call_args[0][0]
-        assert called_tool.server_name == _N8N_MCP_SERVER_NAME
+        # Both tool calls must have used the N8N server tools, not the other one
+        for call in agw.call_mcp_tool.call_args_list:
+            assert call[0][0].server_name == _N8N_MCP_SERVER_NAME
 
     @pytest.mark.asyncio
     async def test_success_synchronous(self):
-        """Returns a Message when execute_workflow responds with status=success."""
+        """Returns a Message when get_execution responds with status=success."""
         tools = [
             _make_n8n_tool(_EXECUTE_WORKFLOW_TOOL_NAME),
             _make_n8n_tool(_GET_EXECUTION_TOOL_NAME),
         ]
         agw = _make_agw_client(
             tools=tools,
-            tool_responses=[_success_payload()],
+            tool_responses=[_running_payload(), _poll_success_payload()],
         )
         client = self._make_client(agw)
         with patch(
             "sap_cloud_sdk.extensibility.client.create_agw_client",
             return_value=agw,
+        ), patch(
+            "sap_cloud_sdk.extensibility.client.asyncio.sleep",
+            new_callable=AsyncMock,
         ):
             result = await client.call_hook_agw(hook=_make_hook(), tenant_subdomain="t")
         assert result is not None
-        assert result.message_id == "msg-1"
-        agw.call_mcp_tool.assert_called_once()
+        assert result.message_id == "msg-2"
+        assert agw.call_mcp_tool.call_count == 2
 
     @pytest.mark.asyncio
     async def test_success_after_polling(self):
@@ -545,14 +551,21 @@ class TestCallHook:
             _make_n8n_tool(_EXECUTE_WORKFLOW_TOOL_NAME),
             _make_n8n_tool(_GET_EXECUTION_TOOL_NAME),
         ]
-        agw = _make_agw_client(tools=tools, tool_responses=[_success_payload("wf-xyz")])
+        agw = _make_agw_client(
+            tools=tools,
+            tool_responses=[_running_payload(), _poll_success_payload()],
+        )
         client = self._make_client(agw)
         with patch(
             "sap_cloud_sdk.extensibility.client.create_agw_client",
             return_value=agw,
+        ), patch(
+            "sap_cloud_sdk.extensibility.client.asyncio.sleep",
+            new_callable=AsyncMock,
         ):
             await client.call_hook_agw(
                 hook=_make_hook(workflow_id="wf-xyz"), tenant_subdomain="t"
             )
-        kwargs = agw.call_mcp_tool.call_args[1]
-        assert kwargs["workflowId"] == "wf-xyz"
+        # First call is execute_workflow — check workflowId was forwarded correctly
+        first_call_kwargs = agw.call_mcp_tool.call_args_list[0][1]
+        assert first_call_kwargs["workflowId"] == "wf-xyz"

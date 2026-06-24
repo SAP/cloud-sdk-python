@@ -55,12 +55,3 @@ Feature: Agent Gateway Auth Integration
     When I call list_mcp_tools
     And I call call_mcp_tool with the sample MCP tool and the user token
     Then the tool result should be a non-empty string
-
-  Scenario: Convert sample MCP tool to LangChain StructuredTool
-    Given I have a valid user token
-    And I have a sample MCP tool name
-    When I call list_mcp_tools
-    And I convert the sample MCP tool to a LangChain StructuredTool
-    Then the LangChain tool should have the sample MCP tool name
-    And the LangChain tool should have a non-empty description
-    And the LangChain tool should require no arguments

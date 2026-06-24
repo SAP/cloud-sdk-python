@@ -58,6 +58,9 @@ The `set_aicore_config()` function:
 4. **Sets resource group** (defaults to "default" if not specified)
 5. **Activates content filtering** — Azure Content Safety + prompt shield enabled by default *(new in 0.28.0)*
 
+Model fallback is **not** auto-activated — it is opt-in via
+[`set_fallbacks()`](#model-fallback-opt-in).
+
 ---
 
 ## Content Filtering (enabled by default from 0.28.0)
@@ -253,6 +256,103 @@ set_filtering(ContentFiltering(
 
 Env vars also renamed: `ORCH_FILTER_*` → `AICORE_FILTER_*`. The
 `set_filtering(enabled=False)` form was replaced by `disable_filtering()`.
+
+---
+
+## Model Fallback (opt-in)
+
+Orchestration v2 supports fallback configurations: when the primary model
+fails (unsupported in region, 429 Too Many Requests, 408 Request Timeout, or
+any 5xx — and only unsupported-in-region for streaming requests), the server
+automatically retries with the next preference in your list.
+
+Unlike content filtering, **fallback is opt-in**. `set_aicore_config()` does
+not enable it. The developer must call `set_fallbacks()` (or set the
+`AICORE_FALLBACK_*` env vars and call `set_fallbacks()` with no args).
+
+### Programmatic configuration
+
+```python
+from sap_cloud_sdk.aicore import (
+    FallbackConfig, FallbackModel, set_aicore_config, set_fallbacks,
+)
+from litellm import completion
+
+set_aicore_config()
+set_fallbacks(FallbackConfig([
+    FallbackModel(
+        model="sap/mistralai--mistral-small-instruct",
+        params={"temperature": 0.7, "max_tokens": 300},
+    ),
+]))
+
+response = completion(
+    model="sap/gpt-4o",
+    messages=[{"role": "user", "content": "Translate 'hello' to German."}],
+)
+```
+
+The orchestration server tries the primary model first. If it fails for a
+fallback-eligible reason, the server transparently uses each fallback in
+order. The first to succeed wins.
+
+When a fallback is used, the returned response carries an
+`intermediate_failures` attribute listing the reasons each higher-preference
+model was skipped:
+
+```python
+failures = getattr(response, "intermediate_failures", None)
+if failures:
+    for f in failures:
+        print(f"skipped preference: {f.get('code')} — {f.get('message')}")
+```
+
+`intermediate_failures` is `None` (or absent via `getattr`) when the primary
+succeeded — useful as a quick check for whether the fallback was exercised.
+This field is currently surfaced for non-streaming responses only.
+
+### Configure via environment
+
+Set these **before** calling `set_fallbacks()`:
+
+| Variable | Default | Description |
+|---|---|---|
+| `AICORE_FALLBACK_ENABLED` | `false` | Opt-in switch. |
+| `AICORE_FALLBACK_MODELS` | `""` | Comma list of model names. Each becomes a fallback with no params. Simple form. |
+| `AICORE_FALLBACK_CONFIG` | `""` | JSON: `[{"model": "...", "params": {...}, "model_version": "..."}, ...]`. Takes precedence over `MODELS`. |
+
+```bash
+AICORE_FALLBACK_ENABLED=true
+AICORE_FALLBACK_MODELS=sap/mistralai--mistral-small-instruct,sap/anthropic--claude-4.5-sonnet
+```
+
+```python
+from sap_cloud_sdk.aicore import set_fallbacks
+set_fallbacks()   # reads the env vars
+```
+
+### Filtering composes with fallback
+
+If filtering is also active, the same filtering configuration applies to the
+primary model AND every fallback preference. The filter set is broadcast
+across all module entries on the wire. To run a fallback without filtering,
+explicitly `disable_filtering()` before the call (filtering is on by default
+after `set_aicore_config()`).
+
+### Clearing at runtime
+
+There is no `disable_fallbacks()` function. To clear a previously-installed
+fallback configuration at runtime, call `set_fallbacks(None)` after clearing
+the `AICORE_FALLBACK_*` env vars (or with them unset). Most applications enable
+fallback once at startup and leave it on.
+
+### Error responses
+
+If every preference fails, orchestration returns an error response listing the
+failure for each attempted preference. This surfaces in user code the same way
+any orchestration error does — LiteLLM raises one of its exception types
+(`APIConnectionError`, etc.). The exception message contains the per-preference
+error list.
 
 ---
 

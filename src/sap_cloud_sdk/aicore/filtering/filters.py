@@ -8,7 +8,8 @@ Everything related to filtering lives in this single module:
 - Direction containers: ``InputFiltering``, ``OutputFiltering``,
   ``ContentFiltering``.
 - Entry points: ``set_filtering()``, ``disable_filtering()``.
-- LiteLLM patch: ``FilteringOrchestrationConfig``, ``_install()``.
+- LiteLLM patch: ``OrchestrationPatchConfig`` (also handles model fallback),
+  ``_install_filter()``, ``_install_fallback()``.
 - Exception parser: ``extract_filter_blocked()``.
 
 The package's ``__init__`` re-exports the public names so users can import
@@ -369,11 +370,14 @@ class ContentFiltering:
 # ---------------------------------------------------------------------------
 #
 # Patches ``litellm.GenAIHubOrchestrationConfig`` with a subclass that:
-# - Injects ``modules.filtering`` into every v2 completion request body
+# - Injects ``modules.filtering`` into every v2 completion request module entry
+# - Injects ``fallback_sap_modules`` so LiteLLM builds ``modules`` as a list
 # - Detects filter rejections in responses and raises ``ContentFilteredError``
+# - Attaches ``intermediate_failures`` on the returned ``ModelResponse``
 #
-# The patch is applied by ``_install(cfg)`` and undone by ``_install(None)``.
-# It is idempotent — calling it multiple times with the same config is safe.
+# The patch is applied by ``_install_filter(cfg)`` and/or
+# ``_install_fallback(cfg)`` and undone by passing ``None`` to either when the
+# other concern is also inactive. It is idempotent — repeated calls are safe.
 #
 # Two filter rejection shapes (from the v2 API) are handled:
 # - Input rejection: HTTP 4xx, ``error.location`` startswith
@@ -387,14 +391,28 @@ class ContentFiltering:
 # with the JSON embedded in the exception message.
 # ``extract_filter_blocked()`` handles that case.
 
-# Keep the original so _install(None) can restore it.
+# Keep the original so the patch can be cleanly removed.
 _ORIGINAL_CONFIG = litellm.GenAIHubOrchestrationConfig
 
-_active_cfg: Any = None  # ContentFiltering | None, stored at module level
+# Module-level state for the two concerns that share the same monkey-patch:
+# filtering (ContentFiltering) and fallback (FallbackConfig). Either or both
+# may be active; the patch class is installed whenever EITHER is non-None.
+_active_cfg: Any = None  # ContentFiltering | None
+_active_fallback_cfg: Any = None  # FallbackConfig | None
 
 
-class FilteringOrchestrationConfig(GenAIHubOrchestrationConfig):
-    """GenAIHubOrchestrationConfig subclass that injects content filtering."""
+class OrchestrationPatchConfig(GenAIHubOrchestrationConfig):
+    """GenAIHubOrchestrationConfig subclass for SDK-side request/response hooks.
+
+    Handles two concerns in one subclass so that filtering and fallback can be
+    enabled independently without fighting over ``litellm.GenAIHubOrchestrationConfig``:
+
+    - Filtering: injects ``modules.filtering`` into every module configuration
+      and raises :class:`ContentFilteredError` when the server rejects content.
+    - Fallback: injects ``fallback_sap_modules`` into ``optional_params`` so
+      LiteLLM builds ``modules`` as a list, and attaches ``intermediate_failures``
+      from the response body onto the returned :class:`ModelResponse`.
+    """
 
     def transform_request(
         self,
@@ -404,6 +422,14 @@ class FilteringOrchestrationConfig(GenAIHubOrchestrationConfig):
         litellm_params: dict,
         headers: dict,
     ) -> dict:
+        # Inject fallback into optional_params BEFORE super() reads it.
+        # LiteLLM's transform_request copies optional_params and pops
+        # "fallback_sap_modules" to build the modules list.
+        if _active_fallback_cfg is not None:
+            optional_params["fallback_sap_modules"] = (
+                _active_fallback_cfg.to_litellm_kwarg()
+            )
+
         body = super().transform_request(
             model=model,
             messages=messages,
@@ -419,10 +445,13 @@ class FilteringOrchestrationConfig(GenAIHubOrchestrationConfig):
         if not filtering_dict:
             return body
 
+        # Broadcast filtering across every module entry (primary + every
+        # fallback). When no fallback is configured ``modules`` is a single
+        # dict; with fallbacks it's a list (litellm transformation.py L383-385).
         modules = body["config"]["modules"]
         if isinstance(modules, list):
-            # Fallback mode (list of configs) — inject into primary config only.
-            modules[0]["filtering"] = filtering_dict
+            for entry in modules:
+                entry["filtering"] = filtering_dict
         else:
             modules["filtering"] = filtering_dict
 
@@ -470,14 +499,18 @@ class FilteringOrchestrationConfig(GenAIHubOrchestrationConfig):
                         request_id=err.get("request_id"),
                     )
 
-        # Output-filter rejection (HTTP 200 + finish_reason == "content_filter").
-        # content-filtering.md L234-303: message.content is "" (empty, not absent).
+        # Single parse of the 200 body — used for both output-filter detection
+        # and intermediate_failures attachment.
+        payload: Any = None
         if status == 200:
             try:
                 payload = raw_response.json()
             except ValueError:
                 # Response wasn't JSON — pass through to LiteLLM.
                 payload = None
+
+            # Output-filter rejection (HTTP 200 + finish_reason == "content_filter").
+            # content-filtering.md L234-303: message.content is "" (empty, not absent).
             if payload is not None:
                 choices = (payload.get("final_result") or {}).get("choices") or []
                 if choices and choices[0].get("finish_reason") == "content_filter":
@@ -492,7 +525,7 @@ class FilteringOrchestrationConfig(GenAIHubOrchestrationConfig):
                         request_id=payload.get("request_id"),
                     )
 
-        return super().transform_response(
+        result = super().transform_response(
             model=model,
             raw_response=raw_response,
             model_response=model_response,
@@ -506,20 +539,69 @@ class FilteringOrchestrationConfig(GenAIHubOrchestrationConfig):
             json_mode=json_mode,
         )
 
+        # Surface intermediate_failures on the returned ModelResponse so callers
+        # can inspect which preferences were skipped (fallback.md L101, L156-165).
+        # Only present on non-streaming responses — streaming surfacing is v2.
+        if payload is not None:
+            failures = payload.get("intermediate_failures")
+            if failures is not None:
+                # ModelResponse uses pydantic ``extra="allow"`` so dynamic
+                # attribute assignment is supported at runtime. Use setattr to
+                # keep the static type checker happy.
+                setattr(result, "intermediate_failures", failures)
 
-def _install(cfg: Any) -> None:  # cfg: ContentFiltering | None
-    """Patch litellm.GenAIHubOrchestrationConfig. Idempotent.
+        return result
 
-    cfg=None restores the original config and disables filtering.
+
+# Backward-compat alias — the original name is still imported by tests and
+# (potentially) by downstream code. Keeping the alias avoids churn.
+FilteringOrchestrationConfig = OrchestrationPatchConfig
+
+
+def _apply_patch() -> None:
+    """Install or uninstall the patch class based on the active config slots.
+
+    The patch is installed whenever EITHER filtering or fallback is active,
+    and removed only when both are cleared. Idempotent.
+    """
+    if _active_cfg is not None or _active_fallback_cfg is not None:
+        litellm.GenAIHubOrchestrationConfig = OrchestrationPatchConfig
+    else:
+        litellm.GenAIHubOrchestrationConfig = _ORIGINAL_CONFIG
+
+
+def _install_filter(cfg: Any) -> None:  # cfg: ContentFiltering | None
+    """Set the active filtering config and refresh the patch state.
+
+    ``cfg=None`` clears filtering. The patch class stays installed if fallback
+    is still active; otherwise the original is restored.
     """
     global _active_cfg
     _active_cfg = cfg
+    _apply_patch()
     if cfg is None:
-        litellm.GenAIHubOrchestrationConfig = _ORIGINAL_CONFIG
         logger.debug("content filtering disabled")
     else:
-        litellm.GenAIHubOrchestrationConfig = FilteringOrchestrationConfig
-        logger.info("content filtering active (FilteringOrchestrationConfig)")
+        logger.info("content filtering active (OrchestrationPatchConfig)")
+
+
+def _install_fallback(cfg: Any) -> None:  # cfg: FallbackConfig | None
+    """Set the active fallback config and refresh the patch state.
+
+    ``cfg=None`` clears fallback. The patch class stays installed if filtering
+    is still active; otherwise the original is restored.
+    """
+    global _active_fallback_cfg
+    _active_fallback_cfg = cfg
+    _apply_patch()
+    if cfg is None:
+        logger.debug("model fallback disabled")
+    else:
+        logger.info("model fallback active (OrchestrationPatchConfig)")
+
+
+# Backward-compat alias — the original ``_install`` was filtering-only.
+_install = _install_filter
 
 
 # ---------------------------------------------------------------------------

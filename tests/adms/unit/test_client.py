@@ -734,7 +734,7 @@ class TestDocumentApiUpdate:
         doc = api.update("11111111-1111-1111-1111-111111111111", upd)
 
         call_path = http.post.call_args[0][0]
-        assert "UpdateDocument" in call_path
+        assert "com.sap.adm.DocumentService.UpdateDocument" in call_path
         assert isinstance(doc, Document)
 
     def test_update_sends_only_set_fields(self):
@@ -759,7 +759,7 @@ class TestDocumentApiVersionOps:
         )
 
         call_path = http.post.call_args[0][0]
-        assert "RestoreDocumentContentVersion" in call_path
+        assert "com.sap.adm.DocumentService.RestoreDocumentContentVersion" in call_path
         payload = http.post.call_args[1]["json"]
         assert payload["DocumentContentVersion"]["DocContentVersionID"] == "1.0"
         assert payload["DocumentContentVersion"]["DocContentVersionComment"] == "Revert"
@@ -773,7 +773,7 @@ class TestDocumentApiVersionOps:
         api.delete_content_version("11111111-1111-1111-1111-111111111111", "2.0")
 
         call_path = http.post.call_args[0][0]
-        assert "DeleteDocumentContentVersion" in call_path
+        assert "com.sap.adm.DocumentService.DeleteDocumentContentVersion" in call_path
         assert http.post.call_args[1]["json"]["DocContentVersionID"] == "2.0"
 
 
@@ -1021,7 +1021,7 @@ class TestDocumentRelationApiUploadUrls:
         doc = api.generate_upload_urls("11111111-1111-1111-1111-111111111111")
 
         call_path = http.post.call_args[0][0]
-        assert "GenerateDocumentUploadURLs" in call_path
+        assert "com.sap.adm.DocumentService.GenerateDocumentUploadURLs" in call_path
         assert doc.document_content_upload_urls == ["https://s3.example.com/upload-url"]
 
     def test_complete_multipart_upload(self):
@@ -1031,7 +1031,7 @@ class TestDocumentRelationApiUploadUrls:
         api.complete_multipart_upload("11111111-1111-1111-1111-111111111111")
 
         call_path = http.post.call_args[0][0]
-        assert "CompleteMultipartUpload" in call_path
+        assert "com.sap.adm.DocumentService.CompleteMultipartUpload" in call_path
 
 
 class TestDocumentRelationApiLockDelete:
@@ -1039,13 +1039,19 @@ class TestDocumentRelationApiLockDelete:
         http = _rel_http()
         api = _DocumentRelationApi(http)
         api.lock("11111111-1111-1111-1111-111111111111")
-        assert "LockDocumentAndRelation" in http.post.call_args[0][0]
+        assert (
+            "com.sap.adm.DocumentService.LockDocumentAndRelation"
+            in http.post.call_args[0][0]
+        )
 
     def test_unlock(self):
         http = _rel_http()
         api = _DocumentRelationApi(http)
         api.unlock("11111111-1111-1111-1111-111111111111")
-        assert "UnlockDocumentAndRelation" in http.post.call_args[0][0]
+        assert (
+            "com.sap.adm.DocumentService.UnlockDocumentAndRelation"
+            in http.post.call_args[0][0]
+        )
 
     def test_delete_calls_http_delete(self):
         http = _rel_http()

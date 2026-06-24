@@ -154,7 +154,7 @@ class _DocumentApi:
             )
 
         fn_key = (
-            f"{rel_key}/DownloadDocument("
+            f"{rel_key}/com.sap.adm.DocumentService.DownloadDocument("
             f"DocContentVersionID={quote_odata_string_key(doc_content_version_id)})"
         )
         resp = self._http.get(fn_key, service_base=_SERVICE_PATH)
@@ -183,7 +183,7 @@ class _DocumentApi:
         """
         path = (
             build_relation_key_path(document_relation_id, is_active_entity)
-            + "/UpdateDocument"
+            + "/com.sap.adm.DocumentService.UpdateDocument"
         )
         payload = {"Document": update_input.to_odata_dict()}
         self._http.post(path, json=payload, service_base=_SERVICE_PATH)
@@ -217,7 +217,7 @@ class _DocumentApi:
         """
         path = (
             build_relation_key_path(document_relation_id, is_active_entity)
-            + "/RestoreDocumentContentVersion"
+            + "/com.sap.adm.DocumentService.RestoreDocumentContentVersion"
         )
         payload: dict = {
             "DocumentContentVersion": {
@@ -246,7 +246,7 @@ class _DocumentApi:
         """
         path = (
             build_relation_key_path(document_relation_id, is_active_entity)
-            + "/DeleteDocumentContentVersion"
+            + "/com.sap.adm.DocumentService.DeleteDocumentContentVersion"
         )
         self._http.post(
             path,
@@ -340,7 +340,7 @@ class _AsyncDocumentApi:
             )
 
         fn_key = (
-            f"{rel_key}/DownloadDocument("
+            f"{rel_key}/com.sap.adm.DocumentService.DownloadDocument("
             f"DocContentVersionID={quote_odata_string_key(doc_content_version_id)})"
         )
         resp = await self._http.get(fn_key, service_base=_SERVICE_PATH)
@@ -357,7 +357,7 @@ class _AsyncDocumentApi:
         """Async variant of :meth:`_DocumentApi.update` — same semantics."""
         path = (
             build_relation_key_path(document_relation_id, is_active_entity)
-            + "/UpdateDocument"
+            + "/com.sap.adm.DocumentService.UpdateDocument"
         )
         payload = {"Document": update.to_odata_dict()}
         await self._http.post(path, json=payload, service_base=_SERVICE_PATH)
@@ -379,7 +379,7 @@ class _AsyncDocumentApi:
         """Async variant of :meth:`_DocumentApi.delete_content_version` — same semantics."""
         path = (
             build_relation_key_path(document_relation_id, is_active_entity)
-            + "/DeleteDocumentContentVersion"
+            + "/com.sap.adm.DocumentService.DeleteDocumentContentVersion"
         )
         await self._http.post(
             path,
@@ -399,7 +399,7 @@ class _AsyncDocumentApi:
         """Async variant of :meth:`_DocumentApi.restore_content_version` — same semantics."""
         path = (
             build_relation_key_path(document_relation_id, is_active_entity)
-            + "/RestoreDocumentContentVersion"
+            + "/com.sap.adm.DocumentService.RestoreDocumentContentVersion"
         )
         payload: dict = {
             "DocumentContentVersion": {

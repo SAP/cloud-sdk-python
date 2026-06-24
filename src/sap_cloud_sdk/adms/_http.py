@@ -211,8 +211,15 @@ class AdmsHttp:
         *,
         params: dict[str, Any] | None = None,
         service_base: str | None = None,
+        extra_headers: dict[str, str] | None = None,
     ) -> Response:
-        return self._request("GET", path, params=params, service_base=service_base)
+        return self._request(
+            "GET",
+            path,
+            params=params,
+            service_base=service_base,
+            extra_headers=extra_headers,
+        )
 
     def post(
         self,
@@ -221,9 +228,15 @@ class AdmsHttp:
         json: Any | None = None,
         params: dict[str, Any] | None = None,
         service_base: str | None = None,
+        extra_headers: dict[str, str] | None = None,
     ) -> Response:
         return self._send_with_csrf(
-            "POST", path, json=json, params=params, service_base=service_base
+            "POST",
+            path,
+            json=json,
+            params=params,
+            service_base=service_base,
+            extra_headers=extra_headers,
         )
 
     def delete(
@@ -232,9 +245,14 @@ class AdmsHttp:
         *,
         params: dict[str, Any] | None = None,
         service_base: str | None = None,
+        extra_headers: dict[str, str] | None = None,
     ) -> Response:
         return self._send_with_csrf(
-            "DELETE", path, params=params, service_base=service_base
+            "DELETE",
+            path,
+            params=params,
+            service_base=service_base,
+            extra_headers=extra_headers,
         )
 
     def patch(
@@ -244,9 +262,15 @@ class AdmsHttp:
         json: Any | None = None,
         params: dict[str, Any] | None = None,
         service_base: str | None = None,
+        extra_headers: dict[str, str] | None = None,
     ) -> Response:
         return self._send_with_csrf(
-            "PATCH", path, json=json, params=params, service_base=service_base
+            "PATCH",
+            path,
+            json=json,
+            params=params,
+            service_base=service_base,
+            extra_headers=extra_headers,
         )
 
     def _send_with_csrf(
@@ -257,8 +281,12 @@ class AdmsHttp:
         json: Any | None = None,
         params: dict[str, Any] | None = None,
         service_base: str | None = None,
+        extra_headers: dict[str, str] | None = None,
     ) -> Response:
         csrf = self._get_csrf_token(service_base)
+        merged: dict[str, str] = {_CSRF_FETCH_HEADER: csrf}
+        if extra_headers:
+            merged.update(extra_headers)
         try:
             return self._request(
                 method,
@@ -266,7 +294,7 @@ class AdmsHttp:
                 json=json,
                 params=params,
                 service_base=service_base,
-                extra_headers={_CSRF_FETCH_HEADER: csrf},
+                extra_headers=merged,
             )
         except HttpError as exc:
             if exc.status_code != 403:
@@ -277,13 +305,16 @@ class AdmsHttp:
                 if self._csrf_tokens.get(service_base or "") == csrf:
                     self._csrf_tokens.pop(service_base or "", None)
             csrf = self._get_csrf_token(service_base)
+            merged = {_CSRF_FETCH_HEADER: csrf}
+            if extra_headers:
+                merged.update(extra_headers)
             return self._request(
                 method,
                 path,
                 json=json,
                 params=params,
                 service_base=service_base,
-                extra_headers={_CSRF_FETCH_HEADER: csrf},
+                extra_headers=merged,
             )
 
     # ------------------------------------------------------------------
@@ -478,9 +509,13 @@ class AsyncAdmsHttp(AsyncHttpClient):
         params: dict[str, Any] | None = None,
         service_base: str | None = None,
         headers: dict[str, str] | None = None,  # accepted for LSP compat, ignored
+        extra_headers: dict[str, str] | None = None,
     ) -> httpx.Response:
         return await self._request(
-            "GET", self._prefixed(path, service_base), params=params
+            "GET",
+            self._prefixed(path, service_base),
+            params=params,
+            extra_headers=extra_headers,
         )
 
     async def post(
@@ -492,9 +527,15 @@ class AsyncAdmsHttp(AsyncHttpClient):
         service_base: str | None = None,
         content: bytes | None = None,  # accepted for LSP compat, ignored
         headers: dict[str, str] | None = None,  # accepted for LSP compat, ignored
+        extra_headers: dict[str, str] | None = None,
     ) -> httpx.Response:
         return await self._send_with_csrf(
-            "POST", path, json=json, params=params, service_base=service_base
+            "POST",
+            path,
+            json=json,
+            params=params,
+            service_base=service_base,
+            extra_headers=extra_headers,
         )
 
     async def delete(
@@ -504,9 +545,14 @@ class AsyncAdmsHttp(AsyncHttpClient):
         params: dict[str, Any] | None = None,
         service_base: str | None = None,
         headers: dict[str, str] | None = None,  # accepted for LSP compat, ignored
+        extra_headers: dict[str, str] | None = None,
     ) -> httpx.Response:
         return await self._send_with_csrf(
-            "DELETE", path, params=params, service_base=service_base
+            "DELETE",
+            path,
+            params=params,
+            service_base=service_base,
+            extra_headers=extra_headers,
         )
 
     async def patch(
@@ -517,9 +563,15 @@ class AsyncAdmsHttp(AsyncHttpClient):
         params: dict[str, Any] | None = None,
         service_base: str | None = None,
         headers: dict[str, str] | None = None,  # accepted for LSP compat, ignored
+        extra_headers: dict[str, str] | None = None,
     ) -> httpx.Response:
         return await self._send_with_csrf(
-            "PATCH", path, json=json, params=params, service_base=service_base
+            "PATCH",
+            path,
+            json=json,
+            params=params,
+            service_base=service_base,
+            extra_headers=extra_headers,
         )
 
     async def _send_with_csrf(
@@ -530,15 +582,19 @@ class AsyncAdmsHttp(AsyncHttpClient):
         json: Any | None = None,
         params: dict[str, Any] | None = None,
         service_base: str | None = None,
+        extra_headers: dict[str, str] | None = None,
     ) -> httpx.Response:
         csrf = await self._get_csrf_token(service_base)
+        merged: dict[str, str] = {_CSRF_FETCH_HEADER: csrf}
+        if extra_headers:
+            merged.update(extra_headers)
         try:
             return await self._request(
                 method,
                 self._prefixed(path, service_base),
                 json=json,
                 params=params,
-                extra_headers={_CSRF_FETCH_HEADER: csrf},
+                extra_headers=merged,
             )
         except HttpError as exc:
             if exc.status_code != 403:
@@ -549,12 +605,15 @@ class AsyncAdmsHttp(AsyncHttpClient):
                 if self._csrf_tokens.get(service_base or "") == csrf:
                     self._csrf_tokens.pop(service_base or "", None)
             csrf = await self._get_csrf_token(service_base)
+            merged = {_CSRF_FETCH_HEADER: csrf}
+            if extra_headers:
+                merged.update(extra_headers)
             return await self._request(
                 method,
                 self._prefixed(path, service_base),
                 json=json,
                 params=params,
-                extra_headers={_CSRF_FETCH_HEADER: csrf},
+                extra_headers=merged,
             )
 
     # ------------------------------------------------------------------

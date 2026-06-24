@@ -292,6 +292,13 @@ def create_destination_instance(context, destination_client):
 @when("I create the destination at subaccount level")
 def create_destination_subaccount(context, destination_client):
     """Create destination at subaccount level."""
+    # Try to delete first to avoid 409 conflicts (idempotent cleanup)
+    try:
+        destination_client.delete_destination(context.destination.name, level=Level.SUB_ACCOUNT)
+    except Exception:
+        # Ignore cleanup errors (destination may not exist)
+        pass
+
     try:
         destination_client.create_destination(context.destination, level=Level.SUB_ACCOUNT)
         context.operation_success = True

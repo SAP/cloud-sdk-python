@@ -32,7 +32,7 @@ from sap_cloud_sdk.core.telemetry.metrics_decorator import record_metrics
 from sap_cloud_sdk.core.telemetry.module import Module
 from sap_cloud_sdk.core.telemetry.operation import Operation
 
-from ..filtering.filters import _install_fallback
+from ._patch import _install_fallback
 
 logger = logging.getLogger(__name__)
 

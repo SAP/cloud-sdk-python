@@ -19,17 +19,19 @@ from unittest.mock import MagicMock, patch
 import httpx
 import pytest
 
+from sap_cloud_sdk.aicore.fallback._patch import (
+    OrchestrationPatchConfig,
+    _install_fallback,
+)
 from sap_cloud_sdk.aicore.fallback.fallback import FallbackConfig, FallbackModel
-from sap_cloud_sdk.aicore.filtering.exceptions import ContentFilteredError
-from sap_cloud_sdk.aicore.filtering.filters import (
+from sap_cloud_sdk.aicore.filtering._models import (
     AzureContentFilter,
     ContentFiltering,
     InputFiltering,
-    OrchestrationPatchConfig,
     OutputFiltering,
-    _install_fallback,
-    _install_filter,
 )
+from sap_cloud_sdk.aicore.filtering._patch import _install as _install_filter
+from sap_cloud_sdk.aicore.filtering.exceptions import ContentFilteredError
 
 
 @pytest.fixture(autouse=True)
@@ -155,7 +157,7 @@ class TestTransformRequestFallback:
             return self._list_modules_body()
 
         with patch(
-            "sap_cloud_sdk.aicore.filtering.filters."
+            "sap_cloud_sdk.aicore.filtering._patch."
             "GenAIHubOrchestrationConfig.transform_request",
             side_effect=fake_super_transform,
         ):
@@ -176,7 +178,7 @@ class TestTransformRequestFallback:
         # asserts the injection is opt-in.
         optional_params: dict = {}
         with patch(
-            "sap_cloud_sdk.aicore.filtering.filters."
+            "sap_cloud_sdk.aicore.filtering._patch."
             "GenAIHubOrchestrationConfig.transform_request",
             return_value=self._dict_modules_body(),
         ):
@@ -194,7 +196,7 @@ class TestTransformRequestFallback:
         _install_fallback(FallbackConfig([FallbackModel(model="sap/mistral-small")]))
 
         with patch(
-            "sap_cloud_sdk.aicore.filtering.filters."
+            "sap_cloud_sdk.aicore.filtering._patch."
             "GenAIHubOrchestrationConfig.transform_request",
             return_value=self._list_modules_body(),
         ):
@@ -219,7 +221,7 @@ class TestTransformRequestFallback:
         _install_filter(_default_filtering())
 
         with patch(
-            "sap_cloud_sdk.aicore.filtering.filters."
+            "sap_cloud_sdk.aicore.filtering._patch."
             "GenAIHubOrchestrationConfig.transform_request",
             return_value=self._dict_modules_body(),
         ):
@@ -239,7 +241,7 @@ class TestTransformRequestFallback:
         _install_fallback(FallbackConfig([FallbackModel(model="sap/mistral-small")]))
 
         with patch(
-            "sap_cloud_sdk.aicore.filtering.filters."
+            "sap_cloud_sdk.aicore.filtering._patch."
             "GenAIHubOrchestrationConfig.transform_request",
             return_value=self._list_modules_body(),
         ):
@@ -263,7 +265,7 @@ class TestTransformRequestFallback:
         _install_fallback(FallbackConfig([FallbackModel(model="sap/mistral-small")]))
 
         with patch(
-            "sap_cloud_sdk.aicore.filtering.filters."
+            "sap_cloud_sdk.aicore.filtering._patch."
             "GenAIHubOrchestrationConfig.transform_request",
             return_value=self._realistic_list_modules_body(),
         ):
@@ -285,7 +287,7 @@ class TestTransformRequestFallback:
         # No fallback installed → litellm emits a single dict (not a list);
         # the broadcast must not touch it. (Also: nothing to broadcast to.)
         with patch(
-            "sap_cloud_sdk.aicore.filtering.filters."
+            "sap_cloud_sdk.aicore.filtering._patch."
             "GenAIHubOrchestrationConfig.transform_request",
             return_value=self._dict_modules_body(),
         ):
@@ -308,7 +310,7 @@ class TestTransformRequestFallback:
         _install_fallback(FallbackConfig([FallbackModel(model="sap/mistral-small")]))
 
         with patch(
-            "sap_cloud_sdk.aicore.filtering.filters."
+            "sap_cloud_sdk.aicore.filtering._patch."
             "GenAIHubOrchestrationConfig.transform_request",
             return_value=self._list_modules_body(),
         ):
@@ -400,7 +402,7 @@ class TestTransformResponseIntermediateFailures:
         from litellm.types.utils import ModelResponse
 
         with patch(
-            "sap_cloud_sdk.aicore.filtering.filters."
+            "sap_cloud_sdk.aicore.filtering._patch."
             "GenAIHubOrchestrationConfig.transform_response",
             return_value=ModelResponse(),
         ):
@@ -449,17 +451,22 @@ class TestInstallComposition:
     def test_patch_installed_when_only_filtering(self):
         import litellm
 
-        from sap_cloud_sdk.aicore.filtering.filters import _ORIGINAL_CONFIG
+        from sap_cloud_sdk.aicore.filtering._patch import (
+            FilteringOrchestrationConfig,
+            _ORIGINAL_CONFIG,
+        )
 
+        # Filtering-only installs the filtering class. ``OrchestrationPatchConfig``
+        # (the combined subclass) is reserved for when fallback is active.
         _install_filter(_default_filtering())
-        assert litellm.GenAIHubOrchestrationConfig is OrchestrationPatchConfig
+        assert litellm.GenAIHubOrchestrationConfig is FilteringOrchestrationConfig
         _install_filter(None)
         assert litellm.GenAIHubOrchestrationConfig is _ORIGINAL_CONFIG
 
     def test_patch_installed_when_only_fallback(self):
         import litellm
 
-        from sap_cloud_sdk.aicore.filtering.filters import _ORIGINAL_CONFIG
+        from sap_cloud_sdk.aicore.filtering._patch import _ORIGINAL_CONFIG
 
         _install_fallback(FallbackConfig([FallbackModel(model="sap/x")]))
         assert litellm.GenAIHubOrchestrationConfig is OrchestrationPatchConfig
@@ -479,7 +486,7 @@ class TestInstallComposition:
 
         # Clear fallback — now both inactive, original restored.
         _install_fallback(None)
-        from sap_cloud_sdk.aicore.filtering.filters import _ORIGINAL_CONFIG
+        from sap_cloud_sdk.aicore.filtering._patch import _ORIGINAL_CONFIG
 
         assert litellm.GenAIHubOrchestrationConfig is _ORIGINAL_CONFIG
 

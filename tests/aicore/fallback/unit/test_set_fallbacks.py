@@ -7,17 +7,19 @@ import os
 import litellm
 import pytest
 
+from sap_cloud_sdk.aicore.fallback import _patch as _fallback_patch
+from sap_cloud_sdk.aicore.fallback._patch import (
+    OrchestrationPatchConfig,
+    _install_fallback,
+)
 from sap_cloud_sdk.aicore.fallback.fallback import (
     FallbackConfig,
     FallbackModel,
     set_fallbacks,
 )
-from sap_cloud_sdk.aicore.filtering import filters as _filters_mod
-from sap_cloud_sdk.aicore.filtering.filters import (
-    _install_fallback,
-    _install_filter,
+from sap_cloud_sdk.aicore.filtering._patch import (
     _ORIGINAL_CONFIG,
-    OrchestrationPatchConfig,
+    _install as _install_filter,
 )
 
 
@@ -38,20 +40,20 @@ class TestSetFallbacks:
     def test_with_explicit_config_installs_patch(self):
         set_fallbacks(FallbackConfig([FallbackModel(model="sap/x")]))
         assert litellm.GenAIHubOrchestrationConfig is OrchestrationPatchConfig
-        assert _filters_mod._active_fallback_cfg is not None
+        assert _fallback_patch._active_fallback_cfg is not None
 
     def test_with_none_no_env_clears(self):
         set_fallbacks(FallbackConfig([FallbackModel(model="sap/x")]))
         set_fallbacks(None)
-        assert _filters_mod._active_fallback_cfg is None
+        assert _fallback_patch._active_fallback_cfg is None
         assert litellm.GenAIHubOrchestrationConfig is _ORIGINAL_CONFIG
 
     def test_with_none_reads_env_when_enabled(self, monkeypatch):
         monkeypatch.setenv("AICORE_FALLBACK_ENABLED", "true")
         monkeypatch.setenv("AICORE_FALLBACK_MODELS", "sap/a,sap/b")
         set_fallbacks(None)
-        assert _filters_mod._active_fallback_cfg is not None
-        assert [m.model for m in _filters_mod._active_fallback_cfg.models] == [
+        assert _fallback_patch._active_fallback_cfg is not None
+        assert [m.model for m in _fallback_patch._active_fallback_cfg.models] == [
             "sap/a",
             "sap/b",
         ]
@@ -60,7 +62,7 @@ class TestSetFallbacks:
     def test_with_none_env_disabled_keeps_inactive(self):
         # AICORE_FALLBACK_ENABLED unset → from_env returns None → install None.
         set_fallbacks(None)
-        assert _filters_mod._active_fallback_cfg is None
+        assert _fallback_patch._active_fallback_cfg is None
         assert litellm.GenAIHubOrchestrationConfig is _ORIGINAL_CONFIG
 
     def test_idempotent(self):

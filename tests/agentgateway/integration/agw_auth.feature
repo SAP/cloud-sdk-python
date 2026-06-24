@@ -41,14 +41,17 @@ Feature: Agent Gateway Auth Integration
     And the error message should mention "user_token is required"
 
   Scenario: List MCP tools returns a non-empty list of tools
+    Given I have a valid user token
     When I call list_mcp_tools
     Then the result should be a list of MCPTool
     And the list should be non-empty
     And each tool should have a non-empty name
     And each tool should have a non-empty url
+    And each tool should have a valid input_schema
 
-  Scenario: Call search_workflows tool returns a non-empty result
+  Scenario: Call sample MCP tool returns a non-empty result
     Given I have a valid user token
+    And I have a sample MCP tool name
     When I call list_mcp_tools
-    And I call call_mcp_tool with "search_workflows" and the user token
+    And I call call_mcp_tool with the sample MCP tool and the user token
     Then the tool result should be a non-empty string

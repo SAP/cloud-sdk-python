@@ -68,5 +68,9 @@ class ClientConfig:
             otherwise STANDARD.
         """
         raw = os.environ.get(_ENV_TLS_MODE, "").lower()
-        tls_mode = TlsMode.TRANSPARENT if raw == TlsMode.TRANSPARENT.value else TlsMode.STANDARD
+        tls_mode = (
+            TlsMode.TRANSPARENT
+            if raw == TlsMode.TRANSPARENT.value
+            else TlsMode.STANDARD
+        )
         return ClientConfig(tls_mode=tls_mode)

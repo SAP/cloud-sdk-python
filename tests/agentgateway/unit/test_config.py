@@ -76,4 +76,3 @@ class TestClientConfigFromEnv:
         with patch.dict(os.environ, {"AGW_TLS_MODE": "unknown"}):
             config = ClientConfig.from_env()
         assert config.tls_mode == TlsMode.STANDARD
-

@@ -1017,4 +1017,3 @@ class TestExchangeUserTokenTransparent:
         call_kwargs = mock_req.call_args
         assert call_kwargs.kwargs["extra_data"]["assertion"] == "user-jwt"
         assert call_kwargs.kwargs["grant_type"] == "urn:ietf:params:oauth:grant-type:jwt-bearer"
-

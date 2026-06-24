@@ -231,7 +231,8 @@ def load_customer_credentials_from_env() -> CustomerCredentials:
         )
 
     logger.debug(
-        "Loaded %d integration dependencies from environment", len(integration_dependencies)
+        "Loaded %d integration dependencies from environment",
+        len(integration_dependencies),
     )
 
     return CustomerCredentials(
@@ -387,7 +388,8 @@ def _request_token_transparent(
             )
 
         logger.debug(
-            "Token acquired successfully (transparent mode, length: %d)", len(access_token)
+            "Token acquired successfully (transparent mode, length: %d)",
+            len(access_token),
         )
         return token_data
 
@@ -417,6 +419,11 @@ def _request_token_mtls(
     Raises:
         AgentGatewaySDKError: If token request fails.
     """
+    if credentials.certificate is None or credentials.private_key is None:
+        raise AgentGatewaySDKError(
+            "mTLS token request requires certificate and private_key. "
+            "Use _request_token_transparent() for TlsMode.TRANSPARENT."
+        )
     ssl_context = _create_ssl_context(credentials.certificate, credentials.private_key)
 
     data = {

@@ -4,13 +4,14 @@ import os
 
 import pytest
 
-from sap_cloud_sdk.aicore.filtering.filters import (
+from sap_cloud_sdk.aicore.filtering._models import (
     AzureContentFilter,
     ContentFiltering,
     InputFiltering,
     LlamaGuard38bFilter,
     OutputFiltering,
 )
+from sap_cloud_sdk.aicore.filtering.config import load_from_env
 
 
 class TestInputFiltering:
@@ -95,7 +96,7 @@ class TestContentFilteringFromEnv:
 
     def test_defaults_with_no_env(self, monkeypatch):
         self._clear_env(monkeypatch)
-        cfg = ContentFiltering.from_env()
+        cfg = load_from_env()
         assert cfg is not None
         assert cfg.input_filtering is not None
         assert cfg.output_filtering is not None
@@ -111,13 +112,13 @@ class TestContentFilteringFromEnv:
     def test_disabled_returns_none(self, monkeypatch):
         self._clear_env(monkeypatch)
         monkeypatch.setenv("AICORE_FILTER_ENABLED", "false")
-        assert ContentFiltering.from_env() is None
+        assert load_from_env() is None
 
     def test_custom_severity_from_env(self, monkeypatch):
         self._clear_env(monkeypatch)
         monkeypatch.setenv("AICORE_FILTER_SELF_HARM", "0")
         monkeypatch.setenv("AICORE_FILTER_HATE", "2")
-        cfg = ContentFiltering.from_env()
+        cfg = load_from_env()
         assert cfg is not None
         assert cfg.input_filtering is not None
         in_filter = cfg.input_filtering.filters[0]
@@ -127,7 +128,7 @@ class TestContentFilteringFromEnv:
     def test_input_only_direction(self, monkeypatch):
         self._clear_env(monkeypatch)
         monkeypatch.setenv("AICORE_FILTER_DIRECTIONS", "input")
-        cfg = ContentFiltering.from_env()
+        cfg = load_from_env()
         assert cfg is not None
         assert cfg.input_filtering is not None
         assert cfg.output_filtering is None
@@ -135,7 +136,7 @@ class TestContentFilteringFromEnv:
     def test_output_only_direction(self, monkeypatch):
         self._clear_env(monkeypatch)
         monkeypatch.setenv("AICORE_FILTER_DIRECTIONS", "output")
-        cfg = ContentFiltering.from_env()
+        cfg = load_from_env()
         assert cfg is not None
         assert cfg.input_filtering is None
         assert cfg.output_filtering is not None
@@ -143,7 +144,7 @@ class TestContentFilteringFromEnv:
     def test_prompt_shield_false_from_env(self, monkeypatch):
         self._clear_env(monkeypatch)
         monkeypatch.setenv("AICORE_FILTER_PROMPT_SHIELD", "false")
-        cfg = ContentFiltering.from_env()
+        cfg = load_from_env()
         assert cfg is not None
         assert cfg.input_filtering is not None
         in_filter = cfg.input_filtering.filters[0]
@@ -153,13 +154,13 @@ class TestContentFilteringFromEnv:
         self._clear_env(monkeypatch)
         monkeypatch.setenv("AICORE_FILTER_HATE", "3")
         with pytest.raises(ValueError, match="AICORE_FILTER_HATE"):
-            ContentFiltering.from_env()
+            load_from_env()
 
     def test_directions_empty_string_disables_both(self, monkeypatch):
         """AICORE_FILTER_DIRECTIONS='' splits to empty set → neither direction."""
         self._clear_env(monkeypatch)
         monkeypatch.setenv("AICORE_FILTER_DIRECTIONS", "")
-        cfg = ContentFiltering.from_env()
+        cfg = load_from_env()
         assert cfg is not None
         assert cfg.input_filtering is None
         assert cfg.output_filtering is None

@@ -8,14 +8,22 @@ filtering off at runtime, use :func:`disable_filtering`; alternatively set
 
 See :mod:`sap_cloud_sdk.aicore` user guide for the documented public API.
 
-This module is a thin re-export surface; the public API + LiteLLM transport
-patch live in :mod:`.filters`. Error types live in :mod:`.exceptions`.
+Internal layout:
+
+- :mod:`._models` — public dataclasses (``Severity``, ``ContentFilter``,
+  ``AzureContentFilter``, ``LlamaGuard38bFilter``, ``InputFiltering``,
+  ``OutputFiltering``, ``ContentFiltering``).
+- :mod:`.config` — ``load_from_env`` + private env helpers.
+- :mod:`._patch` — LiteLLM transport monkeypatch + ``_install``.
+- :mod:`._api` — public entry points (``set_filtering``, ``disable_filtering``,
+  ``extract_filter_blocked``).
+- :mod:`.exceptions` — error types.
 """
 
 from __future__ import annotations
 
-from .exceptions import ContentFilteredError, OrchestrationError
-from .filters import (
+from ._api import disable_filtering, extract_filter_blocked, set_filtering
+from ._models import (
     AzureContentFilter,
     ContentFilter,
     ContentFiltering,
@@ -23,10 +31,8 @@ from .filters import (
     LlamaGuard38bFilter,
     OutputFiltering,
     Severity,
-    disable_filtering,
-    extract_filter_blocked,
-    set_filtering,
 )
+from .exceptions import ContentFilteredError, OrchestrationError
 
 __all__ = [
     "set_filtering",

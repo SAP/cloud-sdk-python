@@ -13,7 +13,7 @@ from sap_cloud_sdk.aicore.filtering import (
     disable_filtering,
     set_filtering,
 )
-from sap_cloud_sdk.aicore.filtering.filters import (
+from sap_cloud_sdk.aicore.filtering._patch import (
     _ORIGINAL_CONFIG,
     FilteringOrchestrationConfig,
     _install,
@@ -54,7 +54,7 @@ class TestSetFiltering:
             )
         )
         set_filtering(cfg)
-        from sap_cloud_sdk.aicore.filtering import filters as _filters_mod
+        from sap_cloud_sdk.aicore.filtering import _patch as _filters_mod
 
         active = _filters_mod._active_cfg
         assert active is not None
@@ -71,7 +71,7 @@ class TestSetFiltering:
         _clear_aicore_env(monkeypatch)
         monkeypatch.setenv("AICORE_FILTER_ENABLED", "false")
         set_filtering()
-        from sap_cloud_sdk.aicore.filtering import filters as _filters_mod
+        from sap_cloud_sdk.aicore.filtering import _patch as _filters_mod
 
         assert _filters_mod._active_cfg is None
 
@@ -102,7 +102,7 @@ class TestSetFiltering:
             )
         )
         set_filtering(cfg)
-        from sap_cloud_sdk.aicore.filtering import filters as _filters_mod
+        from sap_cloud_sdk.aicore.filtering import _patch as _filters_mod
 
         filters = _filters_mod._active_cfg.input_filtering.filters
         assert len(filters) == 2
@@ -128,7 +128,7 @@ class TestDisableFiltering:
         # disable_filtering() before any set_filtering() is a clean no-op:
         # litellm config stays at the original AND _active_cfg stays cleared.
         _clear_aicore_env(monkeypatch)
-        from sap_cloud_sdk.aicore.filtering import filters as _filters_mod
+        from sap_cloud_sdk.aicore.filtering import _patch as _filters_mod
 
         disable_filtering()
         assert litellm.GenAIHubOrchestrationConfig is _ORIGINAL_CONFIG

@@ -1,0 +1,116 @@
+"""Public entry-point functions for SAP AI Core content filtering.
+
+Three functions form the documented runtime API:
+
+- :func:`set_filtering` — install a :class:`ContentFiltering` (or re-apply
+  env-driven defaults when called with no args).
+- :func:`disable_filtering` — restore the original LiteLLM transport.
+- :func:`extract_filter_blocked` — unwrap an input-filter rejection from a
+  LiteLLM ``APIConnectionError``.
+
+Each is decorated with ``@record_metrics(Module.AICORE, …)`` for telemetry.
+The package ``__init__`` re-exports all three.
+"""
+
+from __future__ import annotations
+
+import json
+
+from sap_cloud_sdk.core.telemetry.metrics_decorator import record_metrics
+from sap_cloud_sdk.core.telemetry.module import Module
+from sap_cloud_sdk.core.telemetry.operation import Operation
+
+from ._models import ContentFiltering
+from ._patch import _install
+from .config import load_from_env
+from .exceptions import ContentFilteredError
+
+
+@record_metrics(Module.AICORE, Operation.AICORE_SET_FILTERING)
+def set_filtering(config: ContentFiltering | None = None) -> None:
+    """Install a content-filtering configuration.
+
+    Args:
+        config: A :class:`ContentFiltering` to install. If ``None`` (the
+            default), re-applies env-var-driven defaults — respects
+            ``AICORE_FILTER_ENABLED=false`` to keep filtering off. An
+            explicit non-``None`` config always activates filtering, even
+            when the env var would have disabled it.
+
+    Examples:
+        Activate strict input filtering with Prompt Shield::
+
+            set_filtering(ContentFiltering(
+                input_filtering=InputFiltering(filters=[
+                    AzureContentFilter(
+                        hate=Severity.STRICT,
+                        violence=Severity.STRICT,
+                        sexual=Severity.STRICT,
+                        self_harm=Severity.STRICT,
+                        prompt_shield=True,
+                    ),
+                ]),
+            ))
+
+        Re-apply env-based config after changing variables::
+
+            set_filtering()
+    """
+    if config is None:
+        _install(load_from_env())
+        return
+    _install(config)
+
+
+@record_metrics(Module.AICORE, Operation.AICORE_DISABLE_FILTERING)
+def disable_filtering() -> None:
+    """Disable content filtering for SAP AI Core model calls.
+
+    Restores the original ``litellm.GenAIHubOrchestrationConfig``.
+    Idempotent — safe to call when filtering is already disabled.
+    """
+    _install(None)
+
+
+@record_metrics(Module.AICORE, Operation.AICORE_EXTRACT_FILTER_BLOCKED)
+def extract_filter_blocked(exc: Exception) -> ContentFilteredError | None:
+    """Parse a LiteLLM APIConnectionError for an input-filter rejection.
+
+    When Azure Content Safety blocks the input, LiteLLM's ``raise_for_status()``
+    converts the 400 into an ``httpx.HTTPStatusError``, which is then wrapped
+    into a ``litellm.APIConnectionError`` with the original JSON embedded in
+    the exception message string. This function extracts it.
+
+    Returns None if the exception is not a content-filter rejection.
+
+    A telemetry event is emitted on every call, including calls where the
+    exception was not a content-filter rejection (returns ``None``).
+    """
+    msg = str(exc)
+    brace = msg.find("{")
+    if brace == -1:
+        return None
+    try:
+        payload = json.loads(msg[brace:])
+        err = payload.get("error", {})
+        if not (err.get("location") or "").startswith(
+            "Filtering Module - Input Filter"
+        ):
+            return None
+        data = (
+            err.get("intermediate_results", {})
+            .get("input_filtering", {})
+            .get("data", {})
+        )
+        return ContentFilteredError(
+            direction="input",
+            details=data,
+            request_id=err.get("request_id"),
+        )
+    except (ValueError, KeyError, TypeError, AttributeError):
+        # JSON parsing failure (ValueError from json.loads), missing dict key
+        # (KeyError), wrong shape (TypeError from .get on non-dict), or attribute
+        # access on a non-object (AttributeError) — all mean the exception
+        # message isn't a content-filter rejection. Let other exception types
+        # (logic bugs in ContentFilteredError construction) surface.
+        return None

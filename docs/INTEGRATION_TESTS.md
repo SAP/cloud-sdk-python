@@ -152,13 +152,13 @@ CLOUD_SDK_CFG_DPI_NG_CONSENT_DEFAULT_BASE_URL=https://your-consent-service-host
 
 Authentication is configurable via one of three methods:
 
-**Option A — Static Bearer Token**
+**Option A - Static Bearer Token**
 
 ```bash
 CLOUD_SDK_CFG_DPI_NG_CONSENT_DEFAULT_BEARER_TOKEN=your-bearer-token-here
 ```
 
-**Option B — OAuth 2.0 Client Credentials**
+**Option B - OAuth 2.0 Client Credentials**
 
 ```bash
 CLOUD_SDK_CFG_DPI_NG_CONSENT_DEFAULT_TOKEN_URL=https://your-auth-host/oauth/token
@@ -166,7 +166,7 @@ CLOUD_SDK_CFG_DPI_NG_CONSENT_DEFAULT_CLIENT_ID=your-client-id
 CLOUD_SDK_CFG_DPI_NG_CONSENT_DEFAULT_CLIENT_SECRET=your-client-secret
 ```
 
-**Option C — Mutual TLS (mTLS)**
+**Option C - Mutual TLS (mTLS)**
 
 ```bash
 CLOUD_SDK_CFG_DPI_NG_CONSENT_DEFAULT_CERT_FILE=/path/to/client.crt

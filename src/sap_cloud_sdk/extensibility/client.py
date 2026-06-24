@@ -396,7 +396,9 @@ class ExtensibilityClient:
             f"Last status: {last_status!r}"
         )
 
-    async def _discover_n8n_tools(self, agw_client: Any, user_token: Optional[str]) -> tuple[Any, Any]:
+    async def _discover_n8n_tools(
+        self, agw_client: Any, user_token: Optional[str]
+    ) -> tuple[Any, Any]:
         # TODO: cache the list of mcp tools for performance.
         tools = await agw_client.list_mcp_tools(user_token=user_token or None)
 
@@ -612,7 +614,9 @@ class ExtensibilityClient:
             ```
         """
         agw_client = create_agw_client(tenant_subdomain)
-        execute_tool, get_exec_tool = await self._discover_n8n_tools(agw_client, user_token)
+        execute_tool, get_exec_tool = await self._discover_n8n_tools(
+            agw_client, user_token
+        )
         execution_id, status = await self._execute_workflow_via_agw(
             agw_client, execute_tool, hook, user_token, message, headers
         )

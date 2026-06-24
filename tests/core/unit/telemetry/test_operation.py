@@ -163,6 +163,103 @@ class TestOperation:
         assert Operation.PRINT_UPLOAD_DOCUMENT.value == "upload_document"
         assert Operation.PRINT_CREATE_TASK.value == "create_print_task"
 
+    def test_dpi_ng_consent_operations(self):
+        """Test DPI NG Consent operation values."""
+        assert Operation.DPI_NG_CONSENT_CREATE_CLIENT.value == "consent_create_client"
+        assert Operation.DPI_NG_CONSENT_LIST_CONSENTS.value == "consent_list_consents"
+        assert Operation.DPI_NG_CONSENT_GET_CONSENT.value == "consent_get_consent"
+        assert Operation.DPI_NG_CONSENT_DELETE_CONSENT.value == "consent_delete_consent"
+        assert Operation.DPI_NG_CONSENT_CREATE_CONSENT_FROM_TEMPLATE.value == "consent_create_consent_from_template"
+        assert Operation.DPI_NG_CONSENT_WITHDRAW_CONSENT.value == "consent_withdraw_consent"
+        assert Operation.DPI_NG_CONSENT_TERMINATE_CONSENT.value == "consent_terminate_consent"
+        assert Operation.DPI_NG_CONSENT_CHECK_CONSENT_EXISTS.value == "consent_check_consent_exists"
+        assert Operation.DPI_NG_CONSENT_LIST_PURPOSES.value == "consent_list_purposes"
+        assert Operation.DPI_NG_CONSENT_GET_PURPOSE.value == "consent_get_purpose"
+        assert Operation.DPI_NG_CONSENT_CREATE_PURPOSE.value == "consent_create_purpose"
+        assert Operation.DPI_NG_CONSENT_UPDATE_PURPOSE.value == "consent_update_purpose"
+        assert Operation.DPI_NG_CONSENT_DELETE_PURPOSE.value == "consent_delete_purpose"
+        assert Operation.DPI_NG_CONSENT_SET_PURPOSE_ACTIVE.value == "consent_set_purpose_active"
+        assert Operation.DPI_NG_CONSENT_SET_PURPOSE_INACTIVE.value == "consent_set_purpose_inactive"
+        assert Operation.DPI_NG_CONSENT_LIST_PURPOSE_TEXTS.value == "consent_list_purpose_texts"
+        assert Operation.DPI_NG_CONSENT_GET_PURPOSE_TEXT.value == "consent_get_purpose_text"
+        assert Operation.DPI_NG_CONSENT_CREATE_PURPOSE_TEXT.value == "consent_create_purpose_text"
+        assert Operation.DPI_NG_CONSENT_UPDATE_PURPOSE_TEXT.value == "consent_update_purpose_text"
+        assert Operation.DPI_NG_CONSENT_DELETE_PURPOSE_TEXT.value == "consent_delete_purpose_text"
+        assert Operation.DPI_NG_CONSENT_LIST_TEMPLATES.value == "consent_list_templates"
+        assert Operation.DPI_NG_CONSENT_GET_TEMPLATE.value == "consent_get_template"
+        assert Operation.DPI_NG_CONSENT_CREATE_TEMPLATE.value == "consent_create_template"
+        assert Operation.DPI_NG_CONSENT_UPDATE_TEMPLATE.value == "consent_update_template"
+        assert Operation.DPI_NG_CONSENT_DELETE_TEMPLATE.value == "consent_delete_template"
+        assert Operation.DPI_NG_CONSENT_SET_TEMPLATE_ACTIVE.value == "consent_set_template_active"
+        assert Operation.DPI_NG_CONSENT_SET_TEMPLATE_INACTIVE.value == "consent_set_template_inactive"
+        assert Operation.DPI_NG_CONSENT_LIST_TEMPLATE_TEXTS.value == "consent_list_template_texts"
+        assert Operation.DPI_NG_CONSENT_GET_TEMPLATE_TEXT.value == "consent_get_template_text"
+        assert Operation.DPI_NG_CONSENT_CREATE_TEMPLATE_TEXT.value == "consent_create_template_text"
+        assert Operation.DPI_NG_CONSENT_UPDATE_TEMPLATE_TEXT.value == "consent_update_template_text"
+        assert Operation.DPI_NG_CONSENT_DELETE_TEMPLATE_TEXT.value == "consent_delete_template_text"
+        assert Operation.DPI_NG_CONSENT_LIST_THIRD_PARTY_PERS_DATA.value == "consent_list_third_party_pers_data"
+        assert Operation.DPI_NG_CONSENT_GET_THIRD_PARTY_PERS_DATA.value == "consent_get_third_party_pers_data"
+        assert Operation.DPI_NG_CONSENT_CREATE_THIRD_PARTY_PERS_DATA.value == "consent_create_third_party_pers_data"
+        assert Operation.DPI_NG_CONSENT_UPDATE_THIRD_PARTY_PERS_DATA.value == "consent_update_third_party_pers_data"
+        assert Operation.DPI_NG_CONSENT_DELETE_THIRD_PARTY_PERS_DATA.value == "consent_delete_third_party_pers_data"
+        assert Operation.DPI_NG_CONSENT_LIST_RULES.value == "consent_list_rules"
+        assert Operation.DPI_NG_CONSENT_GET_RULE.value == "consent_get_rule"
+        assert Operation.DPI_NG_CONSENT_CREATE_RULE.value == "consent_create_rule"
+        assert Operation.DPI_NG_CONSENT_UPDATE_RULE.value == "consent_update_rule"
+        assert Operation.DPI_NG_CONSENT_DELETE_RULE.value == "consent_delete_rule"
+        assert Operation.DPI_NG_CONSENT_SET_RULE_ACTIVE.value == "consent_set_rule_active"
+        assert Operation.DPI_NG_CONSENT_SET_RULE_INACTIVE.value == "consent_set_rule_inactive"
+        assert Operation.DPI_NG_CONSENT_LIST_THIRD_PARTIES.value == "consent_list_third_parties"
+        assert Operation.DPI_NG_CONSENT_GET_THIRD_PARTY.value == "consent_get_third_party"
+        assert Operation.DPI_NG_CONSENT_CREATE_THIRD_PARTY.value == "consent_create_third_party"
+        assert Operation.DPI_NG_CONSENT_UPDATE_THIRD_PARTY.value == "consent_update_third_party"
+        assert Operation.DPI_NG_CONSENT_DELETE_THIRD_PARTY.value == "consent_delete_third_party"
+        assert Operation.DPI_NG_CONSENT_LIST_JURISDICTIONS.value == "consent_list_jurisdictions"
+        assert Operation.DPI_NG_CONSENT_GET_JURISDICTION.value == "consent_get_jurisdiction"
+        assert Operation.DPI_NG_CONSENT_CREATE_JURISDICTION.value == "consent_create_jurisdiction"
+        assert Operation.DPI_NG_CONSENT_UPDATE_JURISDICTION.value == "consent_update_jurisdiction"
+        assert Operation.DPI_NG_CONSENT_DELETE_JURISDICTION.value == "consent_delete_jurisdiction"
+        assert Operation.DPI_NG_CONSENT_LIST_JURISDICTION_TEXTS.value == "consent_list_jurisdiction_texts"
+        assert Operation.DPI_NG_CONSENT_CREATE_JURISDICTION_TEXT.value == "consent_create_jurisdiction_text"
+        assert Operation.DPI_NG_CONSENT_UPDATE_JURISDICTION_TEXT.value == "consent_update_jurisdiction_text"
+        assert Operation.DPI_NG_CONSENT_DELETE_JURISDICTION_TEXT.value == "consent_delete_jurisdiction_text"
+        assert Operation.DPI_NG_CONSENT_LIST_LANGUAGES.value == "consent_list_languages"
+        assert Operation.DPI_NG_CONSENT_GET_LANGUAGE.value == "consent_get_language"
+        assert Operation.DPI_NG_CONSENT_LIST_LANGUAGE_DESCRIPTIONS.value == "consent_list_language_descriptions"
+        assert Operation.DPI_NG_CONSENT_CREATE_LANGUAGE_DESCRIPTION.value == "consent_create_language_description"
+        assert Operation.DPI_NG_CONSENT_UPDATE_LANGUAGE_DESCRIPTION.value == "consent_update_language_description"
+        assert Operation.DPI_NG_CONSENT_DELETE_LANGUAGE_DESCRIPTION.value == "consent_delete_language_description"
+        assert Operation.DPI_NG_CONSENT_LIST_SOURCE_INFOS.value == "consent_list_source_infos"
+        assert Operation.DPI_NG_CONSENT_GET_SOURCE_INFO.value == "consent_get_source_info"
+        assert Operation.DPI_NG_CONSENT_CREATE_SOURCE_INFO.value == "consent_create_source_info"
+        assert Operation.DPI_NG_CONSENT_UPDATE_SOURCE_INFO.value == "consent_update_source_info"
+        assert Operation.DPI_NG_CONSENT_DELETE_SOURCE_INFO.value == "consent_delete_source_info"
+        assert Operation.DPI_NG_CONSENT_LIST_CONTROLLERS.value == "consent_list_controllers"
+        assert Operation.DPI_NG_CONSENT_GET_CONTROLLER.value == "consent_get_controller"
+        assert Operation.DPI_NG_CONSENT_CREATE_CONTROLLER.value == "consent_create_controller"
+        assert Operation.DPI_NG_CONSENT_UPDATE_CONTROLLER.value == "consent_update_controller"
+        assert Operation.DPI_NG_CONSENT_DELETE_CONTROLLER.value == "consent_delete_controller"
+        assert Operation.DPI_NG_CONSENT_LIST_DATA_SUBJECT_TYPES.value == "consent_list_data_subject_types"
+        assert Operation.DPI_NG_CONSENT_GET_DATA_SUBJECT_TYPE.value == "consent_get_data_subject_type"
+        assert Operation.DPI_NG_CONSENT_CREATE_DATA_SUBJECT_TYPE.value == "consent_create_data_subject_type"
+        assert Operation.DPI_NG_CONSENT_UPDATE_DATA_SUBJECT_TYPE.value == "consent_update_data_subject_type"
+        assert Operation.DPI_NG_CONSENT_DELETE_DATA_SUBJECT_TYPE.value == "consent_delete_data_subject_type"
+        assert Operation.DPI_NG_CONSENT_LIST_APPLICATIONS.value == "consent_list_applications"
+        assert Operation.DPI_NG_CONSENT_GET_APPLICATION.value == "consent_get_application"
+        assert Operation.DPI_NG_CONSENT_CREATE_APPLICATION.value == "consent_create_application"
+        assert Operation.DPI_NG_CONSENT_UPDATE_APPLICATION.value == "consent_update_application"
+        assert Operation.DPI_NG_CONSENT_DELETE_APPLICATION.value == "consent_delete_application"
+        assert Operation.DPI_NG_CONSENT_LIST_MASTER_DATA_SOURCES.value == "consent_list_master_data_sources"
+        assert Operation.DPI_NG_CONSENT_GET_MASTER_DATA_SOURCE.value == "consent_get_master_data_source"
+        assert Operation.DPI_NG_CONSENT_CREATE_MASTER_DATA_SOURCE.value == "consent_create_master_data_source"
+        assert Operation.DPI_NG_CONSENT_UPDATE_MASTER_DATA_SOURCE.value == "consent_update_master_data_source"
+        assert Operation.DPI_NG_CONSENT_DELETE_MASTER_DATA_SOURCE.value == "consent_delete_master_data_source"
+        assert Operation.DPI_NG_CONSENT_LIST_OUTBOUND_CHANNEL_TYPES.value == "consent_list_outbound_channel_types"
+        assert Operation.DPI_NG_CONSENT_GET_OUTBOUND_CHANNEL_TYPE.value == "consent_get_outbound_channel_type"
+        assert Operation.DPI_NG_CONSENT_CREATE_OUTBOUND_CHANNEL_TYPE.value == "consent_create_outbound_channel_type"
+        assert Operation.DPI_NG_CONSENT_UPDATE_OUTBOUND_CHANNEL_TYPE.value == "consent_update_outbound_channel_type"
+        assert Operation.DPI_NG_CONSENT_DELETE_OUTBOUND_CHANNEL_TYPE.value == "consent_delete_outbound_channel_type"
+
     def test_operation_str_representation(self):
         """Test that Operation enum converts to string correctly."""
         assert str(Operation.AUDITLOG_LOG) == "log"
@@ -170,6 +267,8 @@ class TestOperation:
         assert str(Operation.DESTINATION_GET_INSTANCE_DESTINATION) == "get_instance_destination"
         assert str(Operation.OBJECTSTORE_PUT_OBJECT) == "put_object"
         assert str(Operation.AICORE_AUTO_INSTRUMENT) == "auto_instrument"
+        assert str(Operation.DPI_NG_CONSENT_CREATE_CLIENT) == "consent_create_client"
+        assert str(Operation.DPI_NG_CONSENT_LIST_CONSENTS) == "consent_list_consents"
 
     def test_operation_is_string_enum(self):
         """Test that Operation enum inherits from str."""
@@ -177,6 +276,7 @@ class TestOperation:
         assert isinstance(Operation.DATA_ANONYMIZATION_ANONYMIZE_TEXT, str)
         assert isinstance(Operation.DESTINATION_CREATE_DESTINATION, str)
         assert isinstance(Operation.OBJECTSTORE_GET_OBJECT, str)
+        assert isinstance(Operation.DPI_NG_CONSENT_CREATE_CLIENT, str)
 
     def test_operation_equality(self):
         """Test Operation enum equality comparisons."""
@@ -210,11 +310,12 @@ class TestOperation:
         assert any("OBJECTSTORE" in op.name for op in all_operations)
         assert any("AICORE" in op.name for op in all_operations)
         assert any("PRINT" in op.name for op in all_operations)
+        assert any("DPI_NG" in op.name for op in all_operations)
 
     def test_operation_count(self):
         """Test that we have the expected number of operations."""
         all_operations = list(Operation)
         # 3 auditlog + 12 destination + 10 certificate + 10 fragment + 8 objectstore
         # + 2 extensibility + 4 aicore + 23 dms + 6 agentgateway + 13 agent_memory
-        # + 5 data_anonymization + 52 adms + 6 print = 154
-        assert len(all_operations) == 154
+        # + 5 data_anonymization + 52 adms + 6 print + 94 dpi_ng = 248
+        assert len(all_operations) == 248

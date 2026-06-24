@@ -15,6 +15,7 @@ class TestModule:
         assert Module.AUDITLOG_NG.value == "auditlog_ng"
         assert Module.DATA_ANONYMIZATION.value == "data_anonymization"
         assert Module.DESTINATION.value == "destination"
+        assert Module.DPI_NG.value == "dpi_ng"
         assert Module.OBJECTSTORE.value == "objectstore"
         assert Module.DMS.value == "dms"
         assert Module.PRINT.value == "print"
@@ -26,6 +27,7 @@ class TestModule:
         assert str(Module.AUDITLOG_NG) == "auditlog_ng"
         assert str(Module.DATA_ANONYMIZATION) == "data_anonymization"
         assert str(Module.DESTINATION) == "destination"
+        assert str(Module.DPI_NG) == "dpi_ng"
         assert str(Module.OBJECTSTORE) == "objectstore"
         assert str(Module.DMS) == "dms"
         assert str(Module.PRINT) == "print"
@@ -37,6 +39,7 @@ class TestModule:
         assert isinstance(Module.AUDITLOG_NG, str)
         assert isinstance(Module.DATA_ANONYMIZATION, str)
         assert isinstance(Module.DESTINATION, str)
+        assert isinstance(Module.DPI_NG, str)
         assert isinstance(Module.DMS, str)
 
     def test_module_equality(self):
@@ -55,7 +58,7 @@ class TestModule:
     def test_all_modules_present(self):
         """Test that all expected modules are present."""
         all_modules = list(Module)
-        assert len(all_modules) == 13
+        assert len(all_modules) == 14
         assert Module.ADMS in all_modules
         assert Module.AGENT_MEMORY in all_modules
         assert Module.AGENTGATEWAY in all_modules
@@ -65,6 +68,7 @@ class TestModule:
         assert Module.DATA_ANONYMIZATION in all_modules
         assert Module.DESTINATION in all_modules
         assert Module.DMS in all_modules
+        assert Module.DPI_NG in all_modules
         assert Module.EXTENSIBILITY in all_modules
         assert Module.OBJECTSTORE in all_modules
         assert Module.PRINT in all_modules
@@ -78,6 +82,7 @@ class TestModule:
         assert "auditlog_ng" in module_values
         assert "data_anonymization" in module_values
         assert "destination" in module_values
+        assert "dpi_ng" in module_values
         assert "objectstore" in module_values
         assert "dms" in module_values
         assert "extensibility" in module_values

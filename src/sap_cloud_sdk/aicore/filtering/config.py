@@ -84,7 +84,9 @@ def load_from_env() -> ContentFiltering | None:
     directions_raw = _read_env_str("AICORE_FILTER_DIRECTIONS", "input,output")
     directions = {d.strip() for d in directions_raw.split(",") if d.strip()}
 
-    hate = Severity(_read_env_choice("AICORE_FILTER_HATE", _VALID_SEVERITIES, default=4))
+    hate = Severity(
+        _read_env_choice("AICORE_FILTER_HATE", _VALID_SEVERITIES, default=4)
+    )
     violence = Severity(
         _read_env_choice("AICORE_FILTER_VIOLENCE", _VALID_SEVERITIES, default=4)
     )

@@ -272,6 +272,9 @@ class TestAsyncAdmsClient:
 
     @pytest.mark.asyncio
     async def test_context_manager(self, config):
+        doc = MagicMock(spec=AsyncODataHttpTransport)
+        adm = MagicMock(spec=AsyncODataHttpTransport)
+        cfg = MagicMock(spec=AsyncODataHttpTransport)
         mock_httpx = AsyncMock(spec=httpx.AsyncClient)
         async with AsyncAdmsClient(
             doc,

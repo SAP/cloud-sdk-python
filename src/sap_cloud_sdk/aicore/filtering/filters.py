@@ -5,22 +5,26 @@ Three functions form the documented runtime API:
 - :func:`set_filtering` — install a :class:`ContentFiltering` (or re-apply
   env-driven defaults when called with no args).
 - :func:`disable_filtering` — restore the original LiteLLM transport.
-- :func:`extract_filter_blocked` — unwrap an input-filter rejection from a
-  LiteLLM ``APIConnectionError``.
+- :func:`extract_filter_blocked` — **deprecated**. Unwraps an input-filter
+  rejection from a LiteLLM ``APIConnectionError``. Prefer
+  :func:`sap_cloud_sdk.aicore.completion` /
+  :func:`sap_cloud_sdk.aicore.acompletion`, which already raise
+  :class:`ContentFilteredError` for both input- and output-filter rejections.
 
 Each is decorated with ``@record_metrics(Module.AICORE, …)`` for telemetry.
-The package ``__init__`` re-exports all three.
+The package ``__init__`` re-exports the non-deprecated entries.
 """
 
 from __future__ import annotations
 
 import json
+import warnings
 
 from sap_cloud_sdk.core.telemetry.metrics_decorator import record_metrics
 from sap_cloud_sdk.core.telemetry.module import Module
 from sap_cloud_sdk.core.telemetry.operation import Operation
 
-from ._models import ContentFiltering
+from .models import ContentFiltering
 from ._patch import _install
 from .config import load_from_env
 from .exceptions import ContentFilteredError
@@ -72,19 +76,15 @@ def disable_filtering() -> None:
     _install(None)
 
 
-@record_metrics(Module.AICORE, Operation.AICORE_EXTRACT_FILTER_BLOCKED)
-def extract_filter_blocked(exc: Exception) -> ContentFilteredError | None:
-    """Parse a LiteLLM APIConnectionError for an input-filter rejection.
+def _parse_input_filter_error(exc: Exception) -> ContentFilteredError | None:
+    """Internal: try to unwrap an input-filter rejection from a litellm exception.
 
-    When Azure Content Safety blocks the input, LiteLLM's ``raise_for_status()``
-    converts the 400 into an ``httpx.HTTPStatusError``, which is then wrapped
-    into a ``litellm.APIConnectionError`` with the original JSON embedded in
-    the exception message string. This function extracts it.
-
-    Returns None if the exception is not a content-filter rejection.
-
-    A telemetry event is emitted on every call, including calls where the
-    exception was not a content-filter rejection (returns ``None``).
+    Returns a constructed :class:`ContentFilteredError` if the exception's
+    string form contains the JSON shape produced by Azure Content Safety
+    input-filter rejection, otherwise ``None``. This is the shared parsing
+    logic used by :func:`sap_cloud_sdk.aicore.completion` (and the
+    deprecated :func:`extract_filter_blocked`) — keeping it private lets us
+    evolve the wrappers without ripping the parser out of the public API.
     """
     msg = str(exc)
     brace = msg.find("{")
@@ -114,3 +114,34 @@ def extract_filter_blocked(exc: Exception) -> ContentFilteredError | None:
         # message isn't a content-filter rejection. Let other exception types
         # (logic bugs in ContentFilteredError construction) surface.
         return None
+
+
+@record_metrics(Module.AICORE, Operation.AICORE_EXTRACT_FILTER_BLOCKED)
+def extract_filter_blocked(exc: Exception) -> ContentFilteredError | None:
+    """**Deprecated.** Parse a LiteLLM APIConnectionError for an input-filter rejection.
+
+    .. deprecated::
+        Use :func:`sap_cloud_sdk.aicore.completion` or
+        :func:`sap_cloud_sdk.aicore.acompletion` instead — those wrappers
+        already convert wrapped input-filter rejections into
+        :class:`ContentFilteredError` before the exception reaches caller
+        code. ``extract_filter_blocked`` will be removed in a future release.
+
+    When Azure Content Safety blocks the input, LiteLLM's ``raise_for_status()``
+    converts the 400 into an ``httpx.HTTPStatusError``, which is then wrapped
+    into a ``litellm.APIConnectionError`` with the original JSON embedded in
+    the exception message string. This function extracts it.
+
+    Returns ``None`` if the exception is not a content-filter rejection.
+
+    A telemetry event is emitted on every call, including calls where the
+    exception was not a content-filter rejection (returns ``None``).
+    """
+    warnings.warn(
+        "extract_filter_blocked is deprecated; use sap_cloud_sdk.aicore."
+        "completion / acompletion, which raise ContentFilteredError for both "
+        "input- and output-filter rejections.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    return _parse_input_filter_error(exc)

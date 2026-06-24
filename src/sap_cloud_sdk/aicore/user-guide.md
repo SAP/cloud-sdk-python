@@ -196,14 +196,13 @@ AICORE_FILTER_ENABLED=false
 
 ### Handle blocked requests
 
-When the filter rejects a request, the SDK raises `ContentFilteredError` (for
-rejections that reach `transform_response`) or wraps it inside LiteLLM's
-`APIConnectionError` (for input-filter 400s caught by `raise_for_status()`).
-`extract_filter_blocked()` unwraps the second case.
+Use `sap_cloud_sdk.aicore.completion` (or `acompletion` for the async path)
+instead of importing `completion` directly from LiteLLM. The wrappers
+normalise filter rejections so callers only have to catch a single
+exception type:
 
 ```python
-from sap_cloud_sdk.aicore import ContentFilteredError, extract_filter_blocked
-from litellm import completion
+from sap_cloud_sdk.aicore import ContentFilteredError, completion
 
 try:
     response = completion(
@@ -212,19 +211,24 @@ try:
     )
 except ContentFilteredError as e:
     # e.direction: "input" or "output"
-    # e.details: severity scores (safe to log — does not contain the prompt)
+    # e.details:   severity scores (safe to log — does not contain the prompt)
     # e.request_id: for debugging
     return "Your request was blocked by content safety policy."
-except Exception as e:
-    blocked = extract_filter_blocked(e)   # unwraps LiteLLM-wrapped 400
-    if blocked:
-        return "Your request was blocked by content safety policy."
-    raise
 ```
+
+The wrapper forwards every argument verbatim to `litellm.completion`
+(including `stream=True`), and only intercepts the wrapped
+`APIConnectionError` shape that LiteLLM produces for input-filter
+rejections. All other exceptions surface unchanged.
 
 `ContentFilteredError` exposes three attributes — `direction`, `details`,
 `request_id`. The `details` field contains severity scalars from the server,
 **not** the original prompt or completion content. Safe to log.
+
+> **Deprecated.** Earlier releases exposed `extract_filter_blocked()` for
+> users to unwrap input-filter 400s from a generic `except Exception`
+> block. It is still importable for one cycle (with a `DeprecationWarning`)
+> but new code should use `sap_cloud_sdk.aicore.completion` instead.
 
 ### Migration from prior versions
 

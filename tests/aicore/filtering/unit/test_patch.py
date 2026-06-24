@@ -1,4 +1,4 @@
-"""Unit tests for the LiteLLM patch (FilteringOrchestrationConfig, _install, extract_filter_blocked)."""
+"""Unit tests for the LiteLLM patch (FilteringOrchestrationConfig, _install, _parse_input_filter_error)."""
 
 import json
 import pytest
@@ -6,8 +6,8 @@ from unittest.mock import MagicMock, patch
 
 import httpx
 
-from sap_cloud_sdk.aicore.filtering._api import extract_filter_blocked
-from sap_cloud_sdk.aicore.filtering._models import (
+from sap_cloud_sdk.aicore.filtering.filters import _parse_input_filter_error
+from sap_cloud_sdk.aicore.filtering.models import (
     AzureContentFilter,
     ContentFiltering,
     InputFiltering,
@@ -218,32 +218,34 @@ class TestTransformResponse:
 
 
 # ---------------------------------------------------------------------------
-# extract_filter_blocked tests
+# _parse_input_filter_error — internal parsing helper. Tested here because
+# the legacy ``extract_filter_blocked`` is now a deprecation shim; the
+# completion/acompletion wrappers exercise this code path.
 # ---------------------------------------------------------------------------
 
 
-class TestExtractFilterBlocked:
+class TestParseInputFilterError:
     def _make_exc(self, payload: dict) -> Exception:
         return Exception(f"SapException - {json.dumps(payload)}")
 
     def test_extracts_input_filter(self):
         exc = self._make_exc(INPUT_FILTER_BODY)
-        blocked = extract_filter_blocked(exc)
+        blocked = _parse_input_filter_error(exc)
         assert blocked is not None
         assert blocked.direction == "input"
         assert blocked.request_id == "req-abc"
         assert blocked.details.get("azure_content_safety", {}).get("Violence") == 4
 
     def test_returns_none_for_non_filter_exception(self):
-        assert extract_filter_blocked(Exception("network error")) is None
+        assert _parse_input_filter_error(Exception("network error")) is None
 
     def test_returns_none_for_other_location(self):
         body = {"error": {"location": "Model Module", "message": "model not found"}}
         exc = self._make_exc(body)
-        assert extract_filter_blocked(exc) is None
+        assert _parse_input_filter_error(exc) is None
 
     def test_returns_none_for_malformed_json(self):
-        assert extract_filter_blocked(Exception("{ not valid json }")) is None
+        assert _parse_input_filter_error(Exception("{ not valid json }")) is None
 
 
 # ---------------------------------------------------------------------------

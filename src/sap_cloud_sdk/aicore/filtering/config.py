@@ -24,7 +24,7 @@ from __future__ import annotations
 
 import os
 
-from ._models import (
+from .models import (
     AzureContentFilter,
     ContentFiltering,
     InputFiltering,

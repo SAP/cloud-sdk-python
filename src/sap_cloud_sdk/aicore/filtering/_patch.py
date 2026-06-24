@@ -8,7 +8,7 @@ Patches ``litellm.GenAIHubOrchestrationConfig`` with a subclass that:
   via ``transform_response``.
 
 The patch is applied by :func:`_install` (called by ``set_filtering`` /
-``disable_filtering`` in :mod:`._api`) and is idempotent — calling it
+``disable_filtering`` in :mod:`.filters`) and is idempotent — calling it
 multiple times with the same config is safe.
 
 Two filter-rejection shapes (from the v2 API) are handled:
@@ -22,7 +22,7 @@ LiteLLM's ``raise_for_status()`` turns 4xx responses into
 ``httpx.HTTPStatusError`` before ``transform_response`` is reached, so
 input-filter 400s arrive wrapped in a ``litellm.APIConnectionError`` with
 the JSON embedded in the exception message.
-:func:`extract_filter_blocked` (defined in :mod:`._api`) handles that case.
+:func:`extract_filter_blocked` (defined in :mod:`.filters`) handles that case.
 """
 
 from __future__ import annotations

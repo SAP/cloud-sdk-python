@@ -4,7 +4,7 @@ import os
 
 import pytest
 
-from sap_cloud_sdk.aicore.filtering._models import (
+from sap_cloud_sdk.aicore.filtering.models import (
     AzureContentFilter,
     ContentFiltering,
     InputFiltering,

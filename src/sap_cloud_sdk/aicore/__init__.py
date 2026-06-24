@@ -13,6 +13,7 @@ from sap_cloud_sdk.core.secret_resolver import resolve_base_mount
 from sap_cloud_sdk.core.telemetry.metrics_decorator import record_metrics
 from sap_cloud_sdk.core.telemetry.module import Module
 from sap_cloud_sdk.core.telemetry.operation import Operation
+from .completion import acompletion, completion
 from .filtering import (
     AzureContentFilter,
     ContentFilter,
@@ -24,7 +25,7 @@ from .filtering import (
     OutputFiltering,
     Severity,
     disable_filtering,
-    extract_filter_blocked,
+    extract_filter_blocked,  # noqa: F401 — deprecated, kept importable for back-compat
     set_filtering,
 )
 
@@ -179,6 +180,8 @@ __all__ = [
     "set_aicore_config",
     "set_filtering",
     "disable_filtering",
+    "completion",
+    "acompletion",
     "ContentFiltering",
     "InputFiltering",
     "OutputFiltering",
@@ -188,5 +191,4 @@ __all__ = [
     "Severity",
     "ContentFilteredError",
     "OrchestrationError",
-    "extract_filter_blocked",
 ]

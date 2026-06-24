@@ -7,6 +7,8 @@ The create_client() function accepts an AuditLogNGConfig and returns a
 ready-to-use AuditClient.
 
 Usage:
+    explicit config:
+
     from sap_cloud_sdk.core.auditlog_ng import create_client, AuditLogNGConfig
 
     config = AuditLogNGConfig(
@@ -18,12 +20,24 @@ Usage:
     )
     client = create_client(config=config)
 
+Usage:
+    resolve from a Destination:
+
+    from sap_cloud_sdk.core.auditlog_ng import create_client
+
+    client = create_client(
+        destination_name="my-audit-destination",
+        destination_instance="my-binding-instance",
+        fragment_name="prod-fragment",    # optional
+    )
+
     # Send an audit event (protobuf message)
     event_id = client.send(event, "DataAccess")
     client.close()
 """
 
 from typing import Optional
+from enum import Enum
 
 from sap_cloud_sdk.core.auditlog_ng.client import AuditClient
 from sap_cloud_sdk.core.auditlog_ng.config import (
@@ -43,9 +57,103 @@ from sap_cloud_sdk.core.telemetry import (
 )
 
 
+class _DestinationProperties(Enum):
+    DEPLOYMENT_ID = "deploymentId"
+    DEPLOYMENT_REGION = "deploymentRegion"
+    NAMESPACE = "namespace"
+
+
+def _get_config_from_destination(
+    destination_name: Optional[str],
+    destination_instance: Optional[str],
+    fragment_name: Optional[str] = None,
+) -> dict[str, str]:
+    """Resolve endpoint, deployment_id and namespace from a named Destination.
+
+    The destination must expose these custom properties:
+
+    - ``deploymentId`` (or ``deploymentRegion`` as fallback when absent/empty)
+    - ``namespace``
+
+    The destination ``url`` is used as the OTLP endpoint.
+    The lookup is always performed at ``ConsumptionLevel.SUBACCOUNT``.
+
+    Args:
+        destination_name: Name of the destination to resolve.
+        destination_instance: Destination service binding instance name,
+            passed as ``instance=`` to ``destination.create_client()``.
+        fragment_name: Optional fragment name merged into the destination
+            before resolution. Wrapped in ``ConsumptionOptions`` when provided.
+
+    Returns:
+        dict with keys ``endpoint``, ``deployment_id``, ``namespace``
+        when destination is found.
+
+    Returns:
+        None: If destination is not found.
+
+    Return:
+        ValueError: If required properties are missing.
+    """
+    # Lazy import — keeps destination an optional dependency; importing auditlog_ng
+    # in environments without the destination package continues to work.
+    from sap_cloud_sdk.destination import (
+        ConsumptionOptions,
+        ConsumptionLevel,
+        create_client as _dest_create_client,
+    )
+
+    dest_client = _dest_create_client(instance=destination_instance)
+    options = (
+        ConsumptionOptions(
+            fragment_name=fragment_name, fragment_level=ConsumptionLevel.SUBACCOUNT
+        )
+        if fragment_name
+        else None
+    )
+
+    destination = dest_client.get_destination(
+        name=destination_name, options=options, level=ConsumptionLevel.SUBACCOUNT
+    )
+
+    if destination is None:
+        return {}
+
+    endpoint = destination.url
+    props = destination.properties
+
+    deployment_id = props.get(_DestinationProperties.DEPLOYMENT_ID.value) or ""
+    if not deployment_id:
+        deployment_id = props.get(_DestinationProperties.DEPLOYMENT_REGION.value) or ""
+    if not deployment_id:
+        raise ValueError(
+            f"Destination '{destination_name}' must provide either the "
+            f"'{_DestinationProperties.DEPLOYMENT_ID.value}' or "
+            f"'{_DestinationProperties.DEPLOYMENT_REGION.value}' property"
+        )
+
+    namespace = props.get(_DestinationProperties.NAMESPACE.value) or ""
+    if not namespace:
+        raise ValueError(
+            f"Destination '{destination_name}' must provide the "
+            f"'{_DestinationProperties.NAMESPACE.value}' property"
+        )
+
+    return {
+        "endpoint": endpoint,
+        "deployment_id": deployment_id,
+        "namespace": namespace,
+    }
+
+
 def create_client(
     *,
     config: Optional[AuditLogNGConfig] = None,
+    # Destination-based resolution
+    destination_name: Optional[str] = "AuditLogV3_Destination",
+    destination_instance: Optional[str] = "default",
+    fragment_name: Optional[str] = None,
+    # Explicit connection parameters
     endpoint: Optional[str] = None,
     deployment_id: Optional[str] = None,
     namespace: Optional[str] = None,
@@ -61,13 +169,30 @@ def create_client(
 ) -> AuditClient:
     """Create an AuditClient for sending audit events over OTLP/gRPC.
 
-    Either pass a pre-built ``config`` **or** the individual keyword arguments.
-    When ``config`` is provided the remaining keyword arguments are ignored.
+    Three mutually exclusive ways to provide configuration (evaluated in order):
+
+    1. **Explicit config object** — pass a pre-built :class:`AuditLogNGConfig`
+       via ``config``; all other keyword arguments are ignored.
+
+    2. **Destination-based resolution** — pass ``destination_name`` and
+       ``destination_instance`` (both required); ``fragment_name`` is optional.
+       The Destination module resolves the named destination at subaccount level
+       and extracts ``endpoint``, ``deployment_id`` (with fallback to
+       ``deploymentRegion``), and ``namespace`` from its properties.
+
+    3. **Explicit keyword arguments** — pass ``endpoint``, ``deployment_id``,
+       and ``namespace`` directly.
 
     Args:
         _telemetry_source: Internal parameter for telemetry. Not for external use.
         config: Optional explicit configuration. If provided, all other
-                keyword arguments are ignored.
+            keyword arguments are ignored.
+        destination_name: Name of the SAP Destination to resolve. Must be
+            combined with ``destination_instance`` to enter the destination path.
+        destination_instance: Destination service binding instance name, passed
+            as ``instance=`` to ``destination.create_client()``. Must be combined
+            with ``destination_name`` to enter the destination path.
+        fragment_name: Optional destination fragment name merged before resolution.
         endpoint: OTLP gRPC endpoint (``host:port``).
         deployment_id: Deployment identifier.
         namespace: Namespace identifier.
@@ -85,16 +210,28 @@ def create_client(
 
     Raises:
         ClientCreationError: If client creation fails.
-        ValueError: If required parameters are missing.
+        ValueError: If required parameters are missing or destination
+            resolution fails.
     """
     try:
         if config is None:
             try:
-                if not endpoint or not deployment_id or not namespace:
-                    raise ValueError(
-                        "endpoint, deployment_id, and namespace are required "
-                        "when config is not provided"
-                    )
+                resolved = _get_config_from_destination(
+                    destination_name=destination_name,
+                    destination_instance=destination_instance,
+                    fragment_name=fragment_name,
+                )
+                if resolved:
+                    endpoint = resolved["endpoint"]
+                    deployment_id = resolved["deployment_id"]
+                    namespace = resolved["namespace"]
+                else:
+                    if not endpoint or not deployment_id or not namespace:
+                        raise ValueError(
+                            "endpoint, deployment_id, and namespace are required "
+                            "when config or valid destination is not provided"
+                        )
+
                 config = AuditLogNGConfig(
                     endpoint=endpoint,
                     deployment_id=deployment_id,

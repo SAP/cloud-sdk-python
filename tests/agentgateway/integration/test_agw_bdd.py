@@ -266,4 +266,3 @@ def tool_result_is_non_empty_string(context: ScenarioContext):
     assert context.tool_result is not None
     assert isinstance(context.tool_result, str)
     assert context.tool_result.strip(), "Expected a non-empty tool result"
-

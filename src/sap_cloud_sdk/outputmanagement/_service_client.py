@@ -218,7 +218,7 @@ class OutputManagementServiceClient:
                 )
 
                 if not (certificate and private_key):
-                    logger.error("✗ No certificate or key found in PKCS12")
+                    logger.error("No certificate or key found in PKCS12")
                     return None
 
                 # Write certificate to temp file

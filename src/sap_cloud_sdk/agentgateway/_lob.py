@@ -29,7 +29,10 @@ from sap_cloud_sdk.agentgateway._fragments import (
 )
 from sap_cloud_sdk.agentgateway._models import Agent, AgentCard, MCPTool
 from sap_cloud_sdk.agentgateway._token_cache import _GatewayUrlCache, _TokenCache
-from sap_cloud_sdk.agentgateway.exceptions import AgentGatewaySDKError, MCPServerNotFoundError
+from sap_cloud_sdk.agentgateway.exceptions import (
+    AgentGatewaySDKError,
+    MCPServerNotFoundError,
+)
 
 logger = logging.getLogger(__name__)
 

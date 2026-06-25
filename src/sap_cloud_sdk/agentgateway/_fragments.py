@@ -37,9 +37,7 @@ class FragmentLabel(str, Enum):
 def _list_fragments_by_label(label: FragmentLabel, tenant_subdomain: str) -> list:
     client = create_fragment_client(instance=_DESTINATION_INSTANCE)
     return client.list_instance_fragments(
-        filter=ListOptions(
-            filter_labels=[Label(key=LABEL_KEY, values=[label.value])]
-        ),
+        filter=ListOptions(filter_labels=[Label(key=LABEL_KEY, values=[label.value])]),
         tenant=tenant_subdomain,
     )
 

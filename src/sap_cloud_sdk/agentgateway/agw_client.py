@@ -27,7 +27,12 @@ from sap_cloud_sdk.agentgateway._lob import (
     get_agent_cards_lob,
     get_mcp_tools_lob,
 )
-from sap_cloud_sdk.agentgateway._models import Agent, AgentCardFilter, AuthResult, MCPTool
+from sap_cloud_sdk.agentgateway._models import (
+    Agent,
+    AgentCardFilter,
+    AuthResult,
+    MCPTool,
+)
 from sap_cloud_sdk.agentgateway._token_cache import _GatewayUrlCache, _TokenCache
 from sap_cloud_sdk.agentgateway.exceptions import AgentGatewaySDKError
 from sap_cloud_sdk.core.telemetry import Module, Operation, record_metrics

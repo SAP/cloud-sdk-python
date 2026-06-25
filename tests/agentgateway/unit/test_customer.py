@@ -8,7 +8,6 @@ from unittest.mock import patch, AsyncMock, MagicMock
 from sap_cloud_sdk.agentgateway._customer import (
     detect_customer_agent_credentials,
     load_customer_credentials,
-    load_customer_credentials_from_env,
     get_system_token_mtls,
     get_system_token_transparent,
     exchange_user_token,
@@ -788,7 +787,7 @@ class TestDetectCustomerAgentCredentialsTransparentMode:
 
 
 # ============================================================
-# Test: load_customer_credentials_from_env
+# Test: load_customer_credentials — transparent mode (env vars)
 # ============================================================
 
 _TRANSPARENT_ENV = {
@@ -799,13 +798,13 @@ _TRANSPARENT_ENV = {
 
 
 class TestLoadCustomerCredentialsFromEnv:
-    """Tests for loading customer credentials from environment variables."""
+    """Tests for loading customer credentials from environment variables (transparent mode)."""
 
     def test_loads_required_fields(self):
         """Loads credentials from the three required environment variables."""
         with patch.dict(os.environ, _TRANSPARENT_ENV, clear=False):
             os.environ.pop(_ENV_INTEGRATION_DEPENDENCIES, None)
-            creds = load_customer_credentials_from_env()
+            creds = load_customer_credentials(None, TlsMode.TRANSPARENT)
 
         assert creds.client_id == "test-client-id"
         assert creds.token_service_url == "https://ias.example.com/oauth/token"
@@ -819,7 +818,7 @@ class TestLoadCustomerCredentialsFromEnv:
         env = {**_TRANSPARENT_ENV, _ENV_GATEWAY_URL: "https://agw.example.com/"}
         with patch.dict(os.environ, env, clear=False):
             os.environ.pop(_ENV_INTEGRATION_DEPENDENCIES, None)
-            creds = load_customer_credentials_from_env()
+            creds = load_customer_credentials(None, TlsMode.TRANSPARENT)
 
         assert creds.gateway_url == "https://agw.example.com"
 
@@ -828,7 +827,7 @@ class TestLoadCustomerCredentialsFromEnv:
         deps = json.dumps([{"ordId": "sap.app:res:v1", "globalTenantId": "tenant-1"}])
         env = {**_TRANSPARENT_ENV, _ENV_INTEGRATION_DEPENDENCIES: deps}
         with patch.dict(os.environ, env, clear=False):
-            creds = load_customer_credentials_from_env()
+            creds = load_customer_credentials(None, TlsMode.TRANSPARENT)
 
         assert len(creds.integration_dependencies) == 1
         assert creds.integration_dependencies[0].ord_id == "sap.app:res:v1"
@@ -843,7 +842,7 @@ class TestLoadCustomerCredentialsFromEnv:
         with patch.dict(os.environ, env, clear=False):
             os.environ.pop(_ENV_CLIENT_ID, None)
             with pytest.raises(AgentGatewaySDKError, match="transparent"):
-                load_customer_credentials_from_env()
+                load_customer_credentials(None, TlsMode.TRANSPARENT)
 
     def test_missing_token_service_url_raises(self):
         """Missing TOKEN_SERVICE_URL raises AgentGatewaySDKError."""
@@ -854,14 +853,14 @@ class TestLoadCustomerCredentialsFromEnv:
         with patch.dict(os.environ, env, clear=False):
             os.environ.pop(_ENV_TOKEN_SERVICE_URL, None)
             with pytest.raises(AgentGatewaySDKError, match="transparent"):
-                load_customer_credentials_from_env()
+                load_customer_credentials(None, TlsMode.TRANSPARENT)
 
     def test_invalid_integration_dependencies_json_raises(self):
         """Invalid INTEGRATION_DEPENDENCIES JSON raises AgentGatewaySDKError."""
         env = {**_TRANSPARENT_ENV, _ENV_INTEGRATION_DEPENDENCIES: "not-json"}
         with patch.dict(os.environ, env, clear=False):
             with pytest.raises(AgentGatewaySDKError, match="INTEGRATION_DEPENDENCIES"):
-                load_customer_credentials_from_env()
+                load_customer_credentials(None, TlsMode.TRANSPARENT)
 
 
 # ============================================================

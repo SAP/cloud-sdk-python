@@ -114,18 +114,76 @@ def detect_customer_agent_credentials(
     return None
 
 
-def load_customer_credentials(path: str) -> CustomerCredentials:
-    """Load and parse customer credentials from file.
+def load_customer_credentials(
+    path: str | None,
+    tls_mode: TlsMode = TlsMode.STANDARD,
+) -> CustomerCredentials:
+    """Load customer credentials from a file (standard mode) or environment variables (transparent mode).
+
+    In transparent mode (``tls_mode=TlsMode.TRANSPARENT``) the OpenShell Gateway
+    injects the mTLS client certificate at the TLS layer. Credentials are read
+    from environment variables and ``certificate``/``private_key`` are set to
+    ``None``.
+
+    In standard mode ``path`` must point to a valid JSON credentials file.
 
     Args:
-        path: Path to the credentials JSON file.
+        path: Path to the credentials JSON file. Required in standard mode,
+            ignored in transparent mode.
+        tls_mode: TLS handling mode. When TRANSPARENT, loads from env vars.
 
     Returns:
         Parsed CustomerCredentials.
 
     Raises:
-        AgentGatewaySDKError: If file cannot be read or is missing required fields.
+        AgentGatewaySDKError: If credentials cannot be loaded or required fields
+            are missing.
     """
+    if tls_mode == TlsMode.TRANSPARENT:
+        logger.debug("TLS_MODE=transparent: loading credentials from environment variables")
+        required = [_ENV_CLIENT_ID, _ENV_TOKEN_SERVICE_URL, _ENV_GATEWAY_URL]
+        missing = [v for v in required if not os.environ.get(v)]
+        if missing:
+            raise AgentGatewaySDKError(
+                f"TLS_MODE=transparent requires environment variables: {missing}"
+            )
+
+        raw_deps = os.environ.get(_ENV_INTEGRATION_DEPENDENCIES, "[]")
+        try:
+            deps_data = json.loads(raw_deps)
+            integration_dependencies = [
+                IntegrationDependency(
+                    ord_id=dep[_CredentialFields.ORD_ID],
+                    global_tenant_id=dep[_CredentialFields.GLOBAL_TENANT_ID],
+                )
+                for dep in deps_data
+            ]
+        except (json.JSONDecodeError, KeyError, TypeError) as e:
+            raise AgentGatewaySDKError(
+                f"Failed to parse INTEGRATION_DEPENDENCIES: {e}. "
+                'Expected format: [{"ordId": "...", "globalTenantId": "..."}]'
+            )
+
+        logger.debug(
+            "Loaded %d integration dependencies from environment",
+            len(integration_dependencies),
+        )
+
+        return CustomerCredentials(
+            token_service_url=os.environ[_ENV_TOKEN_SERVICE_URL],
+            client_id=os.environ[_ENV_CLIENT_ID],
+            certificate=None,
+            private_key=None,
+            gateway_url=os.environ[_ENV_GATEWAY_URL].rstrip("/"),
+            integration_dependencies=integration_dependencies,
+        )
+
+    # Standard mode: file-based credentials
+    if not path:
+        raise AgentGatewaySDKError(
+            "Credentials file path is required in standard TLS mode."
+        )
+
     logger.debug("Loading customer credentials from: %s", path)
 
     try:
@@ -134,8 +192,6 @@ def load_customer_credentials(path: str) -> CustomerCredentials:
     except (OSError, json.JSONDecodeError) as e:
         raise AgentGatewaySDKError(f"Failed to load credentials from '{path}': {e}")
 
-    # Map credential file keys to dataclass fields
-    # Credential file uses camelCase, we use snake_case
     required_fields = {
         _CredentialFields.TOKEN_SERVICE_URL: "token_service_url",
         _CredentialFields.CLIENT_ID: "client_id",
@@ -144,13 +200,12 @@ def load_customer_credentials(path: str) -> CustomerCredentials:
         _CredentialFields.GATEWAY_URL: "gateway_url",
     }
 
-    missing = [k for k in required_fields if k not in data]
-    if missing:
+    missing_fields = [k for k in required_fields if k not in data]
+    if missing_fields:
         raise AgentGatewaySDKError(
-            f"Credentials file missing required fields: {missing}"
+            f"Credentials file missing required fields: {missing_fields}"
         )
 
-    # Parse integrationDependencies (required)
     if _CredentialFields.INTEGRATION_DEPENDENCIES not in data:
         raise AgentGatewaySDKError(
             "Credentials file missing required field: integrationDependencies. "
@@ -184,64 +239,6 @@ def load_customer_credentials(path: str) -> CustomerCredentials:
         private_key=data[_CredentialFields.PRIVATE_KEY],
         gateway_url=data[_CredentialFields.GATEWAY_URL].rstrip("/"),
         integration_dependencies=integration_deps,
-    )
-
-
-def load_customer_credentials_from_env() -> CustomerCredentials:
-    """Load customer credentials from environment variables (transparent mode).
-
-    Used when TlsMode.TRANSPARENT is active and the OpenShell Gateway handles
-    mTLS. Certificate and private key are not required — they are injected at
-    the TLS layer by the gateway.
-
-    Environment variables:
-        CLIENT_ID: IAS client ID (may be a gateway-resolved placeholder at runtime)
-        TOKEN_SERVICE_URL: IAS token service endpoint
-        GATEWAY_URL: Agent Gateway base URL
-        INTEGRATION_DEPENDENCIES: JSON array of {ordId, globalTenantId} objects
-
-    Returns:
-        CustomerCredentials with certificate and private_key set to None.
-
-    Raises:
-        AgentGatewaySDKError: If required environment variables are missing or
-            INTEGRATION_DEPENDENCIES cannot be parsed.
-    """
-    required = [_ENV_CLIENT_ID, _ENV_TOKEN_SERVICE_URL, _ENV_GATEWAY_URL]
-    missing = [v for v in required if not os.environ.get(v)]
-    if missing:
-        raise AgentGatewaySDKError(
-            f"TLS_MODE=transparent requires environment variables: {missing}"
-        )
-
-    raw_deps = os.environ.get(_ENV_INTEGRATION_DEPENDENCIES, "[]")
-    try:
-        deps_data = json.loads(raw_deps)
-        integration_dependencies = [
-            IntegrationDependency(
-                ord_id=dep[_CredentialFields.ORD_ID],
-                global_tenant_id=dep[_CredentialFields.GLOBAL_TENANT_ID],
-            )
-            for dep in deps_data
-        ]
-    except (json.JSONDecodeError, KeyError, TypeError) as e:
-        raise AgentGatewaySDKError(
-            f"Failed to parse INTEGRATION_DEPENDENCIES: {e}. "
-            'Expected format: [{"ordId": "...", "globalTenantId": "..."}]'
-        )
-
-    logger.debug(
-        "Loaded %d integration dependencies from environment",
-        len(integration_dependencies),
-    )
-
-    return CustomerCredentials(
-        token_service_url=os.environ[_ENV_TOKEN_SERVICE_URL],
-        client_id=os.environ[_ENV_CLIENT_ID],
-        certificate=None,
-        private_key=None,
-        gateway_url=os.environ[_ENV_GATEWAY_URL].rstrip("/"),
-        integration_dependencies=integration_dependencies,
     )
 
 

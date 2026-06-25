@@ -21,7 +21,6 @@ from sap_cloud_sdk.agentgateway._customer import (
     get_system_token_mtls,
     get_system_token_transparent,
     load_customer_credentials,
-    load_customer_credentials_from_env,
 )
 from sap_cloud_sdk.agentgateway._lob import (
     call_mcp_tool_lob,
@@ -40,12 +39,18 @@ logger = logging.getLogger(__name__)
 class AgentGatewayClient:
     """Client for discovering and invoking MCP tools via SAP Agent Gateway.
 
-    Automatically detects agent type (LoB vs Customer) based on the
-    presence of credential files.
+    Automatically detects agent type (LoB vs Customer) based on credential file
+    presence and the configured TLS mode.
 
-    - LoB agents: Requires tenant_subdomain, uses BTP Destination Service
-    - Customer agents: Uses file-based credentials with mTLS authentication.
-      MCP servers are read from integrationDependencies in the credentials file.
+    - LoB agents: Requires tenant_subdomain, uses BTP Destination Service.
+    - Customer agents (standard mode): Reads credentials from a file mounted on
+      the pod filesystem. The agent performs mTLS directly using the certificate
+      and private key from the credentials file.
+    - Customer agents (transparent mode): The OpenShell Gateway injects the mTLS
+      client certificate at the TLS layer. The agent reads only endpoint URLs from
+      environment variables and never loads certificate or private key material.
+      Activate with ``AGW_TLS_MODE=transparent`` or
+      ``ClientConfig(tls_mode=TlsMode.TRANSPARENT)``.
 
     Example (LoB agent):
         ```python
@@ -53,10 +58,7 @@ class AgentGatewayClient:
 
         agw_client = create_client(tenant_subdomain="my-tenant")
 
-        # Discover tools
         tools = await agw_client.list_mcp_tools()
-
-        # Invoke a tool
         result = await agw_client.call_mcp_tool(
             tool=tools[0],
             user_token="user-jwt",
@@ -64,16 +66,29 @@ class AgentGatewayClient:
         )
         ```
 
-    Example (Customer agent):
+    Example (Customer agent — standard mode):
         ```python
         from sap_cloud_sdk.agentgateway import create_client
 
         agw_client = create_client()
 
-        # Discover tools (reads all servers from credentials integrationDependencies)
         tools = await agw_client.list_mcp_tools()
+        result = await agw_client.call_mcp_tool(
+            tool=tools[0],
+            user_token="user-jwt",
+            cost_center="1000",
+        )
+        ```
 
-        # Invoke a tool
+    Example (Customer agent — transparent mode):
+        ```python
+        from sap_cloud_sdk.agentgateway import create_client
+        from sap_cloud_sdk.agentgateway.config import ClientConfig
+
+        # Reads AGW_TLS_MODE, CLIENT_ID, TOKEN_SERVICE_URL, GATEWAY_URL from env
+        agw_client = create_client(config=ClientConfig.from_env())
+
+        tools = await agw_client.list_mcp_tools()
         result = await agw_client.call_mcp_tool(
             tool=tools[0],
             user_token="user-jwt",
@@ -87,12 +102,10 @@ class AgentGatewayClient:
 
         agw_client = create_client(tenant_subdomain="my-tenant")
 
-        # Get system-scoped auth (token + gateway URL)
         auth = await agw_client.get_system_auth()
         print(auth.access_token)  # raw JWT
         print(auth.gateway_url)   # "https://agw.example.com"
 
-        # Get user-scoped auth (token exchange + gateway URL)
         auth = await agw_client.get_user_auth(user_token="user-jwt")
         print(auth.access_token)  # exchanged JWT with user identity
         print(auth.gateway_url)   # "https://agw.example.com"
@@ -113,7 +126,7 @@ class AgentGatewayClient:
             config: Client configuration. Uses defaults if not provided.
         """
         self._tenant_subdomain = tenant_subdomain
-        self._config = config or ClientConfig()
+        self._config = config or ClientConfig.from_env()
         self._token_cache = _TokenCache(self._config)
         self._gateway_url_cache = _GatewayUrlCache()
 
@@ -176,32 +189,24 @@ class AgentGatewayClient:
         """
         try:
             credentials_path = detect_customer_agent_credentials(self._config.tls_mode)
-            if credentials_path:
+            if credentials_path or self._config.tls_mode == TlsMode.TRANSPARENT:
                 logger.info(
-                    "Customer agent credentials detected at '%s'", credentials_path
+                    "Customer agent detected (path=%s, tls_mode=%s)",
+                    credentials_path,
+                    self._config.tls_mode.value,
                 )
-                credentials = load_customer_credentials(credentials_path)
+                credentials = load_customer_credentials(
+                    credentials_path, self._config.tls_mode
+                )
                 loop = asyncio.get_running_loop()
+                token_fn = (
+                    get_system_token_transparent
+                    if self._config.tls_mode == TlsMode.TRANSPARENT
+                    else get_system_token_mtls
+                )
                 token = await loop.run_in_executor(
                     None,
-                    get_system_token_mtls,
-                    credentials,
-                    self._config.timeout,
-                    app_tid,
-                    self._token_cache,
-                )
-                return AuthResult(
-                    access_token=token,
-                    gateway_url=credentials.gateway_url,
-                )
-
-            if self._config.tls_mode == TlsMode.TRANSPARENT:
-                logger.info("Customer agent transparent mode detected")
-                credentials = load_customer_credentials_from_env()
-                loop = asyncio.get_running_loop()
-                token = await loop.run_in_executor(
-                    None,
-                    get_system_token_transparent,
+                    token_fn,
                     credentials,
                     self._config.timeout,
                     app_tid,
@@ -270,33 +275,24 @@ class AgentGatewayClient:
             )
 
             credentials_path = detect_customer_agent_credentials(self._config.tls_mode)
-            if credentials_path:
+            if credentials_path or self._config.tls_mode == TlsMode.TRANSPARENT:
                 logger.info(
-                    "Customer agent credentials detected at '%s'", credentials_path
+                    "Customer agent detected (path=%s, tls_mode=%s)",
+                    credentials_path,
+                    self._config.tls_mode.value,
                 )
-                credentials = load_customer_credentials(credentials_path)
+                credentials = load_customer_credentials(
+                    credentials_path, self._config.tls_mode
+                )
                 loop = asyncio.get_running_loop()
+                token_fn = (
+                    exchange_user_token_transparent
+                    if self._config.tls_mode == TlsMode.TRANSPARENT
+                    else exchange_user_token
+                )
                 token = await loop.run_in_executor(
                     None,
-                    exchange_user_token,
-                    credentials,
-                    resolved_user_token,
-                    self._config.timeout,
-                    app_tid,
-                    self._token_cache,
-                )
-                return AuthResult(
-                    access_token=token,
-                    gateway_url=credentials.gateway_url,
-                )
-
-            if self._config.tls_mode == TlsMode.TRANSPARENT:
-                logger.info("Customer agent transparent mode detected")
-                credentials = load_customer_credentials_from_env()
-                loop = asyncio.get_running_loop()
-                token = await loop.run_in_executor(
-                    None,
-                    exchange_user_token_transparent,
+                    token_fn,
                     credentials,
                     resolved_user_token,
                     self._config.timeout,
@@ -372,22 +368,15 @@ class AgentGatewayClient:
         try:
             # Check for customer agent credentials
             credentials_path = detect_customer_agent_credentials(self._config.tls_mode)
-            if credentials_path:
+            if credentials_path or self._config.tls_mode == TlsMode.TRANSPARENT:
                 logger.info(
-                    "Customer agent credentials detected at '%s'", credentials_path
+                    "Customer agent detected (path=%s, tls_mode=%s)",
+                    credentials_path,
+                    self._config.tls_mode.value,
                 )
-                credentials = load_customer_credentials(credentials_path)
-                if user_token:
-                    auth = await self.get_user_auth(user_token, app_tid)
-                else:
-                    auth = await self.get_system_auth(app_tid=app_tid)
-                return await get_mcp_tools_customer(
-                    credentials, auth.access_token, self._config.timeout
+                credentials = load_customer_credentials(
+                    credentials_path, self._config.tls_mode
                 )
-
-            if self._config.tls_mode == TlsMode.TRANSPARENT:
-                logger.info("Customer agent transparent mode detected")
-                credentials = load_customer_credentials_from_env()
                 if user_token:
                     auth = await self.get_user_auth(user_token, app_tid)
                 else:
@@ -470,33 +459,18 @@ class AgentGatewayClient:
         try:
             # Check for customer agent credentials
             credentials_path = detect_customer_agent_credentials(self._config.tls_mode)
-            if credentials_path:
+            if credentials_path or self._config.tls_mode == TlsMode.TRANSPARENT:
                 logger.info(
-                    "Customer agent credentials detected at '%s'", credentials_path
+                    "Customer agent detected (path=%s, tls_mode=%s)",
+                    credentials_path,
+                    self._config.tls_mode.value,
                 )
-
-                # Resolve user_token if provided (optional for customer flow)
                 if user_token:
                     auth = await self.get_user_auth(user_token, app_tid)
                 else:
                     # TODO: IBD workaround - use system token when user_token
                     # is not available. This bypasses principal propagation.
                     # Remove this fallback once IBD supports proper user token flow.
-                    logger.warning(
-                        "No user_token provided - using system token for tool "
-                        "invocation. Principal propagation will NOT work."
-                    )
-                    auth = await self.get_system_auth(app_tid)
-
-                return await call_mcp_tool_customer(
-                    tool, auth.access_token, self._config.timeout, **kwargs
-                )
-
-            if self._config.tls_mode == TlsMode.TRANSPARENT:
-                logger.info("Customer agent transparent mode detected")
-                if user_token:
-                    auth = await self.get_user_auth(user_token, app_tid)
-                else:
                     logger.warning(
                         "No user_token provided - using system token for tool "
                         "invocation. Principal propagation will NOT work."
@@ -540,14 +514,16 @@ def create_client(
 ) -> AgentGatewayClient:
     """Create an Agent Gateway client for discovering and invoking MCP tools.
 
-    Automatically detects agent type (LoB vs Customer) based on
-    credential file presence.
+    Automatically detects agent type (LoB vs Customer) based on credential file
+    presence and the configured TLS mode.
 
     Args:
         tenant_subdomain: Tenant subdomain for multi-tenant lookup.
             Can be a string or a callable returning a string.
             Required for LoB agents, ignored for Customer agents.
         config: Client configuration. Uses defaults if not provided.
+            Pass ``ClientConfig.from_env()`` to read ``AGW_TLS_MODE`` from the
+            environment for transparent mode customer agents.
 
     Returns:
         AgentGatewayClient instance.
@@ -558,47 +534,41 @@ def create_client(
 
         agw_client = create_client(tenant_subdomain="my-tenant")
 
-        # Discover tools
         tools = await agw_client.list_mcp_tools()
-
-        # Invoke a tool
-        # Note: kwargs are tool-specific input parameters.
-        # Check tool.input_schema for expected parameters.
         result = await agw_client.call_mcp_tool(
             tool=tools[0],
             user_token="user-jwt",
-            order_id="12345",  # example tool-specific parameter
+            order_id="12345",
         )
         ```
 
-    Example (Customer agent):
+    Example (Customer agent — standard mode):
         ```python
         from sap_cloud_sdk.agentgateway import create_client
 
         agw_client = create_client()
 
-        # Discover tools (reads all servers from credentials integrationDependencies)
         tools = await agw_client.list_mcp_tools()
-
-        # Invoke a tool
-        # Note: kwargs are tool-specific input parameters.
-        # Check tool.input_schema for expected parameters.
         result = await agw_client.call_mcp_tool(
             tool=tools[0],
             user_token="user-jwt",
-            cost_center="1000",  # example tool-specific parameter
+            cost_center="1000",
         )
         ```
 
-    Example (auth fetching):
+    Example (Customer agent — transparent mode):
         ```python
         from sap_cloud_sdk.agentgateway import create_client
+        from sap_cloud_sdk.agentgateway.config import ClientConfig
 
-        agw_client = create_client(tenant_subdomain="my-tenant")
+        agw_client = create_client(config=ClientConfig.from_env())
 
-        # Get auth for external use
-        auth = await agw_client.get_system_auth()
-        user_auth = await agw_client.get_user_auth(user_token="user-jwt")
+        tools = await agw_client.list_mcp_tools()
+        result = await agw_client.call_mcp_tool(
+            tool=tools[0],
+            user_token="user-jwt",
+            cost_center="1000",
+        )
         ```
     """
     return AgentGatewayClient(tenant_subdomain=tenant_subdomain, config=config)

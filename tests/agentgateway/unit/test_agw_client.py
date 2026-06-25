@@ -11,6 +11,7 @@ from sap_cloud_sdk.agentgateway import (
     MCPTool,
     AgentGatewaySDKError,
 )
+from sap_cloud_sdk.agentgateway.config import TlsMode
 
 
 # ============================================================
@@ -165,7 +166,7 @@ class TestGetSystemAuth:
             assert isinstance(result, AuthResult)
             assert result.access_token == "customer-system-token"
             assert result.gateway_url == "https://agw.customer.com"
-            mock_load.assert_called_once_with("/path/to/credentials")
+            mock_load.assert_called_once_with("/path/to/credentials", TlsMode.STANDARD)
             mock_mtls.assert_called_once_with(
                 mock_creds, 60.0, "test-tid", token_cache
             )
@@ -733,7 +734,7 @@ class TestCallMcpTool:
 
             assert result == "customer result"
             # load_customer_credentials is called once in get_user_auth()
-            mock_load.assert_called_once_with("/path/to/credentials")
+            mock_load.assert_called_once_with("/path/to/credentials", TlsMode.STANDARD)
             mock_customer.assert_called_once_with(
                 mock_tool, "exchanged-token", 60.0
             )

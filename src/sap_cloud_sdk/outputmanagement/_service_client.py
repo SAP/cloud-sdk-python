@@ -175,7 +175,7 @@ class OutputManagementServiceClient:
 
         if not cert_name:
             logger.error(
-                "✗ No certificate name in destination properties (tokenService.certificate)"
+                "No certificate name in destination properties (tokenService.certificate)"
             )
             return None
 

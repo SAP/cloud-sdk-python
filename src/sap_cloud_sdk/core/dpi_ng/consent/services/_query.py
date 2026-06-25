@@ -6,7 +6,18 @@ from typing import Any
 
 
 def _apply_query(q: Any, params: dict[str, Any]) -> Any:
-    """Apply OData query options (filter, top, skip, orderby) to a Query builder."""
+    """Apply supported OData query options to a Query builder and return it.
+
+    Supported keys: ``filter``, ``top``, ``skip``, ``orderby``.
+    Unknown keys are silently ignored.
+
+    Args:
+        q: A python-odata ``Query`` instance to apply options to.
+        params: Mapping of OData option names to their values.
+
+    Returns:
+        The Query instance with all supported options applied.
+    """
     if "filter" in params:
         q = q.raw({"$filter": params["filter"]})
     if "top" in params:

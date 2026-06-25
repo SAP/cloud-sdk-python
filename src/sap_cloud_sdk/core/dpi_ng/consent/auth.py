@@ -38,7 +38,14 @@ class BearerTokenAuth(AuthProvider):
     """Static bearer token - use when the caller manages token lifecycle externally."""
 
     def __init__(self, token: str) -> None:
-        """Store the bearer token, raising ValueError if empty."""
+        """Store the bearer token.
+
+        Args:
+            token: A valid bearer token string (e.g. an already-fetched XSUAA access token).
+
+        Raises:
+            ValueError: If *token* is an empty string.
+        """
         logger.info("Invoked BearerTokenAuth.__init__")
         if not token:
             logger.error("token is empty")
@@ -47,7 +54,11 @@ class BearerTokenAuth(AuthProvider):
         logger.info("Exiting BearerTokenAuth.__init__")
 
     def apply(self, session: requests.Session) -> None:
-        """Inject the static bearer token into the session Authorization header."""
+        """Set the ``Authorization: Bearer <token>`` header on the session.
+
+        Args:
+            session: The ``requests.Session`` to configure.
+        """
         logger.info("Invoked BearerTokenAuth.apply")
         session.headers["Authorization"] = f"Bearer {self._token}"
         logger.info("Exiting BearerTokenAuth.apply")
@@ -61,7 +72,17 @@ class ClientCredentialsAuth(AuthProvider):
     """
 
     def __init__(self, token_url: str, client_id: str, client_secret: str) -> None:
-        """Store OAuth2 credentials, raising ValueError if any field is empty."""
+        """Store OAuth2 credentials for lazy token fetching.
+
+        Args:
+            token_url: Full URL of the OAuth2 token endpoint
+                (e.g. ``https://<subdomain>.authentication.eu10.hana.ondemand.com/oauth/token``).
+            client_id: OAuth2 client identifier.
+            client_secret: OAuth2 client secret.
+
+        Raises:
+            ValueError: If any of *token_url*, *client_id*, or *client_secret* is empty.
+        """
         logger.info("Invoked ClientCredentialsAuth.__init__")
         if not token_url or not client_id or not client_secret:
             logger.error("token_url, client_id, or client_secret is empty")
@@ -72,7 +93,14 @@ class ClientCredentialsAuth(AuthProvider):
         logger.info("Exiting ClientCredentialsAuth.__init__")
 
     def apply(self, session: requests.Session) -> None:
-        """Attach the OAuth2 flow handler to the session so tokens are fetched on demand."""
+        """Attach the OAuth2 flow handler to the session.
+
+        Tokens are fetched on the first request and refreshed automatically
+        60 seconds before expiry.
+
+        Args:
+            session: The ``requests.Session`` to configure.
+        """
         logger.info("Invoked ClientCredentialsAuth.apply")
         session.auth = _OAuth2Flow(
             self._token_url, self._client_id, self._client_secret
@@ -96,7 +124,17 @@ class ClientCertificateAuth(AuthProvider):
         key_file: str,
         ca_file: str | None = None,
     ) -> None:
-        """Store mTLS paths, raising ValueError if cert_file or key_file is empty."""
+        """Store mTLS file paths.
+
+        Args:
+            cert_file: Path to the PEM-encoded client certificate file.
+            key_file: Path to the PEM-encoded client private key file.
+            ca_file: Path to a PEM-encoded CA certificate file for server
+                verification. When omitted the system CA bundle is used.
+
+        Raises:
+            ValueError: If *cert_file* or *key_file* is empty.
+        """
         logger.info("Invoked ClientCertificateAuth.__init__")
         if not cert_file or not key_file:
             logger.error("cert_file or key_file is empty")
@@ -107,7 +145,11 @@ class ClientCertificateAuth(AuthProvider):
         logger.info("Exiting ClientCertificateAuth.__init__")
 
     def apply(self, session: requests.Session) -> None:
-        """Configure the session with the client cert/key pair and optional CA bundle."""
+        """Configure the session with the client cert/key pair and optional CA bundle.
+
+        Args:
+            session: The ``requests.Session`` to configure.
+        """
         logger.info("Invoked ClientCertificateAuth.apply")
         session.cert = (self._cert_file, self._key_file)
         if self._ca_file:

@@ -21,7 +21,7 @@ class ConsentSDKConfig:
               ClientCertificateAuth, or a custom AuthProvider subclass.
         timeout: HTTP request timeout in seconds (default 30).
         verify_ssl: Verify TLS certificates - set False only in local dev.
-                    Ignored when ClientCertificateAuth provides its own ca_file.
+                    Overridden by ``ClientCertificateAuth`` when a custom ``ca_file`` is provided.
         service_path: OData service base path prefix - do not override unless
                       deploying to a non-standard environment.
     """
@@ -33,7 +33,12 @@ class ConsentSDKConfig:
     service_path: str = "/sap/cp/kernel/dpi/consent/odata/v4"
 
     def __post_init__(self) -> None:
-        """Validate base_url format and auth type after dataclass construction."""
+        """Validate *base_url* format and *auth* type after dataclass construction.
+
+        Raises:
+            ValueError: If *base_url* is not a valid HTTP(S) URL, or if *auth* is
+                not an ``AuthProvider`` instance.
+        """
         logger.info("Invoked ConsentSDKConfig.__post_init__")
         if not _URL_PATTERN.match(self.base_url):
             logger.error("Invalid base_url — value=%r", self.base_url)

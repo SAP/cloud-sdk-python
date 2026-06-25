@@ -91,7 +91,17 @@ class _ODataClient:
         return self._services[service_name]
 
     def get_entity_classes(self, service_name: str) -> tuple:
-        """Return the tuple of entity classes bound to the given service endpoint."""
+        """Return the tuple of entity classes bound to the given service endpoint.
+
+        Classes are created once and cached; subsequent calls return the same objects.
+
+        Args:
+            service_name: OData service identifier (e.g. ``"consentServices"``).
+
+        Returns:
+            Tuple of python-odata entity classes in the order defined by the
+            service's ``_make_entities`` factory.
+        """
         logger.info("Invoked ODataClient.get_entity_classes")
         if service_name not in self._entity_classes:
             svc = self._get_service(service_name)
@@ -106,7 +116,16 @@ class _ODataClient:
     # ------------------------------------------------------------------
 
     def query(self, service_name: str, entity_cls: type) -> Query:
-        """Return a Query builder for the given entity class."""
+        """Return a Query builder for the given entity class.
+
+        Args:
+            service_name: OData service identifier (e.g. ``"consentServices"``).
+            entity_cls: The python-odata entity class to query.
+
+        Returns:
+            A python-odata ``Query`` instance that can be further filtered,
+            paged, or executed with ``.all()`` / ``.get()``.
+        """
         logger.info("Invoked ODataClient.query")
         svc = self._get_service(service_name)
         result = svc.query(entity_cls)
@@ -114,13 +133,21 @@ class _ODataClient:
         return result
 
     def save(self, entity: Any) -> None:
-        """POST (new entity) or PATCH (existing entity, dirty fields only)."""
+        """Persist an entity: POST if new, PATCH dirty fields if already saved.
+
+        Args:
+            entity: A python-odata entity instance to create or update.
+        """
         logger.info("Invoked ODataClient.save")
         entity.__odata_service__.save(entity)
         logger.info("Exiting ODataClient.save")
 
     def delete_entity(self, entity: Any) -> None:
-        """DELETE the entity from the service."""
+        """Send a DELETE request for the given entity.
+
+        Args:
+            entity: A python-odata entity instance to delete.
+        """
         logger.info("Invoked ODataClient.delete_entity")
         entity.__odata_service__.delete(entity)
         logger.info("Exiting ODataClient.delete_entity")
@@ -136,7 +163,26 @@ class _ODataClient:
         body: dict[str, Any] | None = None,
         params: dict[str, Any] | None = None,
     ) -> dict[str, Any] | None:
-        """POST an OData action and return the parsed response body, or None for 204."""
+        """POST an OData action and return the parsed response body.
+
+        Args:
+            service: OData service identifier (e.g. ``"consentServices"``).
+            path: Action name relative to the service root URL
+                (e.g. ``"createConsentFromTemplate"``).
+            body: JSON-serialisable request payload. Defaults to ``{}`` when omitted.
+            params: Optional URL query parameters to append to the request.
+
+        Returns:
+            Parsed JSON response body as a dict, or ``None`` for HTTP 204 No Content.
+
+        Raises:
+            AuthenticationError: On HTTP 401.
+            AuthorizationError: On HTTP 403.
+            NotFoundError: On HTTP 404.
+            ConflictError: On HTTP 409.
+            ValidationError: On HTTP 400 or 422.
+            ODataError: On any other 4xx or 5xx response.
+        """
         logger.info("Invoked ODataClient.call_action")
         svc = self._get_service(service)
         url = f"{svc.url}{path}"
@@ -176,7 +222,19 @@ class _ODataClient:
 
     @staticmethod
     def _raise_for_status(resp: requests.Response) -> None:
-        """Translate 4xx/5xx HTTP responses into typed ConsentSDK exceptions."""
+        """Translate 4xx/5xx HTTP responses into typed ``ConsentSDKError`` subclasses.
+
+        Args:
+            resp: The ``requests.Response`` to inspect.
+
+        Raises:
+            AuthenticationError: On HTTP 401.
+            AuthorizationError: On HTTP 403.
+            NotFoundError: On HTTP 404.
+            ConflictError: On HTTP 409.
+            ValidationError: On HTTP 400 or 422.
+            ODataError: On any other 4xx or 5xx response.
+        """
         status_code: int = resp.status_code  # ty: ignore[invalid-assignment]
         if status_code < 400:
             return

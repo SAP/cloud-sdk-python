@@ -40,7 +40,18 @@ class ConsentService:
 
     @record_metrics(Module.DPI_NG, Operation.DPI_NG_CONSENT_LIST_CONSENTS)
     def list_consents(self, **query: Any) -> list[Any]:
-        """Return all consents, optionally filtered/paged via OData query kwargs."""
+        """Return all consent records, optionally filtered and paged via OData query kwargs.
+
+        Args:
+            **query: OData query options forwarded to the service (e.g. ``filter``,
+                ``top``, ``skip``, ``orderby``).
+
+        Returns:
+            list of Consent objects matching the query.
+
+        Raises:
+            ODataError: If the OData service returns an unexpected error response.
+        """
         logger.info("Invoked ConsentService.list_consents")
         result = _apply_query(self._client.query(_SVC, self.Consent), query).all()
         logger.info("Exiting ConsentService.list_consents")
@@ -48,7 +59,18 @@ class ConsentService:
 
     @record_metrics(Module.DPI_NG, Operation.DPI_NG_CONSENT_GET_CONSENT)
     def get_consent(self, consent_id: str) -> Any:
-        """Return a single Consent entity by its UUID."""
+        """Return a single Consent entity by its UUID.
+
+        Args:
+            consent_id: UUID of the Consent to retrieve.
+
+        Returns:
+            The matching Consent object.
+
+        Raises:
+            NotFoundError: If no Consent with the given ID exists.
+            ODataError: If the OData service returns an unexpected error response.
+        """
         logger.info("Invoked ConsentService.get_consent")
         result = self._client.query(_SVC, self.Consent).get(consent_id)
         logger.info("Exiting ConsentService.get_consent")
@@ -56,7 +78,15 @@ class ConsentService:
 
     @record_metrics(Module.DPI_NG, Operation.DPI_NG_CONSENT_DELETE_CONSENT)
     def delete_consent(self, consent_id: str) -> None:
-        """Delete a Consent entity by its UUID."""
+        """Delete a Consent entity by its UUID.
+
+        Args:
+            consent_id: UUID of the Consent to delete.
+
+        Raises:
+            NotFoundError: If no Consent with the given ID exists.
+            ODataError: If the OData service returns an unexpected error response.
+        """
         logger.info("Invoked ConsentService.delete_consent")
         entity = self._client.query(_SVC, self.Consent).get(consent_id)
         self._client.delete_entity(entity)
@@ -68,7 +98,19 @@ class ConsentService:
         Module.DPI_NG, Operation.DPI_NG_CONSENT_CREATE_CONSENT_FROM_TEMPLATE
     )
     def create_consent_from_template(self, request: CreateConsentRequest) -> list[Any]:
-        """Invoke createConsentFromTemplate and return the resulting Consent entities."""
+        """Invoke the createConsentFromTemplate OData action and return the resulting Consent entities.
+
+        Args:
+            request: Populated ``CreateConsentRequest`` with the template name and data subject details.
+
+        Returns:
+            list of Consent objects created by the action. Returns an empty list if the
+            service returns no entities.
+
+        Raises:
+            ValidationError: If the request fields fail server-side validation.
+            ODataError: If the OData service returns an unexpected error response.
+        """
         logger.info("Invoked ConsentService.create_consent_from_template")
         result = self._client.call_action(
             _SVC, "createConsentFromTemplate", request.to_dict()
@@ -89,7 +131,18 @@ class ConsentService:
     def withdraw_consent(
         self, request: WithdrawConsentRequest
     ) -> dict[str, Any] | None:
-        """Invoke withdrawConsent and return the raw action response."""
+        """Invoke the withdrawConsent OData action and return the raw action response.
+
+        Args:
+            request: Populated ``WithdrawConsentRequest`` identifying the consent to withdraw.
+
+        Returns:
+            Raw response dict from the OData action, or ``None`` if the service returns no body.
+
+        Raises:
+            NotFoundError: If the referenced Consent does not exist.
+            ODataError: If the OData service returns an unexpected error response.
+        """
         logger.info("Invoked ConsentService.withdraw_consent")
         result = self._client.call_action(_SVC, "withdrawConsent", request.to_dict())
         logger.info("Exiting ConsentService.withdraw_consent")
@@ -99,7 +152,18 @@ class ConsentService:
     def terminate_consent(
         self, request: WithdrawConsentRequest
     ) -> dict[str, Any] | None:
-        """Invoke terminateConsent and return the raw action response."""
+        """Invoke the terminateConsent OData action and return the raw action response.
+
+        Args:
+            request: Populated ``WithdrawConsentRequest`` identifying the consent to terminate.
+
+        Returns:
+            Raw response dict from the OData action, or ``None`` if the service returns no body.
+
+        Raises:
+            NotFoundError: If the referenced Consent does not exist.
+            ODataError: If the OData service returns an unexpected error response.
+        """
         logger.info("Invoked ConsentService.terminate_consent")
         result = self._client.call_action(_SVC, "terminateConsent", request.to_dict())
         logger.info("Exiting ConsentService.terminate_consent")
@@ -109,7 +173,18 @@ class ConsentService:
     def check_consent_exists(
         self, data_subject_id: str, template_id: str
     ) -> CheckConsentExistsResult:
-        """Check whether a consent record exists for the given data subject and template."""
+        """Check whether an active consent record exists for the given data subject and template.
+
+        Args:
+            data_subject_id: ID of the data subject to check.
+            template_id: UUID of the ConsentTemplate to check against.
+
+        Returns:
+            ``CheckConsentExistsResult`` indicating whether a matching consent was found.
+
+        Raises:
+            ODataError: If the OData service returns an unexpected error response.
+        """
         logger.info("Invoked ConsentService.check_consent_exists")
         result = self._client.call_action(
             _SVC,

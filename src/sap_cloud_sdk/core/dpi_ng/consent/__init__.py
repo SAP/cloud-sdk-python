@@ -66,7 +66,12 @@ class ConsentClient:
         *,
         _telemetry_source: Module | None = None,
     ) -> None:
-        """Initialise all service clients from the given config."""
+        """Initialise all service clients from the given config.
+
+        Args:
+            config: Validated ``ConsentSDKConfig`` containing the base URL and auth strategy.
+            _telemetry_source: Internal parameter; not for end-user use.
+        """
         from .client import _ODataClient
 
         self._telemetry_source = _telemetry_source
@@ -110,17 +115,29 @@ def create_client(
     verify_ssl: bool = True,
     _telemetry_source: Module | None = None,
 ) -> ConsentClient:
-    """Instantiate a ConsentClient from a config object or individual keyword arguments.
+    """Create a ConsentClient with explicit configuration or individual keyword arguments.
 
     Args:
-        config: Pre-built ConsentSDKConfig. When provided, all other kwargs are ignored.
+        config: Pre-built ``ConsentSDKConfig``. When provided, all other kwargs
+            are ignored.
         base_url: Host-only root URL of the consent service (no path).
-        auth: Authentication strategy (BearerTokenAuth, ClientCredentialsAuth, etc.).
-        timeout: HTTP request timeout in seconds.
-        verify_ssl: Verify TLS certificates.
+            Required when *config* is not provided.
+        auth: Authentication strategy (``BearerTokenAuth``,
+            ``ClientCredentialsAuth``, ``ClientCertificateAuth``, etc.).
+            Required when *config* is not provided.
+        timeout: HTTP request timeout in seconds. Defaults to ``30.0``.
+        verify_ssl: Whether to verify TLS certificates. Defaults to ``True``.
+        _telemetry_source: Internal parameter; not for end-user use.
+
+    Returns:
+        ConsentClient ready for consent management calls.
 
     Raises:
-        ClientCreationError: If required fields are missing or invalid.
+        ClientCreationError: If required fields are missing or client creation fails.
+
+    Note:
+        Telemetry for client creation records only module/operation metadata and
+        never includes configuration values or processed user content.
     """
     try:
         if config is None:

@@ -9,7 +9,10 @@ from sap_cloud_sdk.core.dpi_ng.consent.dtos.consent import (
 
 @pytest.fixture
 def svc(mock_consent_client):
-    from sap_cloud_sdk.core.dpi_ng.consent.services.consent_service import ConsentService
+    from sap_cloud_sdk.core.dpi_ng.consent.services.consent_service import (
+        ConsentService,
+    )
+
     return ConsentService(mock_consent_client)
 
 
@@ -41,7 +44,9 @@ _MODULE = "sap_cloud_sdk.core.dpi_ng.consent.services.consent_service"
 
 class TestCreateConsentFromTemplate:
     def test_create_consent_from_template_returns_list(self, svc, mock_consent_client):
-        mock_consent_client.call_action.return_value = {"value": [{"consent_id": "c-1"}]}
+        mock_consent_client.call_action.return_value = {
+            "value": [{"consent_id": "c-1"}]
+        }
         req = CreateConsentRequest(
             data_subject_id="ds-1",
             template_name="tmpl",
@@ -114,11 +119,13 @@ class TestWithdrawAndTerminate:
 class TestCheckConsentExists:
     def test_check_consent_exists(self, svc, mock_consent_client):
         mock_consent_client.call_action.return_value = {
-            "consentId": "c-1", "consentExists": True
+            "consentId": "c-1",
+            "consentExists": True,
         }
         result = svc.check_consent_exists("ds-1", "tmpl-1")
         mock_consent_client.call_action.assert_called_once_with(
-            "consentServices", "checkConsentExists",
+            "consentServices",
+            "checkConsentExists",
             {"dataSubjectId": "ds-1", "templateId": "tmpl-1"},
         )
         assert isinstance(result, CheckConsentExistsResult)
@@ -145,7 +152,10 @@ class TestQueryKwargs:
 
 class TestDictToEntity:
     def test_wraps_data_as_persisted_entity(self):
-        from sap_cloud_sdk.core.dpi_ng.consent.services.consent_service import _dict_to_entity
+        from sap_cloud_sdk.core.dpi_ng.consent.services.consent_service import (
+            _dict_to_entity,
+        )
+
         entity_cls = MagicMock()
         entity = entity_cls.return_value
         entity.__odata__ = MagicMock()

@@ -533,7 +533,9 @@ class ConsentConfigurationService:
         logger.info("Exiting ConsentConfigurationService.get_outbound_channel_type")
         return result
 
-    @record_metrics(Module.DPI_NG, Operation.DPI_NG_CONSENT_CREATE_OUTBOUND_CHANNEL_TYPE)
+    @record_metrics(
+        Module.DPI_NG, Operation.DPI_NG_CONSENT_CREATE_OUTBOUND_CHANNEL_TYPE
+    )
     def create_outbound_channel_type(self, body: dict[str, Any]) -> Any:
         """Create a new OutboundChannelType entity and return it."""
         logger.info("Invoked ConsentConfigurationService.create_outbound_channel_type")
@@ -544,7 +546,9 @@ class ConsentConfigurationService:
         logger.info("Exiting ConsentConfigurationService.create_outbound_channel_type")
         return entity
 
-    @record_metrics(Module.DPI_NG, Operation.DPI_NG_CONSENT_UPDATE_OUTBOUND_CHANNEL_TYPE)
+    @record_metrics(
+        Module.DPI_NG, Operation.DPI_NG_CONSENT_UPDATE_OUTBOUND_CHANNEL_TYPE
+    )
     def update_outbound_channel_type(
         self, outbound_channel_type_id: str, body: dict[str, Any]
     ) -> Any:
@@ -559,7 +563,9 @@ class ConsentConfigurationService:
         logger.info("Exiting ConsentConfigurationService.update_outbound_channel_type")
         return entity
 
-    @record_metrics(Module.DPI_NG, Operation.DPI_NG_CONSENT_DELETE_OUTBOUND_CHANNEL_TYPE)
+    @record_metrics(
+        Module.DPI_NG, Operation.DPI_NG_CONSENT_DELETE_OUTBOUND_CHANNEL_TYPE
+    )
     def delete_outbound_channel_type(self, outbound_channel_type_id: str) -> None:
         """Delete an OutboundChannelType entity by its UUID."""
         logger.info("Invoked ConsentConfigurationService.delete_outbound_channel_type")

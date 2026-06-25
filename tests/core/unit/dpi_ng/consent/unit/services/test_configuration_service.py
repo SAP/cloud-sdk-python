@@ -235,5 +235,3 @@ class TestLanguageDescription:
     def test_delete_fetches_by_code(self, svc):
         svc.delete_language_description("ES")
         svc._client.query.return_value.get.assert_called_with("ES")
-
-

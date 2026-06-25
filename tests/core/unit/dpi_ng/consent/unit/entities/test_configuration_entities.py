@@ -5,7 +5,10 @@ from __future__ import annotations
 import pytest
 from odata.property import BooleanProperty
 
-from tests.core.unit.dpi_ng.consent.unit.entities.conftest import CONFIGURATION_ENTITY_SPECS, entity_by_name
+from tests.core.unit.dpi_ng.consent.unit.entities.conftest import (
+    CONFIGURATION_ENTITY_SPECS,
+    entity_by_name,
+)
 
 
 def test_make_entities_returns_all_classes(config_entities):

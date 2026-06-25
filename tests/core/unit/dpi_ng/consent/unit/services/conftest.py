@@ -26,28 +26,33 @@ def _make_mock_client(entities_module):
 @pytest.fixture
 def mock_consent_client():
     from sap_cloud_sdk.core.dpi_ng.consent.entities import consent as m
+
     return _make_mock_client(m)
 
 
 @pytest.fixture
 def mock_config_client():
     from sap_cloud_sdk.core.dpi_ng.consent.entities import consent_configuration as m
+
     return _make_mock_client(m)
 
 
 @pytest.fixture
 def mock_purpose_client():
     from sap_cloud_sdk.core.dpi_ng.consent.entities import consent_purpose as m
+
     return _make_mock_client(m)
 
 
 @pytest.fixture
 def mock_retention_client():
     from sap_cloud_sdk.core.dpi_ng.consent.entities import consent_retention as m
+
     return _make_mock_client(m)
 
 
 @pytest.fixture
 def mock_template_client():
     from sap_cloud_sdk.core.dpi_ng.consent.entities import consent_template as m
+
     return _make_mock_client(m)

@@ -9,7 +9,10 @@ _SVC = "consentPurposeExternalServices"
 
 @pytest.fixture
 def svc(mock_purpose_client):
-    from sap_cloud_sdk.core.dpi_ng.consent.services.consent_purpose_service import ConsentPurposeService
+    from sap_cloud_sdk.core.dpi_ng.consent.services.consent_purpose_service import (
+        ConsentPurposeService,
+    )
+
     return ConsentPurposeService(mock_purpose_client)
 
 
@@ -116,7 +119,12 @@ class TestGetPurposeText:
 
 class TestCreatePurposeText:
     def test_create_purpose_text(self, svc, client):
-        body = {"purpose_id": "pid", "type_code": "tc", "language_code": "EN", "text": "hello"}
+        body = {
+            "purpose_id": "pid",
+            "type_code": "tc",
+            "language_code": "EN",
+            "text": "hello",
+        }
         svc.create_purpose_text(body)
         client.save.assert_called_once()
 
@@ -134,5 +142,3 @@ class TestDeletePurposeText:
         svc.delete_purpose_text("pid", "tc", "EN")
         q.get.assert_called_with(purposeId="pid", typeCode="tc", languageCode="EN")
         client.delete_entity.assert_called_once_with(q.get.return_value)
-
-

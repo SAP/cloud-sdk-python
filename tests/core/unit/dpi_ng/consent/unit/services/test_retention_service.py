@@ -9,7 +9,10 @@ _SVC = "consentRetentionExternalServices"
 
 @pytest.fixture
 def svc(mock_retention_client):
-    from sap_cloud_sdk.core.dpi_ng.consent.services.consent_retention_service import ConsentRetentionService
+    from sap_cloud_sdk.core.dpi_ng.consent.services.consent_retention_service import (
+        ConsentRetentionService,
+    )
+
     return ConsentRetentionService(mock_retention_client)
 
 

@@ -5,7 +5,10 @@ from __future__ import annotations
 import pytest
 from odata.property import IntegerProperty
 
-from tests.core.unit.dpi_ng.consent.unit.entities.conftest import RETENTION_ENTITY_SPECS, entity_by_name
+from tests.core.unit.dpi_ng.consent.unit.entities.conftest import (
+    RETENTION_ENTITY_SPECS,
+    entity_by_name,
+)
 
 
 def test_make_entities_returns_all_classes(retention_entities):

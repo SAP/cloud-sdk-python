@@ -41,15 +41,21 @@ class TestBearerTokenAuth:
 
 class TestClientCredentialsAuth:
     def test_empty_token_url_raises(self):
-        with pytest.raises(ValueError, match="token_url, client_id, and client_secret are all required"):
+        with pytest.raises(
+            ValueError, match="token_url, client_id, and client_secret are all required"
+        ):
             ClientCredentialsAuth("", "cid", "secret")
 
     def test_empty_client_id_raises(self):
-        with pytest.raises(ValueError, match="token_url, client_id, and client_secret are all required"):
+        with pytest.raises(
+            ValueError, match="token_url, client_id, and client_secret are all required"
+        ):
             ClientCredentialsAuth("https://token.url", "", "secret")
 
     def test_empty_client_secret_raises(self):
-        with pytest.raises(ValueError, match="token_url, client_id, and client_secret are all required"):
+        with pytest.raises(
+            ValueError, match="token_url, client_id, and client_secret are all required"
+        ):
             ClientCredentialsAuth("https://token.url", "cid", "")
 
     def test_apply_sets_session_auth_to_oauth2_flow(self):
@@ -109,7 +115,7 @@ class TestOAuth2Flow:
             return_value=_mock_post_response("my-access-token"),
         ):
             result = flow(req)
-        assert result.headers["Authorization"] == "Bearer my-access-token"
+        assert result.headers["Authorization"] == "Bearer my-access-token"  # ty: ignore[not-subscriptable]
 
     def test_second_call_reuses_cached_token(self):
         flow = _OAuth2Flow("https://token.url", "cid", "secret")

@@ -111,7 +111,7 @@ class ClientCertificateAuth(AuthProvider):
         logger.info("Invoked ClientCertificateAuth.apply")
         session.cert = (self._cert_file, self._key_file)
         if self._ca_file:
-            session.verify = self._ca_file
+            session.verify = self._ca_file  # ty: ignore[invalid-assignment]
             logger.debug("Custom CA bundle applied — ca_file=%s", self._ca_file)
         logger.info("Exiting ClientCertificateAuth.apply")
 
@@ -140,7 +140,7 @@ class _OAuth2Flow(requests.auth.AuthBase):
         if self._is_expired():
             logger.debug("Token expired or absent — fetching new token")
             self._fetch_token()
-        r.headers["Authorization"] = f"Bearer {self._access_token}"
+        r.headers["Authorization"] = f"Bearer {self._access_token}"  # ty: ignore[invalid-assignment]
         return r
 
     def _is_expired(self) -> bool:

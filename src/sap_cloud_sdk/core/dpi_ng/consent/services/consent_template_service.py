@@ -197,7 +197,9 @@ class ConsentTemplateService:
         logger.info("Exiting ConsentTemplateService.get_third_party_pers_data")
         return result
 
-    @record_metrics(Module.DPI_NG, Operation.DPI_NG_CONSENT_CREATE_THIRD_PARTY_PERS_DATA)
+    @record_metrics(
+        Module.DPI_NG, Operation.DPI_NG_CONSENT_CREATE_THIRD_PARTY_PERS_DATA
+    )
     def create_third_party_pers_data(self, body: dict[str, Any]) -> Any:
         """Create a new TemplateThirdPartyPersData entity and return it."""
         logger.info("Invoked ConsentTemplateService.create_third_party_pers_data")
@@ -208,7 +210,9 @@ class ConsentTemplateService:
         logger.info("Exiting ConsentTemplateService.create_third_party_pers_data")
         return entity
 
-    @record_metrics(Module.DPI_NG, Operation.DPI_NG_CONSENT_UPDATE_THIRD_PARTY_PERS_DATA)
+    @record_metrics(
+        Module.DPI_NG, Operation.DPI_NG_CONSENT_UPDATE_THIRD_PARTY_PERS_DATA
+    )
     def update_third_party_pers_data(
         self, template_id: str, third_party_id: str, body: dict[str, Any]
     ) -> Any:
@@ -223,7 +227,9 @@ class ConsentTemplateService:
         logger.info("Exiting ConsentTemplateService.update_third_party_pers_data")
         return entity
 
-    @record_metrics(Module.DPI_NG, Operation.DPI_NG_CONSENT_DELETE_THIRD_PARTY_PERS_DATA)
+    @record_metrics(
+        Module.DPI_NG, Operation.DPI_NG_CONSENT_DELETE_THIRD_PARTY_PERS_DATA
+    )
     def delete_third_party_pers_data(
         self, template_id: str, third_party_id: str
     ) -> None:

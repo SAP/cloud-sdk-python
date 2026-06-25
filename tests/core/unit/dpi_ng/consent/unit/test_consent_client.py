@@ -107,7 +107,13 @@ class TestConsentClientAttributes:
             _setup_mock(Mock)
             config = ConsentSDKConfig(base_url="https://example.com", auth=auth)
             client = ConsentClient(config)
-            for attr in ("consents", "purposes", "templates", "retention", "configuration"):
+            for attr in (
+                "consents",
+                "purposes",
+                "templates",
+                "retention",
+                "configuration",
+            ):
                 assert hasattr(client, attr)
 
 

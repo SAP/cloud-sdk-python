@@ -10,13 +10,17 @@ _SVC = "consentTemplateExternalServices"
 
 @pytest.fixture
 def svc(mock_template_client):
-    from sap_cloud_sdk.core.dpi_ng.consent.services.consent_template_service import ConsentTemplateService
+    from sap_cloud_sdk.core.dpi_ng.consent.services.consent_template_service import (
+        ConsentTemplateService,
+    )
+
     return ConsentTemplateService(mock_template_client)
 
 
 # ---------------------------------------------------------------------------
 # ConsentTemplate CRUD
 # ---------------------------------------------------------------------------
+
 
 class TestConsentTemplateCRUD:
     def test_list_templates(self, svc, mock_template_client):
@@ -63,6 +67,7 @@ class TestConsentTemplateCRUD:
 # Lifecycle actions
 # ---------------------------------------------------------------------------
 
+
 class TestTemplateLifecycleActions:
     def test_set_template_active_calls_action(self, svc, mock_template_client):
         svc.set_template_active("tid")
@@ -96,6 +101,7 @@ class TestTemplateLifecycleActions:
 # ---------------------------------------------------------------------------
 # ConsentTemplateText (composite key: template_id + type_code + language_code)
 # ---------------------------------------------------------------------------
+
 
 class TestConsentTemplateText:
     def test_list_template_texts(self, svc, mock_template_client):
@@ -142,17 +148,22 @@ class TestConsentTemplateText:
 # TemplateThirdPartyPersData (composite key: template_id + third_party_id)
 # ---------------------------------------------------------------------------
 
+
 class TestTemplateThirdPartyPersData:
     def test_list_third_party_pers_data(self, svc, mock_template_client):
         result = svc.list_third_party_pers_data()
-        mock_template_client.query.assert_called_with(_SVC, svc.TemplateThirdPartyPersData)
+        mock_template_client.query.assert_called_with(
+            _SVC, svc.TemplateThirdPartyPersData
+        )
         mock_template_client.query.return_value.all.assert_called_once()
         assert result == []
 
     def test_get_third_party_pers_data_composite_key(self, svc, mock_template_client):
         q = mock_template_client.query.return_value
         result = svc.get_third_party_pers_data("tid", "tpid")
-        mock_template_client.query.assert_called_with(_SVC, svc.TemplateThirdPartyPersData)
+        mock_template_client.query.assert_called_with(
+            _SVC, svc.TemplateThirdPartyPersData
+        )
         q.get.assert_called_with(templateId="tid", thirdPartyId="tpid")
         assert result is q.get.return_value
 
@@ -165,18 +176,28 @@ class TestTemplateThirdPartyPersData:
         call_arg = mock_template_client.save.call_args[0][0]
         assert call_arg.third_party_function_code == "PROCESSOR"
 
-    def test_update_third_party_pers_data_composite_key(self, svc, mock_template_client):
+    def test_update_third_party_pers_data_composite_key(
+        self, svc, mock_template_client
+    ):
         q = mock_template_client.query.return_value
-        svc.update_third_party_pers_data("tid", "tpid", {"third_party_function_code": "CONTROLLER"})
+        svc.update_third_party_pers_data(
+            "tid", "tpid", {"third_party_function_code": "CONTROLLER"}
+        )
         q.get.assert_called_with(templateId="tid", thirdPartyId="tpid")
         mock_template_client.save.assert_called_once()
 
-    def test_update_third_party_pers_data_applies_fields(self, svc, mock_template_client):
+    def test_update_third_party_pers_data_applies_fields(
+        self, svc, mock_template_client
+    ):
         entity = mock_template_client.query.return_value.get.return_value
-        svc.update_third_party_pers_data("tid", "tpid", {"third_party_function_code": "CONTROLLER"})
+        svc.update_third_party_pers_data(
+            "tid", "tpid", {"third_party_function_code": "CONTROLLER"}
+        )
         assert entity.third_party_function_code == "CONTROLLER"
 
-    def test_delete_third_party_pers_data_composite_key(self, svc, mock_template_client):
+    def test_delete_third_party_pers_data_composite_key(
+        self, svc, mock_template_client
+    ):
         q = mock_template_client.query.return_value
         svc.delete_third_party_pers_data("tid", "tpid")
         q.get.assert_called_with(templateId="tid", thirdPartyId="tpid")
@@ -186,6 +207,7 @@ class TestTemplateThirdPartyPersData:
 # ---------------------------------------------------------------------------
 # Query parameter forwarding (_apply_query) on list_templates
 # ---------------------------------------------------------------------------
+
 
 class TestQueryParams:
     def test_query_filter(self, svc, mock_template_client):

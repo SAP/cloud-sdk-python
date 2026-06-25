@@ -177,7 +177,8 @@ class _ODataClient:
     @staticmethod
     def _raise_for_status(resp: requests.Response) -> None:
         """Translate 4xx/5xx HTTP responses into typed ConsentSDK exceptions."""
-        if resp.status_code < 400:
+        status_code: int = resp.status_code  # ty: ignore[invalid-assignment]
+        if status_code < 400:
             return
         try:
             body = resp.json()
@@ -198,10 +199,8 @@ class _ODataClient:
             odata_error = {}
             message = resp.text
 
-        logger.error(
-            "HTTP error response — status=%d message=%s", resp.status_code, message
-        )
-        match resp.status_code:
+        logger.error("HTTP error response — status=%d message=%s", status_code, message)
+        match status_code:
             case 401:
                 raise AuthenticationError(message, odata_error)
             case 403:
@@ -213,4 +212,4 @@ class _ODataClient:
             case 400 | 422:
                 raise ValidationError(message, odata_error)
             case _:
-                raise ODataError(message, resp.status_code, odata_error)
+                raise ODataError(message, status_code, odata_error)

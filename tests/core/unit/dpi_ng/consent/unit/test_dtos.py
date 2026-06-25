@@ -114,5 +114,7 @@ class TestCheckConsentExistsResult:
         assert result.consent_exists is None
 
     def test_from_dict_returns_check_consent_exists_result_instance(self):
-        result = CheckConsentExistsResult.from_dict({"consentId": "c-1", "consentExists": True})
+        result = CheckConsentExistsResult.from_dict(
+            {"consentId": "c-1", "consentExists": True}
+        )
         assert isinstance(result, CheckConsentExistsResult)

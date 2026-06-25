@@ -64,7 +64,9 @@ class ConsentService:
 
     # ------ actions ------
 
-    @record_metrics(Module.DPI_NG, Operation.DPI_NG_CONSENT_CREATE_CONSENT_FROM_TEMPLATE)
+    @record_metrics(
+        Module.DPI_NG, Operation.DPI_NG_CONSENT_CREATE_CONSENT_FROM_TEMPLATE
+    )
     def create_consent_from_template(self, request: CreateConsentRequest) -> list[Any]:
         """Invoke createConsentFromTemplate and return the resulting Consent entities."""
         logger.info("Invoked ConsentService.create_consent_from_template")

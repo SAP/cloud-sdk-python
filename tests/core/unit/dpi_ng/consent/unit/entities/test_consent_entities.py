@@ -5,7 +5,10 @@ from __future__ import annotations
 import pytest
 from odata.property import BooleanProperty, StringProperty, UUIDProperty
 
-from tests.core.unit.dpi_ng.consent.unit.entities.conftest import CONSENT_ENTITY_SPECS, entity_by_name
+from tests.core.unit.dpi_ng.consent.unit.entities.conftest import (
+    CONSENT_ENTITY_SPECS,
+    entity_by_name,
+)
 
 
 def test_make_entities_returns_all_classes(consent_entities):
@@ -45,7 +48,8 @@ class TestConsentEntity:
     def test_consent_has_single_pk(self, consent_entities):
         cls = entity_by_name(consent_entities, "Consent")
         pk_props = [
-            name for name, val in vars(cls).items()
+            name
+            for name, val in vars(cls).items()
             if isinstance(val, UUIDProperty) and getattr(val, "primary_key", False)
         ]
         assert pk_props == ["consent_id"]
@@ -61,4 +65,3 @@ class TestConsentEntity:
     def test_consent_tenant_is_string(self, consent_entities):
         cls = entity_by_name(consent_entities, "Consent")
         assert isinstance(cls.tenant, StringProperty)
-

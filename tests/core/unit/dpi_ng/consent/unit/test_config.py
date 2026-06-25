@@ -109,7 +109,8 @@ class TestInvalidAuth:
     def test_dict_auth_raises(self):
         with pytest.raises(ValueError, match="auth must be an AuthProvider"):
             ConsentSDKConfig(
-                base_url="https://example.com", auth={"token": "abc"}  # ty: ignore[invalid-argument-type]
+                base_url="https://example.com",
+                auth={"token": "abc"},  # ty: ignore[invalid-argument-type]
             )
 
     def test_plain_object_auth_raises(self):

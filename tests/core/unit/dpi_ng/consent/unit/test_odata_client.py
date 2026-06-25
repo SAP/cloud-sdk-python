@@ -228,7 +228,9 @@ class TestCallAction:
 @patch("sap_cloud_sdk.core.dpi_ng.consent.client.ODataService")
 @patch("sap_cloud_sdk.core.dpi_ng.consent.client.requests.Session")
 class TestOrmMethods:
-    def test_get_entity_classes_calls_factory_on_cache_miss(self, mock_session_cls, mock_odata_svc_cls):
+    def test_get_entity_classes_calls_factory_on_cache_miss(
+        self, mock_session_cls, mock_odata_svc_cls
+    ):
         mock_session_cls.return_value = MagicMock()
         mock_svc = MagicMock()
         mock_odata_svc_cls.return_value = mock_svc
@@ -236,23 +238,33 @@ class TestOrmMethods:
         mock_factory = MagicMock(return_value=mock_entities)
         config = _make_config()
         client = _ODataClient(config)
-        with patch.dict("sap_cloud_sdk.core.dpi_ng.consent.client._ENTITY_FACTORIES", {"testSvc": mock_factory}):
+        with patch.dict(
+            "sap_cloud_sdk.core.dpi_ng.consent.client._ENTITY_FACTORIES",
+            {"testSvc": mock_factory},
+        ):
             result = client.get_entity_classes("testSvc")
         mock_factory.assert_called_once_with(mock_svc)
         assert result is mock_entities
 
-    def test_get_entity_classes_returns_cached_on_second_call(self, mock_session_cls, mock_odata_svc_cls):
+    def test_get_entity_classes_returns_cached_on_second_call(
+        self, mock_session_cls, mock_odata_svc_cls
+    ):
         mock_session_cls.return_value = MagicMock()
         mock_odata_svc_cls.return_value = MagicMock()
         mock_factory = MagicMock(return_value=(MagicMock(),))
         config = _make_config()
         client = _ODataClient(config)
-        with patch.dict("sap_cloud_sdk.core.dpi_ng.consent.client._ENTITY_FACTORIES", {"testSvc": mock_factory}):
+        with patch.dict(
+            "sap_cloud_sdk.core.dpi_ng.consent.client._ENTITY_FACTORIES",
+            {"testSvc": mock_factory},
+        ):
             client.get_entity_classes("testSvc")
             client.get_entity_classes("testSvc")
         mock_factory.assert_called_once()
 
-    def test_query_delegates_to_odata_service(self, mock_session_cls, mock_odata_svc_cls):
+    def test_query_delegates_to_odata_service(
+        self, mock_session_cls, mock_odata_svc_cls
+    ):
         mock_session_cls.return_value = MagicMock()
         mock_svc = MagicMock()
         mock_odata_svc_cls.return_value = mock_svc
@@ -263,7 +275,9 @@ class TestOrmMethods:
         mock_svc.query.assert_called_once_with(entity_cls)
         assert result is mock_svc.query.return_value
 
-    def test_save_delegates_to_entity_odata_service(self, mock_session_cls, mock_odata_svc_cls):
+    def test_save_delegates_to_entity_odata_service(
+        self, mock_session_cls, mock_odata_svc_cls
+    ):
         mock_session_cls.return_value = MagicMock()
         mock_odata_svc_cls.return_value = MagicMock()
         entity = MagicMock()
@@ -273,7 +287,9 @@ class TestOrmMethods:
         client.save(entity)
         entity.__odata_service__.save.assert_called_once_with(entity)
 
-    def test_delete_entity_delegates_to_entity_odata_service(self, mock_session_cls, mock_odata_svc_cls):
+    def test_delete_entity_delegates_to_entity_odata_service(
+        self, mock_session_cls, mock_odata_svc_cls
+    ):
         mock_session_cls.return_value = MagicMock()
         mock_odata_svc_cls.return_value = MagicMock()
         entity = MagicMock()

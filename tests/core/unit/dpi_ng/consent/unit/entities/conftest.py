@@ -143,29 +143,44 @@ def entity_by_name(entities_tuple, name):
 
 @pytest.fixture(scope="module")
 def consent_entities():
-    from sap_cloud_sdk.core.dpi_ng.consent.entities.consent import _make_entities as make_entities
+    from sap_cloud_sdk.core.dpi_ng.consent.entities.consent import (
+        _make_entities as make_entities,
+    )
+
     return make_entities(_make_service())
 
 
 @pytest.fixture(scope="module")
 def config_entities():
-    from sap_cloud_sdk.core.dpi_ng.consent.entities.consent_configuration import _make_entities as make_entities
+    from sap_cloud_sdk.core.dpi_ng.consent.entities.consent_configuration import (
+        _make_entities as make_entities,
+    )
+
     return make_entities(_make_service())
 
 
 @pytest.fixture(scope="module")
 def purpose_entities():
-    from sap_cloud_sdk.core.dpi_ng.consent.entities.consent_purpose import _make_entities as make_entities
+    from sap_cloud_sdk.core.dpi_ng.consent.entities.consent_purpose import (
+        _make_entities as make_entities,
+    )
+
     return make_entities(_make_service())
 
 
 @pytest.fixture(scope="module")
 def retention_entities():
-    from sap_cloud_sdk.core.dpi_ng.consent.entities.consent_retention import _make_entities as make_entities
+    from sap_cloud_sdk.core.dpi_ng.consent.entities.consent_retention import (
+        _make_entities as make_entities,
+    )
+
     return make_entities(_make_service())
 
 
 @pytest.fixture(scope="module")
 def template_entities():
-    from sap_cloud_sdk.core.dpi_ng.consent.entities.consent_template import _make_entities as make_entities
+    from sap_cloud_sdk.core.dpi_ng.consent.entities.consent_template import (
+        _make_entities as make_entities,
+    )
+
     return make_entities(_make_service())

@@ -15,8 +15,7 @@ Internal layout:
   ``OutputFiltering``, ``ContentFiltering``).
 - :mod:`.config` — ``load_from_env`` + private env helpers.
 - :mod:`._patch` — LiteLLM transport monkeypatch + ``_install``.
-- :mod:`.filters` — public entry points (``set_filtering``, ``disable_filtering``,
-  ``extract_filter_blocked``).
+- :mod:`.filters` — public entry points (``set_filtering``, ``disable_filtering``).
 - :mod:`.exceptions` — error types.
 """
 
@@ -24,7 +23,6 @@ from __future__ import annotations
 
 from .filters import (
     disable_filtering,
-    extract_filter_blocked,  # noqa: F401 — deprecated, kept importable for back-compat
     set_filtering,
 )
 from .models import (

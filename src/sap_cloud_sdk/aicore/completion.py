@@ -9,12 +9,10 @@ the rejection. Output-filter rejections (HTTP 200 with
 ``finish_reason == "content_filter"``) go through ``transform_response``
 and surface as :class:`ContentFilteredError`.
 
-That asymmetry was the previous public API's downside — callers had to
-catch ``APIConnectionError`` AND call :func:`extract_filter_blocked` to
-recover the typed error, alongside catching :class:`ContentFilteredError`
-for output rejections. These wrappers fix that by catching the wrapped
-exception inside the SDK and re-raising as :class:`ContentFilteredError`
-so callers can rely on a single exception type for "filter blocked you."
+That asymmetry would force callers to catch two exception types — these
+wrappers fix it by catching the wrapped exception inside the SDK and
+re-raising as :class:`ContentFilteredError` so callers can rely on a
+single exception type for "filter blocked you."
 
 Usage::
 
@@ -33,7 +31,10 @@ Usage::
 
 These are intentionally thin — every other keyword argument is forwarded
 verbatim to ``litellm.completion`` / ``litellm.acompletion``, including
-``stream=True`` (the streaming iterator is returned unchanged).
+``stream=True`` (the streaming iterator is returned unchanged). No
+telemetry is recorded here; the wrappers fire on every LLM call and a
+counter at this level would be both noisy and uninformative about
+adoption of the SDK.
 """
 
 from __future__ import annotations
@@ -41,10 +42,6 @@ from __future__ import annotations
 from typing import Any
 
 import litellm
-
-from sap_cloud_sdk.core.telemetry.metrics_decorator import record_metrics
-from sap_cloud_sdk.core.telemetry.module import Module
-from sap_cloud_sdk.core.telemetry.operation import Operation
 
 from .filtering.filters import _parse_input_filter_error
 
@@ -62,7 +59,6 @@ def _maybe_translate_filter_error(exc: BaseException) -> BaseException:
     return blocked if blocked is not None else exc
 
 
-@record_metrics(Module.AICORE, Operation.AICORE_COMPLETION)
 def completion(*args: Any, **kwargs: Any) -> Any:
     """Wrapper around :func:`litellm.completion` that normalises filter errors.
 
@@ -84,7 +80,6 @@ def completion(*args: Any, **kwargs: Any) -> Any:
         raise translated from exc
 
 
-@record_metrics(Module.AICORE, Operation.AICORE_ACOMPLETION)
 async def acompletion(*args: Any, **kwargs: Any) -> Any:
     """Async wrapper around :func:`litellm.acompletion`.
 

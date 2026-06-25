@@ -32,7 +32,6 @@ import os
 from typing import Any, Optional
 
 import pytest
-from litellm import completion
 from pytest_bdd import given, parsers, scenarios, then, when
 
 from sap_cloud_sdk.aicore import (
@@ -41,8 +40,8 @@ from sap_cloud_sdk.aicore import (
     ContentFiltering,
     InputFiltering,
     Severity,
+    completion,
     disable_filtering,
-    extract_filter_blocked,
     set_filtering,
 )
 
@@ -144,7 +143,12 @@ def filtering_prompt_shield():
 
 
 def send_prompt(ctx: ScenarioContext, model: str, prompt: str) -> None:
-    """Internal helper: send *prompt* to *model* and capture response or error."""
+    """Internal helper: send *prompt* to *model* and capture response or error.
+
+    Uses ``sap_cloud_sdk.aicore.completion`` so that input- and output-filter
+    rejections both surface as :class:`ContentFilteredError` — no
+    ``except Exception`` fallback or wrapper-unwrapping is needed here.
+    """
     if not prompt:
         pytest.skip(
             "Self-harm test prompt is empty — set the "
@@ -160,12 +164,6 @@ def send_prompt(ctx: ScenarioContext, model: str, prompt: str) -> None:
         )
     except ContentFilteredError as e:
         ctx.error = e
-    except Exception as e:
-        # LiteLLM may wrap input-filter rejections in APIConnectionError
-        if blocked := extract_filter_blocked(e):
-            ctx.error = blocked
-        else:
-            raise
 
 
 @when("I send the benign prompt")
@@ -207,7 +205,7 @@ def no_filter_error(ctx: ScenarioContext):
 
 @then("a ContentFilteredError is raised")
 def filter_error_raised(ctx: ScenarioContext):
-    """Assert a ContentFilteredError was raised by transform_response or extract_filter_blocked."""
+    """Assert a ContentFilteredError was raised (input or output direction)."""
     assert isinstance(ctx.error, ContentFilteredError), (
         f"expected ContentFilteredError, got {type(ctx.error).__name__}: {ctx.error}"
     )

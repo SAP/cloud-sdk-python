@@ -218,9 +218,10 @@ class TestTransformResponse:
 
 
 # ---------------------------------------------------------------------------
-# _parse_input_filter_error — internal parsing helper. Tested here because
-# the legacy ``extract_filter_blocked`` is now a deprecation shim; the
-# completion/acompletion wrappers exercise this code path.
+# _parse_input_filter_error — internal parsing helper used by
+# sap_cloud_sdk.aicore.completion to translate the wrapped litellm
+# APIConnectionError back into ContentFilteredError before it reaches the
+# caller.
 # ---------------------------------------------------------------------------
 
 

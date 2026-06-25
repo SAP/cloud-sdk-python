@@ -1,5 +1,4 @@
-"""Unit tests for sap_cloud_sdk.aicore.completion / acompletion wrappers
-and the extract_filter_blocked deprecation path.
+"""Unit tests for sap_cloud_sdk.aicore.completion / acompletion wrappers.
 
 The wrappers exist so callers can rely on a single exception type
 (:class:`ContentFilteredError`) for "filter blocked you" regardless of
@@ -16,22 +15,18 @@ transport patch as :class:`ContentFilteredError`). Test focus:
 - :class:`ContentFilteredError` already raised by the transport patch
   passes through unchanged (we don't double-wrap).
 - ``acompletion`` exhibits the same behaviour on the async path.
-- ``extract_filter_blocked`` still works for back-compat but emits a
-  ``DeprecationWarning``.
 """
 
 from __future__ import annotations
 
 import asyncio
 import json
-import warnings
 from unittest.mock import patch
 
 import pytest
 
 from sap_cloud_sdk.aicore import acompletion, completion
 from sap_cloud_sdk.aicore.filtering.exceptions import ContentFilteredError
-from sap_cloud_sdk.aicore.filtering.filters import extract_filter_blocked
 
 
 # ---------------------------------------------------------------------------
@@ -202,38 +197,3 @@ class TestACompletionWrapper:
             with pytest.raises(_FakeAPIConnectionError) as ei:
                 asyncio.run(acompletion(model="sap/x", messages=[]))
         assert ei.value is raised
-
-
-# ---------------------------------------------------------------------------
-# extract_filter_blocked deprecation
-# ---------------------------------------------------------------------------
-
-
-class TestExtractFilterBlockedDeprecation:
-    def test_emits_deprecation_warning(self):
-        exc = _FakeAPIConnectionError(_input_filter_apiconn_message())
-        with warnings.catch_warnings(record=True) as recorded:
-            warnings.simplefilter("always")
-            result = extract_filter_blocked(exc)
-        deprecations = [
-            w for w in recorded if issubclass(w.category, DeprecationWarning)
-        ]
-        assert len(deprecations) == 1
-        assert "deprecated" in str(deprecations[0].message)
-        # Behaviour preserved — still returns the parsed error.
-        assert isinstance(result, ContentFilteredError)
-        assert result.direction == "input"
-
-    def test_returns_none_for_non_filter_exception(self):
-        exc = ValueError("not a filter rejection")
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore", DeprecationWarning)
-            result = extract_filter_blocked(exc)
-        assert result is None
-
-    def test_not_exported_from_aicore_top_level(self):
-        # Symbol stays importable from the deep path (back-compat) but is
-        # removed from sap_cloud_sdk.aicore.__all__.
-        import sap_cloud_sdk.aicore as aicore
-
-        assert "extract_filter_blocked" not in aicore.__all__

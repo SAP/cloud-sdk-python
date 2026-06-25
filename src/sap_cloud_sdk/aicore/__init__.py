@@ -25,7 +25,6 @@ from .filtering import (
     OutputFiltering,
     Severity,
     disable_filtering,
-    extract_filter_blocked,  # noqa: F401 — deprecated, kept importable for back-compat
     set_filtering,
 )
 

@@ -225,11 +225,6 @@ rejections. All other exceptions surface unchanged.
 `request_id`. The `details` field contains severity scalars from the server,
 **not** the original prompt or completion content. Safe to log.
 
-> **Deprecated.** Earlier releases exposed `extract_filter_blocked()` for
-> users to unwrap input-filter 400s from a generic `except Exception`
-> block. It is still importable for one cycle (with a `DeprecationWarning`)
-> but new code should use `sap_cloud_sdk.aicore.completion` instead.
-
 ### Migration from prior versions
 
 If your agent previously imported from `sap_cloud_sdk.orchestration` (an

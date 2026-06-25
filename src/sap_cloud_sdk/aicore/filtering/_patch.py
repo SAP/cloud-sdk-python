@@ -22,7 +22,10 @@ LiteLLM's ``raise_for_status()`` turns 4xx responses into
 ``httpx.HTTPStatusError`` before ``transform_response`` is reached, so
 input-filter 400s arrive wrapped in a ``litellm.APIConnectionError`` with
 the JSON embedded in the exception message.
-:func:`extract_filter_blocked` (defined in :mod:`.filters`) handles that case.
+:func:`sap_cloud_sdk.aicore.completion` translates the wrapped exception
+back into :class:`ContentFilteredError` before it reaches caller code; the
+:func:`_parse_input_filter_error` helper in :mod:`.filters` does the JSON
+parsing.
 """
 
 from __future__ import annotations

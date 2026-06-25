@@ -88,8 +88,8 @@ def _make_httpx_response(
 
 def _make_token_fetcher(config: AdmsConfig) -> IasTokenFetcher:
     fetcher = IasTokenFetcher(config=config)
-    fetcher.get_token = MagicMock(return_value="test-bearer-token")  # type: ignore[method-assign]  # ty: ignore[invalid-assignment]
-    fetcher.exchange_token = MagicMock(return_value="user-bearer-token")  # type: ignore[method-assign]  # ty: ignore[invalid-assignment]
+    fetcher.get_token = MagicMock(return_value="test-bearer-token")  # type: ignore[method-assign]
+    fetcher.exchange_token = MagicMock(return_value="user-bearer-token")  # type: ignore[method-assign]
     return fetcher
 
 
@@ -423,13 +423,13 @@ class TestAsyncAdmsClient:
         http = _make_async_http(config, fetcher)
         mock_user_http = MagicMock(spec=AsyncAdmsHttp)
         mock_user_http._client = AsyncMock(spec=httpx.AsyncClient)
-        http.with_user_jwt = MagicMock(return_value=mock_user_http)  # type: ignore[method-assign]  # ty: ignore[invalid-assignment]
+        http.with_user_jwt = MagicMock(return_value=mock_user_http)  # type: ignore[method-assign]
 
         client = AsyncAdmsClient(http)
         new_client = client.with_user_jwt("my-jwt")
 
         assert new_client is not client
-        http.with_user_jwt.assert_called_once_with("my-jwt")  # type: ignore[union-attr]  # ty: ignore[unresolved-attribute]
+        http.with_user_jwt.assert_called_once_with("my-jwt")  # type: ignore[union-attr]
         assert new_client._http is mock_user_http
 
     @pytest.mark.asyncio

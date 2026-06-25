@@ -34,7 +34,7 @@ Tip:
 ## Type Check
 
 ```bash
-uv run ty check .
+uvx ty check .
 ```
 
 ## Code Quality Checks
@@ -49,7 +49,7 @@ uv run ruff check .
 uv run ruff format --check .
 
 # Type check
-uv run ty check .
+uvx ty check .
 ```
 
 ## Pre-commit Hooks (Recommended)

@@ -140,7 +140,9 @@ def load_customer_credentials(
             are missing.
     """
     if tls_mode == TlsMode.TRANSPARENT:
-        logger.debug("TLS_MODE=transparent: loading credentials from environment variables")
+        logger.debug(
+            "TLS_MODE=transparent: loading credentials from environment variables"
+        )
         required = [_ENV_CLIENT_ID, _ENV_TOKEN_SERVICE_URL, _ENV_GATEWAY_URL]
         missing = [v for v in required if not os.environ.get(v)]
         if missing:

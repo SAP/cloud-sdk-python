@@ -202,10 +202,6 @@ class OutputManagementClient:
                 "sender_provider_subaccount_id": subaccount_id,
             }
 
-            logger.info(
-                "MCP tool '%s' invocation payload: %s", tool_name, invocation_payload
-            )
-
             # Validate that mcp_tool is provided
             if mcp_tool is None:
                 raise ValueError("mcp_tool parameter is required")

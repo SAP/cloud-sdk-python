@@ -203,7 +203,7 @@ class OutputManagementServiceClient:
 
                 if cert is None:
                     logger.error(
-                        f"✗ Certificate '{cert_name}' not found in Destination Service"
+                        f"Certificate '{cert_name}' not found in Destination Service"
                     )
                     return None
 
@@ -244,14 +244,13 @@ class OutputManagementServiceClient:
 
             except Exception as e:
                 logger.error(
-                    f"✗ Failed to retrieve/process certificate '{cert_name}': {e}",
                     exc_info=True,
                 )
                 return None
 
             # Make token request with mTLS
             if not (cert_file and key_file):
-                logger.error("✗ No client certificates available")
+                logger.error("No client certificates available")
                 return None
 
             request_kwargs: Dict[str, Any] = {
@@ -271,7 +270,7 @@ class OutputManagementServiceClient:
                     if key_file != cert_file:
                         os.unlink(key_file)
                 except Exception as e:
-                    logger.warning(f"⚠ Failed to cleanup temp files: {e}")
+                    logger.warning(f"Failed to cleanup temp files: {e}")
 
             # Handle response
             if response.status_code == 200:
@@ -279,20 +278,20 @@ class OutputManagementServiceClient:
                 access_token = token_response.get("access_token")
                 if access_token:
                     logger.info(
-                        f"✓ Successfully fetched OAuth token (length: {len(access_token)})"
+                        f"Successfully fetched OAuth token (length: {len(access_token)})"
                     )
                     return access_token
                 else:
                     logger.error(
-                        f"✗ No access_token in response: {list(token_response.keys())}"
+                        f"No access_token in response: {list(token_response.keys())}"
                     )
             else:
                 logger.error(
-                    f"✗ Token fetch failed with status {response.status_code}: {response.text}"
+                    f"Token fetch failed with status {response.status_code}: {response.text}"
                 )
 
         except Exception as e:
-            logger.error(f"✗ Exception fetching OAuth token: {e}", exc_info=True)
+            logger.error(f"Exception fetching OAuth token: {e}", exc_info=True)
             if temp_files_created:
                 try:
                     if cert_file:
@@ -316,9 +315,9 @@ class OutputManagementServiceClient:
             token = self._fetch_oauth_token_from_destination()
             if token:
                 headers[Constants.AUTHORIZATION] = f"{Constants.BEARER} {token}"
-                logger.info("✓ Authorization header added to request")
+                logger.info("Authorization header added to request")
             else:
-                logger.error("✗ Failed to fetch OAuth token from destination")
+                logger.error("Failed to fetch OAuth token from destination")
 
         return headers
 

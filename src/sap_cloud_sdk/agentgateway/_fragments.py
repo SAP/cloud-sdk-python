@@ -7,6 +7,7 @@ Centralises all BTP Destination Service fragment operations:
 """
 
 import logging
+from enum import Enum
 
 from sap_cloud_sdk.destination import (
     create_fragment_client,
@@ -21,20 +22,23 @@ logger = logging.getLogger(__name__)
 # Shared label key for all managed-runtime fragment types
 LABEL_KEY = "sap-managed-runtime-type"
 
-# Label values for fragment discovery
-MCP_LABEL_VALUE = "agw.mcp.server"
-IAS_LABEL_VALUE = "subscriber.ias"
-IAS_USER_LABEL_VALUE = "subscriber.ias.user"
-A2A_LABEL_VALUE = "agw.a2a.server"
-
 _DESTINATION_INSTANCE = "default"
 
 
-def _list_fragments_by_label(label_value: str, tenant_subdomain: str) -> list:
+class FragmentLabel(str, Enum):
+    """Label values for the sap-managed-runtime-type fragment label key."""
+
+    MCP = "agw.mcp.server"
+    A2A = "agw.a2a.server"
+    IAS = "subscriber.ias"
+    IAS_USER = "subscriber.ias.user"
+
+
+def _list_fragments_by_label(label: FragmentLabel, tenant_subdomain: str) -> list:
     client = create_fragment_client(instance=_DESTINATION_INSTANCE)
     return client.list_instance_fragments(
         filter=ListOptions(
-            filter_labels=[Label(key=LABEL_KEY, values=[label_value])]
+            filter_labels=[Label(key=LABEL_KEY, values=[label.value])]
         ),
         tenant=tenant_subdomain,
     )
@@ -50,7 +54,7 @@ def list_mcp_fragments(tenant_subdomain: str) -> list:
         List of fragments with sap-managed-runtime-type=agw.mcp.server label.
     """
     logger.debug("Fetching MCP fragments for tenant '%s'", tenant_subdomain)
-    return _list_fragments_by_label(MCP_LABEL_VALUE, tenant_subdomain)
+    return _list_fragments_by_label(FragmentLabel.MCP, tenant_subdomain)
 
 
 def list_a2a_fragments(tenant_subdomain: str) -> list:
@@ -63,7 +67,7 @@ def list_a2a_fragments(tenant_subdomain: str) -> list:
         List of fragments with sap-managed-runtime-type=agw.a2a.server label.
     """
     logger.debug("Fetching A2A fragments for tenant '%s'", tenant_subdomain)
-    return _list_fragments_by_label(A2A_LABEL_VALUE, tenant_subdomain)
+    return _list_fragments_by_label(FragmentLabel.A2A, tenant_subdomain)
 
 
 def get_ias_fragment_name(tenant_subdomain: str) -> str:
@@ -81,10 +85,10 @@ def get_ias_fragment_name(tenant_subdomain: str) -> str:
     Raises:
         MCPServerNotFoundError: If no IAS fragment is found.
     """
-    fragments = _list_fragments_by_label(IAS_LABEL_VALUE, tenant_subdomain)
+    fragments = _list_fragments_by_label(FragmentLabel.IAS, tenant_subdomain)
     if not fragments:
         raise MCPServerNotFoundError(
-            f"No IAS fragment found (label {LABEL_KEY}={IAS_LABEL_VALUE}) "
+            f"No IAS fragment found (label {LABEL_KEY}={FragmentLabel.IAS.value}) "
             f"for tenant '{tenant_subdomain}'"
         )
     return fragments[0].name
@@ -105,10 +109,10 @@ def get_ias_user_fragment_name(tenant_subdomain: str) -> str:
     Raises:
         MCPServerNotFoundError: If no IAS user fragment is found.
     """
-    fragments = _list_fragments_by_label(IAS_USER_LABEL_VALUE, tenant_subdomain)
+    fragments = _list_fragments_by_label(FragmentLabel.IAS_USER, tenant_subdomain)
     if not fragments:
         raise MCPServerNotFoundError(
-            f"No IAS user fragment found (label {LABEL_KEY}={IAS_USER_LABEL_VALUE}) "
+            f"No IAS user fragment found (label {LABEL_KEY}={FragmentLabel.IAS_USER.value}) "
             f"for tenant '{tenant_subdomain}'"
         )
     return fragments[0].name

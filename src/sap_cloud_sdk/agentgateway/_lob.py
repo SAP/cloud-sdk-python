@@ -21,8 +21,7 @@ from sap_cloud_sdk.destination import (
 
 from sap_cloud_sdk.agentgateway._fragments import (
     LABEL_KEY,
-    MCP_LABEL_VALUE,
-    A2A_LABEL_VALUE,
+    FragmentLabel,
     get_ias_fragment_name,
     get_ias_user_fragment_name,
     list_mcp_fragments,
@@ -328,7 +327,7 @@ async def get_mcp_tools_lob(
 
     if not fragments:
         logger.debug(
-            "No MCP fragments found (label %s=%s)", LABEL_KEY, MCP_LABEL_VALUE
+            "No MCP fragments found (label %s=%s)", LABEL_KEY, FragmentLabel.MCP.value
         )
         return tools
 
@@ -492,7 +491,7 @@ async def get_agent_cards_lob(
 
     if not fragments:
         logger.debug(
-            "No A2A fragments found (label %s=%s)", LABEL_KEY, A2A_LABEL_VALUE
+            "No A2A fragments found (label %s=%s)", LABEL_KEY, FragmentLabel.A2A.value
         )
         return []
 

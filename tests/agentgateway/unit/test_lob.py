@@ -7,10 +7,7 @@ import pytest
 
 from sap_cloud_sdk.agentgateway._fragments import (
     LABEL_KEY,
-    MCP_LABEL_VALUE,
-    IAS_LABEL_VALUE,
-    IAS_USER_LABEL_VALUE,
-    A2A_LABEL_VALUE,
+    FragmentLabel,
     get_ias_fragment_name,
     get_ias_user_fragment_name,
     list_mcp_fragments,
@@ -32,12 +29,12 @@ from sap_cloud_sdk.agentgateway.config import ClientConfig
 from sap_cloud_sdk.agentgateway.exceptions import AgentGatewaySDKError, MCPServerNotFoundError
 from sap_cloud_sdk.destination import ConsumptionLevel
 
-# Aliases kept for backward compat within this test file
+# Aliases for use in existing test assertions
 _LABEL_KEY = LABEL_KEY
-_MCP_LABEL_VALUE = MCP_LABEL_VALUE
-_IAS_LABEL_VALUE = IAS_LABEL_VALUE
-_IAS_USER_LABEL_VALUE = IAS_USER_LABEL_VALUE
-_A2A_LABEL_VALUE = A2A_LABEL_VALUE
+_MCP_LABEL_VALUE = FragmentLabel.MCP.value
+_IAS_LABEL_VALUE = FragmentLabel.IAS.value
+_IAS_USER_LABEL_VALUE = FragmentLabel.IAS_USER.value
+_A2A_LABEL_VALUE = FragmentLabel.A2A.value
 
 
 # ============================================================

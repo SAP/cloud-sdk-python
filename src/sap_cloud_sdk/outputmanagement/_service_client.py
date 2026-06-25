@@ -244,7 +244,8 @@ class OutputManagementServiceClient:
 
             except Exception as e:
                 logger.error(
-                    exc_info=True,
+                     f"Failed to retrieve/process certificate '{cert_name}': {e}",
+                      exc_info=True,
                 )
                 return None
 

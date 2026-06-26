@@ -5,7 +5,7 @@ Quickstart::
     from sap_cloud_sdk.core.dpi_ng.consent import create_client, BearerTokenAuth
 
     with create_client(
-        base_url="https://consent.cfapps.eu10.hana.ondemand.com",
+        base_url="https://api.service.<region>.ngdpi.dpp.cloud.sap",
         auth=BearerTokenAuth("<xsuaa-bearer-token>"),
     ) as client:
         consents = client.consents.list_consents(filter="lifecycleStatusCode eq '1'")
@@ -53,7 +53,7 @@ class ConsentClient:
 
     Access each OData service through its typed attribute:
 
-    - ``client.consents``       - consent creation, withdrawal, and reads (consentServices)
+    - ``client.consents``       - consent record creation, deletion, withdrawal, termination, existence check, and reads (consentServices)
     - ``client.purposes``       - purpose CRUD and lifecycle (consentPurposeExternalServices)
     - ``client.templates``      - template CRUD and lifecycle (consentTemplateExternalServices)
     - ``client.retention``      - retention rule CRUD and lifecycle (consentRetentionExternalServices)
@@ -120,7 +120,9 @@ def create_client(
     Args:
         config: Pre-built ``ConsentSDKConfig``. When provided, all other kwargs
             are ignored.
-        base_url: Host-only root URL of the consent service (no path).
+        base_url: URL of the DPI external service router
+            (e.g. ``https://api.service.<region>.ngdpi.dpp.cloud.sap``).
+            Found in the credentials of the ``data-privacy-integration`` service instance.
             Required when *config* is not provided.
         auth: Authentication strategy (``BearerTokenAuth``,
             ``ClientCredentialsAuth``, ``ClientCertificateAuth``, etc.).

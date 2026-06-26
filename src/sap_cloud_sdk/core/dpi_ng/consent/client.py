@@ -47,10 +47,15 @@ _register_factories()
 
 
 class _ODataClient:
-    """OData v4 client - one ODataService per SAP service endpoint, entity classes bound per service."""
+    """OData v4 client for the DPI Consent module — one ODataService per consent service endpoint, with entity classes bound per service."""
 
     def __init__(self, config: ConsentSDKConfig) -> None:
-        """Initialise the HTTP session and apply the configured auth strategy."""
+        """Configure the client from *config*.
+
+        - Creates a shared requests.Session with JSON OData headers.
+        - Applies the auth strategy from config.auth.
+        - Initializes an empty ODataService registry; individual instances are created lazily on first use via _get_service.
+        """
         logger.info("Invoked ODataClient.__init__")
         self._config = config
         self._session = requests.Session()
@@ -76,7 +81,17 @@ class _ODataClient:
     # ------------------------------------------------------------------
 
     def _get_service(self, service_name: str) -> ODataService:
-        """Return (and lazily create) the ODataService for the given service endpoint."""
+        """Return the ODataService for *service_name*, creating and caching it on first access.
+
+        - URL is assembled as {config.base_url}{config.service_path}/{service_name}/.
+        - Subsequent calls with the same name return the cached instance.
+
+        Args:
+            service_name: The consent service endpoint name (e.g. ``"consentServices"``).
+
+        Returns:
+            The ODataService bound to the resolved service URL and shared session.
+        """
         logger.info("Invoked ODataClient._get_service")
         if service_name not in self._services:
             url = f"{self._config.base_url}{self._config.service_path}/{service_name}/"
@@ -169,7 +184,7 @@ class _ODataClient:
             service: OData service identifier (e.g. ``"consentServices"``).
             path: Action name relative to the service root URL
                 (e.g. ``"createConsentFromTemplate"``).
-            body: JSON-serialisable request payload. Defaults to ``{}`` when omitted.
+            body: JSON-serializable request payload. Defaults to ``{}`` when omitted.
             params: Optional URL query parameters to append to the request.
 
         Returns:

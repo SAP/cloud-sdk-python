@@ -23,7 +23,7 @@ from sap_cloud_sdk.extensibility._models import (
     Hook,
 )
 from sap_cloud_sdk.extensibility.config import HookConfig
-from sap_cloud_sdk.extensibility.exceptions import TransportError
+from sap_cloud_sdk.extensibility.exceptions import ExtensibilityError, TransportError
 
 if TYPE_CHECKING:
     from sap_cloud_sdk.extensibility._local_transport import LocalTransport
@@ -95,7 +95,7 @@ def _parse_response(response: httpx.Response) -> dict[str, Any]:
 def _extract_tool_result(jsonrpc: dict[str, Any]) -> dict[str, Any]:
     if "error" in jsonrpc:
         msg = jsonrpc["error"].get("message", "Unknown error")
-        raise TransportError(f"n8n returned an error: {msg}")
+        raise ExtensibilityError(f"n8n returned an error: {msg}")
 
     result = jsonrpc.get("result", {})
     if result.get("isError"):
@@ -103,7 +103,7 @@ def _extract_tool_result(jsonrpc: dict[str, Any]) -> dict[str, Any]:
         error_text = next(
             (c.get("text", "") for c in content if c.get("type") == "text"), ""
         )
-        raise TransportError(f"n8n tool call failed: {error_text}")
+        raise ExtensibilityError(f"n8n tool call failed: {error_text}")
 
     for item in result.get("content", []):
         if item.get("type") == "text":
@@ -116,7 +116,7 @@ def _extract_tool_result(jsonrpc: dict[str, Any]) -> dict[str, Any]:
     if structured is not None:
         return structured
 
-    raise TransportError("Hook response contains no parseable content.")
+    raise ExtensibilityError("Hook response contains no parseable content.")
 
 
 class ExtensibilityClient:
@@ -317,7 +317,7 @@ class ExtensibilityClient:
         # 2. Fail fast on terminal statuses from execute-workflow
         if status in _EXECUTE_TERMINAL_STATUSES:
             error_msg = data.get("error", "")
-            raise TransportError(
+            raise ExtensibilityError(
                 f"Workflow execution failed with status {status!r}"
                 + (f": {error_msg}" if error_msg else "")
             )
@@ -378,28 +378,29 @@ class ExtensibilityClient:
                     )
                     return Message(**response_json)
                 except (KeyError, IndexError, TypeError, ValidationError) as exc:
-                    raise TransportError(
+                    raise ExtensibilityError(
                         f"Failed to extract response from last executed node: {exc}"
                     ) from exc
 
             if last_status in _EXECUTION_TERMINAL_STATUSES:
                 error_msg = data.get("error", "")
-                raise TransportError(
+                raise ExtensibilityError(
                     f"Workflow execution failed with status {last_status!r}"
                     + (f": {error_msg}" if error_msg else "")
                 )
 
             # Continue polling for: running, waiting, new, unknown
 
-        raise TransportError(
+        raise ExtensibilityError(
             f"Workflow execution timed out after {hook.timeout}s. "
             f"Last status: {last_status!r}"
         )
 
     async def _discover_n8n_tools(
-        self, agw_client: Any, user_token: Optional[str]
+        self, 
+        agw_client: Any, 
+        user_token: Optional[str]
     ) -> tuple[Any, Any]:
-        # TODO: cache the list of mcp tools for performance.
         tools = await agw_client.list_mcp_tools(user_token=user_token or None)
 
         execute_tool = next(
@@ -412,7 +413,7 @@ class ExtensibilityClient:
             None,
         )
         if execute_tool is None:
-            raise TransportError(
+            raise ExtensibilityError(
                 f"MCP tool '{_EXECUTE_WORKFLOW_TOOL_NAME}' on server '{_N8N_MCP_SERVER_NAME}' "
                 "not found via Agent Gateway."
             )
@@ -427,7 +428,7 @@ class ExtensibilityClient:
             None,
         )
         if get_exec_tool is None:
-            raise TransportError(
+            raise ExtensibilityError(
                 f"MCP tool '{_GET_EXECUTION_TOOL_NAME}' on server '{_N8N_MCP_SERVER_NAME}' "
                 "not found via Agent Gateway."
             )
@@ -475,7 +476,7 @@ class ExtensibilityClient:
         status = data.get("status", "")
         if status in _EXECUTE_TERMINAL_STATUSES:
             error_msg = data.get("error", "")
-            raise TransportError(
+            raise ExtensibilityError(
                 f"Workflow execution failed with status {status!r}"
                 + (f": {error_msg}" if error_msg else "")
             )
@@ -546,12 +547,12 @@ class ExtensibilityClient:
 
             if last_status in _EXECUTION_TERMINAL_STATUSES:
                 error_msg = data.get("error", "")
-                raise TransportError(
+                raise ExtensibilityError(
                     f"Workflow execution failed with status {last_status!r}"
                     + (f": {error_msg}" if error_msg else "")
                 )
 
-        raise TransportError(
+        raise ExtensibilityError(
             f"Workflow execution timed out after {hook.timeout}s. "
             f"Last status: {last_status!r}"
         )

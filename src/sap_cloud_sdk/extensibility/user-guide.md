@@ -157,14 +157,37 @@ def call_hook(
 - `hook`: Hook configuration object containing workflow config (`n8n_workflow_config`), timeout, and other settings.
 - `hook_config`: Hook invocation configuration (`endpoint`, optional `auth_token`, and optional `payload`).
 - Returns the response data as a `Message` object, or `None` if no message is produced.
-- Raises `TransportError` if the HTTP request fails or the response cannot be parsed as a valid `Message`.
+- Raises `TransportError` if the HTTP request or SSE parsing fails.
+- Raises `ExtensibilityError` if the workflow reaches a terminal failure status, times out, or n8n returns an application-level error.
 - The hook's `timeout` setting is used for the HTTP request timeout.
 - The hook HTTP method is taken from `hook.n8n_workflow_config.method`.
 - The workflow ID is taken from `hook.n8n_workflow_config.workflow_id`.
 
-#### `N8nWorkflowConfig`
+### `ExtensibilityClient.call_hook_agw()`
 
-Workflow configuration embedded in each `Hook`.
+Async variant of `call_hook()` that invokes a hook via the Agent Gateway MCP tool interface instead of a direct HTTP call. Auth and endpoint resolution are handled internally — no manual URL or token configuration is needed.
+
+```python
+async def call_hook_agw(
+    self,
+    hook: Hook,
+    user_token: Optional[str] = None,
+    message: Optional[Message] = None,
+    headers: Optional[dict] = None,
+    tenant_subdomain: Optional[str] = None,
+) -> Optional[Message]: ...
+```
+
+- `hook`: Hook configuration object containing workflow config, timeout, and other settings.
+- `user_token`: Optional user token forwarded to the Agent Gateway client for MCP tool discovery and invocation.
+- `message`: Optional A2A `Message` payload serialised into the webhook body sent to the n8n workflow.
+- `headers`: Optional HTTP headers included in the webhook data passed to the n8n workflow.
+- `tenant_subdomain`: Tenant subdomain used to instantiate the Agent Gateway client. Pass `None` to use the default subdomain.
+- Returns the response data as a `Message` object, or `None` if no message is produced.
+- Raises `TransportError` if the AGW tool call itself fails (network error, etc.).
+- Raises `ExtensibilityError` if the n8n MCP tools are not found via AGW, the workflow reaches a terminal failure status, times out, or n8n returns an application-level error.
+
+#### `N8nWorkflowConfig`
 
 ```python
 @dataclass
@@ -445,6 +468,35 @@ for hook in ext.hooks:
     print(f"On failure: {hook.on_failure}")
 ```
 
+### Calling Hook Endpoints via Agent Gateway
+
+Use `call_hook_agw()` to invoke a hook through the Agent Gateway MCP interface. No endpoint URL or auth token is required — the AGW client resolves these internally from the tenant subdomain.
+
+```python
+from sap_cloud_sdk.extensibility import create_client, HookType
+from a2a.types import Message, Role, TextPart
+
+client = create_client("sap.ai:agent:myAgent:v1")
+ext = client.get_extension_capability_implementation(tenant=tenant_id)
+
+before_hooks = [h for h in ext.hooks if h.type == HookType.BEFORE]
+
+if before_hooks:
+    hook = before_hooks[0]
+    result = await client.call_hook_agw(
+        hook=hook,
+        user_token="my-user-token",
+        message=Message(
+            message_id="msg-001",
+            role=Role.user,
+            parts=[TextPart(text="Tool execution starting")],
+        ),
+        tenant_subdomain="my-tenant",
+    )
+    if result:
+        print(f"Hook response: {result}")
+```
+
 ### Calling Hook Endpoints
 
 Use the `call_hook()` method to execute a hook with a custom payload. Payloads use the `Message` type from `a2a.types`.
@@ -561,7 +613,7 @@ Hooks can be configured with different failure behaviors via the `on_failure` fi
 ```python
 from sap_cloud_sdk.extensibility import create_client, OnFailure
 from sap_cloud_sdk.extensibility.config import HookConfig
-from sap_cloud_sdk.extensibility.exceptions import TransportError
+from sap_cloud_sdk.extensibility.exceptions import ExtensibilityError
 from a2a.types import Message, Role, TextPart
 
 client = create_client("sap.ai:agent:myAgent:v1")
@@ -582,7 +634,7 @@ for hook in ext.hooks:
         response = client.call_hook(hook, hook_config)
         if response:
             print(f"Hook succeeded: {response}")
-    except TransportError as e:
+    except ExtensibilityError as e:
         if hook.on_failure == OnFailure.BLOCK:
             # Hook is configured to block on failure
             print(f"Critical hook failed, blocking: {e}")
@@ -706,9 +758,9 @@ Validation issues produce log warnings but never prevent output generation.
 
 ### Exception Hierarchy
 
-- `ExtensibilityError` -- Base exception for all extensibility module errors.
+- `ExtensibilityError` -- Base exception for all extensibility module errors. Also raised directly for workflow-level failures: terminal execution status, timeout, n8n application-level errors (JSON-RPC errors, `isError` results), and missing MCP tools via AGW.
 - `ClientCreationError(ExtensibilityError)` -- Represents a client construction failure. Not raised by `create_client()` (which handles it internally), but available for use in custom client-construction logic.
-- `TransportError(ExtensibilityError)` -- Raised by the transport layer on failure. Not seen when using the client, which catches all transport errors and returns an empty result.
+- `TransportError(ExtensibilityError)` -- Raised by the transport layer on network-level failures: HTTP errors, SSE parsing failures, response decode errors. Not seen when using `get_extension_capability_implementation()`, which catches all errors and returns an empty result. May be raised by `call_hook()` and `call_hook_agw()` on network failures.
 
 ## Service Binding
 

@@ -33,6 +33,7 @@ logger = logging.getLogger(__name__)
 
 
 def create_client(
+    destination_credential_config: Optional[DestinationCredentialConfig] = None,
     destination_name: Optional[str] = None,
     access_strategy: Optional[str] = None,
     instance: Optional[str] = None,
@@ -49,6 +50,8 @@ def create_client(
         - CLOUD_SDK_OMS_INSTANCE: Default destination service instance name
 
     Args:
+        destination_credential_config: Pre-configured DestinationCredentialConfig object.
+            If provided, other parameters are ignored.
         destination_name: Name of the destination. If not provided, reads from
             CLOUD_SDK_OMS_DESTINATION_NAME environment variable.
         access_strategy: Destination access strategy. If not provided, reads from
@@ -61,10 +64,11 @@ def create_client(
 
     Raises:
         ValidationException: If destination_name is not provided and not found in environment
+            (when destination_credential_config is not provided)
 
     Example:
         ```python
-        from sap_cloud_sdk.outputmanagement import create_client
+        from sap_cloud_sdk.outputmanagement import create_client, DestinationCredentialConfig
 
         # Using environment variables
         client = create_client()
@@ -76,6 +80,14 @@ def create_client(
             instance="default"
         )
 
+        # With DestinationCredentialConfig
+        config = DestinationCredentialConfig(
+            destination_name="MY_OMS_DESTINATION",
+            access_strategy="PROVIDER_ONLY",
+            instance="default"
+        )
+        client = create_client(destination_credential_config=config)
+
         # Use the client's 4 methods
         response = client.send_email(
             notification_template_key="PO_NOTIFICATION",
@@ -84,31 +96,40 @@ def create_client(
         )
         ```
     """
-    # Read from environment variables with parameter overrides
-    dest_name = destination_name or os.getenv("CLOUD_SDK_OMS_DESTINATION_NAME")
-    access_strat = access_strategy or os.getenv(
-        "CLOUD_SDK_OMS_ACCESS_STRATEGY", "PROVIDER_ONLY"
-    )
-    inst = instance or os.getenv("CLOUD_SDK_OMS_INSTANCE", "default")
+    # If destination_credential_config is provided, use it directly
+    if destination_credential_config is not None:
+        destination_config = destination_credential_config
+        logger.info(
+            f"Creating Output Management client with provided DestinationCredentialConfig: "
+            f"destination '{destination_config.destination_name}'"
+        )
+    else:
+        # Validate and build config from individual parameters
+        # Read from environment variables with parameter overrides
+        dest_name = destination_name or os.getenv("CLOUD_SDK_OMS_DESTINATION_NAME")
+        access_strat = access_strategy or os.getenv(
+            "CLOUD_SDK_OMS_ACCESS_STRATEGY", "PROVIDER_ONLY"
+        )
+        inst = instance or os.getenv("CLOUD_SDK_OMS_INSTANCE", "default")
 
-    if not dest_name:
-        raise ValidationException(
-            "Destination name must be provided either as parameter or via "
-            "CLOUD_SDK_OMS_DESTINATION_NAME environment variable",
-            error_code="MISSING_DESTINATION_NAME",
+        if not dest_name:
+            raise ValidationException(
+                "Destination name must be provided either as parameter or via "
+                "CLOUD_SDK_OMS_DESTINATION_NAME environment variable",
+                error_code="MISSING_DESTINATION_NAME",
+            )
+
+        logger.info(
+            f"Creating Output Management client with destination '{dest_name}', "
+            f"access_strategy '{access_strat}', instance '{inst}'"
         )
 
-    logger.info(
-        f"Creating Output Management client with destination '{dest_name}', "
-        f"access_strategy '{access_strat}', instance '{inst}'"
-    )
-
-    # Create destination config
-    destination_config = DestinationCredentialConfig(
-        destination_name=dest_name,
-        access_strategy=access_strat,
-        instance=inst,
-    )
+        # Create destination config
+        destination_config = DestinationCredentialConfig(
+            destination_name=dest_name,
+            access_strategy=access_strat,
+            instance=inst,
+        )
 
     # Get the destination object
     http_destination = destination_config.get_destination()
@@ -121,7 +142,7 @@ def create_client(
     service_client = OutputManagementServiceClient(
         base_url=base_url,
         destination=http_destination,
-        destination_instance=inst,
+        destination_instance=destination_config.instance or "default",
     )
 
     # Wrap it in the unified OutputManagementClient

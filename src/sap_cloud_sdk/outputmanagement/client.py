@@ -17,6 +17,7 @@ from ._models import (
     AttachmentConfig,
     PreGeneratedAttachment,
 )
+from ._service_client import OutputManagementServiceClient
 from .constants import Channel
 from .utils import RequestValidator
 
@@ -46,7 +47,7 @@ class OutputManagementClient:
         )
     """
 
-    def __init__(self, service_client):
+    def __init__(self, service_client: OutputManagementServiceClient):
         """
         Initialize the Output Management client.
 
@@ -126,6 +127,7 @@ class OutputManagementClient:
         to_emails: List[str],
         business_document: Dict[str, Any],
         cc_email: Optional[str] = None,
+        template_language: Optional[str] = "en",
         attachment_urls: Optional[List[str]] = None,
         mcp_tool: Any = None,
         sender_provider_subaccount_id: Optional[str] = None,
@@ -139,6 +141,7 @@ class OutputManagementClient:
             to_emails: List of recipient email addresses
             business_document: Business document as a dictionary
             cc_email: CC email address (optional)
+            template_language: ISO language code (default: "en")
             attachment_urls: List of DMS URLs for attachments (optional)
             mcp_tool: MCP tool instance (required)
             sender_provider_subaccount_id: Sender provider subaccount ID (optional)
@@ -166,7 +169,7 @@ class OutputManagementClient:
                 to=to_emails,
                 business_document=business_document,
                 cc=[cc_email] if cc_email else None,
-                template_language="en",
+                template_language=template_language,
                 attachment_urls=attachment_urls,
             )
 

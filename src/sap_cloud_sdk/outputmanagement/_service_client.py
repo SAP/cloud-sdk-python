@@ -244,8 +244,8 @@ class OutputManagementServiceClient:
 
             except Exception as e:
                 logger.error(
-                     f"Failed to retrieve/process certificate '{cert_name}': {e}",
-                      exc_info=True,
+                    f"Failed to retrieve/process certificate '{cert_name}': {e}",
+                    exc_info=True,
                 )
                 return None
 
@@ -352,7 +352,7 @@ class OutputManagementServiceClient:
         return error_mapping.get(status_code)
 
     @staticmethod
-    def _create_output_error_response(error_type, message) -> OutputResponse:
+    def _create_output_error_response(error_type: str, message: str) -> OutputResponse:
         """Create an OutputResponse with error information."""
         return OutputResponse(
             outputRequestId=None,

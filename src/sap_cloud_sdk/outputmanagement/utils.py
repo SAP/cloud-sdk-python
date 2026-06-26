@@ -11,7 +11,7 @@ Version: 1.0.0
 Since: 1.0.0
 """
 
-from typing import Optional, List
+from typing import Any, Dict, List, Optional
 from ._models import (
     OutputRequest,
     EmailConfiguration,
@@ -161,7 +161,7 @@ class RequestValidator:
     def validate_email_parameters(
         notification_template_key: str,
         to: List[str],
-        business_document: dict,
+        business_document: Dict[str, Any],
         template_language: str,
         cc: Optional[List[str]] = None,
     ) -> Optional[str]:

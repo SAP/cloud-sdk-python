@@ -458,6 +458,22 @@ async def _fetch_agent_card(
     return AgentCard(raw=payload)
 
 
+def _ord_id_from_url(url: str) -> str:
+    """Extract the ORD ID from an A2A fragment URL.
+
+    A2A fragment URLs follow the pattern:
+        https://{gateway-host}/v1/a2a/{ordId}/{globalTenantId}
+
+    The ORD ID is the second-to-last non-empty path segment.
+
+    Returns an empty string if the URL path has fewer than two segments.
+    """
+    from urllib.parse import urlparse
+
+    path_segments = [s for s in urlparse(url).path.split("/") if s]
+    return path_segments[-2] if len(path_segments) >= 2 else ""
+
+
 async def get_agent_cards_lob(
     tenant_subdomain: str,
     system_token: str,
@@ -507,24 +523,33 @@ async def get_agent_cards_lob(
         fragments = [
             f
             for f in fragments
-            if (f.properties.get("ordId") or f.properties.get("OrdId")) in ord_ids_set
+            if _ord_id_from_url(
+                {k.lower(): v for k, v in f.properties.items()}.get("url", "")
+            )
+            in ord_ids_set
         ]
 
     agents: list[Agent] = []
 
     for fragment in fragments:
         fragment_name = fragment.name
-        ord_id = fragment.properties.get("ordId") or fragment.properties.get("OrdId")
-        fragment_url = fragment.properties.get("URL") or fragment.properties.get("url")
+        props_lower = {k.lower(): v for k, v in fragment.properties.items()}
+        fragment_url = props_lower.get("url")
 
-        if not ord_id:
-            logger.warning(
-                "A2A fragment '%s' missing 'ordId' property — skipping", fragment_name
-            )
-            continue
         if not fragment_url:
             logger.warning(
-                "A2A fragment '%s' missing 'URL' property — skipping", fragment_name
+                "A2A fragment '%s' missing 'URL' property — skipping (properties: %s)",
+                fragment_name,
+                list(fragment.properties.keys()),
+            )
+            continue
+
+        ord_id = _ord_id_from_url(fragment_url)
+        if not ord_id:
+            logger.warning(
+                "A2A fragment '%s' could not extract ordId from URL '%s' — skipping",
+                fragment_name,
+                fragment_url,
             )
             continue
 

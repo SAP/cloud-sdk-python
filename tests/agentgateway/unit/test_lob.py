@@ -16,6 +16,7 @@ from sap_cloud_sdk.agentgateway._fragments import (
 from sap_cloud_sdk.agentgateway._lob import (
     _ias_dest_name,
     _fetch_auth_token,
+    _ord_id_from_url,
     fetch_system_auth,
     fetch_user_auth,
     get_mcp_tools_lob,
@@ -702,6 +703,35 @@ class TestCallMcpToolLob:
 # ============================================================
 
 
+# ============================================================
+# Test: _ord_id_from_url
+# ============================================================
+
+
+class TestOrdIdFromUrl:
+    """Tests for _ord_id_from_url helper."""
+
+    def test_extracts_ord_id_from_standard_url(self):
+        """Return the second-to-last path segment as ord_id."""
+        assert _ord_id_from_url(
+            "https://agw.example.com/v1/a2a/sap.s4:agent:v1/tenant-abc"
+        ) == "sap.s4:agent:v1"
+
+    def test_strips_trailing_slash(self):
+        """Handle trailing slash on URL."""
+        assert _ord_id_from_url(
+            "https://agw.example.com/v1/a2a/ord-1/gt-1/"
+        ) == "ord-1"
+
+    def test_returns_empty_for_single_segment(self):
+        """Return empty string when URL has only one path segment."""
+        assert _ord_id_from_url("https://agw.example.com/only-one") == ""
+
+    def test_returns_empty_for_bare_host(self):
+        """Return empty string for bare host URL with no path."""
+        assert _ord_id_from_url("https://agw.example.com") == ""
+
+
 class TestListA2aFragments:
     """Tests for list_a2a_fragments function."""
 
@@ -823,17 +853,19 @@ class TestFetchAgentCard:
 class TestGetAgentCardsLob:
     """Tests for get_agent_cards_lob async function."""
 
-    def _make_fragment(self, name: str, ord_id: str, url: str) -> MagicMock:
+    def _make_fragment(self, name: str, url: str) -> MagicMock:
         fragment = MagicMock()
         fragment.name = name
-        fragment.properties = {"ordId": ord_id, "URL": url}
+        fragment.properties = {"URL": url}
         return fragment
 
     @pytest.mark.asyncio
     async def test_returns_agents_for_all_fragments(self):
         """Return one Agent per A2A fragment with fetched card."""
         card_payload = {"name": "MyAgent"}
-        fragment = self._make_fragment("frag-1", "sap.s4:agent:v1", "https://agw.example.com/v1/a2a/sap.s4:agent:v1/tenant-abc")
+        fragment = self._make_fragment(
+            "frag-1", "https://agw.example.com/v1/a2a/sap.s4:agent:v1/tenant-abc"
+        )
 
         with (
             patch(
@@ -869,8 +901,8 @@ class TestGetAgentCardsLob:
     @pytest.mark.asyncio
     async def test_filters_by_names(self):
         """Only include fragments whose name is in the names filter."""
-        frag_1 = self._make_fragment("frag-1", "ord-1", "https://agw.example.com/a2a/1/t1")
-        frag_2 = self._make_fragment("frag-2", "ord-2", "https://agw.example.com/a2a/2/t2")
+        frag_1 = self._make_fragment("frag-1", "https://agw.example.com/v1/a2a/ord-1/t1")
+        frag_2 = self._make_fragment("frag-2", "https://agw.example.com/v1/a2a/ord-2/t2")
 
         with (
             patch(
@@ -893,9 +925,9 @@ class TestGetAgentCardsLob:
 
     @pytest.mark.asyncio
     async def test_filters_by_ord_ids(self):
-        """Only include fragments whose ordId is in the ord_ids filter."""
-        frag_1 = self._make_fragment("frag-1", "ord-1", "https://agw.example.com/a2a/1/t1")
-        frag_2 = self._make_fragment("frag-2", "ord-2", "https://agw.example.com/a2a/2/t2")
+        """Only include fragments whose ordId (from URL) is in the ord_ids filter."""
+        frag_1 = self._make_fragment("frag-1", "https://agw.example.com/v1/a2a/ord-1/t1")
+        frag_2 = self._make_fragment("frag-2", "https://agw.example.com/v1/a2a/ord-2/t2")
 
         with (
             patch(
@@ -917,11 +949,11 @@ class TestGetAgentCardsLob:
         assert mock_fetch.call_count == 1
 
     @pytest.mark.asyncio
-    async def test_skips_fragment_missing_ord_id(self):
-        """Skip fragment that has no ordId property."""
+    async def test_skips_fragment_with_unparseable_ord_id(self):
+        """Skip fragment whose URL has fewer than two path segments (no ordId)."""
         fragment = MagicMock()
-        fragment.name = "frag-no-ord"
-        fragment.properties = {"URL": "https://agw.example.com/base"}
+        fragment.name = "frag-bad-url"
+        fragment.properties = {"URL": "https://agw.example.com"}
 
         with patch(
             "sap_cloud_sdk.agentgateway._lob.list_a2a_fragments",
@@ -936,7 +968,7 @@ class TestGetAgentCardsLob:
         """Skip fragment that has no URL property."""
         fragment = MagicMock()
         fragment.name = "frag-no-url"
-        fragment.properties = {"ordId": "ord-1"}
+        fragment.properties = {}
 
         with patch(
             "sap_cloud_sdk.agentgateway._lob.list_a2a_fragments",
@@ -949,11 +981,15 @@ class TestGetAgentCardsLob:
     @pytest.mark.asyncio
     async def test_skips_fragment_on_fetch_error(self):
         """Skip fragment when agent card fetch fails, continue with others."""
-        frag_ok = self._make_fragment("frag-ok", "ord-ok", "https://agw.example.com/ok")
-        frag_err = self._make_fragment("frag-err", "ord-err", "https://agw.example.com/err")
+        frag_ok = self._make_fragment(
+            "frag-ok", "https://agw.example.com/v1/a2a/ord-ok/t-ok"
+        )
+        frag_err = self._make_fragment(
+            "frag-err", "https://agw.example.com/v1/a2a/ord-err/t-err"
+        )
 
         async def _selective_fetch(fragment_url, token, timeout):
-            if "err" in fragment_url:
+            if "ord-err" in fragment_url:
                 raise RuntimeError("server unreachable")
             return AgentCard(raw={"name": "OK"})
 

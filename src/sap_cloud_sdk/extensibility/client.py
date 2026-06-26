@@ -397,9 +397,7 @@ class ExtensibilityClient:
         )
 
     async def _discover_n8n_tools(
-        self, 
-        agw_client: Any, 
-        user_token: Optional[str]
+        self, agw_client: Any, user_token: Optional[str]
     ) -> tuple[Any, Any]:
         tools = await agw_client.list_mcp_tools(user_token=user_token or None)
 

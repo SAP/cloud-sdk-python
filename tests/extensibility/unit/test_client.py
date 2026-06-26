@@ -24,7 +24,7 @@ from sap_cloud_sdk.extensibility._models import (
 )
 from http import HTTPMethod
 from sap_cloud_sdk.extensibility.config import ExtensibilityConfig
-from sap_cloud_sdk.extensibility.exceptions import TransportError
+from sap_cloud_sdk.extensibility.exceptions import ExtensibilityError, TransportError
 from sap_cloud_sdk.agentgateway._models import MCPTool
 
 
@@ -347,19 +347,19 @@ class TestCallHook:
 
     @pytest.mark.asyncio
     async def test_execute_tool_not_found_raises(self):
-        """Raises TransportError when execute_workflow tool is absent."""
+        """Raises ExtensibilityError when execute_workflow tool is absent."""
         agw = _make_agw_client(tools=[], tool_responses=[])
         client = self._make_client(agw)
         with patch(
             "sap_cloud_sdk.extensibility.client.create_agw_client",
             return_value=agw,
         ):
-            with pytest.raises(TransportError, match=_EXECUTE_WORKFLOW_TOOL_NAME):
+            with pytest.raises(ExtensibilityError, match=_EXECUTE_WORKFLOW_TOOL_NAME):
                 await client.call_hook_agw(hook=_make_hook(), tenant_subdomain="t")
 
     @pytest.mark.asyncio
     async def test_get_exec_tool_not_found_raises(self):
-        """Raises TransportError when get_execution tool is absent."""
+        """Raises ExtensibilityError when get_execution tool is absent."""
         tools = [_make_n8n_tool(_EXECUTE_WORKFLOW_TOOL_NAME)]
         agw = _make_agw_client(tools=tools, tool_responses=[])
         client = self._make_client(agw)
@@ -367,7 +367,7 @@ class TestCallHook:
             "sap_cloud_sdk.extensibility.client.create_agw_client",
             return_value=agw,
         ):
-            with pytest.raises(TransportError, match=_GET_EXECUTION_TOOL_NAME):
+            with pytest.raises(ExtensibilityError, match=_GET_EXECUTION_TOOL_NAME):
                 await client.call_hook_agw(hook=_make_hook(), tenant_subdomain="t")
 
     @pytest.mark.asyncio
@@ -383,7 +383,7 @@ class TestCallHook:
             "sap_cloud_sdk.extensibility.client.create_agw_client",
             return_value=agw,
         ):
-            with pytest.raises(TransportError, match=_EXECUTE_WORKFLOW_TOOL_NAME):
+            with pytest.raises(ExtensibilityError, match=_EXECUTE_WORKFLOW_TOOL_NAME):
                 await client.call_hook_agw(hook=_make_hook(), tenant_subdomain="t")
 
     @pytest.mark.asyncio
@@ -463,7 +463,7 @@ class TestCallHook:
 
     @pytest.mark.asyncio
     async def test_terminal_status_from_execute_raises(self):
-        """Raises TransportError on a terminal status from execute_workflow."""
+        """Raises ExtensibilityError on a terminal status from execute_workflow."""
         tools = [
             _make_n8n_tool(_EXECUTE_WORKFLOW_TOOL_NAME),
             _make_n8n_tool(_GET_EXECUTION_TOOL_NAME),
@@ -475,12 +475,12 @@ class TestCallHook:
             "sap_cloud_sdk.extensibility.client.create_agw_client",
             return_value=agw,
         ):
-            with pytest.raises(TransportError, match="workflow crashed"):
+            with pytest.raises(ExtensibilityError, match="workflow crashed"):
                 await client.call_hook_agw(hook=_make_hook(), tenant_subdomain="t")
 
     @pytest.mark.asyncio
     async def test_terminal_status_from_poll_raises(self):
-        """Raises TransportError on a terminal status from get_execution poll."""
+        """Raises ExtensibilityError on a terminal status from get_execution poll."""
         tools = [
             _make_n8n_tool(_EXECUTE_WORKFLOW_TOOL_NAME),
             _make_n8n_tool(_GET_EXECUTION_TOOL_NAME),
@@ -498,12 +498,12 @@ class TestCallHook:
             "sap_cloud_sdk.extensibility.client.asyncio.sleep",
             new_callable=AsyncMock,
         ):
-            with pytest.raises(TransportError, match="node failed"):
+            with pytest.raises(ExtensibilityError, match="node failed"):
                 await client.call_hook_agw(hook=_make_hook(), tenant_subdomain="t")
 
     @pytest.mark.asyncio
     async def test_timeout_raises(self):
-        """Raises TransportError when deadline is exceeded without a success status."""
+        """Raises ExtensibilityError when deadline is exceeded without a success status."""
         tools = [
             _make_n8n_tool(_EXECUTE_WORKFLOW_TOOL_NAME),
             _make_n8n_tool(_GET_EXECUTION_TOOL_NAME),
@@ -523,7 +523,7 @@ class TestCallHook:
             "sap_cloud_sdk.extensibility.client.asyncio.sleep",
             new_callable=AsyncMock,
         ):
-            with pytest.raises(TransportError, match="timed out"):
+            with pytest.raises(ExtensibilityError, match="timed out"):
                 await client.call_hook_agw(hook=hook, tenant_subdomain="t")
 
     @pytest.mark.asyncio

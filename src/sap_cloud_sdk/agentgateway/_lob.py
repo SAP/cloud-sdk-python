@@ -478,27 +478,29 @@ async def get_agent_cards_lob(
     tenant_subdomain: str,
     system_token: str,
     timeout: float,
-    names: list[str] | None = None,
+    agent_names: list[str] | None = None,
     ord_ids: list[str] | None = None,
 ) -> list[Agent]:
     """List A2A agents and their agent cards using LoB flow.
 
-    Discovers A2A fragments (label agw.a2a.server), optionally filters them,
-    then fetches the agent card for each from the fragment's URL property.
+    Discovers A2A fragments (label agw.a2a.server), optionally filters by
+    ORD ID before fetching, fetches each agent card, then optionally filters
+    by agent card name.
 
     Fragment properties used:
         URL: Base URL of the A2A agent (required).
             The agent card is fetched at {URL}/.well-known/agent-card.json.
-        ordId: ORD ID of the A2A agent (required).
+            The ORD ID is extracted from the second-to-last URL path segment.
 
     Args:
         tenant_subdomain: Tenant subdomain for multi-tenant lookup.
         system_token: Pre-fetched raw system token for authentication.
         timeout: HTTP timeout in seconds.
-        names: Optional list of fragment names to include. If empty or None,
-            all fragments are included.
-        ord_ids: Optional list of ORD IDs to include. If empty or None,
-            all fragments are included.
+        agent_names: Optional list of agent card names to include (matched
+            against the `name` field in the fetched agent card JSON).
+            Applied after fetching. If empty or None, all are included.
+        ord_ids: Optional list of ORD IDs to include (extracted from URL).
+            Applied before fetching. If empty or None, all are included.
 
     Returns:
         List of Agent objects, each containing ORD ID and fetched AgentCard.
@@ -514,10 +516,7 @@ async def get_agent_cards_lob(
         )
         return []
 
-    # Apply optional filters
-    if names:
-        names_set = set(names)
-        fragments = [f for f in fragments if f.name in names_set]
+    # Pre-fetch filter: ORD ID is extractable from the URL without fetching the card
     if ord_ids:
         ord_ids_set = set(ord_ids)
         fragments = [
@@ -561,6 +560,11 @@ async def get_agent_cards_lob(
             logger.exception(
                 "Failed to fetch agent card for fragment '%s' — skipping", fragment_name
             )
+
+    # Post-fetch filter: agent card name is only known after fetching
+    if agent_names:
+        agent_names_set = set(agent_names)
+        agents = [a for a in agents if a.agent_card.raw.get("name") in agent_names_set]
 
     logger.info(
         "Fetched %d agent card(s) from %d A2A fragment(s)", len(agents), len(fragments)

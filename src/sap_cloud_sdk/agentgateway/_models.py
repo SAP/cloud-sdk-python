@@ -130,8 +130,10 @@ class AgentCardFilter:
     filtering on that field).
 
     Attributes:
-        names: Fragment names to include.
-        ord_ids: ORD IDs to include.
+        agent_names: Agent card names to include (matched against the `name`
+            field in the agent card JSON). Applied after fetching all cards.
+        ord_ids: ORD IDs to include (extracted from the fragment URL).
+            Applied before fetching, skipping non-matching fragments.
 
     Example:
         ```python
@@ -139,12 +141,12 @@ class AgentCardFilter:
 
         agents = await agw_client.list_agent_cards(
             filter=AgentCardFilter(
-                names=["my-fragment"],
+                agent_names=["Billing Assistant Agent"],
                 ord_ids=["sap.s4:apiAccess:agent:v1"],
             )
         )
         ```
     """
 
-    names: list[str] = field(default_factory=list)
+    agent_names: list[str] = field(default_factory=list)
     ord_ids: list[str] = field(default_factory=list)

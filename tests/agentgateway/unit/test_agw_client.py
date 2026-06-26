@@ -877,7 +877,7 @@ class TestListAgentCards:
             "my-tenant",
             "system-token",
             60.0,
-            names=None,
+            agent_names=None,
             ord_ids=None,
         )
 
@@ -902,14 +902,14 @@ class TestListAgentCards:
         ):
             agw_client = create_client(tenant_subdomain="my-tenant")
             await agw_client.list_agent_cards(
-                filter=AgentCardFilter(names=["frag-1"], ord_ids=["sap.s4:agent:v1"])
+                filter=AgentCardFilter(agent_names=["Billing Agent"], ord_ids=["sap.s4:agent:v1"])
             )
 
         mock_lob.assert_called_once_with(
             "my-tenant",
             "token",
             60.0,
-            names=["frag-1"],
+            agent_names=["Billing Agent"],
             ord_ids=["sap.s4:agent:v1"],
         )
 

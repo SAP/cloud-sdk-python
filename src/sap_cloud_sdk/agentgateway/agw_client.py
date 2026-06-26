@@ -431,7 +431,7 @@ class AgentGatewayClient:
                 tenant,
                 auth.access_token,
                 self._config.timeout,
-                names=f.names or None,
+                agent_names=f.agent_names or None,
                 ord_ids=f.ord_ids or None,
             )
         except AgentGatewaySDKError:

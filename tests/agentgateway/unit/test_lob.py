@@ -899,10 +899,15 @@ class TestGetAgentCardsLob:
         assert result == []
 
     @pytest.mark.asyncio
-    async def test_filters_by_names(self):
-        """Only include fragments whose name is in the names filter."""
+    async def test_filters_by_agent_names(self):
+        """Fetch all cards then keep only those whose agent card name matches."""
         frag_1 = self._make_fragment("frag-1", "https://agw.example.com/v1/a2a/ord-1/t1")
         frag_2 = self._make_fragment("frag-2", "https://agw.example.com/v1/a2a/ord-2/t2")
+
+        async def _cards_by_ord(fragment_url, token, timeout):
+            if "ord-1" in fragment_url:
+                return AgentCard(raw={"name": "Billing Agent"})
+            return AgentCard(raw={"name": "Other Agent"})
 
         with (
             patch(
@@ -911,17 +916,16 @@ class TestGetAgentCardsLob:
             ),
             patch(
                 "sap_cloud_sdk.agentgateway._lob._fetch_agent_card",
-                new_callable=AsyncMock,
-                return_value=AgentCard(raw={}),
-            ) as mock_fetch,
+                side_effect=_cards_by_ord,
+            ),
         ):
             result = await get_agent_cards_lob(
-                "tenant-sub", "token", 60.0, names=["frag-1"]
+                "tenant-sub", "token", 60.0, agent_names=["Billing Agent"]
             )
 
         assert len(result) == 1
         assert result[0].ord_id == "ord-1"
-        assert mock_fetch.call_count == 1
+        assert result[0].agent_card.raw["name"] == "Billing Agent"
 
     @pytest.mark.asyncio
     async def test_filters_by_ord_ids(self):

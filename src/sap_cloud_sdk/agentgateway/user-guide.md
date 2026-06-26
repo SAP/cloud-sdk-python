@@ -64,7 +64,7 @@ result = await agw_client.call_mcp_tool(
 
 ### A2A Agent Cards (LoB only)
 
-Discover A2A agents and their agent cards from destination fragments labelled `agw.a2a.server`. Each fragment must have an `ordId` and a `URL` property; the agent card is fetched from `{URL}/.well-known/agent-card.json`.
+Discover A2A agents and their agent cards from destination fragments labelled `agw.a2a.server`. Each fragment must have a `URL` property; the agent card is fetched from `{URL}/.well-known/agent-card.json` and the ORD ID is extracted from the second-to-last URL path segment.
 
 ```python
 from sap_cloud_sdk.agentgateway import AgentCardFilter, create_client
@@ -78,10 +78,10 @@ for agent in agents:
     print(agent.ord_id)
     print(agent.agent_card.raw)  # full agent card JSON payload
 
-# Filter by fragment name or ORD ID
+# Filter by agent card name (post-fetch) or ORD ID (pre-fetch)
 agents = await agw_client.list_agent_cards(
     filter=AgentCardFilter(
-        names=["my-a2a-fragment"],
+        agent_names=["Sample Agent"],
         ord_ids=["sap.s4:apiAccess:purchaseOrderAI:agent:v1"],
     )
 )
@@ -138,7 +138,7 @@ The SDK discovers resources via BTP Destination Service fragments filtered by th
 | Label value | Resource |
 |---|---|
 | `agw.mcp.server` | MCP tool server — `URL` property points to the MCP endpoint |
-| `agw.a2a.server` | A2A agent — `URL` property is the agent base URL; `ordId` property is the ORD ID |
+| `agw.a2a.server` | A2A agent — `URL` property is the agent base URL; ORD ID is extracted from the second-to-last URL path segment |
 | `subscriber.ias` | IAS credential fragment for system-scoped token acquisition |
 | `subscriber.ias.user` | IAS credential fragment for user-scoped token exchange |
 
@@ -212,12 +212,12 @@ class AgentGatewayClient:
 from sap_cloud_sdk.agentgateway import AgentCardFilter
 
 AgentCardFilter(
-    names=[],    # fragment names to include; empty = no filter
-    ord_ids=[],  # ORD IDs to include; empty = no filter
+    agent_names=[],  # agent card names to include (matched against card JSON `name`); empty = no filter
+    ord_ids=[],      # ORD IDs to include (extracted from fragment URL); empty = no filter
 )
 ```
 
-Both fields default to empty lists. Filters are applied with AND semantics: if both are set, a fragment must match both to be included.
+Both fields default to empty lists. Filters are applied with AND semantics: if both are set, an agent must match both to be included. `agent_names` is applied after fetching (requires reading the card); `ord_ids` is applied before fetching (extracted from the fragment URL, no card request needed).
 
 ### Data Models
 

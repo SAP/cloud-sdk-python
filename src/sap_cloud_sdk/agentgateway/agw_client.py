@@ -407,7 +407,7 @@ class AgentGatewayClient:
             # With filters
             agents = await agw_client.list_agent_cards(
                 filter=AgentCardFilter(
-                    names=["my-fragment"],
+                    agent_names=["Sample Agent"],
                     ord_ids=["sap.s4:apiAccess:agent:v1"],
                 )
             )

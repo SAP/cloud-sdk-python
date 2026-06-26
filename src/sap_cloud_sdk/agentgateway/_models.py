@@ -141,7 +141,7 @@ class AgentCardFilter:
 
         agents = await agw_client.list_agent_cards(
             filter=AgentCardFilter(
-                agent_names=["Billing Assistant Agent"],
+                agent_names=["Sample Agent"],
                 ord_ids=["sap.s4:apiAccess:agent:v1"],
             )
         )

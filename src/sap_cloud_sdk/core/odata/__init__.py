@@ -1,0 +1,58 @@
+"""Shared OData v4 abstractions for the SAP Cloud SDK."""
+
+from sap_cloud_sdk.core.odata._async_transport import AsyncODataHttpTransport
+from sap_cloud_sdk.core.odata._entity_key import EntityKey
+from sap_cloud_sdk.core.odata._factory import odata_transport_from_destination
+from sap_cloud_sdk.core.odata._filter import (
+    FilterExpression,
+    quote_odata_guid_key,
+    quote_odata_string_key,
+)
+from sap_cloud_sdk.core.odata._models import ODataEntity
+from sap_cloud_sdk.core.odata._pagination import ODataPageIterator
+from sap_cloud_sdk.core.odata._query import OrderDirection, StructuredQuery
+from sap_cloud_sdk.core.odata._request_builders import (
+    CreateRequestBuilder,
+    DeleteRequestBuilder,
+    GetAllRequestBuilder,
+    GetByKeyRequestBuilder,
+    UpdateRequestBuilder,
+    build_key_segment,
+)
+from sap_cloud_sdk.core.odata._transport import ODataHttpTransport
+from sap_cloud_sdk.core.odata.exceptions import (
+    ODataAuthError,
+    ODataConnectionError,
+    ODataCsrfError,
+    ODataDeserializationError,
+    ODataError,
+    ODataNotFoundError,
+    ODataRequestError,
+)
+
+__all__ = [
+    "AsyncODataHttpTransport",
+    "build_key_segment",
+    "CreateRequestBuilder",
+    "DeleteRequestBuilder",
+    "EntityKey",
+    "FilterExpression",
+    "GetAllRequestBuilder",
+    "GetByKeyRequestBuilder",
+    "ODataAuthError",
+    "ODataConnectionError",
+    "ODataCsrfError",
+    "ODataDeserializationError",
+    "ODataEntity",
+    "ODataError",
+    "ODataHttpTransport",
+    "ODataNotFoundError",
+    "ODataPageIterator",
+    "ODataRequestError",
+    "OrderDirection",
+    "StructuredQuery",
+    "UpdateRequestBuilder",
+    "odata_transport_from_destination",
+    "quote_odata_guid_key",
+    "quote_odata_string_key",
+]

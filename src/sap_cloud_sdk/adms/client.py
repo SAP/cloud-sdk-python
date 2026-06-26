@@ -1,55 +1,17 @@
-"""ADMS client module — public sync and async entry points.
-
-The four entity-scoped API classes (`_DocumentApi`, `_DocumentRelationApi`,
-`_ConfigurationApi`, `_JobApi` and their async counterparts) live in
-sibling modules:
-
-- :mod:`sap_cloud_sdk.adms._document_api`
-- :mod:`sap_cloud_sdk.adms._relation_api`
-- :mod:`sap_cloud_sdk.adms._configuration_api`
-- :mod:`sap_cloud_sdk.adms._job_api`
-
-This module composes them into the high-level :class:`AdmsClient` /
-:class:`AsyncAdmsClient` and exposes the :func:`create_client` /
-:func:`create_async_client` factories.
-
-Usage::
-
-    from sap_cloud_sdk.adms import (
-        create_client,
-        create_async_client,
-        RelationQueryOptions,
-    )
-
-    # Sync (service-to-service)
-    client = create_client()
-    relations = client.relations.get_all(
-        RelationQueryOptions(
-            filter="HostBusinessObjectNodeID eq 'PO-4500012345'",
-            expand=["Document"],
-        )
-    )
-
-    # Async (FastAPI / LangGraph)
-    async with create_async_client() as client:
-        relations = await client.relations.get_all(
-            RelationQueryOptions(
-                filter="HostBusinessObjectNodeID eq 'PO-4500012345'",
-                expand=["Document"],
-            )
-        )
-"""
+"""ADMS client module — public sync and async entry points."""
 
 from __future__ import annotations
 
+from typing import Callable
+
 import httpx
+import requests
 
 from sap_cloud_sdk.adms._configuration_api import (
     _AsyncConfigurationApi,
     _ConfigurationApi,
 )
 from sap_cloud_sdk.adms._document_api import _AsyncDocumentApi, _DocumentApi
-from sap_cloud_sdk.adms._http import AdmsHttp, AsyncAdmsHttp
 from sap_cloud_sdk.adms._ias_fetcher import IasTokenFetcher
 from sap_cloud_sdk.adms._job_api import _AsyncJobApi, _JobApi
 from sap_cloud_sdk.adms._relation_api import (
@@ -57,12 +19,41 @@ from sap_cloud_sdk.adms._relation_api import (
     _DocumentRelationApi,
 )
 from sap_cloud_sdk.adms._token_cache import TokenCache
-from sap_cloud_sdk.adms.config import AdmsConfig, load_from_env_or_mount
+from sap_cloud_sdk.adms.config import (
+    AdmsConfig,
+    _ADMIN_SERVICE_PATH,
+    _CONFIG_SERVICE_PATH,
+    _SERVICE_PATH,
+    load_from_env_or_mount,
+)
+from sap_cloud_sdk.core.odata._async_transport import AsyncODataHttpTransport
+from sap_cloud_sdk.core.odata._transport import ODataHttpTransport
 
 
-# ---------------------------------------------------------------------------
-# Public client classes
-# ---------------------------------------------------------------------------
+def _sync_transport(
+    config: AdmsConfig,
+    session: requests.Session,
+    get_token: Callable[[], str],
+    path: str,
+) -> ODataHttpTransport:
+    return ODataHttpTransport(
+        base_url=config.service_url.rstrip("/") + path,
+        session=session,
+        get_token=get_token,
+    )
+
+
+def _async_transport(
+    config: AdmsConfig,
+    client: httpx.AsyncClient,
+    get_token: Callable[[], str],
+    path: str,
+) -> AsyncODataHttpTransport:
+    return AsyncODataHttpTransport(
+        base_url=config.service_url.rstrip("/") + path,
+        client=client,
+        get_token=get_token,
+    )
 
 
 class AdmsClient:
@@ -78,12 +69,23 @@ class AdmsClient:
     Use :meth:`with_user_jwt` to obtain a user-context client from an existing one.
     """
 
-    def __init__(self, http: AdmsHttp) -> None:
-        self._http = http
+    def __init__(
+        self,
+        http: ODataHttpTransport,
+        admin_http: ODataHttpTransport,
+        config_http: ODataHttpTransport,
+        *,
+        _config: AdmsConfig,
+        _session: requests.Session,
+        _token_fetcher: IasTokenFetcher,
+    ) -> None:
+        self._config = _config
+        self._session = _session
+        self._token_fetcher = _token_fetcher
         self.documents = _DocumentApi(http)
         self.relations = _DocumentRelationApi(http)
-        self.jobs = _JobApi(http)
-        self.config = _ConfigurationApi(http)
+        self.jobs = _JobApi(http, admin_http)
+        self.config = _ConfigurationApi(config_http)
 
     def with_user_jwt(self, user_jwt: str) -> "AdmsClient":
         """Return a new :class:`AdmsClient` with user-context authentication.
@@ -94,7 +96,21 @@ class AdmsClient:
         Returns:
             New :class:`AdmsClient` configured for user-context calls.
         """
-        return AdmsClient(self._http.with_user_jwt(user_jwt))
+        get_token: Callable[[], str] = lambda: self._token_fetcher.exchange_token(
+            user_jwt
+        )
+        return AdmsClient(
+            _sync_transport(self._config, self._session, get_token, _SERVICE_PATH),
+            _sync_transport(
+                self._config, self._session, get_token, _ADMIN_SERVICE_PATH
+            ),
+            _sync_transport(
+                self._config, self._session, get_token, _CONFIG_SERVICE_PATH
+            ),
+            _config=self._config,
+            _session=self._session,
+            _token_fetcher=self._token_fetcher,
+        )
 
 
 class AsyncAdmsClient:
@@ -110,21 +126,43 @@ class AsyncAdmsClient:
     Use :meth:`with_user_jwt` to obtain a user-context client from an existing one.
     """
 
-    def __init__(self, http: AsyncAdmsHttp) -> None:
-        self._http = http
+    def __init__(
+        self,
+        http: AsyncODataHttpTransport,
+        admin_http: AsyncODataHttpTransport,
+        config_http: AsyncODataHttpTransport,
+        *,
+        _config: AdmsConfig,
+        _httpx_client: httpx.AsyncClient,
+        _token_fetcher: IasTokenFetcher,
+        _owns_client: bool = True,
+    ) -> None:
+        self._config = _config
+        self._httpx_client = _httpx_client
+        self._token_fetcher = _token_fetcher
+        self._owns_client = _owns_client
         self.documents = _AsyncDocumentApi(http)
         self.relations = _AsyncDocumentRelationApi(http)
-        self.jobs = _AsyncJobApi(http)
-        self.config = _AsyncConfigurationApi(http)
+        self.jobs = _AsyncJobApi(http, admin_http)
+        self.config = _AsyncConfigurationApi(config_http)
 
     async def __aenter__(self) -> "AsyncAdmsClient":
         return self
 
     async def __aexit__(self, *_: object) -> None:
-        await self._http.aclose()
+        if self._owns_client:
+            await self._httpx_client.aclose()
+
+    async def aclose(self) -> None:
+        """Close the underlying httpx client if this instance owns it."""
+        if self._owns_client:
+            await self._httpx_client.aclose()
 
     def with_user_jwt(self, user_jwt: str) -> "AsyncAdmsClient":
         """Return a new :class:`AsyncAdmsClient` with user-context authentication.
+
+        The new instance shares the parent's ``httpx.AsyncClient`` (and its
+        connection pool) and will not close it on exit.
 
         Args:
             user_jwt: The user's OIDC or XSUAA JWT.
@@ -132,12 +170,24 @@ class AsyncAdmsClient:
         Returns:
             New :class:`AsyncAdmsClient` for user-context calls.
         """
-        return AsyncAdmsClient(self._http.with_user_jwt(user_jwt))
-
-
-# ---------------------------------------------------------------------------
-# Factory functions
-# ---------------------------------------------------------------------------
+        get_token: Callable[[], str] = lambda: self._token_fetcher.exchange_token(
+            user_jwt
+        )
+        return AsyncAdmsClient(
+            _async_transport(
+                self._config, self._httpx_client, get_token, _SERVICE_PATH
+            ),
+            _async_transport(
+                self._config, self._httpx_client, get_token, _ADMIN_SERVICE_PATH
+            ),
+            _async_transport(
+                self._config, self._httpx_client, get_token, _CONFIG_SERVICE_PATH
+            ),
+            _config=self._config,
+            _httpx_client=self._httpx_client,
+            _token_fetcher=self._token_fetcher,
+            _owns_client=False,
+        )
 
 
 def create_client(
@@ -173,8 +223,20 @@ def create_client(
         )
     binding = config or load_from_env_or_mount(instance)
     token_fetcher = IasTokenFetcher(config=binding, cache=token_cache)
-    http = AdmsHttp(config=binding, token_fetcher=token_fetcher, user_jwt=user_jwt)
-    return AdmsClient(http)
+    session = requests.Session()
+    get_token: Callable[[], str] = (
+        (lambda: token_fetcher.exchange_token(user_jwt))
+        if user_jwt
+        else token_fetcher.get_token
+    )
+    return AdmsClient(
+        _sync_transport(binding, session, get_token, _SERVICE_PATH),
+        _sync_transport(binding, session, get_token, _ADMIN_SERVICE_PATH),
+        _sync_transport(binding, session, get_token, _CONFIG_SERVICE_PATH),
+        _config=binding,
+        _session=session,
+        _token_fetcher=token_fetcher,
+    )
 
 
 def create_async_client(
@@ -208,10 +270,18 @@ def create_async_client(
         )
     binding = config or load_from_env_or_mount(instance)
     token_fetcher = IasTokenFetcher(config=binding, cache=token_cache)
-    http = AsyncAdmsHttp(
-        config=binding,
-        token_fetcher=token_fetcher,
-        client=http_client,
-        user_jwt=user_jwt,
+    httpx_client = http_client or httpx.AsyncClient()
+    get_token: Callable[[], str] = (
+        (lambda: token_fetcher.exchange_token(user_jwt))
+        if user_jwt
+        else token_fetcher.get_token
     )
-    return AsyncAdmsClient(http)
+    return AsyncAdmsClient(
+        _async_transport(binding, httpx_client, get_token, _SERVICE_PATH),
+        _async_transport(binding, httpx_client, get_token, _ADMIN_SERVICE_PATH),
+        _async_transport(binding, httpx_client, get_token, _CONFIG_SERVICE_PATH),
+        _config=binding,
+        _httpx_client=httpx_client,
+        _token_fetcher=token_fetcher,
+        _owns_client=http_client is None,
+    )

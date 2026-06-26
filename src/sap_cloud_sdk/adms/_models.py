@@ -16,6 +16,8 @@ This module defines enums and dataclasses for all ADMS entities:
 
 from __future__ import annotations
 
+from sap_cloud_sdk.core.odata._models import ODataEntity
+
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any
@@ -390,7 +392,7 @@ class DraftAdministrativeData:
 
 
 @dataclass
-class DocumentRelation:
+class DocumentRelation(ODataEntity):
     """Represents the link between a business object node and a stored document.
 
     A DocumentRelation is the *link* between a business object node
@@ -558,7 +560,7 @@ class DraftActivateInput(DraftInput):
 
 
 @dataclass
-class AllowedDomain:
+class AllowedDomain(ODataEntity):
     """Tenant-level domain allow-list for external URL documents.
 
     Controls which hostnames are permitted as targets when a document
@@ -688,7 +690,7 @@ class DocumentTypeText:
 
 
 @dataclass
-class DocumentType:
+class DocumentType(ODataEntity):
     """Tenant-configured document type (classification for documents).
 
     ADM enforces AMS policies per document type.  Each
@@ -787,7 +789,7 @@ class UpdateDocumentTypeInput:
 
 
 @dataclass
-class BusinessObjectNodeType:
+class BusinessObjectNodeType(ODataEntity):
     """Tenant-configured business object node type.
 
     Each :class:`DocumentRelation` is anchored to a
@@ -877,7 +879,7 @@ class UpdateBusinessObjectNodeTypeInput:
 
 
 @dataclass
-class DocumentTypeBusinessObjectTypeMap:
+class DocumentTypeBusinessObjectTypeMap(ODataEntity):
     """Mapping that controls which document types are allowed for a business object node type.
 
     Must be created before consumers can attach documents of a given type
@@ -1217,7 +1219,7 @@ class MimeTypePolicy(str, Enum):
 
 
 @dataclass
-class FileExtensionPolicy:
+class FileExtensionPolicy(ODataEntity):
     """Tenant-level file extension allow/block policy.
 
     ADM checks this list before accepting an upload.
@@ -1277,7 +1279,7 @@ class CreateFileExtensionPolicyInput:
 
 
 @dataclass
-class ApplicationTenant:
+class ApplicationTenant(ODataEntity):
     """Tenant-level application configuration.
 
     Attributes:
@@ -1314,3 +1316,20 @@ class CreateApplicationTenantInput:
             "ApplicationTenantID": self.application_tenant_id,
             "ApplicationTenantName": self.application_tenant_name,
         }
+
+
+# OData entity metadata (set after class definition to avoid Python 3.14 dataclass issues)
+AllowedDomain._entity_set = "AllowedDomainSet"
+AllowedDomain._key_fields = ("AllowedDomainID",)
+DocumentType._entity_set = "DocumentTypeSet"
+DocumentType._key_fields = ("DocumentTypeID",)
+BusinessObjectNodeType._entity_set = "BusinessObjectNodeTypeSet"
+BusinessObjectNodeType._key_fields = ("BusinessObjectNodeTypeUniqueID",)
+DocumentTypeBusinessObjectTypeMap._entity_set = "DocumentTypeBusinessObjectTypeMapSet"
+DocumentTypeBusinessObjectTypeMap._key_fields = ("DocumentTypeBOTypeMapID",)
+FileExtensionPolicy._entity_set = "FileExtensionPolicySet"
+FileExtensionPolicy._key_fields = ("FileExtensionPolicyID",)
+ApplicationTenant._entity_set = "ApplicationTenantSet"
+ApplicationTenant._key_fields = ("ApplicationTenantID",)
+DocumentRelation._entity_set = "DocumentRelation"
+DocumentRelation._key_fields = ("DocumentRelationID", "IsActiveEntity")

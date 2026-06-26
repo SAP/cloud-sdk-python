@@ -97,16 +97,16 @@ client = create_client(token_cache=MySharedCache())
 ## Async Client
 
 ```python
-from sap_cloud_sdk.adms import create_async_client, BaseType, CreateDocumentInput, CreateDocumentRelationInput, RelationQueryOptions
+from sap_cloud_sdk.adms import create_async_client, BaseType, CreateDocumentInput, CreateDocumentRelationInput, StructuredQuery
+from sap_cloud_sdk.core.odata import FilterExpression
 
 async def main():
     async with create_async_client() as client:
         # List all document relations for a business object
         relations = await client.relations.get_all(
-            RelationQueryOptions(
-                filter="HostBusinessObjectNodeID eq 'PO-4500012345'",
-                expand=["Document"],
-            )
+            StructuredQuery()
+            .filter(FilterExpression.field("HostBusinessObjectNodeID").eq("PO-4500012345"))
+            .expand("Document")
         )
         for relation in relations:
             doc = relation.document
@@ -121,47 +121,40 @@ async def main():
 ## Query Options
 
 List endpoints (`documents.get_all`, `relations.get_all`,
-`config.get_all_*`) accept an options class that encapsulates the OData V4
-query parameters.  The classes nest by capability — Configuration endpoints
-expose the smallest subset, DocumentRelation adds `$select`/`$expand`, and
-Document adds `$orderby` on top of that.
-
-| Class | filter | select | expand | top | skip | orderby |
-|---|:-:|:-:|:-:|:-:|:-:|:-:|
-| `ConfigQueryOptions` | ✓ | – | – | ✓ | ✓ | – |
-| `RelationQueryOptions` | ✓ | ✓ | ✓ | ✓ | ✓ | – |
-| `DocumentQueryOptions` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+`config.get_all_*`) accept a `StructuredQuery` from `sap_cloud_sdk.core.odata`
+to express OData V4 query parameters. Build queries by chaining immutable
+methods — each call returns a new instance, so a base query can be shared safely.
 
 ```python
-from sap_cloud_sdk.adms import (
-    ConfigQueryOptions,
-    DocumentQueryOptions,
-    RelationQueryOptions,
-)
+from sap_cloud_sdk.adms import create_client, StructuredQuery
+from sap_cloud_sdk.core.odata import FilterExpression
 
-# Document — full OData surface
+client = create_client()
+
+# Document — filter, paginate, order
 docs = client.documents.get_all(
-    DocumentQueryOptions(
-        filter="DocumentName eq 'Invoice.pdf'",
-        top=10,
-        orderby="CreatedAt desc",
-    )
+    StructuredQuery()
+    .filter(FilterExpression.field("DocumentName").eq("Invoice.pdf"))
+    .top(10)
+    .custom("$orderby", "CreatedAt desc")
 )
 
-# Relation — no $orderby on this entity set
+# Relation — filter and expand
 relations = client.relations.get_all(
-    RelationQueryOptions(
-        filter="HostBusinessObjectNodeID eq 'PO-4500012345'",
-        expand=["Document"],
-    )
+    StructuredQuery()
+    .filter(FilterExpression.field("HostBusinessObjectNodeID").eq("PO-4500012345"))
+    .expand("Document")
 )
 
-# Configuration endpoints — only $filter/$top/$skip
+# Configuration endpoints — filter and paginate
 domains = client.config.get_all_allowed_domains(
-    ConfigQueryOptions(filter="AllowedDomainProtocol eq 'https'")
+    StructuredQuery()
+    .filter(FilterExpression.field("AllowedDomainProtocol").eq("https"))
 )
 ```
 
+`StructuredQuery` supports `filter`, `select`, `expand`, `top`, `skip`,
+`order_by`, and `custom` for any parameter not covered by a dedicated method.
 Passing no options yields an unfiltered, unpaginated request:
 
 ```python

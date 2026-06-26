@@ -85,12 +85,8 @@ from sap_cloud_sdk.adms._models import (
     UpdateDocumentTypeInput,
     ZipDownloadJobParameters,
 )
-from sap_cloud_sdk.adms._query_options import (
-    ConfigQueryOptions,
-    DocumentQueryOptions,
-    RelationQueryOptions,
-)
 from sap_cloud_sdk.adms._token_cache import InMemoryTokenCache, TokenCache
+from sap_cloud_sdk.core.odata._query import StructuredQuery
 
 
 __all__ = [
@@ -142,10 +138,8 @@ __all__ = [
     "DocumentType",
     "DocumentTypeBusinessObjectTypeMap",
     "DocumentTypeText",
-    # query options
-    "ConfigQueryOptions",
-    "DocumentQueryOptions",
-    "RelationQueryOptions",
+    # query builder
+    "StructuredQuery",
     # token cache
     "TokenCache",
     "InMemoryTokenCache",

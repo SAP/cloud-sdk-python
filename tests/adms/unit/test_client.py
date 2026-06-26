@@ -8,14 +8,11 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import httpx
 import pytest
 
-from sap_cloud_sdk.adms import create_client
+from sap_cloud_sdk.adms import create_client, StructuredQuery
+from sap_cloud_sdk.core.odata import FilterExpression
 from sap_cloud_sdk.adms._ias_fetcher import IasTokenFetcher
-from sap_cloud_sdk.adms._http import AdmsHttp, AsyncAdmsHttp
-from sap_cloud_sdk.adms._query_options import (
-    ConfigQueryOptions,
-    DocumentQueryOptions,
-    RelationQueryOptions,
-)
+from sap_cloud_sdk.core.odata._transport import ODataHttpTransport
+from sap_cloud_sdk.core.odata._async_transport import AsyncODataHttpTransport
 from sap_cloud_sdk.adms._models import (
     AllowedDomain,
     BaseType,
@@ -93,52 +90,93 @@ def _make_token_fetcher(config: AdmsConfig) -> IasTokenFetcher:
     return fetcher
 
 
-def _make_async_http(config: AdmsConfig, fetcher: IasTokenFetcher) -> AsyncAdmsHttp:
-    mock_client = AsyncMock(spec=httpx.AsyncClient)
-    http = AsyncAdmsHttp(config=config, token_fetcher=fetcher, client=mock_client)
-    http._csrf_tokens = {"": "csrf-tok"}
-    return http
-
-
 # ── AdmsClient ────────────────────────────────────────────────────────────────
 
 
 @pytest.fixture
 def mock_http() -> MagicMock:
-    http = MagicMock(spec=AdmsHttp)
-    http.with_user_jwt.return_value = MagicMock(spec=AdmsHttp)
-    return http
+    return MagicMock(spec=ODataHttpTransport)
+
+
+@pytest.fixture
+def mock_admin_http() -> MagicMock:
+    return MagicMock(spec=ODataHttpTransport)
+
+
+@pytest.fixture
+def mock_config() -> AdmsConfig:
+    return AdmsConfig(
+        service_url="https://adm.example.com",
+        ias_url="https://ias.example.com",
+        client_id="cid",
+        client_secret="csecret",
+    )
+
+
+@pytest.fixture
+def mock_token_fetcher(mock_config) -> IasTokenFetcher:
+    fetcher = IasTokenFetcher(config=mock_config)
+    fetcher.get_token = MagicMock(return_value="test-token")  # type: ignore[method-assign]  # ty: ignore[invalid-assignment]
+    fetcher.exchange_token = MagicMock(return_value="user-token")  # type: ignore[method-assign]  # ty: ignore[invalid-assignment]
+    return fetcher
 
 
 class TestAdmsClientInit:
-    def test_exposes_document_api(self, mock_http):
-        client = AdmsClient(mock_http)
+    def _make_client(self, mock_http, mock_admin_http, mock_config, mock_token_fetcher):
+        import requests
+
+        return AdmsClient(
+            mock_http,
+            mock_admin_http,
+            mock_http,
+            _config=mock_config,
+            _session=requests.Session(),
+            _token_fetcher=mock_token_fetcher,
+        )
+
+    def test_exposes_document_api(
+        self, mock_http, mock_admin_http, mock_config, mock_token_fetcher
+    ):
+        client = self._make_client(
+            mock_http, mock_admin_http, mock_config, mock_token_fetcher
+        )
         assert isinstance(client.documents, _DocumentApi)
 
-    def test_exposes_relation_api(self, mock_http):
-        client = AdmsClient(mock_http)
+    def test_exposes_relation_api(
+        self, mock_http, mock_admin_http, mock_config, mock_token_fetcher
+    ):
+        client = self._make_client(
+            mock_http, mock_admin_http, mock_config, mock_token_fetcher
+        )
         assert isinstance(client.relations, _DocumentRelationApi)
 
-    def test_exposes_job_api(self, mock_http):
-        client = AdmsClient(mock_http)
+    def test_exposes_job_api(
+        self, mock_http, mock_admin_http, mock_config, mock_token_fetcher
+    ):
+        client = self._make_client(
+            mock_http, mock_admin_http, mock_config, mock_token_fetcher
+        )
         assert isinstance(client.jobs, _JobApi)
 
-    def test_with_user_jwt_returns_new_instance(self, mock_http):
-        client = AdmsClient(mock_http)
+    def test_with_user_jwt_returns_new_instance(
+        self, mock_http, mock_admin_http, mock_config, mock_token_fetcher
+    ):
+        client = self._make_client(
+            mock_http, mock_admin_http, mock_config, mock_token_fetcher
+        )
         user_client = client.with_user_jwt("my-jwt")
-
         assert user_client is not client
-        mock_http.with_user_jwt.assert_called_once_with("my-jwt")
 
-    def test_with_user_jwt_uses_new_http(self, mock_http):
-        mock_user_http = MagicMock(spec=AdmsHttp)
-        mock_http.with_user_jwt.return_value = mock_user_http
-
-        client = AdmsClient(mock_http)
+    def test_with_user_jwt_calls_exchange_token(
+        self, mock_http, mock_admin_http, mock_config, mock_token_fetcher
+    ):
+        client = self._make_client(
+            mock_http, mock_admin_http, mock_config, mock_token_fetcher
+        )
         user_client = client.with_user_jwt("my-jwt")
-
-        assert user_client._http is mock_user_http
-        assert client._http is mock_http
+        # The lambda is lazy — invoke the underlying transport's get_token to verify
+        user_client.relations._http._get_token()
+        mock_token_fetcher.exchange_token.assert_called_once_with("my-jwt")
 
 
 class TestCreateClientFactory:
@@ -191,255 +229,63 @@ class TestCreateClientFactory:
         mock_load.assert_not_called()
         assert isinstance(client, AdmsClient)
 
-    def test_user_jwt_forwarded_to_http(self):
-        mock_config = AdmsConfig(
-            service_url="https://adm.example.com",
-            ias_url="https://ias.example.com",
-            client_id="cid",
-            client_secret="cs",
-        )
-        with patch(
-            "sap_cloud_sdk.adms.client.load_from_env_or_mount",
-            return_value=mock_config,
-        ):
-            client = create_client(user_jwt="user-jwt-123")
-
-        assert client._http._user_jwt == "user-jwt-123"
-
-
-# ── AsyncAdmsHttp ─────────────────────────────────────────────────────────────
-
-
-class TestAsyncAdmsHttp:
-    @pytest.mark.asyncio
-    async def test_get_injects_bearer_token(self, config):
-        fetcher = _make_token_fetcher(config)
-        mock_client = AsyncMock(spec=httpx.AsyncClient)
-        mock_client.request.return_value = _make_httpx_response(200, {"value": []})
-
-        http = AsyncAdmsHttp(config=config, token_fetcher=fetcher, client=mock_client)
-        http._csrf_tokens = {"": "x"}
-
-        await http.get("Documents", service_base="odata/v4/DocumentService")
-
-        call_kwargs = mock_client.request.call_args[1]
-        assert "Authorization" in call_kwargs["headers"]
-        assert call_kwargs["headers"]["Authorization"] == "Bearer test-bearer-token"
-
-    @pytest.mark.asyncio
-    async def test_404_raises_document_not_found(self, config):
-        fetcher = _make_token_fetcher(config)
-        mock_client = AsyncMock(spec=httpx.AsyncClient)
-        mock_client.request.return_value = _make_httpx_response(404, {})
-
-        http = AsyncAdmsHttp(config=config, token_fetcher=fetcher, client=mock_client)
-        http._csrf_tokens = {"": "x"}
-
-        with pytest.raises(DocumentNotFoundError):
-            await http.get(
-                "Document('missing')", service_base="odata/v4/DocumentService"
-            )
-
-    @pytest.mark.asyncio
-    async def test_5xx_raises_http_error(self, config):
-        fetcher = _make_token_fetcher(config)
-        mock_client = AsyncMock(spec=httpx.AsyncClient)
-        mock_client.request.return_value = _make_httpx_response(500, {"error": "boom"})
-
-        http = AsyncAdmsHttp(config=config, token_fetcher=fetcher, client=mock_client)
-        http._csrf_tokens = {"": "x"}
-
-        with pytest.raises(HttpError, match="500"):
-            await http.get("Bad", service_base="odata/v4/DocumentService")
-
-    @pytest.mark.asyncio
-    async def test_context_manager_closes_client(self, config):
-        fetcher = _make_token_fetcher(config)
-        mock_client = AsyncMock(spec=httpx.AsyncClient)
-
-        async with AsyncAdmsHttp(
-            config=config, token_fetcher=fetcher, client=mock_client
-        ):
-            pass
-
-        mock_client.aclose.assert_called_once()
-
-    @pytest.mark.asyncio
-    async def test_context_manager_closes_client_on_exception(self, config):
-        fetcher = _make_token_fetcher(config)
-        mock_client = AsyncMock(spec=httpx.AsyncClient)
-
-        with pytest.raises(RuntimeError, match="boom"):
-            async with AsyncAdmsHttp(
-                config=config, token_fetcher=fetcher, client=mock_client
-            ):
-                raise RuntimeError("boom")
-
-        mock_client.aclose.assert_called_once()
-
-    @pytest.mark.asyncio
-    async def test_aclose_idempotent_on_owned_client(self, config):
-        fetcher = _make_token_fetcher(config)
-        mock_client = AsyncMock(spec=httpx.AsyncClient)
-
-        http = AsyncAdmsHttp(config=config, token_fetcher=fetcher, client=mock_client)
-        await http.aclose()
-        await http.aclose()  # second call must not raise; httpx tolerates double aclose
-
-        # The owned client may be closed once or twice — both are valid.
-        # What matters is no exception is propagated.
-        assert mock_client.aclose.await_count >= 1
-
-    @pytest.mark.asyncio
-    async def test_with_user_jwt_shares_underlying_client(self, config):
-        fetcher = _make_token_fetcher(config)
-        mock_client = AsyncMock(spec=httpx.AsyncClient)
-
-        parent = AsyncAdmsHttp(config=config, token_fetcher=fetcher, client=mock_client)
-        child = parent.with_user_jwt("user-jwt-123")
-
-        # Child must share the parent's httpx client (no fresh pool allocated).
-        assert child._client is parent._client
-        # Child must not own the client; closing it is a no-op.
-        assert child._owns_client is False
-        assert parent._owns_client is True
-
-    @pytest.mark.asyncio
-    async def test_with_user_jwt_close_does_not_close_shared_client(self, config):
-        fetcher = _make_token_fetcher(config)
-        mock_client = AsyncMock(spec=httpx.AsyncClient)
-
-        parent = AsyncAdmsHttp(config=config, token_fetcher=fetcher, client=mock_client)
-        child = parent.with_user_jwt("user-jwt-123")
-
-        await child.aclose()
-        mock_client.aclose.assert_not_called()
-
-        await parent.aclose()
-        mock_client.aclose.assert_called_once()
-
-    @pytest.mark.asyncio
-    async def test_user_jwt_calls_exchange_token(self, config):
-        fetcher = _make_token_fetcher(config)
-        mock_client = AsyncMock(spec=httpx.AsyncClient)
-        mock_client.request.return_value = _make_httpx_response(200, {})
-
-        http = AsyncAdmsHttp(
-            config=config,
-            token_fetcher=fetcher,
-            client=mock_client,
-            user_jwt="user-jwt",
-        )
-        http._csrf_tokens = {"": "x"}
-
-        await http.get("Documents", service_base="odata/v4/DocumentService")
-
-        call_kwargs = mock_client.request.call_args[1]
-        assert call_kwargs["headers"]["Authorization"] == "Bearer user-bearer-token"
-
-    @pytest.mark.asyncio
-    async def test_post_403_evicts_csrf_and_retries_once(self, config):
-        fetcher = _make_token_fetcher(config)
-        mock_client = AsyncMock(spec=httpx.AsyncClient)
-        # Two CSRF fetches via raw GET on the service root.
-        mock_client.get.side_effect = [
-            _make_httpx_response(200, {}, headers={"X-CSRF-Token": "stale"}),
-            _make_httpx_response(200, {}, headers={"X-CSRF-Token": "fresh"}),
-        ]
-        mock_client.request.side_effect = [
-            _make_httpx_response(403, {"error": "csrf"}),
-            _make_httpx_response(200, {"ok": True}),
-        ]
-
-        http = AsyncAdmsHttp(config=config, token_fetcher=fetcher, client=mock_client)
-        resp = await http.post(
-            "Action", json={"x": 1}, service_base="odata/v4/DocumentService"
-        )
-
-        assert resp.status_code == 200
-        assert mock_client.get.call_count == 2
-        assert mock_client.request.call_count == 2
-        assert (
-            mock_client.request.call_args_list[1][1]["headers"]["X-CSRF-Token"]
-            == "fresh"
-        )
-
-    @pytest.mark.asyncio
-    async def test_post_403_after_retry_raises(self, config):
-        fetcher = _make_token_fetcher(config)
-        mock_client = AsyncMock(spec=httpx.AsyncClient)
-        mock_client.get.side_effect = [
-            _make_httpx_response(200, {}, headers={"X-CSRF-Token": "first"}),
-            _make_httpx_response(200, {}, headers={"X-CSRF-Token": "second"}),
-        ]
-        mock_client.request.return_value = _make_httpx_response(
-            403, {"error": "denied"}
-        )
-
-        http = AsyncAdmsHttp(config=config, token_fetcher=fetcher, client=mock_client)
-        with pytest.raises(HttpError) as exc_info:
-            await http.post("Action", json={}, service_base="odata/v4/DocumentService")
-
-        assert exc_info.value.status_code == 403
-        assert mock_client.request.call_count == 2  # exactly one retry
-
-    @pytest.mark.asyncio
-    async def test_post_non_403_error_is_not_retried(self, config):
-        fetcher = _make_token_fetcher(config)
-        mock_client = AsyncMock(spec=httpx.AsyncClient)
-        mock_client.get.return_value = _make_httpx_response(
-            200, {}, headers={"X-CSRF-Token": "csrf"}
-        )
-        mock_client.request.return_value = _make_httpx_response(500, {"error": "boom"})
-
-        http = AsyncAdmsHttp(config=config, token_fetcher=fetcher, client=mock_client)
-        with pytest.raises(HttpError) as exc_info:
-            await http.post("Action", json={}, service_base="odata/v4/DocumentService")
-
-        assert exc_info.value.status_code == 500
-        assert mock_client.request.call_count == 1  # no retry on non-403
-
 
 # ── AsyncAdmsClient ───────────────────────────────────────────────────────────
 
 
 class TestAsyncAdmsClient:
+    def _make_client(self, config, token_fetcher=None):
+        mock_httpx = AsyncMock(spec=httpx.AsyncClient)
+        mock_httpx.aclose = AsyncMock()
+        fetcher = token_fetcher or _make_token_fetcher(config)
+        doc = MagicMock(spec=AsyncODataHttpTransport)
+        adm = MagicMock(spec=AsyncODataHttpTransport)
+        cfg = MagicMock(spec=AsyncODataHttpTransport)
+        return AsyncAdmsClient(
+            doc,
+            adm,
+            cfg,
+            _config=config,
+            _httpx_client=mock_httpx,
+            _token_fetcher=fetcher,
+        )
+
     def test_exposes_api_attributes(self, config):
-        from sap_cloud_sdk.adms.client import _AsyncDocumentApi as _AsyncDocumentApi
-        from sap_cloud_sdk.adms.client import (
+        from sap_cloud_sdk.adms._document_api import (
+            _AsyncDocumentApi as _AsyncDocumentApi,
+        )
+        from sap_cloud_sdk.adms._relation_api import (
             _AsyncDocumentRelationApi as _AsyncDocumentRelationApi,
         )
-        from sap_cloud_sdk.adms.client import _AsyncJobApi as _AsyncJobApi
+        from sap_cloud_sdk.adms._job_api import _AsyncJobApi as _AsyncJobApi
 
-        fetcher = _make_token_fetcher(config)
-        http = _make_async_http(config, fetcher)
-        client = AsyncAdmsClient(http)
+        client = self._make_client(config)
         assert isinstance(client.documents, _AsyncDocumentApi)
         assert isinstance(client.relations, _AsyncDocumentRelationApi)
         assert isinstance(client.jobs, _AsyncJobApi)
 
     def test_with_user_jwt_returns_new_instance(self, config):
-        fetcher = _make_token_fetcher(config)
-        http = _make_async_http(config, fetcher)
-        mock_user_http = MagicMock(spec=AsyncAdmsHttp)
-        mock_user_http._client = AsyncMock(spec=httpx.AsyncClient)
-        http.with_user_jwt = MagicMock(return_value=mock_user_http)  # type: ignore[method-assign]
-
-        client = AsyncAdmsClient(http)
+        client = self._make_client(config)
         new_client = client.with_user_jwt("my-jwt")
-
         assert new_client is not client
-        http.with_user_jwt.assert_called_once_with("my-jwt")  # type: ignore[union-attr]
-        assert new_client._http is mock_user_http
+        assert new_client._owns_client is False
 
     @pytest.mark.asyncio
     async def test_context_manager(self, config):
-        fetcher = _make_token_fetcher(config)
-        mock_client = AsyncMock(spec=httpx.AsyncClient)
-        http = AsyncAdmsHttp(config=config, token_fetcher=fetcher, client=mock_client)
-        async with AsyncAdmsClient(http) as client:
+        doc = MagicMock(spec=AsyncODataHttpTransport)
+        adm = MagicMock(spec=AsyncODataHttpTransport)
+        cfg = MagicMock(spec=AsyncODataHttpTransport)
+        mock_httpx = AsyncMock(spec=httpx.AsyncClient)
+        async with AsyncAdmsClient(
+            doc,
+            adm,
+            cfg,
+            _config=config,
+            _httpx_client=mock_httpx,
+            _token_fetcher=_make_token_fetcher(config),
+        ) as client:
             assert client is not None
-        mock_client.aclose.assert_called_once()
+        mock_httpx.aclose.assert_called_once()
 
 
 class TestCreateAsyncClient:
@@ -472,50 +318,40 @@ class TestCreateAsyncClient:
 class TestAsyncDocumentApi:
     @pytest.mark.asyncio
     async def test_get_document(self, config):
-        fetcher = _make_token_fetcher(config)
-        mock_client = AsyncMock(spec=httpx.AsyncClient)
-        mock_client.request.return_value = _make_httpx_response(
-            200,
-            {
+        from sap_cloud_sdk.adms._document_api import (
+            _AsyncDocumentApi as _AsyncDocumentApi,
+        )
+
+        http = MagicMock(spec=AsyncODataHttpTransport)
+        http.get = AsyncMock(
+            return_value={
                 "DocumentID": "doc-1",
                 "DocumentName": "Invoice.pdf",
                 "DocumentState": ScanStatus.CLEAN.value,
                 "IsActiveEntity": True,
-            },
+            }
         )
-
-        http = AsyncAdmsHttp(config=config, token_fetcher=fetcher, client=mock_client)
-        http._csrf_tokens = {"": "csrf-tok"}
-        from sap_cloud_sdk.adms.client import _AsyncDocumentApi as _AsyncDocumentApi
-
         api = _AsyncDocumentApi(http)
-
         doc = await api.get("11111111-1111-1111-1111-111111111111")
-
         assert doc.document_id == "doc-1"
         assert doc.document_name == "Invoice.pdf"
 
     @pytest.mark.asyncio
     async def test_get_download_url_raises_when_not_clean(self, config):
-        fetcher = _make_token_fetcher(config)
-        mock_client = AsyncMock(spec=httpx.AsyncClient)
-        mock_client.request.return_value = _make_httpx_response(
-            200,
-            {
+        from sap_cloud_sdk.adms._document_api import (
+            _AsyncDocumentApi as _AsyncDocumentApi,
+        )
+
+        http = MagicMock(spec=AsyncODataHttpTransport)
+        http.get = AsyncMock(
+            return_value={
                 "Document": {
                     "DocumentID": "doc-1",
                     "DocumentState": ScanStatus.PENDING.value,
                 }
-            },
+            }
         )
-
-        http = AsyncAdmsHttp(config=config, token_fetcher=fetcher, client=mock_client)
-        http._csrf_tokens = {"": "x"}
-
-        from sap_cloud_sdk.adms.client import _AsyncDocumentApi as _AsyncDocumentApi
-
         api = _AsyncDocumentApi(http)
-
         with pytest.raises(ScanNotCleanError):
             await api.get_download_url(
                 "11111111-1111-1111-1111-111111111111", doc_content_version_id="1.0"
@@ -528,11 +364,13 @@ class TestAsyncDocumentApi:
 class TestAsyncDocumentRelationApi:
     @pytest.mark.asyncio
     async def test_get_all_returns_list(self, config):
-        fetcher = _make_token_fetcher(config)
-        mock_client = AsyncMock(spec=httpx.AsyncClient)
-        mock_client.request.return_value = _make_httpx_response(
-            200,
-            {
+        from sap_cloud_sdk.adms._relation_api import (
+            _AsyncDocumentRelationApi as _AsyncDocumentRelationApi,
+        )
+
+        http = MagicMock(spec=AsyncODataHttpTransport)
+        http.get = AsyncMock(
+            return_value={
                 "value": [
                     {
                         "DocumentRelationID": "11111111-1111-1111-1111-111111111111",
@@ -541,20 +379,10 @@ class TestAsyncDocumentRelationApi:
                         "IsActiveEntity": True,
                     }
                 ]
-            },
+            }
         )
-
-        http = AsyncAdmsHttp(config=config, token_fetcher=fetcher, client=mock_client)
-        http._csrf_tokens = {"": "x"}
-
-        from sap_cloud_sdk.adms.client import (
-            _AsyncDocumentRelationApi as _AsyncDocumentRelationApi,
-        )
-
         api = _AsyncDocumentRelationApi(http)
-
         relations = await api.get_all()
-
         assert len(relations) == 1
         assert (
             relations[0].document_relation_id == "11111111-1111-1111-1111-111111111111"
@@ -567,65 +395,40 @@ class TestAsyncDocumentRelationApi:
 class TestAsyncJobApi:
     @pytest.mark.asyncio
     async def test_get_status(self, config):
-        fetcher = _make_token_fetcher(config)
-        mock_client = AsyncMock(spec=httpx.AsyncClient)
-        mock_client.request.return_value = _make_httpx_response(
-            200,
-            {
-                "JobID": "job-abc",
-                "JobStatus": "IN_PROGRESS",
-            },
+        from sap_cloud_sdk.adms._job_api import _AsyncJobApi as _AsyncJobApi
+
+        http = MagicMock(spec=AsyncODataHttpTransport)
+        admin_http = MagicMock(spec=AsyncODataHttpTransport)
+        http.get = AsyncMock(
+            return_value={"JobID": "job-abc", "JobStatus": "IN_PROGRESS"}
         )
-
-        http = AsyncAdmsHttp(config=config, token_fetcher=fetcher, client=mock_client)
-        http._csrf_tokens = {"": "x"}
-
-        from sap_cloud_sdk.adms.client import _AsyncJobApi as _AsyncJobApi
-
-        api = _AsyncJobApi(http)
-
+        api = _AsyncJobApi(http, admin_http)
         output = await api.get_status("job-abc")
-
         assert output.job_id == "job-abc"
         assert output.job_status == JobStatus.IN_PROGRESS
 
     @pytest.mark.asyncio
-    async def test_get_status_admin_service(self, config):
-        """``use_admin_service=True`` must route through AdminService for DELETE_USER_DATA polling."""
-        fetcher = _make_token_fetcher(config)
-        mock_client = AsyncMock(spec=httpx.AsyncClient)
-        mock_client.request.return_value = _make_httpx_response(
-            200,
-            {
-                "JobID": "job-del",
-                "JobStatus": "COMPLETED",
-            },
+    async def test_get_status_admin_service_uses_admin_transport(self, config):
+        from sap_cloud_sdk.adms._job_api import _AsyncJobApi as _AsyncJobApi
+
+        http = MagicMock(spec=AsyncODataHttpTransport)
+        admin_http = MagicMock(spec=AsyncODataHttpTransport)
+        admin_http.get = AsyncMock(
+            return_value={"JobID": "job-del", "JobStatus": "COMPLETED"}
         )
-
-        http = AsyncAdmsHttp(config=config, token_fetcher=fetcher, client=mock_client)
-        http._csrf_tokens = {"": "x"}
-
-        from sap_cloud_sdk.adms.client import _AsyncJobApi as _AsyncJobApi
-
-        api = _AsyncJobApi(http)
-
+        api = _AsyncJobApi(http, admin_http)
         await api.get_status("job-del", use_admin_service=True)
-
-        called_url = mock_client.request.call_args.kwargs["url"]
-        assert "AdminService" in str(called_url)
+        admin_http.get.assert_called_once()
+        http.get.assert_not_called()
 
 
 # ── _DocumentApi (sync) ────────────────────────────────────────────────────────
 
 
 def _doc_http(get_data=None, post_data=None):
-    http = MagicMock(spec=AdmsHttp)
-    get_resp = MagicMock()
-    get_resp.json.return_value = get_data or {}
-    http.get.return_value = get_resp
-    post_resp = MagicMock()
-    post_resp.json.return_value = post_data or {}
-    http.post.return_value = post_resp
+    http = MagicMock(spec=ODataHttpTransport)
+    http.get.return_value = get_data or {}
+    http.post.return_value = post_data or {}
     return http
 
 
@@ -671,37 +474,20 @@ class TestDocumentApiGet:
 
 class TestDocumentApiDownloadUrl:
     def test_clean_document_returns_url(self):
-        rel_data = {
-            "DocumentRelationID": "11111111-1111-1111-1111-111111111111",
-            "BusinessObjectNodeTypeUniqueID": "PO",
-            "HostBusinessObjectNodeID": "PO-1",
-            "Document": _CLEAN_DOC,
-        }
-        download_data = {"value": "https://s3.example.com/presigned-url"}
-
-        http = MagicMock(spec=AdmsHttp)
+        http = MagicMock(spec=ODataHttpTransport)
         http.get.side_effect = [
-            MagicMock(**{"json.return_value": rel_data}),
-            MagicMock(**{"json.return_value": download_data}),
+            {"Document": _CLEAN_DOC},
+            {"value": "https://s3.example.com/presigned-url"},
         ]
-
         api = _DocumentApi(http)
         url = api.get_download_url(
             "11111111-1111-1111-1111-111111111111", doc_content_version_id="1.0"
         )
-
         assert url == "https://s3.example.com/presigned-url"
 
     def test_pending_document_raises_scan_not_clean_error(self):
-        rel_data = {
-            "DocumentRelationID": "11111111-1111-1111-1111-111111111111",
-            "BusinessObjectNodeTypeUniqueID": "PO",
-            "HostBusinessObjectNodeID": "PO-1",
-            "Document": _PENDING_DOC,
-        }
-        http = MagicMock(spec=AdmsHttp)
-        http.get.return_value = MagicMock(**{"json.return_value": rel_data})
-
+        http = MagicMock(spec=ODataHttpTransport)
+        http.get.return_value = {"Document": _PENDING_DOC}
         api = _DocumentApi(http)
         with pytest.raises(ScanNotCleanError, match="PENDING"):
             api.get_download_url(
@@ -709,15 +495,10 @@ class TestDocumentApiDownloadUrl:
             )
 
     def test_quarantined_document_raises_scan_not_clean_error(self):
-        rel_data = {
-            "DocumentRelationID": "11111111-1111-1111-1111-111111111111",
-            "BusinessObjectNodeTypeUniqueID": "PO",
-            "HostBusinessObjectNodeID": "PO-1",
-            "Document": {**_CLEAN_DOC, "DocumentState": "QUARANTINED"},
+        http = MagicMock(spec=ODataHttpTransport)
+        http.get.return_value = {
+            "Document": {**_CLEAN_DOC, "DocumentState": "QUARANTINED"}
         }
-        http = MagicMock(spec=AdmsHttp)
-        http.get.return_value = MagicMock(**{"json.return_value": rel_data})
-
         api = _DocumentApi(http)
         with pytest.raises(ScanNotCleanError, match="QUARANTINED"):
             api.get_download_url(
@@ -727,7 +508,9 @@ class TestDocumentApiDownloadUrl:
 
 class TestDocumentApiUpdate:
     def test_update_calls_bound_action(self):
-        http = _doc_http(post_data=_CLEAN_DOC)
+        http = MagicMock(spec=ODataHttpTransport)
+        http.post.return_value = {}
+        http.get.return_value = _CLEAN_DOC
         api = _DocumentApi(http)
 
         upd = UpdateDocumentInput(document_name="Renamed.pdf")
@@ -738,7 +521,9 @@ class TestDocumentApiUpdate:
         assert isinstance(doc, Document)
 
     def test_update_sends_only_set_fields(self):
-        http = _doc_http(post_data=_CLEAN_DOC)
+        http = MagicMock(spec=ODataHttpTransport)
+        http.post.return_value = {}
+        http.get.return_value = _CLEAN_DOC
         api = _DocumentApi(http)
 
         upd = UpdateDocumentInput(document_description="New desc")
@@ -751,7 +536,8 @@ class TestDocumentApiUpdate:
 
 class TestDocumentApiVersionOps:
     def test_restore_content_version(self):
-        http = _doc_http(post_data=_CLEAN_DOC)
+        http = MagicMock(spec=ODataHttpTransport)
+        http.post.return_value = _CLEAN_DOC
         api = _DocumentApi(http)
 
         doc = api.restore_content_version(
@@ -766,8 +552,8 @@ class TestDocumentApiVersionOps:
         assert isinstance(doc, Document)
 
     def test_delete_content_version(self):
-        http = MagicMock(spec=AdmsHttp)
-        http.post.return_value = MagicMock()
+        http = MagicMock(spec=ODataHttpTransport)
+        http.post.return_value = {}
         api = _DocumentApi(http)
 
         api.delete_content_version("11111111-1111-1111-1111-111111111111", "2.0")
@@ -832,7 +618,9 @@ class TestDocumentApiGetAll:
     def test_get_all_passes_filter(self):
         http = _doc_http(get_data={"value": []})
         api = _DocumentApi(http)
-        api.get_all(DocumentQueryOptions(filter="DocumentTypeID eq 'INV'"))
+        api.get_all(
+            StructuredQuery().filter(FilterExpression.field("DocumentTypeID").eq("INV"))
+        )
 
         _, kwargs = http.get.call_args
         assert kwargs["params"]["$filter"] == "DocumentTypeID eq 'INV'"
@@ -840,7 +628,7 @@ class TestDocumentApiGetAll:
     def test_get_all_passes_select(self):
         http = _doc_http(get_data={"value": []})
         api = _DocumentApi(http)
-        api.get_all(DocumentQueryOptions(select=["DocumentID", "DocumentName"]))
+        api.get_all(StructuredQuery().select("DocumentID", "DocumentName"))
 
         _, kwargs = http.get.call_args
         assert kwargs["params"]["$select"] == "DocumentID,DocumentName"
@@ -850,7 +638,7 @@ class TestDocumentApiGetAll:
         # $expand must contain both that value AND "Document".
         http = _doc_http(get_data={"value": []})
         api = _DocumentApi(http)
-        api.get_all(DocumentQueryOptions(expand=["DocumentContentVersion"]))
+        api.get_all(StructuredQuery().expand("DocumentContentVersion"))
 
         _, kwargs = http.get.call_args
         expand_parts = kwargs["params"]["$expand"].split(",")
@@ -860,16 +648,16 @@ class TestDocumentApiGetAll:
     def test_get_all_passes_top_and_skip(self):
         http = _doc_http(get_data={"value": []})
         api = _DocumentApi(http)
-        api.get_all(DocumentQueryOptions(top=20, skip=10))
+        api.get_all(StructuredQuery().top(20).skip(10))
 
         _, kwargs = http.get.call_args
-        assert kwargs["params"]["$top"] == 20
-        assert kwargs["params"]["$skip"] == 10
+        assert kwargs["params"]["$top"] == "20"
+        assert kwargs["params"]["$skip"] == "10"
 
     def test_get_all_passes_orderby(self):
         http = _doc_http(get_data={"value": []})
         api = _DocumentApi(http)
-        api.get_all(DocumentQueryOptions(orderby="DocumentName asc"))
+        api.get_all(StructuredQuery().custom("$orderby", "DocumentName asc"))
 
         _, kwargs = http.get.call_args
         assert kwargs["params"]["$orderby"] == "DocumentName asc"
@@ -883,29 +671,16 @@ class TestDocumentApiGetAll:
         args, _ = http.get.call_args
         assert args[0] == "DocumentRelation"
 
-    def test_get_all_uses_service_path(self):
-        from sap_cloud_sdk.adms.config import _SERVICE_PATH
-
-        http = _doc_http(get_data={"value": []})
-        api = _DocumentApi(http)
-        api.get_all()
-
-        _, kwargs = http.get.call_args
-        assert kwargs["service_base"] == _SERVICE_PATH
-
 
 # ── _DocumentRelationApi (sync) ────────────────────────────────────────────────
 
 
 def _rel_http(get_data=None, post_data=None):
-    http = MagicMock(spec=AdmsHttp)
-    get_resp = MagicMock()
-    get_resp.json.return_value = get_data or {}
-    http.get.return_value = get_resp
-    post_resp = MagicMock()
-    post_resp.json.return_value = post_data or {}
-    http.post.return_value = post_resp
-    http.delete.return_value = MagicMock()
+    http = MagicMock(spec=ODataHttpTransport)
+    http.get.return_value = get_data or {}
+    http.post.return_value = post_data or {}
+    http.request.return_value = get_data or {}
+    http.delete.return_value = {}
     return http
 
 
@@ -935,17 +710,16 @@ class TestDocumentRelationApiGet:
         api = _DocumentRelationApi(http)
 
         api.get_all(
-            RelationQueryOptions(
-                filter="HostBusinessObjectNodeID eq 'PO-001'",
-                expand=["Document"],
-                top=10,
-            )
+            StructuredQuery()
+            .filter(FilterExpression.field("HostBusinessObjectNodeID").eq("PO-001"))
+            .expand("Document")
+            .top(10)
         )
 
         params = http.get.call_args[1]["params"]
         assert params["$filter"] == "HostBusinessObjectNodeID eq 'PO-001'"
         assert params["$expand"] == "Document"
-        assert params["$top"] == 10
+        assert params["$top"] == "10"
 
     def test_get_single_relation(self):
         http = _rel_http(get_data=_rel_dict("99999999-9999-9999-9999-999999999999"))
@@ -953,7 +727,7 @@ class TestDocumentRelationApiGet:
 
         rel = api.get("99999999-9999-9999-9999-999999999999")
 
-        call_path = http.get.call_args[0][0]
+        call_path = http.request.call_args[0][1]
         assert "99999999-9999-9999-9999-999999999999" in call_path
         assert isinstance(rel, DocumentRelation)
 
@@ -963,7 +737,7 @@ class TestDocumentRelationApiGet:
 
         api.get("11111111-1111-1111-1111-111111111111", is_active_entity=False)
 
-        call_path = http.get.call_args[0][0]
+        call_path = http.request.call_args[0][1]
         assert "IsActiveEntity=false" in call_path
 
 
@@ -1129,25 +903,21 @@ _MAPPING_DICT = {
 
 
 def _cfg_sync_http(get_data=None, post_data=None):
-    http = MagicMock(spec=AdmsHttp)
-    get_resp = MagicMock()
-    get_resp.json.return_value = get_data or {}
-    http.get.return_value = get_resp
-    post_resp = MagicMock()
-    post_resp.json.return_value = post_data or {}
-    http.post.return_value = post_resp
+    http = MagicMock(spec=ODataHttpTransport)
+    http.get.return_value = get_data or {}
+    http.post.return_value = post_data or {}
+    http.patch.return_value = post_data or {}
+    http.request.return_value = get_data or {}
+    http.delete.return_value = {}
     return http
 
 
 def _cfg_async_http(get_data=None, post_data=None):
-    http = MagicMock(spec=AsyncAdmsHttp)
-    get_resp = MagicMock()
-    get_resp.json.return_value = get_data or {}
-    http.get = AsyncMock(return_value=get_resp)
-    post_resp = MagicMock()
-    post_resp.json.return_value = post_data or {}
-    http.post = AsyncMock(return_value=post_resp)
-    http.delete = AsyncMock()
+    http = MagicMock(spec=AsyncODataHttpTransport)
+    http.get = AsyncMock(return_value=get_data or {})
+    http.post = AsyncMock(return_value=post_data or {})
+    http.patch = AsyncMock(return_value=post_data or {})
+    http.delete = AsyncMock(return_value={})
     return http
 
 
@@ -1167,7 +937,9 @@ class TestConfigurationApiAllowedDomain:
         http = _cfg_sync_http(get_data={"value": []})
         api = _ConfigurationApi(http)
         api.get_all_allowed_domains(
-            ConfigQueryOptions(filter="AllowedDomainProtocol eq 'https'")
+            StructuredQuery().filter(
+                FilterExpression.field("AllowedDomainProtocol").eq("https")
+            )
         )
 
         _, kwargs = http.get.call_args
@@ -1176,11 +948,11 @@ class TestConfigurationApiAllowedDomain:
     def test_get_all_passes_top_and_skip(self):
         http = _cfg_sync_http(get_data={"value": []})
         api = _ConfigurationApi(http)
-        api.get_all_allowed_domains(ConfigQueryOptions(top=10, skip=5))
+        api.get_all_allowed_domains(StructuredQuery().top(10).skip(5))
 
         _, kwargs = http.get.call_args
-        assert kwargs["params"]["$top"] == 10
-        assert kwargs["params"]["$skip"] == 5
+        assert kwargs["params"]["$top"] == "10"
+        assert kwargs["params"]["$skip"] == "5"
 
     def test_get_all_empty_params_when_no_args(self):
         http = _cfg_sync_http(get_data={"value": []})
@@ -1216,16 +988,6 @@ class TestConfigurationApiAllowedDomain:
         call_path = http.delete.call_args[0][0]
         assert "AllowedDomain" in call_path
         assert "33333333-3333-3333-3333-333333333333" in call_path
-
-    def test_get_all_uses_config_service_path(self):
-        from sap_cloud_sdk.adms.config import _CONFIG_SERVICE_PATH
-
-        http = _cfg_sync_http(get_data={"value": []})
-        api = _ConfigurationApi(http)
-        api.get_all_allowed_domains()
-
-        _, kwargs = http.get.call_args
-        assert kwargs["service_base"] == _CONFIG_SERVICE_PATH
 
 
 class TestConfigurationApiDocumentType:
@@ -1504,28 +1266,25 @@ class TestAsyncConfigurationApiTypeMappings:
 
 
 def _job_http(post_data=None, get_data=None):
-    http = MagicMock(spec=AdmsHttp)
-    post_resp = MagicMock()
-    post_resp.json.return_value = (
+    http = MagicMock(spec=ODataHttpTransport)
+    http.post.return_value = (
         post_data
         if post_data is not None
         else {"JobID": "job-1", "JobStatus": "IN_PROGRESS"}
     )
-    http.post.return_value = post_resp
-    get_resp = MagicMock()
-    get_resp.json.return_value = (
+    http.get.return_value = (
         get_data
         if get_data is not None
         else {"JobID": "job-1", "JobStatus": "COMPLETED"}
     )
-    http.get.return_value = get_resp
     return http
 
 
 class TestJobApiStartZipDownload:
     def test_routes_to_document_service(self):
         http = _job_http()
-        api = _JobApi(http)
+        admin_http = MagicMock(spec=ODataHttpTransport)
+        api = _JobApi(http, admin_http)
 
         params = ZipDownloadJobParameters(
             business_object_node_type_unique_id="PurchaseOrder",
@@ -1534,13 +1293,12 @@ class TestJobApiStartZipDownload:
         output = api.start_zip_download(params)
 
         http.post.assert_called_once()
-        call_kwargs = http.post.call_args[1]
-        assert call_kwargs["service_base"] == "/odata/v4/DocumentService"
+        admin_http.post.assert_not_called()
         assert isinstance(output, JobOutput)
 
     def test_payload_has_zip_download_job_type(self):
         http = _job_http()
-        api = _JobApi(http)
+        api = _JobApi(http, MagicMock(spec=ODataHttpTransport))
 
         params = ZipDownloadJobParameters(
             business_object_node_type_unique_id="PO",
@@ -1561,7 +1319,7 @@ class TestJobApiStartZipDownload:
 
     def test_returns_job_output(self):
         http = _job_http(post_data={"JobID": "job-42", "JobStatus": "NOT_STARTED"})
-        api = _JobApi(http)
+        api = _JobApi(http, MagicMock(spec=ODataHttpTransport))
 
         params = ZipDownloadJobParameters(
             business_object_node_type_unique_id="PO",
@@ -1575,23 +1333,24 @@ class TestJobApiStartZipDownload:
 
 class TestJobApiStartDeleteUserData:
     def test_routes_to_admin_service(self):
-        http = _job_http()
-        api = _JobApi(http)
+        http = MagicMock(spec=ODataHttpTransport)
+        admin_http = _job_http()
+        api = _JobApi(http, admin_http)
 
         params = DeleteUserDataJobParameters(user_id="user-123")
         api.start_delete_user_data(params)
 
-        call_kwargs = http.post.call_args[1]
-        assert call_kwargs["service_base"] == "/odata/v4/AdminService"
+        admin_http.post.assert_called_once()
+        http.post.assert_not_called()
 
     def test_payload_has_delete_user_data_job_type(self):
-        http = _job_http()
-        api = _JobApi(http)
+        admin_http = _job_http()
+        api = _JobApi(MagicMock(spec=ODataHttpTransport), admin_http)
 
         params = DeleteUserDataJobParameters(user_id="user-456")
         api.start_delete_user_data(params)
 
-        payload = http.post.call_args[1]["json"]
+        payload = admin_http.post.call_args[1]["json"]
         assert payload["JobInput"]["JobType"] == "DELETE_USER_DATA"
         assert payload["JobInput"]["JobParameters"]["UserID"] == "user-456"
 
@@ -1599,25 +1358,27 @@ class TestJobApiStartDeleteUserData:
 class TestJobApiGetStatus:
     def test_routes_to_document_service_by_default(self):
         http = _job_http()
-        api = _JobApi(http)
+        admin_http = MagicMock(spec=ODataHttpTransport)
+        api = _JobApi(http, admin_http)
 
         api.get_status("job-1")
 
-        call_kwargs = http.get.call_args[1]
-        assert call_kwargs["service_base"] == "/odata/v4/DocumentService"
+        http.get.assert_called_once()
+        admin_http.get.assert_not_called()
 
     def test_routes_to_admin_service_when_flag_set(self):
-        http = _job_http()
-        api = _JobApi(http)
+        http = MagicMock(spec=ODataHttpTransport)
+        admin_http = _job_http()
+        api = _JobApi(http, admin_http)
 
         api.get_status("job-1", use_admin_service=True)
 
-        call_kwargs = http.get.call_args[1]
-        assert call_kwargs["service_base"] == "/odata/v4/AdminService"
+        admin_http.get.assert_called_once()
+        http.get.assert_not_called()
 
     def test_path_contains_job_id(self):
         http = _job_http()
-        api = _JobApi(http)
+        api = _JobApi(http, MagicMock(spec=ODataHttpTransport))
 
         api.get_status("job-99")
 
@@ -1632,7 +1393,7 @@ class TestJobApiGetStatus:
                 "JobProgressPercentage": 100,
             }
         )
-        api = _JobApi(http)
+        api = _JobApi(http, MagicMock(spec=ODataHttpTransport))
 
         output = api.get_status("job-1")
 
@@ -1650,21 +1411,18 @@ class TestJobPollingWorkflow:
         ]
         call_count = 0
 
-        http = MagicMock(spec=AdmsHttp)
-        start_resp = MagicMock()
-        start_resp.json.return_value = {"JobID": "j1", "JobStatus": "IN_PROGRESS"}
-        http.post.return_value = start_resp
+        http = MagicMock(spec=ODataHttpTransport)
+        http.post.return_value = {"JobID": "j1", "JobStatus": "IN_PROGRESS"}
 
         def side_effect(*args, **kwargs):
             nonlocal call_count
-            resp = MagicMock()
-            resp.json.return_value = responses[min(call_count, len(responses) - 1)]
+            result = responses[min(call_count, len(responses) - 1)]
             call_count += 1
-            return resp
+            return result
 
         http.get.side_effect = side_effect
 
-        api = _JobApi(http)
+        api = _JobApi(http, MagicMock(spec=ODataHttpTransport))
         params = ZipDownloadJobParameters(
             business_object_node_type_unique_id="PO",
             host_business_object_node_id="PO-1",

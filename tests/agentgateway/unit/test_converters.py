@@ -92,7 +92,7 @@ class TestMcpToolToLangchainStructure:
 class TestMcpToolToLangchainTypeMapping:
     """Tests that JSON Schema types are mapped to the correct Python types."""
 
-    def _tool_with_types(self, properties: dict, required: list[str] | None = None) -> object:
+    def _tool_with_types(self, properties: dict, required: list[str] | None = None) -> MCPTool:
         return MCPTool(
             name="typed_tool",
             server_name="server",

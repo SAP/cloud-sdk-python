@@ -16,6 +16,15 @@ from sap_cloud_sdk.agentgateway._models import MCPTool
 if TYPE_CHECKING:
     from langchain_core.tools import StructuredTool
 
+_JSON_TYPE_MAP: dict[str, type] = {
+    "string": str,
+    "integer": int,
+    "number": float,
+    "boolean": bool,
+    "array": list,
+    "object": dict,
+}
+
 
 def mcp_tool_to_langchain(
     mcp_tool: MCPTool,
@@ -79,15 +88,6 @@ def mcp_tool_to_langchain(
             **resolved,
         )
 
-    _JSON_TYPE_MAP: dict[str, type] = {
-        "string": str,
-        "integer": int,
-        "number": float,
-        "boolean": bool,
-        "array": list,
-        "object": dict,
-    }
-
     # Build args schema from input_schema
     properties = mcp_tool.input_schema.get("properties", {})
     required = set(mcp_tool.input_schema.get("required", []))
@@ -95,7 +95,10 @@ def mcp_tool_to_langchain(
         k: (
             (_JSON_TYPE_MAP.get(v.get("type", ""), Any), ...)
             if k in required
-            else (_JSON_TYPE_MAP.get(v.get("type", ""), Any) | None, Field(default=None))
+            else (
+                _JSON_TYPE_MAP.get(v.get("type", ""), Any) | None,
+                Field(default=None),
+            )
         )
         for k, v in properties.items()
     }

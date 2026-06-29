@@ -24,9 +24,15 @@ from sap_cloud_sdk.agentgateway._lob import (
     call_mcp_tool_lob,
     fetch_system_auth,
     fetch_user_auth,
+    get_agent_cards_lob,
     get_mcp_tools_lob,
 )
-from sap_cloud_sdk.agentgateway._models import AuthResult, MCPTool
+from sap_cloud_sdk.agentgateway._models import (
+    Agent,
+    AgentCardFilter,
+    AuthResult,
+    MCPTool,
+)
 from sap_cloud_sdk.agentgateway._token_cache import _GatewayUrlCache, _TokenCache
 from sap_cloud_sdk.agentgateway.exceptions import AgentGatewaySDKError
 from sap_cloud_sdk.core.telemetry import Module, Operation, record_metrics
@@ -367,6 +373,72 @@ class AgentGatewayClient:
             logger.exception("Unexpected error during tool discovery")
             cause = _unwrap_exception_group(e)
             raise AgentGatewaySDKError(f"Tool discovery failed: {cause}") from e
+
+    @record_metrics(Module.AGENTGATEWAY, Operation.AGENTGATEWAY_LIST_AGENT_CARDS)
+    async def list_agent_cards(
+        self,
+        filter: AgentCardFilter | None = None,
+    ) -> list[Agent]:
+        """List A2A agents and their agent cards from Agent Gateway.
+
+        Discovers destination fragments labelled as A2A agents and fetches the
+        agent card from each agent's well-known endpoint. Only available for
+        LoB agents.
+
+        Args:
+            filter: Optional filter to narrow results by fragment name or ORD ID.
+                If None or empty, all A2A fragments are included.
+
+        Returns:
+            List of Agent objects, each containing the fragment name, ORD ID,
+            and the fetched AgentCard.
+
+        Raises:
+            AgentGatewaySDKError: If tenant_subdomain is not provided,
+                or if fragment discovery or agent card fetch fails.
+
+        Example:
+            ```python
+            from sap_cloud_sdk.agentgateway import AgentCardFilter
+
+            # All agents
+            agents = await agw_client.list_agent_cards()
+
+            # With filters
+            agents = await agw_client.list_agent_cards(
+                filter=AgentCardFilter(
+                    agent_names=["Sample Agent"],
+                    ord_ids=["sap.s4:apiAccess:agent:v1"],
+                )
+            )
+            ```
+        """
+        try:
+            credentials_path = detect_customer_agent_credentials()
+            if credentials_path:
+                # TODO: Add customer agent flow for list_agent_cards.
+                # Customer agents should discover A2A agents from integrationDependencies
+                # in the credentials file (similar to get_mcp_tools_customer) and fetch
+                # agent cards using the credentials gateway_url.
+                raise AgentGatewaySDKError(
+                    "list_agent_cards is not yet supported for customer agents."
+                )
+
+            tenant = self._resolve_tenant_subdomain()
+            auth = await self.get_system_auth()
+            f = filter or AgentCardFilter()
+            return await get_agent_cards_lob(
+                tenant,
+                auth.access_token,
+                self._config.timeout,
+                agent_names=f.agent_names or None,
+                ord_ids=f.ord_ids or None,
+            )
+        except AgentGatewaySDKError:
+            raise
+        except Exception as e:
+            logger.exception("Unexpected error during agent card discovery")
+            raise AgentGatewaySDKError(f"Agent card discovery failed: {e}") from e
 
     @record_metrics(Module.AGENTGATEWAY, Operation.AGENTGATEWAY_CALL_MCP_TOOL)
     async def call_mcp_tool(

@@ -15,26 +15,26 @@ from mcp import ClientSession
 from mcp.client.streamable_http import streamable_http_client
 from sap_cloud_sdk.destination import (
     create_client as create_destination_client,
-    create_fragment_client,
     ConsumptionLevel,
     ConsumptionOptions,
-    Label,
-    ListOptions,
 )
 
-from sap_cloud_sdk.agentgateway._models import MCPTool
+from sap_cloud_sdk.agentgateway._fragments import (
+    LABEL_KEY,
+    FragmentLabel,
+    get_ias_fragment_name,
+    get_ias_user_fragment_name,
+    list_mcp_fragments,
+    list_a2a_fragments,
+)
+from sap_cloud_sdk.agentgateway._models import Agent, AgentCard, MCPTool
 from sap_cloud_sdk.agentgateway._token_cache import _GatewayUrlCache, _TokenCache
-from sap_cloud_sdk.agentgateway.exceptions import MCPServerNotFoundError
+from sap_cloud_sdk.agentgateway.exceptions import (
+    AgentGatewaySDKError,
+    MCPServerNotFoundError,
+)
 
 logger = logging.getLogger(__name__)
-
-# Shared label key for all managed-runtime fragment types
-_LABEL_KEY = "sap-managed-runtime-type"
-
-# Label values for fragment discovery
-_MCP_LABEL_VALUE = "agw.mcp.server"
-_IAS_LABEL_VALUE = "subscriber.ias"
-_IAS_USER_LABEL_VALUE = "subscriber.ias.user"
 
 _DESTINATION_INSTANCE = "default"
 
@@ -112,85 +112,6 @@ def _fetch_auth_token(
     gateway_url = (dest.url or "").rstrip("/")
 
     return raw_token, gateway_url
-
-
-def list_mcp_fragments(tenant_subdomain: str) -> list:
-    """List destination fragments with MCP server label.
-
-    Args:
-        tenant_subdomain: Tenant subdomain for multi-tenant lookup.
-
-    Returns:
-        List of fragments with sap-managed-runtime-type=agw.mcp.server label.
-    """
-    logger.debug("Fetching MCP fragments for tenant '%s'", tenant_subdomain)
-    client = create_fragment_client(instance=_DESTINATION_INSTANCE)
-    return client.list_instance_fragments(
-        filter=ListOptions(
-            filter_labels=[Label(key=_LABEL_KEY, values=[_MCP_LABEL_VALUE])]
-        ),
-        tenant=tenant_subdomain,
-    )
-
-
-def get_ias_fragment_name(tenant_subdomain: str) -> str:
-    """Get the IAS fragment name for system (technical) token acquisition.
-
-    Looks up the IAS fragment created during subscription by the
-    sap-managed-runtime-type=subscriber.ias label.
-
-    Args:
-        tenant_subdomain: Tenant subdomain for multi-tenant lookup.
-
-    Returns:
-        IAS fragment name.
-
-    Raises:
-        MCPServerNotFoundError: If no IAS fragment is found.
-    """
-    client = create_fragment_client(instance=_DESTINATION_INSTANCE)
-    fragments = client.list_instance_fragments(
-        filter=ListOptions(
-            filter_labels=[Label(key=_LABEL_KEY, values=[_IAS_LABEL_VALUE])]
-        ),
-        tenant=tenant_subdomain,
-    )
-    if not fragments:
-        raise MCPServerNotFoundError(
-            f"No IAS fragment found (label {_LABEL_KEY}={_IAS_LABEL_VALUE}) "
-            f"for tenant '{tenant_subdomain}'"
-        )
-    return fragments[0].name
-
-
-def get_ias_user_fragment_name(tenant_subdomain: str) -> str:
-    """Get the IAS user fragment name for token exchange (principal propagation).
-
-    Looks up the IAS user fragment created during subscription by the
-    sap-managed-runtime-type=subscriber.ias.user label.
-
-    Args:
-        tenant_subdomain: Tenant subdomain for multi-tenant lookup.
-
-    Returns:
-        IAS user fragment name.
-
-    Raises:
-        MCPServerNotFoundError: If no IAS user fragment is found.
-    """
-    client = create_fragment_client(instance=_DESTINATION_INSTANCE)
-    fragments = client.list_instance_fragments(
-        filter=ListOptions(
-            filter_labels=[Label(key=_LABEL_KEY, values=[_IAS_USER_LABEL_VALUE])]
-        ),
-        tenant=tenant_subdomain,
-    )
-    if not fragments:
-        raise MCPServerNotFoundError(
-            f"No IAS user fragment found (label {_LABEL_KEY}={_IAS_USER_LABEL_VALUE}) "
-            f"for tenant '{tenant_subdomain}'"
-        )
-    return fragments[0].name
 
 
 async def fetch_system_auth(
@@ -409,7 +330,7 @@ async def get_mcp_tools_lob(
 
     if not fragments:
         logger.debug(
-            "No MCP fragments found (label %s=%s)", _LABEL_KEY, _MCP_LABEL_VALUE
+            "No MCP fragments found (label %s=%s)", LABEL_KEY, FragmentLabel.MCP.value
         )
         return tools
 
@@ -482,3 +403,170 @@ async def call_mcp_tool_lob(
                     return ""
                 first = result.content[0]
                 return str(getattr(first, "text", ""))
+
+
+async def _fetch_agent_card(
+    fragment_url: str,
+    auth_token: str,
+    timeout: float,
+) -> AgentCard:
+    """Fetch agent card from the A2A well-known endpoint.
+
+    URL: {fragment_url}/.well-known/agent-card.json
+
+    Args:
+        fragment_url: Base URL from the A2A fragment's URL property.
+        auth_token: Raw access token for authentication.
+        timeout: HTTP timeout in seconds.
+
+    Returns:
+        AgentCard with the full parsed response payload.
+
+    Raises:
+        AgentGatewaySDKError: If the request fails or returns a non-200 status.
+    """
+    url = f"{fragment_url.rstrip('/')}/.well-known/agent-card.json"
+    logger.debug("Fetching agent card from '%s'", url)
+
+    async with httpx.AsyncClient(
+        headers={
+            "Authorization": f"Bearer {auth_token}",
+            "x-correlation-id": str(uuid.uuid4()),
+        },
+        timeout=timeout,
+    ) as client:
+        try:
+            response = await client.get(url)
+        except httpx.RequestError as e:
+            raise AgentGatewaySDKError(
+                f"Agent card request failed for '{fragment_url}': {e}"
+            ) from e
+
+    if response.status_code != 200:
+        raise AgentGatewaySDKError(
+            f"Agent card request returned status {response.status_code} "
+            f"for '{fragment_url}': {response.text[:200]}"
+        )
+
+    try:
+        payload = response.json()
+    except Exception as e:
+        raise AgentGatewaySDKError(
+            f"Failed to parse agent card JSON for '{fragment_url}': {e}"
+        ) from e
+
+    return AgentCard(raw=payload)
+
+
+def _ord_id_from_url(url: str) -> str:
+    """Extract the ORD ID from an A2A fragment URL.
+
+    A2A fragment URLs follow the pattern:
+        https://{gateway-host}/v1/a2a/{ordId}/{globalTenantId}
+
+    The ORD ID is the second-to-last non-empty path segment.
+
+    Returns an empty string if the URL path has fewer than two segments.
+    """
+    from urllib.parse import urlparse
+
+    path_segments = [s for s in urlparse(url).path.split("/") if s]
+    return path_segments[-2] if len(path_segments) >= 2 else ""
+
+
+async def get_agent_cards_lob(
+    tenant_subdomain: str,
+    system_token: str,
+    timeout: float,
+    agent_names: list[str] | None = None,
+    ord_ids: list[str] | None = None,
+) -> list[Agent]:
+    """List A2A agents and their agent cards using LoB flow.
+
+    Discovers A2A fragments (label agw.a2a.server), optionally filters by
+    ORD ID before fetching, fetches each agent card, then optionally filters
+    by agent card name.
+
+    Fragment properties used:
+        URL: Base URL of the A2A agent (required).
+            The agent card is fetched at {URL}/.well-known/agent-card.json.
+            The ORD ID is extracted from the second-to-last URL path segment.
+
+    Args:
+        tenant_subdomain: Tenant subdomain for multi-tenant lookup.
+        system_token: Pre-fetched raw system token for authentication.
+        timeout: HTTP timeout in seconds.
+        agent_names: Optional list of agent card names to include (matched
+            against the `name` field in the fetched agent card JSON).
+            Applied after fetching. If empty or None, all are included.
+        ord_ids: Optional list of ORD IDs to include (extracted from URL).
+            Applied before fetching. If empty or None, all are included.
+
+    Returns:
+        List of Agent objects, each containing ORD ID and fetched AgentCard.
+    """
+    loop = asyncio.get_running_loop()
+
+    logger.info("Listing A2A fragments for tenant '%s'", tenant_subdomain)
+    fragments = await loop.run_in_executor(None, list_a2a_fragments, tenant_subdomain)
+
+    if not fragments:
+        logger.debug(
+            "No A2A fragments found (label %s=%s)", LABEL_KEY, FragmentLabel.A2A.value
+        )
+        return []
+
+    # Pre-fetch filter: ORD ID is extractable from the URL without fetching the card
+    if ord_ids:
+        ord_ids_set = set(ord_ids)
+        fragments = [
+            f
+            for f in fragments
+            if _ord_id_from_url(
+                {k.lower(): v for k, v in f.properties.items()}.get("url", "")
+            )
+            in ord_ids_set
+        ]
+
+    agents: list[Agent] = []
+
+    for fragment in fragments:
+        fragment_name = fragment.name
+        props_lower = {k.lower(): v for k, v in fragment.properties.items()}
+        fragment_url = props_lower.get("url")
+
+        if not fragment_url:
+            logger.warning(
+                "A2A fragment '%s' missing 'URL' property — skipping (properties: %s)",
+                fragment_name,
+                list(fragment.properties.keys()),
+            )
+            continue
+
+        ord_id = _ord_id_from_url(fragment_url)
+        if not ord_id:
+            logger.warning(
+                "A2A fragment '%s' could not extract ordId from URL '%s' — skipping",
+                fragment_name,
+                fragment_url,
+            )
+            continue
+
+        try:
+            card = await _fetch_agent_card(fragment_url, system_token, timeout)
+            agents.append(Agent(ord_id=ord_id, agent_card=card))
+            logger.debug("Fetched agent card for fragment '%s'", fragment_name)
+        except Exception:
+            logger.exception(
+                "Failed to fetch agent card for fragment '%s' — skipping", fragment_name
+            )
+
+    # Post-fetch filter: agent card name is only known after fetching
+    if agent_names:
+        agent_names_set = set(agent_names)
+        agents = [a for a in agents if a.agent_card.raw.get("name") in agent_names_set]
+
+    logger.info(
+        "Fetched %d agent card(s) from %d A2A fragment(s)", len(agents), len(fragments)
+    )
+    return agents

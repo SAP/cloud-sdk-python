@@ -7,6 +7,9 @@ import pytest
 from sap_cloud_sdk.agentgateway import (
     create_client,
     AgentGatewayClient,
+    Agent,
+    AgentCard,
+    AgentCardFilter,
     AuthResult,
     MCPTool,
     AgentGatewaySDKError,
@@ -834,3 +837,146 @@ class TestCallMcpTool:
             )
 
             assert result == "Success: Order created"
+
+
+# ============================================================
+# Test: list_agent_cards
+# ============================================================
+
+
+class TestListAgentCards:
+    """Tests for list_agent_cards async method."""
+
+    @pytest.mark.asyncio
+    async def test_returns_agents_from_lob_flow(self):
+        """Return list of Agent objects from LoB flow."""
+        card = AgentCard(raw={"name": "TestAgent"})
+        agent = Agent(ord_id="sap.s4:agent:v1", agent_card=card)
+
+        with (
+            patch(
+                "sap_cloud_sdk.agentgateway.agw_client.detect_customer_agent_credentials",
+                return_value=None,
+            ),
+            patch(
+                "sap_cloud_sdk.agentgateway.agw_client.fetch_system_auth",
+                new_callable=AsyncMock,
+                return_value=("system-token", "https://agw.example.com"),
+            ),
+            patch(
+                "sap_cloud_sdk.agentgateway.agw_client.get_agent_cards_lob",
+                new_callable=AsyncMock,
+                return_value=[agent],
+            ) as mock_lob,
+        ):
+            agw_client = create_client(tenant_subdomain="my-tenant")
+            result = await agw_client.list_agent_cards()
+
+        assert result == [agent]
+        mock_lob.assert_called_once_with(
+            "my-tenant",
+            "system-token",
+            60.0,
+            agent_names=None,
+            ord_ids=None,
+        )
+
+    @pytest.mark.asyncio
+    async def test_passes_filter_arguments(self):
+        """Pass names and ord_ids from AgentCardFilter through to get_agent_cards_lob."""
+        with (
+            patch(
+                "sap_cloud_sdk.agentgateway.agw_client.detect_customer_agent_credentials",
+                return_value=None,
+            ),
+            patch(
+                "sap_cloud_sdk.agentgateway.agw_client.fetch_system_auth",
+                new_callable=AsyncMock,
+                return_value=("token", "https://agw.example.com"),
+            ),
+            patch(
+                "sap_cloud_sdk.agentgateway.agw_client.get_agent_cards_lob",
+                new_callable=AsyncMock,
+                return_value=[],
+            ) as mock_lob,
+        ):
+            agw_client = create_client(tenant_subdomain="my-tenant")
+            await agw_client.list_agent_cards(
+                filter=AgentCardFilter(agent_names=["Billing Agent"], ord_ids=["sap.s4:agent:v1"])
+            )
+
+        mock_lob.assert_called_once_with(
+            "my-tenant",
+            "token",
+            60.0,
+            agent_names=["Billing Agent"],
+            ord_ids=["sap.s4:agent:v1"],
+        )
+
+    @pytest.mark.asyncio
+    async def test_raises_for_customer_agent_flow(self):
+        """Raise AgentGatewaySDKError when called from a customer agent (not yet supported)."""
+        with patch(
+            "sap_cloud_sdk.agentgateway.agw_client.detect_customer_agent_credentials",
+            return_value="/path/to/credentials",
+        ):
+            agw_client = create_client()
+            with pytest.raises(AgentGatewaySDKError, match="not yet supported for customer agents"):
+                await agw_client.list_agent_cards()
+
+    @pytest.mark.asyncio
+    async def test_raises_when_tenant_subdomain_missing(self):
+        """Raise AgentGatewaySDKError when tenant_subdomain is not provided."""
+        agw_client = create_client()
+        with patch(
+            "sap_cloud_sdk.agentgateway.agw_client.detect_customer_agent_credentials",
+            return_value=None,
+        ):
+            with pytest.raises(AgentGatewaySDKError, match="tenant_subdomain"):
+                await agw_client.list_agent_cards()
+
+    @pytest.mark.asyncio
+    async def test_propagates_sdk_error(self):
+        """Re-raise AgentGatewaySDKError from get_agent_cards_lob."""
+        with (
+            patch(
+                "sap_cloud_sdk.agentgateway.agw_client.detect_customer_agent_credentials",
+                return_value=None,
+            ),
+            patch(
+                "sap_cloud_sdk.agentgateway.agw_client.fetch_system_auth",
+                new_callable=AsyncMock,
+                return_value=("token", "https://agw.example.com"),
+            ),
+            patch(
+                "sap_cloud_sdk.agentgateway.agw_client.get_agent_cards_lob",
+                new_callable=AsyncMock,
+                side_effect=AgentGatewaySDKError("fragment discovery failed"),
+            ),
+        ):
+            agw_client = create_client(tenant_subdomain="my-tenant")
+            with pytest.raises(AgentGatewaySDKError, match="fragment discovery failed"):
+                await agw_client.list_agent_cards()
+
+    @pytest.mark.asyncio
+    async def test_wraps_unexpected_error(self):
+        """Wrap unexpected errors in AgentGatewaySDKError."""
+        with (
+            patch(
+                "sap_cloud_sdk.agentgateway.agw_client.detect_customer_agent_credentials",
+                return_value=None,
+            ),
+            patch(
+                "sap_cloud_sdk.agentgateway.agw_client.fetch_system_auth",
+                new_callable=AsyncMock,
+                return_value=("token", "https://agw.example.com"),
+            ),
+            patch(
+                "sap_cloud_sdk.agentgateway.agw_client.get_agent_cards_lob",
+                new_callable=AsyncMock,
+                side_effect=RuntimeError("unexpected"),
+            ),
+        ):
+            agw_client = create_client(tenant_subdomain="my-tenant")
+            with pytest.raises(AgentGatewaySDKError, match="Agent card discovery failed"):
+                await agw_client.list_agent_cards()

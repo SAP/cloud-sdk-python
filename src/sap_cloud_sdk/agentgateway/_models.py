@@ -1,6 +1,6 @@
 """Data models for Agent Gateway MCP tools."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 
@@ -92,3 +92,61 @@ class CustomerCredentials:
     private_key: str
     gateway_url: str
     integration_dependencies: list[IntegrationDependency]
+
+
+@dataclass
+class AgentCard:
+    """Agent Card as returned by the A2A well-known endpoint.
+
+    Contains the raw payload from /.well-known/agent-card.json, plus
+    the ORD ID and global tenant ID of the agent.
+
+    Attributes:
+        raw: Full parsed JSON payload from the agent card endpoint.
+    """
+
+    raw: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass
+class Agent:
+    """A2A agent discovered via Agent Gateway fragment listing.
+
+    Attributes:
+        ord_id: Open Resource Discovery ID of the agent.
+        agent_card: Agent Card fetched from the A2A well-known endpoint.
+    """
+
+    ord_id: str
+    agent_card: AgentCard
+
+
+@dataclass
+class AgentCardFilter:
+    """Filter options for list_agent_cards.
+
+    All fields are optional. When multiple fields are set they are applied
+    together (AND semantics). Empty lists are treated the same as None (no
+    filtering on that field).
+
+    Attributes:
+        agent_names: Agent card names to include (matched against the `name`
+            field in the agent card JSON). Applied after fetching all cards.
+        ord_ids: ORD IDs to include (extracted from the fragment URL).
+            Applied before fetching, skipping non-matching fragments.
+
+    Example:
+        ```python
+        from sap_cloud_sdk.agentgateway import AgentCardFilter
+
+        agents = await agw_client.list_agent_cards(
+            filter=AgentCardFilter(
+                agent_names=["Sample Agent"],
+                ord_ids=["sap.s4:apiAccess:agent:v1"],
+            )
+        )
+        ```
+    """
+
+    agent_names: list[str] = field(default_factory=list)
+    ord_ids: list[str] = field(default_factory=list)

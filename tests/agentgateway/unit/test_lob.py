@@ -5,26 +5,37 @@ from unittest.mock import patch, MagicMock, AsyncMock
 
 import pytest
 
+from sap_cloud_sdk.agentgateway._fragments import (
+    LABEL_KEY,
+    FragmentLabel,
+    get_ias_fragment_name,
+    get_ias_user_fragment_name,
+    list_mcp_fragments,
+    list_a2a_fragments,
+)
 from sap_cloud_sdk.agentgateway._lob import (
     _ias_dest_name,
     _fetch_auth_token,
-    list_mcp_fragments,
-    get_ias_fragment_name,
-    get_ias_user_fragment_name,
+    _ord_id_from_url,
     fetch_system_auth,
     fetch_user_auth,
     get_mcp_tools_lob,
+    get_agent_cards_lob,
+    _fetch_agent_card,
     call_mcp_tool_lob,
-    _LABEL_KEY,
-    _MCP_LABEL_VALUE,
-    _IAS_LABEL_VALUE,
-    _IAS_USER_LABEL_VALUE,
 )
-from sap_cloud_sdk.agentgateway._models import MCPTool
+from sap_cloud_sdk.agentgateway._models import Agent, AgentCard, MCPTool
 from sap_cloud_sdk.agentgateway._token_cache import _GatewayUrlCache, _TokenCache
 from sap_cloud_sdk.agentgateway.config import ClientConfig
-from sap_cloud_sdk.agentgateway.exceptions import MCPServerNotFoundError
+from sap_cloud_sdk.agentgateway.exceptions import AgentGatewaySDKError, MCPServerNotFoundError
 from sap_cloud_sdk.destination import ConsumptionLevel
+
+# Aliases for use in existing test assertions
+_LABEL_KEY = LABEL_KEY
+_MCP_LABEL_VALUE = FragmentLabel.MCP.value
+_IAS_LABEL_VALUE = FragmentLabel.IAS.value
+_IAS_USER_LABEL_VALUE = FragmentLabel.IAS_USER.value
+_A2A_LABEL_VALUE = FragmentLabel.A2A.value
 
 
 # ============================================================
@@ -180,7 +191,7 @@ class TestListMcpFragments:
         fragment2.name = "mcp-server-b"
 
         with patch(
-            "sap_cloud_sdk.agentgateway._lob.create_fragment_client"
+            "sap_cloud_sdk.agentgateway._fragments.create_fragment_client"
         ) as mock_client:
             mock_client.return_value.list_instance_fragments.return_value = [
                 fragment1,
@@ -196,7 +207,7 @@ class TestListMcpFragments:
     def test_uses_correct_filter_labels(self):
         """Use correct label filter for MCP fragments."""
         with patch(
-            "sap_cloud_sdk.agentgateway._lob.create_fragment_client"
+            "sap_cloud_sdk.agentgateway._fragments.create_fragment_client"
         ) as mock_client:
             mock_client.return_value.list_instance_fragments.return_value = []
 
@@ -225,7 +236,7 @@ class TestGetIasFragmentName:
         fragment.name = "sap-managed-runtime-agw-subscriber-ias-abc123"
 
         with patch(
-            "sap_cloud_sdk.agentgateway._lob.create_fragment_client"
+            "sap_cloud_sdk.agentgateway._fragments.create_fragment_client"
         ) as mock_client:
             mock_client.return_value.list_instance_fragments.return_value = [fragment]
 
@@ -239,7 +250,7 @@ class TestGetIasFragmentName:
         fragment.name = "ias-fragment"
 
         with patch(
-            "sap_cloud_sdk.agentgateway._lob.create_fragment_client"
+            "sap_cloud_sdk.agentgateway._fragments.create_fragment_client"
         ) as mock_client:
             mock_client.return_value.list_instance_fragments.return_value = [fragment]
 
@@ -255,7 +266,7 @@ class TestGetIasFragmentName:
     def test_raises_when_no_fragment_found(self):
         """Raise MCPServerNotFoundError when no IAS fragment exists."""
         with patch(
-            "sap_cloud_sdk.agentgateway._lob.create_fragment_client"
+            "sap_cloud_sdk.agentgateway._fragments.create_fragment_client"
         ) as mock_client:
             mock_client.return_value.list_instance_fragments.return_value = []
 
@@ -276,7 +287,7 @@ class TestGetIasUserFragmentName:
         fragment = MagicMock()
         fragment.name = "sap-managed-runtime-agw-subscriber-ias-user-abc123"
 
-        with patch("sap_cloud_sdk.agentgateway._lob.create_fragment_client") as mock_client:
+        with patch("sap_cloud_sdk.agentgateway._fragments.create_fragment_client") as mock_client:
             mock_client.return_value.list_instance_fragments.return_value = [fragment]
 
             result = get_ias_user_fragment_name("tenant-sub")
@@ -288,7 +299,7 @@ class TestGetIasUserFragmentName:
         fragment = MagicMock()
         fragment.name = "ias-user-fragment"
 
-        with patch("sap_cloud_sdk.agentgateway._lob.create_fragment_client") as mock_client:
+        with patch("sap_cloud_sdk.agentgateway._fragments.create_fragment_client") as mock_client:
             mock_client.return_value.list_instance_fragments.return_value = [fragment]
 
             get_ias_user_fragment_name("tenant-sub")
@@ -302,7 +313,7 @@ class TestGetIasUserFragmentName:
 
     def test_raises_when_no_fragment_found(self):
         """Raise MCPServerNotFoundError when no IAS user fragment exists."""
-        with patch("sap_cloud_sdk.agentgateway._lob.create_fragment_client") as mock_client:
+        with patch("sap_cloud_sdk.agentgateway._fragments.create_fragment_client") as mock_client:
             mock_client.return_value.list_instance_fragments.return_value = []
 
             with pytest.raises(MCPServerNotFoundError, match="No IAS user fragment found"):
@@ -685,3 +696,318 @@ class TestCallMcpToolLob:
             result = await call_mcp_tool_lob(tool, "user-auth-token", 60.0)
 
             assert result == ""
+
+
+# ============================================================
+# Test: list_a2a_fragments
+# ============================================================
+
+
+# ============================================================
+# Test: _ord_id_from_url
+# ============================================================
+
+
+class TestOrdIdFromUrl:
+    """Tests for _ord_id_from_url helper."""
+
+    def test_extracts_ord_id_from_standard_url(self):
+        """Return the second-to-last path segment as ord_id."""
+        assert _ord_id_from_url(
+            "https://agw.example.com/v1/a2a/sap.s4:agent:v1/tenant-abc"
+        ) == "sap.s4:agent:v1"
+
+    def test_strips_trailing_slash(self):
+        """Handle trailing slash on URL."""
+        assert _ord_id_from_url(
+            "https://agw.example.com/v1/a2a/ord-1/gt-1/"
+        ) == "ord-1"
+
+    def test_returns_empty_for_single_segment(self):
+        """Return empty string when URL has only one path segment."""
+        assert _ord_id_from_url("https://agw.example.com/only-one") == ""
+
+    def test_returns_empty_for_bare_host(self):
+        """Return empty string for bare host URL with no path."""
+        assert _ord_id_from_url("https://agw.example.com") == ""
+
+
+class TestListA2aFragments:
+    """Tests for list_a2a_fragments function."""
+
+    def test_lists_fragments_with_a2a_label(self):
+        """Return fragments filtered by agw.a2a label."""
+        mock_fragment = MagicMock()
+        mock_fragment.name = "a2a-fragment"
+
+        with patch(
+            "sap_cloud_sdk.agentgateway._fragments.create_fragment_client"
+        ) as mock_client:
+            mock_client.return_value.list_instance_fragments.return_value = [mock_fragment]
+            result = list_a2a_fragments("tenant-sub")
+
+        assert result == [mock_fragment]
+        call_kwargs = mock_client.return_value.list_instance_fragments.call_args
+        filter_obj = call_kwargs[1]["filter"]
+        assert filter_obj.filter_labels[0].key == _LABEL_KEY
+        assert _A2A_LABEL_VALUE in filter_obj.filter_labels[0].values
+
+    def test_returns_empty_list_when_no_fragments(self):
+        """Return empty list when no A2A fragments exist."""
+        with patch(
+            "sap_cloud_sdk.agentgateway._fragments.create_fragment_client"
+        ) as mock_client:
+            mock_client.return_value.list_instance_fragments.return_value = []
+            result = list_a2a_fragments("tenant-sub")
+
+        assert result == []
+
+
+# ============================================================
+# Test: _fetch_agent_card
+# ============================================================
+
+
+class TestFetchAgentCard:
+    """Tests for _fetch_agent_card async function."""
+
+    @pytest.mark.asyncio
+    async def test_fetches_agent_card_successfully(self):
+        """Fetch and parse agent card JSON from well-known endpoint."""
+        card_payload = {"name": "TestAgent", "version": "1.0", "capabilities": {}}
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = card_payload
+
+        with patch("sap_cloud_sdk.agentgateway._lob.httpx.AsyncClient") as mock_http:
+            mock_http_instance = AsyncMock()
+            mock_http_instance.get = AsyncMock(return_value=mock_response)
+            mock_http.return_value.__aenter__.return_value = mock_http_instance
+
+            result = await _fetch_agent_card(
+                "https://agw.example.com/v1/a2a/sap.s4:apiAccess:agent:v1/tenant-123",
+                "auth-token",
+                60.0,
+            )
+
+        assert isinstance(result, AgentCard)
+        assert result.raw == card_payload
+        mock_http_instance.get.assert_called_once_with(
+            "https://agw.example.com/v1/a2a/sap.s4:apiAccess:agent:v1/tenant-123/.well-known/agent-card.json"
+        )
+
+    @pytest.mark.asyncio
+    async def test_strips_trailing_slash_from_fragment_url(self):
+        """Strip trailing slash from fragment URL before appending well-known path."""
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {}
+
+        with patch("sap_cloud_sdk.agentgateway._lob.httpx.AsyncClient") as mock_http:
+            mock_http_instance = AsyncMock()
+            mock_http_instance.get = AsyncMock(return_value=mock_response)
+            mock_http.return_value.__aenter__.return_value = mock_http_instance
+
+            await _fetch_agent_card("https://agw.example.com/base/", "token", 60.0)
+
+        mock_http_instance.get.assert_called_once_with(
+            "https://agw.example.com/base/.well-known/agent-card.json"
+        )
+
+    @pytest.mark.asyncio
+    async def test_raises_on_non_200_status(self):
+        """Raise AgentGatewaySDKError when response status is not 200."""
+        mock_response = MagicMock()
+        mock_response.status_code = 404
+        mock_response.text = "Not found"
+
+        with patch("sap_cloud_sdk.agentgateway._lob.httpx.AsyncClient") as mock_http:
+            mock_http_instance = AsyncMock()
+            mock_http_instance.get = AsyncMock(return_value=mock_response)
+            mock_http.return_value.__aenter__.return_value = mock_http_instance
+
+            with pytest.raises(AgentGatewaySDKError, match="404"):
+                await _fetch_agent_card("https://agw.example.com/base", "auth-token", 60.0)
+
+    @pytest.mark.asyncio
+    async def test_raises_on_request_error(self):
+        """Raise AgentGatewaySDKError when HTTP request fails."""
+        import httpx
+
+        with patch("sap_cloud_sdk.agentgateway._lob.httpx.AsyncClient") as mock_http:
+            mock_http_instance = AsyncMock()
+            mock_http_instance.get = AsyncMock(
+                side_effect=httpx.RequestError("connection refused")
+            )
+            mock_http.return_value.__aenter__.return_value = mock_http_instance
+
+            with pytest.raises(AgentGatewaySDKError, match="Agent card request failed"):
+                await _fetch_agent_card("https://agw.example.com/base", "auth-token", 60.0)
+
+
+# ============================================================
+# Test: get_agent_cards_lob
+# ============================================================
+
+
+class TestGetAgentCardsLob:
+    """Tests for get_agent_cards_lob async function."""
+
+    def _make_fragment(self, name: str, url: str) -> MagicMock:
+        fragment = MagicMock()
+        fragment.name = name
+        fragment.properties = {"URL": url}
+        return fragment
+
+    @pytest.mark.asyncio
+    async def test_returns_agents_for_all_fragments(self):
+        """Return one Agent per A2A fragment with fetched card."""
+        card_payload = {"name": "MyAgent"}
+        fragment = self._make_fragment(
+            "frag-1", "https://agw.example.com/v1/a2a/sap.s4:agent:v1/tenant-abc"
+        )
+
+        with (
+            patch(
+                "sap_cloud_sdk.agentgateway._lob.list_a2a_fragments",
+                return_value=[fragment],
+            ),
+            patch(
+                "sap_cloud_sdk.agentgateway._lob._fetch_agent_card",
+                new_callable=AsyncMock,
+                return_value=AgentCard(raw=card_payload),
+            ),
+        ):
+            result = await get_agent_cards_lob(
+                "tenant-sub", "system-token", 60.0
+            )
+
+        assert len(result) == 1
+        assert isinstance(result[0], Agent)
+        assert result[0].ord_id == "sap.s4:agent:v1"
+        assert result[0].agent_card.raw == card_payload
+
+    @pytest.mark.asyncio
+    async def test_returns_empty_list_when_no_fragments(self):
+        """Return empty list when no A2A fragments exist."""
+        with patch(
+            "sap_cloud_sdk.agentgateway._lob.list_a2a_fragments",
+            return_value=[],
+        ):
+            result = await get_agent_cards_lob("tenant-sub", "system-token", 60.0)
+
+        assert result == []
+
+    @pytest.mark.asyncio
+    async def test_filters_by_agent_names(self):
+        """Fetch all cards then keep only those whose agent card name matches."""
+        frag_1 = self._make_fragment("frag-1", "https://agw.example.com/v1/a2a/ord-1/t1")
+        frag_2 = self._make_fragment("frag-2", "https://agw.example.com/v1/a2a/ord-2/t2")
+
+        async def _cards_by_ord(fragment_url, token, timeout):
+            if "ord-1" in fragment_url:
+                return AgentCard(raw={"name": "Billing Agent"})
+            return AgentCard(raw={"name": "Other Agent"})
+
+        with (
+            patch(
+                "sap_cloud_sdk.agentgateway._lob.list_a2a_fragments",
+                return_value=[frag_1, frag_2],
+            ),
+            patch(
+                "sap_cloud_sdk.agentgateway._lob._fetch_agent_card",
+                side_effect=_cards_by_ord,
+            ),
+        ):
+            result = await get_agent_cards_lob(
+                "tenant-sub", "token", 60.0, agent_names=["Billing Agent"]
+            )
+
+        assert len(result) == 1
+        assert result[0].ord_id == "ord-1"
+        assert result[0].agent_card.raw["name"] == "Billing Agent"
+
+    @pytest.mark.asyncio
+    async def test_filters_by_ord_ids(self):
+        """Only include fragments whose ordId (from URL) is in the ord_ids filter."""
+        frag_1 = self._make_fragment("frag-1", "https://agw.example.com/v1/a2a/ord-1/t1")
+        frag_2 = self._make_fragment("frag-2", "https://agw.example.com/v1/a2a/ord-2/t2")
+
+        with (
+            patch(
+                "sap_cloud_sdk.agentgateway._lob.list_a2a_fragments",
+                return_value=[frag_1, frag_2],
+            ),
+            patch(
+                "sap_cloud_sdk.agentgateway._lob._fetch_agent_card",
+                new_callable=AsyncMock,
+                return_value=AgentCard(raw={}),
+            ) as mock_fetch,
+        ):
+            result = await get_agent_cards_lob(
+                "tenant-sub", "token", 60.0, ord_ids=["ord-2"]
+            )
+
+        assert len(result) == 1
+        assert result[0].ord_id == "ord-2"
+        assert mock_fetch.call_count == 1
+
+    @pytest.mark.asyncio
+    async def test_skips_fragment_with_unparseable_ord_id(self):
+        """Skip fragment whose URL has fewer than two path segments (no ordId)."""
+        fragment = MagicMock()
+        fragment.name = "frag-bad-url"
+        fragment.properties = {"URL": "https://agw.example.com"}
+
+        with patch(
+            "sap_cloud_sdk.agentgateway._lob.list_a2a_fragments",
+            return_value=[fragment],
+        ):
+            result = await get_agent_cards_lob("tenant-sub", "token", 60.0)
+
+        assert result == []
+
+    @pytest.mark.asyncio
+    async def test_skips_fragment_missing_url(self):
+        """Skip fragment that has no URL property."""
+        fragment = MagicMock()
+        fragment.name = "frag-no-url"
+        fragment.properties = {}
+
+        with patch(
+            "sap_cloud_sdk.agentgateway._lob.list_a2a_fragments",
+            return_value=[fragment],
+        ):
+            result = await get_agent_cards_lob("tenant-sub", "token", 60.0)
+
+        assert result == []
+
+    @pytest.mark.asyncio
+    async def test_skips_fragment_on_fetch_error(self):
+        """Skip fragment when agent card fetch fails, continue with others."""
+        frag_ok = self._make_fragment(
+            "frag-ok", "https://agw.example.com/v1/a2a/ord-ok/t-ok"
+        )
+        frag_err = self._make_fragment(
+            "frag-err", "https://agw.example.com/v1/a2a/ord-err/t-err"
+        )
+
+        async def _selective_fetch(fragment_url, token, timeout):
+            if "ord-err" in fragment_url:
+                raise RuntimeError("server unreachable")
+            return AgentCard(raw={"name": "OK"})
+
+        with (
+            patch(
+                "sap_cloud_sdk.agentgateway._lob.list_a2a_fragments",
+                return_value=[frag_ok, frag_err],
+            ),
+            patch(
+                "sap_cloud_sdk.agentgateway._lob._fetch_agent_card",
+                side_effect=_selective_fetch,
+            ),
+        ):
+            result = await get_agent_cards_lob("tenant-sub", "token", 60.0)
+
+        assert len(result) == 1
+        assert result[0].ord_id == "ord-ok"

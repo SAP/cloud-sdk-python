@@ -89,6 +89,103 @@ class TestMcpToolToLangchainStructure:
         assert lc_tool.args_schema is not None
 
 
+class TestMcpToolToLangchainTypeMapping:
+    """Tests that JSON Schema types are mapped to the correct Python types."""
+
+    def _tool_with_types(self, properties: dict, required: list[str] | None = None) -> object:
+        return MCPTool(
+            name="typed_tool",
+            server_name="server",
+            description="desc",
+            input_schema={
+                "type": "object",
+                "required": required or [],
+                "properties": properties,
+            },
+            url="https://example.com/mcp",
+        )
+
+    def test_string_type_maps_to_str(self):
+        lc_tool = mcp_tool_to_langchain(
+            self._tool_with_types({"name": {"type": "string"}}, required=["name"]),
+            AsyncMock(),
+            lambda: "token",
+        )
+        assert _schema_fields(lc_tool)["name"].annotation is str
+
+    def test_integer_type_maps_to_int(self):
+        lc_tool = mcp_tool_to_langchain(
+            self._tool_with_types({"limit": {"type": "integer"}}, required=["limit"]),
+            AsyncMock(),
+            lambda: "token",
+        )
+        assert _schema_fields(lc_tool)["limit"].annotation is int
+
+    def test_number_type_maps_to_float(self):
+        lc_tool = mcp_tool_to_langchain(
+            self._tool_with_types({"ratio": {"type": "number"}}, required=["ratio"]),
+            AsyncMock(),
+            lambda: "token",
+        )
+        assert _schema_fields(lc_tool)["ratio"].annotation is float
+
+    def test_boolean_type_maps_to_bool(self):
+        lc_tool = mcp_tool_to_langchain(
+            self._tool_with_types({"active": {"type": "boolean"}}, required=["active"]),
+            AsyncMock(),
+            lambda: "token",
+        )
+        assert _schema_fields(lc_tool)["active"].annotation is bool
+
+    def test_array_type_maps_to_list(self):
+        lc_tool = mcp_tool_to_langchain(
+            self._tool_with_types({"tags": {"type": "array"}}, required=["tags"]),
+            AsyncMock(),
+            lambda: "token",
+        )
+        assert _schema_fields(lc_tool)["tags"].annotation is list
+
+    def test_object_type_maps_to_dict(self):
+        lc_tool = mcp_tool_to_langchain(
+            self._tool_with_types({"meta": {"type": "object"}}, required=["meta"]),
+            AsyncMock(),
+            lambda: "token",
+        )
+        assert _schema_fields(lc_tool)["meta"].annotation is dict
+
+    def test_unknown_type_maps_to_any(self):
+        from typing import Any
+        lc_tool = mcp_tool_to_langchain(
+            self._tool_with_types({"data": {"type": "unknown"}}, required=["data"]),
+            AsyncMock(),
+            lambda: "token",
+        )
+        assert _schema_fields(lc_tool)["data"].annotation is Any
+
+    def test_missing_type_maps_to_any(self):
+        from typing import Any
+        lc_tool = mcp_tool_to_langchain(
+            self._tool_with_types({"data": {}}, required=["data"]),
+            AsyncMock(),
+            lambda: "token",
+        )
+        assert _schema_fields(lc_tool)["data"].annotation is Any
+
+    def test_optional_non_string_field_is_nullable(self):
+        lc_tool = mcp_tool_to_langchain(
+            self._tool_with_types({"limit": {"type": "integer"}}),
+            AsyncMock(),
+            lambda: "token",
+        )
+        field = _schema_fields(lc_tool)["limit"]
+        assert not field.is_required()
+        # annotation should be int | None
+        import types as _types
+        assert isinstance(field.annotation, _types.UnionType)
+        assert int in field.annotation.__args__
+        assert type(None) in field.annotation.__args__
+
+
 class TestMcpToolToLangchainInvocation:
     """End-to-end invocation tests: verify what actually reaches call_tool."""
 

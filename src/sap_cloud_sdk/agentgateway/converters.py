@@ -79,12 +79,25 @@ def mcp_tool_to_langchain(
             **resolved,
         )
 
+    _JSON_TYPE_MAP: dict[str, type] = {
+        "string": str,
+        "integer": int,
+        "number": float,
+        "boolean": bool,
+        "array": list,
+        "object": dict,
+    }
+
     # Build args schema from input_schema
     properties = mcp_tool.input_schema.get("properties", {})
     required = set(mcp_tool.input_schema.get("required", []))
     fields: dict[str, Any] = {
-        k: (str, ...) if k in required else (str | None, Field(default=None))
-        for k in properties
+        k: (
+            (_JSON_TYPE_MAP.get(v.get("type", ""), Any), ...)
+            if k in required
+            else (_JSON_TYPE_MAP.get(v.get("type", ""), Any) | None, Field(default=None))
+        )
+        for k, v in properties.items()
     }
     args_schema = create_model(f"{mcp_tool.name}_args", **fields) if fields else None
 

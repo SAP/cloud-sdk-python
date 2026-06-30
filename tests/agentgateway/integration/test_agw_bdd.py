@@ -4,12 +4,13 @@ Run against a live BTP tenant:
 
     CLOUD_SDK_CFG_AGW_DEFAULT_TENANT_SUBDOMAIN=<tenant-subdomain> \\
     CLOUD_SDK_CFG_AGW_DEFAULT_LANDSCAPE=<landscape> \\
+    CLOUD_SDK_CFG_AGW_DEFAULT_USER_TOKEN=<user-jwt> \\
+    CLOUD_SDK_CFG_AGW_DEFAULT_SAMPLE_MCP_TOOL=<tool-name> \\
     CLOUD_SDK_CFG_DESTINATION_DEFAULT_CLIENTID=... \\
     CLOUD_SDK_CFG_DESTINATION_DEFAULT_CLIENTSECRET=... \\
     CLOUD_SDK_CFG_DESTINATION_DEFAULT_URL=... \\
     CLOUD_SDK_CFG_DESTINATION_DEFAULT_URI=... \\
     CLOUD_SDK_CFG_DESTINATION_DEFAULT_IDENTITYZONE=... \\
-    AGW_USER_TOKEN=<user-jwt> \\
     pytest tests/agentgateway/integration/ -v
 """
 
@@ -52,6 +53,7 @@ class ScenarioContext:
         self.user_token: Optional[str] = None
         self.tools: Optional[list[MCPTool]] = None
         self.tool_result: Optional[str] = None
+        self.sample_mcp_tool_name: Optional[str] = None
 
 
 @pytest.fixture
@@ -72,10 +74,19 @@ def agent_gateway_client_available(agw_client: AgentGatewayClient):
 @given("I have a valid user token")
 def have_valid_user_token(context: ScenarioContext):
     """Load user token from environment variable."""
-    token = os.environ.get("AGW_USER_TOKEN", "")
+    token = os.environ.get("CLOUD_SDK_CFG_AGW_DEFAULT_USER_TOKEN", "")
     if not token:
-        pytest.skip("AGW_USER_TOKEN is not set — skipping user auth scenario")
+        pytest.skip("CLOUD_SDK_CFG_AGW_DEFAULT_USER_TOKEN is not set — skipping user auth scenario")
     context.user_token = token
+
+
+@given("I have a sample MCP tool name")
+def have_sample_mcp_tool_name(context: ScenarioContext):
+    """Load sample MCP tool name from environment variable."""
+    tool_name = os.environ.get("CLOUD_SDK_CFG_AGW_DEFAULT_SAMPLE_MCP_TOOL", "")
+    if not tool_name:
+        pytest.skip("CLOUD_SDK_CFG_AGW_DEFAULT_SAMPLE_MCP_TOOL is not set — skipping tool scenario")
+    context.sample_mcp_tool_name = tool_name
 
 
 # ==================== WHEN ====================
@@ -119,18 +130,17 @@ def call_get_user_auth_empty_token(context: ScenarioContext, agw_client: AgentGa
 @when("I call list_mcp_tools")
 def call_list_mcp_tools(context: ScenarioContext, agw_client: AgentGatewayClient):
     """Call list_mcp_tools and store the result."""
-    context.tools = run(agw_client.list_mcp_tools())
+    context.tools = run(agw_client.list_mcp_tools(user_token=context.user_token))
 
 
-@when(parsers.parse('I call call_mcp_tool with "{tool_name}" and the user token'))
-def call_call_mcp_tool(
-    context: ScenarioContext, agw_client: AgentGatewayClient, tool_name: str
-):
-    """Find tool by name from list_mcp_tools result and call it."""
+@when("I call call_mcp_tool with the sample MCP tool and the user token")
+def call_call_mcp_tool_sample(context: ScenarioContext, agw_client: AgentGatewayClient):
+    """Find the sample MCP tool and call it."""
     assert context.tools is not None, "call list_mcp_tools before calling a tool"
-    tool = next((t for t in context.tools if t.name == tool_name), None)
+    assert context.sample_mcp_tool_name is not None
+    tool = next((t for t in context.tools if t.name == context.sample_mcp_tool_name), None)
     if tool is None:
-        pytest.fail(f"Tool '{tool_name}' not found in list_mcp_tools result")
+        pytest.fail(f"Tool '{context.sample_mcp_tool_name}' not found in list_mcp_tools result")
     context.tool_result = run(
         agw_client.call_mcp_tool(tool, user_token=context.user_token)
     )
@@ -234,6 +244,19 @@ def each_tool_has_non_empty_url(context: ScenarioContext):
     for tool in context.tools:
         assert isinstance(tool.url, str) and tool.url.strip(), (
             f"Tool '{tool.name}' has empty url"
+        )
+
+
+@then("each tool should have a valid input_schema")
+def each_tool_has_valid_input_schema(context: ScenarioContext):
+    """Verify every tool has an input_schema dict with type=object."""
+    assert context.tools is not None
+    for tool in context.tools:
+        assert isinstance(tool.input_schema, dict), (
+            f"Tool '{tool.name}' input_schema is not a dict: {tool.input_schema!r}"
+        )
+        assert tool.input_schema.get("type") == "object", (
+            f"Tool '{tool.name}' input_schema missing type=object: {tool.input_schema}"
         )
 
 

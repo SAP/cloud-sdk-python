@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, Callable
 
-from pydantic import create_model
+from pydantic import Field, create_model
 
 from sap_cloud_sdk.agentgateway._models import MCPTool
 
@@ -21,6 +21,8 @@ def mcp_tool_to_langchain(
     mcp_tool: MCPTool,
     call_tool: Callable,
     get_user_token: Callable[[], str],
+    *,
+    omit_none: bool = True,
 ) -> StructuredTool:
     """Convert MCPTool to LangChain StructuredTool.
 
@@ -31,6 +33,8 @@ def mcp_tool_to_langchain(
         mcp_tool: MCPTool object from list_mcp_tools().
         call_tool: Callable to invoke the MCP tool (e.g., agw_client.call_mcp_tool).
         get_user_token: Callable that returns the user's JWT token.
+        omit_none: If True (default), optional parameters with a None value are not
+            forwarded to call_tool. Set to False to forward None values explicitly.
 
     Returns:
         LangChain StructuredTool that invokes the MCP tool.
@@ -66,15 +70,22 @@ def mcp_tool_to_langchain(
         ) from None
 
     async def run(**kwargs) -> str:
+        resolved = (
+            {k: v for k, v in kwargs.items() if v is not None} if omit_none else kwargs
+        )
         return await call_tool(
             mcp_tool,
             user_token=get_user_token,
-            **kwargs,
+            **resolved,
         )
 
     # Build args schema from input_schema
     properties = mcp_tool.input_schema.get("properties", {})
-    fields: dict[str, Any] = {k: (str, ...) for k in properties}
+    required = set(mcp_tool.input_schema.get("required", []))
+    fields: dict[str, Any] = {
+        k: (str, ...) if k in required else (str | None, Field(default=None))
+        for k in properties
+    }
     args_schema = create_model(f"{mcp_tool.name}_args", **fields) if fields else None
 
     return StructuredTool.from_function(

@@ -52,9 +52,7 @@ config = ClientConfig(timeout=30.0)
 agw_client = create_client(tenant_subdomain="my-tenant", config=config)
 
 # Discover tools (auto-discovered from destination fragments)
-tools = await agw_client.list_mcp_tools()
-
-# Discover tools with user principal propagation
+# Pass user_token to use principal propagation when listing tools
 tools = await agw_client.list_mcp_tools(user_token="user-jwt")
 
 # Invoke a tool (user_token required for principal propagation)
@@ -74,7 +72,7 @@ from sap_cloud_sdk.agentgateway import create_client
 from sap_cloud_sdk.agentgateway.converters import mcp_tool_to_langchain
 
 agw_client = create_client(tenant_subdomain="my-tenant")
-tools = await agw_client.list_mcp_tools()
+tools = await agw_client.list_mcp_tools(user_token="user-jwt")
 
 langchain_tools = [
     mcp_tool_to_langchain(
@@ -87,6 +85,17 @@ langchain_tools = [
 
 # Use with LangChain agent
 llm_with_tools = llm.bind_tools(langchain_tools)
+```
+
+By default, optional tool parameters that resolve to `None` are not forwarded to `call_mcp_tool`. Set `omit_none=False` to forward them explicitly:
+
+```python
+mcp_tool_to_langchain(
+    t,
+    agw_client.call_mcp_tool,
+    get_user_token=lambda: request.headers["Authorization"],
+    omit_none=False,
+)
 ```
 
 ## Concepts

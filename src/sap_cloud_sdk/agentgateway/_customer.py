@@ -26,6 +26,7 @@ from sap_cloud_sdk.agentgateway._models import (
 )
 from sap_cloud_sdk.agentgateway._token_cache import _TokenCache
 from sap_cloud_sdk.agentgateway.exceptions import AgentGatewaySDKError
+from sap_cloud_sdk.core.secret_resolver import resolve_base_mount
 
 logger = logging.getLogger(__name__)
 
@@ -33,7 +34,6 @@ logger = logging.getLogger(__name__)
 _CREDENTIALS_PATH_ENV = "AGW_CREDENTIALS_PATH"
 
 # servicebinding.io: scan $SERVICE_BINDING_ROOT for a binding whose 'type' file equals the expected type
-_SERVICE_BINDING_ROOT_ENV = "SERVICE_BINDING_ROOT"
 _BINDING_TYPE = "integration-credentials"
 _BINDING_TYPE_FILE = "type"
 _CREDENTIALS_FILE = "credentials"
@@ -86,7 +86,7 @@ def detect_customer_agent_credentials() -> str | None:
         return path_from_env
 
     # 2. servicebinding.io: scan $SERVICE_BINDING_ROOT for a binding whose 'type' file equals _BINDING_TYPE
-    sbr = os.environ.get(_SERVICE_BINDING_ROOT_ENV, _DEFAULT_BINDING_ROOT)
+    sbr = resolve_base_mount(_DEFAULT_BINDING_ROOT)
     if sbr and os.path.isdir(sbr):
         for entry in os.scandir(sbr):
             if not entry.is_dir():

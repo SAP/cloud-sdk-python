@@ -141,6 +141,8 @@ class Operation(str, Enum):
     # AI Core Operations
     AICORE_SET_CONFIG = "set_aicore_config"
     AICORE_AUTO_INSTRUMENT = "auto_instrument"
+    AICORE_SET_FILTERING = "set_filtering"
+    AICORE_DISABLE_FILTERING = "disable_filtering"
 
     # Print Operations
     PRINT_LIST_QUEUES = "list_queues"

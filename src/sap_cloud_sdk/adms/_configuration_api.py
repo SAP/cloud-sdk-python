@@ -264,7 +264,7 @@ class _ConfigurationApi:
     def mark_default(self, document_type_bo_type_map_id: str) -> None:
         """Mark a DocumentType ↔ BusinessObjectNodeType mapping as the default."""
         self._http.post(
-            f"{build_doctype_botype_map_key_path(document_type_bo_type_map_id)}/markDefault",
+            f"{build_doctype_botype_map_key_path(document_type_bo_type_map_id)}/com.sap.adm.ConfigurationService.markDefault",
             json={},
             service_base=_CONFIG_SERVICE_PATH,
         )
@@ -319,12 +319,24 @@ class _ConfigurationApi:
 
     @record_metrics(Module.ADMS, Operation.ADMS_CONFIG_GET_ALL_APP_TENANTS)
     def get_all_application_tenants(
-        self, options: ConfigQueryOptions | None = None
+        self,
+        options: ConfigQueryOptions | None = None,
+        *,
+        subaccount_id: str | None = None,
     ) -> list[ApplicationTenant]:
-        """Return all application tenant configurations."""
+        """Return all application tenant configurations.
+
+        Args:
+            options: Optional OData query parameters.
+            subaccount_id: BTP subaccount ID. ADM requires this header
+                (``x-subaccount-id``) on ApplicationTenant operations.
+        """
         params = options.to_query_params() if options else {}
         resp = self._http.get(
-            "ApplicationTenant", params=params, service_base=_CONFIG_SERVICE_PATH
+            "ApplicationTenant",
+            params=params,
+            service_base=_CONFIG_SERVICE_PATH,
+            extra_headers=_subaccount_header(subaccount_id),
         )
         return [
             ApplicationTenant.from_dict(item) for item in resp.json().get("value", [])
@@ -332,32 +344,59 @@ class _ConfigurationApi:
 
     @record_metrics(Module.ADMS, Operation.ADMS_CONFIG_CREATE_APP_TENANT)
     def create_application_tenant(
-        self, payload: CreateApplicationTenantInput
+        self,
+        payload: CreateApplicationTenantInput,
+        *,
+        subaccount_id: str | None = None,
     ) -> ApplicationTenant:
-        """Create an application tenant configuration."""
+        """Create an application tenant configuration.
+
+        Args:
+            payload: Tenant fields.
+            subaccount_id: BTP subaccount ID. ADM requires this header
+                (``x-subaccount-id``) on ApplicationTenant operations.
+        """
         resp = self._http.post(
             "ApplicationTenant",
             json=payload.to_odata_dict(),
             service_base=_CONFIG_SERVICE_PATH,
+            extra_headers=_subaccount_header(subaccount_id),
         )
         return ApplicationTenant.from_dict(resp.json())
 
     @record_metrics(Module.ADMS, Operation.ADMS_CONFIG_GET_APP_TENANT)
-    def get_application_tenant(self, application_tenant_id: str) -> ApplicationTenant:
+    def get_application_tenant(
+        self,
+        application_tenant_id: str,
+        *,
+        subaccount_id: str | None = None,
+    ) -> ApplicationTenant:
         """Fetch a single ApplicationTenant by its ID."""
         resp = self._http.get(
             f"ApplicationTenant(ApplicationTenantID='{application_tenant_id}')",
             service_base=_CONFIG_SERVICE_PATH,
+            extra_headers=_subaccount_header(subaccount_id),
         )
         return ApplicationTenant.from_dict(resp.json())
 
     @record_metrics(Module.ADMS, Operation.ADMS_CONFIG_DELETE_APP_TENANT)
-    def delete_application_tenant(self, application_tenant_id: str) -> None:
+    def delete_application_tenant(
+        self,
+        application_tenant_id: str,
+        *,
+        subaccount_id: str | None = None,
+    ) -> None:
         """Delete an application tenant configuration."""
         self._http.delete(
             f"ApplicationTenant(ApplicationTenantID='{application_tenant_id}')",
             service_base=_CONFIG_SERVICE_PATH,
+            extra_headers=_subaccount_header(subaccount_id),
         )
+
+
+def _subaccount_header(subaccount_id: str | None) -> dict[str, str] | None:
+    """Build the x-subaccount-id header dict, or None if not provided."""
+    return {"x-subaccount-id": subaccount_id} if subaccount_id else None
 
 
 def _quote_guid(value: str) -> str:
@@ -602,7 +641,7 @@ class _AsyncConfigurationApi:
     async def mark_default(self, document_type_bo_type_map_id: str) -> None:
         """Async variant of :meth:`_ConfigurationApi.mark_default` — same semantics."""
         await self._http.post(
-            f"{build_doctype_botype_map_key_path(document_type_bo_type_map_id)}/markDefault",
+            f"{build_doctype_botype_map_key_path(document_type_bo_type_map_id)}/com.sap.adm.ConfigurationService.markDefault",
             json={},
             service_base=_CONFIG_SERVICE_PATH,
         )
@@ -653,12 +692,18 @@ class _AsyncConfigurationApi:
 
     @record_metrics(Module.ADMS, Operation.ADMS_CONFIG_GET_ALL_APP_TENANTS)
     async def get_all_application_tenants(
-        self, options: ConfigQueryOptions | None = None
+        self,
+        options: ConfigQueryOptions | None = None,
+        *,
+        subaccount_id: str | None = None,
     ) -> list[ApplicationTenant]:
         """Async variant of :meth:`_ConfigurationApi.get_all_application_tenants` — same semantics."""
         params = options.to_query_params() if options else {}
         resp = await self._http.get(
-            "ApplicationTenant", params=params, service_base=_CONFIG_SERVICE_PATH
+            "ApplicationTenant",
+            params=params,
+            service_base=_CONFIG_SERVICE_PATH,
+            extra_headers=_subaccount_header(subaccount_id),
         )
         return [
             ApplicationTenant.from_dict(item) for item in resp.json().get("value", [])
@@ -666,29 +711,42 @@ class _AsyncConfigurationApi:
 
     @record_metrics(Module.ADMS, Operation.ADMS_CONFIG_CREATE_APP_TENANT)
     async def create_application_tenant(
-        self, payload: CreateApplicationTenantInput
+        self,
+        payload: CreateApplicationTenantInput,
+        *,
+        subaccount_id: str | None = None,
     ) -> ApplicationTenant:
         """Async variant of :meth:`_ConfigurationApi.create_application_tenant` — same semantics."""
         resp = await self._http.post(
             "ApplicationTenant",
             json=payload.to_odata_dict(),
             service_base=_CONFIG_SERVICE_PATH,
+            extra_headers=_subaccount_header(subaccount_id),
         )
         return ApplicationTenant.from_dict(resp.json())
 
     @record_metrics(Module.ADMS, Operation.ADMS_CONFIG_GET_APP_TENANT)
     async def get_application_tenant(
-        self, application_tenant_id: str
+        self,
+        application_tenant_id: str,
+        *,
+        subaccount_id: str | None = None,
     ) -> ApplicationTenant:
         """Async variant of :meth:`_ConfigurationApi.get_application_tenant` — same semantics."""
         resp = await self._http.get(
             f"ApplicationTenant(ApplicationTenantID='{application_tenant_id}')",
             service_base=_CONFIG_SERVICE_PATH,
+            extra_headers=_subaccount_header(subaccount_id),
         )
         return ApplicationTenant.from_dict(resp.json())
 
     @record_metrics(Module.ADMS, Operation.ADMS_CONFIG_DELETE_APP_TENANT)
-    async def delete_application_tenant(self, application_tenant_id: str) -> None:
+    async def delete_application_tenant(
+        self,
+        application_tenant_id: str,
+        *,
+        subaccount_id: str | None = None,
+    ) -> None:
         """Async variant of :meth:`_ConfigurationApi.delete_application_tenant` — same semantics."""
         await self._http.delete(
             f"ApplicationTenant(ApplicationTenantID='{application_tenant_id}')",

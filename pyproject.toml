@@ -1,6 +1,6 @@
 [project]
 name = "sap-cloud-sdk"
-version = "0.31.0"
+version = "0.32.0"
 description = "SAP Cloud SDK for Python"
 readme = "README.md"
 license = "Apache-2.0"
@@ -28,6 +28,7 @@ dependencies = [
     "opentelemetry-api>=1.42.1",
     "opentelemetry-sdk>=1.42.1",
     "mcp>=1.1.0",
+    "cryptography>=46.0.3",
 ]
 
 [project.optional-dependencies]

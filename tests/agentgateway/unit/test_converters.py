@@ -185,6 +185,52 @@ class TestMcpToolToLangchainTypeMapping:
         assert int in field.annotation.__args__
         assert type(None) in field.annotation.__args__
 
+    def test_array_type_integer_null_maps_to_int(self):
+        lc_tool = mcp_tool_to_langchain(
+            self._tool_with_types({"limit": {"type": ["integer", "null"]}}, required=["limit"]),
+            AsyncMock(),
+            lambda: "token",
+        )
+        field = _schema_fields(lc_tool)["limit"]
+        import types as _types
+        assert isinstance(field.annotation, _types.UnionType)
+        assert int in field.annotation.__args__
+        assert type(None) in field.annotation.__args__
+
+    def test_array_type_number_null_maps_to_float(self):
+        lc_tool = mcp_tool_to_langchain(
+            self._tool_with_types({"ratio": {"type": ["number", "null"]}}, required=["ratio"]),
+            AsyncMock(),
+            lambda: "token",
+        )
+        field = _schema_fields(lc_tool)["ratio"]
+        import types as _types
+        assert isinstance(field.annotation, _types.UnionType)
+        assert float in field.annotation.__args__
+        assert type(None) in field.annotation.__args__
+
+    def test_array_type_multiple_scalars_uses_first_non_null(self):
+        # e.g. {"type": ["number", "string", "null"]} — pick "number"
+        lc_tool = mcp_tool_to_langchain(
+            self._tool_with_types({"val": {"type": ["number", "string", "null"]}}, required=["val"]),
+            AsyncMock(),
+            lambda: "token",
+        )
+        field = _schema_fields(lc_tool)["val"]
+        import types as _types
+        assert isinstance(field.annotation, _types.UnionType)
+        assert float in field.annotation.__args__
+        assert type(None) in field.annotation.__args__
+
+    def test_array_type_without_null_is_not_nullable(self):
+        lc_tool = mcp_tool_to_langchain(
+            self._tool_with_types({"count": {"type": ["integer"]}}, required=["count"]),
+            AsyncMock(),
+            lambda: "token",
+        )
+        field = _schema_fields(lc_tool)["count"]
+        assert field.annotation is int
+
 
 class TestMcpToolToLangchainInvocation:
     """End-to-end invocation tests: verify what actually reaches call_tool."""

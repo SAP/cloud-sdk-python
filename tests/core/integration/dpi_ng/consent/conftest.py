@@ -63,11 +63,11 @@ def pytest_collection_modifyitems(
 def live_client() -> Iterator[ConsentClient]:
     if _ENV_FILE.exists():
         load_dotenv(_ENV_FILE, override=True)
-    base_url = os.getenv("CLOUD_SDK_CFG_DPI_NG_CONSENT_DEFAULT_BASE_URL", "")
+    base_url = os.getenv("CLOUD_SDK_CFG_DPI_NG_DEFAULT_BASE_URL", "")
     auth = _resolve_auth()
     if not base_url or auth is None:
         pytest.skip(
-            "No integration credentials in .env — set CLOUD_SDK_CFG_DPI_NG_CONSENT_DEFAULT_BASE_URL plus one auth flow"
+            "No integration credentials in .env — set CLOUD_SDK_CFG_DPI_NG_DEFAULT_BASE_URL plus one auth flow"
         )
     with create_client(base_url=base_url, auth=auth) as client:
         yield client

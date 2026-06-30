@@ -18,28 +18,64 @@ pip install sap-cloud-sdk[langchain]
 
 Customer agents use file-based credentials with mTLS authentication. MCP servers are read from `integrationDependencies` in the credentials file.
 
+#### Credential Detection
+
+The SDK looks for credentials in the following order:
+
+1. **`AGW_CREDENTIALS_PATH`** env var — direct path to a JSON credentials file.
+2. **`SERVICE_BINDING_ROOT`** env var — scans all subdirectories for one whose `type` file contains `integration-credentials`, then reads `credentials` from that directory (servicebinding.io format).
+3. **`/bindings`** — same scan as above, used as the default when `SERVICE_BINDING_ROOT` is not set.
+
+**servicebinding.io layout** (used on BTP Kyma / Kubernetes):
+
+```
+$SERVICE_BINDING_ROOT/
+└── my-agw-binding/
+    ├── type          # must contain "integration-credentials"
+    ├── instance_name # optional, ignored by the SDK
+    └── credentials   # JSON credentials object
+```
+
+**Flat file** (used with `AGW_CREDENTIALS_PATH`):
+
+```
+/path/to/credentials.json   # JSON credentials object
+```
+
 ```python
 from sap_cloud_sdk.agentgateway import create_client
 
 agw_client = create_client()
 
-# Discover tools (reads all servers from credentials integrationDependencies)
-tools = await agw_client.list_mcp_tools()
+# Discover tools from all servers in integrationDependencies
+tools = await agw_client.list_mcp_tools(user_token="user-jwt")
 
 for tool in tools:
     print(f"{tool.name}: {tool.description}")
 
-# Discover tools with user principal propagation
-tools = await agw_client.list_mcp_tools(user_token="user-jwt")
+# Filter to a specific ORD ID — tenant ID is derived from credentials automatically
+tools = await agw_client.list_mcp_tools(
+    user_token="user-jwt",
+    ord_id="sap.s4:apiResource:API_PRODUCT_0002_MCP:v1",
+)
 
-# Invoke a tool with user principal propagation
+# Invoke a tool — pass the MCPTool object directly
 result = await agw_client.call_mcp_tool(
     tool=tools[0],
     user_token="user-jwt",
     cost_center="1000",
 )
 
+# Or invoke by tool name — the SDK resolves the MCPTool automatically.
+# Provide ord_id to narrow the lookup to a single server (recommended).
+result = await agw_client.call_mcp_tool(
+    tool="list_ProductPlantCosting_for_sap_self",
+    ord_id="sap.s4:apiResource:API_PRODUCT_0002_MCP:v1",
+    user_token="user-jwt",
+)
 ```
+
+> **Note:** AGW currently requires a user token for all tool calls (principal propagation). Passing `user_token` is therefore required for customer agents.
 
 ### LoB Agent Flow
 
@@ -155,14 +191,30 @@ class AgentGatewayClient:
     async def list_mcp_tools(
         self,
         user_token: str | Callable[[], str] | None = None,
-        app_tid: str | None = None,
+        ord_id: str | None = None,
     ) -> list[MCPTool]
 
     async def call_mcp_tool(
         self,
-        tool: MCPTool,
+        tool: MCPTool | str,
         user_token: str | Callable[[], str] | None = None,
-        app_tid: str | None = None,
+        ord_id: str | None = None,
         **kwargs,
     ) -> str
 ```
+
+#### `list_mcp_tools`
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `user_token` | `str \| Callable[[], str] \| None` | User JWT for principal propagation. When provided, a jwt-bearer token exchange is performed instead of a system token request. |
+| `ord_id` | `str \| None` | ORD ID to filter results to a single MCP server. The tenant ID is derived from the credentials — no need to pass it separately. Raises `AgentGatewaySDKError` if the ORD ID matches multiple `integrationDependencies` entries. |
+
+#### `call_mcp_tool`
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `tool` | `MCPTool \| str` | The tool to invoke. Pass an `MCPTool` object (from `list_mcp_tools`) or a tool name as a string. When a string is given, `list_mcp_tools` is called first to resolve the tool — provide `ord_id` to narrow the lookup. |
+| `user_token` | `str \| Callable[[], str] \| None` | User JWT for principal propagation. Required for LoB agents; optional for customer agents (falls back to system token). |
+| `ord_id` | `str \| None` | ORD ID used to resolve the tool when `tool` is given as a string. The tenant ID is derived from the credentials automatically. |
+| `**kwargs` | | Tool input parameters forwarded directly to the MCP tool. See `tool.input_schema` for expected fields. |

@@ -24,7 +24,6 @@ from sap_cloud_sdk.agentgateway._models import (
     IntegrationDependency,
     MCPTool,
 )
-from sap_cloud_sdk.agentgateway._mcp_session import invoke_mcp_tool
 from sap_cloud_sdk.agentgateway._token_cache import _TokenCache
 from sap_cloud_sdk.agentgateway.exceptions import AgentGatewaySDKError
 
@@ -489,26 +488,64 @@ async def _list_server_tools(
                 ]
 
 
+def _resolve_dependency(
+    credentials: CustomerCredentials,
+    ord_id: str,
+) -> IntegrationDependency:
+    """Resolve a single IntegrationDependency by ORD ID.
+
+    Args:
+        credentials: Customer credentials with integrationDependencies.
+        ord_id: ORD ID to look up.
+
+    Returns:
+        The matching IntegrationDependency.
+
+    Raises:
+        AgentGatewaySDKError: If no match is found or multiple entries share the same ORD ID.
+    """
+    matches = [d for d in credentials.integration_dependencies if d.ord_id == ord_id]
+    if not matches:
+        available = ", ".join(d.ord_id for d in credentials.integration_dependencies)
+        raise AgentGatewaySDKError(
+            f"ORD ID '{ord_id}' not found in integrationDependencies. "
+            f"Available: {available or '(none)'}"
+        )
+    if len(matches) > 1:
+        tids = ", ".join(m.global_tenant_id for m in matches)
+        raise AgentGatewaySDKError(
+            f"ORD ID '{ord_id}' matches multiple integrationDependencies with "
+            f"different tenant IDs ({tids}). Specify the tenant ID explicitly."
+        )
+    return matches[0]
+
+
 async def get_mcp_tools_customer(
     credentials: CustomerCredentials,
     system_token: str,
     timeout: float,
+    ord_id: str | None = None,
 ) -> list[MCPTool]:
-    """List all MCP tools from servers defined in credentials.
+    """List MCP tools from servers defined in credentials.
 
-    Iterates over all integrationDependencies in the credentials file and
-    discovers tools from each MCP server using a pre-fetched system token.
+    When ord_id is given, only tools from that single dependency are returned
+    and the tenant ID is derived automatically from the credentials.
+    When ord_id is omitted, tools from all integrationDependencies are returned.
 
     Args:
         credentials: Customer credentials with integrationDependencies.
         system_token: Pre-fetched raw system token for authentication.
         timeout: HTTP timeout in seconds for MCP server calls.
+        ord_id: Optional ORD ID to filter to a single server. The tenant ID
+            is derived from the credentials — no need to pass it separately.
+            Raises AgentGatewaySDKError if the ORD ID matches multiple entries.
 
     Returns:
-        List of MCPTool objects from all servers.
+        List of MCPTool objects from the matching server(s).
 
     Raises:
-        AgentGatewaySDKError: If integrationDependencies is empty.
+        AgentGatewaySDKError: If integrationDependencies is empty, or if ord_id
+            is given but not found or matches multiple tenant IDs.
     """
     dependencies = credentials.integration_dependencies
 
@@ -516,6 +553,9 @@ async def get_mcp_tools_customer(
         raise AgentGatewaySDKError(
             "integrationDependencies is empty in credentials — no MCP servers configured."
         )
+
+    if ord_id is not None:
+        dependencies = [_resolve_dependency(credentials, ord_id)]
 
     logger.info("Discovering tools from %d MCP server(s)", len(dependencies))
 
@@ -541,27 +581,3 @@ async def get_mcp_tools_customer(
         "Loaded %d MCP tool(s) from %d server(s)", len(tools), len(dependencies)
     )
     return tools
-
-
-async def call_mcp_tool_customer(
-    tool: MCPTool,
-    auth_token: str,
-    timeout: float,
-    **kwargs,
-) -> str:
-    """Invoke an MCP tool using customer flow.
-
-    Uses a pre-fetched token (either user-scoped or system-scoped) for
-    authentication against the MCP server.
-
-    Args:
-        tool: MCPTool to invoke.
-        auth_token: Pre-fetched raw access token for authentication.
-        timeout: HTTP timeout in seconds for the MCP server call.
-        **kwargs: Tool input parameters.
-
-    Returns:
-        Tool execution result as string.
-    """
-    logger.info("Calling tool '%s' on server '%s'", tool.name, tool.server_name)
-    return await invoke_mcp_tool(tool, auth_token, timeout, **kwargs)

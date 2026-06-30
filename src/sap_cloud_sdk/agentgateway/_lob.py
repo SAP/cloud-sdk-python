@@ -23,7 +23,6 @@ from sap_cloud_sdk.destination import (
 )
 
 from sap_cloud_sdk.agentgateway._models import MCPTool
-from sap_cloud_sdk.agentgateway._mcp_session import invoke_mcp_tool
 from sap_cloud_sdk.agentgateway._token_cache import _GatewayUrlCache, _TokenCache
 from sap_cloud_sdk.agentgateway.exceptions import MCPServerNotFoundError
 
@@ -439,25 +438,3 @@ async def get_mcp_tools_lob(
 
     logger.info("Loaded %d MCP tool(s) from %d fragment(s)", len(tools), len(fragments))
     return tools
-
-
-async def call_mcp_tool_lob(
-    tool: MCPTool,
-    user_auth_token: str,
-    timeout: float,
-    **kwargs,
-) -> str:
-    """Invoke an MCP tool using LoB flow (destination-based).
-
-    Uses a pre-fetched user token for principal propagation.
-
-    Args:
-        tool: MCPTool object (from list_mcp_tools).
-        user_auth_token: Pre-fetched raw user token (from get_user_auth).
-        timeout: HTTP timeout in seconds for the MCP server call.
-        **kwargs: Tool input parameters.
-
-    Returns:
-        Tool execution result as string.
-    """
-    return await invoke_mcp_tool(tool, user_auth_token, timeout, **kwargs)

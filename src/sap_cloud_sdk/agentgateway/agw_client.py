@@ -13,7 +13,6 @@ from typing import Callable
 
 from sap_cloud_sdk.agentgateway.config import ClientConfig
 from sap_cloud_sdk.agentgateway._customer import (
-    call_mcp_tool_customer,
     detect_customer_agent_credentials,
     exchange_user_token,
     get_mcp_tools_customer,
@@ -21,11 +20,11 @@ from sap_cloud_sdk.agentgateway._customer import (
     load_customer_credentials,
 )
 from sap_cloud_sdk.agentgateway._lob import (
-    call_mcp_tool_lob,
     fetch_system_auth,
     fetch_user_auth,
     get_mcp_tools_lob,
 )
+from sap_cloud_sdk.agentgateway._mcp_session import invoke_mcp_tool
 from sap_cloud_sdk.agentgateway._models import AuthResult, MCPTool
 from sap_cloud_sdk.agentgateway._token_cache import _GatewayUrlCache, _TokenCache
 from sap_cloud_sdk.agentgateway.exceptions import AgentGatewaySDKError
@@ -294,6 +293,7 @@ class AgentGatewayClient:
         self,
         user_token: str | Callable[[], str] | None = None,
         app_tid: str | None = None,
+        ord_id: str | None = None,
     ) -> list[MCPTool]:
         """List all MCP tools from MCP servers.
 
@@ -314,18 +314,28 @@ class AgentGatewayClient:
                 If provided, uses user-scoped auth instead of system auth.
             app_tid: BTP Application Tenant ID of the subscriber.
                 Only used for customer agents.
+            ord_id: ORD ID of the MCP server to filter to (customer agents only).
+                The tenant ID is derived automatically from the credentials.
+                When omitted, tools from all integrationDependencies are returned.
+                Raises AgentGatewaySDKError if the ORD ID matches multiple entries.
 
         Returns:
             List of MCPTool objects from all MCP servers.
 
         Raises:
-            AgentGatewaySDKError: If credential loading or token acquisition fails.
+            AgentGatewaySDKError: If credential loading or token acquisition fails,
+                or if ord_id does not match exactly one entry in integrationDependencies.
 
         Example:
             ```python
             tools = await agw_client.list_mcp_tools()
             for tool in tools:
                 print(f"{tool.name}: {tool.description}")
+
+            # Filter to a specific ORD (tenant ID resolved from credentials):
+            tools = await agw_client.list_mcp_tools(
+                ord_id="sap.s4:apiResource:API_PRODUCT_0002_MCP:v1"
+            )
 
             # With user token for principal propagation:
             tools = await agw_client.list_mcp_tools(user_token="user-jwt")
@@ -344,7 +354,7 @@ class AgentGatewayClient:
                 else:
                     auth = await self.get_system_auth(app_tid=app_tid)
                 return await get_mcp_tools_customer(
-                    credentials, auth.access_token, self._config.timeout
+                    credentials, auth.access_token, self._config.timeout, ord_id=ord_id
                 )
 
             # LoB flow - requires tenant_subdomain
@@ -370,9 +380,10 @@ class AgentGatewayClient:
     @record_metrics(Module.AGENTGATEWAY, Operation.AGENTGATEWAY_CALL_MCP_TOOL)
     async def call_mcp_tool(
         self,
-        tool: MCPTool,
+        tool: MCPTool | str,
         user_token: str | Callable[[], str] | None = None,
         app_tid: str | None = None,
+        ord_id: str | None = None,
         **kwargs,
     ) -> str:
         """Invoke an MCP tool.
@@ -387,7 +398,9 @@ class AgentGatewayClient:
             provided, falls back to system token (no principal propagation).
 
         Args:
-            tool: MCPTool object (from list_mcp_tools).
+            tool: MCPTool object (from list_mcp_tools) or tool name as a string.
+                When a string is given, list_mcp_tools is called first to resolve
+                the MCPTool. For customer agents, ord_id must also be provided.
             user_token: User's JWT for principal propagation.
                 Can be a string or a callable returning a string.
                 Required for LoB agents.
@@ -397,6 +410,8 @@ class AgentGatewayClient:
                 for tenant-scoped token exchange.
                 TODO: This parameter's requirement is still being clarified with
                 the IBD team and may be removed if unnecessary.
+            ord_id: ORD ID used to resolve the MCPTool when tool is given as a string
+                (customer agents only). The tenant ID is derived from the credentials.
             **kwargs: Tool input parameters (passed directly to the tool).
 
         Returns:
@@ -404,16 +419,23 @@ class AgentGatewayClient:
 
         Raises:
             AgentGatewaySDKError: If user_token or tenant_subdomain is required
-                but not provided (LoB flow), or if token exchange/tool invocation fails.
+                but not provided (LoB flow), if tool name cannot be resolved, or if
+                token exchange/tool invocation fails.
 
         Example:
             ```python
-            # Note: kwargs are tool-specific input parameters.
-            # Check tool.input_schema for expected parameters.
+            # Pass an MCPTool object directly:
             result = await agw_client.call_mcp_tool(
                 tool=tools[0],
                 user_token="user-jwt",
-                order_id="12345",  # example tool-specific parameter
+                order_id="12345",
+            )
+
+            # Or pass the tool name as a string (ord_id required for customer agents):
+            result = await agw_client.call_mcp_tool(
+                tool="list_ProductPlantCosting_for_sap_self",
+                ord_id="sap.s4:apiResource:API_PRODUCT_0002_MCP:v1",
+                user_token="user-jwt",
             )
             ```
         """
@@ -424,6 +446,9 @@ class AgentGatewayClient:
                 logger.info(
                     "Customer agent credentials detected at '%s'", credentials_path
                 )
+
+                if isinstance(tool, str):
+                    tool = await self._resolve_tool_by_name(tool, ord_id, user_token, app_tid)
 
                 # Resolve user_token if provided (optional for customer flow)
                 if user_token:
@@ -438,7 +463,7 @@ class AgentGatewayClient:
                     )
                     auth = await self.get_system_auth(app_tid)
 
-                return await call_mcp_tool_customer(
+                return await invoke_mcp_tool(
                     tool, auth.access_token, self._config.timeout, **kwargs
                 )
 
@@ -446,8 +471,11 @@ class AgentGatewayClient:
             if app_tid:
                 logger.warning("app_tid parameter ignored for LoB agent flow")
 
+            if isinstance(tool, str):
+                tool = await self._resolve_tool_by_name(tool, ord_id, user_token, app_tid)
+
             auth = await self.get_user_auth(user_token, app_tid)
-            return await call_mcp_tool_lob(
+            return await invoke_mcp_tool(
                 tool, auth.access_token, self._config.timeout, **kwargs
             )
 
@@ -457,9 +485,41 @@ class AgentGatewayClient:
         except Exception as e:
             logger.exception("Unexpected error during tool invocation")
             cause = _unwrap_exception_group(e)
+            tool_label = tool if isinstance(tool, str) else tool.name
             raise AgentGatewaySDKError(
-                f"Tool invocation failed for '{tool.name}': {cause}"
+                f"Tool invocation failed for '{tool_label}': {cause}"
             ) from e
+
+    async def _resolve_tool_by_name(
+        self,
+        tool_name: str,
+        ord_id: str | None,
+        user_token: str | Callable[[], str] | None,
+        app_tid: str | None,
+    ) -> MCPTool:
+        """Look up a tool by name via list_mcp_tools.
+
+        Args:
+            tool_name: Name of the tool to resolve.
+            ord_id: ORD ID to narrow the search (customer agents).
+            user_token: Forwarded to list_mcp_tools for auth.
+            app_tid: Forwarded to list_mcp_tools for auth.
+
+        Returns:
+            The matching MCPTool.
+
+        Raises:
+            AgentGatewaySDKError: If no tool with that name is found.
+        """
+        tools = await self.list_mcp_tools(user_token=user_token, app_tid=app_tid, ord_id=ord_id)
+        match = next((t for t in tools if t.name == tool_name), None)
+        if match is None:
+            available = ", ".join(t.name for t in tools[:10])
+            raise AgentGatewaySDKError(
+                f"Tool '{tool_name}' not found. "
+                f"Available tools{' (first 10)' if len(tools) > 10 else ''}: {available or '(none)'}"
+            )
+        return match
 
 
 def _unwrap_exception_group(exc: BaseException) -> BaseException:

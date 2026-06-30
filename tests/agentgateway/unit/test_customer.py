@@ -11,8 +11,8 @@ from sap_cloud_sdk.agentgateway._customer import (
     get_system_token_mtls,
     exchange_user_token,
     get_mcp_tools_customer,
-    call_mcp_tool_customer,
     _build_mcp_url,
+    _resolve_dependency,
     _CREDENTIALS_PATH_ENV,
     _SERVICE_BINDING_ROOT_ENV,
     _BINDING_TYPE,
@@ -20,6 +20,7 @@ from sap_cloud_sdk.agentgateway._customer import (
     _CREDENTIALS_FILE,
     _DEFAULT_BINDING_ROOT,
 )
+from sap_cloud_sdk.agentgateway._mcp_session import invoke_mcp_tool as call_mcp_tool_customer
 from sap_cloud_sdk.agentgateway._models import (
     CustomerCredentials,
     IntegrationDependency,
@@ -565,6 +566,54 @@ class TestExchangeUserToken:
 
 
 # ============================================================
+# Test: _resolve_dependency
+# ============================================================
+
+
+class TestResolveDependency:
+    """Tests for ORD ID → tenant ID resolution."""
+
+    def _make_credentials(self, deps):
+        return CustomerCredentials(
+            token_service_url="https://ias.example.com/oauth2/token",
+            client_id="test-client",
+            certificate="cert",
+            private_key="key",
+            gateway_url="https://agw.example.com",
+            integration_dependencies=deps,
+        )
+
+    def test_resolves_matching_ord_id(self):
+        """Return the dependency whose ord_id matches."""
+        dep = IntegrationDependency(ord_id="sap.s4:apiResource:FOO:v1", global_tenant_id="111")
+        creds = self._make_credentials([dep])
+        assert _resolve_dependency(creds, "sap.s4:apiResource:FOO:v1") is dep
+
+    def test_raises_when_not_found(self):
+        """Raise error when the ORD ID is not in the list."""
+        creds = self._make_credentials([
+            IntegrationDependency(ord_id="sap.s4:apiResource:FOO:v1", global_tenant_id="111"),
+        ])
+        with pytest.raises(AgentGatewaySDKError, match="not found in integrationDependencies"):
+            _resolve_dependency(creds, "sap.s4:apiResource:BAR:v1")
+
+    def test_raises_on_multiple_matches(self):
+        """Raise error when the same ORD ID appears with different tenant IDs."""
+        creds = self._make_credentials([
+            IntegrationDependency(ord_id="sap.s4:apiResource:FOO:v1", global_tenant_id="111"),
+            IntegrationDependency(ord_id="sap.s4:apiResource:FOO:v1", global_tenant_id="222"),
+        ])
+        with pytest.raises(AgentGatewaySDKError, match="matches multiple integrationDependencies"):
+            _resolve_dependency(creds, "sap.s4:apiResource:FOO:v1")
+
+    def test_raises_with_empty_dependencies(self):
+        """Raise error when integrationDependencies is empty."""
+        creds = self._make_credentials([])
+        with pytest.raises(AgentGatewaySDKError, match="not found in integrationDependencies"):
+            _resolve_dependency(creds, "sap.s4:apiResource:FOO:v1")
+
+
+# ============================================================
 # Test: get_mcp_tools_customer
 # ============================================================
 
@@ -682,13 +731,84 @@ class TestGetMcpToolsCustomer:
             assert len(result) == 1
             assert result[0].name == "tool2"
 
+    @pytest.mark.asyncio
+    async def test_filters_to_single_server_when_ord_id_given(self):
+        """Only query the server whose ord_id matches when ord_id is provided."""
+        credentials = CustomerCredentials(
+            token_service_url="https://ias.example.com/oauth2/token",
+            client_id="test-client",
+            certificate="cert",
+            private_key="key",
+            gateway_url="https://agw.example.com",
+            integration_dependencies=[
+                IntegrationDependency(ord_id="sap.s4:apiResource:FOO:v1", global_tenant_id="111"),
+                IntegrationDependency(ord_id="sap.s4:apiResource:BAR:v1", global_tenant_id="222"),
+            ],
+        )
+        mock_tool = MCPTool(
+            name="foo_tool", server_name="FOO", description="", input_schema={},
+            url="https://agw.example.com/v1/mcp/sap.s4:apiResource:FOO:v1/111",
+        )
+
+        with patch(
+            "sap_cloud_sdk.agentgateway._customer._list_server_tools",
+            new_callable=AsyncMock,
+            return_value=[mock_tool],
+        ) as mock_list:
+            result = await get_mcp_tools_customer(
+                credentials, "token", 60.0, ord_id="sap.s4:apiResource:FOO:v1"
+            )
+
+        assert len(result) == 1
+        assert result[0].name == "foo_tool"
+        assert mock_list.call_count == 1
+        called_url = mock_list.call_args[0][0]
+        assert "FOO" in called_url and "111" in called_url
+
+    @pytest.mark.asyncio
+    async def test_raises_when_ord_id_not_found(self):
+        """Raise error when the given ord_id is not in integrationDependencies."""
+        credentials = CustomerCredentials(
+            token_service_url="https://ias.example.com/oauth2/token",
+            client_id="test-client",
+            certificate="cert",
+            private_key="key",
+            gateway_url="https://agw.example.com",
+            integration_dependencies=[
+                IntegrationDependency(ord_id="sap.s4:apiResource:FOO:v1", global_tenant_id="111"),
+            ],
+        )
+        with pytest.raises(AgentGatewaySDKError, match="not found in integrationDependencies"):
+            await get_mcp_tools_customer(
+                credentials, "token", 60.0, ord_id="sap.s4:apiResource:MISSING:v1"
+            )
+
+    @pytest.mark.asyncio
+    async def test_raises_when_ord_id_matches_multiple(self):
+        """Raise error when the given ord_id matches multiple entries."""
+        credentials = CustomerCredentials(
+            token_service_url="https://ias.example.com/oauth2/token",
+            client_id="test-client",
+            certificate="cert",
+            private_key="key",
+            gateway_url="https://agw.example.com",
+            integration_dependencies=[
+                IntegrationDependency(ord_id="sap.s4:apiResource:FOO:v1", global_tenant_id="111"),
+                IntegrationDependency(ord_id="sap.s4:apiResource:FOO:v1", global_tenant_id="222"),
+            ],
+        )
+        with pytest.raises(AgentGatewaySDKError, match="matches multiple integrationDependencies"):
+            await get_mcp_tools_customer(
+                credentials, "token", 60.0, ord_id="sap.s4:apiResource:FOO:v1"
+            )
+
 
 # ============================================================
-# Test: call_mcp_tool_customer
+# Test: invoke_mcp_tool (via customer flow)
 # ============================================================
 
 
-class TestCallMcpToolCustomer:
+class TestInvokeMcpTool:
     """Tests for customer flow tool invocation."""
 
     @pytest.fixture

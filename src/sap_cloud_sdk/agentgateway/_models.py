@@ -162,12 +162,11 @@ class MCPToolFilter:
 
     Attributes:
         names: Tool names to include (matched against MCPTool.name).
-            Applied after fetching, since tool names are only known once
-            each MCP server has been queried.
-        ord_ids: ORD IDs to include. For LoB agents, extracted from the
-            fragment URL; for customer agents, taken from
-            credentials.integration_dependencies. Applied before fetching,
-            skipping non-matching fragments.
+            Applied after fetching.
+        ord_ids: ORD IDs to include (extracted from the fragment URL for LoB
+            agents, or matched against IntegrationDependency.ord_id for
+            customer agents). Applied before fetching, skipping non-matching
+            fragments.
 
     Example:
         ```python

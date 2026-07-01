@@ -55,6 +55,7 @@ Usage (Customer agent):
 from sap_cloud_sdk.agentgateway._models import (
     AuthResult,
     MCPTool,
+    MCPToolFilter,
     Agent,
     AgentCard,
     AgentCardFilter,
@@ -77,6 +78,7 @@ __all__ = [
     # Data models
     "AuthResult",
     "MCPTool",
+    "MCPToolFilter",
     "Agent",
     "AgentCard",
     "AgentCardFilter",

@@ -611,6 +611,139 @@ class TestGetMcpToolsCustomer:
             assert len(result) == 1
             assert result[0].name == "tool2"
 
+    @pytest.mark.asyncio
+    async def test_filters_dependencies_by_ord_id_pre_fetch(self):
+        """Skip non-matching integration dependencies BEFORE calling _list_server_tools."""
+        credentials = CustomerCredentials(
+            token_service_url="https://ias.example.com/oauth2/token",
+            client_id="test-client",
+            certificate="cert",
+            private_key="key",
+            gateway_url="https://agw.example.com",
+            integration_dependencies=[
+                IntegrationDependency(
+                    ord_id="sap.mcpbuilder:apiResource:cost-center:v1",
+                    global_tenant_id="gt-1",
+                ),
+                IntegrationDependency(
+                    ord_id="sap.mcpbuilder:apiResource:finance:v1",
+                    global_tenant_id="gt-1",
+                ),
+            ],
+        )
+
+        cost_tool = MCPTool(
+            name="list_cost_centers",
+            server_name="cost-center",
+            description="",
+            input_schema={},
+            url="https://agw.example.com/v1/mcp/sap.mcpbuilder:apiResource:cost-center:v1/gt-1",
+        )
+
+        with (
+            patch(
+                "sap_cloud_sdk.agentgateway._customer._list_server_tools",
+                new_callable=AsyncMock,
+                return_value=[cost_tool],
+            ) as mock_list,
+        ):
+            result = await get_mcp_tools_customer(
+                credentials,
+                "system-token",
+                60.0,
+                ord_ids=["sap.mcpbuilder:apiResource:cost-center:v1"],
+            )
+
+        # Only the cost-center dependency was queried; finance was filtered out.
+        assert mock_list.call_count == 1
+        assert [t.name for t in result] == ["list_cost_centers"]
+
+    @pytest.mark.asyncio
+    async def test_filters_tools_by_name_post_fetch(self, credentials):
+        """Fetch from all dependencies, then filter the returned tools by name."""
+        keep = MCPTool(
+            name="list_cost_centers",
+            server_name="s",
+            description="",
+            input_schema={},
+            url="https://agw.example.com/v1/mcp/foo/bar",
+        )
+        drop = MCPTool(
+            name="delete_cost_center",
+            server_name="s",
+            description="",
+            input_schema={},
+            url="https://agw.example.com/v1/mcp/foo/bar",
+        )
+
+        with (
+            patch(
+                "sap_cloud_sdk.agentgateway._customer._list_server_tools",
+                new_callable=AsyncMock,
+                return_value=[keep, drop],
+            ),
+        ):
+            result = await get_mcp_tools_customer(
+                credentials,
+                "system-token",
+                60.0,
+                names=["list_cost_centers"],
+            )
+
+        assert [t.name for t in result] == ["list_cost_centers"]
+
+    @pytest.mark.asyncio
+    async def test_empty_filter_lists_behave_like_none(self, credentials):
+        """names=[] and ord_ids=[] should behave the same as None (no filtering)."""
+        tool = MCPTool(
+            name="list_cost_centers",
+            server_name="s",
+            description="",
+            input_schema={},
+            url="https://agw.example.com/v1/mcp/foo/bar",
+        )
+
+        with (
+            patch(
+                "sap_cloud_sdk.agentgateway._customer._list_server_tools",
+                new_callable=AsyncMock,
+                return_value=[tool],
+            ),
+        ):
+            result = await get_mcp_tools_customer(
+                credentials, "system-token", 60.0, names=[], ord_ids=[]
+            )
+
+        assert [t.name for t in result] == ["list_cost_centers"]
+
+    @pytest.mark.asyncio
+    async def test_filter_excluding_all_dependencies_returns_empty(self):
+        """Filter that excludes all dependencies returns empty list, not an error."""
+        credentials = CustomerCredentials(
+            token_service_url="https://ias.example.com/oauth2/token",
+            client_id="test-client",
+            certificate="cert",
+            private_key="key",
+            gateway_url="https://agw.example.com",
+            integration_dependencies=[
+                IntegrationDependency(ord_id="sap.x:v1", global_tenant_id="gt-1"),
+            ],
+        )
+
+        with (
+            patch(
+                "sap_cloud_sdk.agentgateway._customer._list_server_tools",
+                new_callable=AsyncMock,
+            ) as mock_list,
+        ):
+            result = await get_mcp_tools_customer(
+                credentials, "system-token", 60.0, ord_ids=["sap.does-not-exist:v1"]
+            )
+
+        # Filter excluded everything -> empty list, no exception, no network call.
+        assert result == []
+        assert mock_list.call_count == 0
+
 
 # ============================================================
 # Test: call_mcp_tool_customer

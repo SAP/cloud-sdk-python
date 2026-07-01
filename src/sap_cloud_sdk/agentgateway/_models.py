@@ -150,3 +150,37 @@ class AgentCardFilter:
 
     agent_names: list[str] = field(default_factory=list)
     ord_ids: list[str] = field(default_factory=list)
+
+
+@dataclass
+class MCPToolFilter:
+    """Filter options for list_mcp_tools.
+
+    All fields are optional. When multiple fields are set they are applied
+    together (AND semantics). Empty lists are treated the same as None (no
+    filtering on that field).
+
+    Attributes:
+        names: Tool names to include (matched against MCPTool.name).
+            Applied after fetching, since tool names are only known once
+            each MCP server has been queried.
+        ord_ids: ORD IDs to include. For LoB agents, extracted from the
+            fragment URL; for customer agents, taken from
+            credentials.integration_dependencies. Applied before fetching,
+            skipping non-matching fragments.
+
+    Example:
+        ```python
+        from sap_cloud_sdk.agentgateway import MCPToolFilter
+
+        tools = await agw_client.list_mcp_tools(
+            filter=MCPToolFilter(
+                names=["get-sales-order"],
+                ord_ids=["sap.s4:apiAccess:salesOrder:v1"],
+            )
+        )
+        ```
+    """
+
+    names: list[str] = field(default_factory=list)
+    ord_ids: list[str] = field(default_factory=list)

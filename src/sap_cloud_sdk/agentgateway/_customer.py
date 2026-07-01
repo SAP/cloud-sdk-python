@@ -480,6 +480,8 @@ async def get_mcp_tools_customer(
     credentials: CustomerCredentials,
     system_token: str,
     timeout: float,
+    names: list[str] | None = None,
+    ord_ids: list[str] | None = None,
 ) -> list[MCPTool]:
     """List all MCP tools from servers defined in credentials.
 
@@ -490,6 +492,11 @@ async def get_mcp_tools_customer(
         credentials: Customer credentials with integrationDependencies.
         system_token: Pre-fetched raw system token for authentication.
         timeout: HTTP timeout in seconds for MCP server calls.
+        names: Optional list of tool names to include (matched against
+            MCPTool.name). Applied after fetching. If empty or None, all
+            are included.
+        ord_ids: Optional list of ORD IDs to include (extracted from URL).
+            Applied before fetching. If empty or None, all are included.
 
     Returns:
         List of MCPTool objects from all servers.
@@ -503,6 +510,11 @@ async def get_mcp_tools_customer(
         raise AgentGatewaySDKError(
             "integrationDependencies is empty in credentials — no MCP servers configured."
         )
+
+    # Pre-fetch filter: ORD ID is extractable from the URL without fetching tools
+    if ord_ids:
+        ord_ids_set = set(ord_ids)
+        dependencies = [d for d in dependencies if d.ord_id in ord_ids_set]
 
     logger.info("Discovering tools from %d MCP server(s)", len(dependencies))
 
@@ -523,6 +535,11 @@ async def get_mcp_tools_customer(
             logger.debug("Loaded %d tool(s) from %s", len(server_tools), dep.ord_id)
         except Exception:
             logger.exception("Failed to load tools from %s — skipping", dep.ord_id)
+
+    # Post-fetch filter: tool names are only known after fetching
+    if names:
+        names_set = set(names)
+        tools = [t for t in tools if t.name in names_set]
 
     logger.info(
         "Loaded %d MCP tool(s) from %d server(s)", len(tools), len(dependencies)

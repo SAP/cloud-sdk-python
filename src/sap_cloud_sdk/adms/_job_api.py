@@ -17,12 +17,9 @@ from sap_cloud_sdk.adms.config import _ADMIN_SERVICE_PATH, _SERVICE_PATH
 from sap_cloud_sdk.core.telemetry import Module, Operation, record_metrics
 
 # Fully-qualified OData V4 unbound action / function paths.
-# The Java SDK (cloud-sdk-java contrib-java/adms commit e5dd1da) confirmed
-# the canonical wire format includes the namespace prefix.
-_START_JOB_DOC_SERVICE = "com.sap.adm.DocumentService.StartJob"
-_START_JOB_ADMIN_SERVICE = "com.sap.adm.AdminService.StartJob"
-_JOB_STATUS_DOC_SERVICE_NS = "com.sap.adm.DocumentService"
-_JOB_STATUS_ADMIN_SERVICE_NS = "com.sap.adm.AdminService"
+# Unbound action/function import names — no namespace prefix (per EDMX ActionImport/FunctionImport).
+_START_JOB_DOC_SERVICE = "StartJob"
+_START_JOB_ADMIN_SERVICE = "StartJob"
 
 
 class _JobApi:
@@ -96,12 +93,7 @@ class _JobApi:
             Current :class:`~sap_cloud_sdk.adms._models.JobOutput`.
         """
         service = _ADMIN_SERVICE_PATH if use_admin_service else _SERVICE_PATH
-        ns = (
-            _JOB_STATUS_ADMIN_SERVICE_NS
-            if use_admin_service
-            else _JOB_STATUS_DOC_SERVICE_NS
-        )
-        path = f"{ns}.{build_job_status_key_path(job_id)}"
+        path = build_job_status_key_path(job_id)
         resp = self._http.get(path, service_base=service)
         return JobOutput.from_dict(resp.json())
 
@@ -165,11 +157,6 @@ class _AsyncJobApi:
             Current :class:`~sap_cloud_sdk.adms._models.JobOutput`.
         """
         service = _ADMIN_SERVICE_PATH if use_admin_service else _SERVICE_PATH
-        ns = (
-            _JOB_STATUS_ADMIN_SERVICE_NS
-            if use_admin_service
-            else _JOB_STATUS_DOC_SERVICE_NS
-        )
-        path = f"{ns}.{build_job_status_key_path(job_id)}"
+        path = build_job_status_key_path(job_id)
         resp = await self._http.get(path, service_base=service)
         return JobOutput.from_dict(resp.json())

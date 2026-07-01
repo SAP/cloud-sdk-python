@@ -10,6 +10,7 @@ from sap_cloud_sdk.adms._http import (
     build_business_object_node_type_key_path,
     build_doctype_botype_map_key_path,
     build_document_type_key_path,
+    quote_odata_string_key,
 )
 from sap_cloud_sdk.adms._models import (
     AllowedDomain,
@@ -243,42 +244,42 @@ class _ConfigurationApi:
 
     @record_metrics(Module.ADMS, Operation.ADMS_CONFIG_GET_DOCTYPE_BOTYPE_MAP)
     def get_type_mapping(
-        self, document_type_bo_type_map_id: str
+        self, document_type_id: str, business_object_node_type_unique_id: str
     ) -> DocumentTypeBusinessObjectTypeMap:
-        """Fetch a single DocumentType ↔ BusinessObjectNodeType mapping by its UUID."""
+        """Fetch a single DocumentType ↔ BusinessObjectNodeType mapping by its composite key."""
         resp = self._http.get(
-            build_doctype_botype_map_key_path(document_type_bo_type_map_id),
+            build_doctype_botype_map_key_path(document_type_id, business_object_node_type_unique_id),
             service_base=_CONFIG_SERVICE_PATH,
         )
         return DocumentTypeBusinessObjectTypeMap.from_dict(resp.json())
 
     @record_metrics(Module.ADMS, Operation.ADMS_CONFIG_DELETE_DOCTYPE_BOTYPE_MAP)
-    def delete_type_mapping(self, document_type_bo_type_map_id: str) -> None:
+    def delete_type_mapping(self, document_type_id: str, business_object_node_type_unique_id: str) -> None:
         """Delete a DocumentType ↔ BusinessObjectNodeType mapping."""
         self._http.delete(
-            build_doctype_botype_map_key_path(document_type_bo_type_map_id),
+            build_doctype_botype_map_key_path(document_type_id, business_object_node_type_unique_id),
             service_base=_CONFIG_SERVICE_PATH,
         )
 
     @record_metrics(Module.ADMS, Operation.ADMS_CONFIG_MARK_DEFAULT)
-    def mark_default(self, document_type_bo_type_map_id: str) -> None:
+    def mark_default(self, document_type_id: str, business_object_node_type_unique_id: str) -> None:
         """Mark a DocumentType ↔ BusinessObjectNodeType mapping as the default."""
         self._http.post(
-            f"{build_doctype_botype_map_key_path(document_type_bo_type_map_id)}/com.sap.adm.ConfigurationService.markDefault",
+            f"{build_doctype_botype_map_key_path(document_type_id, business_object_node_type_unique_id)}/com.sap.adm.ConfigurationService.markDefault",
             json={},
             service_base=_CONFIG_SERVICE_PATH,
         )
 
-    # ── FileExtensionPolicy ────────────────────────────────────────────────────
+    # ── DocumentTypeFileExtensionPolicy ───────────────────────────────────────
 
     @record_metrics(Module.ADMS, Operation.ADMS_CONFIG_GET_ALL_FILE_EXT_POLICIES)
     def get_all_file_extension_policies(
         self, options: ConfigQueryOptions | None = None
     ) -> list[FileExtensionPolicy]:
-        """Return all file extension allow/block policies."""
+        """Return all document-type file extension policies."""
         params = options.to_query_params() if options else {}
         resp = self._http.get(
-            "FileExtensionPolicy", params=params, service_base=_CONFIG_SERVICE_PATH
+            "DocumentTypeFileExtensionPolicy", params=params, service_base=_CONFIG_SERVICE_PATH
         )
         return [
             FileExtensionPolicy.from_dict(item) for item in resp.json().get("value", [])
@@ -288,30 +289,19 @@ class _ConfigurationApi:
     def create_file_extension_policy(
         self, payload: CreateFileExtensionPolicyInput
     ) -> FileExtensionPolicy:
-        """Create a file extension allow/block policy."""
+        """Create a document-type file extension policy."""
         resp = self._http.post(
-            "FileExtensionPolicy",
+            "DocumentTypeFileExtensionPolicy",
             json=payload.to_odata_dict(),
             service_base=_CONFIG_SERVICE_PATH,
         )
         return FileExtensionPolicy.from_dict(resp.json())
 
-    @record_metrics(Module.ADMS, Operation.ADMS_CONFIG_GET_FILE_EXT_POLICY)
-    def get_file_extension_policy(
-        self, file_extension_policy_id: str
-    ) -> FileExtensionPolicy:
-        """Fetch a single FileExtensionPolicy by its UUID."""
-        resp = self._http.get(
-            f"FileExtensionPolicy(FileExtensionPolicyID={_quote_guid(file_extension_policy_id)})",
-            service_base=_CONFIG_SERVICE_PATH,
-        )
-        return FileExtensionPolicy.from_dict(resp.json())
-
     @record_metrics(Module.ADMS, Operation.ADMS_CONFIG_DELETE_FILE_EXT_POLICY)
-    def delete_file_extension_policy(self, file_extension_policy_id: str) -> None:
-        """Delete a file extension policy."""
+    def delete_file_extension_policy(self, document_type_id: str, file_extension: str) -> None:
+        """Delete a document-type file extension policy by composite key."""
         self._http.delete(
-            f"FileExtensionPolicy(FileExtensionPolicyID={_quote_guid(file_extension_policy_id)})",
+            f"DocumentTypeFileExtensionPolicy(DocumentTypeID={quote_odata_string_key(document_type_id)},FileExtension={quote_odata_string_key(file_extension)})",
             service_base=_CONFIG_SERVICE_PATH,
         )
 
@@ -395,8 +385,8 @@ class _ConfigurationApi:
 
 
 def _subaccount_header(subaccount_id: str | None) -> dict[str, str] | None:
-    """Build the x-subaccount-id header dict, or None if not provided."""
-    return {"x-subaccount-id": subaccount_id} if subaccount_id else None
+    """Build the X-SubaccountId header dict, or None if not provided."""
+    return {"X-SubaccountId": subaccount_id} if subaccount_id else None
 
 
 def _quote_guid(value: str) -> str:
@@ -620,28 +610,28 @@ class _AsyncConfigurationApi:
 
     @record_metrics(Module.ADMS, Operation.ADMS_CONFIG_GET_DOCTYPE_BOTYPE_MAP)
     async def get_type_mapping(
-        self, document_type_bo_type_map_id: str
+        self, document_type_id: str, business_object_node_type_unique_id: str
     ) -> DocumentTypeBusinessObjectTypeMap:
         """Async variant of :meth:`_ConfigurationApi.get_type_mapping` — same semantics."""
         resp = await self._http.get(
-            build_doctype_botype_map_key_path(document_type_bo_type_map_id),
+            build_doctype_botype_map_key_path(document_type_id, business_object_node_type_unique_id),
             service_base=_CONFIG_SERVICE_PATH,
         )
         return DocumentTypeBusinessObjectTypeMap.from_dict(resp.json())
 
     @record_metrics(Module.ADMS, Operation.ADMS_CONFIG_DELETE_DOCTYPE_BOTYPE_MAP)
-    async def delete_type_mapping(self, document_type_bo_type_map_id: str) -> None:
+    async def delete_type_mapping(self, document_type_id: str, business_object_node_type_unique_id: str) -> None:
         """Async variant of :meth:`_ConfigurationApi.delete_type_mapping` — same semantics."""
         await self._http.delete(
-            build_doctype_botype_map_key_path(document_type_bo_type_map_id),
+            build_doctype_botype_map_key_path(document_type_id, business_object_node_type_unique_id),
             service_base=_CONFIG_SERVICE_PATH,
         )
 
     @record_metrics(Module.ADMS, Operation.ADMS_CONFIG_MARK_DEFAULT)
-    async def mark_default(self, document_type_bo_type_map_id: str) -> None:
+    async def mark_default(self, document_type_id: str, business_object_node_type_unique_id: str) -> None:
         """Async variant of :meth:`_ConfigurationApi.mark_default` — same semantics."""
         await self._http.post(
-            f"{build_doctype_botype_map_key_path(document_type_bo_type_map_id)}/com.sap.adm.ConfigurationService.markDefault",
+            f"{build_doctype_botype_map_key_path(document_type_id, business_object_node_type_unique_id)}/com.sap.adm.ConfigurationService.markDefault",
             json={},
             service_base=_CONFIG_SERVICE_PATH,
         )
@@ -653,7 +643,7 @@ class _AsyncConfigurationApi:
         """Async variant of :meth:`_ConfigurationApi.get_all_file_extension_policies` — same semantics."""
         params = options.to_query_params() if options else {}
         resp = await self._http.get(
-            "FileExtensionPolicy", params=params, service_base=_CONFIG_SERVICE_PATH
+            "DocumentTypeFileExtensionPolicy", params=params, service_base=_CONFIG_SERVICE_PATH
         )
         return [
             FileExtensionPolicy.from_dict(item) for item in resp.json().get("value", [])
@@ -665,28 +655,17 @@ class _AsyncConfigurationApi:
     ) -> FileExtensionPolicy:
         """Async variant of :meth:`_ConfigurationApi.create_file_extension_policy` — same semantics."""
         resp = await self._http.post(
-            "FileExtensionPolicy",
+            "DocumentTypeFileExtensionPolicy",
             json=payload.to_odata_dict(),
             service_base=_CONFIG_SERVICE_PATH,
         )
         return FileExtensionPolicy.from_dict(resp.json())
 
-    @record_metrics(Module.ADMS, Operation.ADMS_CONFIG_GET_FILE_EXT_POLICY)
-    async def get_file_extension_policy(
-        self, file_extension_policy_id: str
-    ) -> FileExtensionPolicy:
-        """Async variant of :meth:`_ConfigurationApi.get_file_extension_policy` — same semantics."""
-        resp = await self._http.get(
-            f"FileExtensionPolicy(FileExtensionPolicyID={_quote_guid(file_extension_policy_id)})",
-            service_base=_CONFIG_SERVICE_PATH,
-        )
-        return FileExtensionPolicy.from_dict(resp.json())
-
     @record_metrics(Module.ADMS, Operation.ADMS_CONFIG_DELETE_FILE_EXT_POLICY)
-    async def delete_file_extension_policy(self, file_extension_policy_id: str) -> None:
+    async def delete_file_extension_policy(self, document_type_id: str, file_extension: str) -> None:
         """Async variant of :meth:`_ConfigurationApi.delete_file_extension_policy` — same semantics."""
         await self._http.delete(
-            f"FileExtensionPolicy(FileExtensionPolicyID={_quote_guid(file_extension_policy_id)})",
+            f"DocumentTypeFileExtensionPolicy(DocumentTypeID={quote_odata_string_key(document_type_id)},FileExtension={quote_odata_string_key(file_extension)})",
             service_base=_CONFIG_SERVICE_PATH,
         )
 

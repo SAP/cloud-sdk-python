@@ -128,11 +128,12 @@ def build_business_object_node_type_key_path(unique_id: str) -> str:
     )
 
 
-def build_doctype_botype_map_key_path(map_id: str) -> str:
-    """Return ``DocumentTypeBusinessObjectTypeMap(DocumentTypeBOTypeMapID=<guid>)``."""
+def build_doctype_botype_map_key_path(document_type_id: str, business_object_node_type_unique_id: str) -> str:
+    """Return ``DocumentTypeBusinessObjectTypeMap(DocumentTypeID='x',BusinessObjectNodeTypeUniqueID='y')``."""
     return (
         f"DocumentTypeBusinessObjectTypeMap("
-        f"DocumentTypeBOTypeMapID={quote_odata_guid_key(map_id)})"
+        f"DocumentTypeID={quote_odata_string_key(document_type_id)},"
+        f"BusinessObjectNodeTypeUniqueID={quote_odata_string_key(business_object_node_type_unique_id)})"
     )
 
 

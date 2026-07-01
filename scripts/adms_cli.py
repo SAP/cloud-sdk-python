@@ -36,8 +36,6 @@ Commands:
         relations lock <id>                         — lock document & relation
         relations unlock <id>                       — release lock
     DOCUMENTS
-        documents list                              — list all Documents
-        documents get <relation-id>                 — Document linked to a relation
         documents update <relation-id>              — update document metadata
         documents download <relation-id>            — presigned download URL
         documents restore <relation-id> <version>   — restore a previous content version
@@ -94,7 +92,7 @@ from sap_cloud_sdk.adms._models import (
     DeleteUserDataJobParameters,
     DraftActivateInput,
     DraftInput,
-    MimeTypePolicy,
+    FileExtensionPolicy,
     UpdateAllowedDomainInput,
     UpdateBusinessObjectNodeTypeInput,
     UpdateDocumentInput,
@@ -216,6 +214,37 @@ def _print_json(obj) -> None:
     print(json.dumps(_to_jsonable(obj), indent=2))
 
 
+def _field(key: str, val: object) -> None:
+    print(f"  {key + ':':<42} {val}")
+
+
+def _print_document(doc) -> None:
+    _field("DocumentID",                  doc.document_id)
+    _field("IsActiveEntity",              doc.is_active_entity)
+    _field("DocumentName",                doc.document_name)
+    _field("DocumentBaseType",            getattr(doc.document_base_type, "value", doc.document_base_type))
+    _field("DocumentTypeID",              doc.document_type_id)
+    _field("DocumentMimeType",            doc.document_mime_type)
+    _field("DocumentDescription",         doc.document_description)
+    _field("DocumentSizeInByte",          doc.document_size_in_byte)
+    _field("DocumentContentStreamURI",    doc.document_content_stream_uri)
+    _field("DocumentExternalContentURL",  doc.document_external_content_url)
+    _field("DocumentIsLocked",            doc.document_is_locked)
+    _field("DocumentIsSoftDeleted",       doc.document_is_soft_deleted)
+    _field("HasActiveDocumentEntity",     doc.has_active_document_entity)
+    _field("HasDraftDocumentEntity",      doc.has_draft_document_entity)
+    _field("DraftUUID",                   doc.draft_uuid)
+    _field("DocumentContentUploadURLs",   doc.document_content_upload_urls)
+    _field("DocumentIsMultiReferenced",   doc.document_is_multi_referenced)
+    _field("DocumentCreatedByUserName",   doc.document_created_by_user_name)
+    _field("DocumentCreatedAtDateTime",   doc.document_created_at_date_time)
+    _field("DocumentChangedByUserName",   doc.document_changed_by_user_name)
+    _field("DocumentChangedAtDateTime",   doc.document_changed_at_date_time)
+    _field("DocumentState",               getattr(doc.document_state, "value", doc.document_state))
+    _field("DocumentStateText",           doc.document_state_text)
+    _field("DocumentContentHash",         doc.document_content_hash)
+
+
 def _print_list(items, label: str) -> None:
     print(f"\n{'─' * 62}")
     print(f"  {label}  ({len(items)} items)")
@@ -240,6 +269,7 @@ def _patch_http_for_raw(client: AdmsClient) -> None:
     original_request = AdmsHttp._request
 
     def _capturing_request(self, method, path, **kwargs):
+        _last_raw_responses.clear()
         resp = original_request(self, method, path, **kwargs)
         try:
             body = resp.json()
@@ -261,12 +291,22 @@ def _print_raw_if_enabled(label: str = "Raw API response") -> None:
     print()
 
 
+def _print_last_raw() -> None:
+    """Print the last captured raw wire response (always, no mode check)."""
+    if _last_raw_responses:
+        print(_last_raw_responses[-1])
+
+
 def _clear_raw_captures() -> None:
     _last_raw_responses.clear()
 
 
 def _prompt(prompt: str, default: Optional[str] = None) -> str:
-    value = input(f"  {prompt}: ").strip()
+    if default:
+        label = f"{prompt} (optional — press Enter to skip, default {default})"
+    else:
+        label = prompt
+    value = input(f"  {label}: ").strip()
     if not value and default:
         return default
     return value
@@ -274,13 +314,16 @@ def _prompt(prompt: str, default: Optional[str] = None) -> str:
 
 def _prompt_optional(prompt: str) -> Optional[str]:
     """Prompt for an optional value — empty input returns None."""
-    value = input(f"  {prompt} (optional): ").strip()
+    value = input(f"  {prompt} (optional — press Enter to skip): ").strip()
     return value or None
 
 
 def _prompt_int(prompt: str, default: Optional[int] = None) -> Optional[int]:
-    label = f" (optional, default {default})" if default is not None else " (optional)"
-    raw = input(f"  {prompt}{label}: ").strip()
+    if default is not None:
+        label = f"{prompt} (optional — press Enter to skip, default {default})"
+    else:
+        label = f"{prompt} (optional — press Enter to skip)"
+    raw = input(f"  {label}: ").strip()
     if not raw:
         return default
     try:
@@ -484,23 +527,67 @@ def cmd_relations_unlock(client: AdmsClient, relation_id: str) -> None:
         _err_exc("Unlock failed", exc)
 
 
-def cmd_relations_full_upload(client: AdmsClient, relation_id: str) -> None:
-    """Generate upload URLs, PUT file to GCS, then complete the upload."""
+def cmd_relations_full_upload(client: AdmsClient) -> None:
+    """Create relation + document, generate upload URL, PUT file to GCS, then complete."""
     import os
 
-    file_path = _prompt("Local file path (absolute or relative)")
+    print("\n── Full upload: create relation → generate URL → PUT file → complete ──")
+
+    bo_type_id = _prompt("BusinessObjectNodeTypeUniqueID (UUID)")
+    bo_node_id = _prompt("HostBusinessObjectNodeID")
+    if not bo_type_id or not bo_node_id:
+        _err("Both BO fields are required.")
+        return
+    bo_display_id = _prompt_optional("HostBusinessObjNodeDisplayID")
+    doc_name = _prompt("DocumentName (e.g. test.pdf)")
+    doc_type_id = _prompt("DocumentTypeID")
+    if not doc_name or not doc_type_id:
+        _err("DocumentName and DocumentTypeID are required.")
+        return
+    doc_desc = _prompt_optional("DocumentDescription")
+    doc_base_type_raw = _prompt("DocumentBaseType (D=file, F=folder, U=URL)", default="D").upper()
+    try:
+        doc_base_type = BaseType(doc_base_type_raw)
+    except ValueError:
+        _err(f"Invalid DocumentBaseType {doc_base_type_raw!r} — must be D, F, or U.")
+        return
+    is_active = _prompt_bool("Active entity? (No = draft)", default=True)
+    is_multipart = _prompt_bool("Multipart upload?", default=False)
+    no_of_parts = _prompt_int("Number of parts", default=1) or 1
+    file_path = _prompt("Local file path")
     if not file_path or not os.path.isfile(file_path):
         _err(f"File not found: {file_path!r}")
         return
     file_name = os.path.basename(file_path)
-    is_active = _prompt_bool("Active entity? (No = draft)", default=True)
-    is_multipart = _prompt_bool("Multipart upload?", default=False)
-    no_of_parts = _prompt_int("Number of parts", default=1) or 1
 
-    print(f"\nStep 1 — Generating upload URL(s) for relation {relation_id} …")
+    print(f"\nStep 1 — Creating relation + document …")
+    try:
+        rel = client.relations.create(
+            CreateDocumentRelationInput(
+                business_object_node_type_unique_id=bo_type_id,
+                host_business_object_node_id=bo_node_id,
+                host_business_obj_node_display_id=bo_display_id,
+                is_active_entity=is_active,
+                document=CreateDocumentInput(
+                    document_name=doc_name,
+                    document_type_id=doc_type_id,
+                    document_description=doc_desc,
+                    document_base_type=doc_base_type,
+                    document_is_multipart=is_multipart,
+                    document_no_of_parts=no_of_parts if is_multipart else None,
+                ),
+            )
+        )
+    except AdmsError as exc:
+        _err_exc("Create failed", exc)
+        return
+    _ok(f"Relation created: {rel.document_relation_id}")
+    _print_json(rel)
+
+    print(f"\nStep 2 — Generating upload URL(s) for {rel.document_relation_id} …")
     try:
         doc = client.relations.generate_upload_urls(
-            relation_id,
+            rel.document_relation_id,
             is_active_entity=is_active,
             is_multipart=is_multipart,
             no_of_parts=no_of_parts,
@@ -516,26 +603,36 @@ def cmd_relations_full_upload(client: AdmsClient, relation_id: str) -> None:
     _ok(f"Got {len(urls)} URL(s).")
     upload_url = urls[0]
 
-    # The x-goog-meta-filename value was baked into the GCS signature by ADM
-    # at URL-generation time. We must send the document name ADM registered,
-    # not the local file name — a mismatch causes SignatureDoesNotMatch.
     adm_filename = doc.document_name or file_name
 
-    print(f"\nStep 2 — Uploading {file_name!r} as '{adm_filename}' to GCS …")
+    print(f"\nStep 3 — Uploading {file_name!r} to GCS …")
     try:
         import urllib.request as _urllib_request
+        import ssl as _ssl
+        import mimetypes
+
+        _ssl_ctx = _ssl.create_default_context()
+        _ssl_ctx.check_hostname = False
+        _ssl_ctx.verify_mode = _ssl.CERT_NONE
 
         with open(file_path, "rb") as f:
             file_bytes = f.read()
 
-        req = _urllib_request.Request(
-            upload_url,
-            data=file_bytes,
-            method="PUT",
-            headers={"x-goog-meta-filename": adm_filename},
-        )
+        mime_type, _ = mimetypes.guess_type(file_path)
+        if not mime_type:
+            mime_type = "application/octet-stream"
+
+        put_url = urls[0]
+
+        headers = {"Content-Type": mime_type}
+        if not is_multipart:
+            headers["x-goog-meta-filename"] = adm_filename
+
+        print(f"  →  Content-Type: {mime_type}")
+
+        req = _urllib_request.Request(put_url, data=file_bytes, method="PUT", headers=headers)
         try:
-            with _urllib_request.urlopen(req, timeout=120) as response:
+            with _urllib_request.urlopen(req, timeout=120, context=_ssl_ctx) as response:
                 status = response.status
         except _urllib_request.HTTPError as exc:
             body = exc.read().decode("utf-8", errors="replace")
@@ -550,9 +647,9 @@ def cmd_relations_full_upload(client: AdmsClient, relation_id: str) -> None:
         return
 
     if is_multipart:
-        print(f"\nStep 3 — Completing multipart upload for {relation_id} …")
+        print(f"\nStep 4 — Completing multipart upload for {rel.document_relation_id} …")
         try:
-            client.relations.complete_multipart_upload(relation_id, is_active_entity=is_active)
+            client.relations.complete_multipart_upload(rel.document_relation_id, is_active_entity=is_active)
             _ok("Multipart upload completed.")
         except AdmsError as exc:
             _err_exc("Complete upload failed", exc)
@@ -578,9 +675,9 @@ def cmd_relations_delete_bo_node(client: AdmsClient) -> None:
 
 
 def cmd_relations_change_logs(client: AdmsClient) -> None:
-    print("\nFetching ChangeLog …")
-    items = client.relations.get_change_logs()
-    _print_list(items, "ChangeLog")
+    print("\nFetching BusinessObjectNodeChangeLog …")
+    items = client.relations.get_bo_node_change_logs()
+    _print_list(items, "BusinessObjectNodeChangeLog")
 
 
 def cmd_relations_bo_change_logs(client: AdmsClient) -> None:
@@ -592,34 +689,23 @@ def cmd_relations_bo_change_logs(client: AdmsClient) -> None:
 # ── DOCUMENTS handlers ───────────────────────────────────────────────────────
 
 
-def cmd_documents_list(client: AdmsClient) -> None:
-    print("\nFetching all Documents (via DocumentRelation?$expand=Document) …")
-    items = client.documents.get_all()
-    _print_list(items, "Documents")
-
-
-def cmd_documents_get(client: AdmsClient, relation_id: str) -> None:
-    is_active = _prompt_bool("Active entity? (No = draft)", default=True)
-    print(f"\nFetching Document via relation {relation_id} (IsActiveEntity={str(is_active).lower()}) …")
-    try:
-        doc = client.documents.get(relation_id, is_active_entity=is_active)
-        _print_json(doc)
-    except DocumentNotFoundError:
-        _err(f"No document found for relation {relation_id!r}.")
-    except AdmsError as exc:
-        _err_exc("Failed", exc)
-
-
 def cmd_documents_update(client: AdmsClient, relation_id: str) -> None:
-    print("\n── Update Document metadata ─────────────────────────────────")
-    print("  Leave any field blank to leave it unchanged.")
     is_active = _prompt_bool("Active entity? (No = draft)", default=True)
+    print("  Leave any field blank to leave it unchanged.")
+    document_name = _prompt_optional("New document name")
+    document_description = _prompt_optional("New description")
+    document_type_id = _prompt_optional("New DocumentTypeID")
+    doc_content_version_comment = _prompt_optional("Content version comment")
+    document_external_content_url = _prompt_optional("New external URL")
+    is_content_update_raw = _prompt_bool("Is content update? (new file version)", default=False)
+    is_content_update = is_content_update_raw if is_content_update_raw else None
     update = UpdateDocumentInput(
-        document_name=_prompt_optional("New document name"),
-        document_description=_prompt_optional("New description"),
-        document_type_id=_prompt_optional("New DocumentTypeID"),
-        doc_content_version_comment=_prompt_optional("Content version comment"),
-        document_external_content_url=_prompt_optional("New external URL"),
+        document_name=document_name,
+        document_description=document_description,
+        document_type_id=document_type_id,
+        doc_content_version_comment=doc_content_version_comment,
+        document_external_content_url=document_external_content_url,
+        is_content_update=is_content_update,
     )
     if not any(v is not None for v in update.__dict__.values()):
         _err("Nothing to update — all fields blank.")
@@ -634,13 +720,13 @@ def cmd_documents_update(client: AdmsClient, relation_id: str) -> None:
 
 def cmd_documents_download(client: AdmsClient, relation_id: str) -> None:
     is_active = _prompt_bool("Active entity? (No = draft)", default=True)
-    version = _prompt("DocContentVersionID", default="1.0")
+    version = _prompt_optional("DocContentVersionID (blank = latest)")
     print("\nFetching presigned download URL …")
     try:
         url = client.documents.get_download_url(
             document_relation_id=relation_id,
             is_active_entity=is_active,
-            doc_content_version_id=version,
+            doc_content_version_id=version or None,
         )
         _ok("Presigned URL (valid for a short time — do not cache):")
         print(f"  {url}\n")
@@ -693,9 +779,9 @@ def cmd_config_domains(client: AdmsClient) -> None:
 
 def cmd_config_domains_create(client: AdmsClient) -> None:
     print("\n── Create AllowedDomain ────────────────────────────────────")
-    host = _prompt("Hostname (e.g. storage.example.com)")
-    proto = _prompt("Protocol", default="https")
-    port = _prompt_int("Port (blank = protocol default)")
+    host = _prompt("AllowedDomainHostName * (mandatory, e.g. storage.example.com)")
+    proto = _prompt("AllowedDomainProtocol", default="https")
+    port = _prompt_int("AllowedDomainPort")
     if not host or not proto:
         _err("Hostname and protocol are required.")
         return
@@ -704,7 +790,7 @@ def cmd_config_domains_create(client: AdmsClient) -> None:
             CreateAllowedDomainInput(host_name=host, protocol=proto, port=port)
         )
         _ok(f"Created AllowedDomain {out.allowed_domain_id}")
-        _print_json(out)
+        _print_last_raw()
     except AdmsError as exc:
         _err_exc("Create failed", exc)
 
@@ -713,7 +799,7 @@ def cmd_config_domains_get(client: AdmsClient, allowed_domain_id: str) -> None:
     print(f"\nFetching AllowedDomain {allowed_domain_id} …")
     try:
         out = client.config.get_allowed_domain(allowed_domain_id)
-        _print_json(out)
+        _print_last_raw()
     except AdmsError as exc:
         _err_exc("Failed", exc)
 
@@ -732,7 +818,7 @@ def cmd_config_domains_update(client: AdmsClient, allowed_domain_id: str) -> Non
     try:
         out = client.config.update_allowed_domain(allowed_domain_id, update)
         _ok(f"Updated AllowedDomain {out.allowed_domain_id}.")
-        _print_json(out)
+        _print_last_raw()
     except AdmsError as exc:
         _err_exc("Update failed", exc)
 
@@ -756,9 +842,9 @@ def cmd_config_doctypes(client: AdmsClient) -> None:
 
 def cmd_config_doctypes_create(client: AdmsClient) -> None:
     print("\n── Create DocumentType ─────────────────────────────────────")
-    type_id = _prompt("DocumentTypeID (max 10 chars)")
-    name = _prompt("DocumentTypeName")
-    desc = _prompt_optional("Description")
+    type_id = _prompt("DocumentTypeID * (mandatory, max 10 chars)")
+    name = _prompt("DocumentTypeName * (mandatory)")
+    desc = _prompt_optional("DocumentTypeDescription")
     if not type_id or not name:
         _err("DocumentTypeID and DocumentTypeName are required.")
         return
@@ -771,7 +857,7 @@ def cmd_config_doctypes_create(client: AdmsClient) -> None:
             )
         )
         _ok(f"Created DocumentType {out.document_type_id}.")
-        _print_json(out)
+        _print_last_raw()
     except AdmsError as exc:
         _err_exc("Create failed", exc)
 
@@ -780,7 +866,7 @@ def cmd_config_doctypes_get(client: AdmsClient, document_type_id: str) -> None:
     print(f"\nFetching DocumentType {document_type_id} …")
     try:
         out = client.config.get_document_type(document_type_id)
-        _print_json(out)
+        _print_last_raw()
     except AdmsError as exc:
         _err_exc("Failed", exc)
 
@@ -798,7 +884,7 @@ def cmd_config_doctypes_update(client: AdmsClient, document_type_id: str) -> Non
     try:
         out = client.config.update_document_type(document_type_id, update)
         _ok(f"Updated DocumentType {out.document_type_id}.")
-        _print_json(out)
+        _print_last_raw()
     except AdmsError as exc:
         _err_exc("Update failed", exc)
 
@@ -822,9 +908,10 @@ def cmd_config_botypes(client: AdmsClient) -> None:
 
 def cmd_config_botypes_create(client: AdmsClient) -> None:
     print("\n── Create BusinessObjectNodeType ───────────────────────────")
-    bo_type = _prompt("BusinessObjectNodeType (short code, e.g. PO)")
-    bo_name = _prompt("BusinessObjectNodeTypeName")
-    tenant_id = _prompt("ApplicationTenantID (UUID of the owning tenant)")
+    bo_type = _prompt("BusinessObjectNodeType * (mandatory, short code, e.g. PO)")
+    bo_name = _prompt("BusinessObjectNodeTypeName * (mandatory)")
+    tenant_id = _prompt("ApplicationTenantID * (mandatory, UUID)")
+    odm_name = _prompt_optional("ODMEntityName")
     if not bo_type or not bo_name or not tenant_id:
         _err("BusinessObjectNodeType, name, and ApplicationTenantID are required.")
         return
@@ -834,12 +921,13 @@ def cmd_config_botypes_create(client: AdmsClient) -> None:
                 business_object_node_type=bo_type,
                 business_object_node_type_name=bo_name,
                 application_tenant_id=tenant_id,
+                odm_entity_name=odm_name,
             )
         )
         _ok(
             f"Created BusinessObjectNodeType {out.business_object_node_type_unique_id}."
         )
-        _print_json(out)
+        _print_last_raw()
     except AdmsError as exc:
         _err_exc("Create failed", exc)
 
@@ -848,7 +936,7 @@ def cmd_config_botypes_get(client: AdmsClient, bo_type_unique_id: str) -> None:
     print(f"\nFetching BusinessObjectNodeType {bo_type_unique_id} …")
     try:
         out = client.config.get_business_object_type(bo_type_unique_id)
-        _print_json(out)
+        _print_last_raw()
     except AdmsError as exc:
         _err_exc("Failed", exc)
 
@@ -866,7 +954,7 @@ def cmd_config_botypes_update(client: AdmsClient, bo_type_unique_id: str) -> Non
     try:
         out = client.config.update_business_object_type(bo_type_unique_id, update)
         _ok(f"Updated BusinessObjectNodeType {out.business_object_node_type_unique_id}.")
-        _print_json(out)
+        _print_last_raw()
     except AdmsError as exc:
         _err_exc("Update failed", exc)
 
@@ -890,9 +978,8 @@ def cmd_config_maps(client: AdmsClient) -> None:
 
 def cmd_config_maps_create(client: AdmsClient) -> None:
     print("\n── Create DocumentType ↔ BO type mapping ───────────────────")
-    bo_unique_id = _prompt("BusinessObjectNodeTypeUniqueID (UUID)")
-    doc_type_id = _prompt("DocumentTypeID")
-    is_default = _prompt_bool("Mark as default for this BO type?", default=False)
+    bo_unique_id = _prompt("BusinessObjectNodeTypeUniqueID * (mandatory, UUID)")
+    doc_type_id = _prompt("DocumentTypeID * (mandatory)")
     if not bo_unique_id or not doc_type_id:
         _err("Both IDs are required.")
         return
@@ -901,39 +988,53 @@ def cmd_config_maps_create(client: AdmsClient) -> None:
             CreateDocumentTypeBoTypeMapInput(
                 business_object_node_type_unique_id=bo_unique_id,
                 document_type_id=doc_type_id,
-                is_default=is_default,
             )
         )
-        _ok(f"Created mapping {out.document_type_bo_type_map_id}.")
-        _print_json(out)
+        _ok(f"Created mapping {out.document_type_id}:{out.business_object_node_type_unique_id}.")
+        _print_last_raw()
     except AdmsError as exc:
         _err_exc("Create failed", exc)
 
 
-def cmd_config_maps_get(client: AdmsClient, mapping_id: str) -> None:
-    print(f"\nFetching mapping {mapping_id} …")
+def cmd_config_maps_get(client: AdmsClient) -> None:
+    doc_type_id = _prompt("DocumentTypeID * (mandatory)")
+    bo_unique_id = _prompt("BusinessObjectNodeTypeUniqueID * (mandatory, UUID)")
+    if not doc_type_id or not bo_unique_id:
+        _err("Both fields are required.")
+        return
+    print(f"\nFetching mapping {doc_type_id}:{bo_unique_id} …")
     try:
-        out = client.config.get_type_mapping(mapping_id)
-        _print_json(out)
+        out = client.config.get_type_mapping(doc_type_id, bo_unique_id)
+        _print_last_raw()
     except AdmsError as exc:
         _err_exc("Failed", exc)
 
 
-def cmd_config_maps_delete(client: AdmsClient, mapping_id: str) -> None:
-    if not _confirm(f"Delete mapping {mapping_id!r}?"):
+def cmd_config_maps_delete(client: AdmsClient) -> None:
+    doc_type_id = _prompt("DocumentTypeID * (mandatory)")
+    bo_unique_id = _prompt("BusinessObjectNodeTypeUniqueID * (mandatory, UUID)")
+    if not doc_type_id or not bo_unique_id:
+        _err("Both fields are required.")
+        return
+    if not _confirm(f"Delete mapping {doc_type_id}:{bo_unique_id}?"):
         print("  Aborted.")
         return
     try:
-        client.config.delete_type_mapping(mapping_id)
-        _ok(f"Deleted {mapping_id}.")
+        client.config.delete_type_mapping(doc_type_id, bo_unique_id)
+        _ok(f"Deleted mapping {doc_type_id}:{bo_unique_id}.")
     except AdmsError as exc:
         _err_exc("Delete failed", exc)
 
 
-def cmd_config_maps_mark_default(client: AdmsClient, mapping_id: str) -> None:
+def cmd_config_maps_mark_default(client: AdmsClient) -> None:
+    doc_type_id = _prompt("DocumentTypeID * (mandatory)")
+    bo_unique_id = _prompt("BusinessObjectNodeTypeUniqueID * (mandatory, UUID)")
+    if not doc_type_id or not bo_unique_id:
+        _err("Both fields are required.")
+        return
     try:
-        client.config.mark_default(mapping_id)
-        _ok(f"Mapping {mapping_id} marked as default.")
+        client.config.mark_default(doc_type_id, bo_unique_id)
+        _ok(f"Mapping {doc_type_id}:{bo_unique_id} marked as default.")
     except AdmsError as exc:
         _err_exc("Failed", exc)
 
@@ -948,49 +1049,49 @@ def cmd_config_file_ext_list(client: AdmsClient) -> None:
 
 
 def cmd_config_file_ext_create(client: AdmsClient) -> None:
-    print("\n── Create FileExtensionPolicy ──────────────────────────────")
-    ext = _prompt("File extension (e.g. pdf, exe)")
-    print("  Policy option:")
-    print("    A — Allow")
-    print("    B — Block")
-    policy_raw = _prompt("Policy (A/B)", default="A").upper()
-    try:
-        policy = MimeTypePolicy(policy_raw)
-    except ValueError:
-        _err(f"Invalid policy {policy_raw!r} — must be A or B.")
-        return
-    if not ext:
-        _err("File extension is required.")
+    print("\n── Create DocumentTypeFileExtensionPolicy ──────────────────")
+    doc_type_id = _prompt("DocumentTypeID * (mandatory)")
+    ext = _prompt("FileExtension * (mandatory, e.g. pdf, exe)")
+    if not doc_type_id or not ext:
+        _err("Both fields are required.")
         return
     try:
         out = client.config.create_file_extension_policy(
             CreateFileExtensionPolicyInput(
-                file_extension_policy_option=policy,
+                document_type_id=doc_type_id,
                 file_extension=ext,
             )
         )
-        _ok(f"Created FileExtensionPolicy {out.file_extension_policy_id}.")
-        _print_json(out)
+        _ok(f"Created DocumentTypeFileExtensionPolicy {out.document_type_id}:{out.file_extension}.")
+        _print_last_raw()
     except AdmsError as exc:
         _err_exc("Create failed", exc)
 
 
-def cmd_config_file_ext_get(client: AdmsClient, policy_id: str) -> None:
-    print(f"\nFetching FileExtensionPolicy {policy_id} …")
+def cmd_config_global_file_extensions(client: AdmsClient) -> None:
+    print("\nFetching global allowed file extensions …")
     try:
-        out = client.config.get_file_extension_policy(policy_id)
-        _print_json(out)
+        resp = client.config._http.get(
+            "GetGlobalAllowedFileExtensions()",
+            service_base="/odata/v4/ConfigurationService",
+        )
+        _print_json(resp.json())
     except AdmsError as exc:
         _err_exc("Failed", exc)
 
 
-def cmd_config_file_ext_delete(client: AdmsClient, policy_id: str) -> None:
-    if not _confirm(f"Delete FileExtensionPolicy {policy_id!r}?"):
+def cmd_config_file_ext_delete(client: AdmsClient) -> None:
+    doc_type_id = _prompt("DocumentTypeID * (mandatory)")
+    ext = _prompt("FileExtension * (mandatory)")
+    if not doc_type_id or not ext:
+        _err("Both fields are required.")
+        return
+    if not _confirm(f"Delete DocumentTypeFileExtensionPolicy {doc_type_id}:{ext}?"):
         print("  Aborted.")
         return
     try:
-        client.config.delete_file_extension_policy(policy_id)
-        _ok(f"Deleted {policy_id}.")
+        client.config.delete_file_extension_policy(doc_type_id, ext)
+        _ok(f"Deleted {doc_type_id}:{ext}.")
     except AdmsError as exc:
         _err_exc("Delete failed", exc)
 
@@ -1007,9 +1108,9 @@ def cmd_config_tenant_list(client: AdmsClient) -> None:
 
 def cmd_config_tenant_create(client: AdmsClient) -> None:
     print("\n── Create ApplicationTenant ────────────────────────────────")
-    tenant_id = _prompt("ApplicationTenantID")
-    tenant_name = _prompt("ApplicationTenantName")
-    subaccount_id = _prompt("Subaccount ID (x-subaccount-id header)")
+    tenant_id = _prompt("ApplicationTenantID * (mandatory)")
+    tenant_name = _prompt("ApplicationTenantName * (mandatory)")
+    subaccount_id = _prompt("Subaccount ID * (mandatory, x-subaccount-id header)")
     if not tenant_id or not tenant_name or not subaccount_id:
         _err("ApplicationTenantID, name, and Subaccount ID are required.")
         return
@@ -1022,7 +1123,7 @@ def cmd_config_tenant_create(client: AdmsClient) -> None:
             subaccount_id=subaccount_id,
         )
         _ok(f"Created ApplicationTenant {out.application_tenant_id}.")
-        _print_json(out)
+        _print_last_raw()
     except AdmsError as exc:
         _err_exc("Create failed", exc)
 
@@ -1032,7 +1133,7 @@ def cmd_config_tenant_get(client: AdmsClient, tenant_id: str) -> None:
     print(f"\nFetching ApplicationTenant {tenant_id} …")
     try:
         out = client.config.get_application_tenant(tenant_id, subaccount_id=subaccount_id)
-        _print_json(out)
+        _print_last_raw()
     except AdmsError as exc:
         _err_exc("Failed", exc)
 
@@ -1139,7 +1240,7 @@ _MENU = textwrap.dedent("""
     │    rad  — activateDraft (BO type + node ID)                      │
     │    rdd  — discardDraft (BO type + node ID)                       │
     │    ru   — generateUploadUrls (relation ID)                       │
-    │    rfu  — fullUpload: generate URL + PUT file + complete         │
+    │    rfu  — fullUpload: create relation + PUT file + complete       │
     │    rcu  — completeMultipartUpload (relation ID)                  │
     │    rlk  — lock relation                                          │
     │    ruk  — unlock relation                                        │
@@ -1148,8 +1249,6 @@ _MENU = textwrap.dedent("""
     │    rbl  — getBusinessObjectNodeChangeLog                         │
     ├──────────────────────────────────────────────────────────────────┤
     │  DOCUMENTS (AdmsDocumentsClientApi)                              │
-    │    dl   — list all Documents                                     │
-    │    dg   — get Document by relation ID                            │
     │    du   — update Document (rename)                               │
     │    dd   — getDownloadUrl (pre-signed URL)                        │
     │    drv  — restoreContentVersion                                  │
@@ -1177,7 +1276,7 @@ _MENU = textwrap.dedent("""
     │    cmd  — delete mapping                                         │
     │    cmk  — markDefault (mapping ID)                               │
     │    cfl  — list FileExtensionPolicies                             │
-    │    cfg  — get FileExtensionPolicy by ID                          │
+    │    cgf  — GetGlobalAllowedFileExtensions                         │
     │    cfc  — create FileExtensionPolicy                             │
     │    cfd  — delete FileExtensionPolicy                             │
     │    cal  — list ApplicationTenants                                │
@@ -1227,11 +1326,11 @@ def _interactive(client: AdmsClient) -> None:
         if choice == "rl":
             cmd_relations_list(client)
         elif choice == "rg":
-            rid = _prompt("Relation ID")
+            rid = _prompt("DocumentRelationID")
             if rid:
                 cmd_relations_get(client, rid)
         elif choice == "rd":
-            rid = _prompt("Relation ID to delete")
+            rid = _prompt("DocumentRelationID")
             if rid:
                 cmd_relations_delete(client, rid)
         elif choice == "rcd":
@@ -1243,25 +1342,23 @@ def _interactive(client: AdmsClient) -> None:
         elif choice == "rdd":
             cmd_relations_discard_draft(client)
         elif choice == "ru":
-            rid = _prompt("Relation ID")
+            rid = _prompt("DocumentRelationID")
             if rid:
                 cmd_relations_upload_urls(client, rid)
         elif choice == "rcu":
-            rid = _prompt("Relation ID")
+            rid = _prompt("DocumentRelationID")
             if rid:
                 cmd_relations_complete_upload(client, rid)
         elif choice == "rlk":
-            rid = _prompt("Relation ID to lock")
+            rid = _prompt("DocumentRelationID")
             if rid:
                 cmd_relations_lock(client, rid)
         elif choice == "ruk":
-            rid = _prompt("Relation ID to unlock")
+            rid = _prompt("DocumentRelationID")
             if rid:
                 cmd_relations_unlock(client, rid)
         elif choice == "rfu":
-            rid = _prompt("Relation ID")
-            if rid:
-                cmd_relations_full_upload(client, rid)
+            cmd_relations_full_upload(client)
         elif choice == "rbn":
             cmd_relations_delete_bo_node(client)
         elif choice == "rcl":
@@ -1270,27 +1367,21 @@ def _interactive(client: AdmsClient) -> None:
             cmd_relations_bo_change_logs(client)
 
         # ── documents ──
-        elif choice == "dl":
-            cmd_documents_list(client)
-        elif choice == "dg":
-            rid = _prompt("Relation ID")
-            if rid:
-                cmd_documents_get(client, rid)
         elif choice == "du":
-            rid = _prompt("Relation ID")
+            rid = _prompt("DocumentRelationID")
             if rid:
                 cmd_documents_update(client, rid)
         elif choice == "dd":
-            rid = _prompt("Relation ID")
+            rid = _prompt("DocumentRelationID")
             if rid:
                 cmd_documents_download(client, rid)
         elif choice == "drv":
-            rid = _prompt("Relation ID")
+            rid = _prompt("DocumentRelationID")
             ver = _prompt("DocContentVersionID to restore", default="1.0")
             if rid and ver:
                 cmd_documents_restore(client, rid, ver)
         elif choice == "ddv":
-            rid = _prompt("Relation ID")
+            rid = _prompt("DocumentRelationID")
             ver = _prompt("DocContentVersionID to delete")
             if rid and ver:
                 cmd_documents_delete_version(client, rid, ver)
@@ -1353,33 +1444,23 @@ def _interactive(client: AdmsClient) -> None:
         elif choice == "cm":
             cmd_config_maps(client)
         elif choice == "cmg":
-            mid = _prompt("DocumentTypeBOTypeMapID")
-            if mid:
-                cmd_config_maps_get(client, mid)
+            cmd_config_maps_get(client)
         elif choice == "cma":
             cmd_config_maps_create(client)
         elif choice == "cmd":
-            mid = _prompt("DocumentTypeBOTypeMapID to delete")
-            if mid:
-                cmd_config_maps_delete(client, mid)
+            cmd_config_maps_delete(client)
         elif choice == "cmk":
-            mid = _prompt("DocumentTypeBOTypeMapID to mark as default")
-            if mid:
-                cmd_config_maps_mark_default(client, mid)
+            cmd_config_maps_mark_default(client)
 
         # ── config: FileExtensionPolicy ──
         elif choice == "cfl":
             cmd_config_file_ext_list(client)
-        elif choice == "cfg":
-            pid = _prompt("FileExtensionPolicyID")
-            if pid:
-                cmd_config_file_ext_get(client, pid)
+        elif choice == "cgf":
+            cmd_config_global_file_extensions(client)
         elif choice == "cfc":
             cmd_config_file_ext_create(client)
         elif choice == "cfd":
-            pid = _prompt("FileExtensionPolicyID to delete")
-            if pid:
-                cmd_config_file_ext_delete(client, pid)
+            cmd_config_file_ext_delete(client)
 
         # ── config: ApplicationTenant ──
         elif choice == "cal":
@@ -1457,11 +1538,7 @@ def _cli(client: AdmsClient, args: list[str]) -> None:
 
     elif cmd == "documents":
         sub = args[1] if len(args) > 1 else ""
-        if sub == "list":
-            cmd_documents_list(client)
-        elif sub == "get" and len(args) > 2:
-            cmd_documents_get(client, args[2])
-        elif sub == "update" and len(args) > 2:
+        if sub == "update" and len(args) > 2:
             cmd_documents_update(client, args[2])
         elif sub == "download" and len(args) > 2:
             cmd_documents_download(client, args[2])
@@ -1471,7 +1548,7 @@ def _cli(client: AdmsClient, args: list[str]) -> None:
             cmd_documents_delete_version(client, args[2], args[3])
         else:
             _err(
-                "Usage: documents list | get <id> | update <id> | download <id> "
+                "Usage: documents update <id> | download <id> "
                 "| restore <id> <version> | delete-version <id> <version>"
             )
 
@@ -1499,8 +1576,8 @@ def _cli(client: AdmsClient, args: list[str]) -> None:
             cmd_config_maps(client)
         elif sub == "maps-create":
             cmd_config_maps_create(client)
-        elif sub == "maps-delete" and len(args) > 2:
-            cmd_config_maps_delete(client, args[2])
+        elif sub == "maps-delete":
+            cmd_config_maps_delete(client)
         else:
             _err(
                 "Usage: config domains[-create|-delete <id>] "

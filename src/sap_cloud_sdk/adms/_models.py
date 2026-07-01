@@ -838,19 +838,24 @@ class CreateBusinessObjectNodeTypeInput:
         business_object_node_type: Short identifier code (max 30 chars), e.g. ``"PO"``.
         business_object_node_type_name: Human-readable label (max 50 chars).
         application_tenant_id: Tenant this BO type belongs to.
+        odm_entity_name: Optional ODM (One Domain Model) entity name.
     """
 
     business_object_node_type: str
     business_object_node_type_name: str
     application_tenant_id: str
+    odm_entity_name: str | None = None
 
     def to_odata_dict(self) -> dict:
         """Serialise to the OData payload shape expected by ADM."""
-        return {
+        d: dict = {
             "BusinessObjectNodeType": self.business_object_node_type,
             "BusinessObjectNodeTypeName": self.business_object_node_type_name,
             "ApplicationTenantID": self.application_tenant_id,
         }
+        if self.odm_entity_name is not None:
+            d["ODMEntityName"] = self.odm_entity_name
+        return d
 
 
 @dataclass
@@ -884,26 +889,23 @@ class DocumentTypeBusinessObjectTypeMap:
     to a business object.
 
     Attributes:
-        document_type_bo_type_map_id: Primary key UUID.
-        business_object_node_type_unique_id: FK to :class:`BusinessObjectNodeType`.
-        document_type_id: FK to :class:`DocumentType`.
+        document_type_id: FK to :class:`DocumentType` (part of composite key).
+        business_object_node_type_unique_id: FK to :class:`BusinessObjectNodeType` (part of composite key).
         is_default: If ``True`` this is the default type for the BO node type.
     """
 
-    document_type_bo_type_map_id: str
-    business_object_node_type_unique_id: str
     document_type_id: str
+    business_object_node_type_unique_id: str
     is_default: bool = False
 
     @classmethod
     def from_dict(cls, data: dict) -> DocumentTypeBusinessObjectTypeMap:
         return cls(
-            document_type_bo_type_map_id=data.get("DocumentTypeBOTypeMapID", ""),
+            document_type_id=data.get("DocumentTypeID", ""),
             business_object_node_type_unique_id=data.get(
                 "BusinessObjectNodeTypeUniqueID", ""
             ),
-            document_type_id=data.get("DocumentTypeID", ""),
-            is_default=data.get("IsDefault", False),
+            is_default=data.get("DocumentTypeIsDefault", False),
         )
 
     def to_odata_dict(self) -> dict:
@@ -911,7 +913,6 @@ class DocumentTypeBusinessObjectTypeMap:
         return {
             "BusinessObjectNodeTypeUniqueID": self.business_object_node_type_unique_id,
             "DocumentTypeID": self.document_type_id,
-            "IsDefault": self.is_default,
         }
 
 
@@ -922,19 +923,16 @@ class CreateDocumentTypeBoTypeMapInput:
     Attributes:
         business_object_node_type_unique_id: The BO node type UUID to map.
         document_type_id: The document type code to allow.
-        is_default: Whether this mapping is the default for the BO node type.
     """
 
     business_object_node_type_unique_id: str
     document_type_id: str
-    is_default: bool = False
 
     def to_odata_dict(self) -> dict:
         """Serialise to the OData payload shape expected by ADM."""
         return {
             "BusinessObjectNodeTypeUniqueID": self.business_object_node_type_unique_id,
             "DocumentTypeID": self.document_type_id,
-            "IsDefault": self.is_default,
         }
 
 
@@ -1205,49 +1203,35 @@ class DeleteBusinessObjectNodeResult:
 
 
 # ---------------------------------------------------------------------------
-# FileExtensionPolicy model
+# DocumentTypeFileExtensionPolicy model
 # ---------------------------------------------------------------------------
-
-
-class MimeTypePolicy(str, Enum):
-    """Controls whether a file extension is allowed or blocked."""
-
-    ALLOW = "A"
-    BLOCK = "B"
 
 
 @dataclass
 class FileExtensionPolicy:
-    """Tenant-level file extension allow/block policy.
+    """Mapping that restricts which file extensions are allowed for a document type.
 
-    ADM checks this list before accepting an upload.
+    ADM entity set: ``DocumentTypeFileExtensionPolicy``.
+    Composite key: ``DocumentTypeID`` + ``FileExtension``.
 
     Attributes:
-        file_extension_policy_id: Primary key UUID.
-        file_extension_policy_option: ``ALLOW`` (``"A"``) or ``BLOCK`` (``"B"``).
+        document_type_id: FK to :class:`DocumentType`.
         file_extension: File extension string, e.g. ``"pdf"``, ``"exe"``.
     """
 
-    file_extension_policy_id: str
-    file_extension_policy_option: MimeTypePolicy
+    document_type_id: str
     file_extension: str
 
     @classmethod
     def from_dict(cls, data: dict) -> FileExtensionPolicy:
-        option_raw = data.get("FileExtensionPolicyOption", MimeTypePolicy.ALLOW.value)
-        try:
-            option = MimeTypePolicy(option_raw)
-        except ValueError:
-            option = MimeTypePolicy.ALLOW
         return cls(
-            file_extension_policy_id=data.get("FileExtensionPolicyID", ""),
-            file_extension_policy_option=option,
+            document_type_id=data.get("DocumentTypeID", ""),
             file_extension=data.get("FileExtension", ""),
         )
 
     def to_odata_dict(self) -> dict:
         return {
-            "FileExtensionPolicyOption": self.file_extension_policy_option.value,
+            "DocumentTypeID": self.document_type_id,
             "FileExtension": self.file_extension,
         }
 
@@ -1257,16 +1241,16 @@ class CreateFileExtensionPolicyInput:
     """Input for creating a :class:`FileExtensionPolicy` entry.
 
     Attributes:
-        file_extension_policy_option: ``MimeTypePolicy.ALLOW`` or ``MimeTypePolicy.BLOCK``.
-        file_extension: File extension to allow/block (e.g. ``"pdf"``).
+        document_type_id: The document type to associate the extension with.
+        file_extension: File extension to allow (e.g. ``"pdf"``).
     """
 
-    file_extension_policy_option: MimeTypePolicy
+    document_type_id: str
     file_extension: str
 
     def to_odata_dict(self) -> dict:
         return {
-            "FileExtensionPolicyOption": self.file_extension_policy_option.value,
+            "DocumentTypeID": self.document_type_id,
             "FileExtension": self.file_extension,
         }
 

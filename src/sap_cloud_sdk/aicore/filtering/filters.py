@@ -1,15 +1,18 @@
 """Public entry-point functions for SAP AI Core content filtering.
 
-Three functions form the documented runtime API:
+Two functions form the documented runtime API:
 
 - :func:`set_filtering` — install a :class:`ContentFiltering` (or re-apply
   env-driven defaults when called with no args).
 - :func:`disable_filtering` — restore the original LiteLLM transport.
-- :func:`extract_filter_blocked` — unwrap an input-filter rejection from a
-  LiteLLM ``APIConnectionError``.
 
-Each is decorated with ``@record_metrics(Module.AICORE, …)`` for telemetry.
-The package ``__init__`` re-exports all three.
+Both are decorated with ``@record_metrics(Module.AICORE, …)`` for telemetry.
+The package ``__init__`` re-exports them.
+
+This module also defines :func:`_parse_input_filter_error`, the private
+parser used by :mod:`sap_cloud_sdk.aicore.completion` to translate the
+``litellm.APIConnectionError`` litellm raises for input-filter 400s into a
+:class:`ContentFilteredError` before the exception reaches caller code.
 """
 
 from __future__ import annotations
@@ -20,7 +23,7 @@ from sap_cloud_sdk.core.telemetry.metrics_decorator import record_metrics
 from sap_cloud_sdk.core.telemetry.module import Module
 from sap_cloud_sdk.core.telemetry.operation import Operation
 
-from ._models import ContentFiltering
+from .models import ContentFiltering
 from ._patch import _install
 from .config import load_from_env
 from .exceptions import ContentFilteredError
@@ -72,19 +75,15 @@ def disable_filtering() -> None:
     _install(None)
 
 
-@record_metrics(Module.AICORE, Operation.AICORE_EXTRACT_FILTER_BLOCKED)
-def extract_filter_blocked(exc: Exception) -> ContentFilteredError | None:
-    """Parse a LiteLLM APIConnectionError for an input-filter rejection.
+def _parse_input_filter_error(exc: Exception) -> ContentFilteredError | None:
+    """Internal: try to unwrap an input-filter rejection from a litellm exception.
 
-    When Azure Content Safety blocks the input, LiteLLM's ``raise_for_status()``
-    converts the 400 into an ``httpx.HTTPStatusError``, which is then wrapped
-    into a ``litellm.APIConnectionError`` with the original JSON embedded in
-    the exception message string. This function extracts it.
-
-    Returns None if the exception is not a content-filter rejection.
-
-    A telemetry event is emitted on every call, including calls where the
-    exception was not a content-filter rejection (returns ``None``).
+    Returns a constructed :class:`ContentFilteredError` if the exception's
+    string form contains the JSON shape produced by Azure Content Safety
+    input-filter rejection, otherwise ``None``. Used by
+    :mod:`sap_cloud_sdk.aicore.completion` to translate the
+    ``litellm.APIConnectionError`` wrapping that ``raise_for_status()``
+    produces before our transport patch sees the response.
     """
     msg = str(exc)
     brace = msg.find("{")

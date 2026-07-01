@@ -8,7 +8,7 @@ Patches ``litellm.GenAIHubOrchestrationConfig`` with a subclass that:
   via ``transform_response``.
 
 The patch is applied by :func:`_install` (called by ``set_filtering`` /
-``disable_filtering`` in :mod:`._api`) and is idempotent — calling it
+``disable_filtering`` in :mod:`.filters`) and is idempotent — calling it
 multiple times with the same config is safe.
 
 Two filter-rejection shapes (from the v2 API) are handled:
@@ -22,7 +22,10 @@ LiteLLM's ``raise_for_status()`` turns 4xx responses into
 ``httpx.HTTPStatusError`` before ``transform_response`` is reached, so
 input-filter 400s arrive wrapped in a ``litellm.APIConnectionError`` with
 the JSON embedded in the exception message.
-:func:`extract_filter_blocked` (defined in :mod:`._api`) handles that case.
+:func:`sap_cloud_sdk.aicore.completion` translates the wrapped exception
+back into :class:`ContentFilteredError` before it reaches caller code; the
+:func:`_parse_input_filter_error` helper in :mod:`.filters` does the JSON
+parsing.
 """
 
 from __future__ import annotations
@@ -166,8 +169,8 @@ def _install(cfg: Any) -> None:  # cfg: ContentFiltering | None
     (:class:`sap_cloud_sdk.aicore.fallback._patch.OrchestrationPatchConfig`)
     in place — that class inherits from :class:`FilteringOrchestrationConfig`
     and reads ``_active_cfg`` at request time, so the filtering toggle still
-    takes effect. Lazy import of the fallback patch module avoids a circular
-    dependency at package import time.
+    takes effect. The lazy import of the fallback patch module avoids a
+    circular dependency at package import time.
     """
     global _active_cfg
     _active_cfg = cfg

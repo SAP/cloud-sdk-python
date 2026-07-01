@@ -28,8 +28,10 @@ The two patches share the monkeypatch slot. :func:`_install_fallback`
 installs this subclass (which still does filtering thanks to inheritance);
 clearing fallback restores the filtering-only class (or the original) by
 calling :func:`sap_cloud_sdk.aicore.filtering._patch._install` with the
-filtering side's current state — that path knows nothing about fallback,
-so the filtering module never imports this one. Idempotent.
+filtering side's current state. Filtering's ``_install`` cooperates by
+deferring to fallback when :data:`_active_fallback_cfg` is non-``None``,
+so ``set_filtering`` / ``disable_filtering`` calls while fallback is
+active update filtering state without clobbering our class. Idempotent.
 """
 
 from __future__ import annotations

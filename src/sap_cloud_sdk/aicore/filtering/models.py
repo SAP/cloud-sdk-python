@@ -10,7 +10,7 @@ This module owns the public type vocabulary:
 
 Each class exposes ``to_dict()`` for serialisation to the v2 ``modules.filtering``
 wire format. Env-var loading lives in :mod:`.config`; the LiteLLM transport
-patch lives in :mod:`._patch`; public entry points live in :mod:`._api`.
+patch lives in :mod:`._patch`; public entry points live in :mod:`.filters`.
 """
 
 from __future__ import annotations

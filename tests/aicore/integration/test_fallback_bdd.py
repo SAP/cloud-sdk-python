@@ -22,14 +22,13 @@ from __future__ import annotations
 from typing import Any, Optional
 
 import pytest
-from litellm import completion
 from pytest_bdd import given, scenarios, then, when
 
 from sap_cloud_sdk.aicore import (
     ContentFilteredError,
     FallbackConfig,
     FallbackModel,
-    extract_filter_blocked,
+    completion,
     set_fallbacks,
     set_filtering,
 )
@@ -92,7 +91,12 @@ def filtering_default():
 
 
 def _capture_completion(ctx: ScenarioContext, model: str, prompt: str) -> None:
-    """Send a non-streaming completion and capture the response or error."""
+    """Send a non-streaming completion and capture the response or error.
+
+    Uses ``sap_cloud_sdk.aicore.completion`` so that input- and output-filter
+    rejections both surface as :class:`ContentFilteredError` — no wrapper
+    unwrapping is needed here.
+    """
     try:
         ctx.response = completion(
             model=model,
@@ -101,11 +105,7 @@ def _capture_completion(ctx: ScenarioContext, model: str, prompt: str) -> None:
     except ContentFilteredError as e:
         ctx.error = e
     except Exception as e:
-        # LiteLLM may wrap input-filter rejections in APIConnectionError.
-        if blocked := extract_filter_blocked(e):
-            ctx.error = blocked
-        else:
-            ctx.error = e
+        ctx.error = e
 
 
 @when("I send a benign prompt to the fallback test model")

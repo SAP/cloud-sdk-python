@@ -10,20 +10,22 @@ See :mod:`sap_cloud_sdk.aicore` user guide for the documented public API.
 
 Internal layout:
 
-- :mod:`._models` — public dataclasses (``Severity``, ``ContentFilter``,
+- :mod:`.models` — public dataclasses (``Severity``, ``ContentFilter``,
   ``AzureContentFilter``, ``LlamaGuard38bFilter``, ``InputFiltering``,
   ``OutputFiltering``, ``ContentFiltering``).
 - :mod:`.config` — ``load_from_env`` + private env helpers.
 - :mod:`._patch` — LiteLLM transport monkeypatch + ``_install``.
-- :mod:`._api` — public entry points (``set_filtering``, ``disable_filtering``,
-  ``extract_filter_blocked``).
+- :mod:`.filters` — public entry points (``set_filtering``, ``disable_filtering``).
 - :mod:`.exceptions` — error types.
 """
 
 from __future__ import annotations
 
-from ._api import disable_filtering, extract_filter_blocked, set_filtering
-from ._models import (
+from .filters import (
+    disable_filtering,
+    set_filtering,
+)
+from .models import (
     AzureContentFilter,
     ContentFilter,
     ContentFiltering,
@@ -46,5 +48,4 @@ __all__ = [
     "Severity",
     "ContentFilteredError",
     "OrchestrationError",
-    "extract_filter_blocked",
 ]

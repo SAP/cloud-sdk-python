@@ -24,7 +24,7 @@ from sap_cloud_sdk.aicore.fallback._patch import (
     _install_fallback,
 )
 from sap_cloud_sdk.aicore.fallback.fallback import FallbackConfig, FallbackModel
-from sap_cloud_sdk.aicore.filtering._models import (
+from sap_cloud_sdk.aicore.filtering.models import (
     AzureContentFilter,
     ContentFiltering,
     InputFiltering,

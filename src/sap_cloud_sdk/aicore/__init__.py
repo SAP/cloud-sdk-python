@@ -14,6 +14,7 @@ from sap_cloud_sdk.core.telemetry.metrics_decorator import record_metrics
 from sap_cloud_sdk.core.telemetry.module import Module
 from sap_cloud_sdk.core.telemetry.operation import Operation
 from .completion import acompletion, completion
+from .fallback import FallbackConfig, FallbackModel, set_fallbacks
 from .filtering import (
     AzureContentFilter,
     ContentFilter,
@@ -134,6 +135,11 @@ def set_aicore_config(instance_name: str = "aicore-instance") -> None:
     call :func:`set_filtering` afterward. Use :func:`disable_filtering`
     to turn filtering off at runtime, or set ``AICORE_FILTER_ENABLED=false``
     to keep it off entirely.
+
+    Model fallback is **opt-in** and is NOT activated by this function. To
+    enable it, call :func:`set_fallbacks` programmatically (or set
+    ``AICORE_FALLBACK_ENABLED=true`` and any of ``AICORE_FALLBACK_MODELS`` /
+    ``AICORE_FALLBACK_CONFIG`` and call ``set_fallbacks()`` with no args).
     """
     # Load secrets
     client_id = _get_secret("AICORE_CLIENT_ID", "clientid", instance_name=instance_name)
@@ -190,4 +196,7 @@ __all__ = [
     "Severity",
     "ContentFilteredError",
     "OrchestrationError",
+    "set_fallbacks",
+    "FallbackConfig",
+    "FallbackModel",
 ]

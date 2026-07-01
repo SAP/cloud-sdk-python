@@ -163,9 +163,33 @@ def _install(cfg: Any) -> None:  # cfg: ContentFiltering | None
     """Patch litellm.GenAIHubOrchestrationConfig. Idempotent.
 
     cfg=None restores the original config and disables filtering.
+
+    When the model-fallback module has an active config installed, this
+    function only updates ``_active_cfg`` and leaves the installed class
+    (:class:`sap_cloud_sdk.aicore.fallback._patch.OrchestrationPatchConfig`)
+    in place — that class inherits from :class:`FilteringOrchestrationConfig`
+    and reads ``_active_cfg`` at request time, so the filtering toggle still
+    takes effect. The lazy import of the fallback patch module avoids a
+    circular dependency at package import time.
     """
     global _active_cfg
     _active_cfg = cfg
+
+    # Defer to fallback when it has installed its own subclass — clobbering
+    # the class here would silently disable model fallback.
+    try:
+        from ..fallback._patch import _active_fallback_cfg
+    except ImportError:
+        _active_fallback_cfg = None
+    if _active_fallback_cfg is not None:
+        if cfg is None:
+            logger.debug("content filtering disabled (fallback patch still installed)")
+        else:
+            logger.info(
+                "content filtering active (delegated through OrchestrationPatchConfig)"
+            )
+        return
+
     if cfg is None:
         litellm.GenAIHubOrchestrationConfig = _ORIGINAL_CONFIG
         logger.debug("content filtering disabled")

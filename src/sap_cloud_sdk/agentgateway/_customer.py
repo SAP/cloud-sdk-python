@@ -584,7 +584,7 @@ async def call_mcp_tool_customer(
                     first = result.content[0]
                     return str(getattr(first, "text", ""))
     except Exception:
-        logger.error(
+        logger.exception(
             "MCP tool call failed for '%s' (x-correlation-id: %s)",
             tool.name,
             correlation_id or "unknown",

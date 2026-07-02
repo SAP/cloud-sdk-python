@@ -351,7 +351,6 @@ class AgentGatewayClient:
             ```
         """
         try:
-            f = filter or MCPToolFilter()
             # Check for customer agent credentials
             credentials_path = detect_customer_agent_credentials()
             if credentials_path:
@@ -367,8 +366,7 @@ class AgentGatewayClient:
                     credentials,
                     auth.access_token,
                     self._config.timeout,
-                    names=f.names or None,
-                    ord_ids=f.ord_ids or None,
+                    filter=filter,
                 )
 
             # LoB flow - requires tenant_subdomain
@@ -384,8 +382,7 @@ class AgentGatewayClient:
                 tenant,
                 auth.access_token,
                 self._config.timeout,
-                names=f.names or None,
-                ord_ids=f.ord_ids or None,
+                filter=filter,
             )
 
         except AgentGatewaySDKError:

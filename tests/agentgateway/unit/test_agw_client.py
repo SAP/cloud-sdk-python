@@ -433,7 +433,7 @@ class TestListMcpTools:
             await agw_client.list_mcp_tools()
 
             mock_lob.assert_called_once_with(
-                "my-tenant", "system-token", 60.0, names=None, ord_ids=None
+                "my-tenant", "system-token", 60.0, filter=None
             )
 
     @pytest.mark.asyncio
@@ -460,7 +460,7 @@ class TestListMcpTools:
             await agw_client.list_mcp_tools()
 
             mock_lob.assert_called_once_with(
-                "my-tenant", "system-token-xyz", 60.0, names=None, ord_ids=None
+                "my-tenant", "system-token-xyz", 60.0, filter=None
             )
 
     @pytest.mark.asyncio
@@ -526,7 +526,7 @@ class TestListMcpTools:
             await agw_client.list_mcp_tools(app_tid="tid")
 
             mock_customer.assert_called_once_with(
-                mock_creds, "customer-system-token", 60.0, names=None, ord_ids=None
+                mock_creds, "customer-system-token", 60.0, filter=None
             )
 
     @pytest.mark.asyncio
@@ -554,7 +554,7 @@ class TestListMcpTools:
 
             mock_user_auth.assert_called_once()
             mock_lob.assert_called_once_with(
-                "my-tenant", "user-token-xyz", 60.0, names=None, ord_ids=None
+                "my-tenant", "user-token-xyz", 60.0, filter=None
             )
 
     @pytest.mark.asyncio
@@ -582,12 +582,12 @@ class TestListMcpTools:
             await agw_client.list_mcp_tools(user_token="user-jwt", app_tid="tid")
 
             mock_customer.assert_called_once_with(
-                mock_creds, "exchanged-user-token", 60.0, names=None, ord_ids=None
+                mock_creds, "exchanged-user-token", 60.0, filter=None
             )
 
     @pytest.mark.asyncio
     async def test_passes_filter_arguments_lob(self):
-        """Pass names and ord_ids from MCPToolFilter through to get_mcp_tools_lob."""
+        """Pass the MCPToolFilter object through to get_mcp_tools_lob."""
         with (
             patch(
                 "sap_cloud_sdk.agentgateway.agw_client.detect_customer_agent_credentials",
@@ -605,24 +605,22 @@ class TestListMcpTools:
             ) as mock_lob,
         ):
             agw_client = create_client(tenant_subdomain="my-tenant")
-            await agw_client.list_mcp_tools(
-                filter=MCPToolFilter(
-                    names=["get-sales-order"],
-                    ord_ids=["sap.s4:apiAccess:salesOrder:v1"],
-                )
+            f = MCPToolFilter(
+                names=["get-sales-order"],
+                ord_ids=["sap.s4:apiAccess:salesOrder:v1"],
             )
+            await agw_client.list_mcp_tools(filter=f)
 
         mock_lob.assert_called_once_with(
             "my-tenant",
             "token",
             60.0,
-            names=["get-sales-order"],
-            ord_ids=["sap.s4:apiAccess:salesOrder:v1"],
+            filter=f,
         )
 
     @pytest.mark.asyncio
-    async def test_empty_filter_lists_pass_none_to_lob(self):
-        """MCPToolFilter() with empty lists should forward as None, None to the fetch helper."""
+    async def test_empty_filter_passes_through_to_lob(self):
+        """MCPToolFilter() with empty lists is still passed through as-is."""
         with (
             patch(
                 "sap_cloud_sdk.agentgateway.agw_client.detect_customer_agent_credentials",
@@ -640,15 +638,16 @@ class TestListMcpTools:
             ) as mock_lob,
         ):
             agw_client = create_client(tenant_subdomain="my-tenant")
-            await agw_client.list_mcp_tools(filter=MCPToolFilter())
+            f = MCPToolFilter()
+            await agw_client.list_mcp_tools(filter=f)
 
         mock_lob.assert_called_once_with(
-            "my-tenant", "token", 60.0, names=None, ord_ids=None
+            "my-tenant", "token", 60.0, filter=f
         )
 
     @pytest.mark.asyncio
     async def test_passes_filter_arguments_customer(self):
-        """Pass names and ord_ids from MCPToolFilter through to get_mcp_tools_customer."""
+        """Pass the MCPToolFilter object through to get_mcp_tools_customer."""
         with (
             patch(
                 "sap_cloud_sdk.agentgateway.agw_client.detect_customer_agent_credentials",
@@ -672,19 +671,17 @@ class TestListMcpTools:
             mock_load.return_value = mock_creds
 
             agw_client = create_client()
-            await agw_client.list_mcp_tools(
-                filter=MCPToolFilter(
-                    names=["get-cost-center"],
-                    ord_ids=["sap.s4:apiAccess:finance:v1"],
-                )
+            f = MCPToolFilter(
+                names=["get-cost-center"],
+                ord_ids=["sap.s4:apiAccess:finance:v1"],
             )
+            await agw_client.list_mcp_tools(filter=f)
 
         mock_customer.assert_called_once_with(
             mock_creds,
             "customer-system-token",
             60.0,
-            names=["get-cost-center"],
-            ord_ids=["sap.s4:apiAccess:finance:v1"],
+            filter=f,
         )
 
 

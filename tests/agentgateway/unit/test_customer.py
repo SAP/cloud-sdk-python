@@ -20,6 +20,7 @@ from sap_cloud_sdk.agentgateway._models import (
     CustomerCredentials,
     IntegrationDependency,
     MCPTool,
+    MCPToolFilter,
 )
 from sap_cloud_sdk.agentgateway._token_cache import _TokenCache
 from sap_cloud_sdk.agentgateway.config import ClientConfig
@@ -651,7 +652,9 @@ class TestGetMcpToolsCustomer:
                 credentials,
                 "system-token",
                 60.0,
-                ord_ids=["sap.mcpbuilder:apiResource:cost-center:v1"],
+                filter=MCPToolFilter(
+                    ord_ids=["sap.mcpbuilder:apiResource:cost-center:v1"]
+                ),
             )
 
         # Only the cost-center dependency was queried; finance was filtered out.
@@ -687,14 +690,14 @@ class TestGetMcpToolsCustomer:
                 credentials,
                 "system-token",
                 60.0,
-                names=["list_cost_centers"],
+                filter=MCPToolFilter(names=["list_cost_centers"]),
             )
 
         assert [t.name for t in result] == ["list_cost_centers"]
 
     @pytest.mark.asyncio
     async def test_empty_filter_lists_behave_like_none(self, credentials):
-        """names=[] and ord_ids=[] should behave the same as None (no filtering)."""
+        """MCPToolFilter() with empty lists behaves like no filter (returns everything)."""
         tool = MCPTool(
             name="list_cost_centers",
             server_name="s",
@@ -711,7 +714,7 @@ class TestGetMcpToolsCustomer:
             ),
         ):
             result = await get_mcp_tools_customer(
-                credentials, "system-token", 60.0, names=[], ord_ids=[]
+                credentials, "system-token", 60.0, filter=MCPToolFilter()
             )
 
         assert [t.name for t in result] == ["list_cost_centers"]
@@ -737,7 +740,10 @@ class TestGetMcpToolsCustomer:
             ) as mock_list,
         ):
             result = await get_mcp_tools_customer(
-                credentials, "system-token", 60.0, ord_ids=["sap.does-not-exist:v1"]
+                credentials,
+                "system-token",
+                60.0,
+                filter=MCPToolFilter(ord_ids=["sap.does-not-exist:v1"]),
             )
 
         # Filter excluded everything -> empty list, no exception, no network call.

@@ -24,7 +24,7 @@ from sap_cloud_sdk.agentgateway._lob import (
     _fetch_agent_card,
     call_mcp_tool_lob,
 )
-from sap_cloud_sdk.agentgateway._models import Agent, AgentCard, MCPTool
+from sap_cloud_sdk.agentgateway._models import Agent, AgentCard, MCPTool, MCPToolFilter
 from sap_cloud_sdk.agentgateway._token_cache import _GatewayUrlCache, _TokenCache
 from sap_cloud_sdk.agentgateway.config import ClientConfig
 from sap_cloud_sdk.agentgateway.exceptions import AgentGatewaySDKError, MCPServerNotFoundError
@@ -633,7 +633,7 @@ class TestGetMcpToolsLob:
                 "tenant-sub",
                 "system-token",
                 60.0,
-                ord_ids=["sap.s4:apiAccess:salesOrder:v1"],
+                filter=MCPToolFilter(ord_ids=["sap.s4:apiAccess:salesOrder:v1"]),
             )
 
         assert mock_tools.call_count == 1
@@ -680,7 +680,7 @@ class TestGetMcpToolsLob:
                 "tenant-sub",
                 "system-token",
                 60.0,
-                names=["get-sales-order"],
+                filter=MCPToolFilter(names=["get-sales-order"]),
             )
 
         assert [t.name for t in result] == ["get-sales-order"]
@@ -736,15 +736,17 @@ class TestGetMcpToolsLob:
                 "tenant-sub",
                 "system-token",
                 60.0,
-                names=["get-sales-order"],
-                ord_ids=["sap.s4:apiAccess:finance:v1"],
+                filter=MCPToolFilter(
+                    names=["get-sales-order"],
+                    ord_ids=["sap.s4:apiAccess:finance:v1"],
+                ),
             )
 
             assert result == []
 
     @pytest.mark.asyncio
     async def test_empty_filter_lists_behave_like_none(self):
-        """names=[] and ord_ids=[] should behave the same as None (no filtering)."""
+        """MCPToolFilter() with empty lists behaves like no filter (returns everything)."""
         frag = MagicMock()
         frag.name = "frag"
         frag.properties = {
@@ -770,7 +772,7 @@ class TestGetMcpToolsLob:
             mock_list.return_value = [frag]
 
             result = await get_mcp_tools_lob(
-                "tenant-sub", "system-token", 60.0, names=[], ord_ids=[]
+                "tenant-sub", "system-token", 60.0, filter=MCPToolFilter()
             )
 
             assert [t.name for t in result] == ["get-sales-order"]

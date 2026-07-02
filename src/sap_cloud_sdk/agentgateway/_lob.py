@@ -27,7 +27,7 @@ from sap_cloud_sdk.agentgateway._fragments import (
     list_mcp_fragments,
     list_a2a_fragments,
 )
-from sap_cloud_sdk.agentgateway._models import Agent, AgentCard, MCPTool
+from sap_cloud_sdk.agentgateway._models import Agent, AgentCard, MCPTool, MCPToolFilter
 from sap_cloud_sdk.agentgateway._token_cache import _GatewayUrlCache, _TokenCache
 from sap_cloud_sdk.agentgateway.exceptions import (
     AgentGatewaySDKError,
@@ -308,8 +308,7 @@ async def get_mcp_tools_lob(
     tenant_subdomain: str,
     system_token: str,
     timeout: float,
-    names: list[str] | None = None,
-    ord_ids: list[str] | None = None,
+    filter: MCPToolFilter | None = None,
 ) -> list[MCPTool]:
     """List all MCP tools using LoB flow (destination-based).
 
@@ -319,16 +318,13 @@ async def get_mcp_tools_lob(
         tenant_subdomain: Tenant subdomain for multi-tenant lookup.
         system_token: Pre-fetched raw system token (from get_system_auth).
         timeout: HTTP timeout in seconds for MCP server calls.
-        names: Optional list of tool names to include (matched against
-            MCPTool.name). Applied after fetching. If empty or None, all
-            are included.
-        ord_ids: Optional list of ORD IDs to include (extracted from the
-            fragment URL). Applied before fetching. If empty or None, all
-            are included.
+        filter: Optional MCPToolFilter narrowing results by tool name or ORD ID.
+            If None or empty, all tools are included.
 
     Returns:
         List of MCPTool objects from all MCP servers.
     """
+    f = filter or MCPToolFilter()
     tools: list[MCPTool] = []
     loop = asyncio.get_running_loop()
 
@@ -343,13 +339,13 @@ async def get_mcp_tools_lob(
         return tools
 
     # Pre-fetch filter: ORD ID is extractable from the URL without fetching tools
-    if ord_ids:
-        ord_ids_set = set(ord_ids)
+    if f.ord_ids:
+        ord_ids_set = set(f.ord_ids)
         fragments = [
-            f
-            for f in fragments
+            fr
+            for fr in fragments
             if _ord_id_from_url(
-                f.properties.get("URL") or f.properties.get("url") or ""
+                fr.properties.get("URL") or fr.properties.get("url") or ""
             )
             in ord_ids_set
         ]
@@ -381,8 +377,8 @@ async def get_mcp_tools_lob(
             )
 
     # Post-fetch filter: tool names are only known after fetching
-    if names:
-        names_set = set(names)
+    if f.names:
+        names_set = set(f.names)
         tools = [t for t in tools if t.name in names_set]
 
     logger.info("Loaded %d MCP tool(s) from %d fragment(s)", len(tools), len(fragments))

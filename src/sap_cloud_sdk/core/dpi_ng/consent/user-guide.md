@@ -68,6 +68,17 @@ with create_client(config=config) as client:
         print(c.consent_id, c.lifecycle_status_code)
 ```
 
+**`ConsentSDKConfig` parameters:**
+
+| Parameter | Required | Default | Description |
+|---|---|---|---|
+| `base_url` | Yes | — | URL of the DPI external service router (e.g. `https://api.service.<region>.ngdpi.dpp.cloud.sap`). Found in the credentials of the `data-privacy-integration` service instance. |
+| `auth` | Yes | — | Authentication strategy — one of `BearerTokenAuth`, `ClientCredentialsAuth`, or `ClientCertificateAuth`. |
+| `timeout` | No | `30.0` | HTTP request timeout in seconds. |
+| `verify_ssl` | No | `True` | Verify TLS certificates. Set `False` only in local dev. Overridden by `ClientCertificateAuth` when a custom `ca_file` is provided. |
+| `service_path` | No | `/sap/cp/kernel/dpi/consent/odata/v4` | Base path the DPI external service router uses to forward requests. Do not override unless deploying to a non-standard environment. |
+| `tenant_id` | Required for `ClientCertificateAuth`; **must not be set** for others | `None` | Tenant identifier sent as the `x-tenant-id` header. Required for mTLS because the handshake does not carry a tenant claim. Raises `ValueError` if provided with `BearerTokenAuth` or `ClientCredentialsAuth`. |
+
 ## Authentication
 
 The SDK supports three authentication strategies. Pass one as the `auth`
@@ -151,16 +162,9 @@ config = ConsentSDKConfig(
 | `cert_file` | Yes | Path to the PEM-encoded client certificate file. |
 | `key_file` | Yes | Path to the PEM-encoded private key file. |
 | `ca_file` | No | Path to a custom CA bundle. Omit to use the system trust store. |
-| `tenant_id` | Yes (with mTLS) | Tenant identifier sent as the `x-tenant-id` header on every request. |
 
 Passing an empty string for `cert_file` or `key_file` raises
 `ValueError: cert_file and key_file are required`.
-
-`tenant_id` is **required** with `ClientCertificateAuth`. The mTLS handshake
-does not carry a tenant claim, so the DPI service router needs it to route
-requests to the correct tenant. `tenant_id` is optional for `BearerTokenAuth`
-and `ClientCredentialsAuth` because the bearer token already encodes the tenant
-claim.
 
 ## Client structure
 

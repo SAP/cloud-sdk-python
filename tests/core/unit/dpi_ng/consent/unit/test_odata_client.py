@@ -309,9 +309,7 @@ class TestOrmMethods:
 
 @patch("sap_cloud_sdk.core.dpi_ng.consent.client.requests.Session")
 class TestTenantIdHeader:
-    def test_x_tenant_id_header_set_when_tenant_id_provided(
-        self, mock_session_cls
-    ):
+    def test_x_tenant_id_header_set_when_tenant_id_provided(self, mock_session_cls):
         mock_session = MagicMock()
         mock_session_cls.return_value = mock_session
 
@@ -327,9 +325,7 @@ class TestTenantIdHeader:
             for h in header_updates
         )
 
-    def test_x_tenant_id_header_not_set_when_tenant_id_is_none(
-        self, mock_session_cls
-    ):
+    def test_x_tenant_id_header_not_set_when_tenant_id_is_none(self, mock_session_cls):
         mock_session = MagicMock()
         mock_session_cls.return_value = mock_session
 

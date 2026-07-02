@@ -72,8 +72,8 @@ with create_client(config=config) as client:
 
 | Parameter | Required | Default | Description |
 |---|---|---|---|
-| `base_url` | Yes | — | URL of the DPI external service router (e.g. `https://api.service.<region>.ngdpi.dpp.cloud.sap`). Found in the credentials of the `data-privacy-integration` service instance. |
-| `auth` | Yes | — | Authentication strategy — one of `BearerTokenAuth`, `ClientCredentialsAuth`, or `ClientCertificateAuth`. |
+| `base_url` | Yes | - | URL of the DPI external service router (e.g. `https://api.service.<region>.ngdpi.dpp.cloud.sap`). Found in the credentials of the `data-privacy-integration` service instance. |
+| `auth` | Yes | - | Authentication strategy - one of `BearerTokenAuth`, `ClientCredentialsAuth`, or `ClientCertificateAuth`. |
 | `timeout` | No | `30.0` | HTTP request timeout in seconds. |
 | `verify_ssl` | No | `True` | Verify TLS certificates. Set `False` only in local dev. Overridden by `ClientCertificateAuth` when a custom `ca_file` is provided. |
 | `service_path` | No | `/sap/cp/kernel/dpi/consent/odata/v4` | Base path the DPI external service router uses to forward requests. Do not override unless deploying to a non-standard environment. |
@@ -101,7 +101,7 @@ config = ConsentSDKConfig(
 |---|---|---|
 | `token` | Yes | Bearer token sent as the `Authorization: Bearer` header on every request. |
 
-The token is sent as-is — no automatic refresh is performed. Use
+The token is sent as-is - no automatic refresh is performed. Use
 `ClientCredentialsAuth` for long-running processes where the token may expire.
 Passing an empty string raises `ValueError: token must not be empty`.
 

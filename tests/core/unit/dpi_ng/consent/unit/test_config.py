@@ -1,7 +1,7 @@
 import pytest
 from unittest.mock import MagicMock
 
-from sap_cloud_sdk.core.dpi_ng.consent.auth import AuthProvider
+from sap_cloud_sdk.core.dpi_ng.consent.auth import AuthProvider, ClientCertificateAuth
 from sap_cloud_sdk.core.dpi_ng.consent.config import ConsentSDKConfig
 
 
@@ -81,7 +81,7 @@ class TestCustomValues:
     def test_tenant_id_stored(self):
         cfg = ConsentSDKConfig(
             base_url="https://example.com",
-            auth=valid_auth(),
+            auth=ClientCertificateAuth(cert_file="cert.pem", key_file="key.pem"),
             tenant_id="tenant-abc-123",
         )
         assert cfg.tenant_id == "tenant-abc-123"
@@ -128,3 +128,20 @@ class TestInvalidAuth:
     def test_plain_object_auth_raises(self):
         with pytest.raises(ValueError, match="auth must be an AuthProvider"):
             ConsentSDKConfig(base_url="https://example.com", auth=object())  # ty: ignore[invalid-argument-type]
+
+
+class TestTenantId:
+    def test_cert_auth_without_tenant_id_raises(self):
+        with pytest.raises(ValueError, match="tenant_id is required"):
+            ConsentSDKConfig(
+                base_url="https://example.com",
+                auth=ClientCertificateAuth(cert_file="cert.pem", key_file="key.pem"),
+            )
+
+    def test_non_cert_auth_with_tenant_id_raises(self):
+        with pytest.raises(ValueError, match="tenant_id must not be set"):
+            ConsentSDKConfig(
+                base_url="https://example.com",
+                auth=valid_auth(),
+                tenant_id="tenant-123",
+            )

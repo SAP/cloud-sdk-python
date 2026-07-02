@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from sap_cloud_sdk.core.dpi_ng.consent.auth import AuthProvider
+from sap_cloud_sdk.core.dpi_ng.consent.auth import AuthProvider, ClientCertificateAuth
 from sap_cloud_sdk.core.dpi_ng.consent.client import _ODataClient
 from sap_cloud_sdk.core.dpi_ng.consent.config import ConsentSDKConfig
 from sap_cloud_sdk.core.dpi_ng.consent.exceptions import (
@@ -37,7 +37,7 @@ def _make_config():
 
 
 def _make_config_with_tenant(tenant_id: str):
-    auth = MagicMock(spec=AuthProvider)
+    auth = ClientCertificateAuth(cert_file="cert.pem", key_file="key.pem")
     return ConsentSDKConfig(
         base_url="https://consent.example.com", auth=auth, tenant_id=tenant_id
     )

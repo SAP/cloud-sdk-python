@@ -244,9 +244,23 @@ class _ConfigurationApi:
 
     @record_metrics(Module.ADMS, Operation.ADMS_CONFIG_GET_DOCTYPE_BOTYPE_MAP)
     def get_type_mapping(
-        self, document_type_id: str, business_object_node_type_unique_id: str
+        self,
+        document_type_id: str,
+        business_object_node_type_unique_id: str,
     ) -> DocumentTypeBusinessObjectTypeMap:
-        """Fetch a single DocumentType ↔ BusinessObjectNodeType mapping by its composite key."""
+        """Fetch a single DocumentType ↔ BusinessObjectNodeType mapping by its composite key.
+
+        Args:
+            document_type_id: The ``DocumentTypeID`` half of the composite key.
+            business_object_node_type_unique_id: The ``BusinessObjectNodeTypeUniqueID`` half.
+
+        Note:
+            The ADM ``DocumentTypeBusinessObjectTypeMap`` entity uses a **composite key**
+            (``DocumentTypeID`` + ``BusinessObjectNodeTypeUniqueID``).  The previous
+            single-argument overload used a fabricated ``DocumentTypeBOTypeMapID`` that
+            was never accepted by the service (HTTP 400), so this change is a bug-fix
+            rather than a breaking API change.
+        """
         resp = self._http.get(
             build_doctype_botype_map_key_path(document_type_id, business_object_node_type_unique_id),
             service_base=_CONFIG_SERVICE_PATH,
@@ -254,16 +268,38 @@ class _ConfigurationApi:
         return DocumentTypeBusinessObjectTypeMap.from_dict(resp.json())
 
     @record_metrics(Module.ADMS, Operation.ADMS_CONFIG_DELETE_DOCTYPE_BOTYPE_MAP)
-    def delete_type_mapping(self, document_type_id: str, business_object_node_type_unique_id: str) -> None:
-        """Delete a DocumentType ↔ BusinessObjectNodeType mapping."""
+    def delete_type_mapping(
+        self,
+        document_type_id: str,
+        business_object_node_type_unique_id: str,
+    ) -> None:
+        """Delete a DocumentType ↔ BusinessObjectNodeType mapping by its composite key.
+
+        Args:
+            document_type_id: The ``DocumentTypeID`` half of the composite key.
+            business_object_node_type_unique_id: The ``BusinessObjectNodeTypeUniqueID`` half.
+
+        Note:
+            Same composite-key fix as :meth:`get_type_mapping` — the previous single-argument
+            overload used a non-existent ``DocumentTypeBOTypeMapID`` field.
+        """
         self._http.delete(
             build_doctype_botype_map_key_path(document_type_id, business_object_node_type_unique_id),
             service_base=_CONFIG_SERVICE_PATH,
         )
 
     @record_metrics(Module.ADMS, Operation.ADMS_CONFIG_MARK_DEFAULT)
-    def mark_default(self, document_type_id: str, business_object_node_type_unique_id: str) -> None:
-        """Mark a DocumentType ↔ BusinessObjectNodeType mapping as the default."""
+    def mark_default(
+        self,
+        document_type_id: str,
+        business_object_node_type_unique_id: str,
+    ) -> None:
+        """Mark a DocumentType ↔ BusinessObjectNodeType mapping as the default.
+
+        Args:
+            document_type_id: The ``DocumentTypeID`` half of the composite key.
+            business_object_node_type_unique_id: The ``BusinessObjectNodeTypeUniqueID`` half.
+        """
         self._http.post(
             f"{build_doctype_botype_map_key_path(document_type_id, business_object_node_type_unique_id)}/com.sap.adm.ConfigurationService.markDefault",
             json={},

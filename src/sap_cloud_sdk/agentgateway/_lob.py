@@ -383,26 +383,43 @@ async def call_mcp_tool_lob(
     Returns:
         Tool execution result as string.
     """
-    async with httpx.AsyncClient(
-        headers={
-            "Authorization": f"Bearer {user_auth_token}",
-            "x-correlation-id": str(uuid.uuid4()),
-        },
-        timeout=timeout,
-    ) as http_client:
-        async with streamable_http_client(tool.url, http_client=http_client) as (
-            read,
-            write,
-            _,
-        ):
-            async with ClientSession(read, write) as session:
-                await session.initialize()
-                result = await session.call_tool(tool.name, kwargs)
-                if not result.content:
-                    logger.warning("Tool '%s' returned empty content", tool.name)
-                    return ""
-                first = result.content[0]
-                return str(getattr(first, "text", ""))
+    correlation_id: str | None = None
+
+    async def _capture_correlation_id(response: httpx.Response) -> None:
+        nonlocal correlation_id
+        cid = response.headers.get("x-correlation-id")
+        if cid:
+            correlation_id = cid
+
+    try:
+        async with httpx.AsyncClient(
+            headers={
+                "Authorization": f"Bearer {user_auth_token}",
+                "x-correlation-id": str(uuid.uuid4()),
+            },
+            timeout=timeout,
+            event_hooks={"response": [_capture_correlation_id]},
+        ) as http_client:
+            async with streamable_http_client(tool.url, http_client=http_client) as (
+                read,
+                write,
+                _,
+            ):
+                async with ClientSession(read, write) as session:
+                    await session.initialize()
+                    result = await session.call_tool(tool.name, kwargs)
+                    if not result.content:
+                        logger.warning("Tool '%s' returned empty content", tool.name)
+                        return ""
+                    first = result.content[0]
+                    return str(getattr(first, "text", ""))
+    except Exception:
+        logger.error(
+            "MCP tool call failed for '%s' (x-correlation-id: %s)",
+            tool.name,
+            correlation_id or "unknown",
+        )
+        raise
 
 
 async def _fetch_agent_card(

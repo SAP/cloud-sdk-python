@@ -174,7 +174,7 @@ CLOUD_SDK_CFG_DPI_NG_CONSENT_DEFAULT_KEY_FILE=/path/to/client.key
 CLOUD_SDK_CFG_DPI_NG_CONSENT_DEFAULT_CA_FILE=/path/to/ca.crt   # optional
 ```
 
-Tests are skipped automatically when `CLOUD_SDK_CFG_DPI_NG_CONSENT_DEFAULT_BASE_URL` or all auth variables are missing.
+Tests are skipped automatically when `CLOUD_SDK_CFG_DPI_NG_DEFAULT_BASE_URL` or all auth variables are missing.
 
 ### ObjectStore Integration Tests
 

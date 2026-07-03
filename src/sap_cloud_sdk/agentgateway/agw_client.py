@@ -25,6 +25,7 @@ from sap_cloud_sdk.agentgateway._lob import (
     fetch_system_auth,
     fetch_user_auth,
     get_agent_cards_lob,
+    get_ias_client_id_lob,
     get_mcp_tools_lob,
 )
 from sap_cloud_sdk.agentgateway._models import (
@@ -295,9 +296,44 @@ class AgentGatewayClient:
             logger.exception("Unexpected error during user auth exchange")
             raise AgentGatewaySDKError(f"User auth exchange failed: {e}") from e
 
+    @record_metrics(Module.AGENTGATEWAY, Operation.AGENTGATEWAY_GET_IAS_CLIENT_ID)
+    def get_ias_client_id(self) -> str:
+        """Read the IAS client ID.
+
+        Automatically detects agent type (LoB vs Customer) based on
+        credential file presence.
+
+        - Customer agents: Returns ``client_id`` directly from the credentials file.
+        - LoB agents: Fetches the IAS destination
+          (``sap-managed-runtime-ias-{landscape}``) at provider subaccount level
+          and returns the ``clientId`` destination property.
+
+        Returns:
+            The IAS client ID string, or ``""`` if it cannot be resolved.
+
+        Raises:
+            Nothing — failures are caught, logged at WARNING level,
+            and an empty string is returned instead.
+        """
+        try:
+            credentials_path = detect_customer_agent_credentials()
+            if credentials_path:
+                logger.info(
+                    "Customer agent credentials detected at '%s'", credentials_path
+                )
+                credentials = load_customer_credentials(credentials_path)
+                return credentials.client_id
+
+            # LoB flow — read clientId from the IAS destination properties
+            return get_ias_client_id_lob()
+        except Exception:
+            logger.warning(
+                "Could not resolve IAS client ID from destination — clientId will be empty"
+            )
+            return ""
+
     @record_metrics(Module.AGENTGATEWAY, Operation.AGENTGATEWAY_LIST_MCP_TOOLS)
-    async def list_mcp_tools(
-        self,
+    async def list_mcp_tools(        self,
         user_token: str | Callable[[], str] | None = None,
         app_tid: str | None = None,
     ) -> list[MCPTool]:

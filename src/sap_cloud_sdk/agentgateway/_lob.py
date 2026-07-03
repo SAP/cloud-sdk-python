@@ -114,6 +114,34 @@ def _fetch_auth_token(
     return raw_token, gateway_url
 
 
+def get_ias_client_id_lob() -> str:
+    """Read the IAS client ID from the IAS destination properties (LoB flow).
+
+    Fetches the IAS destination (``sap-managed-runtime-ias-{landscape}``)
+    at provider subaccount level and returns the ``clientId`` property.
+
+    Returns:
+        The IAS client ID string, or ``""`` if the destination is not found
+        or the property is absent.
+
+    Raises:
+        EnvironmentError: If ``APPFND_CONHOS_LANDSCAPE`` is not set.
+        Any exception raised by the destination client.
+    """
+    dest_name = _ias_dest_name()
+    client = create_destination_client(instance=_DESTINATION_INSTANCE)
+    dest = client.get_destination(
+        dest_name,
+        level=ConsumptionLevel.PROVIDER_SUBACCOUNT,
+    )
+    if not dest:
+        logger.warning(
+            "IAS destination '%s' not found — clientId will be empty", dest_name
+        )
+        return ""
+    return dest.properties.get("clientId", "")
+
+
 async def fetch_system_auth(
     tenant_subdomain: str,
     token_cache: _TokenCache | None = None,

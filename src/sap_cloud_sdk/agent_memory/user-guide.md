@@ -57,6 +57,16 @@ plain text, and the service makes it searchable by meaning.
     - [`AgentMemoryNotFoundError` when fetching a resource](#agentmemorynotfounderror-when-fetching-a-resource)
     - [`AgentMemoryHttpError` with status 401](#agentmemoryhttperror-with-status-401)
   - [Configuration](#configuration)
+    - [Service Binding](#service-binding)
+      - [Mounted Secrets (Kubernetes)](#mounted-secrets-kubernetes)
+      - [Environment Variables](#environment-variables)
+      - [UAA JSON Schema](#uaa-json-schema)
+  - [LangGraph Checkpointer](#langgraph-checkpointer)
+    - [Prerequisites](#prerequisites)
+    - [Import](#import-1)
+    - [Usage with LangGraph StateGraph](#usage-with-langgraph-stategraph)
+    - [Usage with LangChain create\_agent](#usage-with-langchain-create_agent)
+    - [Local development](#local-development)
 
 ## Installation
 
@@ -805,4 +815,64 @@ The `uaa` key must contain a JSON string with the XSUAA credentials:
   "clientsecret": "xxx",
   "url": "https://subdomain.authentication.region.hana.ondemand.com"
 }
+```
+
+## LangGraph Checkpointer
+
+> **Framework adapter — optional.** This section covers the LangGraph-specific
+> factory for short-term memory (checkpointing). It is only relevant if your agent
+> is built with LangGraph or LangChain's `create_agent()`. The core
+> `AgentMemoryClient` and `create_client()` above are framework-agnostic and work
+> independently of this section.
+
+For LangGraph agents, the `agent_memory` module provides a `create_checkpointer()`
+factory in the `factory` subpackage. It returns a `BaseCheckpointSaver` that
+manages short-term session memory — conversation state, thread continuity, and
+HITL support — natively within LangGraph.
+
+> [!NOTE]
+> The current implementation uses LangGraph's `InMemorySaver`. State is held
+> in-process and does not survive restarts. Persistent checkpointing backed by
+> the Agent Memory Service is not yet supported.
+
+### Prerequisites
+
+`langgraph` must be installed. The SDK does not declare it as a dependency —
+you control your own LangGraph version.
+
+```bash
+pip install langgraph
+```
+
+### Import
+
+```python
+from sap_cloud_sdk.agent_memory.factory.langgraph_checkpoint import create_checkpointer
+```
+
+### Usage with LangGraph StateGraph
+
+```python
+from sap_cloud_sdk.agent_memory.factory.langgraph_checkpoint import create_checkpointer
+
+checkpointer = create_checkpointer()
+app = workflow.compile(checkpointer=checkpointer)
+
+result = app.invoke(
+    {"messages": [{"role": "user", "content": "hello"}]},
+    {"configurable": {"thread_id": "session-1"}},
+)
+```
+
+### Usage with LangChain create_agent
+
+```python
+from langchain.agents import create_agent
+from sap_cloud_sdk.agent_memory.factory.langgraph_checkpoint import create_checkpointer
+
+agent = create_agent(
+    model="...",
+    tools=[...],
+    checkpointer=create_checkpointer(),
+)
 ```

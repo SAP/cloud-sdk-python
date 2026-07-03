@@ -28,6 +28,7 @@ from sap_cloud_sdk.agentgateway._models import Agent, AgentCard, MCPTool
 from sap_cloud_sdk.agentgateway._token_cache import _GatewayUrlCache, _TokenCache
 from sap_cloud_sdk.agentgateway.config import ClientConfig
 from sap_cloud_sdk.agentgateway.exceptions import AgentGatewaySDKError, MCPServerNotFoundError
+from sap_cloud_sdk.core.telemetry import Module
 from sap_cloud_sdk.destination import ConsumptionLevel
 
 # Aliases for use in existing test assertions
@@ -213,7 +214,10 @@ class TestListMcpFragments:
 
             list_mcp_fragments("tenant-sub")
 
-            mock_client.assert_called_once_with(instance="default")
+            mock_client.assert_called_once_with(
+                instance="default",
+                _telemetry_source=Module.AGENTGATEWAY,
+            )
             call_args = mock_client.return_value.list_instance_fragments.call_args
             filter_opt = call_args.kwargs.get("filter")
             assert filter_opt is not None
@@ -1011,3 +1015,31 @@ class TestGetAgentCardsLob:
 
         assert len(result) == 1
         assert result[0].ord_id == "ord-ok"
+
+
+# ============================================================
+# Test: _fetch_auth_token passes source kwarg to the destination factory
+# ============================================================
+
+
+class TestFetchAuthTokenTelemetrySource:
+    """Verify _fetch_auth_token calls create_destination_client with
+    _telemetry_source=Module.AGENTGATEWAY (call site: agentgateway/_lob.py:92)."""
+
+    def test_passes_agentgateway_as_source(self):
+        mock_dest = MagicMock()
+        mock_dest.auth_tokens = [MagicMock()]
+        mock_dest.auth_tokens[0].http_header = {"value": "Bearer x"}
+        mock_dest.url = "https://agw.example.com"
+
+        with patch(
+            "sap_cloud_sdk.agentgateway._lob.create_destination_client"
+        ) as mock_client:
+            mock_client.return_value.get_destination.return_value = mock_dest
+
+            _fetch_auth_token("dest-name", "tenant-sub")
+
+            mock_client.assert_called_once_with(
+                instance="default",
+                _telemetry_source=Module.AGENTGATEWAY,
+            )

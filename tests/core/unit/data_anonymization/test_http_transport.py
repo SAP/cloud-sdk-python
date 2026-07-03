@@ -262,12 +262,12 @@ class TestHttpTransport:
         monkeypatch.setattr(
             destination_module,
             "create_client",
-            lambda: destination_client,
+            lambda **_: destination_client,
         )
         monkeypatch.setattr(
             destination_module,
             "create_certificate_client",
-            lambda: cert_client,
+            lambda **_: cert_client,
         )
 
         transport = object.__new__(HttpTransport)
@@ -312,11 +312,11 @@ class TestHttpTransport:
         cert_client = types.SimpleNamespace(
             get_instance_certificate=lambda name: certificate
         )
-        monkeypatch.setattr(destination_module, "create_client", lambda: destination_client)
+        monkeypatch.setattr(destination_module, "create_client", lambda **_: destination_client)
         monkeypatch.setattr(
             destination_module,
             "create_certificate_client",
-            lambda: cert_client,
+            lambda **_: cert_client,
         )
 
         transport = object.__new__(HttpTransport)

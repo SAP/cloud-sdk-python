@@ -333,7 +333,8 @@ class AgentGatewayClient:
             return ""
 
     @record_metrics(Module.AGENTGATEWAY, Operation.AGENTGATEWAY_LIST_MCP_TOOLS)
-    async def list_mcp_tools(        self,
+    async def list_mcp_tools(
+        self,
         user_token: str | Callable[[], str] | None = None,
         app_tid: str | None = None,
     ) -> list[MCPTool]:

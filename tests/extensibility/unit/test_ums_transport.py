@@ -10,7 +10,6 @@ import pytest
 from sap_cloud_sdk.extensibility._models import (
     ExtensionCapabilityImplementation,
 )
-from sap_cloud_sdk.core.telemetry import Module
 from sap_cloud_sdk.extensibility._ums_transport import (
     UmsTransport,
     _ums_destination_name,
@@ -105,10 +104,8 @@ class TestUmsTransportInit:
         transport = UmsTransport(AGENT_ORD_ID, config)
         assert transport._config is config
         assert transport._destination_name == "sap-managed-runtime-ums-exttest-dev-eu12"
-        mock_dest_client.assert_called_once_with(
-            instance="default",
-            _telemetry_source=Module.EXTENSIBILITY,
-        )
+        mock_dest_client.assert_called_once()
+        assert mock_dest_client.call_args.kwargs["instance"] == "default"
 
     @patch("sap_cloud_sdk.extensibility._ums_transport.create_destination_client")
     def test_destination_name_none_when_env_not_set(

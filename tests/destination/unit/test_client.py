@@ -2174,3 +2174,47 @@ class TestDestinationClientLabels:
 
         _, kwargs = mock_http.patch.call_args
         assert kwargs["tenant_subdomain"] is None
+
+
+_RESOLVER_PATCH = "sap_cloud_sdk.core.secret_resolver.read_from_mount_and_fallback_to_env_var"
+
+
+class TestGetServiceInstanceId:
+    """Tests for DestinationClient.get_service_instance_id()."""
+
+    @patch(_RESOLVER_PATCH)
+    def test_returns_instanceid_on_success(self, mock_read):
+        def fill_instanceid(*args, **kwargs):
+            kwargs["target"].instanceid = "my-instance-id"
+
+        mock_read.side_effect = fill_instanceid
+        client = DestinationClient(MagicMock())
+
+        result = client.get_service_instance_id()
+
+        assert result == "my-instance-id"
+        mock_read.assert_called_once_with(
+            base_volume_mount="/etc/secrets/appfnd",
+            base_var_name="CLOUD_SDK_CFG",
+            module="destination",
+            instance="default",
+            target=mock_read.call_args[1]["target"],
+        )
+
+    @patch(_RESOLVER_PATCH, side_effect=RuntimeError("mount failed"))
+    def test_returns_empty_string_on_exception(self, _mock_read):
+        client = DestinationClient(MagicMock())
+
+        result = client.get_service_instance_id()
+
+        assert result == ""
+
+    @patch(_RESOLVER_PATCH, side_effect=RuntimeError("mount failed"))
+    def test_logs_warning_on_exception(self, _mock_read):
+        client = DestinationClient(MagicMock())
+
+        with patch("sap_cloud_sdk.destination.client.logger") as mock_logger:
+            client.get_service_instance_id()
+
+        mock_logger.warning.assert_called_once()
+        assert "instanceId" in mock_logger.warning.call_args[0][0]

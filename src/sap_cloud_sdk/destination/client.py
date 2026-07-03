@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import warnings
 from typing import List, Optional, Callable, TypeVar
 
@@ -18,6 +19,7 @@ from sap_cloud_sdk.destination._models import (
     PatchLabels,
     TransparentProxy,
     TransparentProxyDestination,
+    _DestinationInstanceConfig,
 )
 from sap_cloud_sdk.destination.config import load_transparent_proxy
 from sap_cloud_sdk.destination.exceptions import (
@@ -30,6 +32,8 @@ from sap_cloud_sdk.destination.utils._pagination import (
 )
 
 T = TypeVar("T")
+
+logger = logging.getLogger(__name__)
 
 _SUBACCOUNT_COLLECTION = "subaccountDestinations"
 _INSTANCE_COLLECTION = "instanceDestinations"
@@ -664,6 +668,41 @@ class DestinationClient:
             raise DestinationOperationError(
                 f"failed to patch labels for destination '{name}': {e}"
             )
+
+    @record_metrics(Module.DESTINATION, Operation.DESTINATION_GET_SERVICE_INSTANCE_ID)
+    def get_service_instance_id(self) -> str:
+        """Read the destination service instance ID from mounted secrets.
+
+        Resolves ``instanceid`` via the common secret resolver
+        (base mount ``/etc/secrets/appfnd``, env var prefix ``CLOUD_SDK_CFG``,
+        module ``destination``, instance ``default``).
+
+        Returns:
+            The instance ID string, or ``""`` if the secret cannot be resolved.
+
+        Raises:
+            Nothing — resolution failures are caught, logged at WARNING level,
+            and an empty string is returned instead.
+        """
+        try:
+            from sap_cloud_sdk.core.secret_resolver import (
+                read_from_mount_and_fallback_to_env_var,
+            )
+
+            config = _DestinationInstanceConfig()
+            read_from_mount_and_fallback_to_env_var(
+                base_volume_mount="/etc/secrets/appfnd",
+                base_var_name="CLOUD_SDK_CFG",
+                module="destination",
+                instance="default",
+                target=config,
+            )
+            return config.instanceid
+        except Exception:
+            logger.warning(
+                "Could not resolve destination instance ID from secrets — instanceId will be empty"
+            )
+            return ""
 
     # ---------- Internal helpers ----------
 

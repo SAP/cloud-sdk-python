@@ -27,6 +27,7 @@ class Operation(str, Enum):
     DESTINATION_UPDATE_DESTINATION = "update_destination"
     DESTINATION_DELETE_DESTINATION = "delete_destination"
     DESTINATION_GET_DESTINATION = "get_destination"
+    DESTINATION_GET_SERVICE_INSTANCE_ID = "get_service_instance_id"
 
     # Destination Label Operations
     DESTINATION_GET_LABELS = "get_destination_labels"

@@ -1000,3 +1000,8 @@ class TransparentProxyDestination:
             ```
         """
         self.headers[header.value] = value
+
+
+@dataclass
+class _DestinationInstanceConfig:
+    instanceid: str = ""

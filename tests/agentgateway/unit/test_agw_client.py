@@ -1001,8 +1001,9 @@ class TestCreateClientTelemetrySource:
             _telemetry_source=Module.EXTENSIBILITY,
         )
         assert agw_client._telemetry_source is Module.EXTENSIBILITY
-        
-        
+
+
+# ============================================================
 # Test: get_ias_client_id
 # ============================================================
 

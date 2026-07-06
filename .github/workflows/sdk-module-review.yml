@@ -1,0 +1,42 @@
+name: SDK Module Review
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: "PR number to review"
+        required: true
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.draft == false || github.event_name == 'workflow_dispatch'
+    permissions:
+      contents: read
+      pull-requests: write
+      checks: write
+      issues: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Install jq
+        run: sudo apt-get install -y jq
+      - name: Install Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Checkout sibling SDK repo (BDD parity)
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ vars.SIBLING_SDK_REPO }}
+          path: .sibling-sdk
+          token: ${{ secrets.SIBLING_SDK_TOKEN }}
+        continue-on-error: true
+      - name: Run SDK review
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number || inputs.pr_number }}
+          SDK_SIBLING_PATH: ${{ github.workspace }}/.sibling-sdk
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: bash .claude/scripts/orchestrate.sh "$PR_NUMBER"

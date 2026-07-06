@@ -1,0 +1,5 @@
+# Module name aliases across languages.
+# Used by check-bdd.sh to resolve cross-repo feature file location.
+aliases:
+  - python: dms
+    java: documentmanagement

@@ -65,13 +65,9 @@ class ConsentSDKConfig:
         is_cert_auth = isinstance(self.auth, ClientCertificateAuth)
         if is_cert_auth and not self.tenant_id:
             logger.error("tenant_id is required for ClientCertificateAuth")
-            raise ValueError(
-                "tenant_id is required when using ClientCertificateAuth"
-            )
+            raise ValueError("tenant_id is required when using ClientCertificateAuth")
         if not is_cert_auth and self.tenant_id is not None:
-            logger.error(
-                "tenant_id is not applicable for %s", type(self.auth).__name__
-            )
+            logger.error("tenant_id is not applicable for %s", type(self.auth).__name__)
             raise ValueError(
                 f"tenant_id must not be set for {type(self.auth).__name__}; "
                 "it is only valid for ClientCertificateAuth"

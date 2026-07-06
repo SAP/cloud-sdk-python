@@ -36,8 +36,9 @@ from sap_cloud_sdk.agentgateway._models import (
 )
 from sap_cloud_sdk.agentgateway._token_cache import _GatewayUrlCache, _TokenCache
 from sap_cloud_sdk.agentgateway.exceptions import AgentGatewaySDKError
+import sap_cloud_sdk.core.auditlog_ng as auditlog_ng
 from sap_cloud_sdk.core.auditlog_ng import AuditClient
-from sap_cloud_sdk.core.telemetry import Module, Operation, record_metrics
+from sap_cloud_sdk.core.telemetry import Module, Operation, record_metrics, get_tenant_id
 
 logger = logging.getLogger(__name__)
 
@@ -108,8 +109,6 @@ class AgentGatewayClient:
         self,
         tenant_subdomain: str | Callable[[], str] | None = None,
         config: ClientConfig | None = None,
-        audit_client: AuditClient | None = None,
-        tenant_id: str | None = None,
     ):
         """Initialize the Agent Gateway client.
 
@@ -118,17 +117,12 @@ class AgentGatewayClient:
                 Can be a string or a callable returning a string.
                 Required for LoB agents, ignored for Customer agents.
             config: Client configuration. Uses defaults if not provided.
-            audit_client: Optional audit log client. When provided, implicit
-                audit events are sent for list_mcp_tools and call_mcp_tool.
-            tenant_id: BTP tenant UUID (e.g. ``"9e0d89c9-..."``) used in audit
-                events. Required when audit_client is set.
         """
         self._tenant_subdomain = tenant_subdomain
         self._config = config or ClientConfig()
         self._token_cache = _TokenCache(self._config)
         self._gateway_url_cache = _GatewayUrlCache()
-        self._audit_client = audit_client
-        self._tenant_id = tenant_id
+        self._audit_client: AuditClient | None = self._create_audit_client()
 
     @staticmethod
     def _resolve_value(
@@ -161,13 +155,32 @@ class AgentGatewayClient:
             "tenant_subdomain is required for LoB agent flow.",
         )
 
+    def _create_audit_client(self) -> AuditClient | None:
+        """Create an audit client from the LoB destination. Returns None for customer agents or on failure."""
+        tenant_subdomain = (
+            self._tenant_subdomain()
+            if callable(self._tenant_subdomain)
+            else self._tenant_subdomain
+        )
+        if not tenant_subdomain:
+            return None
+        try:
+            return auditlog_ng.create_client(
+                tenant=tenant_subdomain,
+                _telemetry_source=Module.AGENTGATEWAY,
+            )
+        except Exception:
+            logger.debug("Failed to create audit client", exc_info=True)
+            return None
+
     def _send_audit_event(
         self,
         object_id: str,
         user_id: str | None = None,
     ) -> None:
         """Send a DataAccess audit event. Errors are logged and suppressed."""
-        if self._audit_client is None or self._tenant_id is None:
+        tenant_id = get_tenant_id()
+        if self._audit_client is None or not tenant_id:
             return
         try:
             from sap_cloud_sdk.core.auditlog_ng.gen.sap.auditlog.auditevent.v2 import (
@@ -176,7 +189,7 @@ class AgentGatewayClient:
 
             event = pb.DataAccess()
             event.common.timestamp.FromDatetime(datetime.now(timezone.utc))
-            event.common.tenant_id = self._tenant_id
+            event.common.tenant_id = tenant_id
             if user_id:
                 event.common.user_initiator_id = user_id
             event.channel_type = "MCP"
@@ -595,8 +608,6 @@ def _unwrap_exception_group(exc: BaseException) -> BaseException:
 def create_client(
     tenant_subdomain: str | Callable[[], str] | None = None,
     config: ClientConfig | None = None,
-    audit_client: AuditClient | None = None,
-    tenant_id: str | None = None,
 ) -> AgentGatewayClient:
     """Create an Agent Gateway client for discovering and invoking MCP tools.
 
@@ -608,10 +619,6 @@ def create_client(
             Can be a string or a callable returning a string.
             Required for LoB agents, ignored for Customer agents.
         config: Client configuration. Uses defaults if not provided.
-        audit_client: Optional audit log client. When provided, implicit
-            audit events are sent for list_mcp_tools and call_mcp_tool.
-        tenant_id: BTP tenant UUID used in audit events. Required when
-            audit_client is set.
 
     Returns:
         AgentGatewayClient instance.
@@ -668,6 +675,4 @@ def create_client(
     return AgentGatewayClient(
         tenant_subdomain=tenant_subdomain,
         config=config,
-        audit_client=audit_client,
-        tenant_id=tenant_id,
     )

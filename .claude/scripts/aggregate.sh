@@ -22,8 +22,18 @@ get_tier() {
   ' "$RULES_YAML" 2>/dev/null
 }
 
-# Collect all report-*.json files
-reports=$(ls "$TMPDIR_RUN"/report-*.json 2>/dev/null | sort)
+# Collect all report-*.json files. Skip files that are not valid JSON
+# (e.g. a check that timed out or crashed producing partial stdout) so a
+# single bad report can't take the whole aggregation down.
+raw_reports=$(ls "$TMPDIR_RUN"/report-*.json 2>/dev/null | sort)
+reports=""
+for r in $raw_reports; do
+  if jq -e '.' "$r" >/dev/null 2>&1; then
+    reports="$reports $r"
+  else
+    echo "WARN: skipping invalid JSON report: $r" >&2
+  fi
+done
 if [ -z "$reports" ]; then
   echo '{"findings":[],"shadow_findings":[],"summary":{"block_count":0,"flag_count":0,"shadow_count":0,"locked_count":0},"per_check_summary":{}}'
   exit 0

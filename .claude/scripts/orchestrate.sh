@@ -39,8 +39,10 @@ export LANGUAGE
 echo "  Language: $LANGUAGE"
 
 if [ "$DRY_RUN" != "true" ]; then
-  HOSTNAME=$(detect_hostname)
-  check_gh_auth "$HOSTNAME"
+  # Bash sets HOSTNAME automatically; using our own HOSTNAME shadowed it and
+  # produced confusing errors under `set -u`. Rename to GH_HOSTNAME.
+  GH_HOSTNAME=$(detect_hostname)
+  check_gh_auth "$GH_HOSTNAME"
 fi
 
 # 2. Fetch diff + PR metadata
@@ -66,7 +68,7 @@ fi
 export DIFF_FILE="$TMPDIR_RUN/pr.diff"
 export PR_BODY_FILE="$TMPDIR_RUN/pr-body.txt"
 export HEAD_SHA
-export BASE_SHA="${BASE_SHA:-$(git merge-base origin/main HEAD 2>/dev/null || echo HEAD~10)}"
+export BASE_SHA="${BASE_SHA:-$(git merge-base "origin/${GITHUB_BASE_REF:-main}" HEAD 2>/dev/null || git merge-base origin/main HEAD 2>/dev/null || echo HEAD~10)}"
 export BREAKING_JSON="$TMPDIR_RUN/breaking.json"
 
 # 3. Compute added-lines set (used for hunk attribution)
@@ -95,11 +97,30 @@ checks=(secrets license-spdx disclosure hardcode telemetry
         deps-supply deletion-hygiene constants binding-shape
         quality-gate-parity pr-size)
 
+# 6. Run all 20 checks in parallel. Cap each check at 60s so a wedged
+# subprocess (e.g. blocked on stdin) can't hang the review indefinitely.
+CHECK_TIMEOUT="${CHECK_TIMEOUT:-60}"
+# Detect a portable timeout command (BSD/macOS installs gtimeout via coreutils)
+if command -v timeout >/dev/null 2>&1; then
+  TIMEOUT_CMD="timeout"
+elif command -v gtimeout >/dev/null 2>&1; then
+  TIMEOUT_CMD="gtimeout"
+else
+  TIMEOUT_CMD=""
+fi
+
 for check in "${checks[@]}"; do
   script="$SCRIPT_DIR/check-${check}.sh"
   if [ ! -x "$script" ]; then continue; fi
-  DIFF_FILE="$DIFF_FILE" PR_BODY_FILE="$PR_BODY_FILE" \
-    "$script" < "$DIFF_FILE" > "$TMPDIR_RUN/report-${check}.json" 2> "$TMPDIR_RUN/${check}.err" &
+  if [ -n "$TIMEOUT_CMD" ]; then
+    DIFF_FILE="$DIFF_FILE" PR_BODY_FILE="$PR_BODY_FILE" \
+      "$TIMEOUT_CMD" "${CHECK_TIMEOUT}s" "$script" < "$DIFF_FILE" \
+      > "$TMPDIR_RUN/report-${check}.json" 2> "$TMPDIR_RUN/${check}.err" &
+  else
+    DIFF_FILE="$DIFF_FILE" PR_BODY_FILE="$PR_BODY_FILE" \
+      "$script" < "$DIFF_FILE" \
+      > "$TMPDIR_RUN/report-${check}.json" 2> "$TMPDIR_RUN/${check}.err" &
+  fi
 done
 wait
 

@@ -215,6 +215,31 @@ In particular:
 
 Please consult our [documentation](docs/) to understand the project structure and conventions.
 
+## Incremental Delivery
+
+For non-trivial changes, prefer **stacked pull requests** over one large PR. Small,
+review-friendly PRs mean faster reviews, fewer conflicts, and clearer bisection when
+regressions surface.
+
+**Thresholds — the `pr-size` check advises you when to split:**
+
+| Signal | Threshold | Advice |
+|--------|-----------|--------|
+| Additions | > 800 lines | split into a base PR + follow-ups |
+| Files touched | > 15 | separate by concern |
+| Modules touched | > 3 | one module per PR |
+| Commits | > 30 | squash unrelated commits or split |
+
+**How to stack:**
+
+1. Land the foundational, no-surprise piece first (types, config, deps).
+2. Base the next PR on the previous branch, not `main`. Once the parent merges,
+   rebase on `main` and the diff shrinks to just your delta.
+3. Reference the stack in each PR body — e.g. _"Part 2/4 — depends on #123"_.
+
+If a PR is under review and something urgent has to ship, prefer opening a separate
+minimal PR against `main` rather than piling changes onto the in-review branch.
+
 ## Current Maintainers
 
 See [CODEOWNERS](.github/CODEOWNERS) for the current list of maintainers.

@@ -39,7 +39,12 @@ from sap_cloud_sdk.agentgateway._token_cache import _GatewayUrlCache, _TokenCach
 from sap_cloud_sdk.agentgateway.exceptions import AgentGatewaySDKError
 import sap_cloud_sdk.core.auditlog_ng as auditlog_ng
 from sap_cloud_sdk.core.auditlog_ng import AuditClient
-from sap_cloud_sdk.core.telemetry import Module, Operation, record_metrics, get_tenant_id
+from sap_cloud_sdk.core.telemetry import (
+    Module,
+    Operation,
+    record_metrics,
+    get_tenant_id,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -159,9 +164,11 @@ class AgentGatewayClient:
     def _create_audit_client(self) -> AuditClient | None:
         """Create an audit client from the LoB destination. Returns None for customer agents or on failure."""
         tenant_subdomain = (
-            self._tenant_subdomain()
-            if callable(self._tenant_subdomain)
-            else self._tenant_subdomain
+            self._tenant_subdomain
+            if isinstance(self._tenant_subdomain, str)
+            else self._tenant_subdomain()
+            if self._tenant_subdomain is not None
+            else None
         )
         if not tenant_subdomain:
             return None

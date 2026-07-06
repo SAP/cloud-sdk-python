@@ -983,8 +983,8 @@ class TestListAgentCards:
             with pytest.raises(AgentGatewaySDKError, match="Agent card discovery failed"):
                 await agw_client.list_agent_cards()
 
-                
-# ============================================================ 
+
+# ============================================================
 # Test: get_ias_client_id
 # ============================================================
 
@@ -1051,7 +1051,7 @@ class TestGetIasClientId:
             with pytest.raises(AgentGatewaySDKError, match="Could not resolve IAS client ID"):
                 create_client(tenant_subdomain="my-tenant").get_ias_client_id()
 
-                
+
 # ============================================================
 # Test: _send_audit_event
 # ============================================================

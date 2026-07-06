@@ -15,6 +15,8 @@ from sap_cloud_sdk.agentgateway import (
     AgentGatewaySDKError,
 )
 
+_TENANT_UUID = "9e0d89c9-17cd-439d-8a8b-9c44d3d272f0"
+
 
 # ============================================================
 # Fixtures
@@ -980,3 +982,355 @@ class TestListAgentCards:
             agw_client = create_client(tenant_subdomain="my-tenant")
             with pytest.raises(AgentGatewaySDKError, match="Agent card discovery failed"):
                 await agw_client.list_agent_cards()
+
+
+# ============================================================
+# Test: _send_audit_event
+# ============================================================
+
+
+class TestSendAuditEvent:
+    """Tests for _send_audit_event helper."""
+
+    def test_no_op_without_audit_client(self):
+        """_send_audit_event is a no-op when audit_client is not set."""
+        agw_client = create_client(tenant_subdomain="my-tenant")
+        # Should not raise
+        agw_client._send_audit_event("tool-name", "user@example.com")
+
+    def test_no_op_without_tenant_id(self):
+        """_send_audit_event is a no-op when tenant_id is not set."""
+        mock_audit = MagicMock()
+        agw_client = create_client(
+            tenant_subdomain="my-tenant",
+            audit_client=mock_audit,
+            tenant_id=None,
+        )
+        agw_client._send_audit_event("tool-name")
+        mock_audit.send.assert_not_called()
+
+    def test_sends_data_access_event(self):
+        """_send_audit_event builds and sends a DataAccess event."""
+        mock_audit = MagicMock()
+        agw_client = create_client(
+            tenant_subdomain="my-tenant",
+            audit_client=mock_audit,
+            tenant_id=_TENANT_UUID,
+        )
+        agw_client._send_audit_event("my-tool", "user@example.com")
+        mock_audit.send.assert_called_once()
+        event = mock_audit.send.call_args[0][0]
+        assert event.common.tenant_id == _TENANT_UUID
+        assert event.common.user_initiator_id == "user@example.com"
+        assert event.channel_type == "MCP"
+        assert event.channel_id == "agent-gateway"
+        assert event.object_type == "mcp-tool"
+        assert event.object_id == "my-tool"
+
+    def test_sends_without_user_id(self):
+        """_send_audit_event omits user_initiator_id when user_id is None."""
+        mock_audit = MagicMock()
+        agw_client = create_client(
+            tenant_subdomain="my-tenant",
+            audit_client=mock_audit,
+            tenant_id=_TENANT_UUID,
+        )
+        agw_client._send_audit_event("my-tool")
+        mock_audit.send.assert_called_once()
+        event = mock_audit.send.call_args[0][0]
+        assert event.common.user_initiator_id == ""
+
+    def test_suppresses_send_errors(self):
+        """_send_audit_event does not propagate exceptions from audit client."""
+        mock_audit = MagicMock()
+        mock_audit.send.side_effect = RuntimeError("send failed")
+        agw_client = create_client(
+            tenant_subdomain="my-tenant",
+            audit_client=mock_audit,
+            tenant_id=_TENANT_UUID,
+        )
+        # Should not raise
+        agw_client._send_audit_event("my-tool")
+
+
+# ============================================================
+# Test: list_mcp_tools audit logging
+# ============================================================
+
+
+class TestListMcpToolsAuditLog:
+    """Tests that list_mcp_tools emits an audit event on success."""
+
+    @pytest.mark.asyncio
+    async def test_lob_flow_sends_audit_event(self):
+        """list_mcp_tools sends audit event after LoB tool discovery."""
+        mock_audit = MagicMock()
+        with (
+            patch(
+                "sap_cloud_sdk.agentgateway.agw_client.detect_customer_agent_credentials",
+                return_value=None,
+            ),
+            patch(
+                "sap_cloud_sdk.agentgateway.agw_client.fetch_system_auth",
+                new_callable=AsyncMock,
+                return_value=("token", "https://agw.example.com"),
+            ),
+            patch(
+                "sap_cloud_sdk.agentgateway.agw_client.get_mcp_tools_lob",
+                new_callable=AsyncMock,
+                return_value=[],
+            ),
+        ):
+            agw_client = create_client(
+                tenant_subdomain="my-tenant",
+                audit_client=mock_audit,
+                tenant_id=_TENANT_UUID,
+            )
+            await agw_client.list_mcp_tools(user_id="user@example.com")
+
+        mock_audit.send.assert_called_once()
+        event = mock_audit.send.call_args[0][0]
+        assert event.object_id == "*"
+        assert event.common.tenant_id == _TENANT_UUID
+        assert event.common.user_initiator_id == "user@example.com"
+
+    @pytest.mark.asyncio
+    async def test_customer_flow_sends_audit_event(self):
+        """list_mcp_tools sends audit event after customer tool discovery."""
+        mock_audit = MagicMock()
+        with (
+            patch(
+                "sap_cloud_sdk.agentgateway.agw_client.detect_customer_agent_credentials",
+                return_value="/path/to/credentials",
+            ),
+            patch(
+                "sap_cloud_sdk.agentgateway.agw_client.load_customer_credentials",
+            ) as mock_load,
+            patch(
+                "sap_cloud_sdk.agentgateway.agw_client.get_system_token_mtls",
+                return_value="system-token",
+            ),
+            patch(
+                "sap_cloud_sdk.agentgateway.agw_client.get_mcp_tools_customer",
+                new_callable=AsyncMock,
+                return_value=[],
+            ),
+        ):
+            mock_creds = MagicMock()
+            mock_creds.gateway_url = "https://agw.customer.com"
+            mock_load.return_value = mock_creds
+
+            agw_client = create_client(
+                audit_client=mock_audit,
+                tenant_id=_TENANT_UUID,
+            )
+            await agw_client.list_mcp_tools()
+
+        mock_audit.send.assert_called_once()
+        event = mock_audit.send.call_args[0][0]
+        assert event.object_id == "*"
+
+    @pytest.mark.asyncio
+    async def test_no_audit_event_without_audit_client(self):
+        """list_mcp_tools does not attempt audit logging when no audit_client."""
+        with (
+            patch(
+                "sap_cloud_sdk.agentgateway.agw_client.detect_customer_agent_credentials",
+                return_value=None,
+            ),
+            patch(
+                "sap_cloud_sdk.agentgateway.agw_client.fetch_system_auth",
+                new_callable=AsyncMock,
+                return_value=("token", "https://agw.example.com"),
+            ),
+            patch(
+                "sap_cloud_sdk.agentgateway.agw_client.get_mcp_tools_lob",
+                new_callable=AsyncMock,
+                return_value=[],
+            ),
+            patch(
+                "sap_cloud_sdk.agentgateway.agw_client.AgentGatewayClient._send_audit_event"
+            ) as mock_send,
+        ):
+            agw_client = create_client(tenant_subdomain="my-tenant")
+            await agw_client.list_mcp_tools()
+
+        mock_send.assert_called_once_with("*", None)
+
+    @pytest.mark.asyncio
+    async def test_no_audit_event_on_failure(self):
+        """list_mcp_tools does not send audit event when tool discovery fails."""
+        mock_audit = MagicMock()
+        with (
+            patch(
+                "sap_cloud_sdk.agentgateway.agw_client.detect_customer_agent_credentials",
+                return_value=None,
+            ),
+            patch(
+                "sap_cloud_sdk.agentgateway.agw_client.fetch_system_auth",
+                new_callable=AsyncMock,
+                return_value=("token", "https://agw.example.com"),
+            ),
+            patch(
+                "sap_cloud_sdk.agentgateway.agw_client.get_mcp_tools_lob",
+                new_callable=AsyncMock,
+                side_effect=RuntimeError("network error"),
+            ),
+        ):
+            agw_client = create_client(
+                tenant_subdomain="my-tenant",
+                audit_client=mock_audit,
+                tenant_id=_TENANT_UUID,
+            )
+            with pytest.raises(AgentGatewaySDKError):
+                await agw_client.list_mcp_tools()
+
+        mock_audit.send.assert_not_called()
+
+
+# ============================================================
+# Test: call_mcp_tool audit logging
+# ============================================================
+
+
+class TestCallMcpToolAuditLog:
+    """Tests that call_mcp_tool emits an audit event on success."""
+
+    @pytest.mark.asyncio
+    async def test_lob_flow_sends_audit_event(self, mock_tool):
+        """call_mcp_tool sends audit event with tool name after LoB invocation."""
+        mock_audit = MagicMock()
+        with (
+            patch(
+                "sap_cloud_sdk.agentgateway.agw_client.detect_customer_agent_credentials",
+                return_value=None,
+            ),
+            patch(
+                "sap_cloud_sdk.agentgateway.agw_client.fetch_user_auth",
+                new_callable=AsyncMock,
+                return_value=("user-token", "https://agw.example.com"),
+            ),
+            patch(
+                "sap_cloud_sdk.agentgateway.agw_client.call_mcp_tool_lob",
+                new_callable=AsyncMock,
+                return_value="result",
+            ),
+        ):
+            agw_client = create_client(
+                tenant_subdomain="my-tenant",
+                audit_client=mock_audit,
+                tenant_id=_TENANT_UUID,
+            )
+            await agw_client.call_mcp_tool(
+                tool=mock_tool,
+                user_token="user-jwt",
+                user_id="user@example.com",
+            )
+
+        mock_audit.send.assert_called_once()
+        event = mock_audit.send.call_args[0][0]
+        assert event.object_id == mock_tool.name
+        assert event.common.tenant_id == _TENANT_UUID
+        assert event.common.user_initiator_id == "user@example.com"
+
+    @pytest.mark.asyncio
+    async def test_customer_flow_sends_audit_event(self, mock_tool):
+        """call_mcp_tool sends audit event after customer flow invocation."""
+        mock_audit = MagicMock()
+        with (
+            patch(
+                "sap_cloud_sdk.agentgateway.agw_client.detect_customer_agent_credentials",
+                return_value="/path/to/credentials",
+            ),
+            patch(
+                "sap_cloud_sdk.agentgateway.agw_client.load_customer_credentials",
+            ) as mock_load,
+            patch(
+                "sap_cloud_sdk.agentgateway.agw_client.exchange_user_token",
+                return_value="exchanged-token",
+            ),
+            patch(
+                "sap_cloud_sdk.agentgateway.agw_client.call_mcp_tool_customer",
+                new_callable=AsyncMock,
+                return_value="result",
+            ),
+        ):
+            mock_creds = MagicMock()
+            mock_creds.gateway_url = "https://agw.customer.com"
+            mock_load.return_value = mock_creds
+
+            agw_client = create_client(
+                audit_client=mock_audit,
+                tenant_id=_TENANT_UUID,
+            )
+            await agw_client.call_mcp_tool(
+                tool=mock_tool,
+                user_token="user-jwt",
+            )
+
+        mock_audit.send.assert_called_once()
+        event = mock_audit.send.call_args[0][0]
+        assert event.object_id == mock_tool.name
+
+    @pytest.mark.asyncio
+    async def test_no_audit_event_on_failure(self, mock_tool):
+        """call_mcp_tool does not send audit event when tool invocation fails."""
+        mock_audit = MagicMock()
+        with (
+            patch(
+                "sap_cloud_sdk.agentgateway.agw_client.detect_customer_agent_credentials",
+                return_value=None,
+            ),
+            patch(
+                "sap_cloud_sdk.agentgateway.agw_client.fetch_user_auth",
+                new_callable=AsyncMock,
+                return_value=("user-token", "https://agw.example.com"),
+            ),
+            patch(
+                "sap_cloud_sdk.agentgateway.agw_client.call_mcp_tool_lob",
+                new_callable=AsyncMock,
+                side_effect=RuntimeError("invocation error"),
+            ),
+        ):
+            agw_client = create_client(
+                tenant_subdomain="my-tenant",
+                audit_client=mock_audit,
+                tenant_id=_TENANT_UUID,
+            )
+            with pytest.raises(AgentGatewaySDKError):
+                await agw_client.call_mcp_tool(
+                    tool=mock_tool,
+                    user_token="user-jwt",
+                )
+
+        mock_audit.send.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_audit_event_uses_tool_name_as_object_id(self, mock_tool):
+        """call_mcp_tool records tool.name as the audit event object_id."""
+        mock_audit = MagicMock()
+        with (
+            patch(
+                "sap_cloud_sdk.agentgateway.agw_client.detect_customer_agent_credentials",
+                return_value=None,
+            ),
+            patch(
+                "sap_cloud_sdk.agentgateway.agw_client.fetch_user_auth",
+                new_callable=AsyncMock,
+                return_value=("user-token", "https://agw.example.com"),
+            ),
+            patch(
+                "sap_cloud_sdk.agentgateway.agw_client.call_mcp_tool_lob",
+                new_callable=AsyncMock,
+                return_value="ok",
+            ),
+        ):
+            agw_client = create_client(
+                tenant_subdomain="my-tenant",
+                audit_client=mock_audit,
+                tenant_id=_TENANT_UUID,
+            )
+            await agw_client.call_mcp_tool(tool=mock_tool, user_token="jwt")
+
+        event = mock_audit.send.call_args[0][0]
+        assert event.object_id == "test-tool"

@@ -9,6 +9,7 @@ detects agent type (LoB vs Customer) based on credential file presence.
 
 import asyncio
 import logging
+from datetime import datetime, timezone
 from typing import Callable
 
 from sap_cloud_sdk.agentgateway.config import ClientConfig
@@ -35,6 +36,7 @@ from sap_cloud_sdk.agentgateway._models import (
 )
 from sap_cloud_sdk.agentgateway._token_cache import _GatewayUrlCache, _TokenCache
 from sap_cloud_sdk.agentgateway.exceptions import AgentGatewaySDKError
+from sap_cloud_sdk.core.auditlog_ng import AuditClient
 from sap_cloud_sdk.core.telemetry import Module, Operation, record_metrics
 
 logger = logging.getLogger(__name__)
@@ -106,6 +108,8 @@ class AgentGatewayClient:
         self,
         tenant_subdomain: str | Callable[[], str] | None = None,
         config: ClientConfig | None = None,
+        audit_client: AuditClient | None = None,
+        tenant_id: str | None = None,
     ):
         """Initialize the Agent Gateway client.
 
@@ -114,11 +118,17 @@ class AgentGatewayClient:
                 Can be a string or a callable returning a string.
                 Required for LoB agents, ignored for Customer agents.
             config: Client configuration. Uses defaults if not provided.
+            audit_client: Optional audit log client. When provided, implicit
+                audit events are sent for list_mcp_tools and call_mcp_tool.
+            tenant_id: BTP tenant UUID (e.g. ``"9e0d89c9-..."``) used in audit
+                events. Required when audit_client is set.
         """
         self._tenant_subdomain = tenant_subdomain
         self._config = config or ClientConfig()
         self._token_cache = _TokenCache(self._config)
         self._gateway_url_cache = _GatewayUrlCache()
+        self._audit_client = audit_client
+        self._tenant_id = tenant_id
 
     @staticmethod
     def _resolve_value(
@@ -150,6 +160,32 @@ class AgentGatewayClient:
             self._tenant_subdomain,
             "tenant_subdomain is required for LoB agent flow.",
         )
+
+    def _send_audit_event(
+        self,
+        object_id: str,
+        user_id: str | None = None,
+    ) -> None:
+        """Send a DataAccess audit event. Errors are logged and suppressed."""
+        if self._audit_client is None or self._tenant_id is None:
+            return
+        try:
+            from sap_cloud_sdk.core.auditlog_ng.gen.sap.auditlog.auditevent.v2 import (
+                auditevent_pb2 as pb,
+            )
+
+            event = pb.DataAccess()
+            event.common.timestamp.FromDatetime(datetime.now(timezone.utc))
+            event.common.tenant_id = self._tenant_id
+            if user_id:
+                event.common.user_initiator_id = user_id
+            event.channel_type = "MCP"
+            event.channel_id = "agent-gateway"
+            event.object_type = "mcp-tool"
+            event.object_id = object_id
+            self._audit_client.send(event)
+        except Exception:
+            logger.debug("Failed to send audit event", exc_info=True)
 
     @record_metrics(Module.AGENTGATEWAY, Operation.AGENTGATEWAY_GET_SYSTEM_AUTH)
     async def get_system_auth(self, app_tid: str | None = None) -> AuthResult:
@@ -300,6 +336,7 @@ class AgentGatewayClient:
         self,
         user_token: str | Callable[[], str] | None = None,
         app_tid: str | None = None,
+        user_id: str | None = None,
     ) -> list[MCPTool]:
         """List all MCP tools from MCP servers.
 
@@ -320,6 +357,8 @@ class AgentGatewayClient:
                 If provided, uses user-scoped auth instead of system auth.
             app_tid: BTP Application Tenant ID of the subscriber.
                 Only used for customer agents.
+            user_id: User identifier recorded in the audit event when an
+                audit_client is configured on the client.
 
         Returns:
             List of MCPTool objects from all MCP servers.
@@ -349,9 +388,11 @@ class AgentGatewayClient:
                     auth = await self.get_user_auth(user_token, app_tid)
                 else:
                     auth = await self.get_system_auth(app_tid=app_tid)
-                return await get_mcp_tools_customer(
+                tools = await get_mcp_tools_customer(
                     credentials, auth.access_token, self._config.timeout
                 )
+                self._send_audit_event("*", user_id)
+                return tools
 
             # LoB flow - requires tenant_subdomain
             if app_tid:
@@ -362,9 +403,11 @@ class AgentGatewayClient:
                 auth = await self.get_user_auth(user_token)
             else:
                 auth = await self.get_system_auth()
-            return await get_mcp_tools_lob(
+            tools = await get_mcp_tools_lob(
                 tenant, auth.access_token, self._config.timeout
             )
+            self._send_audit_event("*", user_id)
+            return tools
 
         except AgentGatewaySDKError:
             # Re-raise SDK errors as-is
@@ -446,6 +489,7 @@ class AgentGatewayClient:
         tool: MCPTool,
         user_token: str | Callable[[], str] | None = None,
         app_tid: str | None = None,
+        user_id: str | None = None,
         **kwargs,
     ) -> str:
         """Invoke an MCP tool.
@@ -470,6 +514,8 @@ class AgentGatewayClient:
                 for tenant-scoped token exchange.
                 TODO: This parameter's requirement is still being clarified with
                 the IBD team and may be removed if unnecessary.
+            user_id: User identifier recorded in the audit event when an
+                audit_client is configured on the client.
             **kwargs: Tool input parameters (passed directly to the tool).
 
         Returns:
@@ -511,18 +557,22 @@ class AgentGatewayClient:
                     )
                     auth = await self.get_system_auth(app_tid)
 
-                return await call_mcp_tool_customer(
+                result = await call_mcp_tool_customer(
                     tool, auth.access_token, self._config.timeout, **kwargs
                 )
+                self._send_audit_event(tool.name, user_id)
+                return result
 
             # LoB flow - requires user_token and tenant_subdomain
             if app_tid:
                 logger.warning("app_tid parameter ignored for LoB agent flow")
 
             auth = await self.get_user_auth(user_token, app_tid)
-            return await call_mcp_tool_lob(
+            result = await call_mcp_tool_lob(
                 tool, auth.access_token, self._config.timeout, **kwargs
             )
+            self._send_audit_event(tool.name, user_id)
+            return result
 
         except AgentGatewaySDKError:
             # Re-raise SDK errors as-is
@@ -545,6 +595,8 @@ def _unwrap_exception_group(exc: BaseException) -> BaseException:
 def create_client(
     tenant_subdomain: str | Callable[[], str] | None = None,
     config: ClientConfig | None = None,
+    audit_client: AuditClient | None = None,
+    tenant_id: str | None = None,
 ) -> AgentGatewayClient:
     """Create an Agent Gateway client for discovering and invoking MCP tools.
 
@@ -556,6 +608,10 @@ def create_client(
             Can be a string or a callable returning a string.
             Required for LoB agents, ignored for Customer agents.
         config: Client configuration. Uses defaults if not provided.
+        audit_client: Optional audit log client. When provided, implicit
+            audit events are sent for list_mcp_tools and call_mcp_tool.
+        tenant_id: BTP tenant UUID used in audit events. Required when
+            audit_client is set.
 
     Returns:
         AgentGatewayClient instance.
@@ -609,4 +665,9 @@ def create_client(
         user_auth = await agw_client.get_user_auth(user_token="user-jwt")
         ```
     """
-    return AgentGatewayClient(tenant_subdomain=tenant_subdomain, config=config)
+    return AgentGatewayClient(
+        tenant_subdomain=tenant_subdomain,
+        config=config,
+        audit_client=audit_client,
+        tenant_id=tenant_id,
+    )

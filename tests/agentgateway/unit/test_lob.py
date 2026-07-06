@@ -28,6 +28,7 @@ from sap_cloud_sdk.agentgateway._lob import (
 from sap_cloud_sdk.agentgateway._models import Agent, AgentCard, MCPTool
 from sap_cloud_sdk.agentgateway._token_cache import _GatewayUrlCache, _TokenCache
 from sap_cloud_sdk.agentgateway.config import ClientConfig
+from sap_cloud_sdk.destination import ConsumptionOptions, ConsumptionLevel
 from sap_cloud_sdk.agentgateway.exceptions import AgentGatewaySDKError, MCPServerNotFoundError
 from sap_cloud_sdk.destination import ConsumptionLevel
 
@@ -1032,7 +1033,8 @@ class TestGetIasClientIdLob:
         assert result == "lob-client-id"
         mock_dest_client.get_destination.assert_called_once_with(
             "sap-managed-runtime-ias-eu10",
-            level=mock_dest_client.get_destination.call_args[1]["level"],
+            level=ConsumptionLevel.PROVIDER_SUBACCOUNT,
+            options=ConsumptionOptions(skip_token_retrieval=True),
         )
 
     def test_returns_empty_string_when_destination_not_found(self):

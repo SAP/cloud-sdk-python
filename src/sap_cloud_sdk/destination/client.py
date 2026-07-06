@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 import warnings
-from typing import List, Optional, Callable, TypeVar
+from typing import Any, Dict, List, Optional, Callable, TypeVar
 
 from sap_cloud_sdk.core.telemetry import Module, Operation, record_metrics
 from sap_cloud_sdk.destination._http import DestinationHttp, API_V1, API_V2
@@ -430,7 +430,11 @@ class DestinationClient:
                 else f"{API_V2}/destinations/{name}"
             )
 
-            resp = self._http.get(path, headers=headers, tenant_subdomain=tenant)
+            params: Dict[str, Any] = {}
+            if options and options.skip_token_retrieval:
+                params["$skipTokenRetrieval"] = "true"
+
+            resp = self._http.get(path, headers=headers, tenant_subdomain=tenant, params=params or None)
             data = resp.json()
 
             # Parse v2 response: destinationConfiguration + authTokens + certificates

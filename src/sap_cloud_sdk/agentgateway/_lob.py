@@ -118,7 +118,8 @@ def get_ias_client_id_lob() -> str:
     """Read the IAS client ID from the IAS destination properties (LoB flow).
 
     Fetches the IAS destination (``sap-managed-runtime-ias-{landscape}``)
-    at provider subaccount level and returns the ``clientId`` property.
+    at provider subaccount level with ``$skipTokenRetrieval=true`` so only
+    destination properties are returned — no auth token exchange is performed.
 
     Returns:
         The IAS client ID string, or ``""`` if the destination is not found
@@ -133,6 +134,7 @@ def get_ias_client_id_lob() -> str:
     dest = client.get_destination(
         dest_name,
         level=ConsumptionLevel.PROVIDER_SUBACCOUNT,
+        options=ConsumptionOptions(skip_token_retrieval=True),
     )
     if not dest:
         logger.warning(

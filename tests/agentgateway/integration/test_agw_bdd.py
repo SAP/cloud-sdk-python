@@ -54,6 +54,7 @@ class ScenarioContext:
         self.tools: Optional[list[MCPTool]] = None
         self.tool_result: Optional[str] = None
         self.sample_mcp_tool_name: Optional[str] = None
+        self.ias_client_id: Optional[str] = None
 
 
 @pytest.fixture
@@ -266,3 +267,17 @@ def tool_result_is_non_empty_string(context: ScenarioContext):
     assert context.tool_result is not None
     assert isinstance(context.tool_result, str)
     assert context.tool_result.strip(), "Expected a non-empty tool result"
+
+
+@when("I call get_ias_client_id")
+def call_get_ias_client_id(context: ScenarioContext, agw_client: AgentGatewayClient):
+    """Call get_ias_client_id and store the result."""
+    context.ias_client_id = agw_client.get_ias_client_id()
+
+
+@then("the ias_client_id should be a non-empty string")
+def ias_client_id_non_empty(context: ScenarioContext):
+    """Verify the IAS client ID is a non-empty string."""
+    assert context.ias_client_id is not None
+    assert isinstance(context.ias_client_id, str)
+    assert context.ias_client_id.strip(), "Expected a non-empty IAS client ID"

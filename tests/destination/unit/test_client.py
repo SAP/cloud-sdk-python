@@ -1173,6 +1173,52 @@ class TestDestinationClientReadOperations:
         # HTTP should be called since proxy is disabled by default
         mock_http.get.assert_called_once()
 
+    def test_get_destination_skip_token_retrieval_sends_query_param(self):
+        """Test that skip_token_retrieval=True sends $skipTokenRetrieval=true query param."""
+        mock_http = MagicMock()
+        resp = MagicMock(spec=Response)
+        resp.status_code = 200
+        resp.json.return_value = {
+            "destinationConfiguration": {
+                "name": "my-api",
+                "type": "HTTP",
+                "url": "https://api.example.com",
+                "clientId": "my-client-id",
+            },
+            "authTokens": [],
+            "certificates": [],
+        }
+        mock_http.get.return_value = resp
+
+        client = DestinationClient(mock_http)
+        result = client.get_destination(
+            "my-api",
+            options=ConsumptionOptions(skip_token_retrieval=True),
+        )
+
+        assert isinstance(result, Destination)
+        assert result.properties.get("clientId") == "my-client-id"
+        _, kwargs = mock_http.get.call_args
+        assert kwargs.get("params") == {"$skipTokenRetrieval": "true"}
+
+    def test_get_destination_no_skip_token_retrieval_by_default(self):
+        """Test that skip_token_retrieval=False (default) sends no $skipTokenRetrieval param."""
+        mock_http = MagicMock()
+        resp = MagicMock(spec=Response)
+        resp.status_code = 200
+        resp.json.return_value = {
+            "destinationConfiguration": {"name": "my-api", "type": "HTTP", "url": "https://api.example.com"},
+            "authTokens": [],
+            "certificates": [],
+        }
+        mock_http.get.return_value = resp
+
+        client = DestinationClient(mock_http)
+        client.get_destination("my-api")
+
+        _, kwargs = mock_http.get.call_args
+        assert kwargs.get("params") is None
+
 
 class TestDestinationClientWriteOperations:
 

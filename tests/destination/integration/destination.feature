@@ -342,3 +342,7 @@ Feature: Destination Service Integration
     Then the destination creation should be successful
     When I get subaccount destination "test-dest-sub-isolation" with "PROVIDER_ONLY" access strategy
     Then the destination should not be found
+
+  Scenario: Get service instance ID returns a non-empty string
+    When I call get_service_instance_id
+    Then the service instance ID should be a non-empty string

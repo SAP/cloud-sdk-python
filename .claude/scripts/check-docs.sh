@@ -1,0 +1,102 @@
+#!/usr/bin/env bash
+# check-docs.sh — documentation completeness including BTP deps and regional availability.
+set -euo pipefail
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/lib/json-emit.sh"
+
+LANGUAGE="${LANGUAGE:-python}"
+REPO_ROOT="${REPO_ROOT:-.}"
+DIFF_FILE="${DIFF_FILE:-/dev/stdin}"
+
+STARTED=$(now_iso)
+findings=$(mktemp); trap 'rm -f "$findings"' EXIT
+
+diff_content=$(cat "$DIFF_FILE" 2>/dev/null || echo "")
+
+# Detect new module directories (module has new files at top-level)
+if [ "$LANGUAGE" = "python" ]; then
+  new_modules=$(echo "$diff_content" | grep -oE '^\+\+\+ b/src/sap_cloud_sdk/[a-z_]+/[^/]+\.py' | sed 's|^+++ b/src/sap_cloud_sdk/||; s|/[^/]*\.py$||' | sort -u)
+else
+  new_modules=$(echo "$diff_content" | grep -oE '^\+\+\+ b/src/main/java/com/sap/cloud/sdk/[a-z_]+/[^/]+\.java' | sed 's|^+++ b/src/main/java/com/sap/cloud/sdk/||; s|/[^/]*\.java$||' | sort -u)
+fi
+
+while IFS= read -r mod; do
+  [ -z "$mod" ] && continue
+  [ "$mod" = "core" ] && continue
+
+  if [ "$LANGUAGE" = "python" ]; then
+    user_guide="$REPO_ROOT/src/sap_cloud_sdk/$mod/user-guide.md"
+    mod_dir="$REPO_ROOT/src/sap_cloud_sdk/$mod"
+  else
+    user_guide="$REPO_ROOT/src/main/java/com/sap/cloud/sdk/$mod/user-guide.md"
+    mod_dir="$REPO_ROOT/src/main/java/com/sap/cloud/sdk/$mod"
+  fi
+
+  # DC-01: user-guide.md exists
+  if [ ! -f "$user_guide" ]; then
+    # Only fire if module dir exists (module is new-ish)
+    if [ -d "$mod_dir" ]; then
+      emit_finding "DC-01" "BLOCK" "src/.../$mod/user-guide.md" 1 \
+        "Module '$mod' missing user-guide.md" \
+        "Create $user_guide with sections: ## Installation, ## Quick Start, ## Configuration" >> "$findings"
+    fi
+    continue
+  fi
+
+  # DC-02: required sections
+  guide_content=$(cat "$user_guide" 2>/dev/null || echo "")
+  if ! echo "$guide_content" | grep -qE '^##[[:space:]]+(Installation|Import)'; then
+    emit_finding "DC-02" "FLAG" "$user_guide" 1 "user-guide.md missing ## Installation section" "" >> "$findings"
+  fi
+  if ! echo "$guide_content" | grep -qE '^##[[:space:]]+Quick Start'; then
+    emit_finding "DC-02" "BLOCK" "$user_guide" 1 "user-guide.md missing ## Quick Start section" "" >> "$findings"
+  fi
+
+  # DC-11..DC-14 (BTP deps + regional)
+  # Detect module imports/usages
+  if [ "$LANGUAGE" = "python" ]; then
+    has_dest=$(grep -rq "from sap_cloud_sdk\.destination" "$mod_dir" 2>/dev/null && echo yes || echo no)
+    has_frag=$(grep -rq "FragmentClient\|Fragment[[:space:]]*[,)]" "$mod_dir" 2>/dev/null && echo yes || echo no)
+    has_cert=$(grep -rq "CertificateClient\|Certificate[[:space:]]*[,)]" "$mod_dir" 2>/dev/null && echo yes || echo no)
+    has_region=$(grep -rqE "REGION|region_id|SupportedRegion|available_regions" "$mod_dir" 2>/dev/null && echo yes || echo no)
+  else
+    has_dest=$(grep -rq "com\.sap\.cloud\.sdk\.destination" "$mod_dir" 2>/dev/null && echo yes || echo no)
+    has_frag=$(grep -rq "FragmentClient" "$mod_dir" 2>/dev/null && echo yes || echo no)
+    has_cert=$(grep -rq "CertificateClient" "$mod_dir" 2>/dev/null && echo yes || echo no)
+    has_region=$(grep -rqE "Region\b|regionId|SupportedRegion" "$mod_dir" 2>/dev/null && echo yes || echo no)
+  fi
+
+  # DC-11: destination dep must be documented
+  if [ "$has_dest" = "yes" ]; then
+    if ! echo "$guide_content" | grep -qEi 'destination service|## Dependencies|## Prerequisites'; then
+      emit_finding "DC-11" "BLOCK" "$user_guide" 1 \
+        "Module imports destination service — must document in ## Dependencies section" \
+        "Add: ## Dependencies\\n- SAP BTP Destination Service instance" >> "$findings"
+    fi
+  fi
+  # DC-12: fragments
+  if [ "$has_frag" = "yes" ]; then
+    if ! echo "$guide_content" | grep -qEi 'fragments'; then
+      emit_finding "DC-12" "BLOCK" "$user_guide" 1 \
+        "Module uses Fragments — must document Fragments prerequisite" "" >> "$findings"
+    fi
+  fi
+  # DC-13: certificates
+  if [ "$has_cert" = "yes" ]; then
+    if ! echo "$guide_content" | grep -qEi 'certificate'; then
+      emit_finding "DC-13" "BLOCK" "$user_guide" 1 \
+        "Module uses Certificates — must document Certificate prerequisite" "" >> "$findings"
+    fi
+  fi
+  # DC-14: regional
+  if [ "$has_region" = "yes" ]; then
+    if ! echo "$guide_content" | grep -qEi 'Regional Availability|## Limitations|available in|supported region'; then
+      emit_finding "DC-14" "BLOCK" "$user_guide" 1 \
+        "Module has region-specific constants — must document ## Regional Availability" "" >> "$findings"
+    fi
+  fi
+
+done <<< "$new_modules"
+
+status=$(status_from_findings < "$findings")
+emit_report "docs" "$LANGUAGE" "$status" "$STARTED" < "$findings"

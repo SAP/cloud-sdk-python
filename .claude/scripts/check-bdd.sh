@@ -23,23 +23,39 @@ else
 fi
 
 # resolve alias mapping (python name → java name and vice versa)
+# The YAML is a simple list of pairs:
+#   aliases:
+#     - python: dms
+#       java: documentmanagement
+# awk on `$NF` (last field) extracts the value cleanly even when the key
+# column varies. We only pair a python: line with the very next java: line.
 resolve_sibling_name() {
   local mod="$1" dir="$LANGUAGE"
   local aliases="$CONFIG_DIR/module-aliases.yaml"
   if [ ! -f "$aliases" ]; then echo "$mod"; return; fi
-  # Simple parser: "- python: X\n    java: Y" pairs
   if [ "$dir" = "python" ]; then
-    # look for "python: $mod" then get "java: <name>"
     awk -v mod="$mod" '
-      /python:/ { p_name=$2 }
-      /java:/ { j_name=$2; if (p_name == mod) { print j_name; exit } }
-    ' "$aliases" | head -1
+      /^[[:space:]]*-?[[:space:]]*python:[[:space:]]*/ {
+        sub(/^[^:]*:[[:space:]]*/, ""); p_name=$0; next
+      }
+      /^[[:space:]]*java:[[:space:]]*/ {
+        sub(/^[^:]*:[[:space:]]*/, ""); j_name=$0
+        if (p_name == mod) { print j_name; exit }
+        p_name=""
+      }
+    ' "$aliases"
     return
   else
     awk -v mod="$mod" '
-      /python:/ { p_name=$2 }
-      /java:/ { j_name=$2; if (j_name == mod) { print p_name; exit } }
-    ' "$aliases" | head -1
+      /^[[:space:]]*-?[[:space:]]*python:[[:space:]]*/ {
+        sub(/^[^:]*:[[:space:]]*/, ""); p_name=$0; next
+      }
+      /^[[:space:]]*java:[[:space:]]*/ {
+        sub(/^[^:]*:[[:space:]]*/, ""); j_name=$0
+        if (j_name == mod) { print p_name; exit }
+        p_name=""
+      }
+    ' "$aliases"
     return
   fi
 }
@@ -58,8 +74,21 @@ while IFS= read -r mod; do
 
   # BDD-01: feature file exists (only fire if module has any source files)
   if [ ! -f "$feature_path" ] && [ -d "$mod_dir" ]; then
-    # check if it's a "new" module (created in this PR)
-    if echo "$diff_content" | grep -qE "new file mode.*($mod/)"; then
+    # Detect if this PR creates any new file INSIDE the module.
+    # `new file mode` is on its own line before the `+++ b/<path>` header,
+    # so we scan block-by-block to link them.
+    is_new_module=$(echo "$diff_content" | awk -v mod="$mod" -v lang="$LANGUAGE" '
+      BEGIN {
+        if (lang == "python") pat = "src/sap_cloud_sdk/" mod "/"
+        else                  pat = "src/main/java/com/sap/cloud/sdk/" mod "/"
+      }
+      /^diff --git/ { is_new = 0; next }
+      /^new file mode/ { is_new = 1; next }
+      /^\+\+\+ b\// {
+        if (is_new && index($0, pat) > 0) { print "true"; exit }
+      }
+    ')
+    if [ "$is_new_module" = "true" ]; then
       emit_finding "BDD-01" "BLOCK" "tests/$mod/integration/$mod.feature" 1 \
         "New module '$mod' has no BDD feature file" \
         "Create $feature_path with cross-language-consistent scenarios" >> "$findings"

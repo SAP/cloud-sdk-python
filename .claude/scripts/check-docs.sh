@@ -53,17 +53,24 @@ while IFS= read -r mod; do
   fi
 
   # DC-11..DC-14 (BTP deps + regional)
-  # Detect module imports/usages
+  # Detect module imports/usages. Use word boundaries and prefer explicit
+  # SAP-namespaced references to avoid false positives on DocumentFragment,
+  # AWSRegion, region_id inside docstrings, etc.
   if [ "$LANGUAGE" = "python" ]; then
     has_dest=$(grep -rq "from sap_cloud_sdk\.destination" "$mod_dir" 2>/dev/null && echo yes || echo no)
-    has_frag=$(grep -rq "FragmentClient\|Fragment[[:space:]]*[,)]" "$mod_dir" 2>/dev/null && echo yes || echo no)
-    has_cert=$(grep -rq "CertificateClient\|Certificate[[:space:]]*[,)]" "$mod_dir" 2>/dev/null && echo yes || echo no)
-    has_region=$(grep -rqE "REGION|region_id|SupportedRegion|available_regions" "$mod_dir" 2>/dev/null && echo yes || echo no)
+    # Fragment/Certificate: require the SDK-provided client class specifically,
+    # or an import from the SDK's fragments/certificates subpackage.
+    has_frag=$(grep -rqE "\bFragmentClient\b|from[[:space:]]+sap_cloud_sdk\.fragments" "$mod_dir" 2>/dev/null && echo yes || echo no)
+    has_cert=$(grep -rqE "\bCertificateClient\b|from[[:space:]]+sap_cloud_sdk\.certificates" "$mod_dir" 2>/dev/null && echo yes || echo no)
+    # Region: constant naming or SDK-provided helper only — plain 'region_id'
+    # in docstrings should not fire.
+    has_region=$(grep -rqE "\bSUPPORTED_REGIONS\b|\bSupportedRegion\b|\bavailable_regions\b|from[[:space:]]+sap_cloud_sdk\.regions" "$mod_dir" 2>/dev/null && echo yes || echo no)
   else
     has_dest=$(grep -rq "com\.sap\.cloud\.sdk\.destination" "$mod_dir" 2>/dev/null && echo yes || echo no)
-    has_frag=$(grep -rq "FragmentClient" "$mod_dir" 2>/dev/null && echo yes || echo no)
-    has_cert=$(grep -rq "CertificateClient" "$mod_dir" 2>/dev/null && echo yes || echo no)
-    has_region=$(grep -rqE "Region\b|regionId|SupportedRegion" "$mod_dir" 2>/dev/null && echo yes || echo no)
+    has_frag=$(grep -rqE "\bFragmentClient\b|com\.sap\.cloud\.sdk\.fragments" "$mod_dir" 2>/dev/null && echo yes || echo no)
+    has_cert=$(grep -rqE "\bCertificateClient\b|com\.sap\.cloud\.sdk\.certificates" "$mod_dir" 2>/dev/null && echo yes || echo no)
+    # Java word-boundary: require SAP SDK Region type; avoid AWSRegion etc.
+    has_region=$(grep -rqE "\bSupportedRegion\b|com\.sap\.cloud\.sdk\.regions|\bREGIONAL_AVAILABILITY\b" "$mod_dir" 2>/dev/null && echo yes || echo no)
   fi
 
   # DC-11: destination dep must be documented

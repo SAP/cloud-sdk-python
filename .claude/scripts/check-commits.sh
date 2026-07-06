@@ -5,7 +5,19 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/lib/json-emit.sh"
 
 LANGUAGE="${LANGUAGE:-python}"
-BASE_SHA="${BASE_SHA:-HEAD~10}"
+# Resolve BASE_SHA from GITHUB_BASE_REF merge-base when not explicitly set —
+# HEAD~10 is a poor fallback (only reachable when the PR has ≥10 commits).
+if [ -z "${BASE_SHA:-}" ]; then
+  base_ref="${GITHUB_BASE_REF:-main}"
+  # Try origin/<ref>, then <ref>, then finally HEAD~10 as last resort
+  if git rev-parse --verify "origin/${base_ref}" >/dev/null 2>&1; then
+    BASE_SHA=$(git merge-base HEAD "origin/${base_ref}" 2>/dev/null || echo "HEAD~10")
+  elif git rev-parse --verify "$base_ref" >/dev/null 2>&1; then
+    BASE_SHA=$(git merge-base HEAD "$base_ref" 2>/dev/null || echo "HEAD~10")
+  else
+    BASE_SHA="HEAD~10"
+  fi
+fi
 HEAD_SHA="${HEAD_SHA:-HEAD}"
 
 STARTED=$(now_iso)

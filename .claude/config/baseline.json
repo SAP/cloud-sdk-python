@@ -1,0 +1,25 @@
+{
+  "created_at": "2026-07-15T00:00:00Z",
+  "at_commit": "TBD",
+  "schema_version": 1,
+  "exemptions": {
+    "PY-LIC-01": {
+      "reason": "Repo uses REUSE.toml aggregate — pre-existing files exempt",
+      "detector": "REUSE.toml exists with path='**' aggregate annotation",
+      "scope": "repo",
+      "files_exempted_glob": "src/**/*.py"
+    },
+    "PY-LIC-02": {
+      "reason": "Same as PY-LIC-01",
+      "scope": "repo"
+    },
+    "JV-LIC-01": {
+      "reason": "cloud-sdk-java has no REUSE.toml AND no per-file SPDX baseline — rule kept SHADOW pending team decision on Wave-4 baseline PR",
+      "scope": "repo"
+    },
+    "JV-LIC-02": {
+      "reason": "Same as JV-LIC-01",
+      "scope": "repo"
+    }
+  }
+}

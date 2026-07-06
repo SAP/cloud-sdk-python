@@ -7,6 +7,8 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=lib/json-emit.sh
 source "$SCRIPT_DIR/lib/json-emit.sh"
+# shellcheck source=lib/skill-self-skip.sh
+source "$SCRIPT_DIR/lib/skill-self-skip.sh"
 
 LANGUAGE="${LANGUAGE:-python}"
 REPO_ROOT="${REPO_ROOT:-.}"
@@ -25,9 +27,28 @@ else
   client_files=$(echo "$diff_content" | grep -oE '^\+\+\+ b/src/main/java/com/sap/cloud/sdk/[a-z_]+/.*Client\.java' | sed 's|^+++ b/||' | sort -u)
 fi
 
-# Detect new decorator additions (added lines with @record_metrics for Python, executeWithTelemetry for Java)
+# Detect new decorator additions ONLY inside client files (scope predicate).
+# Previously this counted @record_metrics from any added line — including tests,
+# examples, and skill files — which produced false PY-TEL-06 findings.
 if [ "$LANGUAGE" = "python" ]; then
-  new_decorators=$(echo "$diff_content" | grep -E '^\+[[:space:]]*@record_metrics' | wc -l | tr -d ' ')
+  if [ -n "$client_files" ]; then
+    # Build an awk-friendly set of client paths
+    new_decorators=$(echo "$diff_content" | awk -v files="$client_files" '
+      BEGIN {
+        n = split(files, arr, "\n")
+        for (i=1; i<=n; i++) if (arr[i] != "") set[arr[i]] = 1
+        current = ""
+      }
+      /^\+\+\+ b\// { current = substr($0, 7); next }
+      /^\+[[:space:]]*@record_metrics/ {
+        if (current in set) count++
+        next
+      }
+      END { print count+0 }
+    ')
+  else
+    new_decorators=0
+  fi
 else
   new_decorators=$(echo "$diff_content" | grep -E '^\+.*Telemetry\.executeWithTelemetry' | wc -l | tr -d ' ')
 fi

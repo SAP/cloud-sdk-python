@@ -61,9 +61,9 @@ echo "$diff_content" | awk '
   if echo "$content" | grep -qE 'gh[pousr]_[A-Za-z0-9_]{36,}'; then
     emit_finding "SEC-03" "BLOCK" "$file" "$line_num" "GitHub PAT detected — remove and rotate" "" >> "$findings"
   fi
-  # SEC-04: OpenAI key
-  if echo "$content" | grep -qE 'sk-[A-Za-z0-9]{20,}'; then
-    emit_finding "SEC-04" "BLOCK" "$file" "$line_num" "OpenAI-like API key detected — remove and rotate" "" >> "$findings"
+  # SEC-04: OpenAI / Anthropic API key (both use sk-… prefix; Anthropic allows dashes)
+  if echo "$content" | grep -qE 'sk-[A-Za-z0-9_-]{20,}'; then
+    emit_finding "SEC-04" "BLOCK" "$file" "$line_num" "AI provider API key detected (sk-…) — remove and rotate" "" >> "$findings"
   fi
   # SEC-05: Slack bot token
   if echo "$content" | grep -qE 'xox[baprs]-[A-Za-z0-9-]+'; then
@@ -79,19 +79,21 @@ echo "$diff_content" | awk '
   fi
   # SEC-08: BTP client_secret literal (heuristic: assignment with looks-like-secret value)
   # Match client_secret= or clientsecret= with quoted values that look like real secrets
-  if echo "$content" | grep -qE '"clientsecret"\s*:\s*"[A-Za-z0-9+/=]{20,}"'; then
+  if echo "$content" | grep -qE '"clientsecret"[[:space:]]*:[[:space:]]*"[A-Za-z0-9+/=]{20,}"'; then
     emit_finding "SEC-08" "BLOCK" "$file" "$line_num" "BTP client_secret literal detected — use secret resolver" "" >> "$findings"
   fi
 done
 
-# SEC-10: .env files in diff (not .env.example, .env.test, .env.sample)
-env_lines=$(echo "$diff_content" | grep -E '^\+\+\+ b/\.env(\..+)?$' || true)
+# SEC-10: .env files in diff (not .env.example, .env.test, .env.sample, .env.template)
+# Match both top-level .env and subdirectory service/.env
+env_lines=$(echo "$diff_content" | grep -E '^\+\+\+ b/(.*/)?\.env(\..+)?$' || true)
 while IFS= read -r line; do
   [ -z "$line" ] && continue
   # extract path from "+++ b/<path>"
   path="${line#+++ b/}"
-  # skip allowed suffixes
-  case "$path" in
+  # basename check for allowlist
+  base="${path##*/}"
+  case "$base" in
     .env.example|.env.test|.env.sample|.env.template) continue ;;
     .env|.env.*) emit_finding "SEC-10" "BLOCK" "$path" 1 ".env file committed — never commit .env; use .env.example" "" >> "$findings" ;;
   esac

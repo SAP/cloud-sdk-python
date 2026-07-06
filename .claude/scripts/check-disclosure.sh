@@ -36,16 +36,18 @@ echo "$diff_content" | awk '
   # Self-review protection: skip skill files
   if [ "$(is_skill_file "$file")" = "true" ]; then continue; fi
 
-  # DIS-01: SAP-internal hostnames
-  if echo "$content" | grep -qEi '(int\.repositories\.cloud\.sap|\.tools\.sap|\.wdf\.sap\.corp|\.mo\.sap\.corp|jira\.tools\.sap)'; then
-    emit_finding "DIS-01" "$(sev_public)" "$file" "$line_num" "SAP-internal hostname detected in code" "" >> "$findings"
-  fi
-  # DIS-02: Internal Jira URL
+  # DIS-02: Internal Jira URL (checked first — more specific)
+  dis02_fired=false
   if echo "$content" | grep -qEi 'jira\.tools\.sap|jira\.wdf\.sap\.corp'; then
     emit_finding "DIS-02" "$(sev_public)" "$file" "$line_num" "Internal Jira URL — remove or move to internal-only docs" "" >> "$findings"
+    dis02_fired=true
+  fi
+  # DIS-01: SAP-internal hostnames (skip if DIS-02 already covers the same line)
+  if [ "$dis02_fired" = "false" ] && echo "$content" | grep -qEi '(int\.repositories\.cloud\.sap|\.tools\.sap|\.wdf\.sap\.corp|\.mo\.sap\.corp)'; then
+    emit_finding "DIS-01" "$(sev_public)" "$file" "$line_num" "SAP-internal hostname detected in code" "" >> "$findings"
   fi
   # DIS-06: Internal artifactory index-url
-  if echo "$content" | grep -qEi '\-\-index-url\s+https?://int\.repositories\.cloud\.sap'; then
+  if echo "$content" | grep -qEi '\-\-index-url[[:space:]]+https?://int\.repositories\.cloud\.sap'; then
     emit_finding "DIS-06" "BLOCK" "$file" "$line_num" "Internal artifactory --index-url — must not appear in public/shared configs" "" >> "$findings"
   fi
 done

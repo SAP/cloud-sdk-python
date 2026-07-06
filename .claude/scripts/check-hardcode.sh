@@ -36,13 +36,19 @@ echo "$diff_content" | awk '
   # Filter out test/mock/docs/constants files
   if echo "$file" | grep -qE "$ignore_files"; then continue; fi
 
-  # HC-01: hardcoded URL
-  if echo "$content" | grep -qE 'https?://[a-zA-Z0-9]'; then
-    # exempt localhost / example.com / example.org (test-safe)
-    if ! echo "$content" | grep -qE 'https?://(localhost|127\.0\.0\.1|example\.(com|org|net)|reserved\.)'; then
-      emit_finding "HC-01" "BLOCK" "$file" "$line_num" "Hardcoded URL in implementation — externalize to config" "" >> "$findings"
+  # HC-01: hardcoded URL. Extract each URL and check individually so a line
+  # with both example.com (allowed) and api.com (real) still fires on the real one.
+  # Use word boundary via (^|[^A-Za-z0-9]) so we don't match tokens inside identifiers.
+  while IFS= read -r url; do
+    [ -z "$url" ] && continue
+    # allow-list: only IANA-reserved test/example TLDs and localhost
+    # `.example` must be the terminal label (RFC 2606) — anchor at path/port/end.
+    if echo "$url" | grep -qE '^https?://(localhost|127\.0\.0\.1|example\.(com|org|net)|[^/]+\.example(/|:|$)|reserved\.)'; then
+      continue
     fi
-  fi
+    emit_finding "HC-01" "BLOCK" "$file" "$line_num" "Hardcoded URL '$url' in implementation — externalize to config" "" >> "$findings"
+    break  # only one finding per line to avoid duplicate reports
+  done < <(echo "$content" | grep -oE 'https?://[A-Za-z0-9][A-Za-z0-9._~:/?#@!$&*+,;=%-]*' || true)
   # HC-02: Authorization Bearer
   if echo "$content" | grep -qE 'Authorization[[:space:]]*:[[:space:]]*Bearer[[:space:]]+[A-Za-z0-9]'; then
     emit_finding "HC-02" "BLOCK" "$file" "$line_num" "Hardcoded Authorization header value" "" >> "$findings"
@@ -58,7 +64,8 @@ echo "$diff_content" | awk '
     fi
   fi
   # HC-06: hardcoded timeout numeric literal
-  if echo "$content" | grep -qiE '(timeout|retries|max_retries)[[:space:]]*=[[:space:]]*[0-9]+'; then
+  # Use word boundary via (^|[^A-Za-z0-9_]) so 'default_timeout' or 'my_timeout' don't match
+  if echo "$content" | grep -qiE '(^|[^A-Za-z0-9_])(timeout|retries|max_retries)[[:space:]]*=[[:space:]]*[0-9]+'; then
     emit_finding "HC-06" "FLAG" "$file" "$line_num" "Hardcoded timeout/retry number — externalize to config" "" >> "$findings"
   fi
 done

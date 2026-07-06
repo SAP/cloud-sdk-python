@@ -23,14 +23,25 @@ reuse_present=$(reuse_toml_aggregate_present "$REPO_ROOT")
 diff_content=$(cat "$DIFF_FILE" 2>/dev/null || echo "")
 
 if [ "$reuse_present" = "true" ]; then
-  # Baseline exemption: rule OFF for this repo
+  # Baseline exemption: rule OFF for this repo. Emit a valid report matching
+  # the JSON contract in 00-COMMON.md §3 (aggregators expect these fields).
   jq -n --arg check "license-spdx" --arg lang "$LANGUAGE" --arg started "$STARTED" \
     '{
-      check: $check, version: "1.0.0", language: $lang, status: "PASS",
-      started_at: $started, duration_ms: 0, modules_analysed: [],
-      findings: [], shadow_findings: [],
-      summary: {block_count: 0, flag_count: 0, suppressed_by_baseline: 0,
-                note: "REUSE.toml aggregate present — LIC-01/02 exempted"}
+      check: $check,
+      version: "1.0.0",
+      language: $lang,
+      status: "PASS",
+      started_at: $started,
+      duration_ms: 0,
+      modules_analysed: [],
+      findings: [],
+      summary: {
+        block_count: 0,
+        flag_count: 0,
+        suppressed_by_baseline: 0,
+        pass_criteria_met: ["REUSE.toml aggregate present — LIC-01/02 exempted"],
+        pass_criteria_failed: []
+      }
     }'
   exit 0
 fi

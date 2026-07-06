@@ -61,6 +61,7 @@ class ScenarioContext:
         self.retrieved_labels: List[Label] = []
         self.http_client: Optional[DestinationHttpClient] = None
         self.http_response = None
+        self.service_instance_id: Optional[str] = None
 
 
 @pytest.fixture
@@ -1621,3 +1622,17 @@ def assert_authorization_header_present(context):
         f"Expected Authorization header in response, got: {list(echoed.keys())}. "
         "Check that BTP returned an auth token for the destination."
     )
+
+
+@when("I call get_service_instance_id")
+def call_get_service_instance_id(context, destination_client):
+    """Call get_service_instance_id and store the result."""
+    context.service_instance_id = destination_client.get_service_instance_id()
+
+
+@then("the service instance ID should be a non-empty string")
+def assert_service_instance_id_non_empty(context):
+    """Verify the service instance ID is a non-empty string."""
+    assert context.service_instance_id is not None
+    assert isinstance(context.service_instance_id, str)
+    assert context.service_instance_id.strip(), "Expected a non-empty service instance ID"

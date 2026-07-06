@@ -1,0 +1,352 @@
+#!/usr/bin/env python3
+"""AST-based checks for Python source files.
+
+Called from bash check-*.sh scripts. Reads source files, emits JSONL findings
+to stdout (one JSON object per line).
+
+Usage:
+    python3 ast-python-checks.py <check-name> <file1> [<file2> ...]
+
+Where <check-name> is one of:
+    el-01, el-02          exception chaining / swallow
+    tel-02, tel-06        telemetry decorators / tests
+    pt-01, pt-08, pt-11   patterns
+    con-01                repeated string literals
+"""
+
+from __future__ import annotations
+
+import ast
+import json
+import sys
+from pathlib import Path
+
+
+def emit(
+    rule: str, severity: str, file: str, line: int, message: str, suggestion: str = ""
+) -> None:
+    print(
+        json.dumps(
+            {
+                "rule": rule,
+                "severity": severity,
+                "file": file,
+                "line": line,
+                "message": message,
+                "suggestion": suggestion,
+            }
+        )
+    )
+
+
+def parse_file(path: str) -> ast.Module | None:
+    try:
+        source = Path(path).read_text()
+        return ast.parse(source, filename=path)
+    except (SyntaxError, UnicodeDecodeError, FileNotFoundError):
+        return None
+
+
+# ---------- PY-EL-01: raise X from e when raising DIFFERENT exception ----------
+
+
+def check_el_01(path: str, tree: ast.Module) -> None:
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.ExceptHandler):
+            continue
+        handler_name = node.name  # the caught exception variable, may be None
+        for inner in ast.walk(node):
+            if not isinstance(inner, ast.Raise):
+                continue
+            # bare `raise` — PASS (preserves cause)
+            if inner.exc is None:
+                continue
+            # `raise e` where e is the handler var — PASS (same exception)
+            if (
+                isinstance(inner.exc, ast.Name)
+                and handler_name
+                and inner.exc.id == handler_name
+            ):
+                continue
+            # raising a *call* to the same var, e.g. `raise e()` (rare) — PASS
+            if (
+                isinstance(inner.exc, ast.Call)
+                and isinstance(inner.exc.func, ast.Name)
+                and handler_name
+                and inner.exc.func.id == handler_name
+            ):
+                continue
+            # different exception without `from e` → FLAG
+            if inner.cause is None:
+                emit(
+                    "PY-EL-01",
+                    "FLAG",
+                    path,
+                    inner.lineno,
+                    "Raising different exception inside except — use `raise X from e` to preserve cause",
+                )
+
+
+# ---------- PY-EL-02: except body must end with raise or explicit suppression ----------
+
+
+def check_el_02(path: str, tree: ast.Module) -> None:
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.ExceptHandler):
+            continue
+        if not node.body:
+            continue
+        last = node.body[-1]
+        # last statement is Raise → PASS
+        if isinstance(last, ast.Raise):
+            continue
+        # last statement is Return of a variable named e / err / exc → likely intentional propagation → PASS
+        if (
+            isinstance(last, ast.Return)
+            and isinstance(last.value, ast.Name)
+            and last.value.id in {"e", "err", "exc"}
+        ):
+            continue
+        # explicit `pass` and only `pass` in body → obvious swallow → FLAG
+        emit(
+            "PY-EL-02",
+            "FLAG",
+            path,
+            node.lineno,
+            "except block does not end with `raise` — swallowing? Add re-raise or comment justifying suppression",
+        )
+
+
+# ---------- PY-TEL-02: public *Client methods have @record_metrics ----------
+
+
+def check_tel_02(path: str, tree: ast.Module) -> None:
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.ClassDef):
+            continue
+        if not node.name.endswith("Client"):
+            continue
+        for item in node.body:
+            if not isinstance(item, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                continue
+            if item.name.startswith("_"):
+                continue
+            has_record = any(
+                (
+                    isinstance(d, ast.Call)
+                    and isinstance(d.func, ast.Name)
+                    and d.func.id == "record_metrics"
+                )
+                or (isinstance(d, ast.Name) and d.id == "record_metrics")
+                for d in item.decorator_list
+            )
+            if not has_record:
+                emit(
+                    "PY-TEL-02",
+                    "BLOCK",
+                    path,
+                    item.lineno,
+                    f"Public method `{node.name}.{item.name}` missing @record_metrics decorator",
+                )
+
+
+# ---------- PY-TEL-06: test files that assert record_request_metric calls ----------
+
+
+def check_tel_06_test_asserts(path: str, tree: ast.Module) -> bool:
+    """Returns True if the test file asserts record_request_metric was called."""
+    src = ast.dump(tree)
+    return "record_request_metric" in src
+
+
+# ---------- PY-PT-08: public functions/methods have type hints ----------
+
+
+def check_pt_08(path: str, tree: ast.Module) -> None:
+    for node in ast.walk(tree):
+        if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            continue
+        # skip private functions
+        if node.name.startswith("_") and node.name != "__init__":
+            continue
+        # check return annotation
+        if node.returns is None and node.name != "__init__":
+            emit(
+                "PY-PT-08",
+                "FLAG",
+                path,
+                node.lineno,
+                f"Public function `{node.name}` missing return type annotation",
+            )
+        # check arg annotations (excluding self)
+        args = node.args.args
+        for arg in args:
+            if arg.arg == "self":
+                continue
+            if arg.annotation is None:
+                emit(
+                    "PY-PT-08",
+                    "FLAG",
+                    path,
+                    node.lineno,
+                    f"Parameter `{arg.arg}` of `{node.name}` missing type annotation",
+                )
+
+
+# ---------- PY-CON-01: repeated string literals ----------
+
+
+def check_con_01(
+    path: str, tree: ast.Module, threshold: int = 3, min_len: int = 4
+) -> None:
+    counts: dict[str, list[int]] = {}
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Constant) and isinstance(node.value, str):
+            v = node.value
+            if len(v) < min_len:
+                continue
+            if v.startswith(("http", "test-", "SPDX", "@example")):
+                continue  # skip URLs, test fixtures, doc markers
+            counts.setdefault(v, []).append(node.lineno)
+    for literal, lines in counts.items():
+        if len(lines) >= threshold:
+            emit(
+                "PY-CON-01",
+                "FLAG",
+                path,
+                lines[0],
+                f"String literal {literal!r} appears {len(lines)}× — extract module-level constant",
+                suggestion=f"e.g., _CONSTANT_NAME = {literal!r}",
+            )
+
+
+# ---------- PY-PT-01: create_client factory exists ----------
+
+
+def check_pt_01(module_dir: str) -> bool:
+    """Check if module has create_client() function (returns True if found)."""
+    p = Path(module_dir)
+    if not p.is_dir():
+        return False
+    # scan module-level defs across all .py files
+    for py in p.glob("*.py"):
+        if py.name.startswith("_") and py.name != "__init__.py":
+            continue
+        tree = parse_file(str(py))
+        if tree is None:
+            continue
+        for node in tree.body:
+            if (
+                isinstance(node, ast.FunctionDef)
+                and node.name.startswith("create_")
+                and node.name.endswith("client")
+            ):
+                return True
+    return False
+
+
+# ---------- __all__ extraction (used by breaking-detector.py) ----------
+
+
+def extract_all(tree: ast.Module) -> list[str]:
+    """Extract the __all__ list from a module AST."""
+    for node in tree.body:
+        if not isinstance(node, ast.Assign):
+            continue
+        for target in node.targets:
+            if isinstance(target, ast.Name) and target.id == "__all__":
+                if isinstance(node.value, (ast.List, ast.Tuple)):
+                    return [
+                        elt.value
+                        for elt in node.value.elts
+                        if isinstance(elt, ast.Constant) and isinstance(elt.value, str)
+                    ]
+    return []
+
+
+def extract_public_class_methods(
+    tree: ast.Module,
+) -> dict[str, dict[str, tuple[list[str], str | None]]]:
+    """Return {ClassName: {method_name: (arg_names, return_annotation_repr)}}."""
+    result: dict[str, dict[str, tuple[list[str], str | None]]] = {}
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.ClassDef):
+            continue
+        if node.name.startswith("_"):
+            continue
+        methods: dict[str, tuple[list[str], str | None]] = {}
+        for item in node.body:
+            if not isinstance(item, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                continue
+            if item.name.startswith("_") and item.name != "__init__":
+                continue
+            args = [a.arg for a in item.args.args if a.arg != "self"]
+            ret = ast.unparse(item.returns) if item.returns else None
+            methods[item.name] = (args, ret)
+        if methods:
+            result[node.name] = methods
+    return result
+
+
+def extract_dataclass_fields(tree: ast.Module) -> dict[str, list[str]]:
+    """Return {DataclassName: [field_names]} for classes decorated with @dataclass."""
+    result: dict[str, list[str]] = {}
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.ClassDef):
+            continue
+        is_dc = any(
+            (isinstance(d, ast.Name) and d.id == "dataclass")
+            or (
+                isinstance(d, ast.Call)
+                and isinstance(d.func, ast.Name)
+                and d.func.id == "dataclass"
+            )
+            for d in node.decorator_list
+        )
+        if not is_dc:
+            continue
+        fields: list[str] = []
+        for item in node.body:
+            if isinstance(item, ast.AnnAssign) and isinstance(item.target, ast.Name):
+                fields.append(item.target.id)
+        if fields:
+            result[node.name] = fields
+    return result
+
+
+# ---------- dispatcher ----------
+
+CHECKS = {
+    "el-01": check_el_01,
+    "el-02": check_el_02,
+    "tel-02": check_tel_02,
+    "pt-08": check_pt_08,
+    "con-01": check_con_01,
+}
+
+
+def main(argv: list[str]) -> int:
+    if len(argv) < 3:
+        print(
+            "Usage: ast-python-checks.py <check-name> <file1> [<file2> ...]",
+            file=sys.stderr,
+        )
+        return 2
+    check_name = argv[1]
+    files = argv[2:]
+
+    if check_name not in CHECKS:
+        print(f"ERROR: unknown check {check_name}", file=sys.stderr)
+        return 2
+
+    fn = CHECKS[check_name]
+    for f in files:
+        tree = parse_file(f)
+        if tree is None:
+            continue
+        fn(f, tree)
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv))

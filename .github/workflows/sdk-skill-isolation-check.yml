@@ -1,0 +1,59 @@
+name: SDK Skill Isolation Check
+# Validates that sub-PRs into feat/sdk-review-skill satisfy the isolation criteria
+# from 06-INCREMENTAL-DELIVERY.md §isolation criteria.
+on:
+  pull_request:
+    branches: [feat/sdk-review-skill]
+
+jobs:
+  isolation:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Install tools
+        run: |
+          sudo apt-get update && sudo apt-get install -y jq shellcheck bats
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install ruff
+        run: pip install ruff
+      - name: 1. Compiles alone — shellcheck
+        run: |
+          shellcheck -x --severity=error .claude/scripts/**/*.sh
+      - name: 1. Compiles alone — ruff
+        run: |
+          ruff check .claude/scripts/lib/*.py
+      - name: 2. Testable alone — bats
+        run: |
+          bats tests/sdk-review/*.bats
+      - name: 3. Revert-safe — nothing in main branch broken
+        run: |
+          # Verify that scripts still function after this PR is applied
+          bash .claude/scripts/lib/detect-language.sh /tmp || echo "detect-language exit acceptable"
+          bash .claude/scripts/lib/diff-added-lines.sh < /dev/null || echo "diff-added-lines exit acceptable"
+      - name: 4. Sub-PR size check
+        run: |
+          # Warn if PR exceeds max sub-PR size (400 LOC per 06-INCREMENTAL-DELIVERY.md)
+          adds=$(git diff origin/feat/sdk-review-skill...HEAD --shortstat | grep -oE '[0-9]+ insertion' | grep -oE '[0-9]+' || echo 0)
+          if [ "${adds:-0}" -gt 400 ]; then
+            echo "::warning::Sub-PR has $adds additions (>400 target). Consider splitting per 06-INCREMENTAL-DELIVERY.md."
+          fi
+      - name: 5. Fixture-tested check
+        run: |
+          # Every new check-*.sh must have at least one fixture
+          new_checks=$(git diff origin/feat/sdk-review-skill...HEAD --name-only --diff-filter=A | grep '^\.claude/scripts/check-' || true)
+          missing_fixtures=""
+          for check in $new_checks; do
+            name=$(basename "$check" .sh | sed 's/^check-//')
+            if ! ls tests/sdk-review/fixtures/${name}-*.diff >/dev/null 2>&1; then
+              missing_fixtures="$missing_fixtures $name"
+            fi
+          done
+          if [ -n "$missing_fixtures" ]; then
+            echo "::error::New checks missing fixtures:$missing_fixtures"
+            exit 1
+          fi

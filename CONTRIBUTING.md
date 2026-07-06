@@ -70,6 +70,31 @@ Before starting your contribution:
 - **Read [Code Guidelines](docs/GUIDELINES.md)** to understand our development standards and conventions
 - **Review existing user guides** to understand the expected documentation format and API patterns
 
+#### AI-assisted contribution skills — required for review
+
+Before maintainers review your PR, you **must** run the SDK Module Review skill and ensure it passes. Reviewers will not review PRs where `sdk-module-review` is failing or missing.
+
+**How to run:**
+
+- **In CI (automatic):** every PR triggers the `sdk-module-review` GitHub Action. It runs 20 deterministic checks and posts findings (inline comments + summary + check-run + label). This is a **required status check** — the merge button is disabled until the run is green.
+
+- **Locally (recommended, before pushing):**
+  ```
+  /review-new-module <PR_NUMBER>            # posts findings to the PR
+  /review-new-module <PR_NUMBER> --dry-run  # analysis only, prints locally
+  ```
+  Uses the exact same scripts the CI uses. No LLM calls — same input, same output.
+
+**Related skills:**
+
+- **`scaffold-module`** (`.claude/skills/scaffold-module/`) — bootstraps a new BTP service module with the standard directory layout, telemetry wiring, and stubs. Use before writing code for a new module:
+  ```
+  /scaffold-module <module-name>
+  ```
+- **`review-pr`** (`.claude/skills/review-pr/`) — same underlying pipeline as `/review-new-module`; useful when reviewing someone else's PR interactively.
+
+See [`docs/PR-REVIEW.md`](docs/PR-REVIEW.md) for the full rule catalog, suppression syntax, and how to interact with review findings.
+
 ### 2. Create or claim an issue
 
 1. Go to our repository's [GitHub Issues page](https://github.com/SAP/cloud-sdk-python/issues)

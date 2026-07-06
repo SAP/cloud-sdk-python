@@ -434,7 +434,9 @@ class DestinationClient:
             if options and options.skip_token_retrieval:
                 params["$skipTokenRetrieval"] = "true"
 
-            resp = self._http.get(path, headers=headers, tenant_subdomain=tenant, params=params or None)
+            resp = self._http.get(
+                path, headers=headers, tenant_subdomain=tenant, params=params or None
+            )
             data = resp.json()
 
             # Parse v2 response: destinationConfiguration + authTokens + certificates

@@ -16,6 +16,28 @@ from sap_cloud_sdk.agentgateway._models import MCPTool
 if TYPE_CHECKING:
     from langchain_core.tools import StructuredTool
 
+_JSON_TYPE_MAP: dict[str, type] = {
+    "string": str,
+    "integer": int,
+    "number": float,
+    "boolean": bool,
+    "array": list,
+    "object": dict,
+}
+
+
+def _resolve_type(json_type: Any) -> tuple[type, bool]:
+    """Return (python_type, is_nullable) from a JSON Schema ``type`` value.
+
+    Handles both the plain-string form (``"integer"``) and the array form
+    (``["integer", "null"]``).  Unknown or missing types map to ``Any``.
+    """
+    if isinstance(json_type, list):
+        nullable = "null" in json_type
+        scalar = next((t for t in json_type if t != "null"), None)
+        return _JSON_TYPE_MAP.get(scalar, Any), nullable
+    return _JSON_TYPE_MAP.get(json_type, Any), False
+
 
 def mcp_tool_to_langchain(
     mcp_tool: MCPTool,
@@ -82,10 +104,14 @@ def mcp_tool_to_langchain(
     # Build args schema from input_schema
     properties = mcp_tool.input_schema.get("properties", {})
     required = set(mcp_tool.input_schema.get("required", []))
-    fields: dict[str, Any] = {
-        k: (str, ...) if k in required else (str | None, Field(default=None))
-        for k in properties
-    }
+    fields: dict[str, Any] = {}
+    for k, v in properties.items():
+        py_type, type_nullable = _resolve_type(v.get("type"))
+        optional = k not in required
+        if optional or type_nullable:
+            fields[k] = (py_type | None, Field(default=None))
+        else:
+            fields[k] = (py_type, ...)
     args_schema = create_model(f"{mcp_tool.name}_args", **fields) if fields else None
 
     return StructuredTool.from_function(

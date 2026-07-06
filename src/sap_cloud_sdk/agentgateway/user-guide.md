@@ -130,6 +130,20 @@ mcp_tool_to_langchain(
 )
 ```
 
+The converter maps each property's JSON Schema `"type"` to the corresponding Python type so Pydantic validates and forwards the correct native type to the MCP server:
+
+| JSON Schema type | Python type |
+|------------------|-------------|
+| `"string"`       | `str`       |
+| `"integer"`      | `int`       |
+| `"number"`       | `float`     |
+| `"boolean"`      | `bool`      |
+| `"array"`        | `list`      |
+| `"object"`       | `dict`      |
+| missing / other  | `Any`       |
+
+Optional fields (not listed in `"required"`) are typed as `T | None` with a `None` default.
+
 ## Concepts
 
 ### Agent Types

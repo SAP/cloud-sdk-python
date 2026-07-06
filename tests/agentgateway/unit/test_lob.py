@@ -24,7 +24,13 @@ from sap_cloud_sdk.agentgateway._lob import (
     _fetch_agent_card,
     call_mcp_tool_lob,
 )
-from sap_cloud_sdk.agentgateway._models import Agent, AgentCard, MCPTool
+from sap_cloud_sdk.agentgateway._models import (
+    Agent,
+    AgentCard,
+    AgentCardFilter,
+    MCPTool,
+    MCPToolFilter,
+)
 from sap_cloud_sdk.agentgateway._token_cache import _GatewayUrlCache, _TokenCache
 from sap_cloud_sdk.agentgateway.config import ClientConfig
 from sap_cloud_sdk.agentgateway.exceptions import AgentGatewaySDKError, MCPServerNotFoundError
@@ -596,6 +602,187 @@ class TestGetMcpToolsLob:
             assert len(result) == 1
             assert result[0].name == "tool2"
 
+    @pytest.mark.asyncio
+    async def test_filters_fragments_by_ord_id_pre_fetch(self):
+        """Skip non-matching fragments BEFORE calling list_server_tools."""
+        sales = MagicMock()
+        sales.name = "frag-sales"
+        sales.properties = {
+            "URL": "https://agw.example.com/v1/mcp/sap.s4:apiAccess:salesOrder:v1/gt-1"
+        }
+        finance = MagicMock()
+        finance.name = "frag-finance"
+        finance.properties = {
+            "URL": "https://agw.example.com/v1/mcp/sap.s4:apiAccess:finance:v1/gt-1"
+        }
+
+        sales_tool = MCPTool(
+            name="get-sales-order",
+            server_name="sales",
+            description="",
+            input_schema={},
+            url=sales.properties["URL"],
+            fragment_name="frag-sales",
+        )
+
+        with (
+            patch("sap_cloud_sdk.agentgateway._lob.list_mcp_fragments") as mock_list,
+            patch(
+                "sap_cloud_sdk.agentgateway._lob.list_server_tools",
+                new_callable=AsyncMock,
+                return_value=[sales_tool],
+            ) as mock_tools,
+        ):
+            mock_list.return_value = [sales, finance]
+
+            result = await get_mcp_tools_lob(
+                "tenant-sub",
+                "system-token",
+                60.0,
+                filter=MCPToolFilter(ord_ids=["sap.s4:apiAccess:salesOrder:v1"]),
+            )
+
+        assert mock_tools.call_count == 1
+        assert mock_tools.call_args.args[0] == sales.properties["URL"]
+        assert [t.name for t in result] == ["get-sales-order"]
+
+    @pytest.mark.asyncio
+    async def test_filters_tools_by_name_post_fetch(self):
+        """Fetch from all fragments, then filter the returned tools by name."""
+        frag = MagicMock()
+        frag.name = "frag"
+        frag.properties = {
+            "URL": "https://agw.example.com/v1/mcp/sap.s4:apiAccess:salesOrder:v1/gt-1"
+        }
+
+        keep = MCPTool(
+            name="get-sales-order",
+            server_name="s",
+            description="",
+            input_schema={},
+            url=frag.properties["URL"],
+            fragment_name="frag",
+        )
+        drop = MCPTool(
+            name="cancel-sales-order",
+            server_name="s",
+            description="",
+            input_schema={},
+            url=frag.properties["URL"],
+            fragment_name="frag",
+        )
+
+        with (
+            patch("sap_cloud_sdk.agentgateway._lob.list_mcp_fragments") as mock_list,
+            patch(
+                "sap_cloud_sdk.agentgateway._lob.list_server_tools",
+                new_callable=AsyncMock,
+                return_value=[keep, drop],
+            ),
+        ):
+            mock_list.return_value = [frag]
+
+            result = await get_mcp_tools_lob(
+                "tenant-sub",
+                "system-token",
+                60.0,
+                filter=MCPToolFilter(names=["get-sales-order"]),
+            )
+
+        assert [t.name for t in result] == ["get-sales-order"]
+
+    @pytest.mark.asyncio
+    async def test_ord_id_and_name_filter_together_use_and_semantics(self):
+        """Both filters applied together — only tools matching both survive."""
+        sales = MagicMock()
+        sales.name = "frag-sales"
+        sales.properties = {
+            "URL": "https://agw.example.com/v1/mcp/sap.s4:apiAccess:salesOrder:v1/gt-1"
+        }
+        finance = MagicMock()
+        finance.name = "frag-finance"
+        finance.properties = {
+            "URL": "https://agw.example.com/v1/mcp/sap.s4:apiAccess:finance:v1/gt-1"
+        }
+
+        def per_fragment_tools(url, *_args, **_kwargs):
+            if "salesOrder" in url:
+                return [
+                    MCPTool(
+                        name="get-sales-order",
+                        server_name="s",
+                        description="",
+                        input_schema={},
+                        url=url,
+                        fragment_name="frag-sales",
+                    )
+                ]
+            return [
+                MCPTool(
+                    name="get-cost-center",
+                    server_name="f",
+                    description="",
+                    input_schema={},
+                    url=url,
+                    fragment_name="frag-finance",
+                )
+            ]
+
+        with (
+            patch("sap_cloud_sdk.agentgateway._lob.list_mcp_fragments") as mock_list,
+            patch(
+                "sap_cloud_sdk.agentgateway._lob.list_server_tools",
+                new_callable=AsyncMock,
+                side_effect=per_fragment_tools,
+            ),
+        ):
+            mock_list.return_value = [sales, finance]
+
+            result = await get_mcp_tools_lob(
+                "tenant-sub",
+                "system-token",
+                60.0,
+                filter=MCPToolFilter(
+                    names=["get-sales-order"],
+                    ord_ids=["sap.s4:apiAccess:finance:v1"],
+                ),
+            )
+
+            assert result == []
+
+    @pytest.mark.asyncio
+    async def test_empty_filter_lists_behave_like_none(self):
+        """MCPToolFilter() with empty lists behaves like no filter (returns everything)."""
+        frag = MagicMock()
+        frag.name = "frag"
+        frag.properties = {
+            "URL": "https://agw.example.com/v1/mcp/sap.s4:apiAccess:salesOrder:v1/gt-1"
+        }
+        tool = MCPTool(
+            name="get-sales-order",
+            server_name="s",
+            description="",
+            input_schema={},
+            url=frag.properties["URL"],
+            fragment_name="frag",
+        )
+
+        with (
+            patch("sap_cloud_sdk.agentgateway._lob.list_mcp_fragments") as mock_list,
+            patch(
+                "sap_cloud_sdk.agentgateway._lob.list_server_tools",
+                new_callable=AsyncMock,
+                return_value=[tool],
+            ),
+        ):
+            mock_list.return_value = [frag]
+
+            result = await get_mcp_tools_lob(
+                "tenant-sub", "system-token", 60.0, filter=MCPToolFilter()
+            )
+
+            assert [t.name for t in result] == ["get-sales-order"]
+
 
 # ============================================================
 # Test: call_mcp_tool_lob
@@ -709,13 +896,19 @@ class TestCallMcpToolLob:
 
 
 class TestOrdIdFromUrl:
-    """Tests for _ord_id_from_url helper."""
+    """Tests for _ord_id_from_url helper (used for both A2A and MCP fragment URLs)."""
 
     def test_extracts_ord_id_from_standard_url(self):
         """Return the second-to-last path segment as ord_id."""
         assert _ord_id_from_url(
             "https://agw.example.com/v1/a2a/sap.s4:agent:v1/tenant-abc"
         ) == "sap.s4:agent:v1"
+
+    def test_extracts_ord_id_from_mcp_url(self):
+        """Same extraction logic works for MCP fragment URLs."""
+        assert _ord_id_from_url(
+            "https://agw.example.com/v1/mcp/sap.s4:apiAccess:salesOrder:v1/global-tenant-1"
+        ) == "sap.s4:apiAccess:salesOrder:v1"
 
     def test_strips_trailing_slash(self):
         """Handle trailing slash on URL."""
@@ -920,7 +1113,10 @@ class TestGetAgentCardsLob:
             ),
         ):
             result = await get_agent_cards_lob(
-                "tenant-sub", "token", 60.0, agent_names=["Billing Agent"]
+                "tenant-sub",
+                "token",
+                60.0,
+                filter=AgentCardFilter(agent_names=["Billing Agent"]),
             )
 
         assert len(result) == 1
@@ -945,7 +1141,10 @@ class TestGetAgentCardsLob:
             ) as mock_fetch,
         ):
             result = await get_agent_cards_lob(
-                "tenant-sub", "token", 60.0, ord_ids=["ord-2"]
+                "tenant-sub",
+                "token",
+                60.0,
+                filter=AgentCardFilter(ord_ids=["ord-2"]),
             )
 
         assert len(result) == 1

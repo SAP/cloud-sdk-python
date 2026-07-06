@@ -45,7 +45,7 @@ result = await agw_client.call_mcp_tool(
 LoB agents use BTP Destination Service for credential management. Tools and A2A agents are auto-discovered from destination fragments.
 
 ```python
-from sap_cloud_sdk.agentgateway import ClientConfig, create_client
+from sap_cloud_sdk.agentgateway import ClientConfig, MCPToolFilter, create_client
 
 config = ClientConfig(timeout=30.0)
 agw_client = create_client(tenant_subdomain="my-tenant", config=config)
@@ -53,6 +53,14 @@ agw_client = create_client(tenant_subdomain="my-tenant", config=config)
 # Discover MCP tools (auto-discovered from destination fragments)
 # Pass user_token to use principal propagation when listing tools
 tools = await agw_client.list_mcp_tools(user_token="user-jwt")
+
+# Filter by tool name (post-fetch) or ORD ID (pre-fetch)
+tools = await agw_client.list_mcp_tools(
+    filter=MCPToolFilter(
+        names=["get-sales-order"],
+        ord_ids=["sap.s4:apiAccess:salesOrder:v1"],
+    )
+)
 
 # Invoke a tool (user_token required for principal propagation)
 result = await agw_client.call_mcp_tool(
@@ -204,6 +212,7 @@ class AgentGatewayClient:
         self,
         user_token: str | Callable[[], str] | None = None,
         app_tid: str | None = None,
+        filter: MCPToolFilter | None = None,
     ) -> list[MCPTool]
 
     async def call_mcp_tool(
@@ -231,7 +240,23 @@ AgentCardFilter(
 )
 ```
 
-Both fields default to empty lists. Filters are applied with AND semantics: if both are set, an agent must match both to be included. `agent_names` is applied after fetching (requires reading the card); `ord_ids` is applied before fetching (extracted from the fragment URL, no card request needed).
+Both fields default to empty lists. `agent_names` is applied after fetching; `ord_ids` is applied before fetching (extracted from the fragment URL, no card request needed).
+
+### MCPToolFilter
+
+```python
+from sap_cloud_sdk.agentgateway import MCPToolFilter
+
+MCPToolFilter(
+    names=[],    # tool names to include (matched against MCPTool.name); empty = no filter
+    ord_ids=[],  # ORD IDs to include (extracted from fragment URL for LoB, or matched
+                 # against IntegrationDependency.ord_id for customer agents); empty = no filter
+)
+```
+
+Both fields default to empty lists. `names` is applied after fetching; `ord_ids` is applied before fetching, skipping non-matching fragments.
+
+> Both filter classes use AND semantics: if both fields are set, a result must match all of them to be included.
 
 ### Data Models
 

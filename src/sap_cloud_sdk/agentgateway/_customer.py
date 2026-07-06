@@ -23,6 +23,7 @@ from sap_cloud_sdk.agentgateway._models import (
     CustomerCredentials,
     IntegrationDependency,
     MCPTool,
+    MCPToolFilter,
 )
 from sap_cloud_sdk.agentgateway._token_cache import _TokenCache
 from sap_cloud_sdk.agentgateway.exceptions import AgentGatewaySDKError
@@ -480,6 +481,7 @@ async def get_mcp_tools_customer(
     credentials: CustomerCredentials,
     system_token: str,
     timeout: float,
+    filter: MCPToolFilter | None = None,
 ) -> list[MCPTool]:
     """List all MCP tools from servers defined in credentials.
 
@@ -490,6 +492,8 @@ async def get_mcp_tools_customer(
         credentials: Customer credentials with integrationDependencies.
         system_token: Pre-fetched raw system token for authentication.
         timeout: HTTP timeout in seconds for MCP server calls.
+        filter: Optional MCPToolFilter narrowing results by tool name or ORD ID.
+            If None or empty, all tools are included.
 
     Returns:
         List of MCPTool objects from all servers.
@@ -497,12 +501,18 @@ async def get_mcp_tools_customer(
     Raises:
         AgentGatewaySDKError: If integrationDependencies is empty.
     """
+    f = filter or MCPToolFilter()
     dependencies = credentials.integration_dependencies
 
     if not dependencies:
         raise AgentGatewaySDKError(
             "integrationDependencies is empty in credentials — no MCP servers configured."
         )
+
+    # Pre-fetch filter: ORD ID is extractable from the URL without fetching tools
+    if f.ord_ids:
+        ord_ids_set = set(f.ord_ids)
+        dependencies = [d for d in dependencies if d.ord_id in ord_ids_set]
 
     logger.info("Discovering tools from %d MCP server(s)", len(dependencies))
 
@@ -523,6 +533,11 @@ async def get_mcp_tools_customer(
             logger.debug("Loaded %d tool(s) from %s", len(server_tools), dep.ord_id)
         except Exception:
             logger.exception("Failed to load tools from %s — skipping", dep.ord_id)
+
+    # Post-fetch filter: tool names are only known after fetching
+    if f.names:
+        names_set = set(f.names)
+        tools = [t for t in tools if t.name in names_set]
 
     logger.info(
         "Loaded %d MCP tool(s) from %d server(s)", len(tools), len(dependencies)

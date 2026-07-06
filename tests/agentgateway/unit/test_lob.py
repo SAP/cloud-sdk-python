@@ -24,7 +24,13 @@ from sap_cloud_sdk.agentgateway._lob import (
     _fetch_agent_card,
     call_mcp_tool_lob,
 )
-from sap_cloud_sdk.agentgateway._models import Agent, AgentCard, MCPTool, MCPToolFilter
+from sap_cloud_sdk.agentgateway._models import (
+    Agent,
+    AgentCard,
+    AgentCardFilter,
+    MCPTool,
+    MCPToolFilter,
+)
 from sap_cloud_sdk.agentgateway._token_cache import _GatewayUrlCache, _TokenCache
 from sap_cloud_sdk.agentgateway.config import ClientConfig
 from sap_cloud_sdk.agentgateway.exceptions import AgentGatewaySDKError, MCPServerNotFoundError
@@ -1107,7 +1113,10 @@ class TestGetAgentCardsLob:
             ),
         ):
             result = await get_agent_cards_lob(
-                "tenant-sub", "token", 60.0, agent_names=["Billing Agent"]
+                "tenant-sub",
+                "token",
+                60.0,
+                filter=AgentCardFilter(agent_names=["Billing Agent"]),
             )
 
         assert len(result) == 1
@@ -1132,7 +1141,10 @@ class TestGetAgentCardsLob:
             ) as mock_fetch,
         ):
             result = await get_agent_cards_lob(
-                "tenant-sub", "token", 60.0, ord_ids=["ord-2"]
+                "tenant-sub",
+                "token",
+                60.0,
+                filter=AgentCardFilter(ord_ids=["ord-2"]),
             )
 
         assert len(result) == 1

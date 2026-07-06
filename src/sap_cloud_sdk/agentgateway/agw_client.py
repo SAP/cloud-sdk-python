@@ -445,13 +445,11 @@ class AgentGatewayClient:
 
             tenant = self._resolve_tenant_subdomain()
             auth = await self.get_system_auth()
-            f = filter or AgentCardFilter()
             return await get_agent_cards_lob(
                 tenant,
                 auth.access_token,
                 self._config.timeout,
-                agent_names=f.agent_names or None,
-                ord_ids=f.ord_ids or None,
+                filter=filter,
             )
         except AgentGatewaySDKError:
             raise

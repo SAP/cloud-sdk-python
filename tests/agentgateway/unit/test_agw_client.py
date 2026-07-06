@@ -983,8 +983,7 @@ class TestListAgentCards:
             "my-tenant",
             "system-token",
             60.0,
-            agent_names=None,
-            ord_ids=None,
+            filter=None,
         )
 
     @pytest.mark.asyncio
@@ -1015,8 +1014,9 @@ class TestListAgentCards:
             "my-tenant",
             "token",
             60.0,
-            agent_names=["Billing Agent"],
-            ord_ids=["sap.s4:agent:v1"],
+            filter=AgentCardFilter(
+                agent_names=["Billing Agent"], ord_ids=["sap.s4:agent:v1"]
+            ),
         )
 
     @pytest.mark.asyncio

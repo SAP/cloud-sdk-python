@@ -31,9 +31,12 @@ from dataclasses import dataclass
 from typing import Optional
 import os
 
-from sap_cloud_sdk.core.secret_resolver.resolver import (
-    read_from_mount_and_fallback_to_env_var,
+from sap_cloud_sdk.core.secret_resolver._resolvers import (
+    ChainedResolver,
+    EnvVarResolver,
+    MountResolver,
 )
+
 from sap_cloud_sdk.destination.exceptions import ConfigError
 from sap_cloud_sdk.destination._models import TransparentProxy
 
@@ -113,7 +116,7 @@ class BindingData:
         )
 
 
-def load_from_env_or_mount(instance: Optional[str] = None) -> DestinationConfig:
+def load_secrets(instance: Optional[str] = None) -> DestinationConfig:
     """Load Destination configuration from mount with env fallback and normalize.
 
     Args:
@@ -129,17 +132,10 @@ def load_from_env_or_mount(instance: Optional[str] = None) -> DestinationConfig:
     binding = BindingData()
 
     try:
-        # 1) Try mount at /etc/secrets/appfnd/destination/{instance}/...
-        # 2) Fallback to env: CLOUD_SDK_CFG_DESTINATION_{INSTANCE}_{FIELD_KEY}
-        read_from_mount_and_fallback_to_env_var(
-            base_volume_mount="/etc/secrets/appfnd",
-            base_var_name="CLOUD_SDK_CFG",
-            module="destination",
-            instance=inst,
-            target=binding,
-        )
-
+        resolver = ChainedResolver([MountResolver(), EnvVarResolver()])
+        resolver.resolve("destination", inst, binding)
         binding.validate()
+
         return binding.to_binding()
 
     except Exception as e:

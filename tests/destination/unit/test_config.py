@@ -5,7 +5,7 @@ from unittest.mock import patch, MagicMock
 
 from sap_cloud_sdk.destination.config import (
     BindingData,
-    load_from_env_or_mount,
+    load_secrets,
     load_transparent_proxy,
     _TRANSPARENT_PROXY_ENV_VAR,
 )
@@ -115,7 +115,7 @@ class TestLoadFromEnvOrMount:
 
         mock_read.side_effect = fake_read_side_effect
 
-        sb = load_from_env_or_mount()
+        sb = load_secrets()
         assert isinstance(sb, DestinationConfig)
         assert sb.url == "https://destination.example.com"
         assert sb.token_url == "https://auth.example.com/oauth/token"
@@ -144,7 +144,7 @@ class TestLoadFromEnvOrMount:
 
         mock_read.side_effect = fake_read_side_effect
 
-        sb = load_from_env_or_mount("custom")
+        sb = load_secrets("custom")
         assert isinstance(sb, DestinationConfig)
         assert mock_read.call_args[1]["instance"] == "custom"
 
@@ -161,13 +161,13 @@ class TestLoadFromEnvOrMount:
         mock_read.side_effect = fake_read_side_effect
 
         with pytest.raises(ConfigError, match="failed to load destination configuration"):
-            load_from_env_or_mount()
+            load_secrets()
 
     @patch("sap_cloud_sdk.destination.config.read_from_mount_and_fallback_to_env_var")
     def test_load_read_exception_wrapped(self, mock_read):
         mock_read.side_effect = Exception("Mount read failed")
         with pytest.raises(ConfigError, match="failed to load destination configuration"):
-            load_from_env_or_mount()
+            load_secrets()
 
     @patch("sap_cloud_sdk.destination.config.read_from_mount_and_fallback_to_env_var")
     def test_load_error_message_contains_guidance(self, mock_read):
@@ -182,7 +182,7 @@ class TestLoadFromEnvOrMount:
             "- Alternatively, mount secrets under /etc/secrets/appfnd/destination/default/ with files for each required key."
         )
         with pytest.raises(ConfigError) as excinfo:
-            load_from_env_or_mount()
+            load_secrets()
         msg = str(excinfo.value)
         # Central resolver provides generic actionable guidance
         assert "failed to load destination configuration" in msg

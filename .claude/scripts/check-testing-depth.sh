@@ -27,7 +27,13 @@ if [ "$LANGUAGE" = "python" ]; then
   # TD-10: New module → integration test required
   new_modules=$(echo "$diff_content" | awk '/^diff --git/ { flag=0 } /^new file mode/ { flag=1 } flag && /^\+\+\+ b\/src\/sap_cloud_sdk\/[a-z_]+\/[^/]+\.py/ { print }' | grep -oE 'src/sap_cloud_sdk/[a-z_]+/' | sed 's|src/sap_cloud_sdk/||; s|/$||' | sort -u)
   while IFS= read -r mod; do
-    [ -z "$mod" ] || [ "$mod" = "core" ] && continue
+    # Both conditions should skip the loop iteration. The previous
+    # A || B && continue form parses as (A || B) && continue, which is
+    # correct — but the `&& continue` under `set -e` short-circuits the
+    # loop body's exit status and hides errors. Explicit if is safer.
+    if [ -z "$mod" ] || [ "$mod" = "core" ]; then
+      continue
+    fi
     has_integration=$(echo "$diff_content" | grep -qE "tests/$mod/integration/" && echo yes || echo no)
     if [ "$has_integration" = "no" ]; then
       emit_finding "TD-10" "BLOCK" "tests/$mod/integration/" 1 \

@@ -18,10 +18,14 @@ if echo "$diff_content" | grep -qE '\+.*(index-url|extra-index-url).*int\.reposi
   emit_finding "DEP-04" "BLOCK" "config" 1 \
     "Internal artifactory --index-url reference in public artifact" "" >> "$findings"
 fi
+# Helper: `grep -c` returns "0" + exit 1 on zero matches → || echo 0 emits
+# "0\n0" and breaks -eq. Use wc -l instead.
+count_lines() { echo "$1" | grep -E "$2" 2>/dev/null | wc -l | tr -d ' '; }
+
 # DEP-03: pyproject.toml deps changed but uv.lock not
 if [ "$LANGUAGE" = "python" ]; then
-  pyproject_deps_changed=$(echo "$diff_content" | grep -cE '^\+.*"[a-z][a-z0-9_-]*[><=~!]+' || echo 0)
-  uv_lock_changed=$(echo "$diff_content" | grep -c '^\+\+\+ b/uv\.lock' || echo 0)
+  pyproject_deps_changed=$(count_lines "$diff_content" '^\+.*"[a-z][a-z0-9_-]*[><=~!]+')
+  uv_lock_changed=$(count_lines "$diff_content" '^\+\+\+ b/uv\.lock')
   if [ "$pyproject_deps_changed" -gt 0 ] && [ "$uv_lock_changed" -eq 0 ]; then
     # only fire if pyproject.toml dep table (not [project] version) changed
     if echo "$diff_content" | grep -qE '^\+.*\[project\.(dependencies|optional-dependencies)\]|^\+[[:space:]]+"[a-z][a-z0-9_-]*[><=~!].*"'; then

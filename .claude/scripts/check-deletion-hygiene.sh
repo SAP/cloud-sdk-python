@@ -25,8 +25,9 @@ if [ "$LANGUAGE" = "python" ]; then
   ')
   while IFS= read -r sym; do
     [ -z "$sym" ] && continue
-    # search codebase (excluding the file where it was removed)
-    hits=$(grep -rEIln "\b${sym}\b" "$REPO_ROOT/src" 2>/dev/null | wc -l | tr -d ' ')
+    # search codebase (excluding the file where it was removed).
+    # grep -E doesn't universally honor \b — use portable (^|non-word) anchors.
+    hits=$(grep -rEIln "(^|[^A-Za-z0-9_])${sym}([^A-Za-z0-9_]|$)" "$REPO_ROOT/src" 2>/dev/null | wc -l | tr -d ' ')
     if [ "$hits" -gt 0 ]; then
       emit_finding "DEL-01" "BLOCK" "src/" 1 \
         "Symbol '$sym' removed from __all__ but still referenced in $hits files" "" >> "$findings"

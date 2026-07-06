@@ -229,7 +229,7 @@ Returns the IAS client ID. Automatically detects agent type:
 - **Customer agents**: reads `client_id` directly from the mounted credentials file.
 - **LoB agents**: fetches the IAS destination (`sap-managed-runtime-ias-{landscape}`) at provider subaccount level and returns the `clientId` destination property.
 
-Returns `""` and logs a `WARNING` if the value cannot be resolved.
+Raises `AgentGatewaySDKError` if the value cannot be resolved.
 
 ```python
 agw_client = create_client(tenant_subdomain="my-tenant")

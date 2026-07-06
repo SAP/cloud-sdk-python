@@ -755,4 +755,4 @@ The function reads the `instanceid` field from the secret resolved via the stand
 - **Mount path**: `/etc/secrets/appfnd/destination/default/instanceid`
 - **Env var fallback**: `CLOUD_SDK_CFG_DESTINATION_DEFAULT_INSTANCEID`
 
-Returns `""` and logs a `WARNING` if the secret cannot be resolved (e.g., running locally without a binding).
+Raises `DestinationOperationError` if the secret cannot be resolved (e.g., running locally without a binding).

@@ -1012,14 +1012,13 @@ class TestGetIasClientId:
 
         assert result == "customer-client-id"
 
-    def test_customer_returns_empty_string_on_load_failure(self):
+    def test_customer_raises_on_load_failure(self):
         with (
             patch(_DETECT_CREDS_PATCH, return_value="/etc/ums/credentials/credentials"),
             patch(_LOAD_CREDS_PATCH, side_effect=Exception("parse error")),
         ):
-            result = create_client().get_ias_client_id()
-
-        assert result == ""
+            with pytest.raises(AgentGatewaySDKError, match="Could not resolve IAS client ID"):
+                create_client().get_ias_client_id()
 
     # --- LoB flow ---
 
@@ -1031,11 +1030,10 @@ class TestGetIasClientId:
         assert result == "lob-client-id"
 
     @_NO_CUSTOMER_CREDS
-    def test_lob_returns_empty_string_when_destination_not_found(self, _mock_detect):
-        with patch(_GET_IAS_CLIENT_ID_LOB_PATCH, return_value=""):
-            result = create_client(tenant_subdomain="my-tenant").get_ias_client_id()
-
-        assert result == ""
+    def test_lob_raises_when_destination_not_found(self, _mock_detect):
+        with patch(_GET_IAS_CLIENT_ID_LOB_PATCH, side_effect=AgentGatewaySDKError("IAS destination 'sap-managed-runtime-ias-eu10' not found")):
+            with pytest.raises(AgentGatewaySDKError, match="IAS destination"):
+                create_client(tenant_subdomain="my-tenant").get_ias_client_id()
 
     @_NO_CUSTOMER_CREDS
     def test_lob_returns_empty_string_when_property_absent(self, _mock_detect):
@@ -1045,13 +1043,7 @@ class TestGetIasClientId:
         assert result == ""
 
     @_NO_CUSTOMER_CREDS
-    def test_lob_returns_empty_string_and_logs_warning_on_exception(self, _mock_detect):
-        with (
-            patch(_GET_IAS_CLIENT_ID_LOB_PATCH, side_effect=EnvironmentError("APPFND_CONHOS_LANDSCAPE not set")),
-            patch("sap_cloud_sdk.agentgateway.agw_client.logger") as mock_logger,
-        ):
-            result = create_client(tenant_subdomain="my-tenant").get_ias_client_id()
-
-        assert result == ""
-        mock_logger.warning.assert_called_once()
-        assert "clientId" in mock_logger.warning.call_args[0][0]
+    def test_lob_raises_on_exception(self, _mock_detect):
+        with patch(_GET_IAS_CLIENT_ID_LOB_PATCH, side_effect=EnvironmentError("APPFND_CONHOS_LANDSCAPE not set")):
+            with pytest.raises(AgentGatewaySDKError, match="Could not resolve IAS client ID"):
+                create_client(tenant_subdomain="my-tenant").get_ias_client_id()

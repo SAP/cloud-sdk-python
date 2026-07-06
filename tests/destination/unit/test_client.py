@@ -2222,7 +2222,7 @@ class TestDestinationClientLabels:
         assert kwargs["tenant_subdomain"] is None
 
 
-_RESOLVER_PATCH = "sap_cloud_sdk.core.secret_resolver.read_from_mount_and_fallback_to_env_var"
+_RESOLVER_PATCH = "sap_cloud_sdk.destination.client.read_from_mount_and_fallback_to_env_var"
 
 
 class TestGetServiceInstanceId:
@@ -2248,19 +2248,8 @@ class TestGetServiceInstanceId:
         )
 
     @patch(_RESOLVER_PATCH, side_effect=RuntimeError("mount failed"))
-    def test_returns_empty_string_on_exception(self, _mock_read):
+    def test_raises_on_exception(self, _mock_read):
         client = DestinationClient(MagicMock())
 
-        result = client.get_service_instance_id()
-
-        assert result == ""
-
-    @patch(_RESOLVER_PATCH, side_effect=RuntimeError("mount failed"))
-    def test_logs_warning_on_exception(self, _mock_read):
-        client = DestinationClient(MagicMock())
-
-        with patch("sap_cloud_sdk.destination.client.logger") as mock_logger:
+        with pytest.raises(DestinationOperationError, match="Could not resolve destination instance ID from secrets"):
             client.get_service_instance_id()
-
-        mock_logger.warning.assert_called_once()
-        assert "instanceId" in mock_logger.warning.call_args[0][0]

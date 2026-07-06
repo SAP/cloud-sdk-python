@@ -122,11 +122,11 @@ def get_ias_client_id_lob() -> str:
     destination properties are returned — no auth token exchange is performed.
 
     Returns:
-        The IAS client ID string, or ``""`` if the destination is not found
-        or the property is absent.
+        The IAS client ID string, or ``""`` if the ``clientId`` property is absent.
 
     Raises:
         EnvironmentError: If ``APPFND_CONHOS_LANDSCAPE`` is not set.
+        AgentGatewaySDKError: If the IAS destination is not found.
         Any exception raised by the destination client.
     """
     dest_name = _ias_dest_name()
@@ -137,10 +137,7 @@ def get_ias_client_id_lob() -> str:
         options=ConsumptionOptions(skip_token_retrieval=True),
     )
     if not dest:
-        logger.warning(
-            "IAS destination '%s' not found — clientId will be empty", dest_name
-        )
-        return ""
+        raise AgentGatewaySDKError(f"IAS destination '{dest_name}' not found")
     return dest.properties.get("clientId", "")
 
 

@@ -309,11 +309,10 @@ class AgentGatewayClient:
           and returns the ``clientId`` destination property.
 
         Returns:
-            The IAS client ID string, or ``""`` if it cannot be resolved.
+            The IAS client ID string.
 
         Raises:
-            Nothing — failures are caught, logged at WARNING level,
-            and an empty string is returned instead.
+            AgentGatewaySDKError: If the IAS client ID cannot be resolved.
         """
         try:
             credentials_path = detect_customer_agent_credentials()
@@ -326,11 +325,10 @@ class AgentGatewayClient:
 
             # LoB flow — read clientId from the IAS destination properties
             return get_ias_client_id_lob()
-        except Exception:
-            logger.warning(
-                "Could not resolve IAS client ID from destination — clientId will be empty"
-            )
-            return ""
+        except AgentGatewaySDKError:
+            raise
+        except Exception as e:
+            raise AgentGatewaySDKError(f"Could not resolve IAS client ID: {e}") from e
 
     @record_metrics(Module.AGENTGATEWAY, Operation.AGENTGATEWAY_LIST_MCP_TOOLS)
     async def list_mcp_tools(

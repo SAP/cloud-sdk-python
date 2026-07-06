@@ -1037,7 +1037,7 @@ class TestGetIasClientIdLob:
             options=ConsumptionOptions(skip_token_retrieval=True),
         )
 
-    def test_returns_empty_string_when_destination_not_found(self):
+    def test_raises_when_destination_not_found(self):
         mock_dest_client = MagicMock()
         mock_dest_client.get_destination.return_value = None
 
@@ -1045,9 +1045,8 @@ class TestGetIasClientIdLob:
             patch("sap_cloud_sdk.agentgateway._lob._ias_dest_name", return_value="sap-managed-runtime-ias-eu10"),
             patch("sap_cloud_sdk.agentgateway._lob.create_destination_client", return_value=mock_dest_client),
         ):
-            result = get_ias_client_id_lob()
-
-        assert result == ""
+            with pytest.raises(AgentGatewaySDKError, match="sap-managed-runtime-ias-eu10"):
+                get_ias_client_id_lob()
 
     def test_returns_empty_string_when_property_absent(self):
         mock_dest = MagicMock()

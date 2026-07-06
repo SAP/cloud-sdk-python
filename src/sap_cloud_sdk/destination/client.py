@@ -7,6 +7,7 @@ import warnings
 from typing import Any, Dict, List, Optional, Callable, TypeVar
 
 from sap_cloud_sdk.core.telemetry import Module, Operation, record_metrics
+from sap_cloud_sdk.core.secret_resolver import read_from_mount_and_fallback_to_env_var
 from sap_cloud_sdk.destination._http import DestinationHttp, API_V1, API_V2
 from sap_cloud_sdk.destination._models import (
     AccessStrategy,
@@ -684,17 +685,12 @@ class DestinationClient:
         module ``destination``, instance ``default``).
 
         Returns:
-            The instance ID string, or ``""`` if the secret cannot be resolved.
+            The instance ID string.
 
         Raises:
-            Nothing — resolution failures are caught, logged at WARNING level,
-            and an empty string is returned instead.
+            DestinationOperationError: If the instance ID cannot be resolved from secrets.
         """
         try:
-            from sap_cloud_sdk.core.secret_resolver import (
-                read_from_mount_and_fallback_to_env_var,
-            )
-
             config = _DestinationInstanceConfig()
             read_from_mount_and_fallback_to_env_var(
                 base_volume_mount="/etc/secrets/appfnd",
@@ -704,11 +700,10 @@ class DestinationClient:
                 target=config,
             )
             return config.instanceid
-        except Exception:
-            logger.warning(
-                "Could not resolve destination instance ID from secrets — instanceId will be empty"
-            )
-            return ""
+        except Exception as e:
+            raise DestinationOperationError(
+                "Could not resolve destination instance ID from secrets"
+            ) from e
 
     # ---------- Internal helpers ----------
 

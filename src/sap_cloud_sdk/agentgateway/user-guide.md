@@ -218,6 +218,22 @@ class AgentGatewayClient:
         self,
         filter: AgentCardFilter | None = None,
     ) -> list[Agent]
+
+    def get_ias_client_id(self) -> str
+```
+
+#### `get_ias_client_id()`
+
+Returns the IAS client ID. Automatically detects agent type:
+
+- **Customer agents**: reads `client_id` directly from the mounted credentials file.
+- **LoB agents**: fetches the IAS destination (`sap-managed-runtime-ias-{landscape}`) at provider subaccount level and returns the `clientId` destination property.
+
+Raises `AgentGatewaySDKError` if the value cannot be resolved.
+
+```python
+agw_client = create_client(tenant_subdomain="my-tenant")
+client_id = agw_client.get_ias_client_id()
 ```
 
 ### AgentCardFilter

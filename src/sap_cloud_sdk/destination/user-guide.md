@@ -737,3 +737,22 @@ The OAuth2 token URL is derived from service binding (`DestinationConfig.token_u
 
 - Current implementation omits explicit HTTP retries/timeouts for simplicity.
 - The v2 consumption API (`get_destination`) is supported for runtime scenarios requiring automatic token retrieval.
+
+## Utilities
+
+### `get_service_instance_id()`
+
+Reads the destination service instance ID from the mounted secret binding. This is useful when you need the instance ID for programmatic use (e.g., to pass it to another service or for logging).
+
+```python
+from sap_cloud_sdk.destination import get_service_instance_id
+
+instance_id = get_service_instance_id()
+```
+
+The function reads the `instanceid` field from the secret resolved via the standard mount/env fallback:
+
+- **Mount path**: `/etc/secrets/appfnd/destination/default/instanceid`
+- **Env var fallback**: `CLOUD_SDK_CFG_DESTINATION_DEFAULT_INSTANCEID`
+
+Raises `DestinationOperationError` if the secret cannot be resolved (e.g., running locally without a binding).

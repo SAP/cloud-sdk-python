@@ -54,6 +54,10 @@ class TestOperation:
         assert Operation.DESTINATION_CREATE_DESTINATION.value == "create_destination"
         assert Operation.DESTINATION_UPDATE_DESTINATION.value == "update_destination"
         assert Operation.DESTINATION_DELETE_DESTINATION.value == "delete_destination"
+        assert (
+            Operation.DESTINATION_GET_SERVICE_INSTANCE_ID.value
+            == "get_service_instance_id"
+        )
 
     def test_certificate_operations(self):
         """Test Certificate operation values."""
@@ -210,7 +214,7 @@ class TestOperation:
     def test_operation_count(self):
         """Test that we have the expected number of operations."""
         all_operations = list(Operation)
-        # 3 auditlog + 11 destination + 10 certificate + 10 fragment + 8 objectstore
-        # + 2 extensibility + 4 aicore + 23 dms + 5 agentgateway + 13 agent_memory
-        # + 5 data_anonymization + 52 adms + 6 print = 151
-        assert len(all_operations) == 152
+        # 3 auditlog + 12 destination + 10 certificate + 10 fragment + 8 objectstore
+        # + 2 extensibility + 4 aicore + 23 dms + 6 agentgateway + 13 agent_memory
+        # + 5 data_anonymization + 52 adms + 6 print = 154
+        assert len(all_operations) == 154

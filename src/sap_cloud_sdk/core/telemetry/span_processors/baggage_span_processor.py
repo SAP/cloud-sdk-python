@@ -55,7 +55,11 @@ class BaggageSpanProcessor(SpanProcessor):
             if self._baggage_key_predicate(key):
                 span.set_attribute(key, cast(AttributeValue, value))
 
-        overrides = {k: cast(AttributeValue, all_baggage[k]) for k in self._override_keys if k in all_baggage}
+        overrides = {
+            k: cast(AttributeValue, all_baggage[k])
+            for k in self._override_keys
+            if k in all_baggage
+        }
         if overrides:
             span_id = getattr(getattr(span, "context", None), "span_id", None)
             if span_id is not None:

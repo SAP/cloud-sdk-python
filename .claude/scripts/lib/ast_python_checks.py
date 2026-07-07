@@ -5,7 +5,7 @@ Called from bash check-*.sh scripts. Reads source files, emits JSONL findings
 to stdout (one JSON object per line).
 
 Usage:
-    python3 ast_python_checks.py <check-name> <file1> [<file2> ...]
+    python3 ast-python-checks.py <check-name> <file1> [<file2> ...]
 
 Where <check-name> is one of:
     el-01, el-02          exception chaining / swallow
@@ -212,22 +212,38 @@ def check_pt_08(path: str, tree: ast.Module) -> None:
 def check_con_01(
     path: str, tree: ast.Module, threshold: int = 3, min_len: int = 4
 ) -> None:
+    # FP-D-01: skip generated/model files where schema keys legitimately repeat.
+    GENERATED_PATTERNS = ("_models.py", "_generated.py")
+    GENERATED_API_SUFFIX = "_api.py"
+    fname = Path(path).name
+    if fname.endswith(GENERATED_PATTERNS):
+        return
+    # `_<something>_api.py` (starts with underscore, ends with _api.py) → generated OpenAPI client
+    if fname.startswith("_") and fname.endswith(GENERATED_API_SUFFIX):
+        return
     # Skip prefixes: URLs, test/example placeholders, SPDX/doc markers.
     # Must be exact URL scheme match — not `httpx` or `http_pool`.
     URL_PREFIXES = ("http://", "https://", "ftp://", "sftp://", "ssh://", "file://")
     SKIP_PREFIXES = ("test-", "SPDX", "@example")
+    # FP-D-01: minimum length 4 (was 4; enforce hard floor of 3 per plan)
+    effective_min_len = max(min_len, 3)
+    # FP-D-01: per-file cap
+    MAX_PER_FILE = 3
     counts: dict[str, list[int]] = {}
     for node in ast.walk(tree):
         if isinstance(node, ast.Constant) and isinstance(node.value, str):
             v = node.value
-            if len(v) < min_len:
+            if len(v) < effective_min_len:
                 continue
             if v.startswith(URL_PREFIXES):
                 continue
             if v.startswith(SKIP_PREFIXES):
                 continue
             counts.setdefault(v, []).append(node.lineno)
+    emitted = 0
     for literal, lines in counts.items():
+        if emitted >= MAX_PER_FILE:
+            break
         if len(lines) >= threshold:
             emit(
                 "PY-CON-01",
@@ -237,6 +253,44 @@ def check_con_01(
                 f"String literal {literal!r} appears {len(lines)}× — extract module-level constant",
                 suggestion=f"e.g., _CONSTANT_NAME = {literal!r}",
             )
+            emitted += 1
+
+
+# ---------- PY-PT-04: module has any Exception subclass (AST-based) ----------
+
+
+def check_pt_04(module_dir: str) -> bool:
+    """FP-C-02: return True if any .py file in the module directory (recursive)
+    defines a class subclassing Exception (directly or via a name ending in
+    'Error' / 'Exception'). Callers can use this as a soft check before
+    emitting PY-PT-04.
+    """
+    p = Path(module_dir)
+    if not p.is_dir():
+        return False
+    for py in p.rglob("*.py"):
+        if "__pycache__" in py.parts:
+            continue
+        tree = parse_file(str(py))
+        if tree is None:
+            continue
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.ClassDef):
+                continue
+            for base in node.bases:
+                base_name = None
+                if isinstance(base, ast.Name):
+                    base_name = base.id
+                elif isinstance(base, ast.Attribute):
+                    base_name = base.attr
+                if not base_name:
+                    continue
+                if base_name == "Exception" or base_name == "BaseException":
+                    return True
+                # accept anything ending in Error/Exception as an exception hierarchy
+                if base_name.endswith("Error") or base_name.endswith("Exception"):
+                    return True
+    return False
 
 
 # ---------- PY-PT-01: create_client factory exists ----------
@@ -377,12 +431,18 @@ CHECKS = {
 def main(argv: list[str]) -> int:
     if len(argv) < 3:
         print(
-            "Usage: ast_python_checks.py <check-name> <file1> [<file2> ...]",
+            "Usage: ast-python-checks.py <check-name> <file1> [<file2> ...]",
             file=sys.stderr,
         )
         return 2
     check_name = argv[1]
     files = argv[2:]
+
+    # FP-C-02: pt-04 has a different signature (module dir, not files) and
+    # returns a boolean via exit code (0 = has exceptions, 1 = none found).
+    if check_name == "pt-04":
+        module_dir = files[0]
+        return 0 if check_pt_04(module_dir) else 1
 
     if check_name not in CHECKS:
         print(f"ERROR: unknown check {check_name}", file=sys.stderr)

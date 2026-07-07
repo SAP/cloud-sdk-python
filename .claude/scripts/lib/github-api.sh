@@ -4,6 +4,15 @@ set -euo pipefail
 
 # Use plain vars (not readonly) so the file can be sourced multiple times
 # without hitting "readonly variable" under set -e.
+#
+# SDK_REVIEW_MARKER_PREFIX is intentionally an UNCLOSED HTML-comment fragment.
+# It is NEVER emitted verbatim as a comment body; it is used only as a prefix
+# substring matched via jq `contains($m)` in list_bot_review_comments() so we
+# can identify all bot-posted comments regardless of their kind qualifier.
+# Every real emitted marker (see orchestrate.sh) is a fully-closed HTML comment,
+# e.g. "<!-- sdk-review:v1 kind=summary -->" or
+#      "<!-- sdk-review:v1 check=SEC-01 id=SEC-01-3 -->".
+# Do not "close" this prefix or the substring match will miss all qualified forms.
 SDK_REVIEW_MARKER_PREFIX="${SDK_REVIEW_MARKER_PREFIX:-<!-- sdk-review:v1}"
 SUMMARY_MARKER="${SUMMARY_MARKER:-<!-- sdk-review:v1 kind=summary -->}"
 

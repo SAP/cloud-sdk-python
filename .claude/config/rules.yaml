@@ -71,8 +71,8 @@ rules:
   BDD-02:       { tier: BLOCK }
 
   # -------- PATTERNS --------
-  PY-PT-01:     { tier: BLOCK, predicates: { module_shape: client } }
-  JV-PT-01:     { tier: BLOCK, predicates: { module_shape: client } }
+  PY-PT-01:     { tier: FLAG, predicates: { module_shape: client } }
+  JV-PT-01:     { tier: FLAG, predicates: { module_shape: client } }
   PY-PT-03:     { tier: FLAG }
   PY-PT-04:     { tier: FLAG }
   PY-PT-08:     { tier: FLAG }

@@ -4,6 +4,10 @@
 set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/lib/json-emit.sh"
+# DEL-01 uses synthetic path "src/:1" — hunk-filter is sourced for
+# emit_finding_if_touched (via is_meta_finding, which treats non-file paths
+# as metadata and passes them through). No filtering applied here.
+source "$SCRIPT_DIR/lib/hunk-filter.sh"
 
 LANGUAGE="${LANGUAGE:-python}"
 DIFF_FILE="${DIFF_FILE:-/dev/stdin}"

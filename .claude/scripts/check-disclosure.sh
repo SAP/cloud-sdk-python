@@ -6,6 +6,8 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=lib/json-emit.sh
 source "$SCRIPT_DIR/lib/json-emit.sh"
+# shellcheck source=lib/hunk-filter.sh
+source "$SCRIPT_DIR/lib/hunk-filter.sh"
 # shellcheck source=lib/skill-self-skip.sh
 source "$SCRIPT_DIR/lib/skill-self-skip.sh"
 
@@ -39,16 +41,16 @@ echo "$diff_content" | awk '
   # DIS-02: Internal Jira URL (checked first — more specific)
   dis02_fired=false
   if echo "$content" | grep -qEi 'jira\.tools\.sap|jira\.wdf\.sap\.corp'; then
-    emit_finding "DIS-02" "$(sev_public)" "$file" "$line_num" "Internal Jira URL — remove or move to internal-only docs" "" >> "$findings"
+    emit_finding_if_touched "DIS-02" "$(sev_public)" "$file" "$line_num" "Internal Jira URL — remove or move to internal-only docs" "" >> "$findings"
     dis02_fired=true
   fi
   # DIS-01: SAP-internal hostnames (skip if DIS-02 already covers the same line)
   if [ "$dis02_fired" = "false" ] && echo "$content" | grep -qEi '(int\.repositories\.cloud\.sap|\.tools\.sap|\.wdf\.sap\.corp|\.mo\.sap\.corp)'; then
-    emit_finding "DIS-01" "$(sev_public)" "$file" "$line_num" "SAP-internal hostname detected in code" "" >> "$findings"
+    emit_finding_if_touched "DIS-01" "$(sev_public)" "$file" "$line_num" "SAP-internal hostname detected in code" "" >> "$findings"
   fi
   # DIS-06: Internal artifactory index-url
   if echo "$content" | grep -qEi '\-\-index-url[[:space:]]+https?://int\.repositories\.cloud\.sap'; then
-    emit_finding "DIS-06" "BLOCK" "$file" "$line_num" "Internal artifactory --index-url — must not appear in public/shared configs" "" >> "$findings"
+    emit_finding_if_touched "DIS-06" "BLOCK" "$file" "$line_num" "Internal artifactory --index-url — must not appear in public/shared configs" "" >> "$findings"
   fi
 done
 

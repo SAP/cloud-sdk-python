@@ -3,13 +3,11 @@
 # Consumed by .claude/scripts/check-bdd.sh to resolve the sibling repo's
 # feature-file path when the same module has DIFFERENT names in each SDK.
 #
-# When a module has the SAME name in both SDKs (most cases), no entry is
-# needed — check-bdd.sh discovers modules dynamically from `src/` and falls
-# back to the identical name in the sibling repo.
+# When a module has the SAME name in both SDKs (the common case), no entry
+# is needed — check-bdd.sh discovers modules dynamically from `src/` and
+# falls back to the identical name in the sibling repo.
 #
-# Only add an entry here when both SDKs ship the same module under different
-# names, and add it in the SAME PR that creates the divergent module.
+# Add an entry ONLY when both SDKs ship the same module under different
+# names, and add it in the SAME PR that introduces the divergent-name module.
 
-aliases:
-  - python: dms
-    java: documentmanagement
+aliases: []

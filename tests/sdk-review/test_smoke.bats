@@ -180,7 +180,7 @@ EOF
 
 # --- AST checks ---
 
-@test "ast-python-checks: EL-01 fires on raising different exception without from e" {
+@test "ast_python_checks: EL-01 fires on raising different exception without from e" {
   cat > /tmp/bad.py <<'EOF'
 def x():
     try:
@@ -193,7 +193,7 @@ EOF
   rm -f /tmp/bad.py
 }
 
-@test "ast-python-checks: EL-01 PASSES on bare raise" {
+@test "ast_python_checks: EL-01 PASSES on bare raise" {
   cat > /tmp/good.py <<'EOF'
 def x():
     try:
@@ -206,7 +206,7 @@ EOF
   rm -f /tmp/good.py
 }
 
-@test "ast-python-checks: EL-01 PASSES on raise X from e" {
+@test "ast_python_checks: EL-01 PASSES on raise X from e" {
   cat > /tmp/good.py <<'EOF'
 def x():
     try:
@@ -219,7 +219,7 @@ EOF
   rm -f /tmp/good.py
 }
 
-@test "ast-python-checks: TEL-02 fires on public *Client method without @record_metrics" {
+@test "ast_python_checks: TEL-02 fires on public *Client method without @record_metrics" {
   cat > /tmp/client.py <<'EOF'
 class MyClient:
     def do_thing(self):
@@ -230,7 +230,7 @@ EOF
   rm -f /tmp/client.py
 }
 
-@test "ast-python-checks: TEL-02 PASSES when @record_metrics present" {
+@test "ast_python_checks: TEL-02 PASSES when @record_metrics present" {
   cat > /tmp/client.py <<'EOF'
 class MyClient:
     @record_metrics(Module.X, Operation.Y)
@@ -242,7 +242,7 @@ EOF
   rm -f /tmp/client.py
 }
 
-@test "ast-python-checks: CON-01 fires on 3× repeated string" {
+@test "ast_python_checks: CON-01 fires on 3× repeated string" {
   cat > /tmp/const.py <<'EOF'
 def x():
     a = "com.sap.adm.DocumentService"

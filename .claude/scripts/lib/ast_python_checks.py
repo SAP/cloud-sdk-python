@@ -5,7 +5,7 @@ Called from bash check-*.sh scripts. Reads source files, emits JSONL findings
 to stdout (one JSON object per line).
 
 Usage:
-    python3 ast-python-checks.py <check-name> <file1> [<file2> ...]
+    python3 ast_python_checks.py <check-name> <file1> [<file2> ...]
 
 Where <check-name> is one of:
     el-01, el-02          exception chaining / swallow
@@ -377,7 +377,7 @@ CHECKS = {
 def main(argv: list[str]) -> int:
     if len(argv) < 3:
         print(
-            "Usage: ast-python-checks.py <check-name> <file1> [<file2> ...]",
+            "Usage: ast_python_checks.py <check-name> <file1> [<file2> ...]",
             file=sys.stderr,
         )
         return 2

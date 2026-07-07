@@ -6,6 +6,7 @@ from opentelemetry.baggage import get_all as get_all_baggage
 from opentelemetry.context import Context
 from opentelemetry.sdk.trace import ReadableSpan, SpanProcessor
 from opentelemetry.trace import Span
+from opentelemetry.util.types import AttributeValue
 
 logger = logging.getLogger(__name__)
 
@@ -44,7 +45,7 @@ class BaggageSpanProcessor(SpanProcessor):
     ) -> None:
         self._baggage_key_predicate = baggage_key_predicate
         self._override_keys = frozenset(override_keys)
-        self._pending: Dict[int, Dict[str, Any]] = {}
+        self._pending: Dict[int, Dict[str, AttributeValue]] = {}
 
     def on_start(self, span: Span, parent_context: Optional[Context] = None) -> None:
         if not span.is_recording():
@@ -52,9 +53,9 @@ class BaggageSpanProcessor(SpanProcessor):
         all_baggage = get_all_baggage(parent_context)
         for key, value in all_baggage.items():
             if self._baggage_key_predicate(key):
-                span.set_attribute(key, value)
+                span.set_attribute(key, cast(AttributeValue, value))
 
-        overrides = {k: all_baggage[k] for k in self._override_keys if k in all_baggage}
+        overrides = {k: cast(AttributeValue, all_baggage[k]) for k in self._override_keys if k in all_baggage}
         if overrides:
             span_id = getattr(getattr(span, "context", None), "span_id", None)
             if span_id is not None:

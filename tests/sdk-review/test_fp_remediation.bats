@@ -1,0 +1,319 @@
+#!/usr/bin/env bats
+# test_fp_remediation.bats — regression tests for the 8 FP-* fixes catalogued
+# in docs/plans 09-FP-REMEDIATION.md §2. Each test pins ONE fix so a future
+# regression is caught immediately.
+#
+# Runs standalone (uses ADDED_LINES_FILE to feed the hunk filter). If a check
+# script or lib helper isn't present in the current batch, the test is skipped.
+
+setup() {
+  SCRIPT_DIR="$BATS_TEST_DIRNAME/../../.claude/scripts"
+  FIXTURES="$BATS_TEST_DIRNAME/fixtures"
+  export LANGUAGE=python
+  export REPO_ROOT="$BATS_TEST_DIRNAME/../.."
+  export CONFIG_DIR="$REPO_ROOT/.claude/config"
+}
+
+# ------------------------------------------------------------
+# FP-A-01 — hunk attribution enforced
+# ------------------------------------------------------------
+
+@test "FP-A-01: is_line_touched respects ADDED_LINES_FILE" {
+  [ -f "$SCRIPT_DIR/lib/hunk-filter.sh" ] || skip "hunk-filter.sh not in this batch"
+  tmpd=$(mktemp -d)
+  cat > "$tmpd/added.txt" <<'EOF'
+src/foo.py:5
+src/foo.py:6
+src/foo.py:7
+src/foo.py:8
+src/foo.py:9
+src/foo.py:10
+EOF
+  # touched
+  ADDED_LINES_FILE="$tmpd/added.txt" bash "$SCRIPT_DIR/lib/hunk-filter.sh" is_line_touched src/foo.py 7
+  # not touched
+  run env ADDED_LINES_FILE="$tmpd/added.txt" bash "$SCRIPT_DIR/lib/hunk-filter.sh" is_line_touched src/foo.py 100
+  [ "$status" -ne 0 ]
+  rm -rf "$tmpd"
+}
+
+@test "FP-A-01: is_meta_finding treats PR_BODY / COMMIT:* as metadata" {
+  [ -f "$SCRIPT_DIR/lib/hunk-filter.sh" ] || skip "hunk-filter.sh not in this batch"
+  bash "$SCRIPT_DIR/lib/hunk-filter.sh" is_meta_finding PR_BODY
+  bash "$SCRIPT_DIR/lib/hunk-filter.sh" is_meta_finding COMMIT:abc123
+  run bash "$SCRIPT_DIR/lib/hunk-filter.sh" is_meta_finding src/foo.py
+  [ "$status" -ne 0 ]
+}
+
+# ------------------------------------------------------------
+# FP-B-01 — HC-01 ignores POM/XML namespaces
+# ------------------------------------------------------------
+
+@test "FP-B-01: HC-01 does not fire on pom.xml POM namespace" {
+  [ -f "$SCRIPT_DIR/check-hardcode.sh" ] || skip "check-hardcode.sh not in this batch"
+  tmpd=$(mktemp -d)
+  cat > "$tmpd/diff" <<'EOF'
+diff --git a/pom.xml b/pom.xml
+new file mode 100644
+--- /dev/null
++++ b/pom.xml
+@@ -0,0 +1,5 @@
++<?xml version="1.0"?>
++<project xmlns="http://maven.apache.org/POM/4.0.0"
++         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
++  <modelVersion>4.0.0</modelVersion>
++</project>
+EOF
+  bash "$SCRIPT_DIR/lib/diff-added-lines.sh" < "$tmpd/diff" > "$tmpd/added.txt"
+  result=$(LANGUAGE=java ADDED_LINES_FILE="$tmpd/added.txt" DIFF_FILE="$tmpd/diff" bash "$SCRIPT_DIR/check-hardcode.sh")
+  hc01_count=$(echo "$result" | jq '[.findings[] | select(.rule=="HC-01")] | length')
+  [ "$hc01_count" = "0" ]
+  rm -rf "$tmpd"
+}
+
+# ------------------------------------------------------------
+# FP-B-02 — HTTP-01 ignores markdown code fences
+# ------------------------------------------------------------
+
+@test "FP-B-02: HTTP-01 does not fire on .md files" {
+  [ -f "$SCRIPT_DIR/check-http-hygiene.sh" ] || skip "check-http-hygiene.sh not in this batch"
+  tmpd=$(mktemp -d)
+  cat > "$tmpd/diff" <<'EOF'
+diff --git a/docs/user-guide.md b/docs/user-guide.md
+new file mode 100644
+--- /dev/null
++++ b/docs/user-guide.md
+@@ -0,0 +1,4 @@
++# HTTP client usage
++```python
++client = httpx.Client()
++```
+EOF
+  bash "$SCRIPT_DIR/lib/diff-added-lines.sh" < "$tmpd/diff" > "$tmpd/added.txt"
+  result=$(ADDED_LINES_FILE="$tmpd/added.txt" DIFF_FILE="$tmpd/diff" bash "$SCRIPT_DIR/check-http-hygiene.sh")
+  http01_count=$(echo "$result" | jq '[.findings[] | select(.rule=="HTTP-01")] | length')
+  [ "$http01_count" = "0" ]
+  rm -rf "$tmpd"
+}
+
+# ------------------------------------------------------------
+# FP-C-01 — BDD-01 accepts any *.feature file, not just <mod>.feature
+# ------------------------------------------------------------
+
+@test "FP-C-01: BDD-01 accepts scenarios.feature when module <mod>.feature is absent" {
+  [ -f "$SCRIPT_DIR/check-bdd.sh" ] || skip "check-bdd.sh not in this batch"
+  tmpd=$(mktemp -d)
+  # Simulate a new module `foo` with source file and a feature file NOT
+  # named foo.feature — BDD-01 must PASS (glob-based check).
+  mkdir -p "$tmpd/src/sap_cloud_sdk/foo"
+  echo "x = 1" > "$tmpd/src/sap_cloud_sdk/foo/client.py"
+  mkdir -p "$tmpd/tests/foo/integration"
+  echo "Feature: something else" > "$tmpd/tests/foo/integration/scenarios.feature"
+  cat > "$tmpd/diff" <<'EOF'
+diff --git a/src/sap_cloud_sdk/foo/client.py b/src/sap_cloud_sdk/foo/client.py
+new file mode 100644
+--- /dev/null
++++ b/src/sap_cloud_sdk/foo/client.py
+@@ -0,0 +1,1 @@
++x = 1
+EOF
+  result=$(REPO_ROOT="$tmpd" DIFF_FILE="$tmpd/diff" LANGUAGE=python bash "$SCRIPT_DIR/check-bdd.sh")
+  bdd01_count=$(echo "$result" | jq '[.findings[] | select(.rule=="BDD-01")] | length')
+  [ "$bdd01_count" = "0" ]
+  rm -rf "$tmpd"
+}
+
+# ------------------------------------------------------------
+# FP-C-02 — PY-PT-04 accepts Exception subclass anywhere in module (AST)
+# ------------------------------------------------------------
+
+@test "FP-C-02: PY-PT-04 accepts Exception subclass in __init__.py (not exceptions.py)" {
+  [ -f "$SCRIPT_DIR/lib/ast_python_checks.py" ] || skip "ast_python_checks.py not in this batch"
+  tmpd=$(mktemp -d)
+  mkdir -p "$tmpd/foo"
+  cat > "$tmpd/foo/__init__.py" <<'EOF'
+class FooError(Exception):
+    pass
+EOF
+  # pt-04 helper returns exit 0 if module has any Exception subclass.
+  python3 "$SCRIPT_DIR/lib/ast_python_checks.py" pt-04 "$tmpd/foo"
+  # Negative: empty module → exit 1
+  mkdir -p "$tmpd/bar"
+  echo "x = 1" > "$tmpd/bar/__init__.py"
+  run python3 "$SCRIPT_DIR/lib/ast_python_checks.py" pt-04 "$tmpd/bar"
+  [ "$status" -ne 0 ]
+  rm -rf "$tmpd"
+}
+
+# ------------------------------------------------------------
+# FP-D-01 — PY-CON-01 skips generated model files + per-file cap
+# ------------------------------------------------------------
+
+@test "FP-D-01: PY-CON-01 skips _models.py files entirely" {
+  [ -f "$SCRIPT_DIR/lib/ast_python_checks.py" ] || skip "ast_python_checks.py not in this batch"
+  tmpd=$(mktemp -d)
+  cat > "$tmpd/_models.py" <<'EOF'
+class A: x = "value"; y = "value"; z = "value"; w = "value"
+class B: x = "value"; y = "value"; z = "value"
+EOF
+  result=$(python3 "$SCRIPT_DIR/lib/ast_python_checks.py" con-01 "$tmpd/_models.py" 2>/dev/null)
+  # Expect zero findings (file skipped)
+  [ -z "$result" ]
+  rm -rf "$tmpd"
+}
+
+@test "FP-D-01: PY-CON-01 caps at 3 findings per file" {
+  [ -f "$SCRIPT_DIR/lib/ast_python_checks.py" ] || skip "ast_python_checks.py not in this batch"
+  tmpd=$(mktemp -d)
+  # Six different repeated literals (each ≥3× and ≥3 chars) — should be capped to 3.
+  cat > "$tmpd/regular.py" <<'EOF'
+a = "foo1234"; b = "foo1234"; c = "foo1234"
+d = "bar1234"; e = "bar1234"; f = "bar1234"
+g = "baz1234"; h = "baz1234"; i = "baz1234"
+j = "qux1234"; k = "qux1234"; l = "qux1234"
+m = "quux12"; n = "quux12"; o = "quux12"
+p = "corge2"; q = "corge2"; r = "corge2"
+EOF
+  count=$(python3 "$SCRIPT_DIR/lib/ast_python_checks.py" con-01 "$tmpd/regular.py" 2>/dev/null | wc -l | tr -d ' ')
+  [ "$count" -le 3 ]
+  rm -rf "$tmpd"
+}
+
+# ------------------------------------------------------------
+# FP-E-01 — PY-PT-08 baseline suppresses pre-existing lines
+# ------------------------------------------------------------
+
+@test "FP-E-01: is_in_line_baseline matches (rule,file,line) triple" {
+  [ -f "$SCRIPT_DIR/lib/baseline.sh" ] || skip "baseline.sh not in this batch"
+  # Skip if this batch's baseline.sh lacks the new function.
+  grep -q "is_in_line_baseline" "$SCRIPT_DIR/lib/baseline.sh" || skip "baseline.sh lacks is_in_line_baseline"
+  tmpd=$(mktemp -d)
+  cat > "$tmpd/baseline.json" <<'EOF'
+{
+  "line_baseline": [
+    {"rule": "PY-PT-08", "file": "src/foo/__init__.py", "line": 81},
+    {"rule": "PY-PT-08", "file": "src/foo/__init__.py", "line": 127}
+  ]
+}
+EOF
+  BASELINE_FILE="$tmpd/baseline.json" bash "$SCRIPT_DIR/lib/baseline.sh" is_in_line_baseline PY-PT-08 src/foo/__init__.py 81
+  BASELINE_FILE="$tmpd/baseline.json" bash "$SCRIPT_DIR/lib/baseline.sh" is_in_line_baseline PY-PT-08 src/foo/__init__.py 127
+  # Not baselined
+  run env BASELINE_FILE="$tmpd/baseline.json" bash "$SCRIPT_DIR/lib/baseline.sh" is_in_line_baseline PY-PT-08 src/foo/__init__.py 999
+  [ "$status" -ne 0 ]
+  # Prefix-guard: 81 must NOT match 812
+  cat > "$tmpd/baseline.json" <<'EOF'
+{"line_baseline": [{"rule":"PY-PT-08","file":"src/foo.py","line":81}]}
+EOF
+  run env BASELINE_FILE="$tmpd/baseline.json" bash "$SCRIPT_DIR/lib/baseline.sh" is_in_line_baseline PY-PT-08 src/foo.py 812
+  [ "$status" -ne 0 ]
+  rm -rf "$tmpd"
+}
+
+# ------------------------------------------------------------
+# DEL-01 guardrail — synthetic path is not filtered out
+# ------------------------------------------------------------
+
+@test "DEL-01: guardrail — synthetic src/ path is treated as metadata by hunk filter" {
+  [ -f "$SCRIPT_DIR/lib/hunk-filter.sh" ] || skip "hunk-filter.sh not in this batch"
+  # is_meta_finding returns 0 for special paths. src/ is a real path so we test
+  # the emit_finding_if_touched path — DEL-01's src/:1 emission bypasses the
+  # filter because the calling script does NOT wrap it (verified via grep).
+  ! grep -q "emit_finding_if_touched \"DEL-01\"" "$SCRIPT_DIR/check-deletion-hygiene.sh"
+  # DEL-01 is called via plain emit_finding — the fix is deliberate.
+}
+
+# ------------------------------------------------------------
+# FP-G-01 — peer-consistency for PT-01 (no more "factory required" law)
+# ------------------------------------------------------------
+
+@test "FP-G-01: peer_element_fraction returns adopted/total/fraction" {
+  [ -f "$SCRIPT_DIR/lib/peer-consistency.sh" ] || skip "peer-consistency.sh not in this batch"
+  tmpd=$(mktemp -d)
+  mkdir -p "$tmpd/src/sap_cloud_sdk/a" "$tmpd/src/sap_cloud_sdk/b" "$tmpd/src/sap_cloud_sdk/c"
+  # a and b have user-guide.md; c doesn't
+  touch "$tmpd/src/sap_cloud_sdk/a/user-guide.md" "$tmpd/src/sap_cloud_sdk/b/user-guide.md"
+  result=$(bash "$SCRIPT_DIR/lib/peer-consistency.sh" peer_element_fraction "$tmpd" python user-guide.md)
+  adopted=$(echo "$result" | awk '{print $1}')
+  total=$(echo "$result" | awk '{print $2}')
+  [ "$adopted" = "2" ]
+  [ "$total" = "3" ]
+  rm -rf "$tmpd"
+}
+
+@test "FP-G-01: PT-01 fires FLAG when new module lacks a >=80% adopted element" {
+  [ -f "$SCRIPT_DIR/check-patterns.sh" ] || skip "check-patterns.sh not in this batch"
+  tmpd=$(mktemp -d)
+  # Peers a, b, c all have user-guide.md (100%). New module `foo` doesn't.
+  mkdir -p "$tmpd/src/sap_cloud_sdk/"{a,b,c,foo}
+  for m in a b c; do
+    touch "$tmpd/src/sap_cloud_sdk/$m/user-guide.md"
+    touch "$tmpd/src/sap_cloud_sdk/$m/client.py"
+    echo "def create_${m}_client(): pass" > "$tmpd/src/sap_cloud_sdk/$m/client.py"
+  done
+  # foo has client.py but no user-guide.md → should FLAG
+  echo "class FooClient: pass" > "$tmpd/src/sap_cloud_sdk/foo/client.py"
+  # Diff creates foo — client shape
+  cat > "$tmpd/diff" <<'EOF'
+diff --git a/src/sap_cloud_sdk/foo/client.py b/src/sap_cloud_sdk/foo/client.py
+new file mode 100644
+--- /dev/null
++++ b/src/sap_cloud_sdk/foo/client.py
+@@ -0,0 +1,1 @@
++class FooClient: pass
+EOF
+  result=$(REPO_ROOT="$tmpd" DIFF_FILE="$tmpd/diff" LANGUAGE=python bash "$SCRIPT_DIR/check-patterns.sh" 2>/dev/null)
+  # PY-PT-01 should fire FLAG (not BLOCK) mentioning user-guide.md
+  pt01_flag=$(echo "$result" | jq '[.findings[] | select(.rule=="PY-PT-01" and .severity=="FLAG")] | length')
+  [ "$pt01_flag" -ge 1 ]
+  pt01_block=$(echo "$result" | jq '[.findings[] | select(.rule=="PY-PT-01" and .severity=="BLOCK")] | length')
+  [ "$pt01_block" = "0" ]
+  rm -rf "$tmpd"
+}
+
+@test "FP-G-01: PT-01 does NOT fire when peers <80% adopt the element (factory case)" {
+  [ -f "$SCRIPT_DIR/check-patterns.sh" ] || skip "check-patterns.sh not in this batch"
+  tmpd=$(mktemp -d)
+  # 3 peers: only 1 has create_*_client → 33% adoption of factory element.
+  mkdir -p "$tmpd/src/sap_cloud_sdk/"{a,b,c,foo}
+  echo "def create_a_client(): pass" > "$tmpd/src/sap_cloud_sdk/a/client.py"
+  echo "class BClient: pass" > "$tmpd/src/sap_cloud_sdk/b/client.py"
+  echo "class CClient: pass" > "$tmpd/src/sap_cloud_sdk/c/client.py"
+  echo "class FooClient: pass" > "$tmpd/src/sap_cloud_sdk/foo/client.py"
+  cat > "$tmpd/diff" <<'EOF'
+diff --git a/src/sap_cloud_sdk/foo/client.py b/src/sap_cloud_sdk/foo/client.py
+new file mode 100644
+--- /dev/null
++++ b/src/sap_cloud_sdk/foo/client.py
+@@ -0,0 +1,1 @@
++class FooClient: pass
+EOF
+  result=$(REPO_ROOT="$tmpd" DIFF_FILE="$tmpd/diff" LANGUAGE=python bash "$SCRIPT_DIR/check-patterns.sh" 2>/dev/null)
+  # No factory-related PT-01 finding
+  factory_flag=$(echo "$result" | jq '[.findings[] | select(.rule=="PY-PT-01" and (.message | contains("factory")))] | length')
+  [ "$factory_flag" = "0" ]
+  rm -rf "$tmpd"
+}
+
+@test "FP-G-01: PT-01 emits zero findings when module has every universal element" {
+  [ -f "$SCRIPT_DIR/check-patterns.sh" ] || skip "check-patterns.sh not in this batch"
+  tmpd=$(mktemp -d)
+  # 3 peers with user-guide.md; foo also has it and everything else uncommon.
+  mkdir -p "$tmpd/src/sap_cloud_sdk/"{a,b,c,foo}
+  for m in a b c foo; do
+    touch "$tmpd/src/sap_cloud_sdk/$m/user-guide.md"
+    echo "class ${m^}Client: pass" > "$tmpd/src/sap_cloud_sdk/$m/client.py"
+  done
+  cat > "$tmpd/diff" <<'EOF'
+diff --git a/src/sap_cloud_sdk/foo/client.py b/src/sap_cloud_sdk/foo/client.py
+new file mode 100644
+--- /dev/null
++++ b/src/sap_cloud_sdk/foo/client.py
+@@ -0,0 +1,1 @@
++class FooClient: pass
+EOF
+  result=$(REPO_ROOT="$tmpd" DIFF_FILE="$tmpd/diff" LANGUAGE=python bash "$SCRIPT_DIR/check-patterns.sh" 2>/dev/null)
+  pt01_count=$(echo "$result" | jq '[.findings[] | select(.rule=="PY-PT-01")] | length')
+  [ "$pt01_count" = "0" ]
+  rm -rf "$tmpd"
+}

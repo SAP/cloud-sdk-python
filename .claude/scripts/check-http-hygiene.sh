@@ -4,6 +4,7 @@
 set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/lib/json-emit.sh"
+source "$SCRIPT_DIR/lib/hunk-filter.sh"
 source "$SCRIPT_DIR/lib/skill-self-skip.sh"
 
 LANGUAGE="${LANGUAGE:-python}"
@@ -24,10 +25,12 @@ echo "$diff_content" | awk '
 ' | while IFS=$'\t' read -r file line_num content; do
   [ -z "$file" ] && continue
   if [ "$(is_skill_file "$file")" = "true" ]; then continue; fi
-  # only for impl files (not tests/mocks)
-  if echo "$file" | grep -qE '^(tests?/|mocks?/)'; then continue; fi
+  # only for impl files (not tests/mocks/docs/examples/markdown)
+  # FP-B-02: HTTP-01 must not fire on markdown code fences.
+  if echo "$file" | grep -qE '^(tests?/|mocks?/|docs?/|examples?/)'; then continue; fi
+  if echo "$file" | grep -qiE '\.(md|rst|txt)$'; then continue; fi
   if echo "$content" | grep -qE '(requests|httpx)\.(Session|AsyncClient)\(\)'; then
-    emit_finding "HTTP-01" "FLAG" "$file" "$line_num" \
+    emit_finding_if_touched "HTTP-01" "FLAG" "$file" "$line_num" \
       "HTTP session created per invocation — prefer single instance in __init__" "" >> "$findings"
   fi
 done

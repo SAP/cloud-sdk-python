@@ -64,16 +64,28 @@ while IFS= read -r mod; do
   [ -z "$mod" ] && continue
 
   # Path for THIS repo's feature file
+  # FP-C-01: BDD-01 must accept ANY .feature file under the module's integration
+  # dir, not just `<module>.feature`.
   if [ "$LANGUAGE" = "python" ]; then
-    feature_path="$REPO_ROOT/tests/$mod/integration/$mod.feature"
+    feature_dir="$REPO_ROOT/tests/$mod/integration"
+    feature_path="$feature_dir/$mod.feature"      # kept for BDD-02 sibling comparison
     mod_dir="$REPO_ROOT/src/sap_cloud_sdk/$mod"
   else
-    feature_path="$REPO_ROOT/src/test/resources/com/sap/applicationfoundation/$mod/integration/$mod.feature"
+    feature_dir="$REPO_ROOT/src/test/resources/com/sap/applicationfoundation/$mod/integration"
+    feature_path="$feature_dir/$mod.feature"      # kept for BDD-02 sibling comparison
     mod_dir="$REPO_ROOT/src/main/java/com/sap/cloud/sdk/$mod"
   fi
 
-  # BDD-01: feature file exists (only fire if module has any source files)
-  if [ ! -f "$feature_path" ] && [ -d "$mod_dir" ]; then
+  # BDD-01: at least one .feature file exists in the module's integration dir
+  # (only fire if module has any source files and PR creates the module).
+  has_any_feature=false
+  if [ -d "$feature_dir" ]; then
+    if compgen -G "$feature_dir/*.feature" > /dev/null 2>&1; then
+      has_any_feature=true
+    fi
+  fi
+
+  if [ "$has_any_feature" = "false" ] && [ -d "$mod_dir" ]; then
     # Detect if this PR creates any new file INSIDE the module.
     # `new file mode` is on its own line before the `+++ b/<path>` header,
     # so we scan block-by-block to link them.
@@ -89,9 +101,9 @@ while IFS= read -r mod; do
       }
     ')
     if [ "$is_new_module" = "true" ]; then
-      emit_finding "BDD-01" "BLOCK" "tests/$mod/integration/$mod.feature" 1 \
-        "New module '$mod' has no BDD feature file" \
-        "Create $feature_path with cross-language-consistent scenarios" >> "$findings"
+      emit_finding "BDD-01" "BLOCK" "tests/$mod/integration/" 1 \
+        "New module '$mod' has no .feature files under integration/" \
+        "Create at least one $feature_dir/*.feature with cross-language-consistent scenarios" >> "$findings"
     fi
   fi
 

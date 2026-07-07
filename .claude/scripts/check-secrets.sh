@@ -6,6 +6,8 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=lib/json-emit.sh
 source "$SCRIPT_DIR/lib/json-emit.sh"
+# shellcheck source=lib/hunk-filter.sh
+source "$SCRIPT_DIR/lib/hunk-filter.sh"
 # shellcheck source=lib/skill-self-skip.sh
 source "$SCRIPT_DIR/lib/skill-self-skip.sh"
 

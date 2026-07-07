@@ -4,6 +4,7 @@
 set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/lib/json-emit.sh"
+source "$SCRIPT_DIR/lib/hunk-filter.sh"
 source "$SCRIPT_DIR/lib/skill-self-skip.sh"
 
 LANGUAGE="${LANGUAGE:-python}"
@@ -27,7 +28,7 @@ echo "$diff_content" | awk '
   if echo "$content" | grep -qE 'asyncio\.Queue\('; then
     # Check if same file has a Lock or set() nearby
     if [ -f "$REPO_ROOT/$file" ] && ! grep -qE 'asyncio\.Lock|set\(\)' "$REPO_ROOT/$file" 2>/dev/null; then
-      emit_finding "CC-01" "FLAG" "$file" "$line_num" \
+      emit_finding_if_touched "CC-01" "FLAG" "$file" "$line_num" \
         "asyncio.Queue without dedup — if items must be unique, add a set() + asyncio.Lock" "" >> "$findings"
     fi
   fi

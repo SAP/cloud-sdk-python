@@ -7,7 +7,7 @@ version: 2
 # =====================================================
 
 baseline:
-  file: .claude/baseline.json
+  file: .claude/config/baseline.json
   regenerate_with: orchestrate.sh --baseline
 
 tiers:

@@ -7,7 +7,7 @@ is_skill_file() {
   local file="$1"
   case "$file" in
     .claude/*)                             echo "true"; return ;;
-    tests/sdk-review/*)                    echo "true"; return ;;
+    tests/sdk-review/*)                    echo "true"; return ;;  # legacy path pre-bug-8
     .github/workflows/sdk-*)               echo "true"; return ;;
     docs/PR-REVIEW.md|docs/BRANCH-PROTECTION-SETUP.md) echo "true"; return ;;
     *)                                     echo "false" ;;

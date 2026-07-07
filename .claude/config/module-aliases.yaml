@@ -1,23 +1,14 @@
 # Module name aliases across the Python and Java cloud SDKs.
+#
 # Consumed by .claude/scripts/check-bdd.sh to resolve the sibling repo's
-# feature-file path when the two languages happen to name the same module
-# differently.
+# feature-file path when the same module has DIFFERENT names in each SDK.
 #
-# Only add an entry when the module exists in BOTH SDKs under DIFFERENT names.
-# When the names match on both sides, the resolver falls back to the same name
-# — no entry needed. Examples of matching names today: `destination`,
-# `objectstore`. Adding those here would be a no-op.
+# When a module has the SAME name in both SDKs (most cases), no entry is
+# needed — check-bdd.sh discovers modules dynamically from `src/` and falls
+# back to the identical name in the sibling repo.
 #
-# Audit summary (2026-07):
-#   - Python-only modules (no Java counterpart yet): adms, agent_decorators,
-#     agent_memory, agentgateway, aicore, extensibility, ias, print
-#   - Java-only packages: core (SDK baseline, not a client module — skipped
-#     by check-bdd via the `^core$` filter)
-#   - Same-name modules on both sides: destination, objectstore
-#   - Different-name pair: dms ↔ documentmanagement (see below)
-#
-# When a new cross-language module lands that uses a different name on either
-# side, append it here and update the audit summary above.
+# Only add an entry here when both SDKs ship the same module under different
+# names, and add it in the SAME PR that creates the divergent module.
 
 aliases:
   - python: dms

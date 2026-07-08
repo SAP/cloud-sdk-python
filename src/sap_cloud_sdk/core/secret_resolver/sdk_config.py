@@ -30,9 +30,10 @@ from typing import Optional
 from sap_cloud_sdk.core.secret_resolver._resolvers import (
     Resolver,
     ChainedResolver,
-    EnvVarResolver,
-    MountResolver,
 )
+
+from sap_cloud_sdk.core.secret_resolver.env_resolver import EnvVarResolver
+from sap_cloud_sdk.core.secret_resolver.mount_resolver import MountResolver
 
 _lock = threading.Lock()
 _sdk_config: Optional[SdkConfig] = None

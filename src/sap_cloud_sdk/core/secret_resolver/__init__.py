@@ -29,14 +29,18 @@ Legacy function-based API (still supported)::
 
 from sap_cloud_sdk.core.secret_resolver.resolver import (
     read_from_mount_and_fallback_to_env_var,
-    resolve_base_mount,
 )
 from sap_cloud_sdk.core.secret_resolver._resolvers import (
     Resolver,
     ChainedResolver,
-    EnvVarResolver,
-    MountResolver,
 )
+
+from sap_cloud_sdk.core.secret_resolver.mount_resolver import (
+    MountResolver,
+    resolve_base_mount,
+)
+from sap_cloud_sdk.core.secret_resolver.env_resolver import EnvVarResolver
+
 from sap_cloud_sdk.core.secret_resolver.sdk_config import (
     SdkConfig,
     configure,

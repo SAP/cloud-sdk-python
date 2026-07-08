@@ -17,12 +17,6 @@ from __future__ import annotations
 from dataclasses import fields, is_dataclass
 from typing import Any, Protocol, runtime_checkable
 
-from sap_cloud_sdk.core.secret_resolver.resolver import (
-    _load_from_env,
-    _load_from_mount,
-    resolve_base_mount,
-)
-
 
 @runtime_checkable
 class Resolver(Protocol):
@@ -48,49 +42,6 @@ class Resolver(Protocol):
             Any exception on failure; the caller determines how to handle it.
         """
         ...
-
-
-class MountResolver:
-    """Resolves bindings from a mounted volume path.
-
-    Reads secret files at ``{base_volume_mount}/{module}/{instance}/{field_key}``.
-    Respects the ``SERVICE_BINDING_ROOT`` environment variable (servicebinding.io
-    spec) as an override for ``base_volume_mount``.
-
-    Args:
-        base_volume_mount: Base path for mounted secrets. Defaults to
-            ``/etc/secrets/appfnd``.
-    """
-
-    def __init__(self, base_volume_mount: str = "/etc/secrets/appfnd") -> None:
-        self._base_volume_mount = base_volume_mount
-
-    def resolve(self, module: str, instance: str, target: Any) -> None:
-        """Load secrets from the mounted volume path."""
-        effective_base = resolve_base_mount(self._base_volume_mount)
-        _load_from_mount(effective_base, module, instance, target)
-
-
-class EnvVarResolver:
-    """Resolves bindings from environment variables.
-
-    Reads variables named ``{base_var_name}_{module}_{instance}_{field_key}``
-    (uppercased, hyphens in module/instance replaced with underscores).
-
-    Args:
-        base_var_name: Env var name prefix. Defaults to ``"CLOUD_SDK_CFG"``.
-    """
-
-    def __init__(self, base_var_name: str = "CLOUD_SDK_CFG") -> None:
-        self._base_var_name = base_var_name
-
-    def resolve(self, module: str, instance: str, target: Any) -> None:
-        """Load secrets from environment variables."""
-        normalized_module = module.replace("-", "_")
-        normalized_instance = instance.replace("-", "_")
-        _load_from_env(
-            self._base_var_name, normalized_module, normalized_instance, target
-        )
 
 
 class ChainedResolver:

@@ -5,7 +5,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from sap_cloud_sdk.core.telemetry.propagated_attributes_processor import (
+from sap_cloud_sdk.core.telemetry.span_processors.propagated_attributes_processor import (
     PropagatedAttributesSpanProcessor,
 )
 from sap_cloud_sdk.core.telemetry.telemetry import _propagated_attrs_var

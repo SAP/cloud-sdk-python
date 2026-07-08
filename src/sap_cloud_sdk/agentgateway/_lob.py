@@ -281,27 +281,27 @@ async def list_server_tools(
             write,
             _,
         ):
-        async with ClientSession(read, write) as session:
-            init_result = await session.initialize()
-            server_name = (
-                init_result.serverInfo.name
-                if init_result
-                and init_result.serverInfo
-                and init_result.serverInfo.name
-                else fragment_name
-            )
-            result = await session.list_tools()
-            return [
-                MCPTool(
-                    name=t.name,
-                    server_name=server_name,
-                    description=t.description or "",
-                    input_schema=t.inputSchema or {},
-                    url=dest_url,
-                    fragment_name=fragment_name,
+            async with ClientSession(read, write) as session:
+                init_result = await session.initialize()
+                server_name = (
+                    init_result.serverInfo.name
+                    if init_result
+                    and init_result.serverInfo
+                    and init_result.serverInfo.name
+                    else fragment_name
                 )
-                for t in result.tools
-            ]
+                result = await session.list_tools()
+                return [
+                    MCPTool(
+                        name=t.name,
+                        server_name=server_name,
+                        description=t.description or "",
+                        input_schema=t.inputSchema or {},
+                        url=dest_url,
+                        fragment_name=fragment_name,
+                    )
+                    for t in result.tools
+                ]
 
 
 async def get_mcp_tools_lob(
@@ -395,30 +395,30 @@ async def call_mcp_tool_lob(
             write,
             _,
         ):
-        async with ClientSession(read, write) as session:
-            await session.initialize()
-            result = await session.call_tool(tool.name, kwargs)
+            async with ClientSession(read, write) as session:
+                await session.initialize()
+                result = await session.call_tool(tool.name, kwargs)
 
-            # Defensive check: MCP library may return None for failed calls
-            if result is None:
-                logger.error("Tool '%s' returned None result", tool.name)
-                raise AgentGatewaySDKError(
-                    f"MCP tool '{tool.name}' returned no result. "
-                    "This may indicate a network timeout, protocol error, or invalid tool arguments."
-                )
+                # Defensive check: MCP library may return None for failed calls
+                if result is None:
+                    logger.error("Tool '%s' returned None result", tool.name)
+                    raise AgentGatewaySDKError(
+                        f"MCP tool '{tool.name}' returned no result. "
+                        "This may indicate a network timeout, protocol error, or invalid tool arguments."
+                    )
 
-            # Check if the result indicates an error
-            if hasattr(result, "isError") and result.isError:
-                logger.error("Tool '%s' returned error result", tool.name)
-                raise AgentGatewaySDKError(
-                    f"MCP tool '{tool.name}' returned an error: {result}"
-                )
+                # Check if the result indicates an error
+                if hasattr(result, "isError") and result.isError:
+                    logger.error("Tool '%s' returned error result", tool.name)
+                    raise AgentGatewaySDKError(
+                        f"MCP tool '{tool.name}' returned an error: {result}"
+                    )
 
-            if not result.content:
-                logger.warning("Tool '%s' returned empty content", tool.name)
-                return ""
-            first = result.content[0]
-            return str(getattr(first, "text", ""))
+                if not result.content:
+                    logger.warning("Tool '%s' returned empty content", tool.name)
+                    return ""
+                first = result.content[0]
+                return str(getattr(first, "text", ""))
 
 
 async def _fetch_agent_card(

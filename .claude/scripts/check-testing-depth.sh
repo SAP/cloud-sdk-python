@@ -25,7 +25,7 @@ if [ "$LANGUAGE" = "python" ]; then
   fi
 
   # TD-10: New module → integration test required
-  new_modules=$(echo "$diff_content" | awk '/^diff --git/ { flag=0 } /^new file mode/ { flag=1 } flag && /^\+\+\+ b\/src\/sap_cloud_sdk\/[a-z_]+\/[^\/]+\.py/ { print }' | grep -oE 'src/sap_cloud_sdk/[a-z_]+/' | sed 's|src/sap_cloud_sdk/||; s|/$||' | sort -u)
+  new_modules=$(echo "$diff_content" | awk '/^diff --git/ { flag=0 } /^new file mode/ { flag=1 } flag && /^\+\+\+ b\/src\/sap_cloud_sdk\/[a-z_]+\/[^\/]+\.py/ { print }' | { grep -oE 'src/sap_cloud_sdk/[a-z_]+/' 2>/dev/null || true; } | sed 's|src/sap_cloud_sdk/||; s|/$||' | sort -u)
   while IFS= read -r mod; do
     # Both conditions should skip the loop iteration. The previous
     # A || B && continue form parses as (A || B) && continue, which is

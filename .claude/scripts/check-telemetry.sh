@@ -24,9 +24,9 @@ diff_content=$(cat "$DIFF_FILE" 2>/dev/null || echo "")
 
 # Get list of client files newly added or modified
 if [ "$LANGUAGE" = "python" ]; then
-  client_files=$(echo "$diff_content" | grep -oE '^\+\+\+ b/src/sap_cloud_sdk/[a-z_]+/.*Client\.py|^\+\+\+ b/src/sap_cloud_sdk/[a-z_]+/client\.py' | sed 's|^+++ b/||' | sort -u)
+  client_files=$(echo "$diff_content" | { grep -oE '^\+\+\+ b/src/sap_cloud_sdk/[a-z_]+/.*Client\.py|^\+\+\+ b/src/sap_cloud_sdk/[a-z_]+/client\.py' 2>/dev/null || true; } | sed 's|^+++ b/||' | sort -u)
 else
-  client_files=$(echo "$diff_content" | grep -oE '^\+\+\+ b/src/main/java/com/sap/cloud/sdk/[a-z_]+/.*Client\.java' | sed 's|^+++ b/||' | sort -u)
+  client_files=$(echo "$diff_content" | { grep -oE '^\+\+\+ b/src/main/java/com/sap/cloud/sdk/[a-z_]+/.*Client\.java' 2>/dev/null || true; } | sed 's|^+++ b/||' | sort -u)
 fi
 
 # Detect new decorator additions ONLY inside client files (scope predicate).
@@ -52,7 +52,7 @@ if [ "$LANGUAGE" = "python" ]; then
     new_decorators=0
   fi
 else
-  new_decorators=$(echo "$diff_content" | grep -E '^\+.*Telemetry\.executeWithTelemetry' | wc -l | tr -d ' ')
+  new_decorators=$(echo "$diff_content" | { grep -E '^\+.*Telemetry\.executeWithTelemetry' 2>/dev/null || true; } | wc -l | tr -d ' ')
 fi
 
 # PY-TEL-02: For each changed client file, run AST check
@@ -98,7 +98,7 @@ fi
 if [ "$new_decorators" -gt 0 ]; then
   if [ "$LANGUAGE" = "python" ]; then
     # Find test files added/modified in same PR
-    test_files=$(echo "$diff_content" | grep -oE '^\+\+\+ b/tests/[a-z_]+/.*/test_.*\.py' | sed 's|^+++ b/||' | sort -u)
+    test_files=$(echo "$diff_content" | { grep -oE '^\+\+\+ b/tests/[a-z_]+/.*/test_.*\.py' 2>/dev/null || true; } | sed 's|^+++ b/||' | sort -u)
     has_metric_assert=false
     while IFS= read -r tf; do
       [ -z "$tf" ] && continue

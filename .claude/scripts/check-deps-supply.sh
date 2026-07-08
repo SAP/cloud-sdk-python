@@ -20,7 +20,7 @@ if echo "$diff_content" | grep -qE '\+.*(index-url|extra-index-url).*int\.reposi
 fi
 # Helper: `grep -c` returns "0" + exit 1 on zero matches → || echo 0 emits
 # "0\n0" and breaks -eq. Use wc -l instead.
-count_lines() { echo "$1" | grep -E "$2" 2>/dev/null | wc -l | tr -d ' '; }
+count_lines() { echo "$1" | { grep -E "$2" 2>/dev/null || true; } | wc -l | tr -d ' '; }
 
 # DEP-03: pyproject.toml deps changed but uv.lock not
 if [ "$LANGUAGE" = "python" ]; then

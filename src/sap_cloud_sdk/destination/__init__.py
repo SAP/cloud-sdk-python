@@ -115,7 +115,6 @@ def create_client(
 
         # Cloud mode via secret resolver or explicit config
         binding = config or load_from_env_or_mount(instance)
-
         tp = TokenProvider(binding)
         http = DestinationHttp(config=binding, token_provider=tp)
 

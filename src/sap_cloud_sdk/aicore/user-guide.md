@@ -228,7 +228,7 @@ rejections. All other exceptions surface unchanged.
 ### Migration from prior versions
 
 If your agent previously imported from `sap_cloud_sdk.orchestration` (an
-in-flight name during 0.28 development) or used the keyword form
+in-flight name during 0.32 development) or used the keyword form
 `set_filtering(hate=...)`, update to:
 
 ```python

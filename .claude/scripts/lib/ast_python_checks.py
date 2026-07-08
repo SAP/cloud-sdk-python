@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import ast
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -229,6 +230,32 @@ def check_con_01(
     effective_min_len = max(min_len, 3)
     # FP-D-01: per-file cap
     MAX_PER_FILE = 3
+
+    # FP-K-01: load the PR's added-lines set (if orchestrate provided it) so
+    # we only count string occurrences that the PR actually introduces. Prevents
+    # penalizing an unrelated edit for pre-existing repetitions.
+    added_lines_for_file: set[int] | None = None
+    added_lines_file = os.environ.get("ADDED_LINES_FILE", "")
+    if added_lines_file and Path(added_lines_file).is_file():
+        added_lines_for_file = set()
+        try:
+            with open(added_lines_file, encoding="utf-8") as fh:
+                for entry in fh:
+                    entry = entry.strip()
+                    if not entry or ":" not in entry:
+                        continue
+                    p, _, ln = entry.rpartition(":")
+                    if p == path:
+                        try:
+                            added_lines_for_file.add(int(ln))
+                        except ValueError:
+                            continue
+        except OSError:
+            added_lines_for_file = None
+    # If the caller didn't provide a diff scope, fall back to legacy behavior
+    # (count all occurrences). Bats tests exercise the check without an
+    # orchestrate wrapper, so we keep backward-compat.
+
     counts: dict[str, list[int]] = {}
     for node in ast.walk(tree):
         if isinstance(node, ast.Constant) and isinstance(node.value, str):
@@ -244,16 +271,27 @@ def check_con_01(
     for literal, lines in counts.items():
         if emitted >= MAX_PER_FILE:
             break
-        if len(lines) >= threshold:
-            emit(
-                "PY-CON-01",
-                "FLAG",
-                path,
-                lines[0],
-                f"String literal {literal!r} appears {len(lines)}× — extract module-level constant",
-                suggestion=f"e.g., _CONSTANT_NAME = {literal!r}",
-            )
-            emitted += 1
+        if len(lines) < threshold:
+            continue
+        # FP-K-01: require at least one occurrence to live on a PR-added line.
+        # Without this, an unrelated edit is credited for the repetition that
+        # already existed. If we have no diff scope, allow the legacy path.
+        if added_lines_for_file is not None:
+            added_occurrences = [ln for ln in lines if ln in added_lines_for_file]
+            if not added_occurrences:
+                continue
+            anchor_line = added_occurrences[0]
+        else:
+            anchor_line = lines[0]
+        emit(
+            "PY-CON-01",
+            "FLAG",
+            path,
+            anchor_line,
+            f"String literal {literal!r} appears {len(lines)}× — extract module-level constant",
+            suggestion=f"e.g., _CONSTANT_NAME = {literal!r}",
+        )
+        emitted += 1
 
 
 # ---------- PY-PT-04: module has any Exception subclass (AST-based) ----------

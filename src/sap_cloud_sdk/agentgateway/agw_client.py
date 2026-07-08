@@ -45,7 +45,9 @@ from sap_cloud_sdk.core.telemetry import (
     record_metrics,
     get_tenant_id,
 )
-from sap_cloud_sdk.core.auditlog_ng.gen.sap.auditlog.auditevent.v2 import auditevent_pb2 as pb
+from sap_cloud_sdk.core.auditlog_ng.gen.sap.auditlog.auditevent.v2 import (
+    auditevent_pb2 as pb,
+)
 
 logger = logging.getLogger(__name__)
 

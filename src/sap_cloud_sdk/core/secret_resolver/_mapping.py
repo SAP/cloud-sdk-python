@@ -1,3 +1,5 @@
+"""Utilities for mapping dataclass fields to secret store keys."""
+
 from typing import Any, Dict, Tuple
 from dataclasses import fields, is_dataclass
 

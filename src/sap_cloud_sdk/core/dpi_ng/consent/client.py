@@ -156,8 +156,31 @@ class _ODataClient:
             entity: A python-odata entity instance to create or update.
         """
         logger.info("Invoked ODataClient.save")
-        entity.__odata_service__.save(entity)
+        if entity.__odata__.persisted:
+            self._session.headers["If-Match"] = "*"
+        try:
+            entity.__odata_service__.save(entity)
+        finally:
+            self._session.headers.pop("If-Match", None)
         logger.info("Exiting ODataClient.save")
+
+    @staticmethod
+    def _apply_body(entity: Any, body: dict[str, Any]) -> None:
+        """Set fields from *body* on *entity* and force-mark each as dirty.
+
+        The odata library only marks a field dirty when the value changes, so
+        fields already matching their current value are silently dropped from
+        the PATCH body. Forcing dirty ensures the server always receives every
+        field the caller explicitly provided.
+
+        Unknown keys (not mapped as odata property descriptors on the entity
+        class) are silently ignored and never sent in the request.
+        """
+        for k, v in body.items():
+            prop = getattr(type(entity), k, None)
+            if prop is not None:
+                setattr(entity, k, v)
+                entity.__odata__.set_property_dirty(prop)
 
     def delete_entity(self, entity: Any) -> None:
         """Send a DELETE request for the given entity.
@@ -166,7 +189,11 @@ class _ODataClient:
             entity: A python-odata entity instance to delete.
         """
         logger.info("Invoked ODataClient.delete_entity")
-        entity.__odata_service__.delete(entity)
+        self._session.headers["If-Match"] = "*"
+        try:
+            entity.__odata_service__.delete(entity)
+        finally:
+            self._session.headers.pop("If-Match", None)
         logger.info("Exiting ODataClient.delete_entity")
 
     # ------------------------------------------------------------------

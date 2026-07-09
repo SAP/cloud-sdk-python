@@ -113,8 +113,7 @@ class ConsentRetentionService:
         """
         logger.info("Invoked ConsentRetentionService.update_rule")
         entity = self._client.query(_SVC, self.ConsentRetentionRule).get(rule_id)
-        for k, v in body.items():
-            setattr(entity, k, v)
+        self._client._apply_body(entity, body)
         self._client.save(entity)
         logger.info("Exiting ConsentRetentionService.update_rule")
         return entity

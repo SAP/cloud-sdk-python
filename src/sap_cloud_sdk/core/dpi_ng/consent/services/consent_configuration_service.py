@@ -123,8 +123,7 @@ class ConsentConfigurationService:
         """
         logger.info("Invoked ConsentConfigurationService.update_third_party")
         entity = self._client.query(_SVC, self.ThirdParty).get(third_party_id)
-        for k, v in body.items():
-            setattr(entity, k, v)
+        self._client._apply_body(entity, body)
         self._client.save(entity)
         logger.info("Exiting ConsentConfigurationService.update_third_party")
         return entity
@@ -225,8 +224,7 @@ class ConsentConfigurationService:
         """
         logger.info("Invoked ConsentConfigurationService.update_jurisdiction")
         entity = self._client.query(_SVC, self.Jurisdiction).get(jurisdiction_id)
-        for k, v in body.items():
-            setattr(entity, k, v)
+        self._client._apply_body(entity, body)
         self._client.save(entity)
         logger.info("Exiting ConsentConfigurationService.update_jurisdiction")
         return entity
@@ -295,51 +293,42 @@ class ConsentConfigurationService:
 
     @record_metrics(Module.DPI_NG, Operation.DPI_NG_CONSENT_UPDATE_JURISDICTION_TEXT)
     def update_jurisdiction_text(
-        self, jurisdiction_id: str, language_code: str, body: dict[str, Any]
+        self, jurisdiction_text_id: str, body: dict[str, Any]
     ) -> Any:
-        """Fetch a JurisdictionText by composite key, apply field updates, and PATCH it to the service.
+        """Fetch a JurisdictionText by its ID, apply field updates, and PATCH it to the service.
 
         Args:
-            jurisdiction_id: UUID of the parent Jurisdiction.
-            language_code: BCP-47 language code identifying the text entry.
+            jurisdiction_text_id: UUID of the JurisdictionText to update.
             body: Dictionary of field names and values to apply.
 
         Returns:
             The updated JurisdictionText object.
 
         Raises:
-            NotFoundError: If no JurisdictionText for the given composite key exists.
+            NotFoundError: If no JurisdictionText with the given ID exists.
             ValidationError: If the updated fields fail server-side validation.
             ODataError: If the OData service returns an unexpected error response.
         """
         logger.info("Invoked ConsentConfigurationService.update_jurisdiction_text")
-        entity = self._client.query(_SVC, self.JurisdictionText).get(
-            jurisdictionId=jurisdiction_id, languageCode=language_code
-        )
-        for k, v in body.items():
-            setattr(entity, k, v)
+        entity = self._client.query(_SVC, self.JurisdictionText).get(jurisdiction_text_id)
+        self._client._apply_body(entity, body)
         self._client.save(entity)
         logger.info("Exiting ConsentConfigurationService.update_jurisdiction_text")
         return entity
 
     @record_metrics(Module.DPI_NG, Operation.DPI_NG_CONSENT_DELETE_JURISDICTION_TEXT)
-    def delete_jurisdiction_text(
-        self, jurisdiction_id: str, language_code: str
-    ) -> None:
-        """Delete a JurisdictionText entity by its composite key.
+    def delete_jurisdiction_text(self, jurisdiction_text_id: str) -> None:
+        """Delete a JurisdictionText entity by its ID.
 
         Args:
-            jurisdiction_id: UUID of the parent Jurisdiction.
-            language_code: BCP-47 language code identifying the text entry to delete.
+            jurisdiction_text_id: UUID of the JurisdictionText to delete.
 
         Raises:
-            NotFoundError: If no JurisdictionText for the given composite key exists.
+            NotFoundError: If no JurisdictionText with the given ID exists.
             ODataError: If the OData service returns an unexpected error response.
         """
         logger.info("Invoked ConsentConfigurationService.delete_jurisdiction_text")
-        entity = self._client.query(_SVC, self.JurisdictionText).get(
-            jurisdictionId=jurisdiction_id, languageCode=language_code
-        )
+        entity = self._client.query(_SVC, self.JurisdictionText).get(jurisdiction_text_id)
         self._client.delete_entity(entity)
         logger.info("Exiting ConsentConfigurationService.delete_jurisdiction_text")
 
@@ -431,43 +420,42 @@ class ConsentConfigurationService:
 
     @record_metrics(Module.DPI_NG, Operation.DPI_NG_CONSENT_UPDATE_LANGUAGE_DESCRIPTION)
     def update_language_description(
-        self, language_code: str, body: dict[str, Any]
+        self, language_desc_id: str, body: dict[str, Any]
     ) -> Any:
-        """Fetch a LanguageDescription by language code, apply field updates, and PATCH it to the service.
+        """Fetch a LanguageDescription by its ID, apply field updates, and PATCH it to the service.
 
         Args:
-            language_code: BCP-47 language code of the LanguageDescription to update.
+            language_desc_id: UUID of the LanguageDescription to update.
             body: Dictionary of field names and values to apply.
 
         Returns:
             The updated LanguageDescription object.
 
         Raises:
-            NotFoundError: If no LanguageDescription with the given code exists.
+            NotFoundError: If no LanguageDescription with the given ID exists.
             ValidationError: If the updated fields fail server-side validation.
             ODataError: If the OData service returns an unexpected error response.
         """
         logger.info("Invoked ConsentConfigurationService.update_language_description")
-        entity = self._client.query(_SVC, self.LanguageDescription).get(language_code)
-        for k, v in body.items():
-            setattr(entity, k, v)
+        entity = self._client.query(_SVC, self.LanguageDescription).get(language_desc_id)
+        self._client._apply_body(entity, body)
         self._client.save(entity)
         logger.info("Exiting ConsentConfigurationService.update_language_description")
         return entity
 
     @record_metrics(Module.DPI_NG, Operation.DPI_NG_CONSENT_DELETE_LANGUAGE_DESCRIPTION)
-    def delete_language_description(self, language_code: str) -> None:
-        """Delete a LanguageDescription entity by its language code.
+    def delete_language_description(self, language_desc_id: str) -> None:
+        """Delete a LanguageDescription entity by its ID.
 
         Args:
-            language_code: BCP-47 language code of the LanguageDescription to delete.
+            language_desc_id: UUID of the LanguageDescription to delete.
 
         Raises:
-            NotFoundError: If no LanguageDescription with the given code exists.
+            NotFoundError: If no LanguageDescription with the given ID exists.
             ODataError: If the OData service returns an unexpected error response.
         """
         logger.info("Invoked ConsentConfigurationService.delete_language_description")
-        entity = self._client.query(_SVC, self.LanguageDescription).get(language_code)
+        entity = self._client.query(_SVC, self.LanguageDescription).get(language_desc_id)
         self._client.delete_entity(entity)
         logger.info("Exiting ConsentConfigurationService.delete_language_description")
 
@@ -551,8 +539,7 @@ class ConsentConfigurationService:
         """
         logger.info("Invoked ConsentConfigurationService.update_source_info")
         entity = self._client.query(_SVC, self.SourceInfo).get(source_id)
-        for k, v in body.items():
-            setattr(entity, k, v)
+        self._client._apply_body(entity, body)
         self._client.save(entity)
         logger.info("Exiting ConsentConfigurationService.update_source_info")
         return entity
@@ -653,8 +640,7 @@ class ConsentConfigurationService:
         """
         logger.info("Invoked ConsentConfigurationService.update_controller")
         entity = self._client.query(_SVC, self.Controller).get(controller_id)
-        for k, v in body.items():
-            setattr(entity, k, v)
+        self._client._apply_body(entity, body)
         self._client.save(entity)
         logger.info("Exiting ConsentConfigurationService.update_controller")
         return entity
@@ -763,8 +749,7 @@ class ConsentConfigurationService:
         entity = self._client.query(_SVC, self.DataSubjectType).get(
             data_subject_type_id
         )
-        for k, v in body.items():
-            setattr(entity, k, v)
+        self._client._apply_body(entity, body)
         self._client.save(entity)
         logger.info("Exiting ConsentConfigurationService.update_data_subject_type")
         return entity
@@ -867,8 +852,7 @@ class ConsentConfigurationService:
         """
         logger.info("Invoked ConsentConfigurationService.update_application")
         entity = self._client.query(_SVC, self.Application).get(application_id)
-        for k, v in body.items():
-            setattr(entity, k, v)
+        self._client._apply_body(entity, body)
         self._client.save(entity)
         logger.info("Exiting ConsentConfigurationService.update_application")
         return entity
@@ -977,8 +961,7 @@ class ConsentConfigurationService:
         entity = self._client.query(_SVC, self.MasterDataSource).get(
             master_data_source_id
         )
-        for k, v in body.items():
-            setattr(entity, k, v)
+        self._client._apply_body(entity, body)
         self._client.save(entity)
         logger.info("Exiting ConsentConfigurationService.update_master_data_source")
         return entity
@@ -1093,8 +1076,7 @@ class ConsentConfigurationService:
         entity = self._client.query(_SVC, self.OutboundChannelType).get(
             outbound_channel_type_id
         )
-        for k, v in body.items():
-            setattr(entity, k, v)
+        self._client._apply_body(entity, body)
         self._client.save(entity)
         logger.info("Exiting ConsentConfigurationService.update_outbound_channel_type")
         return entity

@@ -64,7 +64,7 @@ class CreateConsentRequest(_CamelSerializable):
     template_name: str
     language_code: str
     data_subject_type_name: str
-    jurisdiction_code: str
+    jurisdiction_code: str | None = None
     data_subject_description: str | None = None
     outbound_channel_type_name: str | None = None
     outbound_channel: str | None = None
@@ -88,5 +88,5 @@ class WithdrawConsentRequest(_CamelSerializable):
     """
 
     consent_id: str
-    withdrawn_by: str
+    withdrawn_by: str | None = None
     withdrawn_at: str | None = None

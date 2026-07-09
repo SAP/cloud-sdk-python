@@ -19,11 +19,11 @@ def _apply_query(q: Any, params: dict[str, Any]) -> Any:
         The Query instance with all supported options applied.
     """
     if "filter" in params:
-        q = q.raw({"$filter": params["filter"]})
+        q = q.filter(params["filter"])
     if "top" in params:
         q = q.limit(int(params["top"]))
     if "skip" in params:
         q = q.offset(int(params["skip"]))
     if "orderby" in params:
-        q = q.raw({"$orderby": params["orderby"]})
+        q = q.order_by(params["orderby"])
     return q

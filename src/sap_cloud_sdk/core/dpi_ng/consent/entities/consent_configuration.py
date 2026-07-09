@@ -30,7 +30,6 @@ def _make_entities(Service: Any) -> tuple:
         tenant = StringProperty("tenant")
         jurisdiction_id = UUIDProperty("jurisdictionId", primary_key=True)
         jurisdiction_code = StringProperty("jurisdictionCode")
-        description = StringProperty("description")
         created_at = DatetimeProperty("createdAt")
         created_by = StringProperty("createdBy")
         changed_at = DatetimeProperty("changedAt")
@@ -40,8 +39,10 @@ def _make_entities(Service: Any) -> tuple:
         """OData entity representing a localised description for a jurisdiction."""
 
         __odata_collection__ = "jurisdictionTexts"
-        jurisdiction_id = UUIDProperty("jurisdictionId", primary_key=True)
-        language_code = StringProperty("languageCode", primary_key=True)
+        jurisdiction_text_id = UUIDProperty("jurisdictionTextId", primary_key=True)
+        jurisdiction_code = StringProperty("jurisdictionCode")
+        jurisdiction_id = UUIDProperty("jurisdictionId")
+        language_code = StringProperty("languageCode")
         description = StringProperty("description")
 
     class Language(Service.Entity):
@@ -59,7 +60,9 @@ def _make_entities(Service: Any) -> tuple:
         """OData entity representing an additional description for a language."""
 
         __odata_collection__ = "languageDescriptions"
-        language_code = StringProperty("languageCode", primary_key=True)
+        language_desc_id = UUIDProperty("languageDescId", primary_key=True)
+        language_code = StringProperty("languageCode")
+        description_language_code = StringProperty("descriptionLanguageCode")
         description = StringProperty("description")
 
     class SourceInfo(Service.Entity):
@@ -144,7 +147,9 @@ def _make_entities(Service: Any) -> tuple:
         outbound_channel_type_name = StringProperty("outboundChannelTypeName")
         description = StringProperty("description")
         created_at = DatetimeProperty("createdAt")
+        created_by = StringProperty("createdBy")
         changed_at = DatetimeProperty("changedAt")
+        changed_by = StringProperty("changedBy")
 
     return (
         ThirdParty,

@@ -27,6 +27,7 @@ def _make_entities(Service: Any) -> tuple:
         controller_id = UUIDProperty("controllerId")
         jurisdiction_code = StringProperty("jurisdictionCode")
         consent_model_code = StringProperty("consentModelCode")
+        retention_period = IntegerProperty("retentionPeriod")
         retention_years = IntegerProperty("retentionYears")
         retention_months = IntegerProperty("retentionMonths")
         retention_days = IntegerProperty("retentionDays")

@@ -205,14 +205,14 @@ for c in consents:
 #### Get a consent by ID
 
 ```python
-consent = client.consents.get_consent("3fa85f64-5717-4562-b3fc-2c963f66afa6")
+consent = client.consents.get_consent("<consent-uuid>")
 print(consent.consent_id, consent.data_subject_id)
 ```
 
 #### Delete a consent
 
 ```python
-client.consents.delete_consent("3fa85f64-5717-4562-b3fc-2c963f66afa6")
+client.consents.delete_consent("<consent-uuid>")
 ```
 
 #### Create a consent from a template
@@ -222,10 +222,9 @@ from sap_cloud_sdk.core.dpi_ng.consent import CreateConsentRequest
 
 request = CreateConsentRequest(
     data_subject_id="user@example.com",
-    template_name="<template-name>",
-    language_code="EN",
-    data_subject_type_name="<type-name>",
-    jurisdiction_code="<jurisdiction-code>",
+    template_name="GDPR_Marketing_2024",
+    language_code="en",
+    data_subject_type_name="Employee",
 )
 consents = client.consents.create_consent_from_template(request)
 for c in consents:
@@ -233,22 +232,22 @@ for c in consents:
 ```
 
 **Required fields:**
-- `data_subject_id` - identifier of the data subject.
-- `template_name` - name of the consent template to use.
-- `language_code` - language code for the consent text (e.g. `"EN"`).
-- `data_subject_type_name` - type classification for the data subject.
-- `jurisdiction_code` - jurisdiction under which the consent is recorded.
+- `data_subject_id` - The unique identifier for the data subject. This sets the `DataSubjectId` for resulting consent records.
+- `template_name` - The name of the consent form that should be used to create the consent record.
+- `language_code` - The language in which the consent was granted.
+- `data_subject_type_name` - The name of a data subject type.
 
 **Optional fields:**
-- `data_subject_description` - human-readable description of the data subject.
-- `outbound_channel_type_name` - outbound channel type name.
-- `outbound_channel` - outbound channel identifier.
-- `valid_from` - ISO 8601 date from which the consent is valid.
-- `application_template_id` - application-specific template reference.
-- `controller_name` - name of the data controller.
-- `granted_by` - actor who granted the consent.
-- `granted_at` - ISO 8601 timestamp of consent grant.
-- `submission_site` - site or URL where the consent was submitted.
+- `data_subject_description` - The full name of the data subject.
+- `outbound_channel_type_name` - The name of an outbound channel type. If you include an outbound channel type, you must also include an outbound channel.
+- `outbound_channel` - Outbound channel identifier.
+- `valid_from` - The date when the consent record starts being valid. If no value is provided, the current timestamp is used.
+- `jurisdiction_code` - The legal space in which the consent is valid. Overrides the `JurisdictionCode` from the consent form.
+- `application_template_id` - Freely used by the integrating application (e.g. a context string identifying the business process). Overrides the `applicationTemplateId` from the consent form.
+- `controller_name` - The name of a data controller. Overrides the `ControllerName` from the consent form.
+- `granted_by` - The natural person who granted the consent — either the data subject or another person acting on their behalf (e.g. a customer service representative or legal guardian).
+- `granted_at` - When the consent was granted.
+- `submission_site` - Where the consent was granted. This could be a physical place (e.g. a hospital name) or a website.
 
 #### Withdraw a consent
 
@@ -257,7 +256,7 @@ from sap_cloud_sdk.core.dpi_ng.consent import WithdrawConsentRequest
 
 client.consents.withdraw_consent(
     WithdrawConsentRequest(
-        consent_id="3fa85f64-5717-4562-b3fc-2c963f66afa6",
+        consent_id="<consent-uuid>",
         withdrawn_by="user@example.com",
     )
 )
@@ -268,13 +267,13 @@ client.consents.withdraw_consent(
 ```python
 client.consents.terminate_consent(
     WithdrawConsentRequest(
-        consent_id="3fa85f64-5717-4562-b3fc-2c963f66afa6",
+        consent_id="<consent-uuid>",
         withdrawn_by="contract-end-process",
     )
 )
 ```
 
-`WithdrawConsentRequest.withdrawn_at` is optional - omit it to let the service
+`WithdrawConsentRequest.withdrawn_by` and `withdrawn_at` are both optional — omit them to let the service
 record the current timestamp.
 
 #### Check whether a consent exists
@@ -317,7 +316,7 @@ print(purpose.purpose_name, purpose.sensitive_data_flag)
 
 ```python
 purpose = client.purposes.create_purpose({
-    "purpose_name": "Marketing Emails",
+    "purpose_name": "Marketing_Emails",
     "sensitive_data_flag": False,
 })
 print(purpose.purpose_id)
@@ -328,7 +327,7 @@ print(purpose.purpose_id)
 ```python
 purpose = client.purposes.update_purpose(
     "<purpose-uuid>",
-    {"purpose_name": "Marketing Emails - Updated"},
+    {"purpose_name": "Marketing_Emails_Updated", "sensitive_data_flag": True},
 )
 ```
 
@@ -357,16 +356,9 @@ texts = client.purposes.list_purpose_texts(
 
 #### Get a purpose text
 
-Purpose texts have a composite key of `purpose_id`, `type_code`, and
-`language_code`.
-
 ```python
-text = client.purposes.get_purpose_text(
-    purpose_id="<purpose-uuid>",
-    type_code="SHORT",
-    language_code="EN",
-)
-print(text.text_value)
+text = client.purposes.get_purpose_text("<purpose-text-uuid>")
+print(text.text)
 ```
 
 #### Create a purpose text
@@ -374,9 +366,9 @@ print(text.text_value)
 ```python
 text = client.purposes.create_purpose_text({
     "purpose_id": "<purpose-uuid>",
-    "type_code": "SHORT",
-    "language_code": "EN",
-    "text_value": "We use your email to send marketing updates.",
+    "type_code": "01",
+    "language_code": "en",
+    "text": "We use your email to send marketing updates.",
 })
 ```
 
@@ -384,21 +376,15 @@ text = client.purposes.create_purpose_text({
 
 ```python
 text = client.purposes.update_purpose_text(
-    purpose_id="<purpose-uuid>",
-    type_code="SHORT",
-    language_code="EN",
-    body={"text_value": "Updated marketing email description."},
+    "<purpose-text-uuid>",
+    body={"purpose_id": "<purpose-uuid>", "type_code": "01", "language_code": "de", "text": "Updated marketing email description."},
 )
 ```
 
 #### Delete a purpose text
 
 ```python
-client.purposes.delete_purpose_text(
-    purpose_id="<purpose-uuid>",
-    type_code="SHORT",
-    language_code="EN",
-)
+client.purposes.delete_purpose_text("<purpose-text-uuid>")
 ```
 
 ---
@@ -424,8 +410,14 @@ print(template.template_name)
 
 ```python
 template = client.templates.create_template({
-    "template_name": "GDPR-Marketing-2024",
+    "template_name": "GDPR_Marketing_2024",
     "jurisdiction_code": "EU",
+    "consent_model_code": "1",
+    "validity_period": 365,
+    "expiring_period": 30,
+    "purpose_name": "Marketing_Emails",
+    "controller_name": "AB_Corp",
+    "application_name": "HR_Portal",
 })
 print(template.template_id)
 ```
@@ -435,7 +427,16 @@ print(template.template_id)
 ```python
 template = client.templates.update_template(
     "<template-uuid>",
-    {"template_name": "GDPR-Marketing-2025"},
+    {
+        "template_name": "GDPR_Marketing_2025",
+        "jurisdiction_code": "DE",
+        "consent_model_code": "2",
+        "validity_period": 180,
+        "expiring_period": 15,
+        "purpose_name": "Marketing_Emails_Updated",
+        "controller_name": "AB_Corp_Updated",
+        "application_name": "HR_Portal_v2",
+    },
 )
 ```
 
@@ -462,15 +463,9 @@ texts = client.templates.list_template_texts(
 
 #### Get a template text
 
-Template texts have a composite key of `template_id`, `type_code`, and
-`language_code`.
-
 ```python
-text = client.templates.get_template_text(
-    template_id="<template-uuid>",
-    type_code="LONG",
-    language_code="EN",
-)
+text = client.templates.get_template_text("<template-text-uuid>")
+print(text.text)
 ```
 
 #### Create a template text
@@ -478,9 +473,9 @@ text = client.templates.get_template_text(
 ```python
 text = client.templates.create_template_text({
     "template_id": "<template-uuid>",
-    "type_code": "LONG",
-    "language_code": "EN",
-    "text_value": "Full consent statement in English...",
+    "language_code": "en",
+    "type_code": "51",
+    "text": "Full consent statement in English...",
 })
 ```
 
@@ -488,21 +483,15 @@ text = client.templates.create_template_text({
 
 ```python
 text = client.templates.update_template_text(
-    template_id="<template-uuid>",
-    type_code="LONG",
-    language_code="EN",
-    body={"text_value": "Revised consent statement."},
+    "<template-text-uuid>",
+    body={"template_id": "<template-uuid>", "language_code": "de", "type_code": "52", "text": "Revised consent statement."},
 )
 ```
 
 #### Delete a template text
 
 ```python
-client.templates.delete_template_text(
-    template_id="<template-uuid>",
-    type_code="LONG",
-    language_code="EN",
-)
+client.templates.delete_template_text("<template-text-uuid>")
 ```
 
 #### List third-party personal data assignments
@@ -515,12 +504,10 @@ records = client.templates.list_third_party_pers_data(
 
 #### Get a third-party personal data record
 
-The composite key is `template_id` and `third_party_id`.
-
 ```python
 record = client.templates.get_third_party_pers_data(
+    third_party_assignment_id="<third-party-assignment-uuid>",
     template_id="<template-uuid>",
-    third_party_id="<third-party-uuid>",
 )
 ```
 
@@ -530,6 +517,8 @@ record = client.templates.get_third_party_pers_data(
 record = client.templates.create_third_party_pers_data({
     "template_id": "<template-uuid>",
     "third_party_id": "<third-party-uuid>",
+    "third_party_function_code": "01",
+    "sensitive_data_flag": False,
 })
 ```
 
@@ -537,9 +526,9 @@ record = client.templates.create_third_party_pers_data({
 
 ```python
 record = client.templates.update_third_party_pers_data(
+    third_party_assignment_id="<third-party-assignment-uuid>",
     template_id="<template-uuid>",
-    third_party_id="<third-party-uuid>",
-    body={"description": "Updated description"},
+    body={"third_party_id": "<third-party-uuid>", "third_party_function_code": "02", "sensitive_data_flag": True},
 )
 ```
 
@@ -547,8 +536,8 @@ record = client.templates.update_third_party_pers_data(
 
 ```python
 client.templates.delete_third_party_pers_data(
+    third_party_assignment_id="<third-party-assignment-uuid>",
     template_id="<template-uuid>",
-    third_party_id="<third-party-uuid>",
 )
 ```
 
@@ -568,15 +557,19 @@ rules = client.retention.list_rules(
 
 ```python
 rule = client.retention.get_rule("<rule-uuid>")
-print(rule.retention_period)
+print(rule.rule_name, rule.retention_period)
 ```
 
 #### Create a retention rule
 
 ```python
 rule = client.retention.create_rule({
-    "rule_name": "7-year-financial",
-    "retention_period": 84,
+    "rule_name": "7_year_financial",
+    "purpose_name": "Marketing_Emails",
+    "retention_period": 7,
+    "jurisdiction_code": "EU",
+    "controller_name": "AB_Corp",
+    "consent_model_code": "1",
 })
 print(rule.rule_id)
 ```
@@ -586,7 +579,14 @@ print(rule.rule_id)
 ```python
 rule = client.retention.update_rule(
     "<rule-uuid>",
-    {"retention_period": 96},
+    {
+        "rule_name": "7_year_financial",
+        "purpose_name": "Marketing_Emails_Updated",
+        "retention_period": 8,
+        "jurisdiction_code": "DE",
+        "controller_name": "AB_Corp_Updated",
+        "consent_model_code": "2",
+    },
 )
 ```
 
@@ -621,15 +621,15 @@ tp = client.configuration.get_third_party("<third-party-uuid>")
 
 # Create
 tp = client.configuration.create_third_party({
-    "third_party_name": "Analytics Corp",
-    "description": "Third-party analytics provider",
+    "third_party_name": "Analytics_Corp",
+    "formatted_description": "Third-party analytics provider",
 })
 print(tp.third_party_id)
 
 # Update
 tp = client.configuration.update_third_party(
     "<third-party-uuid>",
-    {"description": "Updated analytics provider description"},
+    {"third_party_name": "Analytics_Corp", "formatted_description": "Updated analytics provider description"},
 )
 
 # Delete
@@ -648,13 +648,12 @@ jurisdiction = client.configuration.get_jurisdiction("<jurisdiction-uuid>")
 # Create
 jurisdiction = client.configuration.create_jurisdiction({
     "jurisdiction_code": "EU",
-    "jurisdiction_name": "European Union",
 })
 
 # Update
 jurisdiction = client.configuration.update_jurisdiction(
     "<jurisdiction-uuid>",
-    {"jurisdiction_name": "EU - GDPR"},
+    {"jurisdiction_code": "DE"},
 )
 
 # Delete
@@ -663,31 +662,25 @@ client.configuration.delete_jurisdiction("<jurisdiction-uuid>")
 
 #### Jurisdiction texts
 
-Jurisdiction texts have a composite key of `jurisdiction_id` and `language_code`.
-
 ```python
 # List
 texts = client.configuration.list_jurisdiction_texts()
 
 # Create
 text = client.configuration.create_jurisdiction_text({
-    "jurisdiction_id": "<jurisdiction-uuid>",
-    "language_code": "EN",
-    "text_value": "European Union General Data Protection Regulation",
+    "jurisdiction_code": "<jurisdiction-code>",
+    "language_code": "en",
+    "description": "European Union General Data Protection Regulation",
 })
 
 # Update
 text = client.configuration.update_jurisdiction_text(
-    jurisdiction_id="<jurisdiction-uuid>",
-    language_code="EN",
-    body={"text_value": "EU GDPR - Revised"},
+    "<jurisdiction-text-uuid>",
+    body={"language_code": "en", "description": "EU GDPR - Revised"},
 )
 
 # Delete
-client.configuration.delete_jurisdiction_text(
-    jurisdiction_id="<jurisdiction-uuid>",
-    language_code="EN",
-)
+client.configuration.delete_jurisdiction_text("<jurisdiction-text-uuid>")
 ```
 
 #### Languages
@@ -697,7 +690,7 @@ client.configuration.delete_jurisdiction_text(
 languages = client.configuration.list_languages()
 
 # Get
-language = client.configuration.get_language("EN")
+language = client.configuration.get_language("en")
 print(language.language_code)
 ```
 
@@ -711,18 +704,19 @@ descriptions = client.configuration.list_language_descriptions()
 
 # Create
 desc = client.configuration.create_language_description({
-    "language_code": "EN",
-    "description": "English",
+    "language_code": "ar",
+    "description_language_code": "en",
+    "description": "Arabic",
 })
 
 # Update
 desc = client.configuration.update_language_description(
-    language_code="EN",
-    body={"description": "English (Updated)"},
+    "<language-desc-uuid>",
+    body={"language_code": "ar", "description_language_code": "en", "description": "Arabic (Updated)"},
 )
 
 # Delete
-client.configuration.delete_language_description("EN")
+client.configuration.delete_language_description("<language-desc-uuid>")
 ```
 
 #### Source infos
@@ -736,14 +730,14 @@ source = client.configuration.get_source_info("<source-uuid>")
 
 # Create
 source = client.configuration.create_source_info({
-    "source_name": "CRM System",
+    "source_name": "CRM_System",
     "description": "Customer relationship management platform",
 })
 
 # Update
 source = client.configuration.update_source_info(
     "<source-uuid>",
-    {"description": "CRM - Updated"},
+    {"source_name": "CRM_System", "description": "CRM - Updated"},
 )
 
 # Delete
@@ -761,7 +755,8 @@ controller = client.configuration.get_controller("<controller-uuid>")
 
 # Create
 controller = client.configuration.create_controller({
-    "controller_name": "AB Corp",
+    "controller_name": "AB_Corp",
+    "source_name": "CRM_System",
     "description": "Main data controller",
 })
 print(controller.controller_id)
@@ -769,7 +764,7 @@ print(controller.controller_id)
 # Update
 controller = client.configuration.update_controller(
     "<controller-uuid>",
-    {"description": "AB Corp - Primary data controller"},
+    {"controller_name": "AB_Corp", "source_name": "CRM_System", "description": "AB Corp - Primary data controller"},
 )
 
 # Delete
@@ -783,21 +778,22 @@ client.configuration.delete_controller("<controller-uuid>")
 types = client.configuration.list_data_subject_types()
 
 # Get
-dst = client.configuration.get_data_subject_type("<type-uuid>")
+dst = client.configuration.get_data_subject_type("<data-subject-type-uuid>")
 
 # Create
 dst = client.configuration.create_data_subject_type({
     "data_subject_type_name": "Employee",
+    "master_data_source_name": "SAP_HR",
 })
 
 # Update
 dst = client.configuration.update_data_subject_type(
-    "<type-uuid>",
-    {"data_subject_type_name": "Internal Employee"},
+    "<data-subject-type-uuid>",
+    {"data_subject_type_name": "Internal_Employee", "master_data_source_name": "SAP_SuccessFactors"},
 )
 
 # Delete
-client.configuration.delete_data_subject_type("<type-uuid>")
+client.configuration.delete_data_subject_type("<data-subject-type-uuid>")
 ```
 
 #### Applications
@@ -807,21 +803,23 @@ client.configuration.delete_data_subject_type("<type-uuid>")
 apps = client.configuration.list_applications()
 
 # Get
-app = client.configuration.get_application("<app-uuid>")
+app = client.configuration.get_application("<application-uuid>")
 
 # Create
 app = client.configuration.create_application({
-    "application_name": "HR Portal",
+    "application_name": "HR_Portal",
+    "source_name": "CRM_System",
+    "description": "HR self-service portal",
 })
 
 # Update
 app = client.configuration.update_application(
-    "<app-uuid>",
-    {"application_name": "HR Portal v2"},
+    "<application-uuid>",
+    {"application_name": "HR_Portal_v2", "source_name": "CRM_System", "description": "HR portal version 2"},
 )
 
 # Delete
-client.configuration.delete_application("<app-uuid>")
+client.configuration.delete_application("<application-uuid>")
 ```
 
 #### Master data sources
@@ -831,21 +829,22 @@ client.configuration.delete_application("<app-uuid>")
 sources = client.configuration.list_master_data_sources()
 
 # Get
-source = client.configuration.get_master_data_source("<source-uuid>")
+source = client.configuration.get_master_data_source("<master-data-source-uuid>")
 
 # Create
 source = client.configuration.create_master_data_source({
-    "master_data_source_name": "SAP S/4HANA",
+    "master_data_source_name": "SAP_S4HANA",
+    "description": "SAP S/4HANA master data source",
 })
 
 # Update
 source = client.configuration.update_master_data_source(
-    "<source-uuid>",
-    {"master_data_source_name": "SAP S/4HANA Cloud"},
+    "<master-data-source-uuid>",
+    {"master_data_source_name": "SAP_S4HANA_Cloud", "description": "SAP S/4HANA Cloud master data source"},
 )
 
 # Delete
-client.configuration.delete_master_data_source("<source-uuid>")
+client.configuration.delete_master_data_source("<master-data-source-uuid>")
 ```
 
 #### Outbound channel types
@@ -855,21 +854,22 @@ client.configuration.delete_master_data_source("<source-uuid>")
 channel_types = client.configuration.list_outbound_channel_types()
 
 # Get
-ct = client.configuration.get_outbound_channel_type("<type-uuid>")
+channel_type = client.configuration.get_outbound_channel_type("<outbound-channel-type-uuid>")
 
 # Create
-ct = client.configuration.create_outbound_channel_type({
+channel_type = client.configuration.create_outbound_channel_type({
     "outbound_channel_type_name": "Email",
+    "description": "Email notification channel",
 })
 
 # Update
-ct = client.configuration.update_outbound_channel_type(
-    "<type-uuid>",
-    {"outbound_channel_type_name": "Email Newsletter"},
+channel_type = client.configuration.update_outbound_channel_type(
+    "<outbound-channel-type-uuid>",
+    {"outbound_channel_type_name": "Email_Newsletter", "description": "Email newsletter channel"},
 )
 
 # Delete
-client.configuration.delete_outbound_channel_type("<type-uuid>")
+client.configuration.delete_outbound_channel_type("<outbound-channel-type-uuid>")
 ```
 
 ## Error Handling

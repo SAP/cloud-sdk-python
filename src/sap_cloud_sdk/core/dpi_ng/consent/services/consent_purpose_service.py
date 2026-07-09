@@ -116,8 +116,7 @@ class ConsentPurposeService:
         """
         logger.info("Invoked ConsentPurposeService.update_purpose")
         entity = self._client.query(_SVC, self.ConsentPurpose).get(purpose_id)
-        for k, v in body.items():
-            setattr(entity, k, v)
+        self._client._apply_body(entity, body)
         self._client.save(entity)
         logger.info("Exiting ConsentPurposeService.update_purpose")
         return entity
@@ -208,27 +207,21 @@ class ConsentPurposeService:
         return result
 
     @record_metrics(Module.DPI_NG, Operation.DPI_NG_CONSENT_GET_PURPOSE_TEXT)
-    def get_purpose_text(
-        self, purpose_id: str, type_code: str, language_code: str
-    ) -> Any:
-        """Return a single ConsentPurposeText entity by its composite key.
+    def get_purpose_text(self, purpose_text_id: str) -> Any:
+        """Return a single ConsentPurposeText entity by its ID.
 
         Args:
-            purpose_id: UUID of the parent ConsentPurpose.
-            type_code: Type code identifying the text category.
-            language_code: BCP-47 language code of the text entry.
+            purpose_text_id: UUID of the ConsentPurposeText to retrieve.
 
         Returns:
             The matching ConsentPurposeText object.
 
         Raises:
-            NotFoundError: If no ConsentPurposeText for the given composite key exists.
+            NotFoundError: If no ConsentPurposeText with the given ID exists.
             ODataError: If the OData service returns an unexpected error response.
         """
         logger.info("Invoked ConsentPurposeService.get_purpose_text")
-        result = self._client.query(_SVC, self.ConsentPurposeText).get(
-            purposeId=purpose_id, typeCode=type_code, languageCode=language_code
-        )
+        result = self._client.query(_SVC, self.ConsentPurposeText).get(purpose_text_id)
         logger.info("Exiting ConsentPurposeService.get_purpose_text")
         return result
 
@@ -256,53 +249,40 @@ class ConsentPurposeService:
         return entity
 
     @record_metrics(Module.DPI_NG, Operation.DPI_NG_CONSENT_UPDATE_PURPOSE_TEXT)
-    def update_purpose_text(
-        self, purpose_id: str, type_code: str, language_code: str, body: dict[str, Any]
-    ) -> Any:
-        """Fetch a ConsentPurposeText by composite key, apply field updates, and PATCH it to the service.
+    def update_purpose_text(self, purpose_text_id: str, body: dict[str, Any]) -> Any:
+        """Fetch a ConsentPurposeText by its ID, apply field updates, and PATCH it to the service.
 
         Args:
-            purpose_id: UUID of the parent ConsentPurpose.
-            type_code: Type code identifying the text category.
-            language_code: BCP-47 language code of the text entry.
+            purpose_text_id: UUID of the ConsentPurposeText to update.
             body: Dictionary of field names and values to apply.
 
         Returns:
             The updated ConsentPurposeText object.
 
         Raises:
-            NotFoundError: If no ConsentPurposeText for the given composite key exists.
+            NotFoundError: If no ConsentPurposeText with the given ID exists.
             ValidationError: If the updated fields fail server-side validation.
             ODataError: If the OData service returns an unexpected error response.
         """
         logger.info("Invoked ConsentPurposeService.update_purpose_text")
-        entity = self._client.query(_SVC, self.ConsentPurposeText).get(
-            purposeId=purpose_id, typeCode=type_code, languageCode=language_code
-        )
-        for k, v in body.items():
-            setattr(entity, k, v)
+        entity = self._client.query(_SVC, self.ConsentPurposeText).get(purpose_text_id)
+        self._client._apply_body(entity, body)
         self._client.save(entity)
         logger.info("Exiting ConsentPurposeService.update_purpose_text")
         return entity
 
     @record_metrics(Module.DPI_NG, Operation.DPI_NG_CONSENT_DELETE_PURPOSE_TEXT)
-    def delete_purpose_text(
-        self, purpose_id: str, type_code: str, language_code: str
-    ) -> None:
-        """Delete a ConsentPurposeText entity by its composite key.
+    def delete_purpose_text(self, purpose_text_id: str) -> None:
+        """Delete a ConsentPurposeText entity by its ID.
 
         Args:
-            purpose_id: UUID of the parent ConsentPurpose.
-            type_code: Type code identifying the text category.
-            language_code: BCP-47 language code of the text entry to delete.
+            purpose_text_id: UUID of the ConsentPurposeText to delete.
 
         Raises:
-            NotFoundError: If no ConsentPurposeText for the given composite key exists.
+            NotFoundError: If no ConsentPurposeText with the given ID exists.
             ODataError: If the OData service returns an unexpected error response.
         """
         logger.info("Invoked ConsentPurposeService.delete_purpose_text")
-        entity = self._client.query(_SVC, self.ConsentPurposeText).get(
-            purposeId=purpose_id, typeCode=type_code, languageCode=language_code
-        )
+        entity = self._client.query(_SVC, self.ConsentPurposeText).get(purpose_text_id)
         self._client.delete_entity(entity)
         logger.info("Exiting ConsentPurposeService.delete_purpose_text")

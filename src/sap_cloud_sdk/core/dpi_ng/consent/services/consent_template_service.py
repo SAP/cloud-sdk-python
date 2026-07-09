@@ -117,8 +117,7 @@ class ConsentTemplateService:
         """
         logger.info("Invoked ConsentTemplateService.update_template")
         entity = self._client.query(_SVC, self.ConsentTemplate).get(template_id)
-        for k, v in body.items():
-            setattr(entity, k, v)
+        self._client._apply_body(entity, body)
         self._client.save(entity)
         logger.info("Exiting ConsentTemplateService.update_template")
         return entity
@@ -213,27 +212,21 @@ class ConsentTemplateService:
         return result
 
     @record_metrics(Module.DPI_NG, Operation.DPI_NG_CONSENT_GET_TEMPLATE_TEXT)
-    def get_template_text(
-        self, template_id: str, type_code: str, language_code: str
-    ) -> Any:
-        """Return a single ConsentTemplateText entity by its composite key.
+    def get_template_text(self, template_text_id: str) -> Any:
+        """Return a single ConsentTemplateText entity by its ID.
 
         Args:
-            template_id: UUID of the parent ConsentTemplate.
-            type_code: Type code identifying the text category.
-            language_code: BCP-47 language code of the text entry (e.g. ``"en"`` or ``"de"``).
+            template_text_id: UUID of the ConsentTemplateText to retrieve.
 
         Returns:
             The matching ConsentTemplateText object.
 
         Raises:
-            NotFoundError: If no ConsentTemplateText for the given composite key exists.
+            NotFoundError: If no ConsentTemplateText with the given ID exists.
             ODataError: If the OData service returns an unexpected error response.
         """
         logger.info("Invoked ConsentTemplateService.get_template_text")
-        result = self._client.query(_SVC, self.ConsentTemplateText).get(
-            templateId=template_id, typeCode=type_code, languageCode=language_code
-        )
+        result = self._client.query(_SVC, self.ConsentTemplateText).get(template_text_id)
         logger.info("Exiting ConsentTemplateService.get_template_text")
         return result
 
@@ -261,54 +254,41 @@ class ConsentTemplateService:
         return entity
 
     @record_metrics(Module.DPI_NG, Operation.DPI_NG_CONSENT_UPDATE_TEMPLATE_TEXT)
-    def update_template_text(
-        self, template_id: str, type_code: str, language_code: str, body: dict[str, Any]
-    ) -> Any:
-        """Fetch a ConsentTemplateText by composite key, apply field updates, and PATCH it to the service.
+    def update_template_text(self, template_text_id: str, body: dict[str, Any]) -> Any:
+        """Fetch a ConsentTemplateText by its ID, apply field updates, and PATCH it to the service.
 
         Args:
-            template_id: UUID of the parent ConsentTemplate.
-            type_code: Type code identifying the text category.
-            language_code: BCP-47 language code of the text entry (e.g. ``"en"`` or ``"de"``).
+            template_text_id: UUID of the ConsentTemplateText to update.
             body: Dictionary of field names and values to apply.
 
         Returns:
             The updated ConsentTemplateText object.
 
         Raises:
-            NotFoundError: If no ConsentTemplateText for the given composite key exists.
+            NotFoundError: If no ConsentTemplateText with the given ID exists.
             ValidationError: If the updated fields fail server-side validation.
             ODataError: If the OData service returns an unexpected error response.
         """
         logger.info("Invoked ConsentTemplateService.update_template_text")
-        entity = self._client.query(_SVC, self.ConsentTemplateText).get(
-            templateId=template_id, typeCode=type_code, languageCode=language_code
-        )
-        for k, v in body.items():
-            setattr(entity, k, v)
+        entity = self._client.query(_SVC, self.ConsentTemplateText).get(template_text_id)
+        self._client._apply_body(entity, body)
         self._client.save(entity)
         logger.info("Exiting ConsentTemplateService.update_template_text")
         return entity
 
     @record_metrics(Module.DPI_NG, Operation.DPI_NG_CONSENT_DELETE_TEMPLATE_TEXT)
-    def delete_template_text(
-        self, template_id: str, type_code: str, language_code: str
-    ) -> None:
-        """Delete a ConsentTemplateText entity by its composite key.
+    def delete_template_text(self, template_text_id: str) -> None:
+        """Delete a ConsentTemplateText entity by its ID.
 
         Args:
-            template_id: UUID of the parent ConsentTemplate.
-            type_code: Type code identifying the text category.
-            language_code: BCP-47 language code of the text entry to delete (e.g. ``"en"`` or ``"de"``).
+            template_text_id: UUID of the ConsentTemplateText to delete.
 
         Raises:
-            NotFoundError: If no ConsentTemplateText for the given composite key exists.
+            NotFoundError: If no ConsentTemplateText with the given ID exists.
             ODataError: If the OData service returns an unexpected error response.
         """
         logger.info("Invoked ConsentTemplateService.delete_template_text")
-        entity = self._client.query(_SVC, self.ConsentTemplateText).get(
-            templateId=template_id, typeCode=type_code, languageCode=language_code
-        )
+        entity = self._client.query(_SVC, self.ConsentTemplateText).get(template_text_id)
         self._client.delete_entity(entity)
         logger.info("Exiting ConsentTemplateService.delete_template_text")
 
@@ -336,12 +316,12 @@ class ConsentTemplateService:
         return result
 
     @record_metrics(Module.DPI_NG, Operation.DPI_NG_CONSENT_GET_THIRD_PARTY_PERS_DATA)
-    def get_third_party_pers_data(self, template_id: str, third_party_id: str) -> Any:
+    def get_third_party_pers_data(self, third_party_assignment_id: str, template_id: str) -> Any:
         """Return a single TemplateThirdPartyPersData entity by its composite key.
 
         Args:
-            template_id: UUID of the parent ConsentTemplate.
-            third_party_id: UUID of the associated ThirdParty.
+            third_party_assignment_id: UUID of the ThirdPartyAssignment (primary key).
+            template_id: UUID of the parent ConsentTemplate (primary key).
 
         Returns:
             The matching TemplateThirdPartyPersData object.
@@ -352,7 +332,7 @@ class ConsentTemplateService:
         """
         logger.info("Invoked ConsentTemplateService.get_third_party_pers_data")
         result = self._client.query(_SVC, self.TemplateThirdPartyPersData).get(
-            templateId=template_id, thirdPartyId=third_party_id
+            thirdPartyAssignmentId=third_party_assignment_id, templateId=template_id
         )
         logger.info("Exiting ConsentTemplateService.get_third_party_pers_data")
         return result
@@ -386,13 +366,13 @@ class ConsentTemplateService:
         Module.DPI_NG, Operation.DPI_NG_CONSENT_UPDATE_THIRD_PARTY_PERS_DATA
     )
     def update_third_party_pers_data(
-        self, template_id: str, third_party_id: str, body: dict[str, Any]
+        self, third_party_assignment_id: str, template_id: str, body: dict[str, Any]
     ) -> Any:
         """Fetch a TemplateThirdPartyPersData by composite key, apply field updates, and PATCH it to the service.
 
         Args:
-            template_id: UUID of the parent ConsentTemplate.
-            third_party_id: UUID of the associated ThirdParty.
+            third_party_assignment_id: UUID of the ThirdPartyAssignment (primary key).
+            template_id: UUID of the parent ConsentTemplate (primary key).
             body: Dictionary of field names and values to apply.
 
         Returns:
@@ -405,10 +385,9 @@ class ConsentTemplateService:
         """
         logger.info("Invoked ConsentTemplateService.update_third_party_pers_data")
         entity = self._client.query(_SVC, self.TemplateThirdPartyPersData).get(
-            templateId=template_id, thirdPartyId=third_party_id
+            thirdPartyAssignmentId=third_party_assignment_id, templateId=template_id
         )
-        for k, v in body.items():
-            setattr(entity, k, v)
+        self._client._apply_body(entity, body)
         self._client.save(entity)
         logger.info("Exiting ConsentTemplateService.update_third_party_pers_data")
         return entity
@@ -417,13 +396,13 @@ class ConsentTemplateService:
         Module.DPI_NG, Operation.DPI_NG_CONSENT_DELETE_THIRD_PARTY_PERS_DATA
     )
     def delete_third_party_pers_data(
-        self, template_id: str, third_party_id: str
+        self, third_party_assignment_id: str, template_id: str
     ) -> None:
         """Delete a TemplateThirdPartyPersData entity by its composite key.
 
         Args:
-            template_id: UUID of the parent ConsentTemplate.
-            third_party_id: UUID of the associated ThirdParty to remove.
+            third_party_assignment_id: UUID of the ThirdPartyAssignment (primary key).
+            template_id: UUID of the parent ConsentTemplate (primary key).
 
         Raises:
             NotFoundError: If no TemplateThirdPartyPersData for the given composite key exists.
@@ -431,7 +410,7 @@ class ConsentTemplateService:
         """
         logger.info("Invoked ConsentTemplateService.delete_third_party_pers_data")
         entity = self._client.query(_SVC, self.TemplateThirdPartyPersData).get(
-            templateId=template_id, thirdPartyId=third_party_id
+            thirdPartyAssignmentId=third_party_assignment_id, templateId=template_id
         )
         self._client.delete_entity(entity)
         logger.info("Exiting ConsentTemplateService.delete_third_party_pers_data")

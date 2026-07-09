@@ -7,6 +7,7 @@ from typing import Any
 from odata.property import (
     BooleanProperty,
     DatetimeProperty,
+    IntegerProperty,
     StringProperty,
     UUIDProperty,
 )
@@ -28,8 +29,8 @@ def _make_entities(Service: Any) -> tuple:
         jurisdiction_code = StringProperty("jurisdictionCode")
         consent_model_code = StringProperty("consentModelCode")
         application_template_id = StringProperty("applicationTemplateId")
-        validity_period = StringProperty("validityPeriod")
-        expiring_period = StringProperty("expiringPeriod")
+        validity_period = IntegerProperty("validityPeriod")
+        expiring_period = IntegerProperty("expiringPeriod")
         lifecycle_status_code = StringProperty("lifecycleStatusCode")
         purpose_name = StringProperty("purposeName")
         controller_name = StringProperty("controllerName")
@@ -44,9 +45,10 @@ def _make_entities(Service: Any) -> tuple:
 
         __odata_collection__ = "consentTemplateTexts"
         tenant = StringProperty("tenant")
-        template_id = UUIDProperty("templateId", primary_key=True)
-        type_code = StringProperty("typeCode", primary_key=True)
-        language_code = StringProperty("languageCode", primary_key=True)
+        template_text_id = UUIDProperty("templatTextId", primary_key=True)
+        template_id = UUIDProperty("templateId")
+        language_code = StringProperty("languageCode")
+        type_code = StringProperty("typeCode")
         text = StringProperty("text")
         changed_at = DatetimeProperty("changedAt")
 
@@ -55,11 +57,12 @@ def _make_entities(Service: Any) -> tuple:
 
         __odata_collection__ = "templateThirdPartyPersDatas"
         tenant = StringProperty("tenant")
+        third_party_assignment_id = UUIDProperty("thirdPartyAssignmentId", primary_key=True)
         template_id = UUIDProperty("templateId", primary_key=True)
-        third_party_id = UUIDProperty("thirdPartyId", primary_key=True)
+        third_party_id = UUIDProperty("thirdPartyId")
+        third_party_name = StringProperty("thirdPartyName")
         third_party_function_code = StringProperty("thirdPartyFunctionCode")
         sensitive_data_flag = BooleanProperty("sensitiveDataFlag")
-        created_at = DatetimeProperty("createdAt")
         changed_at = DatetimeProperty("changedAt")
 
     return (

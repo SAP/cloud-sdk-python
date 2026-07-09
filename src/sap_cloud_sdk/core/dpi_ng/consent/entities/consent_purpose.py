@@ -23,9 +23,6 @@ def _make_entities(Service: Any) -> tuple:
         purpose_id = UUIDProperty("purposeId", primary_key=True)
         purpose_name = StringProperty("purposeName")
         lifecycle_status_code = StringProperty("lifecycleStatusCode")
-        lifecycle_status_domain_description = StringProperty(
-            "lifecycleStatusDomainDescription"
-        )
         sensitive_data_flag = BooleanProperty("sensitiveDataFlag")
         created_at = DatetimeProperty("createdAt")
         created_by = StringProperty("createdBy")
@@ -37,9 +34,10 @@ def _make_entities(Service: Any) -> tuple:
 
         __odata_collection__ = "consentPurposeTexts"
         tenant = StringProperty("tenant")
-        purpose_id = UUIDProperty("purposeId", primary_key=True)
-        type_code = StringProperty("typeCode", primary_key=True)
-        language_code = StringProperty("languageCode", primary_key=True)
+        purpose_text_id = UUIDProperty("purposeTextId", primary_key=True)
+        purpose_id = UUIDProperty("purposeId")
+        language_code = StringProperty("languageCode")
+        type_code = StringProperty("typeCode")
         text = StringProperty("text")
         changed_at = DatetimeProperty("changedAt")
 

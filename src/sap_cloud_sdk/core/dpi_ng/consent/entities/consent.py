@@ -46,13 +46,13 @@ def _make_entities(Service: Any) -> tuple:
         third_party_function_code = StringProperty("thirdPartyFunctionCode")
         consent_status_code = StringProperty("consentStatusCode")
         lifecycle_status_code = StringProperty("lifecycleStatusCode")
-        purpose_description_text_id = StringProperty("purposeDescriptionTextId")
-        purpose_explanatory_text_id = StringProperty("purposeExplanatoryTextId")
-        template_description_text_id = StringProperty("templateDescriptionTextId")
-        template_explanatory_text_id = StringProperty("templateExplanatoryTextId")
-        template_question_text_id = StringProperty("templateQuestionTextId")
-        template_consequence_text_id = StringProperty("templateConsequenceTextId")
-        template_data_privacy_statement_text_id = StringProperty(
+        purpose_description_text_id = UUIDProperty("purposeDescriptionTextId")
+        purpose_explanatory_text_id = UUIDProperty("purposeExplanatoryTextId")
+        template_description_text_id = UUIDProperty("templateDescriptionTextId")
+        template_explanatory_text_id = UUIDProperty("templateExplanatoryTextId")
+        template_question_text_id = UUIDProperty("templateQuestionTextId")
+        template_consequence_text_id = UUIDProperty("templateConsequenceTextId")
+        template_data_privacy_statement_text_id = UUIDProperty(
             "templateDataPrivacyStatementTextId"
         )
         purpose_sensitive_data_flag = BooleanProperty("purposeSensitiveDataFlag")

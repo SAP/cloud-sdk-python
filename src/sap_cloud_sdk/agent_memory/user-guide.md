@@ -887,23 +887,3 @@ eviction manually via `delete_thread()` if needed.
 ```python
 checkpointer = create_checkpointer(ttl_seconds=3600)
 ```
-
-**Using `@agent_config` for centralised TTL configuration:**
-
-```python
-from sap_cloud_sdk.agent_decorators import agent_config
-from sap_cloud_sdk.agent_memory.factory.langgraph_checkpoint import create_checkpointer
-
-@agent_config(
-    key="config.thread_ttl_seconds",
-    label="Thread TTL (seconds)",
-    description="Evict inactive conversation threads after this period of inactivity",
-)
-def thread_ttl_seconds() -> int:
-    return 3600
-
-checkpointer = create_checkpointer(ttl_seconds=thread_ttl_seconds())
-```
-
-This exposes TTL in the low-code UI alongside model selection and other
-agent settings, allowing operators to adjust it without code changes.

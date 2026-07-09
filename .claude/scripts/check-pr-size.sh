@@ -56,7 +56,7 @@ if [ "$mods_count" -gt 3 ]; then
 fi
 
 # PR-SIZE-05: > 30 commits (exclude merge commits by looking at parents)
-commit_count=$(git log "${BASE_SHA}..${HEAD_SHA}" --no-merges --oneline 2>/dev/null | wc -l | tr -d ' ')
+commit_count=$({ git log "${BASE_SHA}..${HEAD_SHA}" --no-merges --oneline 2>/dev/null || true; } | wc -l | tr -d ' ')
 if [ "$commit_count" -gt 30 ]; then
   emit_finding "PR-SIZE-05" "FLAG" "." 1 \
     "PR has $commit_count commits (>30) — consider squashing or splitting" "" >> "$findings"

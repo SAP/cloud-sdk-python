@@ -57,6 +57,9 @@ fi
 if [ "$DRY_RUN" != "true" ]; then
   gh pr view "$PR_NUMBER" --json body -q .body > "$TMPDIR_RUN/pr-body.txt" 2>/dev/null || echo "" > "$TMPDIR_RUN/pr-body.txt"
   HEAD_SHA=$(get_pr_head_sha "$PR_NUMBER")
+  # PR title feeds check-commits (squash-merge subject). Non-fatal if it fails.
+  PR_TITLE=$(gh pr view "$PR_NUMBER" --json title -q .title 2>/dev/null || echo "")
+  export PR_TITLE
 elif [ -n "${LOCAL_PR_BODY:-}" ] && [ -f "$LOCAL_PR_BODY" ]; then
   cp "$LOCAL_PR_BODY" "$TMPDIR_RUN/pr-body.txt"
   HEAD_SHA="${HEAD_SHA:-HEAD}"

@@ -1,47 +1,42 @@
 #!/usr/bin/env bash
 # check-commits.sh — Conventional Commits enforcement.
+#
+# The repos squash-merge PRs, so ONLY the final squashed subject (which
+# defaults to the PR title) becomes a commit on main. Checking every
+# intermediate commit floods the review with findings for messages that
+# will be discarded. We therefore check a single subject:
+#   1. PR_TITLE  (env, set by orchestrate from the PR metadata) if available
+#   2. else the most recent non-merge commit subject (HEAD)
 set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/lib/json-emit.sh"
 
 LANGUAGE="${LANGUAGE:-python}"
-# Resolve BASE_SHA from GITHUB_BASE_REF merge-base when not explicitly set —
-# HEAD~10 is a poor fallback (only reachable when the PR has ≥10 commits).
-if [ -z "${BASE_SHA:-}" ]; then
-  base_ref="${GITHUB_BASE_REF:-main}"
-  # Try origin/<ref>, then <ref>, then finally HEAD~10 as last resort
-  if git rev-parse --verify "origin/${base_ref}" >/dev/null 2>&1; then
-    BASE_SHA=$(git merge-base HEAD "origin/${base_ref}" 2>/dev/null || echo "HEAD~10")
-  elif git rev-parse --verify "$base_ref" >/dev/null 2>&1; then
-    BASE_SHA=$(git merge-base HEAD "$base_ref" 2>/dev/null || echo "HEAD~10")
-  else
-    BASE_SHA="HEAD~10"
-  fi
-fi
 HEAD_SHA="${HEAD_SHA:-HEAD}"
+PR_TITLE="${PR_TITLE:-}"
 
 STARTED=$(now_iso)
 findings=$(mktemp); trap 'rm -f "$findings"' EXIT
 
-# List commit subjects
-commits=$(git log "${BASE_SHA}..${HEAD_SHA}" --format='%H %s' 2>/dev/null || echo "")
 prefix_regex='^(feat|fix|refactor|chore|docs|test|ci|build|perf|style|revert)(\([a-z0-9_/-]+\))?!?:[[:space:]]+.+'
 
-echo "$commits" | while IFS= read -r line; do
-  [ -z "$line" ] && continue
-  sha=$(echo "$line" | cut -d' ' -f1)
-  subject=$(echo "$line" | cut -d' ' -f2-)
-  # Skip merge commits (identified by 2+ parents, robust regardless of message shape)
-  parents=$(git rev-list --parents -n 1 "$sha" 2>/dev/null | awk '{print NF-1}')
-  if [ "${parents:-0}" -gt 1 ]; then continue; fi
-  # Also skip legacy "Merge branch/pull/etc" defaults
-  if echo "$subject" | grep -qiE '^Merge '; then continue; fi
+# Pick the single subject that will land on main after squash-merge.
+if [ -n "$PR_TITLE" ]; then
+  subject="$PR_TITLE"
+  location="PR_TITLE"
+else
+  # Most recent non-merge commit subject.
+  subject=$({ git log "$HEAD_SHA" --no-merges -1 --format='%s' 2>/dev/null || true; })
+  location="COMMIT:$({ git rev-parse "$HEAD_SHA" 2>/dev/null || echo HEAD; })"
+fi
+
+if [ -n "$subject" ] && ! echo "$subject" | grep -qiE '^Merge '; then
   if ! echo "$subject" | grep -qE "$prefix_regex"; then
-    emit_finding "COM-01" "FLAG" "COMMIT:$sha" 1 \
-      "Commit '$subject' does not follow Conventional Commits" \
-      "Prefix with feat:/fix:/chore:/docs:/test:/refactor:/ci:/build:/perf:/style:/revert:" >> "$findings"
+    emit_finding "COM-01" "FLAG" "$location" 1 \
+      "Squash-merge subject '$subject' does not follow Conventional Commits" \
+      "The PR title becomes the squashed commit — prefix with feat:/fix:/chore:/docs:/test:/refactor:/ci:/build:/perf:/style:/revert:" >> "$findings"
   fi
-done
+fi
 
 status=$(status_from_findings < "$findings")
 emit_report "commits" "$LANGUAGE" "$status" "$STARTED" < "$findings"

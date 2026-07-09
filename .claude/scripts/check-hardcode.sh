@@ -69,6 +69,21 @@ echo "$diff_content" | awk -v ignore="$ignore_files" '
   [ -z "$file" ] && continue
   if [ "$(is_skill_file "$file")" = "true" ]; then continue; fi
 
+  # FP-R-01: skip URLs that live inside a Python docstring (documentation
+  # examples, not runtime code). Compute the docstring line set once per file.
+  if [ "$LANGUAGE" = "python" ] && echo "$file" | grep -q '\.py$'; then
+    if [ "${_docstring_file:-}" != "$file" ]; then
+      _docstring_file="$file"
+      _docstring_lines=""
+      if [ -f "$REPO_ROOT/$file" ]; then
+        _docstring_lines=$(python3 "$SCRIPT_DIR/lib/ast_python_checks.py" docstring-lines "$REPO_ROOT/$file" 2>/dev/null || echo "")
+      fi
+    fi
+    if [ -n "$_docstring_lines" ] && echo "$_docstring_lines" | grep -qx "$line_num"; then
+      continue
+    fi
+  fi
+
   # HC-01: hardcoded URL. Extract each URL and check individually so a line
   # with both example.com (allowed) and api.com (real) still fires on the real one.
   # Use word boundary via (^|[^A-Za-z0-9]) so we don't match tokens inside identifiers.

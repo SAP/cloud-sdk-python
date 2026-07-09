@@ -501,6 +501,64 @@ def main(argv: list[str]) -> int:
         module_dir = files[0]
         return 0 if check_pt_04(module_dir) else 1
 
+    # FP-R-01: docstring-lines prints "1" for every line number that falls
+    # inside a module/class/function docstring, so line-based checks (e.g.
+    # check-hardcode HC-01) can skip URLs that live in documentation examples.
+    if check_name == "docstring-lines":
+        for f in files:
+            tree = parse_file(f)
+            if tree is None:
+                continue
+            for node in ast.walk(tree):
+                if not isinstance(
+                    node, (ast.Module, ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef)
+                ):
+                    continue
+                doc = ast.get_docstring(node, clean=False)
+                if not doc:
+                    continue
+                # The docstring is the first statement's Constant node.
+                body = getattr(node, "body", [])
+                if not body:
+                    continue
+                first = body[0]
+                if (
+                    isinstance(first, ast.Expr)
+                    and isinstance(first.value, ast.Constant)
+                    and isinstance(first.value.value, str)
+                ):
+                    start = first.value.lineno
+                    end = getattr(first.value, "end_lineno", start)
+                    for ln in range(start, end + 1):
+                        print(ln)
+        return 0
+
+    # FP-S-01: http-session-lines prints the line number of every
+    # requests.Session()/httpx.Client()/AsyncClient() call that is NOT inside
+    # __init__ (or a module/class-level assignment). A session created in
+    # __init__ is the RECOMMENDED pattern, so HTTP-01 must not fire on it.
+    # Only lines printed here are per-invocation sessions worth flagging.
+    if check_name == "http-session-lines":
+        SESSION_CTORS = {"Session", "Client", "AsyncClient"}
+        for f in files:
+            tree = parse_file(f)
+            if tree is None:
+                continue
+            # Map every function def to whether it is __init__.
+            for node in ast.walk(tree):
+                if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                    continue
+                if node.name == "__init__":
+                    continue  # sessions here are the correct pattern
+                for sub in ast.walk(node):
+                    if (
+                        isinstance(sub, ast.Call)
+                        and isinstance(sub.func, ast.Attribute)
+                        and sub.func.attr in SESSION_CTORS
+                    ):
+                        print(sub.lineno)
+        return 0
+
     if check_name not in CHECKS:
         print(f"ERROR: unknown check {check_name}", file=sys.stderr)
         return 2

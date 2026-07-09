@@ -40,6 +40,19 @@ echo "$diff_content" | awk '
   [ -z "$file" ] && continue
   if [ "$(is_skill_file "$file")" = "true" ]; then continue; fi
   if echo "$content" | grep -qE '(requests|httpx)\.(Session|AsyncClient)\(\)'; then
+    # FP-S-01: a Session created in __init__ is the RECOMMENDED pattern, not a
+    # finding. Use AST to confirm this line is a per-invocation session (i.e.
+    # created outside __init__). Only fire if the line is in that set. When the
+    # file isn't on disk (no REPO_ROOT context), fall back to firing.
+    if [ "$LANGUAGE" = "python" ] && echo "$file" | grep -q '\.py$' && [ -f "$REPO_ROOT/$file" ]; then
+      if [ "${_http_file:-}" != "$file" ]; then
+        _http_file="$file"
+        _http_lines=$(python3 "$SCRIPT_DIR/lib/ast_python_checks.py" http-session-lines "$REPO_ROOT/$file" 2>/dev/null || echo "")
+      fi
+      if ! echo "$_http_lines" | grep -qx "$line_num"; then
+        continue  # session is in __init__ (or class/module level) → correct pattern
+      fi
+    fi
     emit_finding_if_touched "HTTP-01" "FLAG" "$file" "$line_num" \
       "HTTP session created per invocation — prefer single instance in __init__" "" >> "$findings"
   fi

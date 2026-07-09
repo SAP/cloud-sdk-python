@@ -103,14 +103,25 @@ delete_prior_bot_artifacts() {
   local pr="$1"
   local owner_repo; owner_repo=$(detect_owner_repo)
 
-  # review-comments (inline)
-  list_bot_review_comments "$pr" | awk -F'\t' '{print $1}' | while read -r id; do
-    [ -n "$id" ] && gh_api -X DELETE "repos/${owner_repo}/pulls/comments/${id}" > /dev/null 2>&1 || true
+  # review-comments (inline). Loop with a bounded retry: a single pass can miss
+  # comments if pagination races with deletion, which is how duplicate/stale
+  # comments accumulate. Re-list until none remain (max 5 passes).
+  local pass ids
+  for pass in 1 2 3 4 5; do
+    ids=$(list_bot_review_comments "$pr" | awk -F'\t' '{print $1}' | grep -E '^[0-9]+$' || true)
+    [ -z "$ids" ] && break
+    while read -r id; do
+      [ -n "$id" ] && gh_api -X DELETE "repos/${owner_repo}/pulls/comments/${id}" > /dev/null 2>&1 || true
+    done <<< "$ids"
   done
 
-  # issue-comments (summary)
-  list_bot_issue_comments "$pr" | while read -r id; do
-    [ -n "$id" ] && gh_api -X DELETE "repos/${owner_repo}/issues/comments/${id}" > /dev/null 2>&1 || true
+  # issue-comments (summary) — same bounded-retry loop.
+  for pass in 1 2 3 4 5; do
+    ids=$(list_bot_issue_comments "$pr" | grep -E '^[0-9]+$' || true)
+    [ -z "$ids" ] && break
+    while read -r id; do
+      [ -n "$id" ] && gh_api -X DELETE "repos/${owner_repo}/issues/comments/${id}" > /dev/null 2>&1 || true
+    done <<< "$ids"
   done
 }
 

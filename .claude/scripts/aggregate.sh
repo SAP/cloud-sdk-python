@@ -51,7 +51,10 @@ locked_count=0
 
 n=$(jq '[.[] | .findings // [] | length] | add // 0' "$merged")
 if [ "$n" -gt 0 ]; then
-  all_findings=$(jq '[.[] | .findings // []] | flatten' "$merged")
+  # Flatten findings, stamping each with its parent report's check name so the
+  # per-check table can count POSTED findings per check (bug-T-01: table count
+  # must reconcile with the findings that actually post).
+  all_findings=$(jq '[.[] | .check as $c | (.findings // [])[] | . + {check: $c}]' "$merged")
   rule_ids=$(echo "$all_findings" | jq -r '.[] | .rule' | sort -u)
 
   # Build lookup: rule -> tier
@@ -88,7 +91,27 @@ fi
 block_count=$(echo "$retagged_findings" | jq '[.[] | select(.severity == "BLOCK")] | length')
 flag_count=$(echo "$retagged_findings" | jq '[.[] | select(.severity == "FLAG")] | length')
 shadow_count=$(echo "$retagged_shadow" | jq 'length')
-per_check=$(jq '[.[] | {(.check): {status: .status, count: ((.findings // []) | length)}}] | add' "$merged")
+# per_check_summary: count must match the POSTED findings (after tier-gating /
+# suppression), not the raw per-report count. Otherwise the table shows more
+# than the inline+summary comments and the numbers never reconcile. Build the
+# count from retagged_findings (what actually posts); derive status from the
+# surviving severities so a check whose findings were all shadowed shows PASS.
+per_check=$(jq -n \
+  --argjson merged "$(cat "$merged")" \
+  --argjson posted "$retagged_findings" \
+  '
+  # Start from every check that produced a report (so PASS checks still shown).
+  ($merged | map(.check)) as $checks
+  | reduce $checks[] as $c ({};
+      . + { ($c): {
+        count: ($posted | map(select(.check == $c)) | length),
+        status: (
+          ($posted | map(select(.check == $c))) as $f
+          | if ($f | map(select(.severity=="BLOCK")) | length) > 0 then "BLOCK"
+            elif ($f | map(select(.severity=="FLAG")) | length) > 0 then "FLAG"
+            else "PASS" end)
+      } })
+  ')
 
 jq -n \
   --argjson findings "$retagged_findings" \

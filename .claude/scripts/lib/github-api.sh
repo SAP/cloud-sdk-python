@@ -98,7 +98,10 @@ list_bot_issue_comments() {
     jq -r --arg m "$SUMMARY_MARKER" '.[] | select(.body | contains($m)) | .id' || true
 }
 
-# delete_prior_bot_artifacts <pr> — idempotency: remove all sdk-review:v1 comments before posting new
+# delete_prior_bot_artifacts <pr> — idempotency: remove prior INLINE review
+# comments before posting fresh ones. The summary comment is NOT deleted here;
+# post_summary_comment updates it in place (avoids a delete→recreate race that
+# produced duplicate summaries).
 delete_prior_bot_artifacts() {
   local pr="$1"
   local owner_repo; owner_repo=$(detect_owner_repo)
@@ -114,15 +117,6 @@ delete_prior_bot_artifacts() {
       [ -n "$id" ] && gh_api -X DELETE "repos/${owner_repo}/pulls/comments/${id}" > /dev/null 2>&1 || true
     done <<< "$ids"
   done
-
-  # issue-comments (summary) — same bounded-retry loop.
-  for pass in 1 2 3 4 5; do
-    ids=$(list_bot_issue_comments "$pr" | grep -E '^[0-9]+$' || true)
-    [ -z "$ids" ] && break
-    while read -r id; do
-      [ -n "$id" ] && gh_api -X DELETE "repos/${owner_repo}/issues/comments/${id}" > /dev/null 2>&1 || true
-    done <<< "$ids"
-  done
 }
 
 # is_fork_pr <pr> → prints "true" or "false"
@@ -135,36 +129,53 @@ is_fork_pr() {
 }
 
 # post_inline_comment <pr> <sha> <path> <line> <body>
+# On success: echoes the created comment's html_url (for linking from summary).
+# On 422 (line not in diff): silent, echoes nothing (caller lists it in summary).
 # Silently skips on fork PRs (no write access).
 post_inline_comment() {
   local pr="$1" sha="$2" path="$3" line="$4" body="$5"
   local owner_repo; owner_repo=$(detect_owner_repo)
-  # HTTP 422 means "line not in diff" — retry as issue comment.
-  # Any other failure (403 fork PR, network) is silent.
-  local http_code
-  http_code=$(gh_api "repos/${owner_repo}/pulls/${pr}/comments" \
+  local resp
+  # Capture the JSON response; on success it contains .html_url.
+  resp=$(gh_api "repos/${owner_repo}/pulls/${pr}/comments" \
     -F body="$body" \
     -F commit_id="$sha" \
     -F path="$path" \
     -F line="$line" \
-    -F side="RIGHT" --include 2>&1 | head -1 | awk '{print $2}' || echo "500")
-
-  if [ "$http_code" = "422" ]; then
-    # Line not in diff — fall back to PR-level comment with citation
-    gh_api "repos/${owner_repo}/issues/${pr}/comments" \
-      -F body="$body
-
-_(originally intended as inline on \`$path:$line\` but that line is not in the diff)_" > /dev/null 2>&1 || true
+    -F side="RIGHT" 2>/dev/null || true)
+  local url
+  url=$(echo "$resp" | jq -r '.html_url // empty' 2>/dev/null || echo "")
+  if [ -n "$url" ]; then
+    echo "$url"
   fi
+  # If the post failed (no url), the caller still lists the finding in the
+  # summary, so nothing is lost. We intentionally do NOT create a duplicate
+  # issue-comment fallback here — the summary already carries every finding.
 }
 
 # post_summary_comment <pr> <body>
+# Update-in-place: if a prior summary comment exists, PATCH it instead of
+# creating a new one. This makes the summary idempotent even under concurrent
+# runs (which is how duplicate summaries appeared). Only creates a new comment
+# when none exists.
 post_summary_comment() {
   local pr="$1" body="$2"
   local owner_repo; owner_repo=$(detect_owner_repo)
-  gh_api "repos/${owner_repo}/issues/${pr}/comments" -F body="$body" > /dev/null 2>&1 || {
-    echo "WARN: could not post summary comment (fork PR or missing pull-requests:write scope)" >&2
-  }
+  local existing_id
+  existing_id=$(list_bot_issue_comments "$pr" | grep -E '^[0-9]+$' | head -1 || true)
+  if [ -n "$existing_id" ]; then
+    gh_api -X PATCH "repos/${owner_repo}/issues/comments/${existing_id}" -F body="$body" > /dev/null 2>&1 || {
+      echo "WARN: could not update summary comment (fork PR or missing pull-requests:write scope)" >&2
+    }
+    # Delete any extra duplicates beyond the one we just updated.
+    list_bot_issue_comments "$pr" | grep -E '^[0-9]+$' | tail -n +2 | while read -r dup; do
+      [ -n "$dup" ] && gh_api -X DELETE "repos/${owner_repo}/issues/comments/${dup}" > /dev/null 2>&1 || true
+    done
+  else
+    gh_api "repos/${owner_repo}/issues/${pr}/comments" -F body="$body" > /dev/null 2>&1 || {
+      echo "WARN: could not post summary comment (fork PR or missing pull-requests:write scope)" >&2
+    }
+  fi
 }
 
 # post_or_update_check_run <sha> <conclusion> <title> <summary>

@@ -169,13 +169,15 @@ fi
 # 9. Idempotency: delete prior bot artifacts
 delete_prior_bot_artifacts "$PR_NUMBER"
 
-# 10. Post inline comments — ONLY for findings anchored to a real added line.
-# A finding is "anchorable" when its file:line is present in the PR's
-# added-line set (ADDED_LINES_FILE). Everything else (PR_BODY, PR_METADATA,
-# COMMIT:*, missing-file/missing-dir findings, synthetic "tests/" paths) is
-# NON-anchored and goes into the summary comment body instead — so it is
-# always visible in the PR even though it can't attach to a diff line.
-non_anchored=$(mktemp); trap 'rm -f "$non_anchored"' EXIT
+# 10. Post inline comments — for findings anchored to a real added line.
+# EVERY finding is also listed in the summary (bug: inline-only findings looked
+# "missing" from the Conversation tab). Anchored findings get a link to their
+# inline comment; non-anchored ones (PR_BODY, missing files/dirs, commit
+# metadata, synthetic "tests/" paths) are listed with a location hint.
+all_findings_md=$(mktemp)
+non_anchored=$(mktemp)
+trap 'rm -f "$all_findings_md" "$non_anchored"' EXIT
+inline_count=0
 n_inline=$(jq '.findings | length' "$TMPDIR_RUN/summary.json")
 i=0
 while [ "$i" -lt "$n_inline" ]; do
@@ -195,12 +197,18 @@ $msg"
     anchorable=true
   fi
   if [ "$anchorable" = "true" ]; then
-    post_inline_comment "$PR_NUMBER" "$HEAD_SHA" "$file" "$line" "$body" || true
+    comment_url=$(post_inline_comment "$PR_NUMBER" "$HEAD_SHA" "$file" "$line" "$body" || true)
+    inline_count=$((inline_count + 1))
+    if [ -n "$comment_url" ]; then
+      printf -- '- **[%s] %s** — %s ([inline on `%s:%s`](%s))\n' "$sev" "$rule" "$msg" "$file" "$line" "$comment_url" >> "$all_findings_md"
+    else
+      printf -- '- **[%s] %s** — %s _(inline on `%s:%s`)_\n' "$sev" "$rule" "$msg" "$file" "$line" >> "$all_findings_md"
+    fi
   else
-    # Collect for the summary comment (rendered as a bullet with a location hint)
     loc="$file"
     [ "$line" != "0" ] && [ "$line" != "1" ] && loc="$file:$line"
     printf -- '- **[%s] %s** — %s _(at `%s`)_\n' "$sev" "$rule" "$msg" "$loc" >> "$non_anchored"
+    printf -- '- **[%s] %s** — %s _(at `%s`, no code line to anchor)_\n' "$sev" "$rule" "$msg" "$loc" >> "$all_findings_md"
   fi
   i=$((i + 1))
 done
@@ -220,28 +228,30 @@ summary_table=$(jq -r '
   (.per_check_summary | to_entries | map("| \(.key) | \(.value.status | status_icon) | \(.value.count) |") | join("\n"))
 ' "$TMPDIR_RUN/summary.json")
 
-non_anchored_section=""
 non_anchored_count=0
-if [ -s "$non_anchored" ]; then
-  non_anchored_count=$(grep -c '^- ' "$non_anchored" 2>/dev/null || echo 0)
-  non_anchored_section="
+[ -s "$non_anchored" ] && non_anchored_count=$(grep -c '^- ' "$non_anchored" 2>/dev/null || echo 0)
+total_findings=$(jq '.findings | length' "$TMPDIR_RUN/summary.json")
 
-### Findings not tied to a specific code line ($non_anchored_count)
+# All-findings section — EVERY finding is listed here (anchored ones link to
+# their inline comment; metadata ones show a location). This guarantees the
+# Conversation tab shows the complete picture; nothing is inline-only-invisible.
+all_findings_section=""
+if [ -s "$all_findings_md" ]; then
+  all_findings_section="
 
-$(cat "$non_anchored")"
+### Findings ($total_findings)
+
+$(cat "$all_findings_md")"
 fi
 
-# Reconciliation line so the counts visibly close:
-#   total findings = inline comments + findings listed above
-total_findings=$(jq '.findings | length' "$TMPDIR_RUN/summary.json")
-inline_count=$(( total_findings - non_anchored_count ))
-reconcile="_${total_findings} finding(s): ${inline_count} posted inline on the affected lines, ${non_anchored_count} listed above (no code line to anchor to)._"
+# Reconciliation line so the counts visibly close.
+reconcile="_${total_findings} finding(s): ${inline_count} posted as inline comment(s) on the affected lines, $(( total_findings - inline_count )) not tied to a code line (listed above)._"
 
 summary_body="<!-- sdk-review:v1 kind=summary -->
 ## SDK Module Review
 
 ${summary_table}
-${non_anchored_section}
+${all_findings_section}
 
 ${reconcile}
 

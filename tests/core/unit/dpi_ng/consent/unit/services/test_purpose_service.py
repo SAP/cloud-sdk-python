@@ -35,7 +35,7 @@ class TestListPurposes:
 
     def test_query_filter(self, svc, client, q):
         svc.list_purposes(filter="purpose_name eq 'test'")
-        q.raw.assert_called_with({"$filter": "purpose_name eq 'test'"})
+        q.filter.assert_called_with("purpose_name eq 'test'")
 
     def test_query_top_skip(self, svc, client, q):
         svc.list_purposes(top=5, skip=2)
@@ -110,10 +110,10 @@ class TestListPurposeTexts:
 
 
 class TestGetPurposeText:
-    def test_get_purpose_text_composite_key(self, svc, client, q):
-        result = svc.get_purpose_text("pid", "tc", "EN")
+    def test_get_purpose_text_by_id(self, svc, client, q):
+        result = svc.get_purpose_text("ptid")
         client.query.assert_called_with(_SVC, svc.ConsentPurposeText)
-        q.get.assert_called_with(purposeId="pid", typeCode="tc", languageCode="EN")
+        q.get.assert_called_with("ptid")
         assert result == q.get.return_value
 
 
@@ -130,15 +130,15 @@ class TestCreatePurposeText:
 
 
 class TestUpdatePurposeText:
-    def test_update_purpose_text_composite_key(self, svc, client, q):
+    def test_update_purpose_text_fetches_by_id(self, svc, client, q):
         body = {"text": "updated"}
-        svc.update_purpose_text("pid", "tc", "EN", body)
-        q.get.assert_called_with(purposeId="pid", typeCode="tc", languageCode="EN")
+        svc.update_purpose_text("ptid", body)
+        q.get.assert_called_with("ptid")
         client.save.assert_called_once()
 
 
 class TestDeletePurposeText:
-    def test_delete_purpose_text_composite_key(self, svc, client, q):
-        svc.delete_purpose_text("pid", "tc", "EN")
-        q.get.assert_called_with(purposeId="pid", typeCode="tc", languageCode="EN")
+    def test_delete_purpose_text_fetches_by_id(self, svc, client, q):
+        svc.delete_purpose_text("ptid")
+        q.get.assert_called_with("ptid")
         client.delete_entity.assert_called_once_with(q.get.return_value)

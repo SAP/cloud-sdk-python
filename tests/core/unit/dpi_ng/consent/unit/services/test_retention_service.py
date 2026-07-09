@@ -35,7 +35,7 @@ class TestListRules:
 
     def test_query_filter(self, svc, client, q):
         svc.list_rules(filter="lifecycle_status_code eq '1'")
-        q.raw.assert_called_with({"$filter": "lifecycle_status_code eq '1'"})
+        q.filter.assert_called_with("lifecycle_status_code eq '1'")
 
     def test_query_top(self, svc, client, q):
         svc.list_rules(top=3)

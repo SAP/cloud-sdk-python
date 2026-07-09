@@ -136,7 +136,7 @@ class TestQueryKwargs:
     def test_query_filter_kwarg(self, svc, mock_consent_client):
         q = mock_consent_client.query.return_value
         svc.list_consents(filter="x eq 'y'")
-        q.raw.assert_called_with({"$filter": "x eq 'y'"})
+        q.filter.assert_called_with("x eq 'y'")
 
     def test_query_top_skip(self, svc, mock_consent_client):
         q = mock_consent_client.query.return_value
@@ -147,7 +147,7 @@ class TestQueryKwargs:
     def test_query_orderby(self, svc, mock_consent_client):
         q = mock_consent_client.query.return_value
         svc.list_consents(orderby="changedAt desc")
-        q.raw.assert_called_with({"$orderby": "changedAt desc"})
+        q.order_by.assert_called_with("changedAt desc")
 
 
 class TestDictToEntity:

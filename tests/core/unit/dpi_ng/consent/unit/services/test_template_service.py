@@ -52,9 +52,8 @@ class TestConsentTemplateCRUD:
         mock_template_client.save.assert_called_once()
 
     def test_update_template_applies_fields(self, svc, mock_template_client):
-        entity = mock_template_client.query.return_value.get.return_value
         svc.update_template("tid", {"template_name": "new-name"})
-        assert entity.template_name == "new-name"
+        mock_template_client._apply_body.assert_called_once()
 
     def test_delete_template(self, svc, mock_template_client):
         q = mock_template_client.query.return_value
@@ -110,11 +109,11 @@ class TestConsentTemplateText:
         mock_template_client.query.return_value.all.assert_called_once()
         assert result == []
 
-    def test_get_template_text_composite_key(self, svc, mock_template_client):
+    def test_get_template_text_by_id(self, svc, mock_template_client):
         q = mock_template_client.query.return_value
-        result = svc.get_template_text("tid", "tc", "EN")
+        result = svc.get_template_text("ttid")
         mock_template_client.query.assert_called_with(_SVC, svc.ConsentTemplateText)
-        q.get.assert_called_with(templateId="tid", typeCode="tc", languageCode="EN")
+        q.get.assert_called_with("ttid")
         assert result is q.get.return_value
 
     def test_create_template_text(self, svc, mock_template_client):
@@ -126,26 +125,25 @@ class TestConsentTemplateText:
         call_arg = mock_template_client.save.call_args[0][0]
         assert call_arg.text == "hello"
 
-    def test_update_template_text_composite_key(self, svc, mock_template_client):
+    def test_update_template_text_fetches_by_id(self, svc, mock_template_client):
         q = mock_template_client.query.return_value
-        svc.update_template_text("tid", "tc", "EN", {"text": "updated"})
-        q.get.assert_called_with(templateId="tid", typeCode="tc", languageCode="EN")
+        svc.update_template_text("ttid", {"text": "updated"})
+        q.get.assert_called_with("ttid")
         mock_template_client.save.assert_called_once()
 
     def test_update_template_text_applies_fields(self, svc, mock_template_client):
-        entity = mock_template_client.query.return_value.get.return_value
-        svc.update_template_text("tid", "tc", "EN", {"text": "new text"})
-        assert entity.text == "new text"
+        svc.update_template_text("ttid", {"text": "new text"})
+        mock_template_client._apply_body.assert_called_once()
 
-    def test_delete_template_text_composite_key(self, svc, mock_template_client):
+    def test_delete_template_text_fetches_by_id(self, svc, mock_template_client):
         q = mock_template_client.query.return_value
-        svc.delete_template_text("tid", "tc", "EN")
-        q.get.assert_called_with(templateId="tid", typeCode="tc", languageCode="EN")
+        svc.delete_template_text("ttid")
+        q.get.assert_called_with("ttid")
         mock_template_client.delete_entity.assert_called_once_with(q.get.return_value)
 
 
 # ---------------------------------------------------------------------------
-# TemplateThirdPartyPersData (composite key: template_id + third_party_id)
+# TemplateThirdPartyPersData (composite key: third_party_assignment_id + template_id)
 # ---------------------------------------------------------------------------
 
 
@@ -158,13 +156,13 @@ class TestTemplateThirdPartyPersData:
         mock_template_client.query.return_value.all.assert_called_once()
         assert result == []
 
-    def test_get_third_party_pers_data_composite_key(self, svc, mock_template_client):
+    def test_get_third_party_pers_data_by_assignment_and_template(self, svc, mock_template_client):
         q = mock_template_client.query.return_value
-        result = svc.get_third_party_pers_data("tid", "tpid")
+        result = svc.get_third_party_pers_data("tpaid", "tid")
         mock_template_client.query.assert_called_with(
             _SVC, svc.TemplateThirdPartyPersData
         )
-        q.get.assert_called_with(templateId="tid", thirdPartyId="tpid")
+        q.get.assert_called_with(thirdPartyAssignmentId="tpaid", templateId="tid")
         assert result is q.get.return_value
 
     def test_create_third_party_pers_data(self, svc, mock_template_client):
@@ -176,31 +174,30 @@ class TestTemplateThirdPartyPersData:
         call_arg = mock_template_client.save.call_args[0][0]
         assert call_arg.third_party_function_code == "PROCESSOR"
 
-    def test_update_third_party_pers_data_composite_key(
+    def test_update_third_party_pers_data_by_assignment_and_template(
         self, svc, mock_template_client
     ):
         q = mock_template_client.query.return_value
         svc.update_third_party_pers_data(
-            "tid", "tpid", {"third_party_function_code": "CONTROLLER"}
+            "tpaid", "tid", {"third_party_function_code": "CONTROLLER"}
         )
-        q.get.assert_called_with(templateId="tid", thirdPartyId="tpid")
+        q.get.assert_called_with(thirdPartyAssignmentId="tpaid", templateId="tid")
         mock_template_client.save.assert_called_once()
 
     def test_update_third_party_pers_data_applies_fields(
         self, svc, mock_template_client
     ):
-        entity = mock_template_client.query.return_value.get.return_value
         svc.update_third_party_pers_data(
-            "tid", "tpid", {"third_party_function_code": "CONTROLLER"}
+            "tpaid", "tid", {"third_party_function_code": "CONTROLLER"}
         )
-        assert entity.third_party_function_code == "CONTROLLER"
+        mock_template_client._apply_body.assert_called_once()
 
-    def test_delete_third_party_pers_data_composite_key(
+    def test_delete_third_party_pers_data_by_assignment_and_template(
         self, svc, mock_template_client
     ):
         q = mock_template_client.query.return_value
-        svc.delete_third_party_pers_data("tid", "tpid")
-        q.get.assert_called_with(templateId="tid", thirdPartyId="tpid")
+        svc.delete_third_party_pers_data("tpaid", "tid")
+        q.get.assert_called_with(thirdPartyAssignmentId="tpaid", templateId="tid")
         mock_template_client.delete_entity.assert_called_once_with(q.get.return_value)
 
 
@@ -213,7 +210,7 @@ class TestQueryParams:
     def test_query_filter(self, svc, mock_template_client):
         q = mock_template_client.query.return_value
         svc.list_templates(filter="lifecycle_status_code eq '1'")
-        q.raw.assert_called_with({"$filter": "lifecycle_status_code eq '1'"})
+        q.filter.assert_called_with("lifecycle_status_code eq '1'")
 
     def test_query_top_skip(self, svc, mock_template_client):
         q = mock_template_client.query.return_value
@@ -224,7 +221,7 @@ class TestQueryParams:
     def test_query_orderby(self, svc, mock_template_client):
         q = mock_template_client.query.return_value
         svc.list_templates(orderby="template_name asc")
-        q.raw.assert_called_with({"$orderby": "template_name asc"})
+        q.order_by.assert_called_with("template_name asc")
 
     def test_query_no_params_skips_raw(self, svc, mock_template_client):
         q = mock_template_client.query.return_value

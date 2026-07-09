@@ -134,8 +134,8 @@ def test_delete_calls_delete_entity(svc, row):
 
 def test_list_with_filter_kwarg(svc):
     svc.list_third_parties(filter="third_party_name eq 'ACME'")
-    svc._client.query.return_value.raw.assert_called_with(
-        {"$filter": "third_party_name eq 'ACME'"}
+    svc._client.query.return_value.filter.assert_called_with(
+        "third_party_name eq 'ACME'"
     )
 
 
@@ -151,8 +151,8 @@ def test_list_with_skip_kwarg(svc):
 
 def test_list_with_orderby_kwarg(svc):
     svc.list_third_parties(orderby="third_party_name asc")
-    svc._client.query.return_value.raw.assert_called_with(
-        {"$orderby": "third_party_name asc"}
+    svc._client.query.return_value.order_by.assert_called_with(
+        "third_party_name asc"
     )
 
 
@@ -170,24 +170,20 @@ class TestJurisdictionText:
         svc.create_jurisdiction_text({"description": "x"})
         svc._client.save.assert_called_once()
 
-    def test_update_composite_key(self, svc):
-        svc.update_jurisdiction_text("jur-1", "EN", {"description": "y"})
-        svc._client.query.return_value.get.assert_called_with(
-            jurisdictionId="jur-1", languageCode="EN"
-        )
+    def test_update_fetches_by_id(self, svc):
+        svc.update_jurisdiction_text("jur-text-1", {"description": "y"})
+        svc._client.query.return_value.get.assert_called_with("jur-text-1")
 
     def test_update_calls_save(self, svc):
-        svc.update_jurisdiction_text("jur-1", "EN", {"description": "y"})
+        svc.update_jurisdiction_text("jur-text-1", {"description": "y"})
         svc._client.save.assert_called_once()
 
-    def test_delete_composite_key(self, svc):
-        svc.delete_jurisdiction_text("jur-1", "EN")
-        svc._client.query.return_value.get.assert_called_with(
-            jurisdictionId="jur-1", languageCode="EN"
-        )
+    def test_delete_fetches_by_id(self, svc):
+        svc.delete_jurisdiction_text("jur-text-1")
+        svc._client.query.return_value.get.assert_called_with("jur-text-1")
 
     def test_delete_calls_delete_entity(self, svc):
-        svc.delete_jurisdiction_text("jur-1", "EN")
+        svc.delete_jurisdiction_text("jur-text-1")
         svc._client.delete_entity.assert_called_once()
 
 

@@ -44,6 +44,6 @@ class TestTemplateThirdPartyPersDataCompositeKey:
         cls = entity_by_name(template_entities, "TemplateThirdPartyPersData")
         assert cls.template_id.primary_key is True
 
-    def test_third_party_id_is_pk(self, template_entities):
+    def test_third_party_assignment_id_is_pk(self, template_entities):
         cls = entity_by_name(template_entities, "TemplateThirdPartyPersData")
-        assert cls.third_party_id.primary_key is True
+        assert cls.third_party_assignment_id.primary_key is True

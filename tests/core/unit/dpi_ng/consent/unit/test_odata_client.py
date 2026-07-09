@@ -288,16 +288,34 @@ class TestOrmMethods:
         mock_session_cls.return_value = MagicMock()
         mock_odata_svc_cls.return_value = MagicMock()
         entity = MagicMock()
+        entity.__odata__ = MagicMock()
+        entity.__odata__.persisted = False
         entity.__odata_service__ = MagicMock()
         config = _make_config()
         client = _ODataClient(config)
         client.save(entity)
         entity.__odata_service__.save.assert_called_once_with(entity)
 
+    def test_save_sets_if_match_header_when_entity_is_persisted(
+        self, mock_session_cls, mock_odata_svc_cls
+    ):
+        mock_session = MagicMock()
+        mock_session_cls.return_value = mock_session
+        mock_odata_svc_cls.return_value = MagicMock()
+        entity = MagicMock()
+        entity.__odata__ = MagicMock()
+        entity.__odata__.persisted = True
+        entity.__odata_service__ = MagicMock()
+        config = _make_config()
+        client = _ODataClient(config)
+        client.save(entity)
+        mock_session.headers.__setitem__.assert_any_call("If-Match", "*")
+
     def test_delete_entity_delegates_to_entity_odata_service(
         self, mock_session_cls, mock_odata_svc_cls
     ):
-        mock_session_cls.return_value = MagicMock()
+        mock_session = MagicMock()
+        mock_session_cls.return_value = mock_session
         mock_odata_svc_cls.return_value = MagicMock()
         entity = MagicMock()
         entity.__odata_service__ = MagicMock()
@@ -305,6 +323,30 @@ class TestOrmMethods:
         client = _ODataClient(config)
         client.delete_entity(entity)
         entity.__odata_service__.delete.assert_called_once_with(entity)
+        mock_session.headers.__setitem__.assert_any_call("If-Match", "*")
+
+    def test_apply_body_sets_known_field_and_marks_dirty(
+        self, mock_session_cls, mock_odata_svc_cls
+    ):
+        mock_session_cls.return_value = MagicMock()
+        mock_odata_svc_cls.return_value = MagicMock()
+        prop = MagicMock()
+        entity = MagicMock()
+        entity.__odata__ = MagicMock()
+        type(entity).my_field = prop
+        _ODataClient._apply_body(entity, {"my_field": "new-value"})
+        assert entity.my_field == "new-value"
+        entity.__odata__.set_property_dirty.assert_called_once_with(prop)
+
+    def test_apply_body_ignores_unknown_fields(
+        self, mock_session_cls, mock_odata_svc_cls
+    ):
+        mock_session_cls.return_value = MagicMock()
+        mock_odata_svc_cls.return_value = MagicMock()
+        entity = MagicMock(spec=[])
+        entity.__odata__ = MagicMock()
+        _ODataClient._apply_body(entity, {"nonexistent_field": "x"})
+        entity.__odata__.set_property_dirty.assert_not_called()
 
 
 @patch("sap_cloud_sdk.core.dpi_ng.consent.client.requests.Session")

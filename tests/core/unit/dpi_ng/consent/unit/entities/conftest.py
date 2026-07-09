@@ -31,7 +31,7 @@ CONFIGURATION_ENTITY_SPECS = {
     },
     "JurisdictionText": {
         "collection": "jurisdictionTexts",
-        "pk": ["jurisdiction_id", "language_code"],
+        "pk": ["jurisdiction_text_id"],
         "bool": [],
         "int": [],
     },
@@ -43,7 +43,7 @@ CONFIGURATION_ENTITY_SPECS = {
     },
     "LanguageDescription": {
         "collection": "languageDescriptions",
-        "pk": ["language_code"],
+        "pk": ["language_desc_id"],
         "bool": [],
         "int": [],
     },
@@ -94,7 +94,7 @@ PURPOSE_ENTITY_SPECS = {
     },
     "ConsentPurposeText": {
         "collection": "consentPurposeTexts",
-        "pk": ["purpose_id", "type_code", "language_code"],
+        "pk": ["purpose_text_id"],
         "bool": [],
         "int": [],
     },
@@ -118,13 +118,13 @@ TEMPLATE_ENTITY_SPECS = {
     },
     "ConsentTemplateText": {
         "collection": "consentTemplateTexts",
-        "pk": ["template_id", "type_code", "language_code"],
+        "pk": ["template_text_id"],
         "bool": [],
         "int": [],
     },
     "TemplateThirdPartyPersData": {
         "collection": "templateThirdPartyPersDatas",
-        "pk": ["template_id", "third_party_id"],
+        "pk": ["third_party_assignment_id", "template_id"],
         "bool": ["sensitive_data_flag"],
         "int": [],
     },

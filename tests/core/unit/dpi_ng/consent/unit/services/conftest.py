@@ -17,6 +17,8 @@ def _make_mock_client(entities_module):
     q.all.return_value = []
     q.get.return_value = MagicMock()
     q.raw.return_value = q
+    q.filter.return_value = q
+    q.order_by.return_value = q
     q.limit.return_value = q
     q.offset.return_value = q
     c.query.return_value = q

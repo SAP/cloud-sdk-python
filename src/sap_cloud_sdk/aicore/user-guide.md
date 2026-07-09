@@ -56,11 +56,11 @@ The `set_aicore_config()` function:
 2. **Configures environment variables** for LiteLLM to use AI Core
 3. **Normalizes URLs** by adding required suffixes (`/oauth/token` for auth, `/v2` for base URL)
 4. **Sets resource group** (defaults to "default" if not specified)
-5. **Activates content filtering** — Azure Content Safety + prompt shield enabled by default *(new in 0.28.0)*
+5. **Activates content filtering** — Azure Content Safety + prompt shield enabled by default *(new in 0.32.0)*
 
 ---
 
-## Content Filtering (enabled by default from 0.28.0)
+## Content Filtering (enabled by default from 0.32.0)
 
 `set_aicore_config()` automatically activates content filtering for all `sap/*`
 model calls. No additional code is required. Filtering applies Azure Content
@@ -228,7 +228,7 @@ rejections. All other exceptions surface unchanged.
 ### Migration from prior versions
 
 If your agent previously imported from `sap_cloud_sdk.orchestration` (an
-in-flight name during 0.28 development) or used the keyword form
+in-flight name during 0.32 development) or used the keyword form
 `set_filtering(hate=...)`, update to:
 
 ```python

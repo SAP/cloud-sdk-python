@@ -46,12 +46,15 @@ while IFS= read -r mod; do
   fi
 
   # DC-02: required sections
+  # Report the repo-relative path (strip $REPO_ROOT/ prefix) so findings don't
+  # leak the reviewer's local absolute path into the PR comment.
+  guide_rel="${user_guide#"$REPO_ROOT"/}"
   guide_content=$(cat "$user_guide" 2>/dev/null || echo "")
   if ! echo "$guide_content" | grep -qE '^##[[:space:]]+(Installation|Import)'; then
-    emit_finding "DC-02" "FLAG" "$user_guide" 1 "user-guide.md missing ## Installation section" "" >> "$findings"
+    emit_finding "DC-02" "FLAG" "$guide_rel" 1 "user-guide.md missing ## Installation section" "" >> "$findings"
   fi
   if ! echo "$guide_content" | grep -qE '^##[[:space:]]+Quick Start'; then
-    emit_finding "DC-02" "BLOCK" "$user_guide" 1 "user-guide.md missing ## Quick Start section" "" >> "$findings"
+    emit_finding "DC-02" "BLOCK" "$guide_rel" 1 "user-guide.md missing ## Quick Start section" "" >> "$findings"
   fi
 
   # DC-11..DC-14 (BTP deps + regional)
@@ -78,7 +81,7 @@ while IFS= read -r mod; do
   # DC-11: destination dep must be documented
   if [ "$has_dest" = "yes" ]; then
     if ! echo "$guide_content" | grep -qEi 'destination service|## Dependencies|## Prerequisites'; then
-      emit_finding "DC-11" "BLOCK" "$user_guide" 1 \
+      emit_finding "DC-11" "BLOCK" "$guide_rel" 1 \
         "Module imports destination service — must document in ## Dependencies section" \
         "Add: ## Dependencies\\n- SAP BTP Destination Service instance" >> "$findings"
     fi
@@ -86,21 +89,21 @@ while IFS= read -r mod; do
   # DC-12: fragments
   if [ "$has_frag" = "yes" ]; then
     if ! echo "$guide_content" | grep -qEi 'fragments'; then
-      emit_finding "DC-12" "BLOCK" "$user_guide" 1 \
+      emit_finding "DC-12" "BLOCK" "$guide_rel" 1 \
         "Module uses Fragments — must document Fragments prerequisite" "" >> "$findings"
     fi
   fi
   # DC-13: certificates
   if [ "$has_cert" = "yes" ]; then
     if ! echo "$guide_content" | grep -qEi 'certificate'; then
-      emit_finding "DC-13" "BLOCK" "$user_guide" 1 \
+      emit_finding "DC-13" "BLOCK" "$guide_rel" 1 \
         "Module uses Certificates — must document Certificate prerequisite" "" >> "$findings"
     fi
   fi
   # DC-14: regional
   if [ "$has_region" = "yes" ]; then
     if ! echo "$guide_content" | grep -qEi 'Regional Availability|## Limitations|available in|supported region'; then
-      emit_finding "DC-14" "BLOCK" "$user_guide" 1 \
+      emit_finding "DC-14" "BLOCK" "$guide_rel" 1 \
         "Module has region-specific constants — must document ## Regional Availability" "" >> "$findings"
     fi
   fi

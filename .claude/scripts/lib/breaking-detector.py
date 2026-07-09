@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import ast
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -92,7 +93,26 @@ def files_changed(base: str, head: str) -> list[str]:
         text=True,
         check=False,
     )
-    return [f for f in out.stdout.strip().split("\n") if f]
+    files = [f for f in out.stdout.strip().split("\n") if f]
+    # FP-Q-01: when the PR branch is behind main, `base..head` also surfaces
+    # files that MAIN changed after the merge-base — the PR never touched them.
+    # Comparing base-vs-head on those makes main's additions look like PR
+    # deletions. Restrict to files the PR actually modified, taken from the
+    # PR's own diff (ADDED_LINES_FILE lists "path:line" for every added line).
+    added_lines_file = os.environ.get("ADDED_LINES_FILE", "")
+    if added_lines_file and os.path.isfile(added_lines_file):
+        pr_files: set[str] = set()
+        try:
+            with open(added_lines_file, encoding="utf-8") as fh:
+                for entry in fh:
+                    entry = entry.strip()
+                    if ":" in entry:
+                        pr_files.add(entry.rpartition(":")[0])
+        except OSError:
+            pr_files = set()
+        if pr_files:
+            files = [f for f in files if f in pr_files]
+    return files
 
 
 def _is_breaking_sig_change(base_sig: tuple, head_sig: tuple) -> bool:
@@ -152,9 +172,44 @@ def _is_breaking_sig_change(base_sig: tuple, head_sig: tuple) -> bool:
     return False
 
 
+def _load_pr_removed_text() -> str | None:
+    """Concatenate all '-' (removed) lines from the PR's own diff.
+
+    FP-Q-01 (enum/field/method variant): AST comparison of the full base vs
+    head file treats symbols that MAIN added (but the behind-main PR lacks) as
+    PR deletions. A real deletion by THIS PR must appear on a '-' line in the
+    PR's diff. We load that removed-text once and gate every deletion finding
+    on the symbol name appearing there. Returns None when no diff is available
+    (then we fall back to the AST-only behavior, i.e. no gating).
+    """
+    diff_file = os.environ.get("DIFF_FILE", "")
+    if not diff_file or not os.path.isfile(diff_file):
+        return None
+    removed: list[str] = []
+    try:
+        with open(diff_file, encoding="utf-8", errors="replace") as fh:
+            for ln in fh:
+                # Real removed lines start with '-' but not '---' (file header)
+                if ln.startswith("-") and not ln.startswith("---"):
+                    removed.append(ln[1:])
+    except OSError:
+        return None
+    return "".join(removed)
+
+
 def detect(base: str, head: str) -> dict:
     details: list[dict] = []
     kinds: set[str] = set()
+
+    # FP-Q-01: text of all lines this PR removed (None if no diff available).
+    pr_removed_text = _load_pr_removed_text()
+
+    def pr_actually_removed(symbol_leaf: str) -> bool:
+        """True if the PR's diff removed a line mentioning this symbol leaf.
+        When we have no diff context, don't gate (return True)."""
+        if pr_removed_text is None:
+            return True
+        return symbol_leaf in pr_removed_text
 
     changed = files_changed(base, head)
 
@@ -190,6 +245,8 @@ def detect(base: str, head: str) -> dict:
         head_all = set(extract_all(head_tree))
         removed = base_all - head_all
         for name in removed:
+            if not pr_actually_removed(name):
+                continue
             details.append(
                 {
                     "kind": "api_removal_detected",
@@ -207,6 +264,10 @@ def detect(base: str, head: str) -> dict:
             head_methods = head_classes.get(cls_name, {})
             for mname, base_sig in base_methods.items():
                 if mname not in head_methods:
+                    # FP-Q-01: only a real deletion if the PR removed a line
+                    # mentioning this method (guards against behind-main branches).
+                    if not pr_actually_removed(mname):
+                        continue
                     details.append(
                         {
                             "kind": "method_deletion_on_public_class",
@@ -250,6 +311,8 @@ def detect(base: str, head: str) -> dict:
             head_fields = set(head_dcs.get(dc_name, []))
             for field in base_fields:
                 if field not in head_fields:
+                    if not pr_actually_removed(field):
+                        continue
                     details.append(
                         {
                             "kind": "dataclass_field_deletion_on_public_model",
@@ -267,6 +330,8 @@ def detect(base: str, head: str) -> dict:
             head_values = set(head_enums.get(enum_name, []))
             for val in base_values:
                 if val not in head_values:
+                    if not pr_actually_removed(val):
+                        continue
                     details.append(
                         {
                             "kind": "enum_value_deletion_on_public_enum",

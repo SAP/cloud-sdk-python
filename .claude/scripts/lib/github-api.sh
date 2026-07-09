@@ -36,6 +36,13 @@ detect_hostname() {
   esac
 }
 
+# gh_api — wrapper that pins --hostname so `gh_api repos/OWNER/REPO/…` hits the
+# correct GitHub instance. Without this, gh defaults to github.com and every
+# call against the internal github.tools.sap repo 404s.
+gh_api() {
+  gh api --hostname "$(detect_hostname)" "$@"
+}
+
 # detect_owner_repo → prints "owner/repo" from git remote
 # Handles all remote formats:
 #   https://github.com/OWNER/REPO.git
@@ -79,7 +86,7 @@ get_pr_head_sha() {
 list_bot_review_comments() {
   local pr="$1"
   local owner_repo; owner_repo=$(detect_owner_repo)
-  gh api "repos/${owner_repo}/pulls/${pr}/comments" --paginate 2>/dev/null | \
+  gh_api "repos/${owner_repo}/pulls/${pr}/comments" --paginate 2>/dev/null | \
     jq -r --arg m "$SDK_REVIEW_MARKER_PREFIX" '.[] | select(.body | contains($m)) | "\(.id)\t\(.body[0:120])"' || true
 }
 
@@ -87,7 +94,7 @@ list_bot_review_comments() {
 list_bot_issue_comments() {
   local pr="$1"
   local owner_repo; owner_repo=$(detect_owner_repo)
-  gh api "repos/${owner_repo}/issues/${pr}/comments" --paginate 2>/dev/null | \
+  gh_api "repos/${owner_repo}/issues/${pr}/comments" --paginate 2>/dev/null | \
     jq -r --arg m "$SUMMARY_MARKER" '.[] | select(.body | contains($m)) | .id' || true
 }
 
@@ -98,12 +105,12 @@ delete_prior_bot_artifacts() {
 
   # review-comments (inline)
   list_bot_review_comments "$pr" | awk -F'\t' '{print $1}' | while read -r id; do
-    [ -n "$id" ] && gh api -X DELETE "repos/${owner_repo}/pulls/comments/${id}" > /dev/null 2>&1 || true
+    [ -n "$id" ] && gh_api -X DELETE "repos/${owner_repo}/pulls/comments/${id}" > /dev/null 2>&1 || true
   done
 
   # issue-comments (summary)
   list_bot_issue_comments "$pr" | while read -r id; do
-    [ -n "$id" ] && gh api -X DELETE "repos/${owner_repo}/issues/comments/${id}" > /dev/null 2>&1 || true
+    [ -n "$id" ] && gh_api -X DELETE "repos/${owner_repo}/issues/comments/${id}" > /dev/null 2>&1 || true
   done
 }
 
@@ -124,7 +131,7 @@ post_inline_comment() {
   # HTTP 422 means "line not in diff" — retry as issue comment.
   # Any other failure (403 fork PR, network) is silent.
   local http_code
-  http_code=$(gh api "repos/${owner_repo}/pulls/${pr}/comments" \
+  http_code=$(gh_api "repos/${owner_repo}/pulls/${pr}/comments" \
     -F body="$body" \
     -F commit_id="$sha" \
     -F path="$path" \
@@ -133,7 +140,7 @@ post_inline_comment() {
 
   if [ "$http_code" = "422" ]; then
     # Line not in diff — fall back to PR-level comment with citation
-    gh api "repos/${owner_repo}/issues/${pr}/comments" \
+    gh_api "repos/${owner_repo}/issues/${pr}/comments" \
       -F body="$body
 
 _(originally intended as inline on \`$path:$line\` but that line is not in the diff)_" > /dev/null 2>&1 || true
@@ -144,7 +151,7 @@ _(originally intended as inline on \`$path:$line\` but that line is not in the d
 post_summary_comment() {
   local pr="$1" body="$2"
   local owner_repo; owner_repo=$(detect_owner_repo)
-  gh api "repos/${owner_repo}/issues/${pr}/comments" -F body="$body" > /dev/null 2>&1 || {
+  gh_api "repos/${owner_repo}/issues/${pr}/comments" -F body="$body" > /dev/null 2>&1 || {
     echo "WARN: could not post summary comment (fork PR or missing pull-requests:write scope)" >&2
   }
 }
@@ -158,11 +165,11 @@ post_or_update_check_run() {
 
   # try to find existing run for same SHA + name
   local existing
-  existing=$(gh api "repos/${owner_repo}/commits/${sha}/check-runs?check_name=${check_name}" 2>/dev/null | \
+  existing=$(gh_api "repos/${owner_repo}/commits/${sha}/check-runs?check_name=${check_name}" 2>/dev/null | \
     jq -r '.check_runs[0].id // empty' 2>/dev/null || echo "")
 
   if [ -n "$existing" ]; then
-    gh api -X PATCH "repos/${owner_repo}/check-runs/${existing}" \
+    gh_api -X PATCH "repos/${owner_repo}/check-runs/${existing}" \
       -F status="completed" \
       -F conclusion="$conclusion" \
       -F "output[title]=$title" \
@@ -170,7 +177,7 @@ post_or_update_check_run() {
         echo "WARN: could not update check-run (fork PR or missing checks:write scope)" >&2
       }
   else
-    gh api "repos/${owner_repo}/check-runs" \
+    gh_api "repos/${owner_repo}/check-runs" \
       -F name="$check_name" \
       -F head_sha="$sha" \
       -F external_id="$external_id" \
@@ -193,7 +200,7 @@ apply_label() {
            "sdk-review: ⚠️ flagged:e4e669" "sdk-review: skipped:cccccc"; do
     local name color
     name="${l%:*}"; color="${l##*:}"
-    gh api "repos/${owner_repo}/labels" -F name="$name" -F color="$color" > /dev/null 2>&1 || true
+    gh_api "repos/${owner_repo}/labels" -F name="$name" -F color="$color" > /dev/null 2>&1 || true
   done
 
   # remove any existing sdk-review labels first

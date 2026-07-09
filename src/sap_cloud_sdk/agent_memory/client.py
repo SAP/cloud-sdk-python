@@ -19,6 +19,7 @@ from sap_cloud_sdk.agent_memory._endpoints import (
 )
 from sap_cloud_sdk.agent_memory._http_transport import HttpTransport
 from sap_cloud_sdk.agent_memory._models import (
+    AccessStrategy,
     Memory,
     Message,
     MessageRole,
@@ -32,7 +33,9 @@ from sap_cloud_sdk.agent_memory.utils._odata import (
     build_message_filter,
     extract_value_and_count,
 )
-from sap_cloud_sdk.agent_memory.exceptions import AgentMemoryValidationError
+from sap_cloud_sdk.agent_memory.exceptions import (
+    AgentMemoryValidationError,
+)
 from sap_cloud_sdk.core.telemetry import Module, Operation, record_metrics
 
 
@@ -87,6 +90,23 @@ class AgentMemoryClient:
     def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
         self.close()
 
+    @staticmethod
+    def _resolve_tenant(
+        access_strategy: AccessStrategy, tenant: Optional[str]
+    ) -> Optional[str]:
+        """Return the tenant subdomain to use for token derivation.
+
+        Raises:
+            AgentMemoryValidationError: If ``SUBSCRIBER_ONLY`` is requested but no tenant is given.
+        """
+        if access_strategy is AccessStrategy.SUBSCRIBER_ONLY:
+            if not tenant:
+                raise AgentMemoryValidationError(
+                    "tenant is required when access_strategy=SUBSCRIBER_ONLY"
+                )
+            return tenant
+        return None  # PROVIDER_ONLY
+
     # ── Memory operations ──────────────────────────────────────────────────────
 
     @record_metrics(Module.AGENT_MEMORY, Operation.AGENT_MEMORY_ADD_MEMORY)
@@ -97,6 +117,8 @@ class AgentMemoryClient:
         content: str,
         *,
         metadata: Optional[dict[str, Any]] = None,
+        access_strategy: AccessStrategy = AccessStrategy.SUBSCRIBER_ONLY,
+        tenant: Optional[str] = None,
     ) -> Memory:
         """Create a new memory entry.
 
@@ -105,15 +127,19 @@ class AgentMemoryClient:
             invoker_id: Identifier of the user or invoker.
             content: The memory text content.
             metadata: Optional metadata dict (Map type in OData).
+            access_strategy: Tenant access strategy. Defaults to ``SUBSCRIBER_ONLY``.
+            tenant: Subscriber tenant subdomain. Required when ``access_strategy=SUBSCRIBER_ONLY``.
 
         Returns:
             The created :class:`Memory`.
 
         Raises:
-            AgentMemoryValidationError: If any required field is empty.
+            AgentMemoryValidationError: If any required field is empty or tenant is missing
+                for ``SUBSCRIBER_ONLY``.
             AgentMemoryHttpError: If the request fails.
         """
         _require_non_empty(agent_id=agent_id, invoker_id=invoker_id, content=content)
+        tenant_subdomain = self._resolve_tenant(access_strategy, tenant)
         payload: dict[str, Any] = {
             "agentID": agent_id,
             "invokerID": invoker_id,
@@ -121,26 +147,38 @@ class AgentMemoryClient:
         }
         if metadata is not None:
             payload["metadata"] = metadata
-        data = self._transport.post(MEMORIES, json=payload)
+        data = self._transport.post(MEMORIES, json=payload, tenant_subdomain=tenant_subdomain)
         return Memory.from_dict(data)
 
     @record_metrics(Module.AGENT_MEMORY, Operation.AGENT_MEMORY_GET_MEMORY)
-    def get_memory(self, memory_id: str) -> Memory:
+    def get_memory(
+        self,
+        memory_id: str,
+        *,
+        access_strategy: AccessStrategy = AccessStrategy.SUBSCRIBER_ONLY,
+        tenant: Optional[str] = None,
+    ) -> Memory:
         """Retrieve a memory by ID.
 
         Args:
             memory_id: The memory identifier (UUID).
+            access_strategy: Tenant access strategy. Defaults to ``SUBSCRIBER_ONLY``.
+            tenant: Subscriber tenant subdomain. Required when ``access_strategy=SUBSCRIBER_ONLY``.
 
         Returns:
             The :class:`Memory`.
 
         Raises:
             AgentMemoryNotFoundError: If no memory with the given ID exists.
-            AgentMemoryValidationError: If ``memory_id`` is empty.
+            AgentMemoryValidationError: If ``memory_id`` is empty or tenant is missing
+                for ``SUBSCRIBER_ONLY``.
             AgentMemoryHttpError: If the request fails.
         """
         _require_non_empty(memory_id=memory_id)
-        data = self._transport.get(f"{MEMORIES}({memory_id})")
+        tenant_subdomain = self._resolve_tenant(access_strategy, tenant)
+        data = self._transport.get(
+            f"{MEMORIES}({memory_id})", tenant_subdomain=tenant_subdomain
+        )
         return Memory.from_dict(data)
 
     @record_metrics(Module.AGENT_MEMORY, Operation.AGENT_MEMORY_UPDATE_MEMORY)
@@ -150,6 +188,8 @@ class AgentMemoryClient:
         *,
         content: Optional[str] = None,
         metadata: Optional[dict[str, Any]] = None,
+        access_strategy: AccessStrategy = AccessStrategy.SUBSCRIBER_ONLY,
+        tenant: Optional[str] = None,
     ) -> None:
         """Update a memory's content and/or metadata.
 
@@ -157,10 +197,13 @@ class AgentMemoryClient:
             memory_id: The memory identifier (UUID).
             content: New content to set.
             metadata: New metadata dict to set.
+            access_strategy: Tenant access strategy. Defaults to ``SUBSCRIBER_ONLY``.
+            tenant: Subscriber tenant subdomain. Required when ``access_strategy=SUBSCRIBER_ONLY``.
 
         Raises:
             AgentMemoryNotFoundError: If no memory with the given ID exists.
-            AgentMemoryValidationError: If ``memory_id`` is empty or no fields are provided.
+            AgentMemoryValidationError: If ``memory_id`` is empty, no fields are provided,
+                or tenant is missing for ``SUBSCRIBER_ONLY``.
             AgentMemoryHttpError: If the request fails.
         """
         _require_non_empty(memory_id=memory_id)
@@ -168,27 +211,42 @@ class AgentMemoryClient:
             raise AgentMemoryValidationError(
                 "At least one of 'content' or 'metadata' must be provided"
             )
+        tenant_subdomain = self._resolve_tenant(access_strategy, tenant)
         payload: dict[str, Any] = {}
         if content is not None:
             payload["content"] = content
         if metadata is not None:
             payload["metadata"] = metadata
-        self._transport.patch(f"{MEMORIES}({memory_id})", json=payload)
+        self._transport.patch(
+            f"{MEMORIES}({memory_id})", json=payload, tenant_subdomain=tenant_subdomain
+        )
 
     @record_metrics(Module.AGENT_MEMORY, Operation.AGENT_MEMORY_DELETE_MEMORY)
-    def delete_memory(self, memory_id: str) -> None:
+    def delete_memory(
+        self,
+        memory_id: str,
+        *,
+        access_strategy: AccessStrategy = AccessStrategy.SUBSCRIBER_ONLY,
+        tenant: Optional[str] = None,
+    ) -> None:
         """Delete a memory permanently.
 
         Args:
             memory_id: The memory identifier (UUID).
+            access_strategy: Tenant access strategy. Defaults to ``SUBSCRIBER_ONLY``.
+            tenant: Subscriber tenant subdomain. Required when ``access_strategy=SUBSCRIBER_ONLY``.
 
         Raises:
             AgentMemoryNotFoundError: If no memory with the given ID exists.
-            AgentMemoryValidationError: If ``memory_id`` is empty.
+            AgentMemoryValidationError: If ``memory_id`` is empty or tenant is missing
+                for ``SUBSCRIBER_ONLY``.
             AgentMemoryHttpError: If the request fails.
         """
         _require_non_empty(memory_id=memory_id)
-        self._transport.delete(f"{MEMORIES}({memory_id})")
+        tenant_subdomain = self._resolve_tenant(access_strategy, tenant)
+        self._transport.delete(
+            f"{MEMORIES}({memory_id})", tenant_subdomain=tenant_subdomain
+        )
 
     @record_metrics(Module.AGENT_MEMORY, Operation.AGENT_MEMORY_LIST_MEMORIES)
     def list_memories(
@@ -199,6 +257,8 @@ class AgentMemoryClient:
         filters: Optional[list[FilterDefinition]] = None,
         limit: int = 50,
         offset: int = 0,
+        access_strategy: AccessStrategy = AccessStrategy.SUBSCRIBER_ONLY,
+        tenant: Optional[str] = None,
     ) -> list[Memory]:
         """List memories, optionally filtered by agent and/or invoker.
 
@@ -212,13 +272,15 @@ class AgentMemoryClient:
                 key-value structured search is not supported.
             limit: Maximum number of memories to return. Default is ``50``.
             offset: Number of memories to skip (for pagination). Default is ``0``.
+            access_strategy: Tenant access strategy. Defaults to ``SUBSCRIBER_ONLY``.
+            tenant: Subscriber tenant subdomain. Required when ``access_strategy=SUBSCRIBER_ONLY``.
 
         Returns:
             List of :class:`Memory` objects.
 
         Raises:
-            AgentMemoryValidationError: If ``limit`` < 1, ``offset`` < 0, or a
-                filter clause is invalid.
+            AgentMemoryValidationError: If ``limit`` < 1, ``offset`` < 0, a filter
+                clause is invalid, or tenant is missing for ``SUBSCRIBER_ONLY``.
             AgentMemoryHttpError: If the request fails.
         """
         if limit < 1:
@@ -227,6 +289,7 @@ class AgentMemoryClient:
             raise AgentMemoryValidationError("'offset' must be >= 0")
         if filters is not None:
             _validate_filter_clauses(filters, {"metadata", "content"})
+        tenant_subdomain = self._resolve_tenant(access_strategy, tenant)
         params = build_list_params(
             filter_expr=build_memory_filter(
                 agent_id=agent_id,
@@ -236,7 +299,9 @@ class AgentMemoryClient:
             top=limit,
             skip=offset if offset else None,
         )
-        response = self._transport.get(MEMORIES, params=params)
+        response = self._transport.get(
+            MEMORIES, params=params, tenant_subdomain=tenant_subdomain
+        )
         items, _ = extract_value_and_count(response)
         return [Memory.from_dict(item) for item in items]
 
@@ -245,25 +310,34 @@ class AgentMemoryClient:
         self,
         agent_id: Optional[str] = None,
         invoker_id: Optional[str] = None,
+        *,
+        access_strategy: AccessStrategy = AccessStrategy.SUBSCRIBER_ONLY,
+        tenant: Optional[str] = None,
     ) -> int:
         """Count memories matching the given filters.
 
         Args:
             agent_id: Filter by agent identifier.
             invoker_id: Filter by invoker/user identifier.
+            access_strategy: Tenant access strategy. Defaults to ``SUBSCRIBER_ONLY``.
+            tenant: Subscriber tenant subdomain. Required when ``access_strategy=SUBSCRIBER_ONLY``.
 
         Returns:
             Total number of matching memories.
 
         Raises:
+            AgentMemoryValidationError: If tenant is missing for ``SUBSCRIBER_ONLY``.
             AgentMemoryHttpError: If the request fails.
         """
+        tenant_subdomain = self._resolve_tenant(access_strategy, tenant)
         params = build_list_params(
             filter_expr=build_memory_filter(agent_id=agent_id, invoker_id=invoker_id),
             top=0,
             count=True,
         )
-        response = self._transport.get(MEMORIES, params=params)
+        response = self._transport.get(
+            MEMORIES, params=params, tenant_subdomain=tenant_subdomain
+        )
         _, total = extract_value_and_count(response)
         return total or 0
 
@@ -275,6 +349,9 @@ class AgentMemoryClient:
         query: str,
         threshold: float = 0.6,
         limit: int = 10,
+        *,
+        access_strategy: AccessStrategy = AccessStrategy.SUBSCRIBER_ONLY,
+        tenant: Optional[str] = None,
     ) -> list[SearchResult]:
         """Perform a semantic (vector) search over stored memories.
 
@@ -284,14 +361,16 @@ class AgentMemoryClient:
             query: Natural-language search query (5–5000 characters).
             threshold: Minimum cosine similarity score (0.0–1.0). Default ``0.6``.
             limit: Maximum number of results (1–50). Default is ``10``.
+            access_strategy: Tenant access strategy. Defaults to ``SUBSCRIBER_ONLY``.
+            tenant: Subscriber tenant subdomain. Required when ``access_strategy=SUBSCRIBER_ONLY``.
 
         Returns:
             List of :class:`SearchResult` objects.
 
         Raises:
-            AgentMemoryValidationError: If required fields are empty or parameters are
+            AgentMemoryValidationError: If required fields are empty, parameters are
                 out of range (``query`` must be 5–5000 chars, ``threshold`` 0.0–1.0,
-                ``limit`` 1–50).
+                ``limit`` 1–50), or tenant is missing for ``SUBSCRIBER_ONLY``.
             AgentMemoryHttpError: If the request fails.
         """
         _require_non_empty(agent_id=agent_id, invoker_id=invoker_id, query=query)
@@ -303,6 +382,7 @@ class AgentMemoryClient:
             raise AgentMemoryValidationError("'threshold' must be between 0.0 and 1.0")
         if not (1 <= limit <= 50):
             raise AgentMemoryValidationError("'limit' must be between 1 and 50")
+        tenant_subdomain = self._resolve_tenant(access_strategy, tenant)
         payload: dict[str, Any] = {
             "agentID": agent_id,
             "invokerID": invoker_id,
@@ -310,7 +390,9 @@ class AgentMemoryClient:
             "threshold": threshold,
             "top": limit,
         }
-        response = self._transport.post(MEMORY_SEARCH, json=payload)
+        response = self._transport.post(
+            MEMORY_SEARCH, json=payload, tenant_subdomain=tenant_subdomain
+        )
         items = response.get("value", [])
         return [SearchResult.from_dict(item) for item in items]
 
@@ -326,6 +408,8 @@ class AgentMemoryClient:
         content: str,
         *,
         metadata: Optional[dict[str, Any]] = None,
+        access_strategy: AccessStrategy = AccessStrategy.SUBSCRIBER_ONLY,
+        tenant: Optional[str] = None,
     ) -> Message:
         """Create a new message.
 
@@ -339,12 +423,15 @@ class AgentMemoryClient:
             role: Author role (USER, ASSISTANT, SYSTEM, TOOL).
             content: The message text content.
             metadata: Optional metadata dict.
+            access_strategy: Tenant access strategy. Defaults to ``SUBSCRIBER_ONLY``.
+            tenant: Subscriber tenant subdomain. Required when ``access_strategy=SUBSCRIBER_ONLY``.
 
         Returns:
             The created :class:`Message`.
 
         Raises:
-            AgentMemoryValidationError: If any required field is empty.
+            AgentMemoryValidationError: If any required field is empty or tenant is missing
+                for ``SUBSCRIBER_ONLY``.
             AgentMemoryHttpError: If the request fails.
         """
         _require_non_empty(
@@ -353,6 +440,7 @@ class AgentMemoryClient:
             message_group=message_group,
             content=content,
         )
+        tenant_subdomain = self._resolve_tenant(access_strategy, tenant)
         payload: dict[str, Any] = {
             "agentID": agent_id,
             "invokerID": invoker_id,
@@ -362,42 +450,68 @@ class AgentMemoryClient:
         }
         if metadata is not None:
             payload["metadata"] = metadata
-        data = self._transport.post(MESSAGES, json=payload)
+        data = self._transport.post(
+            MESSAGES, json=payload, tenant_subdomain=tenant_subdomain
+        )
         return Message.from_dict(data)
 
     @record_metrics(Module.AGENT_MEMORY, Operation.AGENT_MEMORY_GET_MESSAGE)
-    def get_message(self, message_id: str) -> Message:
+    def get_message(
+        self,
+        message_id: str,
+        *,
+        access_strategy: AccessStrategy = AccessStrategy.SUBSCRIBER_ONLY,
+        tenant: Optional[str] = None,
+    ) -> Message:
         """Retrieve a message by ID.
 
         Args:
             message_id: The message identifier (UUID).
+            access_strategy: Tenant access strategy. Defaults to ``SUBSCRIBER_ONLY``.
+            tenant: Subscriber tenant subdomain. Required when ``access_strategy=SUBSCRIBER_ONLY``.
 
         Returns:
             The :class:`Message`.
 
         Raises:
             AgentMemoryNotFoundError: If no message with the given ID exists.
-            AgentMemoryValidationError: If ``message_id`` is empty.
+            AgentMemoryValidationError: If ``message_id`` is empty or tenant is missing
+                for ``SUBSCRIBER_ONLY``.
             AgentMemoryHttpError: If the request fails.
         """
         _require_non_empty(message_id=message_id)
-        data = self._transport.get(f"{MESSAGES}({message_id})")
+        tenant_subdomain = self._resolve_tenant(access_strategy, tenant)
+        data = self._transport.get(
+            f"{MESSAGES}({message_id})", tenant_subdomain=tenant_subdomain
+        )
         return Message.from_dict(data)
 
     @record_metrics(Module.AGENT_MEMORY, Operation.AGENT_MEMORY_DELETE_MESSAGE)
-    def delete_message(self, message_id: str) -> None:
+    def delete_message(
+        self,
+        message_id: str,
+        *,
+        access_strategy: AccessStrategy = AccessStrategy.SUBSCRIBER_ONLY,
+        tenant: Optional[str] = None,
+    ) -> None:
         """Delete a message permanently.
 
         Args:
             message_id: The message identifier (UUID).
+            access_strategy: Tenant access strategy. Defaults to ``SUBSCRIBER_ONLY``.
+            tenant: Subscriber tenant subdomain. Required when ``access_strategy=SUBSCRIBER_ONLY``.
 
         Raises:
             AgentMemoryNotFoundError: If no message with the given ID exists.
-            AgentMemoryValidationError: If ``message_id`` is empty.
+            AgentMemoryValidationError: If ``message_id`` is empty or tenant is missing
+                for ``SUBSCRIBER_ONLY``.
             AgentMemoryHttpError: If the request fails.
         """
         _require_non_empty(message_id=message_id)
-        self._transport.delete(f"{MESSAGES}({message_id})")
+        tenant_subdomain = self._resolve_tenant(access_strategy, tenant)
+        self._transport.delete(
+            f"{MESSAGES}({message_id})", tenant_subdomain=tenant_subdomain
+        )
 
     @record_metrics(Module.AGENT_MEMORY, Operation.AGENT_MEMORY_LIST_MESSAGES)
     def list_messages(
@@ -410,6 +524,8 @@ class AgentMemoryClient:
         filters: Optional[list[FilterDefinition]] = None,
         limit: int = 50,
         offset: int = 0,
+        access_strategy: AccessStrategy = AccessStrategy.SUBSCRIBER_ONLY,
+        tenant: Optional[str] = None,
     ) -> list[Message]:
         """List messages, optionally filtered by agent, invoker, group, and role.
 
@@ -425,13 +541,15 @@ class AgentMemoryClient:
                 key-value structured search is not supported.
             limit: Maximum number of messages to return. Default is ``50``.
             offset: Number of messages to skip (for pagination). Default is ``0``.
+            access_strategy: Tenant access strategy. Defaults to ``SUBSCRIBER_ONLY``.
+            tenant: Subscriber tenant subdomain. Required when ``access_strategy=SUBSCRIBER_ONLY``.
 
         Returns:
             List of :class:`Message` objects.
 
         Raises:
-            AgentMemoryValidationError: If ``limit`` < 1, ``offset`` < 0, or a
-                filter clause is invalid.
+            AgentMemoryValidationError: If ``limit`` < 1, ``offset`` < 0, a filter
+                clause is invalid, or tenant is missing for ``SUBSCRIBER_ONLY``.
             AgentMemoryHttpError: If the request fails.
         """
         if limit < 1:
@@ -440,6 +558,7 @@ class AgentMemoryClient:
             raise AgentMemoryValidationError("'offset' must be >= 0")
         if filters is not None:
             _validate_filter_clauses(filters, {"metadata", "content"})
+        tenant_subdomain = self._resolve_tenant(access_strategy, tenant)
         params = build_list_params(
             filter_expr=build_message_filter(
                 agent_id=agent_id,
@@ -451,23 +570,36 @@ class AgentMemoryClient:
             top=limit,
             skip=offset if offset else None,
         )
-        response = self._transport.get(MESSAGES, params=params)
+        response = self._transport.get(
+            MESSAGES, params=params, tenant_subdomain=tenant_subdomain
+        )
         items, _ = extract_value_and_count(response)
         return [Message.from_dict(item) for item in items]
 
     # ── Admin operations ───────────────────────────────────────────────────────
 
     @record_metrics(Module.AGENT_MEMORY, Operation.AGENT_MEMORY_GET_RETENTION_CONFIG)
-    def get_retention_config(self) -> RetentionConfig:
+    def get_retention_config(
+        self,
+        *,
+        access_strategy: AccessStrategy = AccessStrategy.SUBSCRIBER_ONLY,
+        tenant: Optional[str] = None,
+    ) -> RetentionConfig:
         """Retrieve the data retention configuration (singleton).
+
+        Args:
+            access_strategy: Tenant access strategy. Defaults to ``SUBSCRIBER_ONLY``.
+            tenant: Subscriber tenant subdomain. Required when ``access_strategy=SUBSCRIBER_ONLY``.
 
         Returns:
             The current :class:`RetentionConfig`.
 
         Raises:
+            AgentMemoryValidationError: If tenant is missing for ``SUBSCRIBER_ONLY``.
             AgentMemoryHttpError: If the request fails.
         """
-        data = self._transport.get(RETENTION_CONFIG)
+        tenant_subdomain = self._resolve_tenant(access_strategy, tenant)
+        data = self._transport.get(RETENTION_CONFIG, tenant_subdomain=tenant_subdomain)
         return RetentionConfig.from_dict(data)
 
     @record_metrics(Module.AGENT_MEMORY, Operation.AGENT_MEMORY_UPDATE_RETENTION_CONFIG)
@@ -477,6 +609,8 @@ class AgentMemoryClient:
         message_days: Optional[int] = None,
         memory_days: Optional[int] = None,
         usage_log_days: Optional[int] = None,
+        access_strategy: AccessStrategy = AccessStrategy.SUBSCRIBER_ONLY,
+        tenant: Optional[str] = None,
     ) -> None:
         """Update the data retention configuration.
 
@@ -488,10 +622,12 @@ class AgentMemoryClient:
             message_days: How long to keep messages (days).
             memory_days: How long to keep memories without access (days).
             usage_log_days: How long to keep access and search logs (days).
+            access_strategy: Tenant access strategy. Defaults to ``SUBSCRIBER_ONLY``.
+            tenant: Subscriber tenant subdomain. Required when ``access_strategy=SUBSCRIBER_ONLY``.
 
         Raises:
-            AgentMemoryValidationError: If no fields are provided, or any provided
-                value is negative.
+            AgentMemoryValidationError: If no fields are provided, any provided value is
+                negative, or tenant is missing for ``SUBSCRIBER_ONLY``.
             AgentMemoryHttpError: If the request fails.
         """
         if message_days is None and memory_days is None and usage_log_days is None:
@@ -506,6 +642,7 @@ class AgentMemoryClient:
         ):
             if value is not None and value < 0:
                 raise AgentMemoryValidationError(f"'{name}' must be >= 0")
+        tenant_subdomain = self._resolve_tenant(access_strategy, tenant)
         payload: dict[str, Any] = {}
         if message_days is not None:
             payload["messageDays"] = message_days
@@ -513,4 +650,6 @@ class AgentMemoryClient:
             payload["memoryDays"] = memory_days
         if usage_log_days is not None:
             payload["usageLogDays"] = usage_log_days
-        self._transport.patch(RETENTION_CONFIG, json=payload)
+        self._transport.patch(
+            RETENTION_CONFIG, json=payload, tenant_subdomain=tenant_subdomain
+        )

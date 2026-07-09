@@ -22,6 +22,10 @@ plain text, and the service makes it searchable by meaning.
   - [Core Concepts](#core-concepts)
     - [`agent_id`](#agent_id)
     - [`invoker_id`](#invoker_id)
+  - [Multitenancy](#multitenancy)
+    - [AccessStrategy](#accessstrategy)
+    - [SUBSCRIBER_ONLY (default)](#subscriber_only-default)
+    - [PROVIDER_ONLY](#provider_only)
   - [Semantic Search: A Brief Primer](#semantic-search-a-brief-primer)
   - [Memories](#memories)
     - [Create a Memory](#create-a-memory)
@@ -153,6 +157,60 @@ the application's auth system. Memories and messages are scoped to the combinati
 
 Neither value is validated by the service — they are free-form strings. Consistent use
 across create, read, and search calls is the implementer's responsibility.
+
+## Multitenancy
+
+The Agent Memory service runs in a multi-tenant BTP environment. By default, every API
+call uses a **subscriber-scoped token** — meaning data is isolated to the subscriber tenant
+that your application serves. You control this behaviour with the `access_strategy` and
+`tenant` keyword arguments available on every client method.
+
+### AccessStrategy
+
+```python
+from sap_cloud_sdk.agent_memory import AccessStrategy
+```
+
+| Value                       | Description                                                        |
+| --------------------------- | ------------------------------------------------------------------ |
+| `SUBSCRIBER_ONLY` (default) | Reads and writes against the subscriber tenant. Requires `tenant`. |
+| `PROVIDER_ONLY`             | Reads and writes against the provider tenant. No `tenant` needed.  |
+
+### SUBSCRIBER_ONLY (default)
+
+Pass the subscriber tenant subdomain via the `tenant` argument. Omitting `tenant` when
+the strategy is `SUBSCRIBER_ONLY` raises `AgentMemoryValidationError`.
+
+```python
+memories = client.list_memories(
+    agent_id="hr-assistant",
+    invoker_id="user-42",
+    access_strategy=AccessStrategy.SUBSCRIBER_ONLY,
+    tenant="acme-corp",          # subscriber subdomain
+)
+```
+
+The subscriber token URL is derived by replacing the provider's `identityzone` segment
+in the configured `token_url` with the `tenant` value. This requires `identityzone` to
+be present in the service binding's UAA JSON (standard XSUAA field) or set explicitly in
+`AgentMemoryConfig`.
+
+### PROVIDER_ONLY
+
+No `tenant` argument is needed. All calls use the provider token.
+
+```python
+memories = client.list_memories(
+    agent_id="hr-assistant",
+    invoker_id="user-42",
+    access_strategy=AccessStrategy.PROVIDER_ONLY,
+)
+```
+
+> [!NOTE]
+> The `_FIRST` fallback strategies (`SUBSCRIBER_FIRST`, `PROVIDER_FIRST`) are not yet
+> supported and must be evaluated for silent cross-tenant access risks before being
+> introduced.
 
 ## Semantic Search: A Brief Primer
 
@@ -491,9 +549,10 @@ See the [Content and metadata filtering](#content-and-metadata-filtering) note u
 
 ### Enums
 
-| Enum          | Values                                |
-| ------------- | ------------------------------------- |
-| `MessageRole` | `USER`, `ASSISTANT`, `SYSTEM`, `TOOL` |
+| Enum             | Values                                       |
+| ---------------- | -------------------------------------------- |
+| `MessageRole`    | `USER`, `ASSISTANT`, `SYSTEM`, `TOOL`        |
+| `AccessStrategy` | `SUBSCRIBER_ONLY` (default), `PROVIDER_ONLY` |
 
 All models expose a `to_dict()` method that returns a plain dict for logging or forwarding.
 

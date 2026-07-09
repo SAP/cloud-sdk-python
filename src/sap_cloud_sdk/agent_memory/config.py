@@ -35,6 +35,9 @@ class AgentMemoryConfig:
                    requests are sent without authentication (useful for local development).
         client_id: The OAuth2 client ID. Optional.
         client_secret: The OAuth2 client secret. Optional.
+        identityzone: The provider tenant identity zone subdomain. Required when using
+                      ``SUBSCRIBER_ONLY`` access strategy so the subscriber token URL
+                      can be derived by replacing this value in ``token_url``.
         timeout: Timeout in seconds for HTTP requests. Default is 30.0.
 
     Example — deployed BTP service::
@@ -44,6 +47,7 @@ class AgentMemoryConfig:
             token_url="https://<tenant>.authentication.<region>/oauth/token",
             client_id="<client-id>",
             client_secret="<client-secret>",
+            identityzone="<provider-subdomain>",
         )
 
     Example — local development (no auth)::
@@ -55,6 +59,7 @@ class AgentMemoryConfig:
     token_url: Optional[str] = None
     client_id: Optional[str] = None
     client_secret: Optional[str] = None
+    identityzone: Optional[str] = None
     timeout: float = 30.0
 
     def __post_init__(self) -> None:
@@ -71,6 +76,10 @@ class AgentMemoryConfig:
         if self.client_secret is not None and not self.client_secret:
             raise AgentMemoryConfigError(
                 "client_secret must be a non-empty string when provided"
+            )
+        if self.identityzone is not None and not self.identityzone:
+            raise AgentMemoryConfigError(
+                "identityzone must be a non-empty string when provided"
             )
 
 
@@ -108,6 +117,7 @@ class BindingData:
                 token_url=uaa_data["url"].rstrip("/") + "/oauth/token",
                 client_id=uaa_data["clientid"],
                 client_secret=uaa_data["clientsecret"],
+                identityzone=uaa_data.get("identityzone"),
             )
         except KeyError as e:
             raise AgentMemoryConfigError(f"Missing required field in uaa JSON: {e}")

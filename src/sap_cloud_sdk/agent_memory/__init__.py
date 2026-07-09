@@ -24,6 +24,7 @@ from sap_cloud_sdk.agent_memory.exceptions import (
     AgentMemoryValidationError,
 )
 from sap_cloud_sdk.agent_memory._models import (
+    AccessStrategy,
     Memory,
     Message,
     MessageRole,
@@ -61,6 +62,7 @@ def create_client(*, config: Optional[AgentMemoryConfig] = None) -> AgentMemoryC
 
 
 __all__ = [
+    "AccessStrategy",
     "AgentMemoryClient",
     "AgentMemoryConfig",
     "AgentMemoryError",

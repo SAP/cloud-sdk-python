@@ -51,6 +51,14 @@ class TestAgentMemoryConfig:
         config = AgentMemoryConfig(base_url="http://localhost:8080")
         assert config.timeout == 30.0
 
+    def test_raises_when_identityzone_empty_string(self):
+        with pytest.raises(AgentMemoryConfigError, match="identityzone"):
+            AgentMemoryConfig(base_url="http://localhost", identityzone="")
+
+    def test_identityzone_defaults_to_none(self):
+        config = AgentMemoryConfig(base_url="http://localhost:8080")
+        assert config.identityzone is None
+
     def test_valid_config_with_all_fields_does_not_raise(self):
         AgentMemoryConfig(
             base_url="https://memory.example.com",
@@ -102,6 +110,20 @@ class TestBindingData:
         with pytest.raises(AgentMemoryConfigError, match="Missing required field in uaa JSON"):
             BindingData(application_url="https://memory.example.com", uaa=uaa).extract_config()
 
+    def test_extract_config_maps_identityzone_when_present(self):
+        uaa = json.dumps({
+            "url": "https://my-zone.authentication.eu12.hana.ondemand.com",
+            "clientid": "c",
+            "clientsecret": "s",
+            "identityzone": "my-zone",
+        })
+        config = BindingData(application_url="https://memory.example.com", uaa=uaa).extract_config()
+        assert config.identityzone == "my-zone"
+
+    def test_extract_config_identityzone_is_none_when_absent(self):
+        config = BindingData(application_url="https://memory.example.com", uaa=_VALID_UAA).extract_config()
+        assert config.identityzone is None
+
     def test_extract_config_ignores_extra_uaa_fields(self):
         uaa = json.dumps({
             "apiurl": "https://api.authentication.eu12.hana.ondemand.com",
@@ -119,6 +141,7 @@ class TestBindingData:
         assert config.token_url == "https://auth.example.com/oauth/token"
         assert config.client_id == "my-client"
         assert config.client_secret == "my-secret"
+        assert config.identityzone == "my-zone"
 
     def test_extract_config_raises_on_empty_uaa_object(self):
         with pytest.raises(AgentMemoryConfigError, match="Missing required field in uaa JSON"):

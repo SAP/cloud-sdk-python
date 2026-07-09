@@ -11,6 +11,7 @@ from sap_cloud_sdk.agent_memory._endpoints import (
 )
 from sap_cloud_sdk.agent_memory._http_transport import HttpTransport
 from sap_cloud_sdk.agent_memory._models import (
+    AccessStrategy,
     Memory,
     Message,
     MessageRole,
@@ -21,7 +22,6 @@ from sap_cloud_sdk.agent_memory.client import AgentMemoryClient
 from sap_cloud_sdk.agent_memory import create_client, FilterDefinition
 from sap_cloud_sdk.agent_memory.config import AgentMemoryConfig
 from sap_cloud_sdk.agent_memory.exceptions import AgentMemoryValidationError
-
 
 def _make_client() -> tuple[AgentMemoryClient, MagicMock]:
     """Return an AgentMemoryClient with a mocked transport layer."""
@@ -58,6 +58,97 @@ class TestCreateClient:
         assert isinstance(client, AgentMemoryClient)
 
 
+# ── Access strategy ───────────────────────────────────────────────────────────
+
+class TestAccessStrategy:
+
+    def test_subscriber_only_with_tenant_resolves_to_subdomain(self):
+        """SUBSCRIBER_ONLY with a tenant returns the tenant subdomain."""
+        subdomain = AgentMemoryClient._resolve_tenant(
+            AccessStrategy.SUBSCRIBER_ONLY, "my-tenant"
+        )
+        assert subdomain == "my-tenant"
+
+    def test_subscriber_only_without_tenant_raises(self):
+        """SUBSCRIBER_ONLY without a tenant raises AgentMemoryValidationError."""
+        with pytest.raises(AgentMemoryValidationError, match="tenant"):
+            AgentMemoryClient._resolve_tenant(AccessStrategy.SUBSCRIBER_ONLY, None)
+
+    def test_subscriber_only_with_empty_tenant_raises(self):
+        """SUBSCRIBER_ONLY with an empty tenant string raises AgentMemoryValidationError."""
+        with pytest.raises(AgentMemoryValidationError, match="tenant"):
+            AgentMemoryClient._resolve_tenant(AccessStrategy.SUBSCRIBER_ONLY, "")
+
+    def test_provider_only_without_tenant_resolves_to_none(self):
+        """PROVIDER_ONLY without a tenant resolves to None (no subdomain substitution)."""
+        subdomain = AgentMemoryClient._resolve_tenant(AccessStrategy.PROVIDER_ONLY, None)
+        assert subdomain is None
+
+    def test_provider_only_ignores_tenant(self):
+        """PROVIDER_ONLY ignores any tenant value and always returns None."""
+        subdomain = AgentMemoryClient._resolve_tenant(AccessStrategy.PROVIDER_ONLY, "ignored")
+        assert subdomain is None
+
+    def test_add_memory_subscriber_only_passes_tenant_to_transport(self):
+        """add_memory with SUBSCRIBER_ONLY passes tenant_subdomain to transport."""
+        client, mock_transport = _make_client()
+        mock_transport.post.return_value = {
+            "id": "m1", "agentID": "a", "invokerID": "u", "content": "x",
+        }
+
+        client.add_memory(
+            "a", "u", "x",
+            access_strategy=AccessStrategy.SUBSCRIBER_ONLY,
+            tenant="sub-tenant",
+        )
+
+        assert mock_transport.post.call_args[1]["tenant_subdomain"] == "sub-tenant"
+
+    def test_add_memory_provider_only_passes_none_to_transport(self):
+        """add_memory with PROVIDER_ONLY passes tenant_subdomain=None to transport."""
+        client, mock_transport = _make_client()
+        mock_transport.post.return_value = {
+            "id": "m1", "agentID": "a", "invokerID": "u", "content": "x",
+        }
+
+        client.add_memory("a", "u", "x", access_strategy=AccessStrategy.PROVIDER_ONLY)
+
+        assert mock_transport.post.call_args[1]["tenant_subdomain"] is None
+
+    def test_add_memory_subscriber_only_without_tenant_raises(self):
+        """add_memory with SUBSCRIBER_ONLY and no tenant raises before transport call."""
+        client, mock_transport = _make_client()
+
+        with pytest.raises(AgentMemoryValidationError, match="tenant"):
+            client.add_memory(
+                "a", "u", "x", access_strategy=AccessStrategy.SUBSCRIBER_ONLY
+            )
+
+        mock_transport.post.assert_not_called()
+
+    def test_list_memories_subscriber_only_passes_tenant_to_transport(self):
+        """list_memories with SUBSCRIBER_ONLY passes tenant_subdomain to transport."""
+        client, mock_transport = _make_client()
+        mock_transport.get.return_value = {"value": []}
+
+        client.list_memories(
+            agent_id="a",
+            access_strategy=AccessStrategy.SUBSCRIBER_ONLY,
+            tenant="sub",
+        )
+
+        assert mock_transport.get.call_args[1]["tenant_subdomain"] == "sub"
+
+    def test_list_memories_provider_only_passes_none_to_transport(self):
+        """list_memories with PROVIDER_ONLY passes tenant_subdomain=None to transport."""
+        client, mock_transport = _make_client()
+        mock_transport.get.return_value = {"value": []}
+
+        client.list_memories(agent_id="a", access_strategy=AccessStrategy.PROVIDER_ONLY)
+
+        assert mock_transport.get.call_args[1]["tenant_subdomain"] is None
+
+
 # ── Memory CRUD operations ────────────────────────────────────────────────────
 
 
@@ -74,7 +165,7 @@ class TestMemoryCRUD:
             "createType": "DIRECT",
         }
 
-        memory = client.add_memory("agent-a", "user-b", "some memory")
+        memory = client.add_memory("agent-a", "user-b", "some memory", access_strategy=AccessStrategy.PROVIDER_ONLY)
 
         assert isinstance(memory, Memory)
         assert memory.id == "mem-1"
@@ -90,7 +181,7 @@ class TestMemoryCRUD:
             "id": "mem-1", "agentID": "a", "invokerID": "u", "content": "x",
         }
 
-        client.add_memory("a", "u", "x", metadata={"key": "val"})
+        client.add_memory("a", "u", "x", metadata={"key": "val"}, access_strategy=AccessStrategy.PROVIDER_ONLY)
 
         payload = mock_transport.post.call_args[1]["json"]
         assert payload["metadata"] == {"key": "val"}
@@ -102,7 +193,7 @@ class TestMemoryCRUD:
             "id": "mem-1", "agentID": "a", "invokerID": "u", "content": "x",
         }
 
-        client.add_memory("a", "u", "x")
+        client.add_memory("a", "u", "x", access_strategy=AccessStrategy.PROVIDER_ONLY)
 
         payload = mock_transport.post.call_args[1]["json"]
         assert "metadata" not in payload
@@ -115,7 +206,7 @@ class TestMemoryCRUD:
             "id": "mem-1", "agentID": "a", "invokerID": "u", "content": "x",
         }
 
-        client.add_memory("a", "u", "x")
+        client.add_memory("a", "u", "x", access_strategy=AccessStrategy.PROVIDER_ONLY)
 
         call_path = mock_transport.post.call_args[0][0]
         assert call_path == MEMORIES
@@ -127,7 +218,7 @@ class TestMemoryCRUD:
             "id": "mem-1", "agentID": "a", "invokerID": "u", "content": "hello",
         }
 
-        memory = client.get_memory("mem-1")
+        memory = client.get_memory("mem-1", access_strategy=AccessStrategy.PROVIDER_ONLY)
 
         assert memory.id == "mem-1"
         call_path = mock_transport.get.call_args[0][0]
@@ -137,7 +228,7 @@ class TestMemoryCRUD:
         """update_memory sends a PATCH with the updated fields."""
         client, mock_transport = _make_client()
 
-        client.update_memory("mem-1", content="updated")
+        client.update_memory("mem-1", content="updated", access_strategy=AccessStrategy.PROVIDER_ONLY)
 
         mock_transport.patch.assert_called_once()
         payload = mock_transport.patch.call_args[1]["json"]
@@ -147,7 +238,7 @@ class TestMemoryCRUD:
         """update_memory omits None-valued optional fields from the PATCH body."""
         client, mock_transport = _make_client()
 
-        client.update_memory("mem-1", content="x")
+        client.update_memory("mem-1", content="x", access_strategy=AccessStrategy.PROVIDER_ONLY)
 
         payload = mock_transport.patch.call_args[1]["json"]
         assert "metadata" not in payload
@@ -156,7 +247,7 @@ class TestMemoryCRUD:
         """update_memory supports updating metadata without content."""
         client, mock_transport = _make_client()
 
-        client.update_memory("mem-1", metadata={"key": "new-meta"})
+        client.update_memory("mem-1", metadata={"key": "new-meta"}, access_strategy=AccessStrategy.PROVIDER_ONLY)
 
         payload = mock_transport.patch.call_args[1]["json"]
         assert payload["metadata"] == {"key": "new-meta"}
@@ -166,7 +257,7 @@ class TestMemoryCRUD:
         """delete_memory sends a DELETE to the correct path."""
         client, mock_transport = _make_client()
 
-        client.delete_memory("mem-1")
+        client.delete_memory("mem-1", access_strategy=AccessStrategy.PROVIDER_ONLY)
 
         mock_transport.delete.assert_called_once()
         call_path = mock_transport.delete.call_args[0][0]
@@ -187,7 +278,7 @@ class TestListMemories:
             ],
         }
 
-        memories = client.list_memories(agent_id="a", invoker_id="u")
+        memories = client.list_memories(agent_id="a", invoker_id="u", access_strategy=AccessStrategy.PROVIDER_ONLY)
 
         assert len(memories) == 1
         assert isinstance(memories[0], Memory)
@@ -197,7 +288,7 @@ class TestListMemories:
         client, mock_transport = _make_client()
         mock_transport.get.return_value = {"value": []}
 
-        client.list_memories(agent_id="agent-x", invoker_id="user-y")
+        client.list_memories(agent_id="agent-x", invoker_id="user-y", access_strategy=AccessStrategy.PROVIDER_ONLY)
 
         params = mock_transport.get.call_args[1]["params"]
         assert "agentID eq 'agent-x'" in params["$filter"]
@@ -208,7 +299,7 @@ class TestListMemories:
         client, mock_transport = _make_client()
         mock_transport.get.return_value = {"value": []}
 
-        client.list_memories()
+        client.list_memories(access_strategy=AccessStrategy.PROVIDER_ONLY)
 
         params = mock_transport.get.call_args[1]["params"]
         assert params["$top"] == "50"
@@ -218,7 +309,7 @@ class TestListMemories:
         client, mock_transport = _make_client()
         mock_transport.get.return_value = {"value": []}
 
-        client.list_memories(limit=5)
+        client.list_memories(limit=5, access_strategy=AccessStrategy.PROVIDER_ONLY)
 
         params = mock_transport.get.call_args[1]["params"]
         assert params["$top"] == "5"
@@ -228,7 +319,7 @@ class TestListMemories:
         client, mock_transport = _make_client()
         mock_transport.get.return_value = {"value": []}
 
-        memories = client.list_memories()
+        memories = client.list_memories(access_strategy=AccessStrategy.PROVIDER_ONLY)
 
         assert len(memories) == 0
 
@@ -237,7 +328,7 @@ class TestListMemories:
         client, mock_transport = _make_client()
         mock_transport.get.return_value = {"value": []}
 
-        client.list_memories(offset=50)
+        client.list_memories(offset=50, access_strategy=AccessStrategy.PROVIDER_ONLY)
 
         params = mock_transport.get.call_args[1]["params"]
         assert params["$skip"] == "50"
@@ -247,7 +338,7 @@ class TestListMemories:
         client, mock_transport = _make_client()
         mock_transport.get.return_value = {"value": []}
 
-        client.list_memories()
+        client.list_memories(access_strategy=AccessStrategy.PROVIDER_ONLY)
 
         params = mock_transport.get.call_args[1]["params"]
         assert "$skip" not in params
@@ -259,6 +350,7 @@ class TestListMemories:
 
         client.list_memories(
             filters=[FilterDefinition(target="metadata", contains="john")],
+            access_strategy=AccessStrategy.PROVIDER_ONLY,
         )
 
         params = mock_transport.get.call_args[1]["params"]
@@ -271,6 +363,7 @@ class TestListMemories:
 
         client.list_memories(
             filters=[FilterDefinition(target="content", contains="dark mode")],
+            access_strategy=AccessStrategy.PROVIDER_ONLY,
         )
 
         params = mock_transport.get.call_args[1]["params"]
@@ -286,6 +379,7 @@ class TestListMemories:
                 FilterDefinition(target="metadata", contains="john"),
                 FilterDefinition(target="content", contains="user prefers"),
             ],
+            access_strategy=AccessStrategy.PROVIDER_ONLY,
         )
 
         params = mock_transport.get.call_args[1]["params"]
@@ -303,6 +397,7 @@ class TestListMemories:
             agent_id="my-agent",
             invoker_id="user-1",
             filters=[FilterDefinition(target="content", contains="dark mode")],
+            access_strategy=AccessStrategy.PROVIDER_ONLY,
         )
 
         params = mock_transport.get.call_args[1]["params"]
@@ -316,7 +411,7 @@ class TestListMemories:
         client, mock_transport = _make_client()
         mock_transport.get.return_value = {"value": []}
 
-        client.list_memories(agent_id="a", invoker_id="u", filters=None)
+        client.list_memories(agent_id="a", invoker_id="u", filters=None, access_strategy=AccessStrategy.PROVIDER_ONLY)
 
         params = mock_transport.get.call_args[1]["params"]
         assert params["$filter"] == "agentID eq 'a' and invokerID eq 'u'"
@@ -329,7 +424,7 @@ class TestCountMemories:
         client, mock_transport = _make_client()
         mock_transport.get.return_value = {"value": [], "@odata.count": 42}
 
-        total = client.count_memories(agent_id="a", invoker_id="u")
+        total = client.count_memories(agent_id="a", invoker_id="u", access_strategy=AccessStrategy.PROVIDER_ONLY)
 
         assert total == 42
 
@@ -338,7 +433,7 @@ class TestCountMemories:
         client, mock_transport = _make_client()
         mock_transport.get.return_value = {"value": [], "@odata.count": 0}
 
-        client.count_memories()
+        client.count_memories(access_strategy=AccessStrategy.PROVIDER_ONLY)
 
         params = mock_transport.get.call_args[1]["params"]
         assert params["$top"] == "0"
@@ -349,7 +444,7 @@ class TestCountMemories:
         client, mock_transport = _make_client()
         mock_transport.get.return_value = {"value": [], "@odata.count": 3}
 
-        client.count_memories(agent_id="agt", invoker_id="usr")
+        client.count_memories(agent_id="agt", invoker_id="usr", access_strategy=AccessStrategy.PROVIDER_ONLY)
 
         params = mock_transport.get.call_args[1]["params"]
         assert "agentID eq 'agt'" in params["$filter"]
@@ -360,7 +455,7 @@ class TestCountMemories:
         client, mock_transport = _make_client()
         mock_transport.get.return_value = {"value": []}
 
-        total = client.count_memories()
+        total = client.count_memories(access_strategy=AccessStrategy.PROVIDER_ONLY)
 
         assert total == 0
 
@@ -380,7 +475,7 @@ class TestSearchMemories:
             ]
         }
 
-        results = client.search_memories("a", "u", "test query")
+        results = client.search_memories("a", "u", "test query", access_strategy=AccessStrategy.PROVIDER_ONLY)
 
         assert len(results) == 2
         assert all(isinstance(r, SearchResult) for r in results)
@@ -392,7 +487,7 @@ class TestSearchMemories:
         client, mock_transport = _make_client()
         mock_transport.post.return_value = {"value": []}
 
-        client.search_memories("agent-a", "user-b", "my query", threshold=0.7, limit=5)
+        client.search_memories("agent-a", "user-b", "my query", threshold=0.7, limit=5, access_strategy=AccessStrategy.PROVIDER_ONLY)
 
         call_path = mock_transport.post.call_args[0][0]
         assert call_path == MEMORY_SEARCH
@@ -408,7 +503,7 @@ class TestSearchMemories:
         client, mock_transport = _make_client()
         mock_transport.post.return_value = {"value": []}
 
-        results = client.search_memories("a", "u", "empty query")
+        results = client.search_memories("a", "u", "empty query", access_strategy=AccessStrategy.PROVIDER_ONLY)
 
         assert len(results) == 0
 
@@ -417,7 +512,7 @@ class TestSearchMemories:
         client, mock_transport = _make_client()
         mock_transport.post.return_value = {"value": []}
 
-        client.search_memories("a", "u", "query")
+        client.search_memories("a", "u", "query", access_strategy=AccessStrategy.PROVIDER_ONLY)
 
         payload = mock_transport.post.call_args[1]["json"]
         assert payload["threshold"] == 0.6
@@ -444,6 +539,7 @@ class TestMessageCRUD:
 
         message = client.add_message(
             "agent-a", "user-b", "conv-1", MessageRole.USER, "Hello!",
+            access_strategy=AccessStrategy.PROVIDER_ONLY,
         )
 
         assert isinstance(message, Message)
@@ -464,7 +560,7 @@ class TestMessageCRUD:
             "messageGroup": "g", "role": "USER", "content": "hi",
         }
 
-        client.add_message("a", "u", "g", MessageRole.USER, "hi")
+        client.add_message("a", "u", "g", MessageRole.USER, "hi", access_strategy=AccessStrategy.PROVIDER_ONLY)
 
         call_path = mock_transport.post.call_args[0][0]
         assert call_path == MESSAGES
@@ -478,7 +574,7 @@ class TestMessageCRUD:
             "metadata": {"key": "val"},
         }
 
-        client.add_message("a", "u", "g", MessageRole.USER, "hi", metadata={"key": "val"})
+        client.add_message("a", "u", "g", MessageRole.USER, "hi", metadata={"key": "val"}, access_strategy=AccessStrategy.PROVIDER_ONLY)
 
         payload = mock_transport.post.call_args[1]["json"]
         assert payload["metadata"] == {"key": "val"}
@@ -491,7 +587,7 @@ class TestMessageCRUD:
             "messageGroup": "g", "role": "USER", "content": "hi",
         }
 
-        client.add_message("a", "u", "g", MessageRole.USER, "hi")
+        client.add_message("a", "u", "g", MessageRole.USER, "hi", access_strategy=AccessStrategy.PROVIDER_ONLY)
 
         payload = mock_transport.post.call_args[1]["json"]
         assert "metadata" not in payload
@@ -504,7 +600,7 @@ class TestMessageCRUD:
             "messageGroup": "g", "role": "USER", "content": "hi",
         }
 
-        message = client.get_message("msg-1")
+        message = client.get_message("msg-1", access_strategy=AccessStrategy.PROVIDER_ONLY)
 
         assert message.id == "msg-1"
         call_path = mock_transport.get.call_args[0][0]
@@ -514,7 +610,7 @@ class TestMessageCRUD:
         """delete_message sends a DELETE to the correct path."""
         client, mock_transport = _make_client()
 
-        client.delete_message("msg-1")
+        client.delete_message("msg-1", access_strategy=AccessStrategy.PROVIDER_ONLY)
 
         mock_transport.delete.assert_called_once()
         call_path = mock_transport.delete.call_args[0][0]
@@ -538,7 +634,7 @@ class TestListMessages:
             ],
         }
 
-        messages = client.list_messages(agent_id="a", invoker_id="u")
+        messages = client.list_messages(agent_id="a", invoker_id="u", access_strategy=AccessStrategy.PROVIDER_ONLY)
 
         assert len(messages) == 1
         assert isinstance(messages[0], Message)
@@ -551,6 +647,7 @@ class TestListMessages:
         client.list_messages(
             agent_id="a", invoker_id="u",
             message_group="conv-1", role="USER",
+            access_strategy=AccessStrategy.PROVIDER_ONLY,
         )
 
         params = mock_transport.get.call_args[1]["params"]
@@ -565,7 +662,7 @@ class TestListMessages:
         client, mock_transport = _make_client()
         mock_transport.get.return_value = {"value": []}
 
-        client.list_messages()
+        client.list_messages(access_strategy=AccessStrategy.PROVIDER_ONLY)
 
         params = mock_transport.get.call_args[1]["params"]
         assert params["$top"] == "50"
@@ -575,7 +672,7 @@ class TestListMessages:
         client, mock_transport = _make_client()
         mock_transport.get.return_value = {"value": []}
 
-        client.list_messages(limit=20)
+        client.list_messages(limit=20, access_strategy=AccessStrategy.PROVIDER_ONLY)
 
         params = mock_transport.get.call_args[1]["params"]
         assert params["$top"] == "20"
@@ -585,7 +682,7 @@ class TestListMessages:
         client, mock_transport = _make_client()
         mock_transport.get.return_value = {"value": []}
 
-        messages = client.list_messages()
+        messages = client.list_messages(access_strategy=AccessStrategy.PROVIDER_ONLY)
 
         assert len(messages) == 0
 
@@ -594,7 +691,7 @@ class TestListMessages:
         client, mock_transport = _make_client()
         mock_transport.get.return_value = {"value": []}
 
-        client.list_messages(offset=100)
+        client.list_messages(offset=100, access_strategy=AccessStrategy.PROVIDER_ONLY)
 
         params = mock_transport.get.call_args[1]["params"]
         assert params["$skip"] == "100"
@@ -604,7 +701,7 @@ class TestListMessages:
         client, mock_transport = _make_client()
         mock_transport.get.return_value = {"value": []}
 
-        client.list_messages()
+        client.list_messages(access_strategy=AccessStrategy.PROVIDER_ONLY)
 
         params = mock_transport.get.call_args[1]["params"]
         assert "$skip" not in params
@@ -616,6 +713,7 @@ class TestListMessages:
 
         client.list_messages(
             filters=[FilterDefinition(target="metadata", contains="demo-app")],
+            access_strategy=AccessStrategy.PROVIDER_ONLY,
         )
 
         params = mock_transport.get.call_args[1]["params"]
@@ -628,6 +726,7 @@ class TestListMessages:
 
         client.list_messages(
             filters=[FilterDefinition(target="content", contains="invoice")],
+            access_strategy=AccessStrategy.PROVIDER_ONLY,
         )
 
         params = mock_transport.get.call_args[1]["params"]
@@ -643,6 +742,7 @@ class TestListMessages:
                 FilterDefinition(target="metadata", contains="john"),
                 FilterDefinition(target="content", contains="user prefers"),
             ],
+            access_strategy=AccessStrategy.PROVIDER_ONLY,
         )
 
         params = mock_transport.get.call_args[1]["params"]
@@ -662,6 +762,7 @@ class TestListMessages:
             message_group="g",
             role="USER",
             filters=[FilterDefinition(target="content", contains="hello")],
+            access_strategy=AccessStrategy.PROVIDER_ONLY,
         )
 
         params = mock_transport.get.call_args[1]["params"]
@@ -677,7 +778,7 @@ class TestListMessages:
         client, mock_transport = _make_client()
         mock_transport.get.return_value = {"value": []}
 
-        client.list_messages(agent_id="a", invoker_id="u", filters=None)
+        client.list_messages(agent_id="a", invoker_id="u", filters=None, access_strategy=AccessStrategy.PROVIDER_ONLY)
 
         params = mock_transport.get.call_args[1]["params"]
         assert params["$filter"] == "agentID eq 'a' and invokerID eq 'u'"
@@ -698,7 +799,7 @@ class TestRetentionConfig:
             "updateTimestamp": "2025-01-02T00:00:00Z",
         }
 
-        rc = client.get_retention_config()
+        rc = client.get_retention_config(access_strategy=AccessStrategy.PROVIDER_ONLY)
 
         assert isinstance(rc, RetentionConfig)
         assert rc.id == 1
@@ -712,7 +813,7 @@ class TestRetentionConfig:
         """update_retention_config sends PATCH with updated fields."""
         client, mock_transport = _make_client()
 
-        client.update_retention_config(message_days=60)
+        client.update_retention_config(message_days=60, access_strategy=AccessStrategy.PROVIDER_ONLY)
 
         mock_transport.patch.assert_called_once()
         call_path = mock_transport.patch.call_args[0][0]
@@ -725,7 +826,7 @@ class TestRetentionConfig:
         """update_retention_config omits None-valued fields from PATCH body."""
         client, mock_transport = _make_client()
 
-        client.update_retention_config(memory_days=90, usage_log_days=180)
+        client.update_retention_config(memory_days=90, usage_log_days=180, access_strategy=AccessStrategy.PROVIDER_ONLY)
 
         payload = mock_transport.patch.call_args[1]["json"]
         assert "messageDays" not in payload
@@ -766,55 +867,55 @@ class TestMemoryValidation:
         """add_memory raises AgentMemoryValidationError when agent_id is empty."""
         client, _ = _make_client()
         with pytest.raises(AgentMemoryValidationError, match="agent_id"):
-            client.add_memory("", "user-1", "content")
+            client.add_memory("", "user-1", "content", access_strategy=AccessStrategy.PROVIDER_ONLY)
 
     def test_add_memory_raises_for_empty_invoker_id(self):
         """add_memory raises AgentMemoryValidationError when invoker_id is empty."""
         client, _ = _make_client()
         with pytest.raises(AgentMemoryValidationError, match="invoker_id"):
-            client.add_memory("agent-1", "", "content")
+            client.add_memory("agent-1", "", "content", access_strategy=AccessStrategy.PROVIDER_ONLY)
 
     def test_add_memory_raises_for_empty_content(self):
         """add_memory raises AgentMemoryValidationError when content is empty."""
         client, _ = _make_client()
         with pytest.raises(AgentMemoryValidationError, match="content"):
-            client.add_memory("agent-1", "user-1", "")
+            client.add_memory("agent-1", "user-1", "", access_strategy=AccessStrategy.PROVIDER_ONLY)
 
     def test_get_memory_raises_for_empty_id(self):
         """get_memory raises AgentMemoryValidationError when memory_id is empty."""
         client, _ = _make_client()
         with pytest.raises(AgentMemoryValidationError, match="memory_id"):
-            client.get_memory("")
+            client.get_memory("", access_strategy=AccessStrategy.PROVIDER_ONLY)
 
     def test_update_memory_raises_for_empty_id(self):
         """update_memory raises AgentMemoryValidationError when memory_id is empty."""
         client, _ = _make_client()
         with pytest.raises(AgentMemoryValidationError, match="memory_id"):
-            client.update_memory("", content="new content")
+            client.update_memory("", content="new content", access_strategy=AccessStrategy.PROVIDER_ONLY)
 
     def test_update_memory_raises_when_no_fields_provided(self):
         """update_memory raises AgentMemoryValidationError when neither content nor metadata is provided."""
         client, _ = _make_client()
         with pytest.raises(AgentMemoryValidationError, match="At least one"):
-            client.update_memory("uuid-123")
+            client.update_memory("uuid-123", access_strategy=AccessStrategy.PROVIDER_ONLY)
 
     def test_delete_memory_raises_for_empty_id(self):
         """delete_memory raises AgentMemoryValidationError when memory_id is empty."""
         client, _ = _make_client()
         with pytest.raises(AgentMemoryValidationError, match="memory_id"):
-            client.delete_memory("")
+            client.delete_memory("", access_strategy=AccessStrategy.PROVIDER_ONLY)
 
     def test_list_memories_raises_for_zero_limit(self):
         """list_memories raises AgentMemoryValidationError when limit is 0."""
         client, _ = _make_client()
         with pytest.raises(AgentMemoryValidationError, match="limit"):
-            client.list_memories(limit=0)
+            client.list_memories(limit=0, access_strategy=AccessStrategy.PROVIDER_ONLY)
 
     def test_list_memories_raises_for_negative_offset(self):
         """list_memories raises AgentMemoryValidationError when offset is negative."""
         client, _ = _make_client()
         with pytest.raises(AgentMemoryValidationError, match="offset"):
-            client.list_memories(offset=-1)
+            client.list_memories(offset=-1, access_strategy=AccessStrategy.PROVIDER_ONLY)
 
 
 class TestSearchMemoriesValidation:
@@ -823,57 +924,57 @@ class TestSearchMemoriesValidation:
         """search_memories raises AgentMemoryValidationError when agent_id is empty."""
         client, _ = _make_client()
         with pytest.raises(AgentMemoryValidationError, match="agent_id"):
-            client.search_memories("", "user-1", "what do I know about Python?")
+            client.search_memories("", "user-1", "what do I know about Python?", access_strategy=AccessStrategy.PROVIDER_ONLY)
 
     def test_raises_for_empty_invoker_id(self):
         """search_memories raises AgentMemoryValidationError when invoker_id is empty."""
         client, _ = _make_client()
         with pytest.raises(AgentMemoryValidationError, match="invoker_id"):
-            client.search_memories("agent-1", "", "what do I know about Python?")
+            client.search_memories("agent-1", "", "what do I know about Python?", access_strategy=AccessStrategy.PROVIDER_ONLY)
 
     def test_raises_for_query_too_short(self):
         """search_memories raises AgentMemoryValidationError when query has fewer than 5 chars."""
         client, _ = _make_client()
         with pytest.raises(AgentMemoryValidationError, match="query"):
-            client.search_memories("agent-1", "user-1", "hi")
+            client.search_memories("agent-1", "user-1", "hi", access_strategy=AccessStrategy.PROVIDER_ONLY)
 
     def test_raises_for_query_too_long(self):
         """search_memories raises AgentMemoryValidationError when query exceeds 5000 chars."""
         client, _ = _make_client()
         with pytest.raises(AgentMemoryValidationError, match="query"):
-            client.search_memories("agent-1", "user-1", "x" * 5001)
+            client.search_memories("agent-1", "user-1", "x" * 5001, access_strategy=AccessStrategy.PROVIDER_ONLY)
 
     def test_raises_for_threshold_below_zero(self):
         """search_memories raises AgentMemoryValidationError when threshold < 0.0."""
         client, _ = _make_client()
         with pytest.raises(AgentMemoryValidationError, match="threshold"):
-            client.search_memories("a", "u", "valid query here", threshold=-0.1)
+            client.search_memories("a", "u", "valid query here", threshold=-0.1, access_strategy=AccessStrategy.PROVIDER_ONLY)
 
     def test_raises_for_threshold_above_one(self):
         """search_memories raises AgentMemoryValidationError when threshold > 1.0."""
         client, _ = _make_client()
         with pytest.raises(AgentMemoryValidationError, match="threshold"):
-            client.search_memories("a", "u", "valid query here", threshold=1.1)
+            client.search_memories("a", "u", "valid query here", threshold=1.1, access_strategy=AccessStrategy.PROVIDER_ONLY)
 
     def test_raises_for_limit_zero(self):
         """search_memories raises AgentMemoryValidationError when limit is 0."""
         client, _ = _make_client()
         with pytest.raises(AgentMemoryValidationError, match="limit"):
-            client.search_memories("a", "u", "valid query here", limit=0)
+            client.search_memories("a", "u", "valid query here", limit=0, access_strategy=AccessStrategy.PROVIDER_ONLY)
 
     def test_raises_for_limit_above_fifty(self):
         """search_memories raises AgentMemoryValidationError when limit exceeds 50."""
         client, _ = _make_client()
         with pytest.raises(AgentMemoryValidationError, match="limit"):
-            client.search_memories("a", "u", "valid query here", limit=51)
+            client.search_memories("a", "u", "valid query here", limit=51, access_strategy=AccessStrategy.PROVIDER_ONLY)
 
     def test_boundary_values_are_accepted(self):
         """search_memories accepts boundary values: 5-char query, threshold 0.0/1.0, limit 1/50."""
         client, mock_transport = _make_client()
         mock_transport.post.return_value = {"value": []}
 
-        client.search_memories("a", "u", "hello", threshold=0.0, limit=1)
-        client.search_memories("a", "u", "x" * 5000, threshold=1.0, limit=50)
+        client.search_memories("a", "u", "hello", threshold=0.0, limit=1, access_strategy=AccessStrategy.PROVIDER_ONLY)
+        client.search_memories("a", "u", "x" * 5000, threshold=1.0, limit=50, access_strategy=AccessStrategy.PROVIDER_ONLY)
 
         assert mock_transport.post.call_count == 2
 
@@ -884,49 +985,49 @@ class TestMessageValidation:
         """add_message raises AgentMemoryValidationError when agent_id is empty."""
         client, _ = _make_client()
         with pytest.raises(AgentMemoryValidationError, match="agent_id"):
-            client.add_message("", "u", "grp", MessageRole.USER, "hi")
+            client.add_message("", "u", "grp", MessageRole.USER, "hi", access_strategy=AccessStrategy.PROVIDER_ONLY)
 
     def test_add_message_raises_for_empty_invoker_id(self):
         """add_message raises AgentMemoryValidationError when invoker_id is empty."""
         client, _ = _make_client()
         with pytest.raises(AgentMemoryValidationError, match="invoker_id"):
-            client.add_message("a", "", "grp", MessageRole.USER, "hi")
+            client.add_message("a", "", "grp", MessageRole.USER, "hi", access_strategy=AccessStrategy.PROVIDER_ONLY)
 
     def test_add_message_raises_for_empty_message_group(self):
         """add_message raises AgentMemoryValidationError when message_group is empty."""
         client, _ = _make_client()
         with pytest.raises(AgentMemoryValidationError, match="message_group"):
-            client.add_message("a", "u", "", MessageRole.USER, "hi")
+            client.add_message("a", "u", "", MessageRole.USER, "hi", access_strategy=AccessStrategy.PROVIDER_ONLY)
 
     def test_add_message_raises_for_empty_content(self):
         """add_message raises AgentMemoryValidationError when content is empty."""
         client, _ = _make_client()
         with pytest.raises(AgentMemoryValidationError, match="content"):
-            client.add_message("a", "u", "grp", MessageRole.USER, "")
+            client.add_message("a", "u", "grp", MessageRole.USER, "", access_strategy=AccessStrategy.PROVIDER_ONLY)
 
     def test_get_message_raises_for_empty_id(self):
         """get_message raises AgentMemoryValidationError when message_id is empty."""
         client, _ = _make_client()
         with pytest.raises(AgentMemoryValidationError, match="message_id"):
-            client.get_message("")
+            client.get_message("", access_strategy=AccessStrategy.PROVIDER_ONLY)
 
     def test_delete_message_raises_for_empty_id(self):
         """delete_message raises AgentMemoryValidationError when message_id is empty."""
         client, _ = _make_client()
         with pytest.raises(AgentMemoryValidationError, match="message_id"):
-            client.delete_message("")
+            client.delete_message("", access_strategy=AccessStrategy.PROVIDER_ONLY)
 
     def test_list_messages_raises_for_zero_limit(self):
         """list_messages raises AgentMemoryValidationError when limit is 0."""
         client, _ = _make_client()
         with pytest.raises(AgentMemoryValidationError, match="limit"):
-            client.list_messages(limit=0)
+            client.list_messages(limit=0, access_strategy=AccessStrategy.PROVIDER_ONLY)
 
     def test_list_messages_raises_for_negative_offset(self):
         """list_messages raises AgentMemoryValidationError when offset is negative."""
         client, _ = _make_client()
         with pytest.raises(AgentMemoryValidationError, match="offset"):
-            client.list_messages(offset=-1)
+            client.list_messages(offset=-1, access_strategy=AccessStrategy.PROVIDER_ONLY)
 
 
 class TestRetentionConfigValidation:
@@ -935,31 +1036,31 @@ class TestRetentionConfigValidation:
         """update_retention_config raises AgentMemoryValidationError when no fields are provided."""
         client, _ = _make_client()
         with pytest.raises(AgentMemoryValidationError, match="At least one"):
-            client.update_retention_config()
+            client.update_retention_config(access_strategy=AccessStrategy.PROVIDER_ONLY)
 
     def test_update_raises_for_negative_message_days(self):
         """update_retention_config raises AgentMemoryValidationError when message_days < 0."""
         client, _ = _make_client()
         with pytest.raises(AgentMemoryValidationError, match="message_days"):
-            client.update_retention_config(message_days=-1)
+            client.update_retention_config(message_days=-1, access_strategy=AccessStrategy.PROVIDER_ONLY)
 
     def test_update_raises_for_negative_memory_days(self):
         """update_retention_config raises AgentMemoryValidationError when memory_days < 0."""
         client, _ = _make_client()
         with pytest.raises(AgentMemoryValidationError, match="memory_days"):
-            client.update_retention_config(memory_days=-1)
+            client.update_retention_config(memory_days=-1, access_strategy=AccessStrategy.PROVIDER_ONLY)
 
     def test_update_raises_for_negative_usage_log_days(self):
         """update_retention_config raises AgentMemoryValidationError when usage_log_days < 0."""
         client, _ = _make_client()
         with pytest.raises(AgentMemoryValidationError, match="usage_log_days"):
-            client.update_retention_config(usage_log_days=-1)
+            client.update_retention_config(usage_log_days=-1, access_strategy=AccessStrategy.PROVIDER_ONLY)
 
     def test_update_accepts_zero_values(self):
         """update_retention_config accepts 0 as a valid value (disables cleanup)."""
         client, mock_transport = _make_client()
 
-        client.update_retention_config(memory_days=0)
+        client.update_retention_config(memory_days=0, access_strategy=AccessStrategy.PROVIDER_ONLY)
 
         mock_transport.patch.assert_called_once()
 
@@ -975,6 +1076,7 @@ class TestFilterDefinitionValidation:
         with pytest.raises(AgentMemoryValidationError, match="target"):
             client.list_memories(
                 filters=[FilterDefinition(target="agentID", contains="x")],
+                access_strategy=AccessStrategy.PROVIDER_ONLY,
             )
 
     def test_list_memories_raises_for_empty_contains(self):
@@ -983,6 +1085,7 @@ class TestFilterDefinitionValidation:
         with pytest.raises(AgentMemoryValidationError, match="contains"):
             client.list_memories(
                 filters=[FilterDefinition(target="content", contains="")],
+                access_strategy=AccessStrategy.PROVIDER_ONLY,
             )
 
     def test_list_messages_raises_for_unsupported_target(self):
@@ -991,6 +1094,7 @@ class TestFilterDefinitionValidation:
         with pytest.raises(AgentMemoryValidationError, match="target"):
             client.list_messages(
                 filters=[FilterDefinition(target="role", contains="x")],
+                access_strategy=AccessStrategy.PROVIDER_ONLY,
             )
 
     def test_list_messages_raises_for_empty_contains(self):
@@ -999,4 +1103,5 @@ class TestFilterDefinitionValidation:
         with pytest.raises(AgentMemoryValidationError, match="contains"):
             client.list_messages(
                 filters=[FilterDefinition(target="metadata", contains="")],
+                access_strategy=AccessStrategy.PROVIDER_ONLY,
             )

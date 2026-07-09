@@ -77,7 +77,9 @@ class HttpTransport:
             AgentMemoryHttpError: On HTTP errors or network failures.
             AgentMemoryNotFoundError: If the server returns 404.
         """
-        return self._request("GET", path, params=params, tenant_subdomain=tenant_subdomain)
+        return self._request(
+            "GET", path, params=params, tenant_subdomain=tenant_subdomain
+        )
 
     def post(
         self,
@@ -123,7 +125,9 @@ class HttpTransport:
             AgentMemoryHttpError: On HTTP errors or network failures.
             AgentMemoryNotFoundError: If the server returns 404.
         """
-        return self._request("PATCH", path, json=json, tenant_subdomain=tenant_subdomain)
+        return self._request(
+            "PATCH", path, json=json, tenant_subdomain=tenant_subdomain
+        )
 
     def delete(self, path: str, *, tenant_subdomain: Optional[str] = None) -> None:
         """Perform a DELETE request.

@@ -147,7 +147,9 @@ class AgentMemoryClient:
         }
         if metadata is not None:
             payload["metadata"] = metadata
-        data = self._transport.post(MEMORIES, json=payload, tenant_subdomain=tenant_subdomain)
+        data = self._transport.post(
+            MEMORIES, json=payload, tenant_subdomain=tenant_subdomain
+        )
         return Memory.from_dict(data)
 
     @record_metrics(Module.AGENT_MEMORY, Operation.AGENT_MEMORY_GET_MEMORY)

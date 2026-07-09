@@ -425,22 +425,6 @@ async def call_mcp_tool_lob(
             async with ClientSession(read, write) as session:
                 await session.initialize()
                 result = await session.call_tool(tool.name, kwargs)
-
-                # Defensive check: MCP library may return None for failed calls
-                if result is None:
-                    logger.error("Tool '%s' returned None result", tool.name)
-                    raise AgentGatewaySDKError(
-                        f"MCP tool '{tool.name}' returned no result. "
-                        "This may indicate a network timeout, protocol error, or invalid tool arguments."
-                    )
-
-                # Check if the result indicates an error
-                if hasattr(result, "isError") and result.isError:
-                    logger.error("Tool '%s' returned error result", tool.name)
-                    raise AgentGatewaySDKError(
-                        f"MCP tool '{tool.name}' returned an error: {result}"
-                    )
-
                 if not result.content:
                     logger.warning("Tool '%s' returned empty content", tool.name)
                     return ""

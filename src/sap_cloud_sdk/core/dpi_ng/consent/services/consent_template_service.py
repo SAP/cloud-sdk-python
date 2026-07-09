@@ -226,7 +226,9 @@ class ConsentTemplateService:
             ODataError: If the OData service returns an unexpected error response.
         """
         logger.info("Invoked ConsentTemplateService.get_template_text")
-        result = self._client.query(_SVC, self.ConsentTemplateText).get(template_text_id)
+        result = self._client.query(_SVC, self.ConsentTemplateText).get(
+            template_text_id
+        )
         logger.info("Exiting ConsentTemplateService.get_template_text")
         return result
 
@@ -270,7 +272,9 @@ class ConsentTemplateService:
             ODataError: If the OData service returns an unexpected error response.
         """
         logger.info("Invoked ConsentTemplateService.update_template_text")
-        entity = self._client.query(_SVC, self.ConsentTemplateText).get(template_text_id)
+        entity = self._client.query(_SVC, self.ConsentTemplateText).get(
+            template_text_id
+        )
         self._client._apply_body(entity, body)
         self._client.save(entity)
         logger.info("Exiting ConsentTemplateService.update_template_text")
@@ -288,7 +292,9 @@ class ConsentTemplateService:
             ODataError: If the OData service returns an unexpected error response.
         """
         logger.info("Invoked ConsentTemplateService.delete_template_text")
-        entity = self._client.query(_SVC, self.ConsentTemplateText).get(template_text_id)
+        entity = self._client.query(_SVC, self.ConsentTemplateText).get(
+            template_text_id
+        )
         self._client.delete_entity(entity)
         logger.info("Exiting ConsentTemplateService.delete_template_text")
 
@@ -316,7 +322,9 @@ class ConsentTemplateService:
         return result
 
     @record_metrics(Module.DPI_NG, Operation.DPI_NG_CONSENT_GET_THIRD_PARTY_PERS_DATA)
-    def get_third_party_pers_data(self, third_party_assignment_id: str, template_id: str) -> Any:
+    def get_third_party_pers_data(
+        self, third_party_assignment_id: str, template_id: str
+    ) -> Any:
         """Return a single TemplateThirdPartyPersData entity by its composite key.
 
         Args:

@@ -156,7 +156,9 @@ class TestTemplateThirdPartyPersData:
         mock_template_client.query.return_value.all.assert_called_once()
         assert result == []
 
-    def test_get_third_party_pers_data_by_assignment_and_template(self, svc, mock_template_client):
+    def test_get_third_party_pers_data_by_assignment_and_template(
+        self, svc, mock_template_client
+    ):
         q = mock_template_client.query.return_value
         result = svc.get_third_party_pers_data("tpaid", "tid")
         mock_template_client.query.assert_called_with(

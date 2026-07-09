@@ -57,7 +57,9 @@ def _make_entities(Service: Any) -> tuple:
 
         __odata_collection__ = "templateThirdPartyPersDatas"
         tenant = StringProperty("tenant")
-        third_party_assignment_id = UUIDProperty("thirdPartyAssignmentId", primary_key=True)
+        third_party_assignment_id = UUIDProperty(
+            "thirdPartyAssignmentId", primary_key=True
+        )
         template_id = UUIDProperty("templateId", primary_key=True)
         third_party_id = UUIDProperty("thirdPartyId")
         third_party_name = StringProperty("thirdPartyName")

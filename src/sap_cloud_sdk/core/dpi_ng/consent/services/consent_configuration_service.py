@@ -310,7 +310,9 @@ class ConsentConfigurationService:
             ODataError: If the OData service returns an unexpected error response.
         """
         logger.info("Invoked ConsentConfigurationService.update_jurisdiction_text")
-        entity = self._client.query(_SVC, self.JurisdictionText).get(jurisdiction_text_id)
+        entity = self._client.query(_SVC, self.JurisdictionText).get(
+            jurisdiction_text_id
+        )
         self._client._apply_body(entity, body)
         self._client.save(entity)
         logger.info("Exiting ConsentConfigurationService.update_jurisdiction_text")
@@ -328,7 +330,9 @@ class ConsentConfigurationService:
             ODataError: If the OData service returns an unexpected error response.
         """
         logger.info("Invoked ConsentConfigurationService.delete_jurisdiction_text")
-        entity = self._client.query(_SVC, self.JurisdictionText).get(jurisdiction_text_id)
+        entity = self._client.query(_SVC, self.JurisdictionText).get(
+            jurisdiction_text_id
+        )
         self._client.delete_entity(entity)
         logger.info("Exiting ConsentConfigurationService.delete_jurisdiction_text")
 
@@ -437,7 +441,9 @@ class ConsentConfigurationService:
             ODataError: If the OData service returns an unexpected error response.
         """
         logger.info("Invoked ConsentConfigurationService.update_language_description")
-        entity = self._client.query(_SVC, self.LanguageDescription).get(language_desc_id)
+        entity = self._client.query(_SVC, self.LanguageDescription).get(
+            language_desc_id
+        )
         self._client._apply_body(entity, body)
         self._client.save(entity)
         logger.info("Exiting ConsentConfigurationService.update_language_description")
@@ -455,7 +461,9 @@ class ConsentConfigurationService:
             ODataError: If the OData service returns an unexpected error response.
         """
         logger.info("Invoked ConsentConfigurationService.delete_language_description")
-        entity = self._client.query(_SVC, self.LanguageDescription).get(language_desc_id)
+        entity = self._client.query(_SVC, self.LanguageDescription).get(
+            language_desc_id
+        )
         self._client.delete_entity(entity)
         logger.info("Exiting ConsentConfigurationService.delete_language_description")
 

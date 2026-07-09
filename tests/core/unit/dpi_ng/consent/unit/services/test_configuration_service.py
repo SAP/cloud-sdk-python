@@ -151,9 +151,7 @@ def test_list_with_skip_kwarg(svc):
 
 def test_list_with_orderby_kwarg(svc):
     svc.list_third_parties(orderby="third_party_name asc")
-    svc._client.query.return_value.order_by.assert_called_with(
-        "third_party_name asc"
-    )
+    svc._client.query.return_value.order_by.assert_called_with("third_party_name asc")
 
 
 # ---------------------------------------------------------------------------

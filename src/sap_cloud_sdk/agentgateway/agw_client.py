@@ -374,7 +374,6 @@ class AgentGatewayClient:
         self,
         user_token: str | Callable[[], str] | None = None,
         app_tid: str | None = None,
-        ord_id: str | None = None,
     ) -> list[MCPTool]:
         """List all MCP tools from MCP servers.
 
@@ -395,28 +394,18 @@ class AgentGatewayClient:
                 If provided, uses user-scoped auth instead of system auth.
             app_tid: BTP Application Tenant ID of the subscriber.
                 Only used for customer agents.
-            ord_id: ORD ID of the MCP server to filter to (customer agents only).
-                The tenant ID is derived automatically from the credentials.
-                When omitted, tools from all integrationDependencies are returned.
-                Raises AgentGatewaySDKError if the ORD ID matches multiple entries.
 
         Returns:
             List of MCPTool objects from all MCP servers.
 
         Raises:
-            AgentGatewaySDKError: If credential loading or token acquisition fails,
-                or if ord_id does not match exactly one entry in integrationDependencies.
+            AgentGatewaySDKError: If credential loading or token acquisition fails.
 
         Example:
             ```python
             tools = await agw_client.list_mcp_tools()
             for tool in tools:
                 print(f"{tool.name}: {tool.description}")
-
-            # Filter to a specific ORD (tenant ID resolved from credentials):
-            tools = await agw_client.list_mcp_tools(
-                ord_id="sap.s4:apiResource:API_PRODUCT_0002_MCP:v1"
-            )
 
             # With user token for principal propagation:
             tools = await agw_client.list_mcp_tools(user_token="user-jwt")
@@ -435,7 +424,7 @@ class AgentGatewayClient:
                 else:
                     auth = await self.get_system_auth(app_tid=app_tid)
                 return await get_mcp_tools_customer(
-                    credentials, auth.access_token, self._config.timeout, ord_id=ord_id
+                    credentials, auth.access_token, self._config.timeout
                 )
 
             # Check for transparent mode
@@ -447,7 +436,7 @@ class AgentGatewayClient:
                 else:
                     auth = await self.get_system_auth(app_tid=app_tid)
                 return await get_mcp_tools_customer(
-                    credentials, auth.access_token, self._config.timeout, ord_id=ord_id
+                    credentials, auth.access_token, self._config.timeout
                 )
 
             # LoB flow - requires tenant_subdomain

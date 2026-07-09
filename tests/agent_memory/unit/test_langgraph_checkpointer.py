@@ -22,6 +22,21 @@ class TestCreateCheckpointer:
         result = create_checkpointer()
         assert isinstance(result, InMemorySaver)
 
+    def test_ttl_seconds_still_returns_in_memory_saver(self):
+        """ttl_seconds is accepted but InMemorySaver is still returned."""
+        result = create_checkpointer(ttl_seconds=3600)
+        assert isinstance(result, InMemorySaver)
+
+    def test_ttl_seconds_logs_warning(self, caplog):
+        """ttl_seconds logs a warning that TTL has no effect locally."""
+        import logging
+        with caplog.at_level(
+            logging.WARNING,
+            logger="sap_cloud_sdk.agent_memory.factory.langgraph_checkpoint",
+        ):
+            create_checkpointer(ttl_seconds=3600)
+        assert "TTL has no effect" in caplog.text
+
     # ── Missing langgraph ─────────────────────────────────────────────────────
 
     def test_missing_langgraph_raises_import_error(self):

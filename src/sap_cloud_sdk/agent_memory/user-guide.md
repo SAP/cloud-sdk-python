@@ -831,10 +831,9 @@ manages short-term session memory — conversation state, thread continuity, and
 HITL support — natively within LangGraph.
 
 > [!NOTE]
-> The current implementation uses LangGraph's `InMemorySaver` or
-> `TimedInMemorySaver` (when `ttl_seconds` is set). State is held in-process
-> and does not survive restarts. Persistent checkpointing backed by the
-> Agent Memory Service is not yet supported.
+> The current implementation uses LangGraph's `InMemorySaver`. State is held
+> in-process and does not survive restarts. Persistent checkpointing backed by
+> the Agent Memory Service is not yet supported.
 
 ### Prerequisites
 
@@ -878,19 +877,16 @@ agent = create_agent(
 )
 ```
 
-### Thread TTL — evicting inactive threads
+### Thread TTL
 
-Pass `ttl_seconds` to evict threads that have been inactive beyond the given
-threshold. This prevents unbounded memory growth in long-running processes.
+Pass `ttl_seconds` to declare the intended thread lifetime. The parameter is
+accepted now for interface stability — TTL enforcement will be active when
+`HanaAgentMemorySaver` is available. For local development, manage thread
+eviction manually via `delete_thread()` if needed.
 
 ```python
-# Evict threads inactive for more than 1 hour
 checkpointer = create_checkpointer(ttl_seconds=3600)
 ```
-
-Returns a `TimedInMemorySaver` that tracks last-active time per thread and
-evicts expired threads via a background sweep. Eviction is best-effort —
-a thread may live up to `ttl_seconds + 60` seconds before deletion.
 
 **Using `@agent_config` for centralised TTL configuration:**
 

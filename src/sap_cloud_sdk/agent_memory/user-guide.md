@@ -66,7 +66,7 @@ plain text, and the service makes it searchable by meaning.
     - [Import](#import-1)
     - [Usage with LangGraph StateGraph](#usage-with-langgraph-stategraph)
     - [Usage with LangChain create\_agent](#usage-with-langchain-create_agent)
-    - [Local development](#local-development)
+    - [Thread TTL](#thread-ttl)
 
 ## Installation
 
@@ -819,7 +819,7 @@ The `uaa` key must contain a JSON string with the XSUAA credentials:
 
 ## LangGraph Checkpointer
 
-> **Framework adapter — optional.** This section covers the LangGraph-specific
+> This section covers the LangGraph-specific
 > factory for short-term memory (checkpointing). It is only relevant if your agent
 > is built with LangGraph or LangChain's `create_agent()`. The core
 > `AgentMemoryClient` and `create_client()` above are framework-agnostic and work
@@ -880,11 +880,20 @@ agent = create_agent(
 
 ### Thread TTL
 
-Pass `ttl_seconds` to declare the intended thread lifetime. The parameter is
-accepted now for interface stability — TTL enforcement will be active when
-`HanaAgentMemorySaver` is available. For local development, manage thread
-eviction manually via `delete_thread()` if needed.
+Pass `ttl_seconds` to evict threads that have been inactive for the given
+period. This prevents unbounded memory growth in long-running processes.
 
 ```python
+# Evict threads inactive for more than 1 hour
 checkpointer = create_checkpointer(ttl_seconds=3600)
 ```
+
+When `ttl_seconds` is set, the factory returns a `TimedInMemorySaver` that
+tracks last-active time per thread and evicts inactive threads via a
+background daemon sweep. Eviction is best-effort — a thread may live up to
+`ttl_seconds + 60` seconds before deletion.
+
+> [!NOTE]
+> `TimedInMemorySaver` state does not survive process restarts — the TTL
+> applies to in-process memory only. Persistent TTL enforcement will be
+> available when the Agent Memory Service checkpointer ships.

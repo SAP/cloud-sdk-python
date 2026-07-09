@@ -15,11 +15,23 @@ findings=$(mktemp); trap 'rm -f "$findings"' EXIT
 diff_content=$(cat "$DIFF_FILE" 2>/dev/null || echo "")
 
 # BND-02 (LOCKED): token URL via string concat + "/oauth/token"
+# FP-N-01: pre-filter — only lines mentioning /oauth/token can match.
+# FP-O-01: skip test files (multi-module: <module>/src/test/…) — a hardcoded
+# token path in a test fixture is not production binding code.
 echo "$diff_content" | awk '
-  BEGIN { file=""; line=0 }
-  /^diff --git a\// { file=$4; sub(/^b\//, "", file); line=0; next }
+  BEGIN { file=""; line=0; skip=0 }
+  /^diff --git a\// {
+    file=$4; sub(/^b\//, "", file); line=0
+    skip = (file ~ /(^|\/)src\/test\// || file ~ /(^|\/)(tests?|mocks?)\//) ? 1 : 0
+    next
+  }
   /^@@/ { if (match($0, /\+[0-9]+/)) line=substr($0, RSTART+1, RLENGTH-1)+0; next }
-  /^\+/ && !/^\+\+\+/ { print file "\t" line "\t" substr($0, 2); line++; next }
+  /^\+/ && !/^\+\+\+/ {
+    c = substr($0, 2)
+    if (!skip && c ~ /\/oauth\/token/) { print file "\t" line "\t" c }
+    line++
+    next
+  }
   /^ / { line++; next }
 ' | while IFS=$'\t' read -r file line_num content; do
   [ -z "$file" ] && continue

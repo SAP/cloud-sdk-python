@@ -31,17 +31,23 @@ if [ "$reuse_present" != "true" ]; then
     src_root="$REPO_ROOT/src"
     ext="py"
   else
-    src_root="$REPO_ROOT/src/main/java"
+    # Multi-module Maven: sources live under <module>/src/main/java, so scan
+    # the whole repo for .java rather than a fixed src/main/java root.
+    src_root="$REPO_ROOT"
     ext="java"
   fi
   if [ -d "$src_root" ]; then
     total=0; with_spdx=0
+    # Sample up to 20 files. Read them into an array first so no pipe stays
+    # open when we stop early (avoids SIGPIPE / exit 141 under pipefail).
+    sample_files=$(find "$src_root" -type f -name "*.${ext}" 2>/dev/null | head -20 || true)
     while IFS= read -r f; do
+      [ -z "$f" ] && continue
       total=$((total+1))
       if head -10 "$f" 2>/dev/null | grep -q "SPDX-License-Identifier"; then
         with_spdx=$((with_spdx+1))
       fi
-    done < <(find "$src_root" -type f -name "*.${ext}" 2>/dev/null | head -20)
+    done <<< "$sample_files"
     if [ "$total" -gt 0 ]; then
       # Percent threshold: <20% adoption means the repo hasn't converged yet
       if [ $((with_spdx * 100 / total)) -lt 20 ]; then

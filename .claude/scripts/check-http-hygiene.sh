@@ -16,19 +16,29 @@ findings=$(mktemp); trap 'rm -f "$findings"' EXIT
 diff_content=$(cat "$DIFF_FILE" 2>/dev/null || echo "")
 
 # HTTP-PY-01: Session per invocation (only fire on newly added lines)
+# FP-N-01: pre-filter — only lines that create a session/client can match,
+# and skip test/mock/doc/example/markdown files right in awk.
 echo "$diff_content" | awk '
-  BEGIN { file=""; line=0 }
-  /^diff --git a\// { file=$4; sub(/^b\//, "", file); line=0; next }
+  BEGIN { file=""; line=0; skip=0 }
+  /^diff --git a\// {
+    file=$4; sub(/^b\//, "", file); line=0
+    # File-level skip: tests/mocks/docs/examples (any depth) + md/rst/txt
+    skip = (file ~ /(^|\/)(tests?|mocks?|docs?|examples?)\// || file ~ /\.(md|rst|txt)$/) ? 1 : 0
+    next
+  }
   /^@@/ { if (match($0, /\+[0-9]+/)) line=substr($0, RSTART+1, RLENGTH-1)+0; next }
-  /^\+/ && !/^\+\+\+/ { print file "\t" line "\t" substr($0, 2); line++; next }
+  /^\+/ && !/^\+\+\+/ {
+    c = substr($0, 2)
+    if (!skip && c ~ /(requests|httpx)\.(Session|AsyncClient)\(\)/) {
+      print file "\t" line "\t" c
+    }
+    line++
+    next
+  }
   /^ / { line++; next }
 ' | while IFS=$'\t' read -r file line_num content; do
   [ -z "$file" ] && continue
   if [ "$(is_skill_file "$file")" = "true" ]; then continue; fi
-  # only for impl files (not tests/mocks/docs/examples/markdown)
-  # FP-B-02: HTTP-01 must not fire on markdown code fences.
-  if echo "$file" | grep -qE '^(tests?/|mocks?/|docs?/|examples?/)'; then continue; fi
-  if echo "$file" | grep -qiE '\.(md|rst|txt)$'; then continue; fi
   if echo "$content" | grep -qE '(requests|httpx)\.(Session|AsyncClient)\(\)'; then
     emit_finding_if_touched "HTTP-01" "FLAG" "$file" "$line_num" \
       "HTTP session created per invocation — prefer single instance in __init__" "" >> "$findings"

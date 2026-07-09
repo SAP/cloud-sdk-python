@@ -377,13 +377,17 @@ def extract_all(tree: ast.Module) -> list[str]:
 
 def extract_public_class_methods(
     tree: ast.Module,
-) -> dict[str, dict[str, tuple[list[str], list[str], list[str], str | None]]]:
-    """Return {ClassName: {method_name: (positional_args, kwonly_args, vararg_kwarg_flags, return_ann)}}.
+) -> dict[str, dict[str, tuple]]:
+    """Return {ClassName: {method_name: signature_tuple}}.
 
-    positional_args: names of positional args (self/cls excluded)
-    kwonly_args: names of keyword-only args
-    vararg_kwarg_flags: ["*args", "**kwargs"] if present (for tracking their addition/removal)
-    return_ann: repr of return annotation, or None
+    signature_tuple = (
+        positional_args,        # names of positional args (self/cls excluded)
+        kwonly_args,            # names of keyword-only args
+        vararg_kwarg_flags,     # ["*args", "**kwargs"] if present
+        return_ann,             # repr of return annotation, or None
+        num_pos_defaults,       # count of positional args with a default value
+        num_kwonly_required,    # count of keyword-only args WITHOUT a default
+    )
     """
     result: dict[str, dict] = {}
     for node in ast.walk(tree):
@@ -405,7 +409,22 @@ def extract_public_class_methods(
             if item.args.kwarg:
                 varflags.append(f"**{item.args.kwarg.arg}")
             ret = ast.unparse(item.returns) if item.returns else None
-            methods[item.name] = (pos_args, kwonly, varflags, ret)
+            # Count of positional args that have a default value. Needed by
+            # the breaking-change detector to tell an additive change (new
+            # optional trailing arg) from a breaking one (new required arg).
+            num_pos_defaults = len(item.args.defaults)
+            # kwonly defaults: kw_defaults has None entries for required kwonly
+            num_kwonly_required = sum(
+                1 for d in item.args.kw_defaults if d is None
+            )
+            methods[item.name] = (
+                pos_args,
+                kwonly,
+                varflags,
+                ret,
+                num_pos_defaults,
+                num_kwonly_required,
+            )
         if methods:
             result[node.name] = methods
     return result

@@ -28,22 +28,46 @@ LOCKFILE_PATTERNS='.*\.lock$|(.*/)?uv\.lock$|(.*/)?poetry\.lock$|(.*/)?Pipfile\.
 # .env, .env.X, .env_X, .env-X — any file whose basename starts with .env
 ENV_EXAMPLE_PATTERNS='(.*/)?\.env(\..*|_.*|-.*)?$'
 if [ "$LANGUAGE" = "python" ]; then
-  ignore_files="^(tests?/|mocks?/|docs?/|.*/spec/|.*/constants\.py|.*/user-guide\.md|README\.md|.*\.md$|.*\.ya?ml$|.*\.xml$|.*\.properties$|.*pom\.xml$|${LOCKFILE_PATTERNS}|${ENV_EXAMPLE_PATTERNS})"
+  ignore_files="^(tests?/|.*/tests?/|mocks?/|docs?/|.*/spec/|.*/constants\.py|.*/user-guide\.md|README\.md|.*\.md$|.*\.ya?ml$|.*\.xml$|.*\.properties$|.*pom\.xml$|${LOCKFILE_PATTERNS}|${ENV_EXAMPLE_PATTERNS})"
 else
-  ignore_files="^(src/test/|mocks?/|docs?/|.*Constants\.java|.*/constants/|.*/user-guide\.md|README\.md|.*\.md$|.*\.ya?ml$|.*\.xml$|.*\.properties$|.*pom\.xml$|${LOCKFILE_PATTERNS}|${ENV_EXAMPLE_PATTERNS})"
+  # FP-O-01: multi-module Maven puts tests at <module>/src/test/java, not
+  # src/test/. Match src/test/ at any depth. Same for mocks/constants.
+  ignore_files="^(src/test/|.*/src/test/|mocks?/|docs?/|.*Constants\.java|.*/constants/|.*/user-guide\.md|README\.md|.*\.md$|.*\.ya?ml$|.*\.xml$|.*\.properties$|.*pom\.xml$|${LOCKFILE_PATTERNS}|${ENV_EXAMPLE_PATTERNS})"
 fi
 
-echo "$diff_content" | awk '
+# FP-N-01: performance. A per-line shell loop over the full added-line set
+# forks 5-6 subprocesses per line; on a 13k-line diff that is ~80k forks and
+# blows past the orchestrate timeout. Pre-filter in awk so ONLY lines that
+# could match some HC-* rule reach the shell loop. The awk stage also does
+# the file-level ignore so we never even emit lines from ignored files.
+#
+# Interesting-line heuristic (broad — real rule regexes still run in-loop):
+#   - contains http:// or https://           (HC-01)
+#   - contains "Authorization" or "Bearer"    (HC-02)
+#   - contains os.environ[ or System.getenv(  (HC-04)
+#   - contains timeout/retries/max_retries =  (HC-06)
+echo "$diff_content" | awk -v ignore="$ignore_files" '
   BEGIN { file=""; line=0 }
   /^diff --git a\// { file=$4; sub(/^b\//, "", file); line=0; next }
   /^@@/ { if (match($0, /\+[0-9]+/)) line=substr($0, RSTART+1, RLENGTH-1)+0; next }
-  /^\+/ && !/^\+\+\+/ { print file "\t" line "\t" substr($0, 2); line++; next }
+  /^\+/ && !/^\+\+\+/ {
+    c = substr($0, 2)
+    # File-level ignore (awk regex; mirrors the shell ignore_files pattern)
+    if (file ~ ignore) { line++; next }
+    # Interesting-line pre-filter
+    if (c ~ /https?:\/\// || \
+        c ~ /Authorization|Bearer/ || \
+        c ~ /os\.environ\[|System\.getenv\(/ || \
+        c ~ /(timeout|retries|max_retries)[ \t]*=[ \t]*[0-9]/) {
+      print file "\t" line "\t" c
+    }
+    line++
+    next
+  }
   /^ / { line++; next }
 ' | while IFS=$'\t' read -r file line_num content; do
   [ -z "$file" ] && continue
   if [ "$(is_skill_file "$file")" = "true" ]; then continue; fi
-  # Filter out test/mock/docs/constants files
-  if echo "$file" | grep -qE "$ignore_files"; then continue; fi
 
   # HC-01: hardcoded URL. Extract each URL and check individually so a line
   # with both example.com (allowed) and api.com (real) still fires on the real one.

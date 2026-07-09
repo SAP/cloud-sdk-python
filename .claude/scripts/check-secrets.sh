@@ -27,7 +27,12 @@ fi
 findings=$(mktemp)
 trap 'rm -f "$findings"' EXIT
 
-# Parse diff and scan each added line
+# Parse diff and scan each added line.
+# FP-N-01: pre-filter in awk so only lines that could contain a secret reach
+# the shell loop. The heuristic is a BROAD superset of every SEC-* anchor —
+# the precise per-rule regexes still run in the loop. Secrets are
+# BLOCK_LOCKED, so the pre-filter is intentionally over-inclusive (favor
+# false-inclusion over ever missing a real secret).
 echo "$diff_content" | awk '
   BEGIN { file=""; line=0 }
   /^diff --git a\// {
@@ -41,7 +46,12 @@ echo "$diff_content" | awk '
     next
   }
   /^\+/ && !/^\+\+\+/ {
-    print file "\t" line "\t" substr($0, 2)
+    c = substr($0, 2)
+    # Broad superset of SEC-01..08 anchors:
+    #   AKIA / AIza / gh?_ / sk- / xox / eyJ / PRIVATE KEY / clientsecret
+    if (c ~ /AKIA|AIza|gh[pousr]_|sk-|xox[baprs]-|eyJ|PRIVATE KEY|[Cc]lient[_]?[Ss]ecret/) {
+      print file "\t" line "\t" c
+    }
     line++
     next
   }

@@ -16,11 +16,17 @@ findings=$(mktemp); trap 'rm -f "$findings"' EXIT
 diff_content=$(cat "$DIFF_FILE" 2>/dev/null || echo "")
 
 # CC-01: asyncio.Queue with no accompanying Lock/set — flag when queue+append pattern present
+# FP-N-01: pre-filter — only lines mentioning asyncio.Queue can match.
 echo "$diff_content" | awk '
   BEGIN { file=""; line=0 }
   /^diff --git a\// { file=$4; sub(/^b\//, "", file); line=0; next }
   /^@@/ { if (match($0, /\+[0-9]+/)) line=substr($0, RSTART+1, RLENGTH-1)+0; next }
-  /^\+/ && !/^\+\+\+/ { print file "\t" line "\t" substr($0, 2); line++; next }
+  /^\+/ && !/^\+\+\+/ {
+    c = substr($0, 2)
+    if (c ~ /asyncio\.Queue\(/) { print file "\t" line "\t" c }
+    line++
+    next
+  }
   /^ / { line++; next }
 ' | while IFS=$'\t' read -r file line_num content; do
   [ -z "$file" ] && continue

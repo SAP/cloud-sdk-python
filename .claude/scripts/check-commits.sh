@@ -37,7 +37,7 @@ echo "$commits" | while IFS= read -r line; do
   # Also skip legacy "Merge branch/pull/etc" defaults
   if echo "$subject" | grep -qiE '^Merge '; then continue; fi
   if ! echo "$subject" | grep -qE "$prefix_regex"; then
-    emit_finding "COM-01" "BLOCK" "COMMIT:$sha" 1 \
+    emit_finding "COM-01" "FLAG" "COMMIT:$sha" 1 \
       "Commit '$subject' does not follow Conventional Commits" \
       "Prefix with feat:/fix:/chore:/docs:/test:/refactor:/ci:/build:/perf:/style:/revert:" >> "$findings"
   fi

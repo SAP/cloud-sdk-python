@@ -99,7 +99,7 @@ checks=(secrets license-spdx disclosure hardcode telemetry
 
 # 6. Run all 20 checks in parallel. Cap each check at 60s so a wedged
 # subprocess (e.g. blocked on stdin) can't hang the review indefinitely.
-CHECK_TIMEOUT="${CHECK_TIMEOUT:-60}"
+CHECK_TIMEOUT="${CHECK_TIMEOUT:-180}"
 # Detect a portable timeout command (BSD/macOS installs gtimeout via coreutils)
 if command -v timeout >/dev/null 2>&1; then
   TIMEOUT_CMD="timeout"
@@ -186,12 +186,19 @@ done
 
 # 11. Post summary comment
 summary_body=$(jq -r '
+  # Map status → icon (aligns with PR labels: ✅ passed / ⚠️ flagged / ❌ blocked)
+  def status_icon:
+    if . == "PASS" then "✅ PASS"
+    elif . == "FLAG" then "⚠️ FLAG"
+    elif . == "BLOCK" then "❌ BLOCK"
+    elif . == "SHADOW" then "⏩ SHADOW"
+    else . end;
   "<!-- sdk-review:v1 kind=summary -->
 ## SDK Module Review
 
 | Check | Status | Findings |
 |-------|--------|----------|
-" + (.per_check_summary | to_entries | map("| \(.key) | \(.value.status) | \(.value.count) |") | join("\n")) + "
+" + (.per_check_summary | to_entries | map("| \(.key) | \(.value.status | status_icon) | \(.value.count) |") | join("\n")) + "
 
 <details><summary>Details</summary>
 

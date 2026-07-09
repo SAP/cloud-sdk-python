@@ -95,6 +95,63 @@ def files_changed(base: str, head: str) -> list[str]:
     return [f for f in out.stdout.strip().split("\n") if f]
 
 
+def _is_breaking_sig_change(base_sig: tuple, head_sig: tuple) -> bool:
+    """Return True only if the signature change breaks existing callers.
+
+    Signature tuple layout (see ast_python_checks.extract_public_class_methods):
+      (pos_args, kwonly_args, var_flags, return_ann,
+       num_pos_defaults, num_kwonly_required)
+
+    ADDITIVE (not breaking):
+      - Appending new positional args that all have defaults.
+      - Adding keyword-only args that have defaults.
+      - (var_flags unchanged, return unchanged, no existing arg renamed/removed/reordered)
+
+    BREAKING:
+      - Removing/renaming/reordering any existing positional arg.
+      - Adding a positional arg WITHOUT a default (new required arg).
+      - Adding a required keyword-only arg.
+      - Removing *args/**kwargs.
+      - Changing the return annotation.
+    """
+    base_pos, base_kw, base_var, base_ret = base_sig[0], base_sig[1], base_sig[2], base_sig[3]
+    head_pos, head_kw, head_var, head_ret = head_sig[0], head_sig[1], head_sig[2], head_sig[3]
+    # Older signature tuples (4-element) had no default counts — treat any
+    # change as breaking to stay conservative for legacy callers.
+    if len(base_sig) < 6 or len(head_sig) < 6:
+        return base_sig != head_sig
+    head_pos_defaults = head_sig[4]
+    head_kwonly_required = head_sig[5]
+    base_kwonly_required = base_sig[5]
+
+    # Return type change → breaking.
+    if base_ret != head_ret:
+        return True
+    # Removing *args/**kwargs → breaking (callers may rely on them).
+    if set(base_var) - set(head_var):
+        return True
+    # Existing positional args must be preserved as a prefix, in order.
+    if head_pos[: len(base_pos)] != base_pos:
+        return True  # a prefix arg was removed, renamed, or reordered
+    # Any NEW positional args (beyond the base prefix) must all have defaults.
+    num_new_pos = len(head_pos) - len(base_pos)
+    if num_new_pos > 0:
+        # head_pos_defaults counts trailing defaulted positionals. For the new
+        # args to be additive, there must be at least num_new_pos defaults.
+        if head_pos_defaults < num_new_pos:
+            return True  # added a required positional arg → breaking
+    elif num_new_pos < 0:
+        return True  # positional args were removed
+    # Keyword-only: any newly-required kwonly arg is breaking.
+    if head_kwonly_required > base_kwonly_required:
+        return True
+    # Removing an existing kwonly arg is breaking.
+    if set(base_kw) - set(head_kw):
+        return True
+    # Everything else is additive or a no-op.
+    return False
+
+
 def detect(base: str, head: str) -> dict:
     details: list[dict] = []
     kinds: set[str] = set()
@@ -161,9 +218,9 @@ def detect(base: str, head: str) -> dict:
                     kinds.add("method_deletion_on_public_class")
                 else:
                     head_sig = head_methods[mname]
-                    # Compare all four elements of the signature tuple:
-                    # (pos_args, kwonly_args, vararg_flags, return_annotation)
-                    if base_sig != head_sig:
+                    # Compare signatures, but only flag CALLER-BREAKING changes.
+                    # Adding a trailing optional arg is additive, not breaking.
+                    if _is_breaking_sig_change(base_sig, head_sig):
                         details.append(
                             {
                                 "kind": "public_method_signature_change",

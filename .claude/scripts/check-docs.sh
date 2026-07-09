@@ -14,10 +14,12 @@ findings=$(mktemp); trap 'rm -f "$findings"' EXIT
 diff_content=$(cat "$DIFF_FILE" 2>/dev/null || echo "")
 
 # Detect new module directories (module has new files at top-level)
+# FP-M-01: multi-module Maven nests sources under <module>/src/main/java.
+# Match the module segment after .../com/sap/cloud/sdk/ at any prefix depth.
 if [ "$LANGUAGE" = "python" ]; then
-  new_modules=$(echo "$diff_content" | grep -oE '^\+\+\+ b/src/sap_cloud_sdk/[a-z_]+/[^/]+\.py' | sed 's|^+++ b/src/sap_cloud_sdk/||; s|/[^/]*\.py$||' | sort -u)
+  new_modules=$(echo "$diff_content" | { grep -oE '^\+\+\+ b/src/sap_cloud_sdk/[a-z_]+/[^/]+\.py' 2>/dev/null || true; } | sed 's|^+++ b/src/sap_cloud_sdk/||; s|/[^/]*\.py$||' | sort -u)
 else
-  new_modules=$(echo "$diff_content" | grep -oE '^\+\+\+ b/src/main/java/com/sap/cloud/sdk/[a-z_]+/[^/]+\.java' | sed 's|^+++ b/src/main/java/com/sap/cloud/sdk/||; s|/[^/]*\.java$||' | sort -u)
+  new_modules=$(echo "$diff_content" | { grep -oE '^\+\+\+ b/.*src/main/java/com/sap/cloud/sdk/[a-z_]+/[^/]+\.java' 2>/dev/null || true; } | sed -E 's|^.*com/sap/cloud/sdk/||; s|/[^/]*\.java$||' | sort -u)
 fi
 
 while IFS= read -r mod; do

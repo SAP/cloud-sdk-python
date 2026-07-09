@@ -26,12 +26,20 @@ diff_content=$(cat "$DIFF_FILE" 2>/dev/null || echo "")
 sev_public() { if [ "$PROFILE" = "public" ]; then echo "BLOCK"; else echo "FLAG"; fi; }
 sev_internal_ok() { if [ "$PROFILE" = "public" ]; then echo "BLOCK"; else echo "PASS"; fi; }
 
-# Scan added lines only
+# Scan added lines only.
+# FP-N-01: pre-filter in awk. All DIS-* rules key off SAP-internal hostnames
+# or --index-url. Only lines containing 'sap' (case-insensitive) or
+# 'index-url' can match — everything else is skipped before the shell loop.
 echo "$diff_content" | awk '
   BEGIN { file=""; line=0 }
   /^diff --git a\// { file=$4; sub(/^b\//, "", file); line=0; next }
   /^@@/ { if (match($0, /\+[0-9]+/)) line=substr($0, RSTART+1, RLENGTH-1)+0; next }
-  /^\+/ && !/^\+\+\+/ { print file "\t" line "\t" substr($0, 2); line++; next }
+  /^\+/ && !/^\+\+\+/ {
+    c = substr($0, 2)
+    if (c ~ /[Ss][Aa][Pp]|index-url/) { print file "\t" line "\t" c }
+    line++
+    next
+  }
   /^ / { line++; next }
 ' | while IFS=$'\t' read -r file line_num content; do
   [ -z "$file" ] && continue

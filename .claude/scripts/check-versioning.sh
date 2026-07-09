@@ -31,11 +31,11 @@ diff_content=$(cat "$DIFF_FILE" 2>/dev/null || echo "")
 
 # Detect version-bump line change
 if [ "$LANGUAGE" = "python" ]; then
-  version_bumped=$(echo "$diff_content" | grep -E '^\+version[[:space:]]*=' | head -1)
-  version_removed=$(echo "$diff_content" | grep -E '^-version[[:space:]]*=' | head -1)
+  version_bumped=$(echo "$diff_content" | grep -E '^\+version[[:space:]]*=' | head -1 || true)
+  version_removed=$(echo "$diff_content" | grep -E '^-version[[:space:]]*=' | head -1 || true)
 else
-  version_bumped=$(echo "$diff_content" | grep -E '^\+[[:space:]]*<version>' | head -1)
-  version_removed=$(echo "$diff_content" | grep -E '^-[[:space:]]*<version>' | head -1)
+  version_bumped=$(echo "$diff_content" | grep -E '^\+[[:space:]]*<version>' | head -1 || true)
+  version_removed=$(echo "$diff_content" | grep -E '^-[[:space:]]*<version>' | head -1 || true)
 fi
 
 # src/ changes present?

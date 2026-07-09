@@ -134,7 +134,10 @@ def get_ias_client_id_lob() -> str:
         Any exception raised by the destination client.
     """
     dest_name = _ias_dest_name()
-    client = create_destination_client(instance=_DESTINATION_INSTANCE)
+    client = create_destination_client(
+        instance=_DESTINATION_INSTANCE,
+        _telemetry_source=Module.AGENTGATEWAY,
+    )
     dest = client.get_destination(
         dest_name,
         level=ConsumptionLevel.PROVIDER_SUBACCOUNT,

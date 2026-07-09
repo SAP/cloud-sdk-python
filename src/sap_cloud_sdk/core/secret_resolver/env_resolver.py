@@ -1,3 +1,5 @@
+"""Resolver that reads service binding secrets from environment variables."""
+
 import os
 from typing import Any
 

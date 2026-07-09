@@ -1,3 +1,5 @@
+"""Resolver that reads service binding secrets from a mounted volume path."""
+
 import os
 from typing import Any
 

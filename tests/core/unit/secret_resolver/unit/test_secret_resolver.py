@@ -15,9 +15,9 @@ from sap_cloud_sdk.core.secret_resolver import (
     configure,
     get_sdk_config,
     get_resolver,
-    reset_sdk_config,
     resolve_base_mount,
 )
+from sap_cloud_sdk.core.secret_resolver.sdk_config import _reset_sdk_config
 
 
 @dataclass
@@ -462,7 +462,7 @@ class TestChainedResolver:
 class TestSdkConfig:
 
     def teardown_method(self):
-        reset_sdk_config()
+        _reset_sdk_config()
 
     def test_get_sdk_config_is_none_by_default(self):
         assert get_sdk_config() is None
@@ -474,7 +474,7 @@ class TestSdkConfig:
 
     def test_reset_clears_config(self):
         configure(SdkConfig())
-        reset_sdk_config()
+        _reset_sdk_config()
         assert get_sdk_config() is None
 
     def test_configure_replaces_previous_config(self):

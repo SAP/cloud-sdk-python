@@ -7,7 +7,6 @@ Built-in resolvers and chain builder::
         MountResolver,
         EnvVarResolver,
         ChainedResolver,
-        BindingResolver,
     )
 
     # Build a chain explicitly
@@ -46,7 +45,6 @@ from sap_cloud_sdk.core.secret_resolver.sdk_config import (
     configure,
     get_sdk_config,
     get_resolver,
-    reset_sdk_config,
 )
 
 __all__ = [
@@ -60,7 +58,6 @@ __all__ = [
     "configure",
     "get_sdk_config",
     "get_resolver",
-    "reset_sdk_config",
     # Legacy function-based API
     "read_from_mount_and_fallback_to_env_var",
     "resolve_base_mount",

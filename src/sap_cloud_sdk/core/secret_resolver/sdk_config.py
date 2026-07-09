@@ -71,7 +71,7 @@ def get_sdk_config() -> Optional[SdkConfig]:
     return _sdk_config
 
 
-def reset_sdk_config() -> None:
+def _reset_sdk_config() -> None:
     """Reset the global configuration to the unset state.
 
     Intended for test teardown only. Not part of the public API.

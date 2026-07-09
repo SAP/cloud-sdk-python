@@ -4,7 +4,7 @@ from typing import Any, Dict, Tuple
 from dataclasses import fields, is_dataclass
 
 
-def _get_field_map(target: Any) -> Dict[str, Tuple[str, type]]:
+def _get_field_map(target: Any) -> dict[str, tuple[str, type]]:
     """
     Build a mapping from secret key -> (attribute_name, attribute_type) for a dataclass instance.
 

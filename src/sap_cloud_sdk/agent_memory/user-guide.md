@@ -831,9 +831,10 @@ manages short-term session memory — conversation state, thread continuity, and
 HITL support — natively within LangGraph.
 
 > [!NOTE]
-> The current implementation uses LangGraph's `InMemorySaver`. State is held
-> in-process and does not survive restarts. Persistent checkpointing backed by
-> the Agent Memory Service is not yet supported.
+> The current implementation uses LangGraph's `InMemorySaver` or
+> `TimedInMemorySaver` (when `ttl_seconds` is set). State is held in-process
+> and does not survive restarts. Persistent checkpointing backed by the
+> Agent Memory Service is not yet supported.
 
 ### Prerequisites
 

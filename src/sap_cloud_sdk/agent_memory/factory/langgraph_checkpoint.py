@@ -4,10 +4,10 @@ Usage::
 
     from sap_cloud_sdk.agent_memory.factory.langgraph_checkpoint import create_checkpointer
 
-    # No TTL
+    # No TTL — plain InMemorySaver
     checkpointer = create_checkpointer()
 
-    # With TTL — accepted now, enforced when HanaAgentMemorySaver is available
+    # With TTL — TimedInMemorySaver evicts inactive threads automatically
     checkpointer = create_checkpointer(ttl_seconds=3600)
 
     app = workflow.compile(checkpointer=checkpointer)
@@ -26,13 +26,13 @@ logger = logging.getLogger(__name__)
 def create_checkpointer(*, ttl_seconds: Optional[int] = None):
     """Create a LangGraph checkpointer for the current environment.
 
-    Returns LangGraph's ``InMemorySaver``. State is held in-process
-    and does not survive restarts.
+    Returns LangGraph's ``InMemorySaver`` (no TTL) or ``TimedInMemorySaver``
+    (with TTL-based thread eviction). State is held in-process and does not
+    survive restarts.
 
     Args:
-        ttl_seconds: Thread TTL in seconds. Accepted for interface stability —
-                     TTL enforcement will be active when ``HanaAgentMemorySaver``
-                     is available. Has no effect with ``InMemorySaver``.
+        ttl_seconds: Evict threads inactive for this many seconds.
+                     ``None`` (default) disables eviction.
 
     Returns:
         BaseCheckpointSaver instance.
@@ -45,7 +45,7 @@ def create_checkpointer(*, ttl_seconds: Optional[int] = None):
         checkpointer = create_checkpointer()
         app = workflow.compile(checkpointer=checkpointer)
 
-    Example — with TTL (enforced in production, accepted but inactive locally)::
+    Example — evict threads inactive for 1 hour::
 
         checkpointer = create_checkpointer(ttl_seconds=3600)
         app = workflow.compile(checkpointer=checkpointer)
@@ -59,13 +59,14 @@ def create_checkpointer(*, ttl_seconds: Optional[int] = None):
         )
 
     if ttl_seconds is not None:
+        from sap_cloud_sdk.agent_memory.factory._timed_memory import TimedInMemorySaver
+
         logger.warning(
-            "create_checkpointer(ttl_seconds=%d): TTL has no effect with "
-            "InMemorySaver. TTL will be enforced when HanaAgentMemorySaver "
-            "is available. Manage thread eviction manually via delete_thread() "
-            "for local development.",
+            "create_checkpointer(): using TimedInMemorySaver(ttl_seconds=%d) — "
+            "session state is in-process only and will be lost on process exit.",
             ttl_seconds,
         )
+        return TimedInMemorySaver(ttl_seconds=ttl_seconds)
 
     logger.warning(
         "create_checkpointer(): using InMemorySaver — "

@@ -127,7 +127,7 @@ class AgentGatewayClient:
         self._token_cache = _TokenCache(self._config)
         self._gateway_url_cache = _GatewayUrlCache()
         self._audit_client: AuditClient | None = create_audit_client(
-            tenant_subdomain, Module.AGENTGATEWAY
+            tenant_subdomain, Module.AGENTGATEWAY, self._config.audit_log_mode
         )
 
     @staticmethod
@@ -399,7 +399,7 @@ class AgentGatewayClient:
                 tools = await get_mcp_tools_customer(
                     credentials, auth.access_token, self._config.timeout
                 )
-                send_audit_event(self._audit_client, "*", user_id)
+                send_audit_event(self._audit_client, "*", user_id, self._config.audit_log_mode)
                 return tools
 
             # LoB flow - requires tenant_subdomain
@@ -568,7 +568,7 @@ class AgentGatewayClient:
                 result = await call_mcp_tool_customer(
                     tool, auth.access_token, self._config.timeout, **kwargs
                 )
-                send_audit_event(self._audit_client, tool.name, user_id)
+                send_audit_event(self._audit_client, tool.name, user_id, self._config.audit_log_mode)
                 return result
 
             # LoB flow - requires user_token and tenant_subdomain

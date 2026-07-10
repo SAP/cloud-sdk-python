@@ -15,6 +15,7 @@ from sap_cloud_sdk.agentgateway import (
     AgentGatewaySDKError,
 )
 from sap_cloud_sdk.agentgateway._auditlog_helper import send_audit_event
+from sap_cloud_sdk.agentgateway.config import AuditLogMode, ClientConfig
 
 _TENANT_UUID = "9e0d89c9-17cd-439d-8a8b-9c44d3d272f0"
 
@@ -1054,7 +1055,7 @@ class TestGetIasClientId:
 
 
 # ============================================================
-# Test: _send_audit_event
+# Test: send_audit_event
 # ============================================================
 
 
@@ -1105,16 +1106,38 @@ class TestSendAuditEvent:
         event = mock_audit.send.call_args[0][0]
         assert event.common.user_initiator_id == ""
 
-    def test_suppresses_send_errors(self):
-        """send_audit_event does not propagate exceptions from audit client."""
+    def test_best_effort_suppresses_send_errors(self):
+        """send_audit_event does not propagate exceptions in BEST_EFFORT mode."""
         mock_audit = MagicMock()
         mock_audit.send.side_effect = RuntimeError("send failed")
         with patch(
             "sap_cloud_sdk.agentgateway._auditlog_helper.get_tenant_id",
             return_value=_TENANT_UUID,
         ):
-            # Should not raise
-            send_audit_event(mock_audit, "my-tool")
+            send_audit_event(mock_audit, "my-tool", mode=AuditLogMode.BEST_EFFORT)
+
+    def test_strict_raises_on_send_error(self):
+        """send_audit_event raises in STRICT mode when send fails."""
+        mock_audit = MagicMock()
+        mock_audit.send.side_effect = RuntimeError("send failed")
+        with (
+            patch(
+                "sap_cloud_sdk.agentgateway._auditlog_helper.get_tenant_id",
+                return_value=_TENANT_UUID,
+            ),
+            pytest.raises(RuntimeError, match="send failed"),
+        ):
+            send_audit_event(mock_audit, "my-tool", mode=AuditLogMode.STRICT)
+
+    def test_disabled_skips_send(self):
+        """send_audit_event does nothing in DISABLED mode."""
+        mock_audit = MagicMock()
+        with patch(
+            "sap_cloud_sdk.agentgateway._auditlog_helper.get_tenant_id",
+            return_value=_TENANT_UUID,
+        ):
+            send_audit_event(mock_audit, "my-tool", mode=AuditLogMode.DISABLED)
+        mock_audit.send.assert_not_called()
 
 
 # ============================================================

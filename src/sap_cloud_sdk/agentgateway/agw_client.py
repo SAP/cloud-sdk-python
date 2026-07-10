@@ -9,7 +9,6 @@ detects agent type (LoB vs Customer) based on credential file presence.
 
 import asyncio
 import logging
-from datetime import datetime, timezone
 from typing import Callable
 
 from sap_cloud_sdk.agentgateway.config import ClientConfig
@@ -35,18 +34,14 @@ from sap_cloud_sdk.agentgateway._models import (
     AuthResult,
     MCPTool,
 )
+from sap_cloud_sdk.agentgateway._auditlog_helper import create_audit_client, send_audit_event
 from sap_cloud_sdk.agentgateway._token_cache import _GatewayUrlCache, _TokenCache
 from sap_cloud_sdk.agentgateway.exceptions import AgentGatewaySDKError
-import sap_cloud_sdk.core.auditlog_ng as auditlog_ng
 from sap_cloud_sdk.core.auditlog_ng import AuditClient
 from sap_cloud_sdk.core.telemetry import (
     Module,
     Operation,
     record_metrics,
-    get_tenant_id,
-)
-from sap_cloud_sdk.core.auditlog_ng.gen.sap.auditlog.auditevent.v2 import (
-    auditevent_pb2 as pb,
 )
 
 logger = logging.getLogger(__name__)
@@ -131,7 +126,9 @@ class AgentGatewayClient:
         self._config = config or ClientConfig()
         self._token_cache = _TokenCache(self._config)
         self._gateway_url_cache = _GatewayUrlCache()
-        self._audit_client: AuditClient | None = self._create_audit_client()
+        self._audit_client: AuditClient | None = create_audit_client(
+            tenant_subdomain, Module.AGENTGATEWAY
+        )
 
     @staticmethod
     def _resolve_value(
@@ -163,49 +160,6 @@ class AgentGatewayClient:
             self._tenant_subdomain,
             "tenant_subdomain is required for LoB agent flow.",
         )
-
-    def _create_audit_client(self) -> AuditClient | None:
-        """Create an audit client from the LoB destination. Returns None for customer agents or on failure."""
-        tenant_subdomain = (
-            self._tenant_subdomain
-            if isinstance(self._tenant_subdomain, str)
-            else self._tenant_subdomain()
-            if self._tenant_subdomain is not None
-            else None
-        )
-        if not tenant_subdomain:
-            return None
-        try:
-            return auditlog_ng.create_client(
-                tenant=tenant_subdomain,
-                _telemetry_source=Module.AGENTGATEWAY,
-            )
-        except Exception:
-            logger.debug("Failed to create audit client", exc_info=True)
-            return None
-
-    def _send_audit_event(
-        self,
-        object_id: str,
-        user_id: str | None = None,
-    ) -> None:
-        """Send a DataAccess audit event. Errors are logged and suppressed."""
-        tenant_id = get_tenant_id()
-        if self._audit_client is None or not tenant_id:
-            return
-        try:
-            event = pb.DataAccess()
-            event.common.timestamp.FromDatetime(datetime.now(timezone.utc))
-            event.common.tenant_id = tenant_id
-            if user_id:
-                event.common.user_initiator_id = user_id
-            event.channel_type = "MCP"
-            event.channel_id = "agent-gateway"
-            event.object_type = "mcp-tool"
-            event.object_id = object_id
-            self._audit_client.send(event)
-        except Exception:
-            logger.debug("Failed to send audit event", exc_info=True)
 
     @record_metrics(Module.AGENTGATEWAY, Operation.AGENTGATEWAY_GET_SYSTEM_AUTH)
     async def get_system_auth(self, app_tid: str | None = None) -> AuthResult:
@@ -445,7 +399,7 @@ class AgentGatewayClient:
                 tools = await get_mcp_tools_customer(
                     credentials, auth.access_token, self._config.timeout
                 )
-                self._send_audit_event("*", user_id)
+                send_audit_event(self._audit_client, "*", user_id)
                 return tools
 
             # LoB flow - requires tenant_subdomain
@@ -460,7 +414,7 @@ class AgentGatewayClient:
             tools = await get_mcp_tools_lob(
                 tenant, auth.access_token, self._config.timeout
             )
-            self._send_audit_event("*", user_id)
+            send_audit_event(self._audit_client, "*", user_id)
             return tools
 
         except AgentGatewaySDKError:
@@ -614,7 +568,7 @@ class AgentGatewayClient:
                 result = await call_mcp_tool_customer(
                     tool, auth.access_token, self._config.timeout, **kwargs
                 )
-                self._send_audit_event(tool.name, user_id)
+                send_audit_event(self._audit_client, tool.name, user_id)
                 return result
 
             # LoB flow - requires user_token and tenant_subdomain
@@ -625,7 +579,7 @@ class AgentGatewayClient:
             result = await call_mcp_tool_lob(
                 tool, auth.access_token, self._config.timeout, **kwargs
             )
-            self._send_audit_event(tool.name, user_id)
+            send_audit_event(self._audit_client, tool.name, user_id)
             return result
 
         except AgentGatewaySDKError:

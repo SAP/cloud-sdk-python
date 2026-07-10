@@ -14,6 +14,7 @@ from sap_cloud_sdk.agentgateway import (
     MCPTool,
     AgentGatewaySDKError,
 )
+from sap_cloud_sdk.agentgateway._auditlog_helper import send_audit_event
 
 _TENANT_UUID = "9e0d89c9-17cd-439d-8a8b-9c44d3d272f0"
 
@@ -1058,46 +1059,31 @@ class TestGetIasClientId:
 
 
 class TestSendAuditEvent:
-    """Tests for _send_audit_event helper."""
+    """Tests for send_audit_event helper."""
 
     def test_no_op_without_audit_client(self):
-        """_send_audit_event is a no-op when audit client creation fails (no tenant_subdomain)."""
-        agw_client = create_client()
+        """send_audit_event is a no-op when audit_client is None."""
         # Should not raise
-        agw_client._send_audit_event("tool-name", "user@example.com")
+        send_audit_event(None, "tool-name", "user@example.com")
 
     def test_no_op_without_tenant_id(self):
-        """_send_audit_event is a no-op when get_tenant_id returns empty string."""
+        """send_audit_event is a no-op when get_tenant_id returns empty string."""
         mock_audit = MagicMock()
-        with (
-            patch(
-                "sap_cloud_sdk.agentgateway.agw_client.auditlog_ng.create_client",
-                return_value=mock_audit,
-            ),
-            patch(
-                "sap_cloud_sdk.agentgateway.agw_client.get_tenant_id",
-                return_value="",
-            ),
+        with patch(
+            "sap_cloud_sdk.agentgateway._auditlog_helper.get_tenant_id",
+            return_value="",
         ):
-            agw_client = create_client(tenant_subdomain="my-tenant")
-            agw_client._send_audit_event("tool-name")
+            send_audit_event(mock_audit, "tool-name")
         mock_audit.send.assert_not_called()
 
     def test_sends_data_access_event(self):
-        """_send_audit_event builds and sends a DataAccess event."""
+        """send_audit_event builds and sends a DataAccess event."""
         mock_audit = MagicMock()
-        with (
-            patch(
-                "sap_cloud_sdk.agentgateway.agw_client.auditlog_ng.create_client",
-                return_value=mock_audit,
-            ),
-            patch(
-                "sap_cloud_sdk.agentgateway.agw_client.get_tenant_id",
-                return_value=_TENANT_UUID,
-            ),
+        with patch(
+            "sap_cloud_sdk.agentgateway._auditlog_helper.get_tenant_id",
+            return_value=_TENANT_UUID,
         ):
-            agw_client = create_client(tenant_subdomain="my-tenant")
-            agw_client._send_audit_event("my-tool", "user@example.com")
+            send_audit_event(mock_audit, "my-tool", "user@example.com")
         mock_audit.send.assert_called_once()
         event = mock_audit.send.call_args[0][0]
         assert event.common.tenant_id == _TENANT_UUID
@@ -1108,41 +1094,27 @@ class TestSendAuditEvent:
         assert event.object_id == "my-tool"
 
     def test_sends_without_user_id(self):
-        """_send_audit_event omits user_initiator_id when user_id is None."""
+        """send_audit_event omits user_initiator_id when user_id is None."""
         mock_audit = MagicMock()
-        with (
-            patch(
-                "sap_cloud_sdk.agentgateway.agw_client.auditlog_ng.create_client",
-                return_value=mock_audit,
-            ),
-            patch(
-                "sap_cloud_sdk.agentgateway.agw_client.get_tenant_id",
-                return_value=_TENANT_UUID,
-            ),
+        with patch(
+            "sap_cloud_sdk.agentgateway._auditlog_helper.get_tenant_id",
+            return_value=_TENANT_UUID,
         ):
-            agw_client = create_client(tenant_subdomain="my-tenant")
-            agw_client._send_audit_event("my-tool")
+            send_audit_event(mock_audit, "my-tool")
         mock_audit.send.assert_called_once()
         event = mock_audit.send.call_args[0][0]
         assert event.common.user_initiator_id == ""
 
     def test_suppresses_send_errors(self):
-        """_send_audit_event does not propagate exceptions from audit client."""
+        """send_audit_event does not propagate exceptions from audit client."""
         mock_audit = MagicMock()
         mock_audit.send.side_effect = RuntimeError("send failed")
-        with (
-            patch(
-                "sap_cloud_sdk.agentgateway.agw_client.auditlog_ng.create_client",
-                return_value=mock_audit,
-            ),
-            patch(
-                "sap_cloud_sdk.agentgateway.agw_client.get_tenant_id",
-                return_value=_TENANT_UUID,
-            ),
+        with patch(
+            "sap_cloud_sdk.agentgateway._auditlog_helper.get_tenant_id",
+            return_value=_TENANT_UUID,
         ):
-            agw_client = create_client(tenant_subdomain="my-tenant")
             # Should not raise
-            agw_client._send_audit_event("my-tool")
+            send_audit_event(mock_audit, "my-tool")
 
 
 # ============================================================
@@ -1159,11 +1131,11 @@ class TestListMcpToolsAuditLog:
         mock_audit = MagicMock()
         with (
             patch(
-                "sap_cloud_sdk.agentgateway.agw_client.auditlog_ng.create_client",
+                "sap_cloud_sdk.agentgateway._auditlog_helper.auditlog_ng.create_client",
                 return_value=mock_audit,
             ),
             patch(
-                "sap_cloud_sdk.agentgateway.agw_client.get_tenant_id",
+                "sap_cloud_sdk.agentgateway._auditlog_helper.get_tenant_id",
                 return_value=_TENANT_UUID,
             ),
             patch(
@@ -1196,11 +1168,11 @@ class TestListMcpToolsAuditLog:
         mock_audit = MagicMock()
         with (
             patch(
-                "sap_cloud_sdk.agentgateway.agw_client.auditlog_ng.create_client",
+                "sap_cloud_sdk.agentgateway._auditlog_helper.auditlog_ng.create_client",
                 return_value=mock_audit,
             ),
             patch(
-                "sap_cloud_sdk.agentgateway.agw_client.get_tenant_id",
+                "sap_cloud_sdk.agentgateway._auditlog_helper.get_tenant_id",
                 return_value=_TENANT_UUID,
             ),
             patch(
@@ -1231,7 +1203,7 @@ class TestListMcpToolsAuditLog:
 
     @pytest.mark.asyncio
     async def test_no_audit_event_without_audit_client(self):
-        """list_mcp_tools still calls _send_audit_event (which silently skips when no audit client)."""
+        """list_mcp_tools still calls send_audit_event (which silently skips when no audit client)."""
         with (
             patch(
                 "sap_cloud_sdk.agentgateway.agw_client.detect_customer_agent_credentials",
@@ -1248,13 +1220,13 @@ class TestListMcpToolsAuditLog:
                 return_value=[],
             ),
             patch(
-                "sap_cloud_sdk.agentgateway.agw_client.AgentGatewayClient._send_audit_event"
+                "sap_cloud_sdk.agentgateway.agw_client.send_audit_event"
             ) as mock_send,
         ):
             agw_client = create_client(tenant_subdomain="my-tenant")
             await agw_client.list_mcp_tools()
 
-        mock_send.assert_called_once_with("*", None)
+        mock_send.assert_called_once_with(agw_client._audit_client, "*", None)
 
     @pytest.mark.asyncio
     async def test_no_audit_event_on_failure(self):
@@ -1262,11 +1234,11 @@ class TestListMcpToolsAuditLog:
         mock_audit = MagicMock()
         with (
             patch(
-                "sap_cloud_sdk.agentgateway.agw_client.auditlog_ng.create_client",
+                "sap_cloud_sdk.agentgateway._auditlog_helper.auditlog_ng.create_client",
                 return_value=mock_audit,
             ),
             patch(
-                "sap_cloud_sdk.agentgateway.agw_client.get_tenant_id",
+                "sap_cloud_sdk.agentgateway._auditlog_helper.get_tenant_id",
                 return_value=_TENANT_UUID,
             ),
             patch(
@@ -1305,11 +1277,11 @@ class TestCallMcpToolAuditLog:
         mock_audit = MagicMock()
         with (
             patch(
-                "sap_cloud_sdk.agentgateway.agw_client.auditlog_ng.create_client",
+                "sap_cloud_sdk.agentgateway._auditlog_helper.auditlog_ng.create_client",
                 return_value=mock_audit,
             ),
             patch(
-                "sap_cloud_sdk.agentgateway.agw_client.get_tenant_id",
+                "sap_cloud_sdk.agentgateway._auditlog_helper.get_tenant_id",
                 return_value=_TENANT_UUID,
             ),
             patch(
@@ -1346,11 +1318,11 @@ class TestCallMcpToolAuditLog:
         mock_audit = MagicMock()
         with (
             patch(
-                "sap_cloud_sdk.agentgateway.agw_client.auditlog_ng.create_client",
+                "sap_cloud_sdk.agentgateway._auditlog_helper.auditlog_ng.create_client",
                 return_value=mock_audit,
             ),
             patch(
-                "sap_cloud_sdk.agentgateway.agw_client.get_tenant_id",
+                "sap_cloud_sdk.agentgateway._auditlog_helper.get_tenant_id",
                 return_value=_TENANT_UUID,
             ),
             patch(
@@ -1388,11 +1360,11 @@ class TestCallMcpToolAuditLog:
         mock_audit = MagicMock()
         with (
             patch(
-                "sap_cloud_sdk.agentgateway.agw_client.auditlog_ng.create_client",
+                "sap_cloud_sdk.agentgateway._auditlog_helper.auditlog_ng.create_client",
                 return_value=mock_audit,
             ),
             patch(
-                "sap_cloud_sdk.agentgateway.agw_client.get_tenant_id",
+                "sap_cloud_sdk.agentgateway._auditlog_helper.get_tenant_id",
                 return_value=_TENANT_UUID,
             ),
             patch(
@@ -1425,11 +1397,11 @@ class TestCallMcpToolAuditLog:
         mock_audit = MagicMock()
         with (
             patch(
-                "sap_cloud_sdk.agentgateway.agw_client.auditlog_ng.create_client",
+                "sap_cloud_sdk.agentgateway._auditlog_helper.auditlog_ng.create_client",
                 return_value=mock_audit,
             ),
             patch(
-                "sap_cloud_sdk.agentgateway.agw_client.get_tenant_id",
+                "sap_cloud_sdk.agentgateway._auditlog_helper.get_tenant_id",
                 return_value=_TENANT_UUID,
             ),
             patch(

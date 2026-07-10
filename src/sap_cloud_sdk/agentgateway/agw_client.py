@@ -344,7 +344,6 @@ class AgentGatewayClient:
         self,
         user_token: str | Callable[[], str] | None = None,
         app_tid: str | None = None,
-        user_id: str | None = None,
     ) -> list[MCPTool]:
         """List all MCP tools from MCP servers.
 
@@ -365,8 +364,6 @@ class AgentGatewayClient:
                 If provided, uses user-scoped auth instead of system auth.
             app_tid: BTP Application Tenant ID of the subscriber.
                 Only used for customer agents.
-            user_id: User identifier recorded in the audit event when an
-                audit_client is configured on the client.
 
         Returns:
             List of MCPTool objects from all MCP servers.
@@ -399,7 +396,6 @@ class AgentGatewayClient:
                 tools = await get_mcp_tools_customer(
                     credentials, auth.access_token, self._config.timeout
                 )
-                send_audit_event(self._audit_client, "*", user_id, self._config.audit_log_mode)
                 return tools
 
             # LoB flow - requires tenant_subdomain
@@ -414,7 +410,6 @@ class AgentGatewayClient:
             tools = await get_mcp_tools_lob(
                 tenant, auth.access_token, self._config.timeout
             )
-            send_audit_event(self._audit_client, "*", user_id)
             return tools
 
         except AgentGatewaySDKError:

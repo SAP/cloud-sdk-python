@@ -339,41 +339,6 @@ class TestGetSystemTokenMtls:
         assert second == "system-token-123"
         mock_request.assert_called_once()
 
-    def test_scopes_system_token_cache_by_app_tid(self, credentials):
-        """Keep app-tid-specific system tokens isolated in the cache."""
-        token_cache = _TokenCache(ClientConfig())
-
-        with patch(
-            "sap_cloud_sdk.agentgateway._customer._request_token_mtls",
-            side_effect=[
-                {"access_token": "token-tid-1", "expires_in": 300},
-                {"access_token": "token-tid-2", "expires_in": 300},
-            ],
-        ) as mock_request:
-            first = get_system_token_mtls(
-                credentials,
-                timeout=60.0,
-                app_tid="tid-1",
-                token_cache=token_cache,
-            )
-            second = get_system_token_mtls(
-                credentials,
-                timeout=60.0,
-                app_tid="tid-1",
-                token_cache=token_cache,
-            )
-            third = get_system_token_mtls(
-                credentials,
-                timeout=60.0,
-                app_tid="tid-2",
-                token_cache=token_cache,
-            )
-
-        assert first == "token-tid-1"
-        assert second == "token-tid-1"
-        assert third == "token-tid-2"
-        assert mock_request.call_count == 2
-
 
 # ============================================================
 # Test: exchange_user_token
@@ -422,34 +387,6 @@ class TestExchangeUserToken:
             data = call_args.kwargs.get("data", {})
             assert data["grant_type"] == "urn:ietf:params:oauth:grant-type:jwt-bearer"
             assert data["assertion"] == "user-jwt-token"
-
-    def test_passes_app_tid_when_provided(self, credentials):
-        """Include app_tid in request when provided."""
-        mock_response = MagicMock()
-        mock_response.status_code = 200
-        mock_response.json.return_value = {"access_token": "token-with-tid"}
-
-        with (
-            patch(
-                "sap_cloud_sdk.agentgateway._customer._create_ssl_context"
-            ) as mock_ssl,
-            patch("httpx.Client") as mock_client_class,
-        ):
-            mock_ssl.return_value = MagicMock()
-            mock_client = MagicMock()
-            mock_client.__enter__ = MagicMock(return_value=mock_client)
-            mock_client.__exit__ = MagicMock(return_value=False)
-            mock_client.post.return_value = mock_response
-            mock_client_class.return_value = mock_client
-
-            result = exchange_user_token(
-                credentials, "user-jwt", timeout=60.0, app_tid="test-tid"
-            )
-
-            assert result == "token-with-tid"
-            call_args = mock_client.post.call_args
-            data = call_args.kwargs.get("data", {})
-            assert data["app_tid"] == "test-tid"
 
     def test_reuses_cached_user_token(self, credentials):
         """Reuse exchanged user token until it expires."""

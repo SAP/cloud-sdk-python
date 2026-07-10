@@ -155,16 +155,11 @@ class AgentGatewayClient:
         )
 
     @record_metrics(Module.AGENTGATEWAY, Operation.AGENTGATEWAY_GET_SYSTEM_AUTH)
-    async def get_system_auth(self, app_tid: str | None = None) -> AuthResult:
+    async def get_system_auth(self) -> AuthResult:
         """Get system-scoped authentication (client_credentials flow).
 
         Automatically detects agent type (LoB vs Customer) based on
         credential file presence.
-
-        Args:
-            app_tid: BTP Application Tenant ID of the subscriber.
-                Only used for customer agents. This is passed to the token
-                service for tenant-scoped token requests.
 
         Returns:
             AuthResult with raw access token (JWT) and Agent Gateway URL.
@@ -217,10 +212,6 @@ class AgentGatewayClient:
                     gateway_url=credentials.gateway_url,
                 )
 
-            # LoB flow
-            if app_tid:
-                logger.warning("app_tid parameter ignored for LoB agent flow")
-
             tenant = self._resolve_tenant_subdomain()
             token, gateway_url = await fetch_system_auth(
                 tenant,
@@ -238,8 +229,7 @@ class AgentGatewayClient:
     @record_metrics(Module.AGENTGATEWAY, Operation.AGENTGATEWAY_GET_USER_AUTH)
     async def get_user_auth(
         self,
-        user_token: str | Callable[[], str] | None,
-        app_tid: str | None = None,
+        user_token: str | Callable[[], str] | None
     ) -> AuthResult:
         """Exchange a user token for AGW-scoped authentication (token exchange).
 
@@ -249,9 +239,6 @@ class AgentGatewayClient:
         Args:
             user_token: User's JWT for principal propagation.
                 Can be a string or a callable returning a string.
-            app_tid: BTP Application Tenant ID of the subscriber.
-                Only used for customer agents. This is passed to the token
-                service for tenant-scoped token exchange.
 
         Returns:
             AuthResult with raw access token (JWT, user identity embedded)
@@ -312,10 +299,6 @@ class AgentGatewayClient:
                     gateway_url=credentials.gateway_url,
                 )
 
-            # LoB flow
-            if app_tid:
-                logger.warning("app_tid parameter ignored for LoB agent flow")
-
             tenant = self._resolve_tenant_subdomain()
             token, gateway_url = await fetch_user_auth(
                 resolved_user_token,
@@ -368,8 +351,7 @@ class AgentGatewayClient:
     @record_metrics(Module.AGENTGATEWAY, Operation.AGENTGATEWAY_LIST_MCP_TOOLS)
     async def list_mcp_tools(
         self,
-        user_token: str | Callable[[], str] | None = None,
-        app_tid: str | None = None,
+        user_token: str | Callable[[], str] | None = None
     ) -> list[MCPTool]:
         """List all MCP tools from MCP servers.
 
@@ -388,8 +370,6 @@ class AgentGatewayClient:
             user_token: User's JWT for principal propagation.
                 Can be a string or a callable returning a string.
                 If provided, uses user-scoped auth instead of system auth.
-            app_tid: BTP Application Tenant ID of the subscriber.
-                Only used for customer agents.
 
         Returns:
             List of MCPTool objects from all MCP servers.
@@ -408,6 +388,11 @@ class AgentGatewayClient:
             ```
         """
         try:
+            if user_token:
+                auth = await self.get_user_auth(user_token)
+            else:
+                auth = await self.get_system_auth()
+        
             # Check for customer agent credentials
             credentials_path = detect_customer_agent_credentials()
             if credentials_path:
@@ -415,10 +400,6 @@ class AgentGatewayClient:
                     "Customer agent credentials detected at '%s'", credentials_path
                 )
                 credentials = load_customer_credentials(credentials_path)
-                if user_token:
-                    auth = await self.get_user_auth(user_token, app_tid)
-                else:
-                    auth = await self.get_system_auth(app_tid=app_tid)
                 return await get_mcp_tools_customer(
                     credentials, auth.access_token, self._config.timeout
                 )
@@ -427,18 +408,11 @@ class AgentGatewayClient:
             if detect_transparent_credentials():
                 logger.info("Transparent mode credentials detected")
                 credentials = load_customer_credentials_from_env()
-                if user_token:
-                    auth = await self.get_user_auth(user_token, app_tid)
-                else:
-                    auth = await self.get_system_auth(app_tid=app_tid)
                 return await get_mcp_tools_customer(
                     credentials, auth.access_token, self._config.timeout
                 )
 
             # LoB flow - requires tenant_subdomain
-            if app_tid:
-                logger.warning("app_tid parameter ignored for LoB agent flow")
-
             tenant = self._resolve_tenant_subdomain()
             if user_token:
                 auth = await self.get_user_auth(user_token)
@@ -526,7 +500,6 @@ class AgentGatewayClient:
         self,
         tool: MCPTool,
         user_token: str | Callable[[], str] | None = None,
-        app_tid: str | None = None,
         **kwargs,
     ) -> str:
         """Invoke an MCP tool.
@@ -546,11 +519,6 @@ class AgentGatewayClient:
                 Can be a string or a callable returning a string.
                 Required for LoB agents.
                 Optional for Customer agents (falls back to system token if not provided).
-            app_tid: BTP Application Tenant ID of the subscriber.
-                Only used for customer agents. This is passed to the token service
-                for tenant-scoped token exchange.
-                TODO: This parameter's requirement is still being clarified with
-                the IBD team and may be removed if unnecessary.
             **kwargs: Tool input parameters (passed directly to the tool).
 
         Returns:
@@ -573,25 +541,18 @@ class AgentGatewayClient:
             ```
         """
         try:
+            # Resolve user_token if provided
+            if user_token:
+                auth = await self.get_user_auth(user_token)
+            else:
+                auth = await self.get_system_auth()
+
             # Check for customer agent credentials
             credentials_path = detect_customer_agent_credentials()
             if credentials_path:
-                logger.info(
+                logger.debug(
                     "Customer agent credentials detected at '%s'", credentials_path
                 )
-
-                # Resolve user_token if provided (optional for customer flow)
-                if user_token:
-                    auth = await self.get_user_auth(user_token, app_tid)
-                else:
-                    # TODO: IBD workaround - use system token when user_token
-                    # is not available. This bypasses principal propagation.
-                    # Remove this fallback once IBD supports proper user token flow.
-                    logger.warning(
-                        "No user_token provided - using system token for tool "
-                        "invocation. Principal propagation will NOT work."
-                    )
-                    auth = await self.get_system_auth(app_tid)
 
                 return await call_mcp_tool_customer(
                     tool, auth.access_token, self._config.timeout, **kwargs
@@ -599,30 +560,13 @@ class AgentGatewayClient:
 
             # Check for transparent mode
             if detect_transparent_credentials():
-                logger.info("Transparent mode credentials detected")
-
-                # Resolve user_token if provided (optional for customer flow)
-                if user_token:
-                    auth = await self.get_user_auth(user_token, app_tid)
-                else:
-                    # TODO: IBD workaround - use system token when user_token
-                    # is not available. This bypasses principal propagation.
-                    # Remove this fallback once IBD supports proper user token flow.
-                    logger.warning(
-                        "No user_token provided - using system token for tool "
-                        "invocation. Principal propagation will NOT work."
-                    )
-                    auth = await self.get_system_auth(app_tid)
+                logger.debug("Transparent mode credentials detected")
 
                 return await call_mcp_tool_customer(
                     tool, auth.access_token, self._config.timeout, **kwargs
                 )
 
-            # LoB flow - requires user_token and tenant_subdomain
-            if app_tid:
-                logger.warning("app_tid parameter ignored for LoB agent flow")
-
-            auth = await self.get_user_auth(user_token, app_tid)
+            auth = await self.get_user_auth(user_token)
             return await call_mcp_tool_lob(
                 tool, auth.access_token, self._config.timeout, **kwargs
             )

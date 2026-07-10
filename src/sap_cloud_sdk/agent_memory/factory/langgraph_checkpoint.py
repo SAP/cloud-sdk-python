@@ -55,7 +55,7 @@ def create_checkpointer(*, ttl_seconds: Optional[int] = None):
     except ImportError:
         raise ImportError(
             "langgraph is required for create_checkpointer(). "
-            "Install it with: pip install sap-cloud-sdk[langchain] or pip install langgraph"
+            "Install it with: pip install sap-cloud-sdk[langgraph] or pip install langgraph"
         )
 
     if ttl_seconds is not None:

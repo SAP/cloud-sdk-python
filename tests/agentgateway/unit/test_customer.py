@@ -178,6 +178,30 @@ class TestLoadCustomerCredentials:
         assert result.integration_dependencies[1].ord_id == "sap.flights:mcpServer:v1"
         assert result.integration_dependencies[1].global_tenant_id == "892451733"
 
+    def test_loads_integration_dependencies_flat_format(self, tmp_path):
+        """Load integrationDependencies in flat format (globalTenantId at top level)."""
+        creds_file = tmp_path / "credentials.json"
+        creds_data = {
+            "tokenServiceUrl": "https://ias.example.com/oauth2/token",
+            "clientid": "my-client-id",
+            "certificate": "-----BEGIN CERTIFICATE-----\ntest\n-----END CERTIFICATE-----",
+            "privateKey": "-----BEGIN PRIVATE KEY-----\ntest\n-----END PRIVATE KEY-----",
+            "gatewayUrl": "https://agw.example.com",
+            "integrationDependencies": [
+                {
+                    "ordId": "sap.s4:apiResource:API_PRODUCT:v1",
+                    "globalTenantId": "731473562",
+                },
+            ],
+        }
+        creds_file.write_text(json.dumps(creds_data))
+
+        result = load_customer_credentials(str(creds_file))
+
+        assert len(result.integration_dependencies) == 1
+        assert result.integration_dependencies[0].ord_id == "sap.s4:apiResource:API_PRODUCT:v1"
+        assert result.integration_dependencies[0].global_tenant_id == "731473562"
+
     def test_raises_when_integration_dependencies_missing(self, tmp_path):
         """Raise error when integrationDependencies is not in credentials file."""
         creds_file = tmp_path / "credentials.json"

@@ -82,16 +82,14 @@ class _CredentialFields:
 def detect_customer_agent_credentials() -> str | None:
     """Check if customer agent credentials file exists.
 
-    Checks for credential file in the following order:
-    1. $SERVICE_BINDING_ROOT (or /bindings if unset): scans all subdirectories for one whose
+    $SERVICE_BINDING_ROOT (or /bindings if unset): scans all subdirectories for one whose
        'type' file contains 'integration-credentials', then reads 'credentials' from that directory
-    2. Default path /etc/ums/credentials/credentials (legacy, for backward compatibility)
 
     Returns:
         Path to credentials file if found, None otherwise.
     """
 
-    # 1. servicebinding.io: scan $SERVICE_BINDING_ROOT for a binding whose 'type' file equals _BINDING_TYPE
+    # servicebinding.io: scan $SERVICE_BINDING_ROOT for a binding whose 'type' file equals _BINDING_TYPE
     sbr = resolve_base_mount(_DEFAULT_BINDING_ROOT)
     if sbr and os.path.isdir(sbr):
         for entry in os.scandir(sbr):
@@ -614,7 +612,6 @@ def _build_mcp_url(gateway_url: str, ord_id: str, gt_id: str) -> str:
 async def _list_server_tools(
     url: str,
     auth_token: str,
-    dependency: IntegrationDependency,
     timeout: float,
 ) -> list[MCPTool]:
     """List tools from a single MCP server.
@@ -712,7 +709,7 @@ async def get_mcp_tools_customer(
         )
 
         try:
-            server_tools = await _list_server_tools(url, system_token, dep, timeout)
+            server_tools = await _list_server_tools(url, system_token, timeout)
             tools.extend(server_tools)
             logger.debug("Loaded %d tool(s) from %s", len(server_tools), dep.ord_id)
         except Exception:

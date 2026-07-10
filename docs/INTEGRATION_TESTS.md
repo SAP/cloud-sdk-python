@@ -146,7 +146,7 @@ CLOUD_SDK_CFG_SDM_DEFAULT_UAA='{"url":"https://your-auth-url","clientid":"your-c
 For DPI NG Consent integration tests, configure the following variables in `.env_integration_tests`:
 
 ```bash
-# DPI NG Consent Configuration — use the shared base URL (applies to all DPI NG sub-services)
+# DPI NG Consent Configuration - use the shared base URL (applies to all DPI NG sub-services)
 CLOUD_SDK_CFG_DPI_NG_DEFAULT_BASE_URL=https://your-dpi-ng-service-host
 ```
 

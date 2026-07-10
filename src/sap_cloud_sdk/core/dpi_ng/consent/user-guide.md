@@ -27,7 +27,9 @@ Import what you need explicitly:
 from sap_cloud_sdk.core.dpi_ng.consent import (
     create_client,
     ConsentSDKConfig,
+    ClientCertificateAuth,
     ClientCredentialsAuth,
+    BearerTokenAuth,
     CreateConsentRequest,
     WithdrawConsentRequest,
     CheckConsentExistsResult,
@@ -41,6 +43,8 @@ from sap_cloud_sdk.core.dpi_ng.consent import *
 ```
 
 ## Quick Start
+
+### With client credentials (OAuth2)
 
 Pass a `ConsentSDKConfig` with `ClientCredentialsAuth` when OAuth2 client
 credentials are available. The auth provider fetches and refreshes bearer tokens
@@ -68,6 +72,35 @@ with create_client(config=config) as client:
         print(c.consent_id, c.lifecycle_status_code)
 ```
 
+### With a client certificate (mTLS) - recommended for production
+
+`ClientCertificateAuth` is the preferred authentication method for production
+deployments. It uses mutual TLS (mTLS) instead of bearer tokens, so there is no
+shared secret to rotate and no token expiry to manage. The `tenant_id` header is
+required because the mTLS handshake does not carry a tenant claim.
+
+```python
+from sap_cloud_sdk.core.dpi_ng.consent import (
+    create_client,
+    ConsentSDKConfig,
+    ClientCertificateAuth,
+)
+
+config = ConsentSDKConfig(
+    base_url="https://api.service.<region>.ngdpi.dpp.cloud.sap",
+    auth=ClientCertificateAuth(
+        cert_file="/path/to/client.crt",
+        key_file="/path/to/client.key",
+    ),
+    tenant_id="<your-tenant-id>",
+)
+
+with create_client(config=config) as client:
+    consents = client.consents.list_consents(filter="lifecycleStatusCode eq '1'")
+    for c in consents:
+        print(c.consent_id, c.lifecycle_status_code)
+```
+
 **`ConsentSDKConfig` parameters:**
 
 | Parameter | Required | Default | Description |
@@ -83,6 +116,15 @@ with create_client(config=config) as client:
 
 The SDK supports three authentication strategies. Pass one as the `auth`
 argument to `ConsentSDKConfig`.
+
+| Strategy | Best for | Token refresh | `tenant_id` required |
+|---|---|---|---|
+| `ClientCertificateAuth` | Production, mTLS environments | n/a - no tokens | Yes |
+| `ClientCredentialsAuth` | Services with OAuth2 credentials | Automatic (60 s before expiry) | No |
+| `BearerTokenAuth` | Short-lived scripts, testing | Manual | No |
+
+`ClientCertificateAuth` is recommended for production: no shared secret, no token
+expiry, and rotation is handled at the infrastructure level.
 
 ### BearerTokenAuth
 
@@ -245,7 +287,7 @@ for c in consents:
 - `jurisdiction_code` - The legal space in which the consent is valid. Overrides the `JurisdictionCode` from the consent form.
 - `application_template_id` - Freely used by the integrating application (e.g. a context string identifying the business process). Overrides the `applicationTemplateId` from the consent form.
 - `controller_name` - The name of a data controller. Overrides the `ControllerName` from the consent form.
-- `granted_by` - The natural person who granted the consent — either the data subject or another person acting on their behalf (e.g. a customer service representative or legal guardian).
+- `granted_by` - The natural person who granted the consent - either the data subject or another person acting on their behalf (e.g. a customer service representative or legal guardian).
 - `granted_at` - When the consent was granted.
 - `submission_site` - Where the consent was granted. This could be a physical place (e.g. a hospital name) or a website.
 
@@ -273,7 +315,7 @@ client.consents.terminate_consent(
 )
 ```
 
-`WithdrawConsentRequest.withdrawn_by` and `withdrawn_at` are both optional — omit them to let the service
+`WithdrawConsentRequest.withdrawn_by` and `withdrawn_at` are both optional - omit them to let the service
 record the current timestamp.
 
 #### Check whether a consent exists

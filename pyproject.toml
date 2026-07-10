@@ -35,7 +35,7 @@ dependencies = [
 extensibility = ["a2a-sdk>=0.2.0"]
 starlette = ["starlette>=0.40.0"]
 langchain = ["langchain-core>=1.2.7"]
-langgraph = ["langgraph>=0.2.0"]
+langgraph = ["langgraph>=1.0.0"]
 
 [build-system]
 requires = ["hatchling"]

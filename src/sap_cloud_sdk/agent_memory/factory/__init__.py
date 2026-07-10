@@ -8,7 +8,7 @@ Available factories:
 - :func:`sap_cloud_sdk.agent_memory.factory.langgraph_checkpoint.create_checkpointer`
   — returns a LangGraph ``BaseCheckpointSaver`` (short-term memory)
 
-Usage::
+Usage:
 
     from sap_cloud_sdk.agent_memory.factory.langgraph_checkpoint import create_checkpointer
 """

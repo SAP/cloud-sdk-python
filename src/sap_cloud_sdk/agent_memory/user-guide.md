@@ -896,7 +896,7 @@ tracks last-active time per thread and evicts inactive threads via a
 background daemon sweep. Eviction is best-effort — a thread may live up to
 `ttl_seconds + 60` seconds before deletion.
 
-**Exposing TTL as a configurable parameter with `@agent_config`:**
+#### Exposing TTL as a configurable parameter with `@agent_config`
 
 Use `@agent_config` from `sap_cloud_sdk.agent_decorators` to expose
 `ttl_seconds` as an operator-adjustable configuration field. The key

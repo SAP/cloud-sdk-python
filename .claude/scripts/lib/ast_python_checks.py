@@ -395,6 +395,10 @@ def extract_public_class_methods(
             continue
         if node.name.startswith("_"):
             continue
+        # FP-V-01: skip test classes (Test*, *Test, *TestCase) — they are not
+        # public API and removing/renaming test methods never breaks SDK consumers.
+        if node.name.startswith("Test") or node.name.endswith("Test") or node.name.endswith("TestCase"):
+            continue
         methods: dict = {}
         for item in node.body:
             if not isinstance(item, (ast.FunctionDef, ast.AsyncFunctionDef)):

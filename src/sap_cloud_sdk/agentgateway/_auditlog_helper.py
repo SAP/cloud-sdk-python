@@ -34,6 +34,7 @@ def create_audit_client(
     except Exception:
         if mode is AuditLogMode.STRICT:
             raise
+        # BEST_EFFORT: suppress and warn — audit failure must never break the main flow
         logger.warning("Failed to create audit client — audit events will not be recorded", exc_info=True)
         return None
 
@@ -64,4 +65,5 @@ def send_audit_event(
     except Exception:
         if mode is AuditLogMode.STRICT:
             raise
+        # BEST_EFFORT: suppress and warn — audit failure must never break the main flow
         logger.warning("Failed to send audit event", exc_info=True)

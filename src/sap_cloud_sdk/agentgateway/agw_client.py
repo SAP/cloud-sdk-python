@@ -36,7 +36,9 @@ from sap_cloud_sdk.agentgateway._models import (
 )
 from sap_cloud_sdk.agentgateway._auditlog_helper import (
     create_audit_client,
-    send_audit_event,
+    send_audit_event_invoked,
+    send_audit_event_completed,
+    send_audit_event_failed,
 )
 from sap_cloud_sdk.agentgateway._token_cache import _GatewayUrlCache, _TokenCache
 from sap_cloud_sdk.agentgateway.exceptions import AgentGatewaySDKError
@@ -566,10 +568,19 @@ class AgentGatewayClient:
                     )
                     auth = await self.get_system_auth(app_tid)
 
-                result = await call_mcp_tool_customer(
-                    tool, auth.access_token, self._config.timeout, **kwargs
+                send_audit_event_invoked(
+                    self._audit_client, tool.name, user_id, self._config.audit_log_mode
                 )
-                send_audit_event(
+                try:
+                    result = await call_mcp_tool_customer(
+                        tool, auth.access_token, self._config.timeout, **kwargs
+                    )
+                except Exception as e:
+                    send_audit_event_failed(
+                        self._audit_client, tool.name, type(e).__name__, user_id, self._config.audit_log_mode
+                    )
+                    raise
+                send_audit_event_completed(
                     self._audit_client, tool.name, user_id, self._config.audit_log_mode
                 )
                 return result
@@ -579,10 +590,15 @@ class AgentGatewayClient:
                 logger.warning("app_tid parameter ignored for LoB agent flow")
 
             auth = await self.get_user_auth(user_token, app_tid)
-            result = await call_mcp_tool_lob(
-                tool, auth.access_token, self._config.timeout, **kwargs
-            )
-            send_audit_event(self._audit_client, tool.name, user_id)
+            send_audit_event_invoked(self._audit_client, tool.name, user_id)
+            try:
+                result = await call_mcp_tool_lob(
+                    tool, auth.access_token, self._config.timeout, **kwargs
+                )
+            except Exception as e:
+                send_audit_event_failed(self._audit_client, tool.name, type(e).__name__, user_id)
+                raise
+            send_audit_event_completed(self._audit_client, tool.name, user_id)
             return result
 
         except AgentGatewaySDKError:

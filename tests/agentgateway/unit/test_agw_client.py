@@ -15,7 +15,14 @@ from sap_cloud_sdk.agentgateway import (
     AgentGatewaySDKError,
 )
 
-from sap_cloud_sdk.agentgateway._auditlog_helper import send_audit_event
+from sap_cloud_sdk.agentgateway._auditlog_helper import (
+    send_audit_event_invoked,
+    send_audit_event_completed,
+    send_audit_event_failed,
+    MCP_TOOL_INVOKED,
+    MCP_TOOL_COMPLETED,
+    MCP_TOOL_FAILED,
+)
 from sap_cloud_sdk.agentgateway.config import AuditLogMode, ClientConfig
 from sap_cloud_sdk.core.telemetry import Module
 
@@ -1077,69 +1084,64 @@ class TestGetIasClientId:
 
 
 # ============================================================
-# Test: send_audit_event
+# Test: send_audit_event_invoked / completed / failed
 # ============================================================
 
 
-class TestSendAuditEvent:
-    """Tests for send_audit_event helper."""
+class TestSendAuditEventInvoked:
+    """Tests for send_audit_event_invoked helper."""
 
     def test_no_op_without_audit_client(self):
-        """send_audit_event is a no-op when audit_client is None."""
-        # Should not raise
-        send_audit_event(None, "tool-name", "user@example.com")
+        """send_audit_event_invoked is a no-op when audit_client is None."""
+        send_audit_event_invoked(None, "tool-name", "user@example.com")
 
     def test_no_op_without_tenant_id(self):
-        """send_audit_event is a no-op when get_tenant_id returns empty string."""
+        """send_audit_event_invoked is a no-op when get_tenant_id returns empty string."""
         mock_audit = MagicMock()
         with patch(
             "sap_cloud_sdk.agentgateway._auditlog_helper.get_tenant_id",
             return_value="",
         ):
-            send_audit_event(mock_audit, "tool-name")
+            send_audit_event_invoked(mock_audit, "tool-name")
         mock_audit.send.assert_not_called()
 
-    def test_sends_data_access_event(self):
-        """send_audit_event builds and sends a DataAccess event."""
+    def test_sends_invoked_event(self):
+        """send_audit_event_invoked builds and sends a ZzzCustomEvent with MCP_TOOL_INVOKED."""
         mock_audit = MagicMock()
         with patch(
             "sap_cloud_sdk.agentgateway._auditlog_helper.get_tenant_id",
             return_value=_TENANT_UUID,
         ):
-            send_audit_event(mock_audit, "my-tool", "user@example.com")
+            send_audit_event_invoked(mock_audit, "my-tool", "user@example.com")
         mock_audit.send.assert_called_once()
         event = mock_audit.send.call_args[0][0]
         assert event.common.tenant_id == _TENANT_UUID
         assert event.common.user_initiator_id == "user@example.com"
-        assert event.channel_type == "MCP"
-        assert event.channel_id == "agent-gateway"
-        assert event.object_type == "mcp-tool"
-        assert event.object_id == "my-tool"
+        assert event.common.app_context["event_name"] == MCP_TOOL_INVOKED
 
     def test_sends_without_user_id(self):
-        """send_audit_event omits user_initiator_id when user_id is None."""
+        """send_audit_event_invoked omits user_initiator_id when user_id is None."""
         mock_audit = MagicMock()
         with patch(
             "sap_cloud_sdk.agentgateway._auditlog_helper.get_tenant_id",
             return_value=_TENANT_UUID,
         ):
-            send_audit_event(mock_audit, "my-tool")
-        mock_audit.send.assert_called_once()
+            send_audit_event_invoked(mock_audit, "my-tool")
         event = mock_audit.send.call_args[0][0]
         assert event.common.user_initiator_id == ""
 
     def test_best_effort_suppresses_send_errors(self):
-        """send_audit_event does not propagate exceptions in BEST_EFFORT mode."""
+        """send_audit_event_invoked does not propagate exceptions in BEST_EFFORT mode."""
         mock_audit = MagicMock()
         mock_audit.send.side_effect = RuntimeError("send failed")
         with patch(
             "sap_cloud_sdk.agentgateway._auditlog_helper.get_tenant_id",
             return_value=_TENANT_UUID,
         ):
-            send_audit_event(mock_audit, "my-tool", mode=AuditLogMode.BEST_EFFORT)
+            send_audit_event_invoked(mock_audit, "my-tool", mode=AuditLogMode.BEST_EFFORT)
 
     def test_strict_raises_on_send_error(self):
-        """send_audit_event raises in STRICT mode when send fails."""
+        """send_audit_event_invoked raises in STRICT mode when send fails."""
         mock_audit = MagicMock()
         mock_audit.send.side_effect = RuntimeError("send failed")
         with (
@@ -1149,16 +1151,72 @@ class TestSendAuditEvent:
             ),
             pytest.raises(RuntimeError, match="send failed"),
         ):
-            send_audit_event(mock_audit, "my-tool", mode=AuditLogMode.STRICT)
+            send_audit_event_invoked(mock_audit, "my-tool", mode=AuditLogMode.STRICT)
 
     def test_disabled_skips_send(self):
-        """send_audit_event does nothing in DISABLED mode."""
+        """send_audit_event_invoked does nothing in DISABLED mode."""
         mock_audit = MagicMock()
         with patch(
             "sap_cloud_sdk.agentgateway._auditlog_helper.get_tenant_id",
             return_value=_TENANT_UUID,
         ):
-            send_audit_event(mock_audit, "my-tool", mode=AuditLogMode.DISABLED)
+            send_audit_event_invoked(mock_audit, "my-tool", mode=AuditLogMode.DISABLED)
+        mock_audit.send.assert_not_called()
+
+
+class TestSendAuditEventCompleted:
+    """Tests for send_audit_event_completed helper."""
+
+    def test_sends_completed_event(self):
+        """send_audit_event_completed sends a ZzzCustomEvent with MCP_TOOL_COMPLETED."""
+        mock_audit = MagicMock()
+        with patch(
+            "sap_cloud_sdk.agentgateway._auditlog_helper.get_tenant_id",
+            return_value=_TENANT_UUID,
+        ):
+            send_audit_event_completed(mock_audit, "my-tool", "user@example.com")
+        event = mock_audit.send.call_args[0][0]
+        assert event.common.app_context["event_name"] == MCP_TOOL_COMPLETED
+        assert event.common.tenant_id == _TENANT_UUID
+
+    def test_no_op_without_audit_client(self):
+        send_audit_event_completed(None, "tool-name")
+
+    def test_disabled_skips_send(self):
+        mock_audit = MagicMock()
+        with patch(
+            "sap_cloud_sdk.agentgateway._auditlog_helper.get_tenant_id",
+            return_value=_TENANT_UUID,
+        ):
+            send_audit_event_completed(mock_audit, "my-tool", mode=AuditLogMode.DISABLED)
+        mock_audit.send.assert_not_called()
+
+
+class TestSendAuditEventFailed:
+    """Tests for send_audit_event_failed helper."""
+
+    def test_sends_failed_event_with_error_type(self):
+        """send_audit_event_failed sends MCP_TOOL_FAILED with error_type in payload."""
+        mock_audit = MagicMock()
+        with patch(
+            "sap_cloud_sdk.agentgateway._auditlog_helper.get_tenant_id",
+            return_value=_TENANT_UUID,
+        ):
+            send_audit_event_failed(mock_audit, "my-tool", "ValueError", "user@example.com")
+        event = mock_audit.send.call_args[0][0]
+        assert event.common.app_context["event_name"] == MCP_TOOL_FAILED
+        assert event.common.tenant_id == _TENANT_UUID
+
+    def test_no_op_without_audit_client(self):
+        send_audit_event_failed(None, "tool-name", "RuntimeError")
+
+    def test_disabled_skips_send(self):
+        mock_audit = MagicMock()
+        with patch(
+            "sap_cloud_sdk.agentgateway._auditlog_helper.get_tenant_id",
+            return_value=_TENANT_UUID,
+        ):
+            send_audit_event_failed(mock_audit, "my-tool", "RuntimeError", mode=AuditLogMode.DISABLED)
         mock_audit.send.assert_not_called()
 
 
@@ -1169,11 +1227,11 @@ class TestSendAuditEvent:
 
 
 class TestCallMcpToolAuditLog:
-    """Tests that call_mcp_tool emits an audit event on success."""
+    """Tests that call_mcp_tool emits audit events for the full tool lifecycle."""
 
     @pytest.mark.asyncio
-    async def test_lob_flow_sends_audit_event(self, mock_tool):
-        """call_mcp_tool sends audit event with tool name after LoB invocation."""
+    async def test_lob_flow_sends_invoked_and_completed(self, mock_tool):
+        """call_mcp_tool sends MCP_TOOL_INVOKED then MCP_TOOL_COMPLETED on success."""
         mock_audit = MagicMock()
         with (
             patch(
@@ -1206,15 +1264,17 @@ class TestCallMcpToolAuditLog:
                 user_id="user@example.com",
             )
 
-        mock_audit.send.assert_called_once()
-        event = mock_audit.send.call_args[0][0]
-        assert event.object_id == mock_tool.name
-        assert event.common.tenant_id == _TENANT_UUID
-        assert event.common.user_initiator_id == "user@example.com"
+        assert mock_audit.send.call_count == 2
+        invoked_event = mock_audit.send.call_args_list[0][0][0]
+        completed_event = mock_audit.send.call_args_list[1][0][0]
+        assert invoked_event.common.app_context["event_name"] == "MCP_TOOL_INVOKED"
+        assert invoked_event.common.tenant_id == _TENANT_UUID
+        assert invoked_event.common.user_initiator_id == "user@example.com"
+        assert completed_event.common.app_context["event_name"] == "MCP_TOOL_COMPLETED"
 
     @pytest.mark.asyncio
     async def test_customer_flow_no_audit_event(self, mock_tool):
-        """call_mcp_tool does not send audit event for customer agents (no tenant_subdomain)."""
+        """call_mcp_tool does not send audit events for customer agents (no tenant_subdomain)."""
         mock_audit = MagicMock()
         with (
             patch(
@@ -1255,8 +1315,8 @@ class TestCallMcpToolAuditLog:
         mock_audit.send.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_no_audit_event_on_failure(self, mock_tool):
-        """call_mcp_tool does not send audit event when tool invocation fails."""
+    async def test_lob_flow_sends_invoked_and_failed_on_error(self, mock_tool):
+        """call_mcp_tool sends MCP_TOOL_INVOKED then MCP_TOOL_FAILED when tool raises."""
         mock_audit = MagicMock()
         with (
             patch(
@@ -1289,11 +1349,15 @@ class TestCallMcpToolAuditLog:
                     user_token="user-jwt",
                 )
 
-        mock_audit.send.assert_not_called()
+        assert mock_audit.send.call_count == 2
+        invoked_event = mock_audit.send.call_args_list[0][0][0]
+        failed_event = mock_audit.send.call_args_list[1][0][0]
+        assert invoked_event.common.app_context["event_name"] == "MCP_TOOL_INVOKED"
+        assert failed_event.common.app_context["event_name"] == "MCP_TOOL_FAILED"
 
     @pytest.mark.asyncio
-    async def test_audit_event_uses_tool_name_as_object_id(self, mock_tool):
-        """call_mcp_tool records tool.name as the audit event object_id."""
+    async def test_audit_event_uses_tool_name(self, mock_tool):
+        """call_mcp_tool stamps tool.name in the invoked audit event payload."""
         mock_audit = MagicMock()
         with (
             patch(
@@ -1322,5 +1386,5 @@ class TestCallMcpToolAuditLog:
             agw_client = create_client(tenant_subdomain="my-tenant")
             await agw_client.call_mcp_tool(tool=mock_tool, user_token="jwt")
 
-        event = mock_audit.send.call_args[0][0]
-        assert event.object_id == "test-tool"
+        invoked_event = mock_audit.send.call_args_list[0][0][0]
+        assert invoked_event.custom.struct_value.fields["tool"].string_value == "test-tool"

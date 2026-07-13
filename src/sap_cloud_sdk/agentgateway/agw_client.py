@@ -577,7 +577,11 @@ class AgentGatewayClient:
                     )
                 except Exception as e:
                     send_audit_event_failed(
-                        self._audit_client, tool.name, type(e).__name__, user_id, self._config.audit_log_mode
+                        self._audit_client,
+                        tool.name,
+                        type(e).__name__,
+                        user_id,
+                        self._config.audit_log_mode,
                     )
                     raise
                 send_audit_event_completed(
@@ -596,7 +600,9 @@ class AgentGatewayClient:
                     tool, auth.access_token, self._config.timeout, **kwargs
                 )
             except Exception as e:
-                send_audit_event_failed(self._audit_client, tool.name, type(e).__name__, user_id)
+                send_audit_event_failed(
+                    self._audit_client, tool.name, type(e).__name__, user_id
+                )
                 raise
             send_audit_event_completed(self._audit_client, tool.name, user_id)
             return result

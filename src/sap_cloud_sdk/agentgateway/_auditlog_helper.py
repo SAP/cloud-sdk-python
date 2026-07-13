@@ -10,7 +10,6 @@ from sap_cloud_sdk.core.auditlog_ng import AuditClient
 from sap_cloud_sdk.core.auditlog_ng.gen.sap.auditlog.auditevent.v2 import (
     auditevent_pb2 as pb,
 )
-from google.protobuf.struct_pb2 import Struct, Value
 from sap_cloud_sdk.core.telemetry import Module, get_tenant_id
 
 logger = logging.getLogger(__name__)
@@ -69,20 +68,20 @@ def _build_custom_event(
     payload: dict = {"event_name": event_name, "tool": tool_name}
     if extra:
         payload.update(extra)
-    custom_struct = Struct()
-    custom_struct.update(payload)
 
     event = pb.ZzzCustomEvent()
     event.common.CopyFrom(common)
-    event.custom.CopyFrom(Value(struct_value=custom_struct))
+    event.custom.struct_value.update(payload)
     return event
 
 
 def _send(
-    audit_client: AuditClient,
+    audit_client: AuditClient | None,
     event: pb.ZzzCustomEvent,
     mode: AuditLogMode,
 ) -> None:
+    if audit_client is None:
+        return
     try:
         audit_client.send(event)
     except Exception:
@@ -115,7 +114,11 @@ def send_audit_event_invoked(
     tenant_id, skip = _guard(audit_client, mode)
     if skip:
         return
-    _send(audit_client, _build_custom_event(MCP_TOOL_INVOKED, tool_name, tenant_id, user_id), mode)  # type: ignore[arg-type]
+    _send(
+        audit_client,
+        _build_custom_event(MCP_TOOL_INVOKED, tool_name, tenant_id, user_id),
+        mode,
+    )
 
 
 def send_audit_event_completed(
@@ -128,7 +131,11 @@ def send_audit_event_completed(
     tenant_id, skip = _guard(audit_client, mode)
     if skip:
         return
-    _send(audit_client, _build_custom_event(MCP_TOOL_COMPLETED, tool_name, tenant_id, user_id), mode)  # type: ignore[arg-type]
+    _send(
+        audit_client,
+        _build_custom_event(MCP_TOOL_COMPLETED, tool_name, tenant_id, user_id),
+        mode,
+    )
 
 
 def send_audit_event_failed(
@@ -143,7 +150,13 @@ def send_audit_event_failed(
     if skip:
         return
     _send(
-        audit_client,  # type: ignore[arg-type]
-        _build_custom_event(MCP_TOOL_FAILED, tool_name, tenant_id, user_id, extra={"error_type": error_type}),
+        audit_client,
+        _build_custom_event(
+            MCP_TOOL_FAILED,
+            tool_name,
+            tenant_id,
+            user_id,
+            extra={"error_type": error_type},
+        ),
         mode,
     )

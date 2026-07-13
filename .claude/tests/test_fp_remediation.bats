@@ -508,3 +508,45 @@ ADDED
   [ "$anchor" = "4" ]
   rm -rf "$tmpd"
 }
+
+@test "FP-U-01: TD-checkbox PASS when tests are in multi-module Maven path (sdk-adms/src/test/)" {
+  [ -f "$SCRIPT_DIR/check-testing-depth.sh" ] || skip "check-testing-depth.sh not present"
+  tmpd=$(mktemp -d)
+  cat > "$tmpd/diff" <<'DIFF'
+diff --git a/sdk-adms/src/test/java/com/sap/cloud/sdk/adms/AdmsHttpCallsTest.java b/sdk-adms/src/test/java/com/sap/cloud/sdk/adms/AdmsHttpCallsTest.java
+new file mode 100644
+--- /dev/null
++++ b/sdk-adms/src/test/java/com/sap/cloud/sdk/adms/AdmsHttpCallsTest.java
+@@ -0,0 +1,1 @@
++public class AdmsHttpCallsTest {}
+DIFF
+  cat > "$tmpd/body" <<'BODY'
+- [x] I have added/updated automated tests to cover my changes
+BODY
+  result=$(DIFF_FILE="$tmpd/diff" PR_BODY_FILE="$tmpd/body" LANGUAGE=java \
+    bash "$SCRIPT_DIR/check-testing-depth.sh" 2>/dev/null)
+  status=$(echo "$result" | jq -r '.status')
+  [ "$status" = "PASS" ]
+  rm -rf "$tmpd"
+}
+
+@test "FP-U-01: TD-checkbox still fires when no tests at all in multi-module repo" {
+  [ -f "$SCRIPT_DIR/check-testing-depth.sh" ] || skip "check-testing-depth.sh not present"
+  tmpd=$(mktemp -d)
+  cat > "$tmpd/diff" <<'DIFF'
+diff --git a/sdk-adms/src/main/java/com/sap/cloud/sdk/adms/AdmsClient.java b/sdk-adms/src/main/java/com/sap/cloud/sdk/adms/AdmsClient.java
+new file mode 100644
+--- /dev/null
++++ b/sdk-adms/src/main/java/com/sap/cloud/sdk/adms/AdmsClient.java
+@@ -0,0 +1,1 @@
++public class AdmsClient {}
+DIFF
+  cat > "$tmpd/body" <<'BODY'
+- [x] I have added/updated automated tests to cover my changes
+BODY
+  result=$(DIFF_FILE="$tmpd/diff" PR_BODY_FILE="$tmpd/body" LANGUAGE=java \
+    bash "$SCRIPT_DIR/check-testing-depth.sh" 2>/dev/null)
+  count=$(echo "$result" | jq '[.findings[] | select(.rule=="TD-checkbox")] | length')
+  [ "$count" = "1" ]
+  rm -rf "$tmpd"
+}

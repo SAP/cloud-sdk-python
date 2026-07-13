@@ -46,7 +46,15 @@ fi
 if [ -n "$PR_BODY_FILE" ] && [ -f "$PR_BODY_FILE" ]; then
   body=$(cat "$PR_BODY_FILE")
   if echo "$body" | grep -qE '\-[[:space:]]*\[[xX]\][[:space:]].*(added|updated).*tests'; then
-    if ! echo "$diff_content" | grep -qE 'diff --git a/(tests?/|src/test/)'; then
+    # FP-U-01: multi-module Maven layouts put tests at <module>/src/test/… or
+    # <module>/tests?/, not at the root. Allow an optional module-path prefix
+    # before the test-folder segment (Adwitiya Sushant I743000, JV#5 feedback):
+    #   old: diff --git a/(tests?/|src/test/)          — requires root-level path
+    #   new: diff --git a/([^ ]*/)?( tests?/|src/test/) — module prefix optional
+    # Use grep on $DIFF_FILE directly (not echo "$diff_content") so large diffs
+    # aren't truncated by shell argument expansion.
+    _diff_src="${DIFF_FILE:-/dev/stdin}"
+    if ! grep -qE 'diff --git a/([^ ]*/)?(tests?/|src/test/)' "${_diff_src}" 2>/dev/null; then
       emit_finding "TD-checkbox" "FLAG" "PR_BODY" 1 \
         "PR body ticks 'added tests' checkbox but no test files changed" "" >> "$findings"
     fi

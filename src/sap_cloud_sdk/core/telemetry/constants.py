@@ -32,6 +32,9 @@ ATTR_MLFLOW_EXPERIMENT_ID = "mlflow.experiment_id"
 # Attribute keys - ORD
 ATTR_SAP_ORD_ID = "sap.ord.id"
 
+# Attribute keys - Service display name
+ATTR_SAP_SERVICE_DISPLAY_NAME = "sap.service.display_name"
+
 # Attribute keys - SAP App Foundation specific
 ATTR_CAPABILITY = "sap.cloud_sdk.capability"
 ATTR_FUNCTIONALITY = "sap.cloud_sdk.functionality"

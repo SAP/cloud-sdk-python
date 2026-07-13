@@ -116,7 +116,10 @@ def _get_config_from_destination(
         create_client as _dest_create_client,
     )
 
-    dest_client = _dest_create_client(instance=destination_instance)
+    dest_client = _dest_create_client(
+        instance=destination_instance,
+        _telemetry_source=Module.AUDITLOG_NG,
+    )
     options = (
         ConsumptionOptions(
             fragment_name=fragment_name, fragment_level=ConsumptionLevel.SUBACCOUNT

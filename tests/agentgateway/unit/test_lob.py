@@ -215,7 +215,8 @@ class TestListMcpFragments:
 
             list_mcp_fragments("tenant-sub")
 
-            mock_client.assert_called_once_with(instance="default")
+            mock_client.assert_called_once()
+            assert mock_client.call_args.kwargs["instance"] == "default"
             call_args = mock_client.return_value.list_instance_fragments.call_args
             filter_opt = call_args.kwargs.get("filter")
             assert filter_opt is not None

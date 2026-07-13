@@ -14,8 +14,10 @@ from sap_cloud_sdk.agentgateway import (
     MCPTool,
     AgentGatewaySDKError,
 )
+
 from sap_cloud_sdk.agentgateway._auditlog_helper import send_audit_event
 from sap_cloud_sdk.agentgateway.config import AuditLogMode, ClientConfig
+from sap_cloud_sdk.core.telemetry import Module
 
 _TENANT_UUID = "9e0d89c9-17cd-439d-8a8b-9c44d3d272f0"
 
@@ -984,6 +986,26 @@ class TestListAgentCards:
             agw_client = create_client(tenant_subdomain="my-tenant")
             with pytest.raises(AgentGatewaySDKError, match="Agent card discovery failed"):
                 await agw_client.list_agent_cards()
+
+
+# ============================================================
+# Test: _telemetry_source wiring
+# ============================================================
+
+
+class TestCreateClientTelemetrySource:
+    """Verify _telemetry_source kwarg is stored on the AgentGatewayClient."""
+
+    def test_default_source_is_none(self):
+        agw_client = create_client(tenant_subdomain="my-tenant")
+        assert agw_client._telemetry_source is None
+
+    def test_explicit_source_is_stored(self):
+        agw_client = create_client(
+            tenant_subdomain="my-tenant",
+            _telemetry_source=Module.EXTENSIBILITY,
+        )
+        assert agw_client._telemetry_source is Module.EXTENSIBILITY
 
 
 # ============================================================

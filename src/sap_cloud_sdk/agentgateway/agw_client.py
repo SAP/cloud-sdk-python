@@ -113,6 +113,7 @@ class AgentGatewayClient:
         self,
         tenant_subdomain: str | Callable[[], str] | None = None,
         config: ClientConfig | None = None,
+        _telemetry_source: Module | None = None,
     ):
         """Initialize the Agent Gateway client.
 
@@ -121,11 +122,13 @@ class AgentGatewayClient:
                 Can be a string or a callable returning a string.
                 Required for LoB agents, ignored for Customer agents.
             config: Client configuration. Uses defaults if not provided.
+            _telemetry_source: Internal telemetry source identifier. Not intended for external use.
         """
         self._tenant_subdomain = tenant_subdomain
         self._config = config or ClientConfig()
         self._token_cache = _TokenCache(self._config)
         self._gateway_url_cache = _GatewayUrlCache()
+        self._telemetry_source = _telemetry_source
         self._audit_client: AuditClient | None = create_audit_client(
             tenant_subdomain, Module.AGENTGATEWAY, self._config.audit_log_mode
         )
@@ -598,6 +601,8 @@ def _unwrap_exception_group(exc: BaseException) -> BaseException:
 def create_client(
     tenant_subdomain: str | Callable[[], str] | None = None,
     config: ClientConfig | None = None,
+    *,
+    _telemetry_source: Module | None = None,
 ) -> AgentGatewayClient:
     """Create an Agent Gateway client for discovering and invoking MCP tools.
 
@@ -609,6 +614,7 @@ def create_client(
             Can be a string or a callable returning a string.
             Required for LoB agents, ignored for Customer agents.
         config: Client configuration. Uses defaults if not provided.
+        _telemetry_source: Internal telemetry source identifier. Not intended for external use.
 
     Returns:
         AgentGatewayClient instance.
@@ -665,4 +671,5 @@ def create_client(
     return AgentGatewayClient(
         tenant_subdomain=tenant_subdomain,
         config=config,
+        _telemetry_source=_telemetry_source,
     )

@@ -43,7 +43,7 @@ def create_audit_client(
     except Exception:
         if mode is AuditLogMode.STRICT:
             raise
-        # BEST_EFFORT: suppress and warn — audit failure must never break the main flow
+        # BEST_EFFORT: suppress and warn — audit failure does not break the main agw flow
         logger.warning(
             "Failed to create audit client — audit events will not be recorded",
             exc_info=True,
@@ -77,11 +77,18 @@ def _build_custom_event(
 
 def _send(
     audit_client: AuditClient | None,
-    event: pb.ZzzCustomEvent,
+    event_name: str,
+    tool_name: str,
+    user_id: str | None,
     mode: AuditLogMode,
+    extra: dict | None = None,
 ) -> None:
-    if audit_client is None:
+    if mode is AuditLogMode.DISABLED:
         return
+    tenant_id = get_tenant_id()
+    if audit_client is None or not tenant_id:
+        return
+    event = _build_custom_event(event_name, tool_name, tenant_id, user_id, extra)
     try:
         audit_client.send(event)
     except Exception:
@@ -91,19 +98,6 @@ def _send(
         logger.warning("Failed to send audit event", exc_info=True)
 
 
-def _guard(
-    audit_client: AuditClient | None,
-    mode: AuditLogMode,
-) -> tuple[str, bool]:
-    """Return (tenant_id, should_skip). Skip when disabled, no client, or no tenant."""
-    if mode is AuditLogMode.DISABLED:
-        return "", True
-    tenant_id = get_tenant_id()
-    if audit_client is None or not tenant_id:
-        return "", True
-    return tenant_id, False
-
-
 def send_audit_event_invoked(
     audit_client: AuditClient | None,
     tool_name: str,
@@ -111,14 +105,7 @@ def send_audit_event_invoked(
     mode: AuditLogMode = AuditLogMode.BEST_EFFORT,
 ) -> None:
     """Emit MCP_TOOL_INVOKED before the tool call starts."""
-    tenant_id, skip = _guard(audit_client, mode)
-    if skip:
-        return
-    _send(
-        audit_client,
-        _build_custom_event(MCP_TOOL_INVOKED, tool_name, tenant_id, user_id),
-        mode,
-    )
+    _send(audit_client, MCP_TOOL_INVOKED, tool_name, user_id, mode)
 
 
 def send_audit_event_completed(
@@ -128,14 +115,7 @@ def send_audit_event_completed(
     mode: AuditLogMode = AuditLogMode.BEST_EFFORT,
 ) -> None:
     """Emit MCP_TOOL_COMPLETED after the tool call succeeds."""
-    tenant_id, skip = _guard(audit_client, mode)
-    if skip:
-        return
-    _send(
-        audit_client,
-        _build_custom_event(MCP_TOOL_COMPLETED, tool_name, tenant_id, user_id),
-        mode,
-    )
+    _send(audit_client, MCP_TOOL_COMPLETED, tool_name, user_id, mode)
 
 
 def send_audit_event_failed(
@@ -146,17 +126,4 @@ def send_audit_event_failed(
     mode: AuditLogMode = AuditLogMode.BEST_EFFORT,
 ) -> None:
     """Emit MCP_TOOL_FAILED when the tool call raises an exception."""
-    tenant_id, skip = _guard(audit_client, mode)
-    if skip:
-        return
-    _send(
-        audit_client,
-        _build_custom_event(
-            MCP_TOOL_FAILED,
-            tool_name,
-            tenant_id,
-            user_id,
-            extra={"error_type": error_type},
-        ),
-        mode,
-    )
+    _send(audit_client, MCP_TOOL_FAILED, tool_name, user_id, mode, extra={"error_type": error_type})

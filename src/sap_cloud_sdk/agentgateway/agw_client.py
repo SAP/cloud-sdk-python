@@ -34,7 +34,10 @@ from sap_cloud_sdk.agentgateway._models import (
     AuthResult,
     MCPTool,
 )
-from sap_cloud_sdk.agentgateway._auditlog_helper import create_audit_client, send_audit_event
+from sap_cloud_sdk.agentgateway._auditlog_helper import (
+    create_audit_client,
+    send_audit_event,
+)
 from sap_cloud_sdk.agentgateway._token_cache import _GatewayUrlCache, _TokenCache
 from sap_cloud_sdk.agentgateway.exceptions import AgentGatewaySDKError
 from sap_cloud_sdk.core.auditlog_ng import AuditClient
@@ -566,7 +569,9 @@ class AgentGatewayClient:
                 result = await call_mcp_tool_customer(
                     tool, auth.access_token, self._config.timeout, **kwargs
                 )
-                send_audit_event(self._audit_client, tool.name, user_id, self._config.audit_log_mode)
+                send_audit_event(
+                    self._audit_client, tool.name, user_id, self._config.audit_log_mode
+                )
                 return result
 
             # LoB flow - requires user_token and tenant_subdomain

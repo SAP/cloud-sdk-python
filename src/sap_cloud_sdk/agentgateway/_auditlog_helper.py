@@ -23,7 +23,12 @@ def create_audit_client(
     """Create an audit client from a LoB destination. Returns None on failure."""
     if mode is AuditLogMode.DISABLED:
         return None
-    resolved = tenant_subdomain() if callable(tenant_subdomain) else tenant_subdomain
+    if isinstance(tenant_subdomain, str):
+        resolved: str | None = tenant_subdomain
+    elif tenant_subdomain is not None:
+        resolved = tenant_subdomain()
+    else:
+        resolved = None
     if not resolved:
         return None
     try:
@@ -35,7 +40,10 @@ def create_audit_client(
         if mode is AuditLogMode.STRICT:
             raise
         # BEST_EFFORT: suppress and warn — audit failure must never break the main flow
-        logger.warning("Failed to create audit client — audit events will not be recorded", exc_info=True)
+        logger.warning(
+            "Failed to create audit client — audit events will not be recorded",
+            exc_info=True,
+        )
         return None
 
 

@@ -126,4 +126,11 @@ def send_audit_event_failed(
     mode: AuditLogMode = AuditLogMode.BEST_EFFORT,
 ) -> None:
     """Emit MCP_TOOL_FAILED when the tool call raises an exception."""
-    _send(audit_client, MCP_TOOL_FAILED, tool_name, user_id, mode, extra={"error_type": error_type})
+    _send(
+        audit_client,
+        MCP_TOOL_FAILED,
+        tool_name,
+        user_id,
+        mode,
+        extra={"error_type": error_type},
+    )

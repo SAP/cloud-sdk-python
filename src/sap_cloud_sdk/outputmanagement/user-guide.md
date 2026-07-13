@@ -4,6 +4,18 @@
 
 The Output Management Service provides a simplified way to send emails through SAP Ariba Output Service. This guide covers the unified `OutputManagementClient` which offers four main methods for sending notification emails with optional attachments using ANS (Ariba Notification Service) templates.
 
+## Installation
+
+```bash
+# Using uv (recommended)
+uv add sap-cloud-sdk
+
+# Using pip
+pip install sap-cloud-sdk
+```
+
+See further information about installation in the [main documentation](/README.md#installation).
+
 ## Table of Contents
 
 1. [Prerequisites](#prerequisites)

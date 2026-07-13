@@ -127,8 +127,7 @@ if ext_ctx:
 The extension baggage span processor (registered automatically by `auto_instrument()`)
 stamps `sap.extension.*` attributes on all spans created inside an
 `extension_context()` block, including spans from third-party instrumentation.
-It uses the official `BaggageSpanProcessor` from `opentelemetry-processor-baggage`
-under the hood, filtering to only propagate `sap.extension.*` baggage keys.
+It uses a built-in `BaggageSpanProcessor` under the hood to stamp baggage keys.
 
 ### Available operations
 

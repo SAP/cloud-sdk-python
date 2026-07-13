@@ -1173,6 +1173,52 @@ class TestDestinationClientReadOperations:
         # HTTP should be called since proxy is disabled by default
         mock_http.get.assert_called_once()
 
+    def test_get_destination_skip_token_retrieval_sends_query_param(self):
+        """Test that skip_token_retrieval=True sends $skipTokenRetrieval=true query param."""
+        mock_http = MagicMock()
+        resp = MagicMock(spec=Response)
+        resp.status_code = 200
+        resp.json.return_value = {
+            "destinationConfiguration": {
+                "name": "my-api",
+                "type": "HTTP",
+                "url": "https://api.example.com",
+                "clientId": "my-client-id",
+            },
+            "authTokens": [],
+            "certificates": [],
+        }
+        mock_http.get.return_value = resp
+
+        client = DestinationClient(mock_http)
+        result = client.get_destination(
+            "my-api",
+            options=ConsumptionOptions(skip_token_retrieval=True),
+        )
+
+        assert isinstance(result, Destination)
+        assert result.properties.get("clientId") == "my-client-id"
+        _, kwargs = mock_http.get.call_args
+        assert kwargs.get("params") == {"$skipTokenRetrieval": "true"}
+
+    def test_get_destination_no_skip_token_retrieval_by_default(self):
+        """Test that skip_token_retrieval=False (default) sends no $skipTokenRetrieval param."""
+        mock_http = MagicMock()
+        resp = MagicMock(spec=Response)
+        resp.status_code = 200
+        resp.json.return_value = {
+            "destinationConfiguration": {"name": "my-api", "type": "HTTP", "url": "https://api.example.com"},
+            "authTokens": [],
+            "certificates": [],
+        }
+        mock_http.get.return_value = resp
+
+        client = DestinationClient(mock_http)
+        client.get_destination("my-api")
+
+        _, kwargs = mock_http.get.call_args
+        assert kwargs.get("params") is None
+
 
 class TestDestinationClientWriteOperations:
 
@@ -2174,3 +2220,36 @@ class TestDestinationClientLabels:
 
         _, kwargs = mock_http.patch.call_args
         assert kwargs["tenant_subdomain"] is None
+
+
+_RESOLVER_PATCH = "sap_cloud_sdk.destination.client.read_from_mount_and_fallback_to_env_var"
+
+
+class TestGetServiceInstanceId:
+    """Tests for DestinationClient.get_service_instance_id()."""
+
+    @patch(_RESOLVER_PATCH)
+    def test_returns_instanceid_on_success(self, mock_read):
+        def fill_instanceid(*args, **kwargs):
+            kwargs["target"].instanceid = "my-instance-id"
+
+        mock_read.side_effect = fill_instanceid
+        client = DestinationClient(MagicMock())
+
+        result = client.get_service_instance_id()
+
+        assert result == "my-instance-id"
+        mock_read.assert_called_once_with(
+            base_volume_mount="/etc/secrets/appfnd",
+            base_var_name="CLOUD_SDK_CFG",
+            module="destination",
+            instance="default",
+            target=mock_read.call_args[1]["target"],
+        )
+
+    @patch(_RESOLVER_PATCH, side_effect=RuntimeError("mount failed"))
+    def test_raises_on_exception(self, _mock_read):
+        client = DestinationClient(MagicMock())
+
+        with pytest.raises(DestinationOperationError, match="Could not resolve destination instance ID from secrets"):
+            client.get_service_instance_id()

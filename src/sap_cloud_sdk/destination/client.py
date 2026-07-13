@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import logging
 import warnings
-from typing import List, Optional, Callable, TypeVar
+from typing import Any, Dict, List, Optional, Callable, TypeVar
 
 from sap_cloud_sdk.core.telemetry import Module, Operation, record_metrics
+from sap_cloud_sdk.core.secret_resolver import read_from_mount_and_fallback_to_env_var
 from sap_cloud_sdk.destination._http import DestinationHttp, API_V1, API_V2
 from sap_cloud_sdk.destination._models import (
     AccessStrategy,
@@ -18,6 +20,7 @@ from sap_cloud_sdk.destination._models import (
     PatchLabels,
     TransparentProxy,
     TransparentProxyDestination,
+    _DestinationInstanceConfig,
 )
 from sap_cloud_sdk.destination.config import load_transparent_proxy
 from sap_cloud_sdk.destination.exceptions import (
@@ -30,6 +33,8 @@ from sap_cloud_sdk.destination.utils._pagination import (
 )
 
 T = TypeVar("T")
+
+logger = logging.getLogger(__name__)
 
 _SUBACCOUNT_COLLECTION = "subaccountDestinations"
 _INSTANCE_COLLECTION = "instanceDestinations"
@@ -90,7 +95,12 @@ class DestinationClient:
         ```
     """
 
-    def __init__(self, http: DestinationHttp, use_default_proxy: bool = False) -> None:
+    def __init__(
+        self,
+        http: DestinationHttp,
+        use_default_proxy: bool = False,
+        _telemetry_source: Optional[Module] = None,
+    ) -> None:
         """Initialize DestinationClient with dependency injection.
 
         Note:
@@ -103,6 +113,7 @@ class DestinationClient:
             use_default_proxy: Whether to use the default transparent proxy for all get operations.
                               When True, will attempt to load transparent proxy configuration from
                               APPFND_CONHOS_TRANSP_PROXY environment variable. Defaults to False.
+            _telemetry_source: Internal telemetry source identifier. Not intended for external use.
 
         Raises:
             DestinationOperationError: If initialization fails.
@@ -110,6 +121,7 @@ class DestinationClient:
         self._http = http
         self._client_proxy_enabled = use_default_proxy
         self._transparent_proxy = load_transparent_proxy()
+        self._telemetry_source = _telemetry_source
 
     def set_proxy(self, transparent_proxy: TransparentProxy) -> None:
         """Set or update the transparent proxy configuration for this client.
@@ -426,7 +438,13 @@ class DestinationClient:
                 else f"{API_V2}/destinations/{name}"
             )
 
-            resp = self._http.get(path, headers=headers, tenant_subdomain=tenant)
+            params: Dict[str, Any] = {}
+            if options and options.skip_token_retrieval:
+                params["$skipTokenRetrieval"] = "true"
+
+            resp = self._http.get(
+                path, headers=headers, tenant_subdomain=tenant, params=params or None
+            )
             data = resp.json()
 
             # Parse v2 response: destinationConfiguration + authTokens + certificates
@@ -664,6 +682,35 @@ class DestinationClient:
             raise DestinationOperationError(
                 f"failed to patch labels for destination '{name}': {e}"
             )
+
+    @record_metrics(Module.DESTINATION, Operation.DESTINATION_GET_SERVICE_INSTANCE_ID)
+    def get_service_instance_id(self) -> str:
+        """Read the destination service instance ID from mounted secrets.
+
+        Resolves ``instanceid`` via the common secret resolver
+        (base mount ``/etc/secrets/appfnd``, env var prefix ``CLOUD_SDK_CFG``,
+        module ``destination``, instance ``default``).
+
+        Returns:
+            The instance ID string.
+
+        Raises:
+            DestinationOperationError: If the instance ID cannot be resolved from secrets.
+        """
+        try:
+            config = _DestinationInstanceConfig()
+            read_from_mount_and_fallback_to_env_var(
+                base_volume_mount="/etc/secrets/appfnd",
+                base_var_name="CLOUD_SDK_CFG",
+                module="destination",
+                instance="default",
+                target=config,
+            )
+            return config.instanceid
+        except Exception as e:
+            raise DestinationOperationError(
+                "Could not resolve destination instance ID from secrets"
+            ) from e
 
     # ---------- Internal helpers ----------
 

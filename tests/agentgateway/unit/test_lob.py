@@ -19,6 +19,7 @@ from sap_cloud_sdk.agentgateway._lob import (
     _ord_id_from_url,
     fetch_system_auth,
     fetch_user_auth,
+    get_ias_client_id_lob,
     get_mcp_tools_lob,
     get_agent_cards_lob,
     _fetch_agent_card,
@@ -27,6 +28,7 @@ from sap_cloud_sdk.agentgateway._lob import (
 from sap_cloud_sdk.agentgateway._models import Agent, AgentCard, MCPTool
 from sap_cloud_sdk.agentgateway._token_cache import _GatewayUrlCache, _TokenCache
 from sap_cloud_sdk.agentgateway.config import ClientConfig
+from sap_cloud_sdk.destination import ConsumptionOptions, ConsumptionLevel
 from sap_cloud_sdk.agentgateway.exceptions import AgentGatewaySDKError, MCPServerNotFoundError
 from sap_cloud_sdk.destination import ConsumptionLevel
 
@@ -213,7 +215,8 @@ class TestListMcpFragments:
 
             list_mcp_fragments("tenant-sub")
 
-            mock_client.assert_called_once_with(instance="default")
+            mock_client.assert_called_once()
+            assert mock_client.call_args.kwargs["instance"] == "default"
             call_args = mock_client.return_value.list_instance_fragments.call_args
             filter_opt = call_args.kwargs.get("filter")
             assert filter_opt is not None
@@ -1011,3 +1014,56 @@ class TestGetAgentCardsLob:
 
         assert len(result) == 1
         assert result[0].ord_id == "ord-ok"
+
+
+class TestGetIasClientIdLob:
+    """Tests for get_ias_client_id_lob()."""
+
+    def test_returns_client_id_from_destination_properties(self):
+        mock_dest = MagicMock()
+        mock_dest.properties = {"clientId": "lob-client-id"}
+        mock_dest_client = MagicMock()
+        mock_dest_client.get_destination.return_value = mock_dest
+
+        with (
+            patch("sap_cloud_sdk.agentgateway._lob._ias_dest_name", return_value="sap-managed-runtime-ias-eu10"),
+            patch("sap_cloud_sdk.agentgateway._lob.create_destination_client", return_value=mock_dest_client),
+        ):
+            result = get_ias_client_id_lob()
+
+        assert result == "lob-client-id"
+        mock_dest_client.get_destination.assert_called_once_with(
+            "sap-managed-runtime-ias-eu10",
+            level=ConsumptionLevel.PROVIDER_SUBACCOUNT,
+            options=ConsumptionOptions(skip_token_retrieval=True),
+        )
+
+    def test_raises_when_destination_not_found(self):
+        mock_dest_client = MagicMock()
+        mock_dest_client.get_destination.return_value = None
+
+        with (
+            patch("sap_cloud_sdk.agentgateway._lob._ias_dest_name", return_value="sap-managed-runtime-ias-eu10"),
+            patch("sap_cloud_sdk.agentgateway._lob.create_destination_client", return_value=mock_dest_client),
+        ):
+            with pytest.raises(AgentGatewaySDKError, match="sap-managed-runtime-ias-eu10"):
+                get_ias_client_id_lob()
+
+    def test_returns_empty_string_when_property_absent(self):
+        mock_dest = MagicMock()
+        mock_dest.properties = {}
+        mock_dest_client = MagicMock()
+        mock_dest_client.get_destination.return_value = mock_dest
+
+        with (
+            patch("sap_cloud_sdk.agentgateway._lob._ias_dest_name", return_value="sap-managed-runtime-ias-eu10"),
+            patch("sap_cloud_sdk.agentgateway._lob.create_destination_client", return_value=mock_dest_client),
+        ):
+            result = get_ias_client_id_lob()
+
+        assert result == ""
+
+    def test_raises_when_landscape_env_not_set(self):
+        with patch("sap_cloud_sdk.agentgateway._lob._ias_dest_name", side_effect=EnvironmentError("APPFND_CONHOS_LANDSCAPE not set")):
+            with pytest.raises(EnvironmentError, match="APPFND_CONHOS_LANDSCAPE"):
+                get_ias_client_id_lob()

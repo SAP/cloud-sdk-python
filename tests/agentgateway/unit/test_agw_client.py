@@ -14,6 +14,7 @@ from sap_cloud_sdk.agentgateway import (
     MCPTool,
     AgentGatewaySDKError,
 )
+from sap_cloud_sdk.core.telemetry import Module
 
 
 # ============================================================
@@ -980,3 +981,90 @@ class TestListAgentCards:
             agw_client = create_client(tenant_subdomain="my-tenant")
             with pytest.raises(AgentGatewaySDKError, match="Agent card discovery failed"):
                 await agw_client.list_agent_cards()
+
+
+# ============================================================
+# Test: _telemetry_source wiring
+# ============================================================
+
+
+class TestCreateClientTelemetrySource:
+    """Verify _telemetry_source kwarg is stored on the AgentGatewayClient."""
+
+    def test_default_source_is_none(self):
+        agw_client = create_client(tenant_subdomain="my-tenant")
+        assert agw_client._telemetry_source is None
+
+    def test_explicit_source_is_stored(self):
+        agw_client = create_client(
+            tenant_subdomain="my-tenant",
+            _telemetry_source=Module.EXTENSIBILITY,
+        )
+        assert agw_client._telemetry_source is Module.EXTENSIBILITY
+
+
+# ============================================================
+# Test: get_ias_client_id
+# ============================================================
+
+_DEST_CREATE_PATCH = "sap_cloud_sdk.destination.create_client"
+_IAS_DEST_NAME_PATCH = "sap_cloud_sdk.agentgateway._lob._ias_dest_name"
+_GET_IAS_CLIENT_ID_LOB_PATCH = "sap_cloud_sdk.agentgateway.agw_client.get_ias_client_id_lob"
+_DETECT_CREDS_PATCH = "sap_cloud_sdk.agentgateway.agw_client.detect_customer_agent_credentials"
+_LOAD_CREDS_PATCH = "sap_cloud_sdk.agentgateway.agw_client.load_customer_credentials"
+
+_NO_CUSTOMER_CREDS = patch(_DETECT_CREDS_PATCH, return_value=None)
+
+
+class TestGetIasClientId:
+    """Tests for AgentGatewayClient.get_ias_client_id()."""
+
+    # --- Customer flow ---
+
+    def test_customer_returns_client_id_from_credentials(self):
+        mock_creds = MagicMock()
+        mock_creds.client_id = "customer-client-id"
+
+        with (
+            patch(_DETECT_CREDS_PATCH, return_value="/etc/ums/credentials/credentials"),
+            patch(_LOAD_CREDS_PATCH, return_value=mock_creds),
+        ):
+            result = create_client().get_ias_client_id()
+
+        assert result == "customer-client-id"
+
+    def test_customer_raises_on_load_failure(self):
+        with (
+            patch(_DETECT_CREDS_PATCH, return_value="/etc/ums/credentials/credentials"),
+            patch(_LOAD_CREDS_PATCH, side_effect=Exception("parse error")),
+        ):
+            with pytest.raises(AgentGatewaySDKError, match="Could not resolve IAS client ID"):
+                create_client().get_ias_client_id()
+
+    # --- LoB flow ---
+
+    @_NO_CUSTOMER_CREDS
+    def test_lob_returns_client_id_from_destination_properties(self, _mock_detect):
+        with patch(_GET_IAS_CLIENT_ID_LOB_PATCH, return_value="lob-client-id"):
+            result = create_client(tenant_subdomain="my-tenant").get_ias_client_id()
+
+        assert result == "lob-client-id"
+
+    @_NO_CUSTOMER_CREDS
+    def test_lob_raises_when_destination_not_found(self, _mock_detect):
+        with patch(_GET_IAS_CLIENT_ID_LOB_PATCH, side_effect=AgentGatewaySDKError("IAS destination 'sap-managed-runtime-ias-eu10' not found")):
+            with pytest.raises(AgentGatewaySDKError, match="IAS destination"):
+                create_client(tenant_subdomain="my-tenant").get_ias_client_id()
+
+    @_NO_CUSTOMER_CREDS
+    def test_lob_returns_empty_string_when_property_absent(self, _mock_detect):
+        with patch(_GET_IAS_CLIENT_ID_LOB_PATCH, return_value=""):
+            result = create_client(tenant_subdomain="my-tenant").get_ias_client_id()
+
+        assert result == ""
+
+    @_NO_CUSTOMER_CREDS
+    def test_lob_raises_on_exception(self, _mock_detect):
+        with patch(_GET_IAS_CLIENT_ID_LOB_PATCH, side_effect=EnvironmentError("APPFND_CONHOS_LANDSCAPE not set")):
+            with pytest.raises(AgentGatewaySDKError, match="Could not resolve IAS client ID"):
+                create_client(tenant_subdomain="my-tenant").get_ias_client_id()

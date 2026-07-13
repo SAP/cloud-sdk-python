@@ -250,7 +250,8 @@ class TestCreateClientFromDestination:
         ) as mock_dest_factory:
             client = create_client(tenant="my-tenant", insecure=True)
 
-        mock_dest_factory.assert_called_once_with(instance="default")
+        mock_dest_factory.assert_called_once()
+        assert mock_dest_factory.call_args.kwargs["instance"] == "default"
         dest_client.get_destination.assert_called_once()
         call_kwargs = dest_client.get_destination.call_args.kwargs
         assert call_kwargs["name"] == "AuditLogV3_Destination"
@@ -329,7 +330,8 @@ class TestCreateClientFromDestination:
                 insecure=True,
             )
 
-        mock_dest_factory.assert_called_once_with(instance="my-instance")
+        mock_dest_factory.assert_called_once()
+        assert mock_dest_factory.call_args.kwargs["instance"] == "my-instance"
 
     def test_destination_fragment_name_forwarded(self, mock_provider_cls, mock_exporter_fn):
         """fragment_name is always wrapped in ConsumptionOptions and forwarded to get_destination."""
@@ -384,7 +386,8 @@ class TestCreateClientFromDestination:
                 insecure=True,
             )
 
-        mock_dest_factory.assert_called_once_with(instance="default")
+        mock_dest_factory.assert_called_once()
+        assert mock_dest_factory.call_args.kwargs["instance"] == "default"
         assert isinstance(client, AuditClient)
 
     def test_destination_name_without_fragment_uses_destination_path(
@@ -439,7 +442,8 @@ class TestCreateClientFromDestination:
                 insecure=True,
             )
 
-        mock_dest_factory.assert_called_once_with(instance="default")
+        mock_dest_factory.assert_called_once()
+        assert mock_dest_factory.call_args.kwargs["instance"] == "default"
         assert isinstance(client, AuditClient)
 
     # ------------------------------------------------------------------

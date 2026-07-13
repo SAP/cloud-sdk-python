@@ -27,6 +27,7 @@ class Operation(str, Enum):
     DESTINATION_UPDATE_DESTINATION = "update_destination"
     DESTINATION_DELETE_DESTINATION = "delete_destination"
     DESTINATION_GET_DESTINATION = "get_destination"
+    DESTINATION_GET_SERVICE_INSTANCE_ID = "get_service_instance_id"
 
     # Destination Label Operations
     DESTINATION_GET_LABELS = "get_destination_labels"
@@ -141,6 +142,8 @@ class Operation(str, Enum):
     # AI Core Operations
     AICORE_SET_CONFIG = "set_aicore_config"
     AICORE_AUTO_INSTRUMENT = "auto_instrument"
+    AICORE_SET_FILTERING = "set_filtering"
+    AICORE_DISABLE_FILTERING = "disable_filtering"
 
     # Print Operations
     PRINT_LIST_QUEUES = "list_queues"
@@ -186,6 +189,7 @@ class Operation(str, Enum):
     AGENTGATEWAY_GET_SYSTEM_AUTH = "get_system_auth"
     AGENTGATEWAY_GET_USER_AUTH = "get_user_auth"
     AGENTGATEWAY_LIST_AGENT_CARDS = "list_agent_cards"
+    AGENTGATEWAY_GET_IAS_CLIENT_ID = "get_ias_client_id"
 
     # Agent Memory Operations
     AGENT_MEMORY_ADD_MEMORY = "add_memory"

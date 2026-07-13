@@ -18,6 +18,7 @@ from sap_cloud_sdk.destination import (
     ConsumptionLevel,
     ConsumptionOptions,
 )
+from sap_cloud_sdk.core.telemetry import Module
 
 from sap_cloud_sdk.agentgateway._fragments import (
     LABEL_KEY,
@@ -88,7 +89,10 @@ def _fetch_auth_token(
     Raises:
         MCPServerNotFoundError: If no auth token is returned.
     """
-    client = create_destination_client(instance=_DESTINATION_INSTANCE)
+    client = create_destination_client(
+        instance=_DESTINATION_INSTANCE,
+        _telemetry_source=Module.AGENTGATEWAY,
+    )
     dest = client.get_destination(
         dest_name,
         level=ConsumptionLevel.PROVIDER_SUBACCOUNT,
@@ -112,6 +116,36 @@ def _fetch_auth_token(
     gateway_url = (dest.url or "").rstrip("/")
 
     return raw_token, gateway_url
+
+
+def get_ias_client_id_lob() -> str:
+    """Read the IAS client ID from the IAS destination properties (LoB flow).
+
+    Fetches the IAS destination (``sap-managed-runtime-ias-{landscape}``)
+    at provider subaccount level with ``$skipTokenRetrieval=true`` so only
+    destination properties are returned — no auth token exchange is performed.
+
+    Returns:
+        The IAS client ID string, or ``""`` if the ``clientId`` property is absent.
+
+    Raises:
+        EnvironmentError: If ``APPFND_CONHOS_LANDSCAPE`` is not set.
+        AgentGatewaySDKError: If the IAS destination is not found.
+        Any exception raised by the destination client.
+    """
+    dest_name = _ias_dest_name()
+    client = create_destination_client(
+        instance=_DESTINATION_INSTANCE,
+        _telemetry_source=Module.AGENTGATEWAY,
+    )
+    dest = client.get_destination(
+        dest_name,
+        level=ConsumptionLevel.PROVIDER_SUBACCOUNT,
+        options=ConsumptionOptions(skip_token_retrieval=True),
+    )
+    if not dest:
+        raise AgentGatewaySDKError(f"IAS destination '{dest_name}' not found")
+    return dest.properties.get("clientId", "")
 
 
 async def fetch_system_auth(

@@ -24,8 +24,9 @@ plain text, and the service makes it searchable by meaning.
     - [`invoker_id`](#invoker_id)
   - [Multitenancy](#multitenancy)
     - [AccessStrategy](#accessstrategy)
-    - [SUBSCRIBER_ONLY (default)](#subscriber_only-default)
-    - [PROVIDER_ONLY](#provider_only)
+    - [Configuring at client level](#configuring-at-client-level)
+    - [SUBSCRIBER\_ONLY (default)](#subscriber_only-default)
+    - [PROVIDER\_ONLY](#provider_only)
   - [Semantic Search: A Brief Primer](#semantic-search-a-brief-primer)
   - [Memories](#memories)
     - [Create a Memory](#create-a-memory)
@@ -61,6 +62,10 @@ plain text, and the service makes it searchable by meaning.
     - [`AgentMemoryNotFoundError` when fetching a resource](#agentmemorynotfounderror-when-fetching-a-resource)
     - [`AgentMemoryHttpError` with status 401](#agentmemoryhttperror-with-status-401)
   - [Configuration](#configuration)
+    - [Service Binding](#service-binding)
+      - [Mounted Secrets (Kubernetes)](#mounted-secrets-kubernetes)
+      - [Environment Variables](#environment-variables)
+      - [UAA JSON Schema](#uaa-json-schema)
 
 ## Installation
 
@@ -176,6 +181,36 @@ from sap_cloud_sdk.agent_memory import AccessStrategy
 | `SUBSCRIBER_ONLY` (default) | Reads and writes against the subscriber tenant. Requires `tenant`. |
 | `PROVIDER_ONLY`             | Reads and writes against the provider tenant. No `tenant` needed.  |
 
+### Configuring at client level
+
+Pass `access_strategy` and `tenant` to `create_client()` to set defaults for the entire
+client instance. Every method call then inherits them, so you do not need to repeat them
+on each operation.
+
+```python
+from sap_cloud_sdk.agent_memory import create_client, AccessStrategy
+
+# Tenant set once — all calls below use it automatically
+client = create_client(
+    access_strategy=AccessStrategy.SUBSCRIBER_ONLY,
+    tenant="acme-corp",
+)
+
+memories = client.list_memories(agent_id="hr-assistant", invoker_id="user-42")
+count    = client.count_memories(agent_id="hr-assistant")
+```
+
+A per-call value overrides the client default for that single call:
+
+```python
+# All calls use SUBSCRIBER_ONLY / "acme-corp" except this one
+provider_memories = client.list_memories(
+    agent_id="hr-assistant",
+    invoker_id="user-42",
+    access_strategy=AccessStrategy.PROVIDER_ONLY,  # overrides for this call only
+)
+```
+
 ### SUBSCRIBER_ONLY (default)
 
 Pass the subscriber tenant subdomain via the `tenant` argument. Omitting `tenant` when
@@ -206,6 +241,10 @@ memories = client.list_memories(
     access_strategy=AccessStrategy.PROVIDER_ONLY,
 )
 ```
+
+> [!WARNING]
+> `PROVIDER_ONLY` provides **no tenant isolation** — the provider token grants access to data across all subscriber tenants. Only use this strategy for provider-owned operations
+> (e.g., admin tasks, shared datasets). Never use it to serve subscriber-specific data.
 
 > [!NOTE]
 > The `_FIRST` fallback strategies (`SUBSCRIBER_FIRST`, `PROVIDER_FIRST`) are not yet

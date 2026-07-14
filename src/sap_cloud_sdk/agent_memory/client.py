@@ -75,10 +75,22 @@ class AgentMemoryClient:
 
     Args:
         transport: HTTP transport layer (injected by ``create_client``).
+        access_strategy: Default tenant access strategy for all operations.
+            Defaults to ``SUBSCRIBER_ONLY``. Can be overridden per method call.
+        tenant: Default subscriber tenant subdomain. Required when
+            ``access_strategy=SUBSCRIBER_ONLY``. Can be overridden per method call.
     """
 
-    def __init__(self, transport: HttpTransport) -> None:
+    def __init__(
+        self,
+        transport: HttpTransport,
+        *,
+        access_strategy: AccessStrategy = AccessStrategy.SUBSCRIBER_ONLY,
+        tenant: Optional[str] = None,
+    ) -> None:
         self._transport = transport
+        self._default_access_strategy = access_strategy
+        self._default_tenant = tenant
 
     def close(self) -> None:
         """Close the underlying HTTP session and release resources."""
@@ -90,22 +102,38 @@ class AgentMemoryClient:
     def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
         self.close()
 
-    @staticmethod
     def _resolve_tenant(
-        access_strategy: AccessStrategy, tenant: Optional[str]
+        self,
+        access_strategy: Optional[AccessStrategy],
+        tenant: Optional[str],
     ) -> Optional[str]:
         """Return the tenant subdomain to use for token derivation.
 
+        Per-call parameters take precedence over instance defaults.
+
         Raises:
-            AgentMemoryValidationError: If ``SUBSCRIBER_ONLY`` is requested but no tenant is given.
+            AgentMemoryValidationError: If the effective strategy is ``SUBSCRIBER_ONLY``
+                but no tenant is available.
         """
-        if access_strategy is AccessStrategy.SUBSCRIBER_ONLY:
-            if not tenant:
-                raise AgentMemoryValidationError(
-                    "tenant is required when access_strategy=SUBSCRIBER_ONLY"
-                )
-            return tenant
-        return None  # PROVIDER_ONLY
+        effective_strategy = (
+            access_strategy
+            if access_strategy is not None
+            else self._default_access_strategy
+        )
+        effective_tenant = tenant if tenant is not None else self._default_tenant
+
+        if (
+            effective_strategy is AccessStrategy.SUBSCRIBER_ONLY
+            and not effective_tenant
+        ):
+            raise AgentMemoryValidationError(
+                "tenant is required when access_strategy=SUBSCRIBER_ONLY"
+            )
+        return (
+            effective_tenant
+            if effective_strategy is AccessStrategy.SUBSCRIBER_ONLY
+            else None
+        )
 
     # ── Memory operations ──────────────────────────────────────────────────────
 
@@ -117,7 +145,7 @@ class AgentMemoryClient:
         content: str,
         *,
         metadata: Optional[dict[str, Any]] = None,
-        access_strategy: AccessStrategy = AccessStrategy.SUBSCRIBER_ONLY,
+        access_strategy: Optional[AccessStrategy] = None,
         tenant: Optional[str] = None,
     ) -> Memory:
         """Create a new memory entry.
@@ -127,8 +155,10 @@ class AgentMemoryClient:
             invoker_id: Identifier of the user or invoker.
             content: The memory text content.
             metadata: Optional metadata dict (Map type in OData).
-            access_strategy: Tenant access strategy. Defaults to ``SUBSCRIBER_ONLY``.
-            tenant: Subscriber tenant subdomain. Required when ``access_strategy=SUBSCRIBER_ONLY``.
+            access_strategy: Tenant access strategy. Overrides the client default when
+                provided. Falls back to the default set on :func:`create_client`.
+            tenant: Subscriber tenant subdomain. Overrides the client default when
+                provided. Required (at call or client level) when strategy is ``SUBSCRIBER_ONLY``.
 
         Returns:
             The created :class:`Memory`.
@@ -157,15 +187,17 @@ class AgentMemoryClient:
         self,
         memory_id: str,
         *,
-        access_strategy: AccessStrategy = AccessStrategy.SUBSCRIBER_ONLY,
+        access_strategy: Optional[AccessStrategy] = None,
         tenant: Optional[str] = None,
     ) -> Memory:
         """Retrieve a memory by ID.
 
         Args:
             memory_id: The memory identifier (UUID).
-            access_strategy: Tenant access strategy. Defaults to ``SUBSCRIBER_ONLY``.
-            tenant: Subscriber tenant subdomain. Required when ``access_strategy=SUBSCRIBER_ONLY``.
+            access_strategy: Tenant access strategy. Overrides the client default when
+                provided. Falls back to the default set on :func:`create_client`.
+            tenant: Subscriber tenant subdomain. Overrides the client default when
+                provided. Required (at call or client level) when strategy is ``SUBSCRIBER_ONLY``.
 
         Returns:
             The :class:`Memory`.
@@ -190,7 +222,7 @@ class AgentMemoryClient:
         *,
         content: Optional[str] = None,
         metadata: Optional[dict[str, Any]] = None,
-        access_strategy: AccessStrategy = AccessStrategy.SUBSCRIBER_ONLY,
+        access_strategy: Optional[AccessStrategy] = None,
         tenant: Optional[str] = None,
     ) -> None:
         """Update a memory's content and/or metadata.
@@ -199,8 +231,10 @@ class AgentMemoryClient:
             memory_id: The memory identifier (UUID).
             content: New content to set.
             metadata: New metadata dict to set.
-            access_strategy: Tenant access strategy. Defaults to ``SUBSCRIBER_ONLY``.
-            tenant: Subscriber tenant subdomain. Required when ``access_strategy=SUBSCRIBER_ONLY``.
+            access_strategy: Tenant access strategy. Overrides the client default when
+                provided. Falls back to the default set on :func:`create_client`.
+            tenant: Subscriber tenant subdomain. Overrides the client default when
+                provided. Required (at call or client level) when strategy is ``SUBSCRIBER_ONLY``.
 
         Raises:
             AgentMemoryNotFoundError: If no memory with the given ID exists.
@@ -228,15 +262,17 @@ class AgentMemoryClient:
         self,
         memory_id: str,
         *,
-        access_strategy: AccessStrategy = AccessStrategy.SUBSCRIBER_ONLY,
+        access_strategy: Optional[AccessStrategy] = None,
         tenant: Optional[str] = None,
     ) -> None:
         """Delete a memory permanently.
 
         Args:
             memory_id: The memory identifier (UUID).
-            access_strategy: Tenant access strategy. Defaults to ``SUBSCRIBER_ONLY``.
-            tenant: Subscriber tenant subdomain. Required when ``access_strategy=SUBSCRIBER_ONLY``.
+            access_strategy: Tenant access strategy. Overrides the client default when
+                provided. Falls back to the default set on :func:`create_client`.
+            tenant: Subscriber tenant subdomain. Overrides the client default when
+                provided. Required (at call or client level) when strategy is ``SUBSCRIBER_ONLY``.
 
         Raises:
             AgentMemoryNotFoundError: If no memory with the given ID exists.
@@ -259,7 +295,7 @@ class AgentMemoryClient:
         filters: Optional[list[FilterDefinition]] = None,
         limit: int = 50,
         offset: int = 0,
-        access_strategy: AccessStrategy = AccessStrategy.SUBSCRIBER_ONLY,
+        access_strategy: Optional[AccessStrategy] = None,
         tenant: Optional[str] = None,
     ) -> list[Memory]:
         """List memories, optionally filtered by agent and/or invoker.
@@ -274,8 +310,10 @@ class AgentMemoryClient:
                 key-value structured search is not supported.
             limit: Maximum number of memories to return. Default is ``50``.
             offset: Number of memories to skip (for pagination). Default is ``0``.
-            access_strategy: Tenant access strategy. Defaults to ``SUBSCRIBER_ONLY``.
-            tenant: Subscriber tenant subdomain. Required when ``access_strategy=SUBSCRIBER_ONLY``.
+            access_strategy: Tenant access strategy. Overrides the client default when
+                provided. Falls back to the default set on :func:`create_client`.
+            tenant: Subscriber tenant subdomain. Overrides the client default when
+                provided. Required (at call or client level) when strategy is ``SUBSCRIBER_ONLY``.
 
         Returns:
             List of :class:`Memory` objects.
@@ -313,7 +351,7 @@ class AgentMemoryClient:
         agent_id: Optional[str] = None,
         invoker_id: Optional[str] = None,
         *,
-        access_strategy: AccessStrategy = AccessStrategy.SUBSCRIBER_ONLY,
+        access_strategy: Optional[AccessStrategy] = None,
         tenant: Optional[str] = None,
     ) -> int:
         """Count memories matching the given filters.
@@ -321,8 +359,10 @@ class AgentMemoryClient:
         Args:
             agent_id: Filter by agent identifier.
             invoker_id: Filter by invoker/user identifier.
-            access_strategy: Tenant access strategy. Defaults to ``SUBSCRIBER_ONLY``.
-            tenant: Subscriber tenant subdomain. Required when ``access_strategy=SUBSCRIBER_ONLY``.
+            access_strategy: Tenant access strategy. Overrides the client default when
+                provided. Falls back to the default set on :func:`create_client`.
+            tenant: Subscriber tenant subdomain. Overrides the client default when
+                provided. Required (at call or client level) when strategy is ``SUBSCRIBER_ONLY``.
 
         Returns:
             Total number of matching memories.
@@ -352,7 +392,7 @@ class AgentMemoryClient:
         threshold: float = 0.6,
         limit: int = 10,
         *,
-        access_strategy: AccessStrategy = AccessStrategy.SUBSCRIBER_ONLY,
+        access_strategy: Optional[AccessStrategy] = None,
         tenant: Optional[str] = None,
     ) -> list[SearchResult]:
         """Perform a semantic (vector) search over stored memories.
@@ -363,8 +403,10 @@ class AgentMemoryClient:
             query: Natural-language search query (5–5000 characters).
             threshold: Minimum cosine similarity score (0.0–1.0). Default ``0.6``.
             limit: Maximum number of results (1–50). Default is ``10``.
-            access_strategy: Tenant access strategy. Defaults to ``SUBSCRIBER_ONLY``.
-            tenant: Subscriber tenant subdomain. Required when ``access_strategy=SUBSCRIBER_ONLY``.
+            access_strategy: Tenant access strategy. Overrides the client default when
+                provided. Falls back to the default set on :func:`create_client`.
+            tenant: Subscriber tenant subdomain. Overrides the client default when
+                provided. Required (at call or client level) when strategy is ``SUBSCRIBER_ONLY``.
 
         Returns:
             List of :class:`SearchResult` objects.
@@ -410,7 +452,7 @@ class AgentMemoryClient:
         content: str,
         *,
         metadata: Optional[dict[str, Any]] = None,
-        access_strategy: AccessStrategy = AccessStrategy.SUBSCRIBER_ONLY,
+        access_strategy: Optional[AccessStrategy] = None,
         tenant: Optional[str] = None,
     ) -> Message:
         """Create a new message.
@@ -425,8 +467,10 @@ class AgentMemoryClient:
             role: Author role (USER, ASSISTANT, SYSTEM, TOOL).
             content: The message text content.
             metadata: Optional metadata dict.
-            access_strategy: Tenant access strategy. Defaults to ``SUBSCRIBER_ONLY``.
-            tenant: Subscriber tenant subdomain. Required when ``access_strategy=SUBSCRIBER_ONLY``.
+            access_strategy: Tenant access strategy. Overrides the client default when
+                provided. Falls back to the default set on :func:`create_client`.
+            tenant: Subscriber tenant subdomain. Overrides the client default when
+                provided. Required (at call or client level) when strategy is ``SUBSCRIBER_ONLY``.
 
         Returns:
             The created :class:`Message`.
@@ -462,15 +506,17 @@ class AgentMemoryClient:
         self,
         message_id: str,
         *,
-        access_strategy: AccessStrategy = AccessStrategy.SUBSCRIBER_ONLY,
+        access_strategy: Optional[AccessStrategy] = None,
         tenant: Optional[str] = None,
     ) -> Message:
         """Retrieve a message by ID.
 
         Args:
             message_id: The message identifier (UUID).
-            access_strategy: Tenant access strategy. Defaults to ``SUBSCRIBER_ONLY``.
-            tenant: Subscriber tenant subdomain. Required when ``access_strategy=SUBSCRIBER_ONLY``.
+            access_strategy: Tenant access strategy. Overrides the client default when
+                provided. Falls back to the default set on :func:`create_client`.
+            tenant: Subscriber tenant subdomain. Overrides the client default when
+                provided. Required (at call or client level) when strategy is ``SUBSCRIBER_ONLY``.
 
         Returns:
             The :class:`Message`.
@@ -493,15 +539,17 @@ class AgentMemoryClient:
         self,
         message_id: str,
         *,
-        access_strategy: AccessStrategy = AccessStrategy.SUBSCRIBER_ONLY,
+        access_strategy: Optional[AccessStrategy] = None,
         tenant: Optional[str] = None,
     ) -> None:
         """Delete a message permanently.
 
         Args:
             message_id: The message identifier (UUID).
-            access_strategy: Tenant access strategy. Defaults to ``SUBSCRIBER_ONLY``.
-            tenant: Subscriber tenant subdomain. Required when ``access_strategy=SUBSCRIBER_ONLY``.
+            access_strategy: Tenant access strategy. Overrides the client default when
+                provided. Falls back to the default set on :func:`create_client`.
+            tenant: Subscriber tenant subdomain. Overrides the client default when
+                provided. Required (at call or client level) when strategy is ``SUBSCRIBER_ONLY``.
 
         Raises:
             AgentMemoryNotFoundError: If no message with the given ID exists.
@@ -526,7 +574,7 @@ class AgentMemoryClient:
         filters: Optional[list[FilterDefinition]] = None,
         limit: int = 50,
         offset: int = 0,
-        access_strategy: AccessStrategy = AccessStrategy.SUBSCRIBER_ONLY,
+        access_strategy: Optional[AccessStrategy] = None,
         tenant: Optional[str] = None,
     ) -> list[Message]:
         """List messages, optionally filtered by agent, invoker, group, and role.
@@ -543,8 +591,10 @@ class AgentMemoryClient:
                 key-value structured search is not supported.
             limit: Maximum number of messages to return. Default is ``50``.
             offset: Number of messages to skip (for pagination). Default is ``0``.
-            access_strategy: Tenant access strategy. Defaults to ``SUBSCRIBER_ONLY``.
-            tenant: Subscriber tenant subdomain. Required when ``access_strategy=SUBSCRIBER_ONLY``.
+            access_strategy: Tenant access strategy. Overrides the client default when
+                provided. Falls back to the default set on :func:`create_client`.
+            tenant: Subscriber tenant subdomain. Overrides the client default when
+                provided. Required (at call or client level) when strategy is ``SUBSCRIBER_ONLY``.
 
         Returns:
             List of :class:`Message` objects.
@@ -584,14 +634,16 @@ class AgentMemoryClient:
     def get_retention_config(
         self,
         *,
-        access_strategy: AccessStrategy = AccessStrategy.SUBSCRIBER_ONLY,
+        access_strategy: Optional[AccessStrategy] = None,
         tenant: Optional[str] = None,
     ) -> RetentionConfig:
         """Retrieve the data retention configuration (singleton).
 
         Args:
-            access_strategy: Tenant access strategy. Defaults to ``SUBSCRIBER_ONLY``.
-            tenant: Subscriber tenant subdomain. Required when ``access_strategy=SUBSCRIBER_ONLY``.
+            access_strategy: Tenant access strategy. Overrides the client default when
+                provided. Falls back to the default set on :func:`create_client`.
+            tenant: Subscriber tenant subdomain. Overrides the client default when
+                provided. Required (at call or client level) when strategy is ``SUBSCRIBER_ONLY``.
 
         Returns:
             The current :class:`RetentionConfig`.
@@ -611,7 +663,7 @@ class AgentMemoryClient:
         message_days: Optional[int] = None,
         memory_days: Optional[int] = None,
         usage_log_days: Optional[int] = None,
-        access_strategy: AccessStrategy = AccessStrategy.SUBSCRIBER_ONLY,
+        access_strategy: Optional[AccessStrategy] = None,
         tenant: Optional[str] = None,
     ) -> None:
         """Update the data retention configuration.
@@ -624,8 +676,10 @@ class AgentMemoryClient:
             message_days: How long to keep messages (days).
             memory_days: How long to keep memories without access (days).
             usage_log_days: How long to keep access and search logs (days).
-            access_strategy: Tenant access strategy. Defaults to ``SUBSCRIBER_ONLY``.
-            tenant: Subscriber tenant subdomain. Required when ``access_strategy=SUBSCRIBER_ONLY``.
+            access_strategy: Tenant access strategy. Overrides the client default when
+                provided. Falls back to the default set on :func:`create_client`.
+            tenant: Subscriber tenant subdomain. Overrides the client default when
+                provided. Required (at call or client level) when strategy is ``SUBSCRIBER_ONLY``.
 
         Raises:
             AgentMemoryValidationError: If no fields are provided, any provided value is

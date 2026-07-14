@@ -5,9 +5,13 @@ or ``CLOUD_SDK_CFG_AGENT_MEMORY_DEFAULT_*`` environment variables.
 
 Usage::
 
-    from sap_cloud_sdk.agent_memory import create_client
+    from sap_cloud_sdk.agent_memory import create_client, AccessStrategy
 
-    client = create_client()
+    # Subscriber tenant — strategy and tenant set once, inherited by all calls
+    client = create_client(
+        access_strategy=AccessStrategy.SUBSCRIBER_ONLY,
+        tenant="my-tenant-subdomain",
+    )
     memories = client.list_memories(agent_id="my-agent", invoker_id="user-123")
 """
 
@@ -34,7 +38,12 @@ from sap_cloud_sdk.agent_memory._models import (
 from sap_cloud_sdk.agent_memory.utils._odata import FilterDefinition
 
 
-def create_client(*, config: Optional[AgentMemoryConfig] = None) -> AgentMemoryClient:
+def create_client(
+    *,
+    config: Optional[AgentMemoryConfig] = None,
+    access_strategy: AccessStrategy = AccessStrategy.SUBSCRIBER_ONLY,
+    tenant: Optional[str] = None,
+) -> AgentMemoryClient:
     """Create an :class:`AgentMemoryClient` with automatic credential detection.
 
     Args:
@@ -42,17 +51,28 @@ def create_client(*, config: Optional[AgentMemoryConfig] = None) -> AgentMemoryC
                 loaded from the mounted volume at
                 ``/etc/secrets/appfnd/hana-agent-memory/default/`` or from
                 ``CLOUD_SDK_CFG_AGENT_MEMORY_DEFAULT_*`` environment variables.
+        access_strategy: Default tenant access strategy for all client operations.
+                Defaults to ``SUBSCRIBER_ONLY``. Individual method calls may override
+                this value.
+        tenant: Default subscriber tenant subdomain. Required when
+                ``access_strategy=SUBSCRIBER_ONLY``. Individual method calls may
+                override this value.
 
     Returns:
         A ready-to-use :class:`AgentMemoryClient`.
 
     Raises:
-        AgentMemoryConfigError: If configuration is missing or invalid.
+        AgentMemoryConfigError: If configuration is missing, invalid, or
+            ``access_strategy=SUBSCRIBER_ONLY`` is used without a ``tenant``.
     """
     try:
         resolved_config = config if config is not None else _load_config_from_env()
         transport = HttpTransport(resolved_config)
-        return AgentMemoryClient(transport)
+        return AgentMemoryClient(
+            transport,
+            access_strategy=access_strategy,
+            tenant=tenant,
+        )
     except AgentMemoryConfigError:
         raise
     except Exception as exc:

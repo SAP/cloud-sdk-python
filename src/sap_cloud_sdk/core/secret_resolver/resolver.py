@@ -1,136 +1,14 @@
 """Core secret resolver implementation."""
 
 from __future__ import annotations
-
 import os
-from dataclasses import fields, is_dataclass
-from typing import Any, Dict, Tuple
-from .constants import BASE_MOUNT_PATH
+from typing import Any
 
-
-def resolve_base_mount(base_volume_mount: str = BASE_MOUNT_PATH) -> str:
-    """Resolve the base mount path for service binding discovery.
-
-    Checks the ``SERVICE_BINDING_ROOT`` environment variable first (as defined
-    by the `servicebinding.io <https://servicebinding.io/spec/core/1.1.0/>`_
-    specification). Falls back to ``base_volume_mount`` when the env var is
-    absent.
-
-    Args:
-        base_volume_mount: Default base path used when ``SERVICE_BINDING_ROOT``
-            is not set. Defaults to ``/etc/secrets/appfnd``.
-
-    Returns:
-        The effective base path for secret mount resolution.
-    """
-    return os.environ.get("SERVICE_BINDING_ROOT", base_volume_mount)
-
-
-def _validate_inputs(module: str, instance: str) -> None:
-    """Validate module and instance inputs."""
-    if not isinstance(module, str) or not module.strip():
-        raise ValueError("module name cannot be empty")
-    if not isinstance(instance, str) or not instance.strip():
-        raise ValueError("instance name cannot be empty")
-
-
-def _validate_path(path: str) -> None:
-    """Validate that the given path exists and is a directory."""
-    try:
-        _st = os.stat(path)
-    except FileNotFoundError as e:
-        raise FileNotFoundError(f"path does not exist: {path}") from e
-    except OSError as e:
-        raise OSError(f"cannot access path {path}: {e}") from e
-    # If exists, ensure it's a directory
-    if not os.path.isdir(path):
-        raise NotADirectoryError(f"path is not a directory: {path}")
-
-
-def _get_field_map(target: Any) -> Dict[str, Tuple[str, type]]:
-    """
-    Build a mapping from secret key -> (attribute_name, attribute_type) for a dataclass instance.
-
-    Priority:
-      1. Use field.metadata["secret"] if present as the key
-      2. Fallback to the lowercase dataclass field name
-    Only string-typed fields are supported.
-    """
-    if not is_dataclass(target) or isinstance(target, type):
-        raise TypeError("target must be a dataclass instance")
-
-    mapping: Dict[str, Tuple[str, type]] = {}
-    for f in fields(target):
-        # Only support string fields for secrets (consistent with Go SDK)
-        # Allow plain 'str' annotations; reject others to keep behavior predictable
-        if f.type is not str:
-            raise TypeError(
-                f"target field '{f.name}' is not a string (only str fields are supported)"
-            )
-        key = f.metadata.get("secret") if hasattr(f, "metadata") else None
-        if key and isinstance(key, str) and key.strip():
-            mapping[key] = (f.name, f.type)
-        else:
-            mapping[f.name.lower()] = (f.name, f.type)
-    return mapping
-
-
-def _load_from_path(secret_dir: str, target: Any) -> None:
-    """
-    Load secrets from files directly in secret_dir into target dataclass.
-
-    Reads each field key as a file name under secret_dir. Used for both the
-    servicebinding.io flat layout ($ROOT/<module>/<field>) and the legacy
-    three-level layout via :func:`_load_from_mount`.
-    """
-    _validate_path(secret_dir)
-
-    field_map = _get_field_map(target)
-    for key, (attr_name, _) in field_map.items():
-        file_path = os.path.join(secret_dir, key)
-        try:
-            # Read entire file content as text; do not strip newlines to match Go behavior
-            with open(file_path, "r", encoding="utf-8") as f:
-                content = f.read()
-        except FileNotFoundError as e:
-            # Align with Go: surface precise file error
-            raise FileNotFoundError(
-                f"failed to read secret file {file_path}: {e}"
-            ) from e
-        except OSError as e:
-            raise OSError(f"failed to read secret file {file_path}: {e}") from e
-
-        # Set target field (string only)
-        setattr(target, attr_name, content)
-
-
-def _load_from_mount(
-    base_volume_mount: str, module: str, instance: str, target: Any
-) -> None:
-    """
-    Load secrets from files at:
-        {base_volume_mount}/{module}/{instance}/{field_key}
-    """
-    secret_dir = os.path.join(base_volume_mount, module, instance)
-    _load_from_path(secret_dir, target)
-
-
-def _load_from_env(base_var_name: str, module: str, instance: str, target: Any) -> None:
-    """
-    Load secrets from environment variables with names:
-        {base_var_name}_{module}_{instance}_{field_key} (uppercased)
-    instance names have '-' replaced with '_' for env var compatibility.
-    """
-    field_map = _get_field_map(target)
-    prefix = f"{base_var_name}_{module}_{instance}".upper()
-
-    for key, (attr_name, _) in field_map.items():
-        var_name = f"{prefix}_{key}".upper()
-        value = os.environ.get(var_name)
-        if value is None:
-            # Align with Go: error if env var not found
-            raise KeyError(f"env var not found: {var_name}")
-        setattr(target, attr_name, value)
+from sap_cloud_sdk.core.secret_resolver.mount_resolver import (
+    resolve_base_mount,
+    _load_from_mount,
+)
+from sap_cloud_sdk.core.secret_resolver.env_resolver import _load_from_env
 
 
 def read_from_mount_and_fallback_to_env_var(
@@ -142,21 +20,17 @@ def read_from_mount_and_fallback_to_env_var(
 ) -> None:
     """
     Load secrets for a given module and instance into the provided dataclass instance `target`.
-
-    Fallback order when ``SERVICE_BINDING_ROOT`` is set:
-      1. Flat path: {SERVICE_BINDING_ROOT}/{module}/{field_key}  (servicebinding.io spec)
-      2. Full path: {SERVICE_BINDING_ROOT}/{module}/{instance}/{field_key}  (legacy convention)
-      3. Environment variables: {base_var_name}_{module}_{instance}_{field_key} (uppercased)
-
-    Fallback order when ``SERVICE_BINDING_ROOT`` is **not** set:
-      1. Full path: {base_volume_mount}/{module}/{instance}/{field_key}
+    Fallback order:
+      1. Mounted volume path: {base_volume_mount}/{module}/{instance}/{field_key}
+         (``SERVICE_BINDING_ROOT`` env var overrides ``base_volume_mount`` — see
+         :func:`resolve_base_mount`)
       2. Environment variables: {base_var_name}_{module}_{instance}_{field_key} (uppercased)
 
     Raises:
       ValueError: If inputs are invalid or target is not a dataclass instance
       FileNotFoundError / NotADirectoryError / OSError: If mount path issues occur
       KeyError: If environment variables are missing on fallback
-      RuntimeError: If all strategies fail (aggregated error)
+      RuntimeError: If both mount and env var loading fail (aggregated error)
     """
     _validate_inputs(module, instance)
 
@@ -164,15 +38,6 @@ def read_from_mount_and_fallback_to_env_var(
     errors: list[str] = []
     normalized_module = module.replace("-", "_")
     normalized_instance = instance.replace("-", "_")
-
-    # servicebinding.io: when SERVICE_BINDING_ROOT is explicitly set, try the flat path
-    # $ROOT/<module>/<field> before the legacy $ROOT/<module>/<instance>/<field> path.
-    if os.environ.get("SERVICE_BINDING_ROOT") is not None:
-        try:
-            _load_from_path(os.path.join(resolved_base_path, module), target)
-            return
-        except Exception as e:
-            errors.append(f"mount failed: {e};")
 
     try:
         _load_from_mount(resolved_base_path, module, instance, target)
@@ -202,3 +67,11 @@ def read_from_mount_and_fallback_to_env_var(
     raise RuntimeError(
         f"module={module} instance={instance} failed to read secrets: {errors} {guidance}"
     )
+
+
+def _validate_inputs(module: str, instance: str) -> None:
+    """Validate module and instance inputs."""
+    if not isinstance(module, str) or not module.strip():
+        raise ValueError("module name cannot be empty")
+    if not isinstance(instance, str) or not instance.strip():
+        raise ValueError("instance name cannot be empty")

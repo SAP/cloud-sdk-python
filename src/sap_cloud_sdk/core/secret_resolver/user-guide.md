@@ -1,256 +1,179 @@
-# Secret Resolver User Guide
+# Secret Resolver — User Guide
 
-This module provides secure credential management by loading secrets from mounted volumes (Kubernetes-style) with fallback to environment variables. It supports type-safe configuration using dataclasses and follows Cloud patterns for secret resolution.
+The `secret_resolver` module loads service-binding credentials (secrets) into
+dataclass instances from two sources: **mounted volume files** and **environment
+variables**. Resolvers are composable and the default chain can be replaced
+process-wide for custom environments (e.g. Cloud Foundry VCAP).
 
-The Secret Resolver is designed to work seamlessly in both Kubernetes environments with mounted secrets and with environment variables.
+---
 
-## Import
+## Concepts
+
+### Target dataclass
+
+All resolvers populate a **dataclass instance** whose fields are all `str`.
+Each field maps to one secret key. By default the key is the lowercase field
+name; you can override it with `field(metadata={"secret": "custom-key"})`.
 
 ```python
-from sap_cloud_sdk.secret_resolver import read_from_mount_and_fallback_to_env_var
+from dataclasses import dataclass, field
+
+@dataclass
+class DestinationBinding:
+    clientid: str = ""
+    clientsecret: str = ""
+    url: str = ""
+    # Override the lookup key to "token_service_url"
+    token_url: str = field(default="", metadata={"secret": "token_service_url"})
+```
+
+### module / instance
+
+Every resolver call takes a `module` (service category, e.g. `"destination"`)
+and an `instance` (service instance name, e.g. `"default"`). These are used to
+build the lookup path or variable name prefix. Hyphens in both are normalised
+to underscores where required.
+
+---
+
+## Resolver types
+
+### `MountResolver`
+
+Reads secret files at:
+
+```
+{base_volume_mount}/{module}/{instance}/{field_key}
+```
+
+
+```python
+from sap_cloud_sdk.core.secret_resolver import MountResolver
+
+resolver = MountResolver()                          # defaults to /etc/secrets/appfnd
+resolver = MountResolver("/custom/mount/path")      # explicit base path
+```
+
+### `EnvVarResolver`
+
+Reads environment variables named:
+
+```
+{BASE_VAR_NAME}_{MODULE}_{INSTANCE}_{FIELD_KEY}   (all uppercased)
+```
+
+Example: `CLOUD_SDK_CFG_DESTINATION_DEFAULT_CLIENTID`
+
+```python
+from sap_cloud_sdk.core.secret_resolver import EnvVarResolver
+
+resolver = EnvVarResolver()                         # base prefix: CLOUD_SDK_CFG
+resolver = EnvVarResolver("MY_APP_SECRETS")         # custom prefix
+```
+
+### `ChainedResolver`
+
+Tries each resolver in order and returns on the first success. Raises
+`RuntimeError` with an aggregated report when all resolvers fail.
+
+```python
+from sap_cloud_sdk.core.secret_resolver import ChainedResolver, MountResolver, EnvVarResolver
+
+resolver = ChainedResolver([MountResolver(), EnvVarResolver()])
+resolver.resolve("destination", "default", binding)
+```
+
+### Custom resolver
+
+Any object with a `resolve(module, instance, target)` method satisfies the
+`Resolver` protocol — no inheritance needed.
+
+```python
+class VaultResolver:
+    def resolve(self, module: str, instance: str, target: object) -> None:
+        # fetch from HashiCorp Vault, populate target fields
+        ...
 ```
 
 ---
 
-## Getting Started
+## Process-wide configuration
 
-The Secret Resolver loads configuration into dataclass objects using a hierarchical approach:
-
-1. **First**: Try to read from mounted volume paths (Kubernetes secrets)
-2. **Fallback**: Use environment variables if mounted secrets are not available
+Call `configure()` once at application startup to install a custom resolver
+chain. All `create_client()` calls across every module will use it.
 
 ```python
-from dataclasses import dataclass
-from sap_cloud_sdk.secret_resolver import read_from_mount_and_fallback_to_env_var
+from sap_cloud_sdk.core.secret_resolver import configure, SdkConfig, ChainedResolver, EnvVarResolver
+
+configure(SdkConfig(
+    resolver=ChainedResolver([VaultResolver(), EnvVarResolver()])
+))
+```
+
+If `configure()` is never called, each module falls back to the default chain:
+`ChainedResolver([MountResolver(), EnvVarResolver()])`.
+
+### Configuration API
+
+| Function | Description |
+|---|---|
+| `configure(config)` | Install a process-wide `SdkConfig`. Thread-safe. |
+| `get_sdk_config()` | Return the current `SdkConfig`, or `None` if unset. |
+| `get_resolver()` | Return the active resolver (custom or default chain). |
+| `reset_sdk_config()` | Reset to unset state. Intended for test teardown only. |
+
+---
+
+## Putting it together
+
+```python
+from dataclasses import dataclass, field
+from sap_cloud_sdk.core.secret_resolver import ChainedResolver, MountResolver, EnvVarResolver
 
 @dataclass
-class DatabaseConfig:
-    host: str = ""
-    port: str = ""
-    username: str = ""
-    password: str = ""
+class DestinationBinding:
+    clientid: str = ""
+    clientsecret: str = ""
+    url: str = ""
 
-# Load configuration
-config = DatabaseConfig()
-read_from_mount_and_fallback_to_env_var(
-    base_volume_mount="/etc/secrets",      # Base mount path
-    base_var_name="DB",                    # Environment variable prefix
-    module="database",                     # Module/service name
-    instance="primary",                    # Instance name
-    target=config                          # Target dataclass instance
-)
+binding = DestinationBinding()
 
-print(f"Database: {config.username}@{config.host}:{config.port}")
+resolver = ChainedResolver([MountResolver(), EnvVarResolver()])
+resolver.resolve("destination", "my-instance", binding)
+
+print(binding.clientid)
 ```
 
 ---
 
-## Configuration Patterns
+## Legacy API
 
-### Mount Path Structure
+The function-based API from earlier SDK versions is still supported:
 
-The Secret Resolver expects mounted secrets to follow this hierarchy:
+```python
+from sap_cloud_sdk.core.secret_resolver import read_from_mount_and_fallback_to_env_var
 
-```
-/etc/secrets/appfnd
-└── <module_name>/
-    └── <instance_name>/
-        ├── host
-        ├── port
-        ├── username
-        └── password
-```
-
-### Base Path Resolution
-
-By default, the resolver looks for secrets under `/etc/secrets/appfnd`. You can override this by setting the `SERVICE_BINDING_ROOT` environment variable, which follows the [servicebinding.io](https://servicebinding.io) specification used across SAP SDKs and Kubernetes-native tooling.
-
-When `SERVICE_BINDING_ROOT` is set, it takes precedence over the default `/etc/secrets/appfnd` path:
-
-```bash
-export SERVICE_BINDING_ROOT=/bindings
+read_from_mount_and_fallback_to_env_var(
+    base_volume_mount="/etc/secrets/appfnd",
+    base_var_name="CLOUD_SDK_CFG",
+    module="destination",
+    instance="default",
+    target=binding,
+)
 ```
 
-With this set, the resolver looks for secrets at `$SERVICE_BINDING_ROOT/<module>/<instance>/<field>` instead of `/etc/secrets/appfnd/<module>/<instance>/<field>`.
-
-Example for the above configuration:
-```
-/etc/secrets/appfnd
-└── database/
-    └── primary/
-        ├── host          # Contains: "db.example.com"
-        ├── port          # Contains: "5432"
-        ├── username      # Contains: "app_user"
-        └── password      # Contains: "secret123"
-```
-
-### Environment Variable Fallback
-
-If mounted secrets are not available, the resolver falls back to environment variables using this pattern:
-
-```
-<ENV_PREFIX>_<MODULE_NAME>_<INSTANCE_NAME>_<FIELD_NAME>
-```
--  INSTANCE_NAME has `'-'` replaced with `'_'` for compatibility with system environment variable naming rules.
-
-
-For the example above:
-```bash
-export DB_DATABASE_PRIMARY_HOST="db.example.com"
-export DB_DATABASE_PRIMARY_PORT="5432"
-export DB_DATABASE_PRIMARY_USERNAME="app_user"
-export DB_DATABASE_PRIMARY_PASSWORD="secret123"
-```
+Prefer the class-based API for new code — it is more composable and supports
+process-wide configuration.
 
 ---
 
-## Usage Examples
+## Error handling
 
-### ObjectStore Configuration
-
-This is how the ObjectStore module uses the Secret Resolver internally:
-
-```python
-from dataclasses import dataclass
-from sap_cloud_sdk.secret_resolver import read_from_mount_and_fallback_to_env_var
-
-@dataclass
-class ObjectStoreConfig:
-    access_key_id: str = ""
-    secret_access_key: str = ""
-    bucket: str = ""
-    host: str = ""
-
-# Load ObjectStore credentials
-config = ObjectStoreConfig()
-read_from_mount_and_fallback_to_env_var(
-    base_volume_mount="/etc/secrets",
-    base_var_name="OBJECTSTORE",
-    module="objectstore",
-    instance="credentials",
-    target=config
-)
-```
-
-**Mounted secrets structure:**
-```
-/etc/secrets/appfnd
-└── objectstore/
-    └── credentials/
-        ├── access_key_id
-        ├── secret_access_key
-        ├── bucket
-        └── host
-```
-
-**Environment variable fallback:**
-```bash
-export OBJECTSTORE_OBJECTSTORE_CREDENTIALS_ACCESS_KEY_ID="AKIA..."
-export OBJECTSTORE_OBJECTSTORE_CREDENTIALS_SECRET_ACCESS_KEY="secret"
-export OBJECTSTORE_OBJECTSTORE_CREDENTIALS_BUCKET="my-bucket"
-export OBJECTSTORE_OBJECTSTORE_CREDENTIALS_HOST="s3.amazonaws.com"
-```
-
-### Database Configuration with Multiple Instances
-
-```python
-from dataclasses import dataclass
-from sap_cloud_sdk.secret_resolver import read_from_mount_and_fallback_to_env_var
-
-@dataclass
-class DatabaseConfig:
-    host: str = ""
-    port: str = "5432"           # Default value
-    database: str = ""
-    username: str = ""
-    password: str = ""
-    ssl_mode: str = "require"    # Default value
-
-# Load primary database config
-primary_db = DatabaseConfig()
-read_from_mount_and_fallback_to_env_var(
-    base_volume_mount="/etc/secrets",
-    base_var_name="APP",
-    module="database",
-    instance="primary",
-    target=primary_db
-)
-
-# Load read replica config
-replica_db = DatabaseConfig()
-read_from_mount_and_fallback_to_env_var(
-    base_volume_mount="/etc/secrets",
-    base_var_name="APP",
-    module="database",
-    instance="replica",
-    target=replica_db
-)
-
-print(f"Primary DB: {primary_db.username}@{primary_db.host}")
-print(f"Replica DB: {replica_db.username}@{replica_db.host}")
-```
-
-### API Configuration
-
-```python
-from dataclasses import dataclass
-from sap_cloud_sdk.secret_resolver import read_from_mount_and_fallback_to_env_var
-
-@dataclass
-class ApiConfig:
-    base_url: str = ""
-    api_key: str = ""
-    timeout: str = "30"
-    retries: str = "3"
-
-# Load external API configuration
-api_config = ApiConfig()
-read_from_mount_and_fallback_to_env_var(
-    base_volume_mount="/etc/secrets",
-    base_var_name="EXTERNAL",
-    module="payment",
-    instance="stripe",
-    target=api_config
-)
-
-# Convert string values to appropriate types
-timeout_seconds = int(api_config.timeout)
-max_retries = int(api_config.retries)
-```
-
----
-
-## Error Handling
-
-The Secret Resolver handles missing secrets gracefully by leaving default values unchanged:
-
-```python
-from dataclasses import dataclass
-from sap_cloud_sdk.secret_resolver import read_from_mount_and_fallback_to_env_var
-
-@dataclass
-class ServiceConfig:
-    api_key: str = ""
-    timeout: str = "30"     # Default value
-    retries: str = "3"      # Default value
-    debug: str = "false"    # Default value
-
-config = ServiceConfig()
-
-# This won't raise an error if secrets are missing
-read_from_mount_and_fallback_to_env_var(
-    base_volume_mount="/etc/secrets",
-    base_var_name="API",
-    module="external",
-    instance="service",
-    target=config
-)
-
-# Check if required values were loaded
-if not config.api_key:
-    raise ValueError("API key is required but not found in secrets or environment")
-
-print(f"Loaded config: timeout={config.timeout}, retries={config.retries}")
-```
-
----
+| Situation | Exception raised |
+|---|---|
+| Target is not a dataclass instance | `TypeError` |
+| A target field is not `str` | `TypeError` |
+| Mount directory does not exist | `FileNotFoundError` |
+| Mount path is not a directory | `NotADirectoryError` |
+| Expected env var is absent | `KeyError` |
+| All resolvers in a chain fail | `RuntimeError` (aggregated message with guidance) |

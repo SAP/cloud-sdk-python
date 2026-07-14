@@ -225,19 +225,29 @@ apply_label() {
     gh_api "repos/${owner_repo}/labels" -F name="$name" -F color="$color" > /dev/null 2>&1 || true
   done
 
-  # remove any existing sdk-review labels first
-  # Guard: `grep` returns 1 on no-match, which combined with `set -o pipefail`
-  # aborts the caller. Use `|| true` to swallow that.
+  # Idempotent: read current labels first. If the target label is already
+  # the ONLY sdk-review label, skip all GitHub API calls to avoid the noisy
+  # "added X and removed X" churn in the PR timeline.
   local existing_labels
   existing_labels=$(gh pr view "$pr" --json labels -q '.labels[].name' 2>/dev/null || echo "")
-  echo "$existing_labels" | grep '^sdk-review:' 2>/dev/null | while read -r existing; do
-    [ -n "$existing" ] && gh pr edit "$pr" --remove-label "$existing" > /dev/null 2>&1 || true
+  local current_sdk_labels
+  current_sdk_labels=$(echo "$existing_labels" | grep '^sdk-review:' 2>/dev/null || true)
+  if [ "$current_sdk_labels" = "$label" ]; then
+    return 0  # already correct — nothing to do
+  fi
+
+  # remove any existing sdk-review labels that differ from target
+  echo "$current_sdk_labels" | while read -r existing; do
+    [ -n "$existing" ] && [ "$existing" != "$label" ] && \
+      gh pr edit "$pr" --remove-label "$existing" > /dev/null 2>&1 || true
   done || true
 
-  # add the target label
-  gh pr edit "$pr" --add-label "$label" > /dev/null 2>&1 || {
-    echo "WARN: could not apply label (fork PR or missing pull-requests:write scope)" >&2
-  }
+  # add the target label only if not already present
+  if ! echo "$current_sdk_labels" | grep -Fxq "$label" 2>/dev/null; then
+    gh pr edit "$pr" --add-label "$label" > /dev/null 2>&1 || {
+      echo "WARN: could not apply label (fork PR or missing pull-requests:write scope)" >&2
+    }
+  fi
 }
 
 if [ "${BASH_SOURCE[0]}" = "${0}" ]; then

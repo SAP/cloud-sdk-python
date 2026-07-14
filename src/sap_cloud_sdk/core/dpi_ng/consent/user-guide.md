@@ -993,3 +993,9 @@ with create_client(config=config) as client:
 ```
 
 Or call `client.close()` explicitly when not using `with`.
+
+## Running the Unit Tests
+
+```bash
+uv run pytest tests/core/unit/dpi_ng/ -v
+```

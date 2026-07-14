@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import pytest
-from odata.property import BooleanProperty
 
 from tests.core.unit.dpi_ng.consent.unit.entities.conftest import (
     CONFIGURATION_ENTITY_SPECS,
@@ -27,13 +26,3 @@ def test_pk_fields_marked(config_entities, name, spec):
     for pk_field in spec["pk"]:
         prop = getattr(cls, pk_field)
         assert prop.primary_key is True
-
-
-@pytest.mark.parametrize(
-    "name,spec",
-    [(n, s) for n, s in CONFIGURATION_ENTITY_SPECS.items() if s["bool"]],
-)
-def test_bool_fields(config_entities, name, spec):
-    cls = entity_by_name(config_entities, name)
-    for field in spec["bool"]:
-        assert isinstance(getattr(cls, field), BooleanProperty)

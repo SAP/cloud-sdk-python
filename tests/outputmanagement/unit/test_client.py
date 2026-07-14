@@ -67,11 +67,18 @@ class TestOutputManagementClient:
                 business_document={"Document": {"id": "123"}},
             )
 
-            mock_metric.assert_called_once_with(
-                Module.OUTPUT_MANAGEMENT,
-                None,
-                Operation.OUTPUT_MANAGEMENT_SEND_EMAIL,
-                False,
+            # send_email calls send_output_request internally, so both decorators fire
+            # We verify that send_email's metric was recorded (it's the second call)
+            assert mock_metric.call_count == 2
+            
+            # First call is from send_output_request
+            assert mock_metric.call_args_list[0] == (
+                (Module.OUTPUT_MANAGEMENT, None, Operation.OUTPUT_MANAGEMENT_SEND_OUTPUT_REQUEST, False),
+            )
+            
+            # Second call is from send_email
+            assert mock_metric.call_args_list[1] == (
+                (Module.OUTPUT_MANAGEMENT, None, Operation.OUTPUT_MANAGEMENT_SEND_EMAIL, False),
             )
 
             assert response.output_request_id == "req-123"
@@ -103,12 +110,14 @@ class TestOutputManagementClient:
     @pytest.mark.asyncio
     async def test_send_email_with_mcp_records_request_metric(self):
         """Test that send_email_with_mcp records request metric."""
+        from unittest.mock import AsyncMock
+        
         mock_service_client = Mock(spec=OutputManagementServiceClient)
         client = OutputManagementClient(service_client=mock_service_client)
 
-        # Mock MCP tool
+        # Mock MCP tool with AsyncMock for ainvoke
         mock_mcp_tool = Mock()
-        mock_mcp_tool.ainvoke = Mock(return_value="mcp_result")
+        mock_mcp_tool.ainvoke = AsyncMock(return_value="mcp_result")
 
         with patch(
             "sap_cloud_sdk.core.telemetry.metrics_decorator.record_request_metric"
@@ -159,4 +168,4 @@ class TestOutputManagementClient:
         assert output_request is not None
         assert isinstance(output_request, OutputRequest)
         assert output_request.data is not None
-        assert output_request.data.OutputManagement is not None
+        assert output_request.data.output_management is not None

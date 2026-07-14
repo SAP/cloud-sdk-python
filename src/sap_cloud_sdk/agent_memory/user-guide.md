@@ -176,10 +176,10 @@ that your application serves. You control this behaviour with the `access_strate
 from sap_cloud_sdk.agent_memory import AccessStrategy
 ```
 
-| Value                       | Description                                                        |
-| --------------------------- | ------------------------------------------------------------------ |
-| `SUBSCRIBER_ONLY` (default) | Reads and writes against the subscriber tenant. Requires `tenant`. |
-| `PROVIDER_ONLY`             | Reads and writes against the provider tenant. No `tenant` needed.  |
+| Value                       | Description                                                                                                   |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| `SUBSCRIBER_ONLY` (default) | Reads and writes against the subscriber tenant. Requires `tenant`.                                            |
+| `PROVIDER_ONLY`             | Reads and writes against the provider tenant. No `tenant` needed. Caution: this provides no tenant isolation. |
 
 ### Configuring at client level
 
@@ -243,13 +243,7 @@ memories = client.list_memories(
 ```
 
 > [!WARNING]
-> `PROVIDER_ONLY` provides **no tenant isolation** — the provider token grants access to data across all subscriber tenants. Only use this strategy for provider-owned operations
-> (e.g., admin tasks, shared datasets). Never use it to serve subscriber-specific data.
-
-> [!NOTE]
-> The `_FIRST` fallback strategies (`SUBSCRIBER_FIRST`, `PROVIDER_FIRST`) are not yet
-> supported and must be evaluated for silent cross-tenant access risks before being
-> introduced.
+> `PROVIDER_ONLY` provides **no tenant isolation** — the provider token grants access to data across all subscriber tenants Only use this strategy for provider-owned operations (e.g., admin tasks, shared datasets). Never use it to serve subscriber-specific data.
 
 ## Semantic Search: A Brief Primer
 

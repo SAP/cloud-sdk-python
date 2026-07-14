@@ -15,7 +15,7 @@ from typing import Optional
 
 from sap_cloud_sdk.agent_memory._http_transport import HttpTransport
 from sap_cloud_sdk.agent_memory.client import AgentMemoryClient
-from sap_cloud_sdk.agent_memory.config import AgentMemoryConfig, _load_config_from_env
+from sap_cloud_sdk.agent_memory.config import AgentMemoryConfig, _load_secrets
 from sap_cloud_sdk.agent_memory.exceptions import (
     AgentMemoryConfigError,
     AgentMemoryError,
@@ -49,7 +49,7 @@ def create_client(*, config: Optional[AgentMemoryConfig] = None) -> AgentMemoryC
         AgentMemoryConfigError: If configuration is missing or invalid.
     """
     try:
-        resolved_config = config if config is not None else _load_config_from_env()
+        resolved_config = config if config is not None else _load_secrets()
         transport = HttpTransport(resolved_config)
         return AgentMemoryClient(transport)
     except AgentMemoryConfigError:

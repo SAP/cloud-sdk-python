@@ -8,7 +8,7 @@ import pytest
 from sap_cloud_sdk.agent_memory.config import (
     AgentMemoryConfig,
     BindingData,
-    _load_config_from_env,
+    _load_secrets,
 )
 from sap_cloud_sdk.agent_memory.exceptions import AgentMemoryConfigError
 
@@ -137,7 +137,7 @@ def _fill_binding(**kwargs) -> None:
 class TestLoadConfigFromEnv:
     def test_success_via_resolver(self):
         with patch(_RESOLVER, side_effect=_fill_binding):
-            config = _load_config_from_env()
+            config = _load_secrets()
 
         assert config.base_url == "https://memory.example.com"
         assert config.token_url == "https://auth.example.com/oauth/token"
@@ -146,7 +146,7 @@ class TestLoadConfigFromEnv:
 
     def test_calls_resolver_with_correct_arguments(self):
         with patch(_RESOLVER, side_effect=_fill_binding) as mock_resolver:
-            _load_config_from_env()
+            _load_secrets()
 
         mock_resolver.assert_called_once()
         _, kwargs = mock_resolver.call_args
@@ -161,7 +161,7 @@ class TestLoadConfigFromEnv:
 
         # Let the real resolver run — mount will fail, env vars will succeed
         with patch("os.stat", side_effect=FileNotFoundError("no mount")):
-            config = _load_config_from_env()
+            config = _load_secrets()
 
         assert config.base_url == "https://memory.example.com"
         assert config.client_id == "my-client"
@@ -169,7 +169,7 @@ class TestLoadConfigFromEnv:
     def test_raises_config_error_when_resolver_fails(self):
         with patch(_RESOLVER, side_effect=RuntimeError("both sources failed")):
             with pytest.raises(AgentMemoryConfigError, match="Failed to load Agent Memory configuration"):
-                _load_config_from_env()
+                _load_secrets()
 
     def test_raises_config_error_when_binding_incomplete(self):
         def partial_fill(**kwargs):
@@ -178,7 +178,7 @@ class TestLoadConfigFromEnv:
 
         with patch(_RESOLVER, side_effect=partial_fill):
             with pytest.raises(AgentMemoryConfigError, match="uaa"):
-                _load_config_from_env()
+                _load_secrets()
 
     def test_raises_config_error_when_uaa_json_invalid(self, monkeypatch):
         monkeypatch.setenv("CLOUD_SDK_CFG_HANA_AGENT_MEMORY_DEFAULT_APPLICATION_URL", "https://memory.example.com")
@@ -186,4 +186,4 @@ class TestLoadConfigFromEnv:
 
         with patch("os.stat", side_effect=FileNotFoundError("no mount")):
             with pytest.raises(AgentMemoryConfigError, match="Failed to parse uaa JSON"):
-                _load_config_from_env()
+                _load_secrets()

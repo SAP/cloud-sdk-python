@@ -26,7 +26,7 @@ Import what you need explicitly:
 ```python
 from sap_cloud_sdk.core.dpi_ng.consent import (
     create_client,
-    ConsentSDKConfig,
+    ConsentConfig,
     ClientCertificateAuth,
     ClientCredentialsAuth,
     BearerTokenAuth,
@@ -46,18 +46,18 @@ from sap_cloud_sdk.core.dpi_ng.consent import *
 
 ### With client credentials (OAuth2)
 
-Pass a `ConsentSDKConfig` with `ClientCredentialsAuth` when OAuth2 client
+Pass a `ConsentConfig` with `ClientCredentialsAuth` when OAuth2 client
 credentials are available. The auth provider fetches and refreshes bearer tokens
 automatically.
 
 ```python
 from sap_cloud_sdk.core.dpi_ng.consent import (
     create_client,
-    ConsentSDKConfig,
+    ConsentConfig,
     ClientCredentialsAuth,
 )
 
-config = ConsentSDKConfig(
+config = ConsentConfig(
     base_url="https://<your-consent-service-host>",
     auth=ClientCredentialsAuth(
         token_url="https://<your-xsuaa-host>/oauth/token",
@@ -82,11 +82,11 @@ required because the mTLS handshake does not carry a tenant claim.
 ```python
 from sap_cloud_sdk.core.dpi_ng.consent import (
     create_client,
-    ConsentSDKConfig,
+    ConsentConfig,
     ClientCertificateAuth,
 )
 
-config = ConsentSDKConfig(
+config = ConsentConfig(
     base_url="https://api.service.<region>.ngdpi.dpp.cloud.sap",
     auth=ClientCertificateAuth(
         cert_file="/path/to/client.crt",
@@ -101,7 +101,7 @@ with create_client(config=config) as client:
         print(c.consent_id, c.lifecycle_status_code)
 ```
 
-**`ConsentSDKConfig` parameters:**
+**`ConsentConfig` parameters:**
 
 | Parameter | Required | Default | Description |
 |---|---|---|---|
@@ -115,7 +115,7 @@ with create_client(config=config) as client:
 ## Authentication
 
 The SDK supports three authentication strategies. Pass one as the `auth`
-argument to `ConsentSDKConfig`.
+argument to `ConsentConfig`.
 
 | Strategy | Best for | Token refresh | `tenant_id` required |
 |---|---|---|---|
@@ -131,9 +131,9 @@ expiry, and rotation is handled at the infrastructure level.
 Use when you already have a valid bearer token:
 
 ```python
-from sap_cloud_sdk.core.dpi_ng.consent import ConsentSDKConfig, BearerTokenAuth
+from sap_cloud_sdk.core.dpi_ng.consent import ConsentConfig, BearerTokenAuth
 
-config = ConsentSDKConfig(
+config = ConsentConfig(
     base_url="https://api.service.<region>.ngdpi.dpp.cloud.sap",
     auth=BearerTokenAuth(token="<bearer-token>"),
 )
@@ -155,11 +155,11 @@ transparently 60 seconds before it expires:
 
 ```python
 from sap_cloud_sdk.core.dpi_ng.consent import (
-    ConsentSDKConfig,
+    ConsentConfig,
     ClientCredentialsAuth,
 )
 
-config = ConsentSDKConfig(
+config = ConsentConfig(
     base_url="https://api.service.<region>.ngdpi.dpp.cloud.sap",
     auth=ClientCredentialsAuth(
         token_url="https://<xsuaa-host>/oauth/token",
@@ -184,11 +184,11 @@ Use when your environment requires mutual TLS (mTLS):
 
 ```python
 from sap_cloud_sdk.core.dpi_ng.consent import (
-    ConsentSDKConfig,
+    ConsentConfig,
     ClientCertificateAuth,
 )
 
-config = ConsentSDKConfig(
+config = ConsentConfig(
     base_url="https://api.service.<region>.ngdpi.dpp.cloud.sap",
     auth=ClientCertificateAuth(
         cert_file="/path/to/client.crt",
@@ -916,7 +916,7 @@ client.configuration.delete_outbound_channel_type("<outbound-channel-type-uuid>"
 
 ## Error Handling
 
-All SDK errors inherit from `ConsentSDKError`.
+All SDK errors inherit from `DPINGError`.
 
 | Exception | HTTP status |
 |---|---|
@@ -927,20 +927,20 @@ All SDK errors inherit from `ConsentSDKError`.
 | `ConflictError` | 409 |
 | `ODataError` | other 4xx / 5xx |
 
-Always catch `ConsentSDKError` or its subclasses around calls:
+Always catch `DPINGError` or its subclasses around calls:
 
 ```python
 from sap_cloud_sdk.core.dpi_ng.consent import (
     create_client,
-    ConsentSDKConfig,
+    ConsentConfig,
     ClientCredentialsAuth,
-    ConsentSDKError,
+    DPINGError,
     NotFoundError,
     ValidationError,
     AuthenticationError,
 )
 
-config = ConsentSDKConfig(
+config = ConsentConfig(
     base_url="https://<your-consent-service-host>",
     auth=ClientCredentialsAuth(
         token_url="https://<your-xsuaa-host>/oauth/token",
@@ -961,7 +961,7 @@ except NotFoundError as e:
 except ValidationError as e:
     # Bad request - check the request fields
     handle_error(e)
-except ConsentSDKError as e:
+except DPINGError as e:
     # Catch-all for any other SDK error
     handle_error(e)
 ```
@@ -974,11 +974,11 @@ underlying `requests.Session` is closed when the block exits:
 ```python
 from sap_cloud_sdk.core.dpi_ng.consent import (
     create_client,
-    ConsentSDKConfig,
+    ConsentConfig,
     ClientCredentialsAuth,
 )
 
-config = ConsentSDKConfig(
+config = ConsentConfig(
     base_url="https://<your-consent-service-host>",
     auth=ClientCredentialsAuth(
         token_url="https://<your-xsuaa-host>/oauth/token",

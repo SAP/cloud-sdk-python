@@ -172,6 +172,7 @@ CLOUD_SDK_CFG_DPI_NG_CONSENT_DEFAULT_CLIENT_SECRET=your-client-secret
 CLOUD_SDK_CFG_DPI_NG_CONSENT_DEFAULT_CERT_FILE=/path/to/client.crt
 CLOUD_SDK_CFG_DPI_NG_CONSENT_DEFAULT_KEY_FILE=/path/to/client.key
 CLOUD_SDK_CFG_DPI_NG_CONSENT_DEFAULT_CA_FILE=/path/to/ca.crt   # optional
+CLOUD_SDK_CFG_DPI_NG_CONSENT_DEFAULT_TENANT_ID=your-tenant-id-here
 ```
 
 Tests are skipped automatically when `CLOUD_SDK_CFG_DPI_NG_DEFAULT_BASE_URL` or all auth variables are missing.

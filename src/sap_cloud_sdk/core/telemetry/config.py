@@ -1,5 +1,6 @@
 """Configuration for OpenTelemetry telemetry."""
 
+import logging
 import os
 from dataclasses import dataclass
 from typing import Optional
@@ -44,6 +45,8 @@ ENV_TRACES_EXPORTER = "OTEL_TRACES_EXPORTER"
 ENV_OTLP_PROTOCOL = "OTEL_EXPORTER_OTLP_PROTOCOL"
 ENV_OTEL_DISABLED = "CLOUD_SDK_OTEL_DISABLED"
 
+logger = logging.getLogger(__name__)
+
 
 def _get_region() -> str:
     """Get region from environment or return default."""
@@ -77,7 +80,16 @@ def _get_system_role() -> str:
         System role from APPFND_CONHOS_SYSTEM_ROLE environment variable,
         or "ZAFT" if not set.
     """
-    return os.getenv(ENV_SYSTEM_ROLE, DEFAULT_UNKNOWN)
+    value = os.getenv(ENV_SYSTEM_ROLE)
+    if not value:
+        logger.warning(
+            "APPFND_CONHOS_SYSTEM_ROLE is not set. "
+            "The sap.cld.system_role telemetry attribute will default to '%s', "
+            "which may cause malformed telemetry and broken metering.",
+            DEFAULT_UNKNOWN,
+        )
+        return DEFAULT_UNKNOWN
+    return value
 
 
 def _get_solution_area() -> str:
@@ -109,7 +121,14 @@ def _get_ord_id() -> Optional[str]:
         Value of ORD_DOCUMENT_ID, or None if the env var is missing or empty.
     """
     value = os.getenv(ENV_ORD_DOCUMENT_ID)
-    return value if value else None
+    if not value:
+        logger.warning(
+            "ORD_DOCUMENT_ID is not set. "
+            "The sap.ord.id telemetry attribute will be omitted, "
+            "which may cause incomplete metering telemetry.",
+        )
+        return None
+    return value
 
 
 def _get_service_display_name() -> Optional[str]:

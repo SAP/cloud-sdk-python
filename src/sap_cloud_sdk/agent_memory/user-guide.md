@@ -57,6 +57,16 @@ plain text, and the service makes it searchable by meaning.
     - [`AgentMemoryNotFoundError` when fetching a resource](#agentmemorynotfounderror-when-fetching-a-resource)
     - [`AgentMemoryHttpError` with status 401](#agentmemoryhttperror-with-status-401)
   - [Configuration](#configuration)
+    - [Service Binding](#service-binding)
+      - [Mounted Secrets (Kubernetes)](#mounted-secrets-kubernetes)
+      - [Environment Variables](#environment-variables)
+      - [UAA JSON Schema](#uaa-json-schema)
+  - [LangGraph Checkpointer](#langgraph-checkpointer)
+    - [Prerequisites](#prerequisites)
+    - [Import](#import-1)
+    - [Usage with LangGraph StateGraph](#usage-with-langgraph-stategraph)
+    - [Usage with LangChain create\_agent](#usage-with-langchain-create_agent)
+    - [Thread TTL](#thread-ttl)
 
 ## Installation
 
@@ -806,3 +816,116 @@ The `uaa` key must contain a JSON string with the XSUAA credentials:
   "url": "https://subdomain.authentication.region.hana.ondemand.com"
 }
 ```
+
+## LangGraph Checkpointer
+
+> This section covers the LangGraph-specific
+> factory for short-term memory (checkpointing). It is only relevant if your agent
+> is built with LangGraph or LangChain's `create_agent()`. The core
+> `AgentMemoryClient` and `create_client()` above are framework-agnostic and work
+> independently of this section.
+
+For LangGraph agents, the `agent_memory` module provides a `create_checkpointer()`
+factory in the `factory` subpackage. It returns a `BaseCheckpointSaver` that
+manages short-term session memory — conversation state, thread continuity, and
+HITL support — natively within LangGraph.
+
+> [!NOTE]
+> The current implementation uses LangGraph's `InMemorySaver` or
+> `TimedInMemorySaver` (when `ttl_seconds` is set). State is held in-process
+> and does not survive restarts. Persistent checkpointing backed by the
+> Agent Memory Service is not yet supported.
+
+### Prerequisites
+
+`langgraph` is an optional dependency. Install it via the SDK extra or directly:
+
+```bash
+# Via SDK optional extra (recommended)
+pip install "sap-cloud-sdk[langgraph]"
+
+# Or install langgraph directly
+pip install langgraph
+```
+
+### Import
+
+```python
+from sap_cloud_sdk.agent_memory.factory.langgraph_checkpoint import create_checkpointer
+```
+
+### Usage with LangGraph StateGraph
+
+```python
+from sap_cloud_sdk.agent_memory.factory.langgraph_checkpoint import create_checkpointer
+
+checkpointer = create_checkpointer()
+app = workflow.compile(checkpointer=checkpointer)
+
+result = app.invoke(
+    {"messages": [{"role": "user", "content": "hello"}]},
+    {"configurable": {"thread_id": "session-1"}},
+)
+```
+
+### Usage with LangChain create_agent
+
+```python
+from langchain.agents import create_agent
+from sap_cloud_sdk.agent_memory.factory.langgraph_checkpoint import create_checkpointer
+
+agent = create_agent(
+    model="...",
+    tools=[...],
+    checkpointer=create_checkpointer(),
+)
+```
+
+### Thread TTL
+
+Pass `ttl_seconds` to evict threads that have been inactive for the given
+period. This prevents unbounded memory growth in long-running processes.
+
+```python
+# Evict threads inactive for more than 1 hour
+checkpointer = create_checkpointer(ttl_seconds=3600)
+```
+
+When `ttl_seconds` is set, the factory returns a `TimedInMemorySaver` that
+tracks last-active time per thread and evicts inactive threads via a
+background daemon sweep. Eviction is best-effort — a thread may live up to
+`ttl_seconds + 60` seconds before deletion.
+
+#### Exposing TTL as a configurable parameter with `@agent_config`
+
+Use `@agent_config` from `sap_cloud_sdk.agent_decorators` to expose
+`ttl_seconds` as an operator-adjustable configuration field. The key
+`config.checkpointer.ttl_seconds` groups it with other checkpointer settings
+so external tooling can surface it in the low-code UI alongside model
+selection and temperature.
+
+```python
+from sap_cloud_sdk.agent_decorators import agent_config
+from sap_cloud_sdk.agent_memory.factory.langgraph_checkpoint import create_checkpointer
+
+
+@agent_config(
+    key="config.checkpointer.ttl_seconds",
+    label="Thread TTL (seconds)",
+    description="Evict inactive conversation threads after this period of "
+                "inactivity. Set to 0 to disable eviction.",
+)
+def thread_ttl_seconds() -> int:
+    return 3600 # 1 hour
+
+
+class MyAgent:
+    def __init__(self):
+        ttl = thread_ttl_seconds()
+        self._checkpointer = create_checkpointer(ttl_seconds=ttl or None)
+```
+
+> [!NOTE]
+> `TimedInMemorySaver` state does not survive process restarts — the TTL
+> applies to in-process memory only. Persistent TTL enforcement will be
+> available when the Agent Memory Service checkpointer ships.

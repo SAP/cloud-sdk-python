@@ -3685,7 +3685,7 @@ wheels = [
 
 [[package]]
 name = "sap-cloud-sdk"
-version = "0.33.2"
+version = "0.35.0"
 source = { editable = "." }
 dependencies = [
     { name = "grpcio" },
@@ -3714,6 +3714,9 @@ extensibility = [
 ]
 langchain = [
     { name = "langchain-core" },
+]
+langgraph = [
+    { name = "langgraph" },
 ]
 starlette = [
     { name = "starlette" },
@@ -3747,6 +3750,7 @@ requires-dist = [
     { name = "hatchling", specifier = "~=1.27.0" },
     { name = "httpx", specifier = ">=0.27.0" },
     { name = "langchain-core", marker = "extra == 'langchain'", specifier = ">=1.2.7" },
+    { name = "langgraph", marker = "extra == 'langgraph'", specifier = ">=1.0.0" },
     { name = "mcp", specifier = ">=1.1.0" },
     { name = "minio", specifier = "~=7.2.16" },
     { name = "opentelemetry-api", specifier = ">=1.42.1" },
@@ -3764,7 +3768,7 @@ requires-dist = [
     { name = "starlette", marker = "extra == 'starlette'", specifier = ">=0.40.0" },
     { name = "traceloop-sdk", specifier = "~=0.61.0" },
 ]
-provides-extras = ["extensibility", "starlette", "langchain"]
+provides-extras = ["extensibility", "starlette", "langchain", "langgraph"]
 
 [package.metadata.requires-dev]
 dev = [

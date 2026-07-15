@@ -23,7 +23,7 @@ from dataclasses import dataclass
 from typing import Optional
 
 from sap_cloud_sdk.agent_memory.exceptions import AgentMemoryConfigError
-from sap_cloud_sdk.core.secret_resolver.sdk_config import get_resolver
+from sap_cloud_sdk.core.secret_resolver import get_resolver
 
 
 @dataclass

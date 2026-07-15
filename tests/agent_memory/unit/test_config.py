@@ -18,7 +18,7 @@ _VALID_UAA = json.dumps({
     "clientsecret": "my-secret",
 })
 
-_RESOLVER = "sap_cloud_sdk.core.secret_resolver.read_from_mount_and_fallback_to_env_var"
+_RESOLVER = "sap_cloud_sdk.agent_memory.config.get_resolver"
 
 
 # ── AgentMemoryConfig ─────────────────────────────────────────────────────────
@@ -128,15 +128,15 @@ class TestBindingData:
 # ── _load_config_from_env ─────────────────────────────────────────────────────
 
 
-def _fill_binding(**kwargs) -> None:
-    target = kwargs["target"]
+def _fill_binding(module, instance, target) -> None:
     target.application_url = "https://memory.example.com"
     target.uaa = _VALID_UAA
 
 
 class TestLoadConfigFromEnv:
     def test_success_via_resolver(self):
-        with patch(_RESOLVER, side_effect=_fill_binding):
+        with patch(_RESOLVER) as mock_get_resolver:
+            mock_get_resolver.return_value.resolve.side_effect = _fill_binding
             config = _load_secrets()
 
         assert config.base_url == "https://memory.example.com"
@@ -145,45 +145,36 @@ class TestLoadConfigFromEnv:
         assert config.client_secret == "my-secret"
 
     def test_calls_resolver_with_correct_arguments(self):
-        with patch(_RESOLVER, side_effect=_fill_binding) as mock_resolver:
+        with patch(_RESOLVER) as mock_get_resolver:
+            mock_get_resolver.return_value.resolve.side_effect = _fill_binding
             _load_secrets()
 
-        mock_resolver.assert_called_once()
-        _, kwargs = mock_resolver.call_args
-        assert kwargs["base_volume_mount"] == "/etc/secrets/appfnd"
-        assert kwargs["base_var_name"] == "CLOUD_SDK_CFG"
-        assert kwargs["module"] == "hana-agent-memory"
-        assert kwargs["instance"] == "default"
-
-    def test_falls_back_to_env_vars(self, monkeypatch):
-        monkeypatch.setenv("CLOUD_SDK_CFG_HANA_AGENT_MEMORY_DEFAULT_APPLICATION_URL", "https://memory.example.com")
-        monkeypatch.setenv("CLOUD_SDK_CFG_HANA_AGENT_MEMORY_DEFAULT_UAA", _VALID_UAA)
-
-        # Let the real resolver run — mount will fail, env vars will succeed
-        with patch("os.stat", side_effect=FileNotFoundError("no mount")):
-            config = _load_secrets()
-
-        assert config.base_url == "https://memory.example.com"
-        assert config.client_id == "my-client"
+        mock_get_resolver.return_value.resolve.assert_called_once_with(
+            module="agent_memory", instance="default", target=mock_get_resolver.return_value.resolve.call_args[1]["target"]
+        )
 
     def test_raises_config_error_when_resolver_fails(self):
-        with patch(_RESOLVER, side_effect=RuntimeError("both sources failed")):
+        with patch(_RESOLVER) as mock_get_resolver:
+            mock_get_resolver.return_value.resolve.side_effect = RuntimeError("both sources failed")
             with pytest.raises(AgentMemoryConfigError, match="Failed to load Agent Memory configuration"):
                 _load_secrets()
 
     def test_raises_config_error_when_binding_incomplete(self):
-        def partial_fill(**kwargs):
-            kwargs["target"].application_url = "https://memory.example.com"
+        def partial_fill(module, instance, target):
+            target.application_url = "https://memory.example.com"
             # uaa remains empty → validate() raises
 
-        with patch(_RESOLVER, side_effect=partial_fill):
+        with patch(_RESOLVER) as mock_get_resolver:
+            mock_get_resolver.return_value.resolve.side_effect = partial_fill
             with pytest.raises(AgentMemoryConfigError, match="uaa"):
                 _load_secrets()
 
-    def test_raises_config_error_when_uaa_json_invalid(self, monkeypatch):
-        monkeypatch.setenv("CLOUD_SDK_CFG_HANA_AGENT_MEMORY_DEFAULT_APPLICATION_URL", "https://memory.example.com")
-        monkeypatch.setenv("CLOUD_SDK_CFG_HANA_AGENT_MEMORY_DEFAULT_UAA", "not-valid-json")
+    def test_raises_config_error_when_uaa_json_invalid(self):
+        def fill_invalid_uaa(module, instance, target):
+            target.application_url = "https://memory.example.com"
+            target.uaa = "not-valid-json"
 
-        with patch("os.stat", side_effect=FileNotFoundError("no mount")):
+        with patch(_RESOLVER) as mock_get_resolver:
+            mock_get_resolver.return_value.resolve.side_effect = fill_invalid_uaa
             with pytest.raises(AgentMemoryConfigError, match="Failed to parse uaa JSON"):
                 _load_secrets()

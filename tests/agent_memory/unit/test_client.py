@@ -21,12 +21,29 @@ from sap_cloud_sdk.agent_memory._models import (
 from sap_cloud_sdk.agent_memory.client import AgentMemoryClient
 from sap_cloud_sdk.agent_memory import create_client, FilterDefinition
 from sap_cloud_sdk.agent_memory.config import AgentMemoryConfig
-from sap_cloud_sdk.agent_memory.exceptions import AgentMemoryValidationError
+from sap_cloud_sdk.agent_memory.exceptions import (
+    AgentMemoryConfigError,
+    AgentMemoryValidationError,
+)
+
 
 def _make_client() -> tuple[AgentMemoryClient, MagicMock]:
-    """Return an AgentMemoryClient with a mocked transport and PROVIDER_ONLY default."""
+    """Return an AgentMemoryClient with a mocked provider transport."""
     transport = MagicMock(spec=HttpTransport)
     client = AgentMemoryClient(transport, access_strategy=AccessStrategy.PROVIDER_ONLY)
+    return client, transport
+
+
+def _make_subscriber_client(
+    tenant: str = "default-sub",
+) -> tuple[AgentMemoryClient, MagicMock]:
+    """Return a client with SUBSCRIBER_ONLY default and a pre-warmed mock transport."""
+    transport = MagicMock(spec=HttpTransport)
+    client = AgentMemoryClient(
+        transport,
+        access_strategy=AccessStrategy.SUBSCRIBER_ONLY,
+        tenant=tenant,
+    )
     return client, transport
 
 
@@ -36,17 +53,18 @@ def _make_client() -> tuple[AgentMemoryClient, MagicMock]:
 class TestCreateClient:
 
     def test_uses_provided_config_with_provider_strategy(self):
-        """Factory accepts an explicit config and PROVIDER_ONLY strategy."""
+        """Factory with explicit config and PROVIDER_ONLY stores the transport as provider."""
         config = AgentMemoryConfig(base_url="http://localhost:3000")
         with patch("sap_cloud_sdk.agent_memory.HttpTransport") as MockTransport:
             MockTransport.return_value = MagicMock(spec=HttpTransport)
             client = create_client(config=config, access_strategy=AccessStrategy.PROVIDER_ONLY)
         assert isinstance(client, AgentMemoryClient)
         assert client._default_access_strategy is AccessStrategy.PROVIDER_ONLY
-        assert client._default_tenant is None
+        assert client._provider_transport is not None
+        assert client._config_loader is None  # explicit config disables lazy loading
 
     def test_uses_provided_config_with_subscriber_strategy(self):
-        """Factory stores subscriber strategy and tenant on the client."""
+        """Factory with explicit config and SUBSCRIBER_ONLY pre-warms subscriber cache."""
         config = AgentMemoryConfig(base_url="http://localhost:3000")
         with patch("sap_cloud_sdk.agent_memory.HttpTransport") as MockTransport:
             MockTransport.return_value = MagicMock(spec=HttpTransport)
@@ -57,156 +75,167 @@ class TestCreateClient:
             )
         assert client._default_access_strategy is AccessStrategy.SUBSCRIBER_ONLY
         assert client._default_tenant == "acme-corp"
+        assert "acme-corp" in client._subscriber_transport_cache
+        assert client._config_loader is None
 
-    def test_reads_env_when_no_config_provided(self, monkeypatch):
-        """Factory falls back to environment variables when no config given."""
+    def test_subscriber_strategy_loads_tenant_binding(self, monkeypatch):
+        """Factory with SUBSCRIBER_ONLY loads the tenant binding (not default)."""
         import json
-        monkeypatch.setenv("CLOUD_SDK_CFG_HANA_AGENT_MEMORY_DEFAULT_APPLICATION_URL", "http://memory.example.com")
-        monkeypatch.setenv("CLOUD_SDK_CFG_HANA_AGENT_MEMORY_DEFAULT_UAA", json.dumps({
-            "url": "http://auth.example.com",
-            "clientid": "client-id",
-            "clientsecret": "client-secret",
-        }))
+        monkeypatch.setenv(
+            "CLOUD_SDK_CFG_HANA_AGENT_MEMORY_ACME_CORP_APPLICATION_URL",
+            "http://acme.memory.example.com",
+        )
+        monkeypatch.setenv(
+            "CLOUD_SDK_CFG_HANA_AGENT_MEMORY_ACME_CORP_UAA",
+            json.dumps({"url": "http://acme.auth.example.com", "clientid": "c", "clientsecret": "s"}),
+        )
+        with patch("sap_cloud_sdk.agent_memory.HttpTransport") as MockTransport:
+            MockTransport.return_value = MagicMock(spec=HttpTransport)
+            client = create_client(
+                access_strategy=AccessStrategy.SUBSCRIBER_ONLY,
+                tenant="acme-corp",
+            )
+        # config_loader is set so per-call overrides work
+        assert client._config_loader is not None
+        assert "acme-corp" in client._subscriber_transport_cache
+
+    def test_provider_strategy_loads_default_binding(self, monkeypatch):
+        """Factory with PROVIDER_ONLY loads the default binding."""
+        import json
+        monkeypatch.setenv(
+            "CLOUD_SDK_CFG_HANA_AGENT_MEMORY_DEFAULT_APPLICATION_URL",
+            "http://memory.example.com",
+        )
+        monkeypatch.setenv(
+            "CLOUD_SDK_CFG_HANA_AGENT_MEMORY_DEFAULT_UAA",
+            json.dumps({"url": "http://auth.example.com", "clientid": "c", "clientsecret": "s"}),
+        )
         with patch("sap_cloud_sdk.agent_memory.HttpTransport") as MockTransport:
             MockTransport.return_value = MagicMock(spec=HttpTransport)
             client = create_client(access_strategy=AccessStrategy.PROVIDER_ONLY)
-        assert isinstance(client, AgentMemoryClient)
+        assert client._provider_transport is not None
+        assert client._config_loader is not None
 
 
-# ── Access strategy ───────────────────────────────────────────────────────────
+# ── Access strategy and per-tenant transport routing ─────────────────────────
+
 
 class TestAccessStrategy:
 
-    def _subscriber_client(self, tenant="default-sub"):
-        """Helper: client with SUBSCRIBER_ONLY default."""
-        transport = MagicMock(spec=HttpTransport)
-        return AgentMemoryClient(transport, access_strategy=AccessStrategy.SUBSCRIBER_ONLY, tenant=tenant)
+    # ── _get_transport routing ─────────────────────────────────────────────────
 
-    # ── _resolve_tenant instance method ───────────────────────────────────────
+    def test_provider_default_returns_provider_transport(self):
+        """PROVIDER_ONLY default returns the provider transport."""
+        client, transport = _make_client()
+        assert client._get_transport(None, None) is transport
 
-    def test_subscriber_default_with_no_override_returns_default_tenant(self):
-        """No per-call params → instance default tenant is used."""
-        client = self._subscriber_client("default-sub")
-        assert client._resolve_tenant(None, None) == "default-sub"
+    def test_subscriber_default_returns_pre_warmed_transport(self):
+        """SUBSCRIBER_ONLY default returns the pre-warmed subscriber transport."""
+        client, transport = _make_subscriber_client("acme")
+        assert client._get_transport(None, None) is transport
 
-    def test_subscriber_default_no_tenant_raises_at_call_time(self):
-        """SUBSCRIBER_ONLY default with no tenant raises at first call."""
+    def test_subscriber_default_no_tenant_raises(self):
+        """SUBSCRIBER_ONLY default without tenant raises at call time."""
         transport = MagicMock(spec=HttpTransport)
         client = AgentMemoryClient(transport, access_strategy=AccessStrategy.SUBSCRIBER_ONLY)
         with pytest.raises(AgentMemoryValidationError, match="tenant"):
-            client._resolve_tenant(None, None)
-
-    def test_per_call_tenant_overrides_default(self):
-        """Per-call tenant overrides the instance default tenant."""
-        client = self._subscriber_client("default-sub")
-        assert client._resolve_tenant(None, "override-sub") == "override-sub"
+            client._get_transport(None, None)
 
     def test_per_call_provider_overrides_subscriber_default(self):
-        """Per-call PROVIDER_ONLY overrides a SUBSCRIBER_ONLY instance default."""
-        client = self._subscriber_client("default-sub")
-        assert client._resolve_tenant(AccessStrategy.PROVIDER_ONLY, None) is None
-
-    def test_provider_default_resolves_to_none(self):
-        """PROVIDER_ONLY default returns None."""
-        transport = MagicMock(spec=HttpTransport)
-        client = AgentMemoryClient(transport, access_strategy=AccessStrategy.PROVIDER_ONLY)
-        assert client._resolve_tenant(None, None) is None
+        """Per-call PROVIDER_ONLY overrides SUBSCRIBER_ONLY default → provider transport."""
+        client, sub_transport = _make_subscriber_client("acme")
+        provider_transport = MagicMock(spec=HttpTransport)
+        client._provider_transport = provider_transport
+        assert client._get_transport(AccessStrategy.PROVIDER_ONLY, None) is provider_transport
 
     def test_per_call_subscriber_overrides_provider_default(self):
-        """Per-call SUBSCRIBER_ONLY overrides a PROVIDER_ONLY instance default."""
-        transport = MagicMock(spec=HttpTransport)
-        client = AgentMemoryClient(transport, access_strategy=AccessStrategy.PROVIDER_ONLY)
-        assert client._resolve_tenant(AccessStrategy.SUBSCRIBER_ONLY, "sub") == "sub"
-
-    def test_per_call_subscriber_without_tenant_raises(self):
-        """Per-call SUBSCRIBER_ONLY with no tenant raises even when default is PROVIDER_ONLY."""
-        transport = MagicMock(spec=HttpTransport)
-        client = AgentMemoryClient(transport, access_strategy=AccessStrategy.PROVIDER_ONLY)
-        with pytest.raises(AgentMemoryValidationError, match="tenant"):
-            client._resolve_tenant(AccessStrategy.SUBSCRIBER_ONLY, None)
-
-    # ── Client-level defaults flow through to transport ───────────────────────
-
-    def test_client_default_subscriber_passes_tenant_without_per_call_params(self):
-        """Client with SUBSCRIBER_ONLY default uses default tenant on transport call."""
-        transport = MagicMock(spec=HttpTransport)
-        transport.post.return_value = {"id": "m1", "agentID": "a", "invokerID": "u", "content": "x"}
-        client = AgentMemoryClient(transport, access_strategy=AccessStrategy.SUBSCRIBER_ONLY, tenant="default-sub")
-
-        client.add_memory("a", "u", "x")
-
-        assert transport.post.call_args[1]["tenant_subdomain"] == "default-sub"
-
-    def test_per_call_tenant_overrides_default_on_transport(self):
-        """Per-call tenant overrides client default when forwarded to transport."""
-        transport = MagicMock(spec=HttpTransport)
-        transport.post.return_value = {"id": "m1", "agentID": "a", "invokerID": "u", "content": "x"}
-        client = AgentMemoryClient(transport, access_strategy=AccessStrategy.SUBSCRIBER_ONLY, tenant="default-sub")
-
-        client.add_memory("a", "u", "x", tenant="override-sub")
-
-        assert transport.post.call_args[1]["tenant_subdomain"] == "override-sub"
-
-    # ── Per-call explicit params (existing behaviour) ─────────────────────────
-
-    def test_add_memory_subscriber_only_passes_tenant_to_transport(self):
-        """add_memory with per-call SUBSCRIBER_ONLY passes tenant_subdomain to transport."""
-        client, mock_transport = _make_client()
-        mock_transport.post.return_value = {
-            "id": "m1", "agentID": "a", "invokerID": "u", "content": "x",
-        }
-
-        client.add_memory(
-            "a", "u", "x",
-            access_strategy=AccessStrategy.SUBSCRIBER_ONLY,
-            tenant="sub-tenant",
+        """Per-call SUBSCRIBER_ONLY overrides PROVIDER_ONLY default → loads/caches subscriber."""
+        client, provider_transport = _make_client()
+        sub_transport = MagicMock(spec=HttpTransport)
+        mock_loader = MagicMock(
+            return_value=AgentMemoryConfig(base_url="http://sub.example.com")
         )
+        client._config_loader = mock_loader
+        with patch("sap_cloud_sdk.agent_memory.client.HttpTransport", return_value=sub_transport):
+            result = client._get_transport(AccessStrategy.SUBSCRIBER_ONLY, "beta")
+        assert result is sub_transport
+        assert "beta" in client._subscriber_transport_cache
+        mock_loader.assert_called_once_with("beta")
 
-        assert mock_transport.post.call_args[1]["tenant_subdomain"] == "sub-tenant"
+    def test_per_call_subscriber_cached_on_second_call(self):
+        """Subscriber binding is loaded once and cached for subsequent calls."""
+        client, _ = _make_client()
+        sub_transport = MagicMock(spec=HttpTransport)
+        mock_loader = MagicMock(
+            return_value=AgentMemoryConfig(base_url="http://sub.example.com")
+        )
+        client._config_loader = mock_loader
+        with patch("sap_cloud_sdk.agent_memory.client.HttpTransport", return_value=sub_transport):
+            client._get_transport(AccessStrategy.SUBSCRIBER_ONLY, "beta")
+            client._get_transport(AccessStrategy.SUBSCRIBER_ONLY, "beta")
+        mock_loader.assert_called_once()  # loaded only once
 
-    def test_add_memory_provider_only_passes_none_to_transport(self):
-        """add_memory with PROVIDER_ONLY passes tenant_subdomain=None to transport."""
-        client, mock_transport = _make_client()
-        mock_transport.post.return_value = {
+    def test_per_call_subscriber_without_config_loader_raises(self):
+        """Per-call subscriber with no config_loader raises AgentMemoryConfigError."""
+        client, _ = _make_client()
+        assert client._config_loader is None
+        with pytest.raises(AgentMemoryConfigError, match="config_loader"):
+            client._get_transport(AccessStrategy.SUBSCRIBER_ONLY, "beta")
+
+    def test_per_call_tenant_overrides_default_tenant(self):
+        """Per-call tenant overrides the default subscriber tenant."""
+        client, _ = _make_subscriber_client("acme")
+        override_transport = MagicMock(spec=HttpTransport)
+        mock_loader = MagicMock(
+            return_value=AgentMemoryConfig(base_url="http://beta.example.com")
+        )
+        client._config_loader = mock_loader
+        with patch("sap_cloud_sdk.agent_memory.client.HttpTransport", return_value=override_transport):
+            result = client._get_transport(None, "beta")
+        assert result is override_transport
+
+    # ── Method-level integration ───────────────────────────────────────────────
+
+    def test_client_default_subscriber_uses_subscriber_transport(self):
+        """Client with SUBSCRIBER_ONLY default routes calls to the subscriber transport."""
+        client, sub_transport = _make_subscriber_client("acme")
+        sub_transport.post.return_value = {
             "id": "m1", "agentID": "a", "invokerID": "u", "content": "x",
         }
+        client.add_memory("a", "u", "x")
+        sub_transport.post.assert_called_once()
 
+    def test_per_call_subscriber_uses_different_transport_than_provider(self):
+        """Per-call subscriber tenant uses a different transport from the provider."""
+        client, provider_transport = _make_client()
+        sub_transport = MagicMock(spec=HttpTransport)
+        sub_transport.post.return_value = {
+            "id": "m1", "agentID": "a", "invokerID": "u", "content": "x",
+        }
+        mock_loader = MagicMock(
+            return_value=AgentMemoryConfig(base_url="http://sub.example.com")
+        )
+        client._config_loader = mock_loader
+        with patch("sap_cloud_sdk.agent_memory.client.HttpTransport", return_value=sub_transport):
+            client.add_memory("a", "u", "x", access_strategy=AccessStrategy.SUBSCRIBER_ONLY, tenant="acme")
+        sub_transport.post.assert_called_once()
+        provider_transport.post.assert_not_called()
+
+    def test_provider_only_uses_provider_transport(self):
+        """PROVIDER_ONLY routes calls to the provider transport."""
+        client, provider_transport = _make_client()
+        provider_transport.post.return_value = {
+            "id": "m1", "agentID": "a", "invokerID": "u", "content": "x",
+        }
         client.add_memory("a", "u", "x", access_strategy=AccessStrategy.PROVIDER_ONLY)
-
-        assert mock_transport.post.call_args[1]["tenant_subdomain"] is None
+        provider_transport.post.assert_called_once()
 
     def test_add_memory_subscriber_only_without_tenant_raises(self):
-        """add_memory with per-call SUBSCRIBER_ONLY and no tenant raises before transport call."""
+        """add_memory with SUBSCRIBER_ONLY and no tenant raises before transport call."""
         client, mock_transport = _make_client()
-
         with pytest.raises(AgentMemoryValidationError, match="tenant"):
-            client.add_memory(
-                "a", "u", "x", access_strategy=AccessStrategy.SUBSCRIBER_ONLY
-            )
-
+            client.add_memory("a", "u", "x", access_strategy=AccessStrategy.SUBSCRIBER_ONLY)
         mock_transport.post.assert_not_called()
-
-    def test_list_memories_subscriber_only_passes_tenant_to_transport(self):
-        """list_memories with SUBSCRIBER_ONLY passes tenant_subdomain to transport."""
-        client, mock_transport = _make_client()
-        mock_transport.get.return_value = {"value": []}
-
-        client.list_memories(
-            agent_id="a",
-            access_strategy=AccessStrategy.SUBSCRIBER_ONLY,
-            tenant="sub",
-        )
-
-        assert mock_transport.get.call_args[1]["tenant_subdomain"] == "sub"
-
-    def test_list_memories_provider_only_passes_none_to_transport(self):
-        """list_memories with PROVIDER_ONLY passes tenant_subdomain=None to transport."""
-        client, mock_transport = _make_client()
-        mock_transport.get.return_value = {"value": []}
-
-        client.list_memories(agent_id="a", access_strategy=AccessStrategy.PROVIDER_ONLY)
-
-        assert mock_transport.get.call_args[1]["tenant_subdomain"] is None
 
 
 # ── Memory CRUD operations ────────────────────────────────────────────────────

@@ -19,7 +19,11 @@ from typing import Optional
 
 from sap_cloud_sdk.agent_memory._http_transport import HttpTransport
 from sap_cloud_sdk.agent_memory.client import AgentMemoryClient
-from sap_cloud_sdk.agent_memory.config import AgentMemoryConfig, _load_config_from_env
+from sap_cloud_sdk.agent_memory.config import (
+    AgentMemoryConfig,
+    _load_config_for_instance,
+    _load_config_from_env,
+)
 from sap_cloud_sdk.agent_memory.exceptions import (
     AgentMemoryConfigError,
     AgentMemoryError,
@@ -46,11 +50,21 @@ def create_client(
 ) -> AgentMemoryClient:
     """Create an :class:`AgentMemoryClient` with automatic credential detection.
 
+    The binding loaded depends on ``access_strategy`` and ``tenant``:
+
+    - ``SUBSCRIBER_ONLY`` with ``tenant="acme-corp"`` — loads the subscriber
+      binding from ``/etc/secrets/appfnd/hana-agent-memory/acme-corp/`` (or
+      ``CLOUD_SDK_CFG_HANA_AGENT_MEMORY_ACME_CORP_*`` env vars). Per-call
+      tenant overrides load additional bindings lazily and cache them.
+    - ``PROVIDER_ONLY`` — loads the provider binding from
+      ``/etc/secrets/appfnd/hana-agent-memory/default/`` (or
+      ``CLOUD_SDK_CFG_HANA_AGENT_MEMORY_DEFAULT_*`` env vars).
+    - Explicit ``config`` — uses the provided configuration for all calls.
+      Per-call tenant overrides are not supported when ``config`` is provided.
+
     Args:
-        config: Optional explicit configuration. If ``None``, credentials are
-                loaded from the mounted volume at
-                ``/etc/secrets/appfnd/hana-agent-memory/default/`` or from
-                ``CLOUD_SDK_CFG_AGENT_MEMORY_DEFAULT_*`` environment variables.
+        config: Optional explicit configuration. When provided, no binding
+                discovery is performed and per-call tenant overrides are disabled.
         access_strategy: Default tenant access strategy for all client operations.
                 Defaults to ``SUBSCRIBER_ONLY``. Individual method calls may override
                 this value.
@@ -62,16 +76,25 @@ def create_client(
         A ready-to-use :class:`AgentMemoryClient`.
 
     Raises:
-        AgentMemoryConfigError: If configuration is missing, invalid, or
-            ``access_strategy=SUBSCRIBER_ONLY`` is used without a ``tenant``.
+        AgentMemoryConfigError: If configuration is missing or invalid.
     """
     try:
-        resolved_config = config if config is not None else _load_config_from_env()
-        transport = HttpTransport(resolved_config)
+        if config is not None:
+            initial_config = config
+            loader = None
+        elif access_strategy is AccessStrategy.SUBSCRIBER_ONLY and tenant:
+            initial_config = _load_config_for_instance(tenant)
+            loader = _load_config_for_instance
+        else:
+            initial_config = _load_config_from_env()
+            loader = _load_config_for_instance
+
+        transport = HttpTransport(initial_config)
         return AgentMemoryClient(
             transport,
             access_strategy=access_strategy,
             tenant=tenant,
+            config_loader=loader,
         )
     except AgentMemoryConfigError:
         raise

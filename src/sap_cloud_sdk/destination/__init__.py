@@ -26,6 +26,7 @@ import logging
 import os
 from typing import Optional
 
+from sap_cloud_sdk.core.telemetry import Module
 from sap_cloud_sdk.destination._models import (
     Destination,
     AuthToken,
@@ -83,6 +84,7 @@ def create_client(
     instance: Optional[str] = None,
     config: Optional[DestinationConfig] = None,
     use_default_proxy: bool = False,
+    _telemetry_source: Optional[Module] = None,
 ):
     """Creates a Destination client with local/cloud detection.
 
@@ -98,6 +100,7 @@ def create_client(
                           will attempt to load transparent proxy configuration from APPFND_CONHOS_TRANSP_PROXY
                           environment variable. To use a custom proxy, use client.set_proxy() after creation.
                           Defaults to False.
+        _telemetry_source: Internal telemetry source identifier. Not intended for external use.
 
     Returns:
         DestinationClient or LocalDevDestinationClient: Client implementing the Destination interface.
@@ -118,7 +121,9 @@ def create_client(
         tp = TokenProvider(binding)
         http = DestinationHttp(config=binding, token_provider=tp)
 
-        return DestinationClient(http, use_default_proxy)
+        return DestinationClient(
+            http, use_default_proxy, _telemetry_source=_telemetry_source
+        )
 
     except Exception as e:
         raise ClientCreationError(f"failed to create destination client: {e}")
@@ -128,6 +133,7 @@ def create_fragment_client(
     *,
     instance: Optional[str] = None,
     config: Optional[DestinationConfig] = None,
+    _telemetry_source: Optional[Module] = None,
 ):
     """Creates a Fragment client with local/cloud detection.
 
@@ -139,6 +145,7 @@ def create_fragment_client(
     Args:
         instance: Instance name used for secret resolution in cloud mode. Defaults to "default".
         config: Optional explicit DestinationConfig.
+        _telemetry_source: Internal telemetry source identifier. Not intended for external use.
 
     Returns:
         FragmentClient or LocalDevFragmentClient: Client for managing destination fragments.
@@ -159,7 +166,7 @@ def create_fragment_client(
         tp = TokenProvider(binding)
         http = DestinationHttp(config=binding, token_provider=tp)
 
-        return FragmentClient(http)
+        return FragmentClient(http, _telemetry_source=_telemetry_source)
 
     except Exception as e:
         raise ClientCreationError(f"failed to create fragment client: {e}")
@@ -169,6 +176,7 @@ def create_certificate_client(
     *,
     instance: Optional[str] = None,
     config: Optional[DestinationConfig] = None,
+    _telemetry_source: Optional[Module] = None,
 ):
     """Creates a Certificate client with local/cloud detection.
 
@@ -180,6 +188,7 @@ def create_certificate_client(
     Args:
         instance: Instance name used for secret resolution in cloud mode. Defaults to "default".
         config: Optional explicit DestinationConfig.
+        _telemetry_source: Internal telemetry source identifier. Not intended for external use.
 
     Returns:
         CertificateClient or LocalDevCertificateClient: Client for managing certificates.
@@ -200,7 +209,7 @@ def create_certificate_client(
         tp = TokenProvider(binding)
         http = DestinationHttp(config=binding, token_provider=tp)
 
-        return CertificateClient(http)
+        return CertificateClient(http, _telemetry_source=_telemetry_source)
 
     except Exception as e:
         raise ClientCreationError(f"failed to create certificate client: {e}")

@@ -1,6 +1,6 @@
 [project]
 name = "sap-cloud-sdk"
-version = "0.33.1"
+version = "0.35.0"
 description = "SAP Cloud SDK for Python"
 readme = "README.md"
 license = "Apache-2.0"
@@ -33,6 +33,7 @@ dependencies = [
 extensibility = ["a2a-sdk>=0.2.0"]
 starlette = ["starlette>=0.40.0"]
 langchain = ["langchain-core>=1.2.7"]
+langgraph = ["langgraph>=1.0.0"]
 
 [build-system]
 requires = ["hatchling"]

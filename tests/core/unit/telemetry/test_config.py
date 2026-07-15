@@ -12,6 +12,7 @@ from sap_cloud_sdk.core.telemetry.constants import (
     ATTR_MLFLOW_EXPERIMENT_ID,
     ATTR_SAP_SOLUTION_AREA,
     ATTR_SAP_ORD_ID,
+    ATTR_SAP_SERVICE_DISPLAY_NAME,
 )
 
 
@@ -266,3 +267,35 @@ class TestCreateResourceAttributesFromEnv:
 
             assert attrs[ATTR_SAP_ORD_ID] == "my-ord-id"
             assert attrs[ATTR_MLFLOW_EXPERIMENT_ID] == "exp-99"
+
+    def test_service_display_name_omitted_when_unset(self):
+        """sap.service.display_name is omitted entirely when SAP_SERVICE_DISPLAY_NAME is unset."""
+        with patch.dict('os.environ', {}, clear=True):
+            attrs = create_resource_attributes_from_env()
+
+            assert ATTR_SAP_SERVICE_DISPLAY_NAME not in attrs
+
+    def test_service_display_name_omitted_when_empty(self):
+        """sap.service.display_name is omitted when SAP_SERVICE_DISPLAY_NAME is an empty string."""
+        with patch.dict('os.environ', {'SAP_SERVICE_DISPLAY_NAME': ''}, clear=True):
+            attrs = create_resource_attributes_from_env()
+
+            assert ATTR_SAP_SERVICE_DISPLAY_NAME not in attrs
+
+    def test_service_display_name_read_from_env(self):
+        """sap.service.display_name resource attribute is read from SAP_SERVICE_DISPLAY_NAME."""
+        with patch.dict('os.environ', {'SAP_SERVICE_DISPLAY_NAME': 'My Service'}, clear=True):
+            attrs = create_resource_attributes_from_env()
+
+            assert attrs[ATTR_SAP_SERVICE_DISPLAY_NAME] == "My Service"
+
+    def test_service_display_name_independent_of_other_attributes(self):
+        """sap.service.display_name is populated independently from other optional attributes."""
+        with patch.dict('os.environ', {
+            'SAP_SERVICE_DISPLAY_NAME': 'My Service',
+            'ORD_DOCUMENT_ID': 'my-ord-id',
+        }, clear=True):
+            attrs = create_resource_attributes_from_env()
+
+            assert attrs[ATTR_SAP_SERVICE_DISPLAY_NAME] == "My Service"
+            assert attrs[ATTR_SAP_ORD_ID] == "my-ord-id"

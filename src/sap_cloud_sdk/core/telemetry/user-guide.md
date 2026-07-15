@@ -28,7 +28,7 @@ auto_instrument()
 from litellm import completion
 # LLM calls are now automatically traced
 ```
-When auto-instrumentation initializes successfully, the SDK also unwraps OpenTelemetry MCP instrumentation on `BaseSession.send_request` and the streamable HTTP client helpers so MCP `list_tools()` responses are not silently dropped. Agents should not add duplicate unwrap logic in application startup once they use SDK 0.35.2 or newer.
+If OpenTelemetry MCP instrumentation (`opentelemetry-instrumentation-mcp`) swallows protocol errors and `list_tools()` returns `None`, the Agent Gateway SDK logs a warning and skips that fragment instead of crashing (SDK 0.35.2+). Removing instrumentation is not recommended. Until upstream fixes land, agents may keep an application-side unwrap after `auto_instrument()` (see Agent Gateway user guide — OpenTelemetry and MCP).
 
 
 ### 2. Add business context with a parent span

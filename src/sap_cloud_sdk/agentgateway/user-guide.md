@@ -275,7 +275,7 @@ class MCPTool:
 
 ### Empty or null tool lists
 
-If the MCP session returns no tool list (`list_tools()` is `None` or `tools` is `None`), the SDK logs a warning and skips that destination fragment instead of raising an error. Discovery continues with remaining fragments. This often happens when OpenTelemetry MCP instrumentation swallows errors; see the telemetry user guide for `auto_instrument()` behavior on SDK 0.35.2+.
+If the MCP session returns no tool list (`list_tools()` is `None` or `tools` is `None`), the SDK logs a warning and skips that destination fragment instead of raising an error. Discovery continues with remaining fragments. This often happens when OpenTelemetry MCP instrumentation swallows errors. SDK 0.35.2+ treats null responses defensively; see the telemetry and OpenTelemetry sections below for optional agent-side workarounds.
 
 ### HTTP 403 during discovery
 
@@ -283,4 +283,6 @@ Many LoB landscapes require a **user-scoped token** for MCP tool listing. Pass `
 
 ### OpenTelemetry and MCP
 
-Call `auto_instrument()` from `sap_cloud_sdk.core.telemetry` before importing MCP or AI libraries. On SDK **0.35.2+**, successful auto-instrumentation automatically unwraps OpenTelemetry MCP wrappers (`BaseSession.send_request` and streamable HTTP client entry points). Do not duplicate that unwrap in your application `main.py` once you depend on that release.
+Call `auto_instrument()` from `sap_cloud_sdk.core.telemetry` before importing MCP or AI libraries. The SDK does **not** remove OpenTelemetry MCP wrappers during `auto_instrument()` — instrumentation should stay enabled.
+
+If you still see null `list_tools()` results with MCP OTel enabled, you can apply an agent-side unwrap after `auto_instrument()` and before MCP imports (for example `opentelemetry.instrumentation.utils.unwrap` on `BaseSession.send_request` and both `streamablehttp_client` / `streamable_http_client` in `mcp.client.streamable_http`) until `opentelemetry-instrumentation-mcp` is fixed upstream. Prefer the SDK None guard so discovery continues without disabling telemetry.

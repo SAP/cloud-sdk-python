@@ -90,38 +90,8 @@ def auto_instrument(
     if middlewares:
         _register_middleware_processors(middlewares)
 
-    _unwrap_mcp_otel_instrumentation()
 
     logger.info("Cloud auto instrumentation initialized successfully")
-
-
-def _unwrap_mcp_otel_instrumentation() -> None:
-    """Remove OTel MCP instrumentation wrappers that swallow protocol errors.
-
-    opentelemetry-instrumentation-mcp wraps MCP transport with handlers that can
-    return None on tracing failures, which breaks Agent Gateway tool discovery.
-    """
-    try:
-        from opentelemetry.instrumentation.utils import unwrap
-
-        unwrap("mcp.shared.session.BaseSession", "send_request")
-        import mcp.client.streamable_http  # noqa: F401
-
-        for _fn in ("streamablehttp_client", "streamable_http_client"):
-            try:
-                unwrap("mcp.client.streamable_http", _fn)
-            except Exception:
-                pass
-        logger.debug(
-            "Unwrapped MCP OpenTelemetry instrumentation for reliable tool discovery"
-        )
-    except ImportError:
-        logger.debug("MCP OpenTelemetry instrumentation not available; skipping unwrap")
-    except Exception:
-        logger.warning(
-            "Failed to unwrap MCP OpenTelemetry instrumentation",
-            exc_info=True,
-        )
 
 
 def _create_exporter() -> SpanExporter:

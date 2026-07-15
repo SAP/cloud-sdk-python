@@ -479,36 +479,6 @@ class TestAutoInstrument:
                 wrapper_provider.resource.attributes["service.name"] == "cloud-sdk-app"
             )
 
-    def test_auto_instrument_unwraps_mcp_otel_instrumentation(
-        self, mock_traceloop_components
-    ):
-        """Test that successful init unwraps MCP OTel instrumentation."""
-        mock_traceloop_components["get_app_name"].return_value = "test-app"
-        mock_traceloop_components["create_resource"].return_value = {}
-
-        with patch(
-            "sap_cloud_sdk.core.telemetry.auto_instrument._unwrap_mcp_otel_instrumentation"
-        ) as mock_unwrap:
-            with patch.dict(
-                "os.environ",
-                {"OTEL_EXPORTER_OTLP_ENDPOINT": "http://localhost:4317"},
-                clear=True,
-            ):
-                auto_instrument()
-                mock_unwrap.assert_called_once()
-
-    def test_auto_instrument_skips_mcp_unwrap_when_disabled(
-        self, mock_traceloop_components
-    ):
-        """When instrumentation is disabled, MCP unwrap is not attempted."""
-        with patch(
-            "sap_cloud_sdk.core.telemetry.auto_instrument._unwrap_mcp_otel_instrumentation"
-        ) as mock_unwrap:
-            with patch.dict("os.environ", {}, clear=True):
-                auto_instrument()
-                mock_unwrap.assert_not_called()
-
-
 class TestAutoInstrumentMiddlewares:
     """Tests for the middlewares parameter of auto_instrument."""
 

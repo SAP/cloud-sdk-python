@@ -90,7 +90,6 @@ def auto_instrument(
     if middlewares:
         _register_middleware_processors(middlewares)
 
-
     logger.info("Cloud auto instrumentation initialized successfully")
 
 

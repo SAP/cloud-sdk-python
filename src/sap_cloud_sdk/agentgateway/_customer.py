@@ -464,6 +464,15 @@ async def _list_server_tools(
                 server_name = init_result.serverInfo.name
                 result = await session.list_tools()
 
+                if result is None or result.tools is None:
+                    logger.warning(
+                        "list_tools() returned no tools (response=%r); dependency %r skipped — "
+                        "check MCP server health",
+                        result,
+                        dependency.ord_id,
+                    )
+                    return []
+
                 return [
                     MCPTool(
                         name=t.name,

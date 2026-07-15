@@ -325,6 +325,14 @@ async def list_server_tools(
                     else fragment_name
                 )
                 result = await session.list_tools()
+                if result is None or result.tools is None:
+                    logger.warning(
+                        "list_tools() returned no tools (response=%r); fragment %r skipped — "
+                        "check MCP server health and OpenTelemetry MCP instrumentation",
+                        result,
+                        fragment_name,
+                    )
+                    return []
                 return [
                     MCPTool(
                         name=t.name,
@@ -388,11 +396,34 @@ async def get_mcp_tools_lob(
                 len(server_tools),
                 fragment_name,
             )
+        # intentional: fragment failure must not abort remaining fragments
+        # (HTTPStatusError: 403 → warning + continue; other status → exception log + skip)
+        except httpx.HTTPStatusError as exc:
+            if exc.response.status_code == 403:
+                logger.warning(
+                    "HTTP 403 listing tools from fragment '%s' with system token — "
+                    "pass user_token to list_mcp_tools() for user-scoped tool discovery",
+                    fragment_name,
+                )
+                continue
+            logger.exception(
+                "Failed to load tools from fragment '%s' — skipping",
+                fragment_name,
+            )
+        # intentional: fragment failure must not abort remaining fragments
+        # (unexpected errors → exception log + skip)
         except Exception:
             logger.exception(
                 "Failed to load tools from fragment '%s' — skipping",
                 fragment_name,
             )
+
+    if fragments and not tools:
+        logger.warning(
+            "No MCP tools loaded from %d fragment(s) for tenant '%s'",
+            len(fragments),
+            tenant_subdomain,
+        )
 
     logger.info("Loaded %d MCP tool(s) from %d fragment(s)", len(tools), len(fragments))
     return tools

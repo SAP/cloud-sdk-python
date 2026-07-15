@@ -151,7 +151,7 @@ def load_customer_credentials_from_env(
 
     # Check required environment variables
     required_vars = {
-        _INTEGRATION_CLIENT_ID_ENV: "client_id",
+        _INTEGRATION_CLIENT_ID_ENV: _TOKEN_FIELD_CLIENT_ID,
         _INTEGRATION_AUTH_URL_ENV: "auth_url",
         _INTEGRATION_GATEWAY_URL_ENV: "gateway_url",
     }
@@ -204,7 +204,7 @@ def load_customer_credentials(path: str) -> CustomerCredentials:
     # Credential file uses camelCase, we use snake_case
     required_fields = {
         _CredentialFields.TOKEN_SERVICE_URL: "token_service_url",
-        _CredentialFields.CLIENT_ID: "client_id",
+        _CredentialFields.CLIENT_ID: _TOKEN_FIELD_CLIENT_ID,
         _CredentialFields.CERTIFICATE: "certificate",
         _CredentialFields.PRIVATE_KEY: "private_key",
         _CredentialFields.GATEWAY_URL: "gateway_url",

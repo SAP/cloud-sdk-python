@@ -92,7 +92,7 @@ echo "$diff_content" | awk '
   if echo "$content" | grep -qE 'BEGIN (RSA |EC |OPENSSH |DSA |ENCRYPTED )?PRIVATE KEY'; then
     # Skip if file is under a test directory (path heuristic)
     _is_test_path=false
-    if echo "$file" | grep -qE '(^|/)(tests?|test_[^/]+|[^/]+_test)\.(py|java)$|/(tests?|fixtures?)/'; then
+    if echo "$file" | grep -qE '(^|/)(tests?|test_[^/]+|[^/]+_test)\.(py|java)$|/(tests?|fixtures?)/|\.env[^/]*\.example$'; then
       _is_test_path=true
     fi
     if [ "$_is_test_path" = "false" ]; then

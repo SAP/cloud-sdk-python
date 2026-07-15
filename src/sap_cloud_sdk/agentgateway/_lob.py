@@ -18,6 +18,7 @@ from sap_cloud_sdk.destination import (
     ConsumptionLevel,
     ConsumptionOptions,
 )
+from sap_cloud_sdk.core.telemetry import Module
 
 from sap_cloud_sdk.agentgateway._fragments import (
     LABEL_KEY,
@@ -88,7 +89,10 @@ def _fetch_auth_token(
     Raises:
         MCPServerNotFoundError: If no auth token is returned.
     """
-    client = create_destination_client(instance=_DESTINATION_INSTANCE)
+    client = create_destination_client(
+        instance=_DESTINATION_INSTANCE,
+        _telemetry_source=Module.AGENTGATEWAY,
+    )
     dest = client.get_destination(
         dest_name,
         level=ConsumptionLevel.PROVIDER_SUBACCOUNT,
@@ -130,7 +134,10 @@ def get_ias_client_id_lob() -> str:
         Any exception raised by the destination client.
     """
     dest_name = _ias_dest_name()
-    client = create_destination_client(instance=_DESTINATION_INSTANCE)
+    client = create_destination_client(
+        instance=_DESTINATION_INSTANCE,
+        _telemetry_source=Module.AGENTGATEWAY,
+    )
     dest = client.get_destination(
         dest_name,
         level=ConsumptionLevel.PROVIDER_SUBACCOUNT,
@@ -318,6 +325,15 @@ async def list_server_tools(
                     else fragment_name
                 )
                 result = await session.list_tools()
+                if result is None or result.tools is None:
+                    logger.warning(
+                        "MCP server '%s' at '%s' returned no tools from list_tools() "
+                        "(response was None — often caused by OpenTelemetry MCP "
+                        "instrumentation swallowing errors). Skipping fragment.",
+                        fragment_name,
+                        dest_url,
+                    )
+                    return []
                 return [
                     MCPTool(
                         name=t.name,

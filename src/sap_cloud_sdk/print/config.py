@@ -19,10 +19,8 @@ from typing import Optional
 import json
 import logging
 
-from sap_cloud_sdk.core.secret_resolver.resolver import (
-    read_from_mount_and_fallback_to_env_var,
-)
 from sap_cloud_sdk.print.exceptions import ConfigError
+from sap_cloud_sdk.core.secret_resolver import get_resolver
 
 logger = logging.getLogger(__name__)
 
@@ -84,7 +82,7 @@ class _BindingData:
         )
 
 
-def load_from_env_or_mount(instance: Optional[str] = None) -> PrintConfig:
+def load_secrets(instance: Optional[str] = None) -> PrintConfig:
     """Load Print configuration from mount with env fallback and normalize.
 
     Args:
@@ -100,13 +98,7 @@ def load_from_env_or_mount(instance: Optional[str] = None) -> PrintConfig:
     binding = _BindingData()
 
     try:
-        read_from_mount_and_fallback_to_env_var(
-            base_volume_mount="/etc/secrets/appfnd",
-            base_var_name="CLOUD_SDK_CFG",
-            module="print",
-            instance=inst,
-            target=binding,
-        )
+        get_resolver().resolve(module="print", instance=inst, target=binding)
 
         binding.validate()
         return binding.to_config()

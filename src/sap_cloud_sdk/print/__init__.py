@@ -34,7 +34,7 @@ from sap_cloud_sdk.print._models import (
     PrintTask,
     PrintTaskMetadata,
 )
-from sap_cloud_sdk.print.config import load_from_env_or_mount, PrintConfig
+from sap_cloud_sdk.print.config import load_secrets, PrintConfig
 from sap_cloud_sdk.print._http import PrintHttp, TokenProvider
 from sap_cloud_sdk.print.client import PrintClient
 from sap_cloud_sdk.print.exceptions import (
@@ -72,7 +72,7 @@ def create_client(
         ClientCreationError: If client creation fails.
     """
     try:
-        binding = config or load_from_env_or_mount(instance)
+        binding = config or load_secrets(instance)
         tp = TokenProvider(binding)
         http = PrintHttp(config=binding, token_provider=tp)
         return PrintClient(http, _telemetry_source=_telemetry_source)

@@ -5,7 +5,7 @@ from unittest.mock import patch, MagicMock
 
 from sap_cloud_sdk.destination.config import (
     BindingData,
-    load_from_env_or_mount,
+    load_secrets,
     load_transparent_proxy,
     _TRANSPARENT_PROXY_ENV_VAR,
 )
@@ -102,10 +102,11 @@ class TestBindingData:
 
 class TestLoadFromEnvOrMount:
 
-    @patch("sap_cloud_sdk.destination.config.read_from_mount_and_fallback_to_env_var")
-    def test_load_success_default_instance(self, mock_read):
-        def fake_read_side_effect(*args, **kwargs):
-            target = kwargs.get("target")
+    @patch("sap_cloud_sdk.destination.config.get_resolver")
+    def test_load_success_default_instance(self, mock_get_resolver):
+        mock_resolver = MagicMock()
+
+        def fake_resolve(module, instance, target):
             assert isinstance(target, BindingData)
             target.clientid = "cid"
             target.clientsecret = "csecret"
@@ -113,9 +114,10 @@ class TestLoadFromEnvOrMount:
             target.uri = "https://destination.example.com"
             target.identityzone = "provider-zone"
 
-        mock_read.side_effect = fake_read_side_effect
+        mock_resolver.resolve.side_effect = fake_resolve
+        mock_get_resolver.return_value = mock_resolver
 
-        sb = load_from_env_or_mount()
+        sb = load_secrets()
         assert isinstance(sb, DestinationConfig)
         assert sb.url == "https://destination.example.com"
         assert sb.token_url == "https://auth.example.com/oauth/token"
@@ -123,76 +125,73 @@ class TestLoadFromEnvOrMount:
         assert sb.client_secret == "csecret"
         assert sb.identityzone == "provider-zone"
 
-        # Verify resolver called with expected parameters
-        assert mock_read.call_count == 1
-        _, kwargs = mock_read.call_args
-        assert kwargs["base_volume_mount"] == "/etc/secrets/appfnd"
-        assert kwargs["base_var_name"] == "CLOUD_SDK_CFG"
-        assert kwargs["module"] == "destination"
-        assert kwargs["instance"] == "default"
-        assert isinstance(kwargs["target"], BindingData)
-
-    @patch("sap_cloud_sdk.destination.config.read_from_mount_and_fallback_to_env_var")
-    def test_load_success_custom_instance(self, mock_read):
-        def fake_read_side_effect(*args, **kwargs):
-            target = kwargs.get("target")
-            target.clientid = "cid"  # ty: ignore[invalid-assignment]
-            target.clientsecret = "csecret"  # ty: ignore[invalid-assignment]
-            target.url = "https://auth.example.com"  # ty: ignore[invalid-assignment]
-            target.uri = "https://destination.example.com"  # ty: ignore[invalid-assignment]
-            target.identityzone = "provider-zone"  # ty: ignore[invalid-assignment]
-
-        mock_read.side_effect = fake_read_side_effect
-
-        sb = load_from_env_or_mount("custom")
-        assert isinstance(sb, DestinationConfig)
-        assert mock_read.call_args[1]["instance"] == "custom"
-
-    @patch("sap_cloud_sdk.destination.config.read_from_mount_and_fallback_to_env_var")
-    def test_load_validation_error_propagates_as_config_error(self, mock_read):
-        def fake_read_side_effect(*args, **kwargs):
-            target = kwargs.get("target")
-            # Populate invalid data to trigger BindingData.validate failure
-            target.clientid = ""  # ty: ignore[invalid-assignment]
-            target.clientsecret = ""  # ty: ignore[invalid-assignment]
-            target.url = ""  # ty: ignore[invalid-assignment]
-            target.uri = ""  # ty: ignore[invalid-assignment]
-
-        mock_read.side_effect = fake_read_side_effect
-
-        with pytest.raises(ConfigError, match="failed to load destination configuration"):
-            load_from_env_or_mount()
-
-    @patch("sap_cloud_sdk.destination.config.read_from_mount_and_fallback_to_env_var")
-    def test_load_read_exception_wrapped(self, mock_read):
-        mock_read.side_effect = Exception("Mount read failed")
-        with pytest.raises(ConfigError, match="failed to load destination configuration"):
-            load_from_env_or_mount()
-
-    @patch("sap_cloud_sdk.destination.config.read_from_mount_and_fallback_to_env_var")
-    def test_load_error_message_contains_guidance(self, mock_read):
-        # Simulate aggregated failure inside the resolver (mount + env fallback) with resolver-style message
-        mock_read.side_effect = RuntimeError(
-            "module=destination instance=default failed to read secrets: "
-            "['mount failed: path does not exist: /etc/secrets/appfnd/destination/default;', "
-            "\"env var failed: 'env var not found: CLOUD_SDK_CFG_DESTINATION_DEFAULT_CLIENTID';\"] "
-            "Secrets could not be loaded from mount or environment. "
-            "Options: - If running locally and '/etc/secrets/appfnd' is not available, "
-            "- Provide environment variables like CLOUD_SDK_CFG_DESTINATION_DEFAULT_CLIENTID. "
-            "- Alternatively, mount secrets under /etc/secrets/appfnd/destination/default/ with files for each required key."
+        mock_resolver.resolve.assert_called_once_with(
+            module="destination", instance="default", target=mock_resolver.resolve.call_args[1]["target"]
         )
+
+    @patch("sap_cloud_sdk.destination.config.get_resolver")
+    def test_load_success_custom_instance(self, mock_get_resolver):
+        mock_resolver = MagicMock()
+
+        def fake_resolve(module, instance, target):
+            target.clientid = "cid"
+            target.clientsecret = "csecret"
+            target.url = "https://auth.example.com"
+            target.uri = "https://destination.example.com"
+            target.identityzone = "provider-zone"
+
+        mock_resolver.resolve.side_effect = fake_resolve
+        mock_get_resolver.return_value = mock_resolver
+
+        sb = load_secrets("custom")
+        assert isinstance(sb, DestinationConfig)
+        mock_resolver.resolve.assert_called_once_with(
+            module="destination", instance="custom", target=mock_resolver.resolve.call_args[1]["target"]
+        )
+
+    @patch("sap_cloud_sdk.destination.config.get_resolver")
+    def test_load_validation_error_propagates_as_config_error(self, mock_get_resolver):
+        mock_resolver = MagicMock()
+
+        def fake_resolve(module, instance, target):
+            target.clientid = ""
+            target.clientsecret = ""
+            target.url = ""
+            target.uri = ""
+
+        mock_resolver.resolve.side_effect = fake_resolve
+        mock_get_resolver.return_value = mock_resolver
+
+        with pytest.raises(ConfigError, match="failed to load destination configuration"):
+            load_secrets()
+
+    @patch("sap_cloud_sdk.destination.config.get_resolver")
+    def test_load_read_exception_wrapped(self, mock_get_resolver):
+        mock_resolver = MagicMock()
+        mock_resolver.resolve.side_effect = Exception("Mount read failed")
+        mock_get_resolver.return_value = mock_resolver
+
+        with pytest.raises(ConfigError, match="failed to load destination configuration"):
+            load_secrets()
+
+    @patch("sap_cloud_sdk.destination.config.get_resolver")
+    def test_load_error_message_contains_guidance(self, mock_get_resolver):
+        mock_resolver = MagicMock()
+        mock_resolver.resolve.side_effect = RuntimeError(
+            "module=destination instance=default failed to read secrets from all resolvers: "
+            "['MountResolver failed: path does not exist: /etc/secrets/appfnd/destination/default;', "
+            "\"EnvVarResolver failed: 'env var not found: CLOUD_SDK_CFG_DESTINATION_DEFAULT_CLIENTID';\"] "
+            "Options: mount secrets under the service binding path, set environment variables "
+            "like CLOUD_SDK_CFG_destination_default_<KEY> (uppercased), or set VCAP_SERVICES."
+        )
+        mock_get_resolver.return_value = mock_resolver
+
         with pytest.raises(ConfigError) as excinfo:
-            load_from_env_or_mount()
+            load_secrets()
         msg = str(excinfo.value)
-        # Central resolver provides generic actionable guidance
         assert "failed to load destination configuration" in msg
-        assert "Secrets could not be loaded from mount or environment." in msg
-        assert "Options:" in msg
-        # Generic env var prefix for default instance
         assert "CLOUD_SDK_CFG_DESTINATION_DEFAULT_CLIENTID" in msg
-        assert "CLOUD_SDK_CFG_DESTINATION_DEFAULT_CLIENTID" in msg
-        # Mount path for default instance should be referenced
-        assert "/etc/secrets/appfnd/destination/default/" in msg
+        assert "/etc/secrets/appfnd/destination/default" in msg
 
 
 class TestLoadTransparentProxy:

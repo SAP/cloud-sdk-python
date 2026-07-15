@@ -46,7 +46,7 @@ from sap_cloud_sdk.destination.utils._pagination import (
     PaginationInfo,
     PagedResult,
 )
-from sap_cloud_sdk.destination.config import load_from_env_or_mount, DestinationConfig
+from sap_cloud_sdk.destination.config import load_secrets, DestinationConfig
 from sap_cloud_sdk.destination._http import TokenProvider, DestinationHttp
 from sap_cloud_sdk.destination._destination_http_client import DestinationHttpClient
 from sap_cloud_sdk.destination.client import DestinationClient
@@ -114,7 +114,7 @@ def create_client(
             return LocalDevDestinationClient()
 
         # Cloud mode via secret resolver or explicit config
-        binding = config or load_from_env_or_mount(instance)
+        binding = config or load_secrets(instance)
         tp = TokenProvider(binding)
         http = DestinationHttp(config=binding, token_provider=tp)
 
@@ -155,7 +155,7 @@ def create_fragment_client(
             return LocalDevFragmentClient()
 
         # Use provided config or load from environment/mount (cloud mode)
-        binding = config or load_from_env_or_mount(instance)
+        binding = config or load_secrets(instance)
         tp = TokenProvider(binding)
         http = DestinationHttp(config=binding, token_provider=tp)
 
@@ -196,7 +196,7 @@ def create_certificate_client(
             return LocalDevCertificateClient()
 
         # Use provided config or load from environment/mount (cloud mode)
-        binding = config or load_from_env_or_mount(instance)
+        binding = config or load_secrets(instance)
         tp = TokenProvider(binding)
         http = DestinationHttp(config=binding, token_provider=tp)
 

@@ -2,17 +2,16 @@
 
 import base64
 from dataclasses import is_dataclass
-import importlib
+from unittest.mock import patch
+
+import pytest
 
 from sap_cloud_sdk.core.data_anonymization.config import (
     DataAnonymizationConfig,
     _BindingData,
-    _load_config_from_env,
+    _load_secrets,
 )
 from sap_cloud_sdk.core.data_anonymization.exceptions import ClientCreationError
-
-
-secret_resolver = importlib.import_module("sap_cloud_sdk.core.secret_resolver")
 
 CLIENT_CERT_BASE64 = base64.b64encode(
     b"-----BEGIN CERTIFICATE-----\nCERT\n-----END CERTIFICATE-----\n"
@@ -125,41 +124,26 @@ class TestBindingData:
 
 
 class TestLoadConfigFromEnv:
-    def test_load_config_success(self, monkeypatch) -> None:
-        def fake_read(mount_path, env_var, service, instance, binding_data):
-            assert mount_path == "/etc/secrets/appfnd"
-            assert env_var == "CLOUD_SDK_CFG"
-            assert service == "data-anonymization"
+    def test_load_config_success(self) -> None:
+        def fake_resolve(module, instance, target):
+            assert module == "data-anonymization"
             assert instance == "custom-instance"
-            binding_data.url = "https://service.example.com"
-            binding_data.destination_name = "anon-destination"
+            target.url = "https://service.example.com"
+            target.destination_name = "anon-destination"
 
-        monkeypatch.setattr(
-            secret_resolver,
-            "read_from_mount_and_fallback_to_env_var",
-            fake_read,
-        )
-
-        config = _load_config_from_env("custom-instance")
+        with patch("sap_cloud_sdk.core.data_anonymization.config.get_resolver") as mock_get_resolver:
+            mock_get_resolver.return_value.resolve.side_effect = fake_resolve
+            config = _load_secrets("custom-instance")
 
         assert config.service_url == "https://service.example.com"
         assert config.destination_name == "anon-destination"
 
-    def test_load_config_failure_wraps_exception(
-        self,
-        monkeypatch,
-    ) -> None:
-        def fake_read(*args, **kwargs):
-            raise RuntimeError("read failed")
+    def test_load_config_failure_wraps_exception(self) -> None:
+        with patch("sap_cloud_sdk.core.data_anonymization.config.get_resolver") as mock_get_resolver:
+            mock_get_resolver.return_value.resolve.side_effect = RuntimeError("read failed")
 
-        monkeypatch.setattr(
-            secret_resolver,
-            "read_from_mount_and_fallback_to_env_var",
-            fake_read,
-        )
-
-        assert_raises(
-            ClientCreationError,
-            "Failed to load configuration",
-            _load_config_from_env,
-        )
+            assert_raises(
+                ClientCreationError,
+                "Failed to load configuration",
+                _load_secrets,
+            )

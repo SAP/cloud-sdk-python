@@ -18,10 +18,8 @@ Environment variable fallback (uppercase):
 
 from dataclasses import dataclass
 
-from sap_cloud_sdk.core.secret_resolver.resolver import (
-    read_from_mount_and_fallback_to_env_var,
-)
 from sap_cloud_sdk.adms.exceptions import ConfigError
+from sap_cloud_sdk.core.secret_resolver import get_resolver
 
 _DEFAULT_INSTANCE = "default"
 _SECRET_MOUNT_BASE = "/etc/secrets/appfnd"
@@ -96,7 +94,7 @@ class _BindingData:
         )
 
 
-def load_from_env_or_mount(instance: str | None = None) -> AdmsConfig:
+def load_secrets(instance: str | None = None) -> AdmsConfig:
     """Load ADMS configuration from a mounted secret volume or environment variables.
 
     Args:
@@ -111,13 +109,8 @@ def load_from_env_or_mount(instance: str | None = None) -> AdmsConfig:
     instance = instance or _DEFAULT_INSTANCE
     raw = _BindingData()
     try:
-        read_from_mount_and_fallback_to_env_var(
-            base_volume_mount=_SECRET_MOUNT_BASE,
-            base_var_name=_ENV_VAR_BASE,
-            module="adms",
-            instance=instance,
-            target=raw,
-        )
+        get_resolver().resolve(module="adms", instance=instance, target=raw)
+
     except Exception as exc:
         raise ConfigError(
             f"failed to load ADMS binding for instance '{instance}': {exc}"

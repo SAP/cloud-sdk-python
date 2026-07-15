@@ -1,9 +1,10 @@
 """Configuration and secret resolution for Destination Service.
 
-Loads service binding secrets from a mounted volume with environment fallback,
-then normalizes into a unified DestinationConfig model.
+Loads service binding secrets via the SDK-wide resolver chain (mount with
+environment fallback by default), then normalizes into a unified DestinationConfig
+model.
 
-Mount path convention:
+Default mount path convention:
   /etc/secrets/appfnd/destination/{instance}/
 Keys:
   - clientid
@@ -12,32 +13,24 @@ Keys:
   - uri (destination service base)
   - identityzone
 
-Env fallback convention (uppercased):
-  CLOUD_SDK_CFG_DESTINATION_destination_{instance}_{field_key}
-  e.g., CLOUD_SDK_CFG_DESTINATION_DESTINATION_DEFAULT_CLIENTID
-  CLOUD_SDK_CFG_DESTINATION_destination_{instance}_{field_key}
-  e.g., CLOUD_SDK_CFG_DESTINATION_DESTINATION_DEFAULT_CLIENTID
+Default env fallback convention (uppercased):
+  CLOUD_SDK_CFG_DESTINATION_{INSTANCE}_{FIELD_KEY}
+  e.g., CLOUD_SDK_CFG_DESTINATION_DEFAULT_CLIENTID
 
-Note: We use the common secret resolver with:
-  base_volume_mount="/etc/secrets/appfnd"
-  base_var_name="CLOUD_SDK_CFG"
-  module="destination"
-  instance="{instance}"
-This results in env var names: CLOUD_SDK_CFG_DESTINATION_{INSTANCE}_{FIELD_KEY}
-This results in env var names: CLOUD_SDK_CFG_DESTINATION_{INSTANCE}_{FIELD_KEY}
+The resolver chain can be customised process-wide via::
+
+    from sap_cloud_sdk.core.secret_resolver import configure, SdkConfig
+    configure(SdkConfig(resolver=MyCustomResolver()))
 """
 
 from dataclasses import dataclass
 from typing import Optional
 import os
 
-from sap_cloud_sdk.core.secret_resolver.resolver import (
-    read_from_mount_and_fallback_to_env_var,
-)
+from sap_cloud_sdk.core.secret_resolver import get_resolver
 from sap_cloud_sdk.destination.exceptions import ConfigError
 from sap_cloud_sdk.destination._models import TransparentProxy
 
-_TRANSPARENT_PROXY_ENV_VAR = "APPFND_CONHOS_TRANSP_PROXY"
 _TRANSPARENT_PROXY_ENV_VAR = "APPFND_CONHOS_TRANSP_PROXY"
 
 
@@ -113,7 +106,7 @@ class BindingData:
         )
 
 
-def load_from_env_or_mount(instance: Optional[str] = None) -> DestinationConfig:
+def load_secrets(instance: Optional[str] = None) -> DestinationConfig:
     """Load Destination configuration from mount with env fallback and normalize.
 
     Args:
@@ -129,15 +122,7 @@ def load_from_env_or_mount(instance: Optional[str] = None) -> DestinationConfig:
     binding = BindingData()
 
     try:
-        # 1) Try mount at /etc/secrets/appfnd/destination/{instance}/...
-        # 2) Fallback to env: CLOUD_SDK_CFG_DESTINATION_{INSTANCE}_{FIELD_KEY}
-        read_from_mount_and_fallback_to_env_var(
-            base_volume_mount="/etc/secrets/appfnd",
-            base_var_name="CLOUD_SDK_CFG",
-            module="destination",
-            instance=inst,
-            target=binding,
-        )
+        get_resolver().resolve(module="destination", instance=inst, target=binding)
 
         binding.validate()
         return binding.to_binding()
@@ -151,7 +136,6 @@ def load_from_env_or_mount(instance: Optional[str] = None) -> DestinationConfig:
 
 def load_transparent_proxy() -> Optional[TransparentProxy]:
     """Load transparent proxy configuration from environment variable.
-    The environment variable APPFND_CONHOS_TRANSP_PROXY should be in the format:
     The environment variable APPFND_CONHOS_TRANSP_PROXY should be in the format:
     {proxy_name}.{namespace}
 

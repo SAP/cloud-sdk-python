@@ -2,10 +2,12 @@
 
 import json
 import pytest
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock
 
-from sap_cloud_sdk.print.config import PrintConfig, load_from_env_or_mount
+from sap_cloud_sdk.print.config import PrintConfig, load_secrets
 from sap_cloud_sdk.print.exceptions import ConfigError
+
+_RESOLVER = "sap_cloud_sdk.print.config.get_resolver"
 
 
 def _uaa_json(
@@ -16,15 +18,15 @@ def _uaa_json(
 
 class TestLoadFromEnvOrMount:
 
-    @patch("sap_cloud_sdk.print.config.read_from_mount_and_fallback_to_env_var")
-    def test_returns_print_config(self, mock_resolver):
-        def fill_binding(*, target, **_):
+    @patch(_RESOLVER)
+    def test_returns_print_config(self, mock_get_resolver):
+        def fill_binding(module, instance, target):
             target.url = "https://api.eu10.print.services.sap"
             target.uaa = _uaa_json()
 
-        mock_resolver.side_effect = fill_binding
+        mock_get_resolver.return_value.resolve.side_effect = fill_binding
 
-        config = load_from_env_or_mount()
+        config = load_secrets()
 
         assert isinstance(config, PrintConfig)
         assert config.url == "https://api.eu10.print.services.sap"
@@ -32,85 +34,83 @@ class TestLoadFromEnvOrMount:
         assert config.client_secret == "csecret"
         assert config.token_url == "https://auth.example.com/oauth/token"
 
-    @patch("sap_cloud_sdk.print.config.read_from_mount_and_fallback_to_env_var")
-    def test_uses_default_instance(self, mock_resolver):
-        calls = []
+    @patch(_RESOLVER)
+    def test_uses_default_instance(self, mock_get_resolver):
+        def fill_binding(module, instance, target):
+            target.url = "https://api.eu10.print.services.sap"
+            target.uaa = _uaa_json()
 
-        def capture(**kwargs):
-            calls.append(kwargs)
-            kwargs["target"].url = "https://api.eu10.print.services.sap"
-            kwargs["target"].uaa = _uaa_json()
+        mock_get_resolver.return_value.resolve.side_effect = fill_binding
 
-        mock_resolver.side_effect = capture
+        load_secrets()
+        mock_get_resolver.return_value.resolve.assert_called_once_with(
+            module="print", instance="default", target=mock_get_resolver.return_value.resolve.call_args[1]["target"]
+        )
 
-        load_from_env_or_mount()
-        assert calls[0]["instance"] == "default"
+    @patch(_RESOLVER)
+    def test_uses_provided_instance(self, mock_get_resolver):
+        def fill_binding(module, instance, target):
+            target.url = "https://api.eu10.print.services.sap"
+            target.uaa = _uaa_json()
 
-    @patch("sap_cloud_sdk.print.config.read_from_mount_and_fallback_to_env_var")
-    def test_uses_provided_instance(self, mock_resolver):
-        calls = []
+        mock_get_resolver.return_value.resolve.side_effect = fill_binding
 
-        def capture(**kwargs):
-            calls.append(kwargs)
-            kwargs["target"].url = "https://api.eu10.print.services.sap"
-            kwargs["target"].uaa = _uaa_json()
+        load_secrets(instance="prod")
+        mock_get_resolver.return_value.resolve.assert_called_once_with(
+            module="print", instance="prod", target=mock_get_resolver.return_value.resolve.call_args[1]["target"]
+        )
 
-        mock_resolver.side_effect = capture
-
-        load_from_env_or_mount(instance="prod")
-        assert calls[0]["instance"] == "prod"
-
-    @patch("sap_cloud_sdk.print.config.read_from_mount_and_fallback_to_env_var")
-    def test_missing_url_raises_config_error(self, mock_resolver):
-        def fill_binding(*, target, **_):
+    @patch(_RESOLVER)
+    def test_missing_url_raises_config_error(self, mock_get_resolver):
+        def fill_binding(module, instance, target):
             target.url = ""
             target.uaa = _uaa_json()
 
-        mock_resolver.side_effect = fill_binding
+        mock_get_resolver.return_value.resolve.side_effect = fill_binding
 
         with pytest.raises(ConfigError, match="failed to load print configuration"):
-            load_from_env_or_mount()
+            load_secrets()
 
-    @patch("sap_cloud_sdk.print.config.read_from_mount_and_fallback_to_env_var")
-    def test_invalid_uaa_json_raises_config_error(self, mock_resolver):
-        def fill_binding(*, target, **_):
+    @patch(_RESOLVER)
+    def test_invalid_uaa_json_raises_config_error(self, mock_get_resolver):
+        def fill_binding(module, instance, target):
             target.url = "https://api.eu10.print.services.sap"
             target.uaa = "not-valid-json"
 
-        mock_resolver.side_effect = fill_binding
+        mock_get_resolver.return_value.resolve.side_effect = fill_binding
 
         with pytest.raises(ConfigError):
-            load_from_env_or_mount()
+            load_secrets()
 
-    @patch("sap_cloud_sdk.print.config.read_from_mount_and_fallback_to_env_var")
-    def test_missing_clientid_raises_config_error(self, mock_resolver):
-        def fill_binding(*, target, **_):
+    @patch(_RESOLVER)
+    def test_missing_clientid_raises_config_error(self, mock_get_resolver):
+        def fill_binding(module, instance, target):
             target.url = "https://api.eu10.print.services.sap"
             target.uaa = _uaa_json(clientid="")
 
-        mock_resolver.side_effect = fill_binding
+        mock_get_resolver.return_value.resolve.side_effect = fill_binding
 
         with pytest.raises(ConfigError, match="clientid"):
-            load_from_env_or_mount()
+            load_secrets()
 
-    @patch("sap_cloud_sdk.print.config.read_from_mount_and_fallback_to_env_var")
-    def test_missing_clientsecret_raises_config_error(self, mock_resolver):
-        def fill_binding(*, target, **_):
+    @patch(_RESOLVER)
+    def test_missing_clientsecret_raises_config_error(self, mock_get_resolver):
+        def fill_binding(module, instance, target):
             target.url = "https://api.eu10.print.services.sap"
             target.uaa = _uaa_json(clientsecret="")
 
-        mock_resolver.side_effect = fill_binding
+        mock_get_resolver.return_value.resolve.side_effect = fill_binding
 
         with pytest.raises(ConfigError, match="clientsecret"):
-            load_from_env_or_mount()
+            load_secrets()
 
-    @patch("sap_cloud_sdk.print.config.read_from_mount_and_fallback_to_env_var")
-    def test_missing_uaa_url_raises_config_error(self, mock_resolver):
-        def fill_binding(*, target, **_):
+    @patch(_RESOLVER)
+    def test_missing_uaa_url_raises_config_error(self, mock_get_resolver):
+        def fill_binding(module, instance, target):
             target.url = "https://api.eu10.print.services.sap"
             target.uaa = _uaa_json(url="")
 
-        mock_resolver.side_effect = fill_binding
+        mock_get_resolver.return_value.resolve.side_effect = fill_binding
 
         with pytest.raises(ConfigError, match="uaa.url"):
-            load_from_env_or_mount()
+            load_secrets()

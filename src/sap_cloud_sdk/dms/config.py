@@ -3,11 +3,9 @@ from dataclasses import dataclass
 from typing import Any, Dict, Optional
 from urllib.parse import urlparse
 
-from sap_cloud_sdk.core.secret_resolver.resolver import (
-    read_from_mount_and_fallback_to_env_var,
-)
 from sap_cloud_sdk.destination.exceptions import ConfigError
 from sap_cloud_sdk.dms.model import DMSCredentials
+from sap_cloud_sdk.core.secret_resolver import get_resolver
 
 
 @dataclass
@@ -116,15 +114,7 @@ def load_sdm_config_from_env_or_mount(instance: Optional[str] = None) -> DMSCred
     )  # Initialize with empty values; will be populated by resolver
 
     try:
-        # 1) Try mount at /etc/secrets/appfnd/destination/{instance}/...
-        # 2) Fallback to env: CLOUD_SDK_CFG_SDM_{INSTANCE}_{FIELD_KEY}
-        read_from_mount_and_fallback_to_env_var(
-            base_volume_mount="/etc/secrets/appfnd",
-            base_var_name="CLOUD_SDK_CFG",
-            module="sdm",
-            instance=inst,
-            target=binding,
-        )
+        get_resolver().resolve(module="sdm", instance=inst, target=binding)
 
         binding.validate()
         return binding.to_credentials()

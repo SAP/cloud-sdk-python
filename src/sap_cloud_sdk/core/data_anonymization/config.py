@@ -22,6 +22,7 @@ from dataclasses import dataclass
 from typing import Optional
 
 from sap_cloud_sdk.core.data_anonymization.exceptions import ClientCreationError
+from sap_cloud_sdk.core.secret_resolver import get_resolver
 
 
 @dataclass
@@ -111,7 +112,7 @@ class _BindingData:
         )
 
 
-def _load_config_from_env(instance: str = "default") -> DataAnonymizationConfig:
+def _load_secrets(instance: str = "default") -> DataAnonymizationConfig:
     """Load anonymization config from environment / mount path.
 
     Uses the secret resolver to read from:
@@ -126,18 +127,11 @@ def _load_config_from_env(instance: str = "default") -> DataAnonymizationConfig:
     Raises:
         ClientCreationError: If loading or parsing fails.
     """
-    from sap_cloud_sdk.core.secret_resolver import (
-        read_from_mount_and_fallback_to_env_var,
-    )
 
     try:
         binding = _BindingData("")
-        read_from_mount_and_fallback_to_env_var(
-            "/etc/secrets/appfnd",
-            "CLOUD_SDK_CFG",
-            "data-anonymization",
-            instance,
-            binding,
+        get_resolver().resolve(
+            module="data-anonymization", instance=instance, target=binding
         )
         binding.validate()
         return binding.extract_config()

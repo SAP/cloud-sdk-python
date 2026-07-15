@@ -8,6 +8,7 @@ import json
 from dataclasses import dataclass
 
 from sap_cloud_sdk.core.auditlog.exceptions import ClientCreationError
+from sap_cloud_sdk.core.secret_resolver import get_resolver
 
 
 @dataclass
@@ -85,7 +86,7 @@ class BindingData:
             raise ClientCreationError(f"Missing required field in UAA JSON: {e}")
 
 
-def _load_config_from_env() -> AuditLogConfig:
+def _load_secrets() -> AuditLogConfig:
     """Load audit log configuration from environment/mounts.
 
     Uses the secret resolver to load configuration from:
@@ -100,20 +101,13 @@ def _load_config_from_env() -> AuditLogConfig:
     Raises:
         ClientCreationError: If loading or parsing fails
     """
-    from sap_cloud_sdk.core.secret_resolver import (
-        read_from_mount_and_fallback_to_env_var,
-    )
 
     try:
         # Load raw config data using secret resolver
         binding_data: BindingData = BindingData("", "")
 
-        read_from_mount_and_fallback_to_env_var(
-            base_volume_mount="/etc/secrets/appfnd",
-            base_var_name="CLOUD_SDK_CFG",
-            module="auditlog",
-            instance="default",
-            target=binding_data,
+        get_resolver().resolve(
+            module="auditlog", instance="default", target=binding_data
         )
 
         binding_data.validate()

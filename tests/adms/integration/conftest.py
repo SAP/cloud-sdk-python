@@ -24,7 +24,7 @@ from sap_cloud_sdk.adms.client import (
     AsyncAdmsClient,
     create_async_client,
 )
-from sap_cloud_sdk.adms.config import AdmsConfig, load_from_env_or_mount
+from sap_cloud_sdk.adms.config import AdmsConfig, load_secrets
 from sap_cloud_sdk.adms.exceptions import ConfigError
 
 
@@ -40,7 +40,7 @@ def adms_config() -> AdmsConfig:
     Skips the entire integration suite when required credentials are missing.
     """
     try:
-        return load_from_env_or_mount("default")
+        return load_secrets("default")
     except ConfigError as exc:
         pytest.skip(f"ADMS integration tests skipped — missing config: {exc}")
 

@@ -23,6 +23,7 @@ from dataclasses import dataclass
 from typing import Optional
 
 from sap_cloud_sdk.agent_memory.exceptions import AgentMemoryConfigError
+from sap_cloud_sdk.core.secret_resolver import get_resolver
 
 
 @dataclass
@@ -113,7 +114,7 @@ class BindingData:
             raise AgentMemoryConfigError(f"Missing required field in uaa JSON: {e}")
 
 
-def _load_config_from_env() -> AgentMemoryConfig:
+def _load_secrets() -> AgentMemoryConfig:
     """Load Agent Memory configuration from a mounted volume or environment variables.
 
     Uses the secret resolver with fallback order:
@@ -126,19 +127,12 @@ def _load_config_from_env() -> AgentMemoryConfig:
     Raises:
         AgentMemoryConfigError: If configuration cannot be loaded or is incomplete.
     """
-    from sap_cloud_sdk.core.secret_resolver import (
-        read_from_mount_and_fallback_to_env_var,
-    )
-
     try:
         binding = BindingData()
-        read_from_mount_and_fallback_to_env_var(
-            base_volume_mount="/etc/secrets/appfnd",
-            base_var_name="CLOUD_SDK_CFG",
-            module="hana-agent-memory",
-            instance="default",
-            target=binding,
+        get_resolver().resolve(
+            module="agent_memory", instance="default", target=binding
         )
+
         binding.validate()
         return binding.extract_config()
     except AgentMemoryConfigError:

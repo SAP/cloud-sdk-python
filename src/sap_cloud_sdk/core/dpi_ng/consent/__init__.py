@@ -72,6 +72,7 @@ class ConsentClient:
             config: Validated ``ConsentConfig`` containing the base URL and auth strategy.
             _telemetry_source: Internal parameter; not for end-user use.
         """
+        # deferred import to break circular dependency: consent/__init__ → services → client
         from .client import _ConsentODataClient
 
         self._telemetry_source = _telemetry_source

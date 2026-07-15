@@ -18,7 +18,6 @@ from sap_cloud_sdk.destination import (
     ConsumptionLevel,
     ConsumptionOptions,
 )
-
 from sap_cloud_sdk.agentgateway._fragments import (
     LABEL_KEY,
     FragmentLabel,

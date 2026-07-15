@@ -45,7 +45,7 @@ from typing import Optional
 from sap_cloud_sdk.core.data_anonymization.client import DataAnonymizationClient
 from sap_cloud_sdk.core.data_anonymization.config import (
     DataAnonymizationConfig,
-    _load_config_from_env,
+    _load_secrets,
 )
 from sap_cloud_sdk.core.data_anonymization._http_transport import HttpTransport
 from sap_cloud_sdk.core.data_anonymization.models import (
@@ -101,7 +101,7 @@ def create_client(
         never includes configuration values or processed user content.
     """
     try:
-        resolved = config if config is not None else _load_config_from_env(instance)
+        resolved = config if config is not None else _load_secrets(instance)
         transport = HttpTransport(resolved)
         return DataAnonymizationClient(transport, _telemetry_source=_telemetry_source)
     except Exception as e:

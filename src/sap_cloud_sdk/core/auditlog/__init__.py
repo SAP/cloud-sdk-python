@@ -33,7 +33,7 @@ from sap_cloud_sdk.core.auditlog.models import (
     ChangeAttribute,
     DeletedAttribute,
 )
-from sap_cloud_sdk.core.auditlog.config import AuditLogConfig, _load_config_from_env
+from sap_cloud_sdk.core.auditlog.config import AuditLogConfig, _load_secrets
 from sap_cloud_sdk.core.auditlog.exceptions import (
     AuditLogError,
     ClientCreationError,
@@ -67,7 +67,7 @@ def create_client(
             transport = HttpTransport(config)
             return AuditLogClient(transport, _telemetry_source=_telemetry_source)
 
-        transport = HttpTransport(_load_config_from_env())
+        transport = HttpTransport(_load_secrets())
         return AuditLogClient(transport, _telemetry_source=_telemetry_source)
 
     except Exception as e:

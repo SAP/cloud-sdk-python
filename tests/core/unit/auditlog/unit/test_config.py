@@ -7,7 +7,7 @@ from unittest.mock import patch, MagicMock
 from sap_cloud_sdk.core.auditlog.config import (
     AuditLogConfig,
     BindingData,
-    _load_config_from_env
+    _load_secrets
 )
 from sap_cloud_sdk.core.auditlog.exceptions import ClientCreationError
 
@@ -194,62 +194,50 @@ class TestBindingData:
 
 class TestLoadConfigFromEnv:
 
-    @patch('sap_cloud_sdk.core.secret_resolver.read_from_mount_and_fallback_to_env_var')
-    def test_load_config_success(self, mock_read):
-        mock_binding = BindingData(
-            url="https://service.example.com",
-            uaa='{"clientid": "test", "clientsecret": "secret", "url": "oauth"}'
-        )
+    @patch('sap_cloud_sdk.core.auditlog.config.get_resolver')
+    def test_load_config_success(self, mock_get_resolver):
+        def fill_binding(module, instance, target):
+            target.url = "https://service.example.com"
+            target.uaa = '{"clientid": "test", "clientsecret": "secret", "url": "oauth"}'
 
-        def mock_read_side_effect(*args, **kwargs):
-            binding_data: BindingData = kwargs["target"]
-            binding_data.url = mock_binding.url
-            binding_data.uaa = mock_binding.uaa
+        mock_get_resolver.return_value.resolve.side_effect = fill_binding
 
-        mock_read.side_effect = mock_read_side_effect
-
-        config = _load_config_from_env()
+        config = _load_secrets()
 
         assert config.client_id == "test"
         assert config.client_secret == "secret"
         assert config.oauth_url == "oauth"
         assert config.service_url == "https://service.example.com"
 
-        mock_read.assert_called_once_with(
-            base_volume_mount="/etc/secrets/appfnd",
-            base_var_name="CLOUD_SDK_CFG",
-            module="auditlog",
-            instance="default",
-            target=mock_read.call_args.kwargs["target"]
+        mock_get_resolver.return_value.resolve.assert_called_once_with(
+            module="auditlog", instance="default", target=mock_get_resolver.return_value.resolve.call_args[1]["target"]
         )
 
-    @patch('sap_cloud_sdk.core.secret_resolver.read_from_mount_and_fallback_to_env_var')
-    def test_load_config_validation_error(self, mock_read):
-        def mock_read_side_effect(*args, **kwargs):
-            binding_data: BindingData = kwargs["target"]
-            binding_data.url = ""
-            binding_data.uaa = ""
+    @patch('sap_cloud_sdk.core.auditlog.config.get_resolver')
+    def test_load_config_validation_error(self, mock_get_resolver):
+        def fill_binding(module, instance, target):
+            target.url = ""
+            target.uaa = ""
 
-        mock_read.side_effect = mock_read_side_effect
-
-        with pytest.raises(ClientCreationError, match="Failed to load configuration"):
-            _load_config_from_env()
-
-    @patch('sap_cloud_sdk.core.secret_resolver.read_from_mount_and_fallback_to_env_var')
-    def test_load_config_read_exception(self, mock_read):
-        mock_read.side_effect = Exception("Mount read failed")
+        mock_get_resolver.return_value.resolve.side_effect = fill_binding
 
         with pytest.raises(ClientCreationError, match="Failed to load configuration"):
-            _load_config_from_env()
+            _load_secrets()
 
-    @patch('sap_cloud_sdk.core.secret_resolver.read_from_mount_and_fallback_to_env_var')
-    def test_load_config_invalid_uaa(self, mock_read):
-        def mock_read_side_effect(*args, **kwargs):
-            binding_data: BindingData = kwargs["target"]
-            binding_data.url = "https://service.example.com"
-            binding_data.uaa = "invalid json"
-
-        mock_read.side_effect = mock_read_side_effect
+    @patch('sap_cloud_sdk.core.auditlog.config.get_resolver')
+    def test_load_config_read_exception(self, mock_get_resolver):
+        mock_get_resolver.return_value.resolve.side_effect = Exception("Mount read failed")
 
         with pytest.raises(ClientCreationError, match="Failed to load configuration"):
-            _load_config_from_env()
+            _load_secrets()
+
+    @patch('sap_cloud_sdk.core.auditlog.config.get_resolver')
+    def test_load_config_invalid_uaa(self, mock_get_resolver):
+        def fill_binding(module, instance, target):
+            target.url = "https://service.example.com"
+            target.uaa = "invalid json"
+
+        mock_get_resolver.return_value.resolve.side_effect = fill_binding
+
+        with pytest.raises(ClientCreationError, match="Failed to load configuration"):
+            _load_secrets()

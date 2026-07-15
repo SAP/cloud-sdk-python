@@ -396,6 +396,18 @@ async def get_mcp_tools_lob(
                 len(server_tools),
                 fragment_name,
             )
+        except httpx.HTTPStatusError as exc:
+            if exc.response.status_code == 403:
+                logger.warning(
+                    "HTTP 403 listing tools from fragment '%s' with system token — "
+                    "MCP list_tools may require a user-scoped token; use Phase 2 flow "
+                    "with user_token when calling list_mcp_tools with principal context",
+                    fragment_name,
+                )
+            logger.exception(
+                "Failed to load tools from fragment '%s' — skipping",
+                fragment_name,
+            )
         except Exception:
             logger.exception(
                 "Failed to load tools from fragment '%s' — skipping",

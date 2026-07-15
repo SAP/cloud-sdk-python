@@ -396,6 +396,8 @@ async def get_mcp_tools_lob(
                 len(server_tools),
                 fragment_name,
             )
+        # intentional: fragment failure must not abort remaining fragments
+        # (HTTPStatusError: 403 → warning + continue; other status → exception log + skip)
         except httpx.HTTPStatusError as exc:
             if exc.response.status_code == 403:
                 logger.warning(
@@ -405,12 +407,12 @@ async def get_mcp_tools_lob(
                     fragment_name,
                 )
                 continue
-            # intentional: fragment failure must not abort remaining fragments
             logger.exception(
                 "Failed to load tools from fragment '%s' — skipping",
                 fragment_name,
             )
         # intentional: fragment failure must not abort remaining fragments
+        # (unexpected errors → exception log + skip)
         except Exception:
             logger.exception(
                 "Failed to load tools from fragment '%s' — skipping",

@@ -10,7 +10,7 @@ Set the following environment variables before running integration tests:
 Multitenancy:
 
     CLOUD_SDK_CFG_HANA_AGENT_MEMORY_DEFAULT_SUBSCRIBER_TENANT   Subscriber tenant subdomain
-        Required for SUBSCRIBER_ONLY tests. When absent those tests are skipped.
+        Required for SUBSCRIBER tests. When absent those tests are skipped.
 """
 
 import os
@@ -28,15 +28,15 @@ from sap_cloud_sdk.agent_memory.exceptions import AgentMemoryConfigError
 def agent_memory_client() -> AgentMemoryClient:
     """Create a real AgentMemoryClient from environment variables.
 
-    Uses PROVIDER_ONLY as the default strategy — individual BDD steps override
-    this per-call to exercise both PROVIDER_ONLY and SUBSCRIBER_ONLY scenarios.
+    Uses PROVIDER as the default strategy — individual BDD steps override
+    this per-call to exercise both PROVIDER and SUBSCRIBER scenarios.
     """
     env_file = Path(__file__).parents[3] / ".env_integration_tests"
     if env_file.exists():
         load_dotenv(env_file, override=True)
 
     try:
-        return create_client(access_strategy=AccessStrategy.PROVIDER_ONLY)
+        return create_client(access_strategy=AccessStrategy.PROVIDER)
     except AgentMemoryConfigError as e:
         pytest.skip(f"Agent Memory credentials not configured — skipping integration tests: {e}")
     except Exception as e:

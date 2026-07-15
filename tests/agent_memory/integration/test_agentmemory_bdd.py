@@ -97,52 +97,52 @@ def test_filter_messages_by_metadata():
 # ── Subscriber scenarios ──────────────────────────────────────────────────────
 
 
-@scenario("agentmemory.feature", "Create a new memory using SUBSCRIBER_ONLY access strategy")
+@scenario("agentmemory.feature", "Create a new memory using SUBSCRIBER access strategy")
 def test_add_memory_subscriber():
     pass
 
 
-@scenario("agentmemory.feature", "Get a memory using SUBSCRIBER_ONLY access strategy")
+@scenario("agentmemory.feature", "Get a memory using SUBSCRIBER access strategy")
 def test_get_memory_subscriber():
     pass
 
 
-@scenario("agentmemory.feature", "Update memory content using SUBSCRIBER_ONLY access strategy")
+@scenario("agentmemory.feature", "Update memory content using SUBSCRIBER access strategy")
 def test_update_memory_subscriber():
     pass
 
 
-@scenario("agentmemory.feature", "List memories using SUBSCRIBER_ONLY access strategy")
+@scenario("agentmemory.feature", "List memories using SUBSCRIBER access strategy")
 def test_list_memories_subscriber():
     pass
 
 
-@scenario("agentmemory.feature", "Delete a memory using SUBSCRIBER_ONLY access strategy")
+@scenario("agentmemory.feature", "Delete a memory using SUBSCRIBER access strategy")
 def test_delete_memory_subscriber():
     pass
 
 
-@scenario("agentmemory.feature", "Search memories using SUBSCRIBER_ONLY access strategy")
+@scenario("agentmemory.feature", "Search memories using SUBSCRIBER access strategy")
 def test_search_memories_subscriber():
     pass
 
 
-@scenario("agentmemory.feature", "Create and get a message using SUBSCRIBER_ONLY access strategy")
+@scenario("agentmemory.feature", "Create and get a message using SUBSCRIBER access strategy")
 def test_add_message_subscriber():
     pass
 
 
-@scenario("agentmemory.feature", "List messages using SUBSCRIBER_ONLY access strategy")
+@scenario("agentmemory.feature", "List messages using SUBSCRIBER access strategy")
 def test_list_messages_subscriber():
     pass
 
 
-@scenario("agentmemory.feature", "Delete a message using SUBSCRIBER_ONLY access strategy")
+@scenario("agentmemory.feature", "Delete a message using SUBSCRIBER access strategy")
 def test_delete_message_subscriber():
     pass
 
 
-@scenario("agentmemory.feature", "Count memories using SUBSCRIBER_ONLY access strategy")
+@scenario("agentmemory.feature", "Count memories using SUBSCRIBER access strategy")
 def test_count_memories_subscriber():
     pass
 
@@ -163,7 +163,7 @@ def test_filter_messages_by_metadata_subscriber():
 @pytest.fixture
 def context():
     return {
-        "access_strategy": AccessStrategy.PROVIDER_ONLY,
+        "access_strategy": AccessStrategy.PROVIDER,
         "tenant": None,
     }
 
@@ -178,7 +178,7 @@ def configured_client(context, agent_memory_client):
 
 @given("I use the configured subscriber tenant")
 def use_configured_subscriber_tenant(context, subscriber_tenant):
-    context["access_strategy"] = AccessStrategy.SUBSCRIBER_ONLY
+    context["access_strategy"] = AccessStrategy.SUBSCRIBER
     context["tenant"] = subscriber_tenant
 
 

@@ -184,8 +184,8 @@ from sap_cloud_sdk.agent_memory import AccessStrategy
 
 | Value                       | Description                                                                                                   |
 | --------------------------- | ------------------------------------------------------------------------------------------------------------- |
-| `SUBSCRIBER_ONLY` (default) | Reads and writes against the subscriber tenant. Requires `tenant`.                                            |
-| `PROVIDER_ONLY`             | Reads and writes against the provider tenant. No `tenant` needed. Caution: this provides no tenant isolation. |
+| `SUBSCRIBER` (default) | Reads and writes against the subscriber tenant. Requires `tenant`.                                            |
+| `PROVIDER`             | Reads and writes against the provider tenant. No `tenant` needed. Caution: this provides no tenant isolation. |
 
 ### Configuring at client level
 
@@ -198,7 +198,7 @@ from sap_cloud_sdk.agent_memory import create_client, AccessStrategy
 
 # Tenant set once — all calls below use it automatically
 client = create_client(
-    access_strategy=AccessStrategy.SUBSCRIBER_ONLY,
+    access_strategy=AccessStrategy.SUBSCRIBER,
     tenant="acme-corp",
 )
 
@@ -209,24 +209,24 @@ count    = client.count_memories(agent_id="hr-assistant")
 A per-call value overrides the client default for that single call:
 
 ```python
-# All calls use SUBSCRIBER_ONLY / "acme-corp" except this one
+# All calls use SUBSCRIBER / "acme-corp" except this one
 provider_memories = client.list_memories(
     agent_id="hr-assistant",
     invoker_id="user-42",
-    access_strategy=AccessStrategy.PROVIDER_ONLY,  # overrides for this call only
+    access_strategy=AccessStrategy.PROVIDER,  # overrides for this call only
 )
 ```
 
-### SUBSCRIBER_ONLY (default)
+### SUBSCRIBER (default)
 
 Pass the subscriber tenant subdomain via the `tenant` argument. Omitting `tenant` when
-the strategy is `SUBSCRIBER_ONLY` raises `AgentMemoryValidationError`.
+the strategy is `SUBSCRIBER` raises `AgentMemoryValidationError`.
 
 ```python
 memories = client.list_memories(
     agent_id="hr-assistant",
     invoker_id="user-42",
-    access_strategy=AccessStrategy.SUBSCRIBER_ONLY,
+    access_strategy=AccessStrategy.SUBSCRIBER,
     tenant="acme-corp",          # subscriber subdomain
 )
 ```
@@ -236,7 +236,7 @@ in the configured `token_url` with the `tenant` value. This requires `identityzo
 be present in the service binding's UAA JSON (standard XSUAA field) or set explicitly in
 `AgentMemoryConfig`.
 
-### PROVIDER_ONLY
+### PROVIDER
 
 No `tenant` argument is needed. All calls use the provider token.
 
@@ -244,12 +244,12 @@ No `tenant` argument is needed. All calls use the provider token.
 memories = client.list_memories(
     agent_id="hr-assistant",
     invoker_id="user-42",
-    access_strategy=AccessStrategy.PROVIDER_ONLY,
+    access_strategy=AccessStrategy.PROVIDER,
 )
 ```
 
 > [!WARNING]
-> `PROVIDER_ONLY` provides **no tenant isolation** — the provider token grants access to data across all subscriber tenants Only use this strategy for provider-owned operations (e.g., admin tasks, shared datasets). Never use it to serve subscriber-specific data.
+> `PROVIDER` provides **no tenant isolation** — the provider token grants access to data across all subscriber tenants Only use this strategy for provider-owned operations (e.g., admin tasks, shared datasets). Never use it to serve subscriber-specific data.
 
 ## Semantic Search: A Brief Primer
 
@@ -591,7 +591,7 @@ See the [Content and metadata filtering](#content-and-metadata-filtering) note u
 | Enum             | Values                                       |
 | ---------------- | -------------------------------------------- |
 | `MessageRole`    | `USER`, `ASSISTANT`, `SYSTEM`, `TOOL`        |
-| `AccessStrategy` | `SUBSCRIBER_ONLY` (default), `PROVIDER_ONLY` |
+| `AccessStrategy` | `SUBSCRIBER` (default), `PROVIDER` |
 
 All models expose a `to_dict()` method that returns a plain dict for logging or forwarding.
 

@@ -18,8 +18,6 @@ from sap_cloud_sdk.destination import (
     ConsumptionLevel,
     ConsumptionOptions,
 )
-from sap_cloud_sdk.core.telemetry import Module
-
 from sap_cloud_sdk.agentgateway._fragments import (
     LABEL_KEY,
     FragmentLabel,
@@ -89,10 +87,7 @@ def _fetch_auth_token(
     Raises:
         MCPServerNotFoundError: If no auth token is returned.
     """
-    client = create_destination_client(
-        instance=_DESTINATION_INSTANCE,
-        _telemetry_source=Module.AGENTGATEWAY,
-    )
+    client = create_destination_client(instance=_DESTINATION_INSTANCE)
     dest = client.get_destination(
         dest_name,
         level=ConsumptionLevel.PROVIDER_SUBACCOUNT,
@@ -134,10 +129,7 @@ def get_ias_client_id_lob() -> str:
         Any exception raised by the destination client.
     """
     dest_name = _ias_dest_name()
-    client = create_destination_client(
-        instance=_DESTINATION_INSTANCE,
-        _telemetry_source=Module.AGENTGATEWAY,
-    )
+    client = create_destination_client(instance=_DESTINATION_INSTANCE)
     dest = client.get_destination(
         dest_name,
         level=ConsumptionLevel.PROVIDER_SUBACCOUNT,
@@ -325,14 +317,6 @@ async def list_server_tools(
                     else fragment_name
                 )
                 result = await session.list_tools()
-                if result is None or result.tools is None:
-                    logger.warning(
-                        "list_tools() returned no tools (response=%r); fragment %r skipped — "
-                        "check MCP server health and OTel instrumentation",
-                        result,
-                        fragment_name,
-                    )
-                    return []
                 return [
                     MCPTool(
                         name=t.name,
@@ -394,18 +378,6 @@ async def get_mcp_tools_lob(
             logger.debug(
                 "Loaded %d tool(s) from fragment '%s'",
                 len(server_tools),
-                fragment_name,
-            )
-        except httpx.HTTPStatusError as exc:
-            if exc.response.status_code == 403:
-                logger.warning(
-                    "HTTP 403 listing tools from fragment '%s' with system token — "
-                    "MCP list_tools may require a user-scoped token; use Phase 2 flow "
-                    "with user_token when calling list_mcp_tools with principal context",
-                    fragment_name,
-                )
-            logger.exception(
-                "Failed to load tools from fragment '%s' — skipping",
                 fragment_name,
             )
         except Exception:

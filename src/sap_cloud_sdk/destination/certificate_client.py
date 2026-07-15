@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import List, Optional, TypeVar, Callable
 
-from sap_cloud_sdk.core.telemetry import Module, Operation, record_metrics
+from sap_cloud_sdk.core._telemetry_compat import Module, Operation, record_metrics
 from sap_cloud_sdk.destination._http import DestinationHttp, API_V1
 from sap_cloud_sdk.destination._models import (
     AccessStrategy,

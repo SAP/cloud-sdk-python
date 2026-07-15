@@ -1,64 +1,26 @@
 """
-Secret resolver: load configuration/secrets from mounted files or environment variables.
+Secret resolver: load configuration/secrets from mounted files or environment variables
 
-Built-in resolvers and chain builder::
+Usage:
+    from dataclasses import dataclass, field
+    from sap_cloud_sdk.secret_resolver import read_from_mount_and_fallback_to_env_var
 
-    from sap_cloud_sdk.core.secret_resolver import (
-        MountResolver,
-        EnvVarResolver,
-        ChainedResolver,
-    )
+    @dataclass
+    class MyConfig:
+        username: str = field(metadata={"secret": "username"})
+        password: str = field(metadata={"secret": "password"})
+        endpoint: str = "http://localhost"
 
-    # Build a chain explicitly
-    resolver = ChainedResolver([MountResolver(), EnvVarResolver()])
-    resolver.resolve("destination", "default", binding)
-
-Legacy function-based API (still supported)::
-
-    from sap_cloud_sdk.core.secret_resolver import read_from_mount_and_fallback_to_env_var
-
+    cfg = MyConfig()
     read_from_mount_and_fallback_to_env_var(
         base_volume_mount="/etc/secrets/appfnd",
         base_var_name="CLOUD_SDK_CFG",
-        module="destination",
+        module="objectstore",
         instance="default",
-        target=binding,
+        target=cfg
     )
 """
 
-from sap_cloud_sdk.core.secret_resolver.resolver import (
-    read_from_mount_and_fallback_to_env_var,
-)
-from sap_cloud_sdk.core.secret_resolver._resolvers import (
-    Resolver,
-    ChainedResolver,
-)
+from .resolver import read_from_mount_and_fallback_to_env_var, resolve_base_mount
 
-from sap_cloud_sdk.core.secret_resolver.mount_resolver import (
-    MountResolver,
-    resolve_base_mount,
-)
-from sap_cloud_sdk.core.secret_resolver.env_resolver import EnvVarResolver
-
-from sap_cloud_sdk.core.secret_resolver.sdk_config import (
-    SdkConfig,
-    configure,
-    get_sdk_config,
-    get_resolver,
-)
-
-__all__ = [
-    # Class-based API
-    "Resolver",
-    "MountResolver",
-    "EnvVarResolver",
-    "ChainedResolver",
-    # Global configuration
-    "SdkConfig",
-    "configure",
-    "get_sdk_config",
-    "get_resolver",
-    # Legacy function-based API
-    "read_from_mount_and_fallback_to_env_var",
-    "resolve_base_mount",
-]
+__all__ = ["read_from_mount_and_fallback_to_env_var", "resolve_base_mount"]

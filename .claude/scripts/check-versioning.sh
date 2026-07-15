@@ -69,6 +69,12 @@ fi
 if [ "$breaking_detected" = "true" ]; then
   # collect requirements
   has_bang=$(has_commit_type "$BASE_SHA" "$HEAD_SHA" "feat!,fix!" 2>/dev/null || echo "false")
+  # Also accept ! in the PR_TITLE (squash-merge subject) when commit history
+  # is not available locally (e.g. dry-run with LOCAL_DIFF).
+  if [ "$has_bang" = "false" ] && [ -n "${PR_TITLE:-}" ]; then
+    echo "$PR_TITLE" | grep -qE '^(feat|fix|refactor|chore|docs|test|ci|build|perf|style|revert)\([^)]*\)!:' && has_bang="true"
+    echo "$PR_TITLE" | grep -qE '^(feat|fix|refactor|chore|docs|test|ci|build|perf|style|revert)!:' && has_bang="true"
+  fi
   has_bump=$([ -n "$version_bumped" ] && echo "true" || echo "false")
 
   pr_body=""
@@ -88,8 +94,10 @@ if [ "$breaking_detected" = "true" ]; then
       has_breaking_section="true"
     fi
   fi
-  # Checkbox: accept -, *, +, or bullet with either ticked casing
-  has_checkbox=$(echo "$pr_body" | grep -qE '^[[:space:]]*[-*+][[:space:]]*\[[xX]\][[:space:]]+([Bb]reaking change|BREAKING|Contains breaking)' && echo "true" || echo "false")
+  # Checkbox: match any ticked checkbox whose text contains "breaking" (case-insensitive).
+  # Covers: "Breaking change", "BREAKING", "Contains breaking changes",
+  # "This PR contains breaking changes", etc.
+  has_checkbox=$(echo "$pr_body" | grep -qiE '^[[:space:]]*[-*+][[:space:]]*\[[xX]\][[:space:]].*breaking' && echo "true" || echo "false")
 
   # if ANY of the 4 requirements is missing → BLOCK
   missing=""

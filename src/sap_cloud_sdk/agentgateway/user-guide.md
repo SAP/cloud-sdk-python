@@ -203,14 +203,12 @@ class AgentGatewayClient:
     async def list_mcp_tools(
         self,
         user_token: str | Callable[[], str] | None = None,
-        app_tid: str | None = None,
     ) -> list[MCPTool]
 
     async def call_mcp_tool(
         self,
         tool: MCPTool,
         user_token: str | Callable[[], str] | None = None,
-        app_tid: str | None = None,
         **kwargs,
     ) -> str
 
@@ -270,18 +268,3 @@ class MCPTool:
     url: str
     fragment_name: str | None
 ```
-
-## Troubleshooting (LoB MCP)
-
-### Empty or null tool lists
-
-If the MCP session returns no tool list (`list_tools()` is `None` or `tools` is `None`), the SDK logs a warning and skips that destination fragment instead of raising an error. Discovery continues with remaining fragments. This often happens when OpenTelemetry MCP instrumentation swallows errors; see the telemetry user guide for `auto_instrument()` behavior on SDK 0.35.2+.
-
-### HTTP 403 during discovery
-
-Many LoB landscapes require a **user-scoped token** for MCP tool listing. Pass `user_token` on **every** `list_mcp_tools()` call that must see user-scoped tools. If one code path calls `list_mcp_tools()` without `user_token` while another passes it, you may get HTTP 403 on some fragments, zero tools from that path, and misleading errors such as “no tool for role” even when ordId mapping is correct.
-
-### OpenTelemetry and MCP
-
-Call `auto_instrument()` from `sap_cloud_sdk.core.telemetry` before importing MCP or AI libraries. On SDK **0.35.2+**, successful auto-instrumentation automatically unwraps OpenTelemetry MCP wrappers (`BaseSession.send_request` and streamable HTTP client entry points). Do not duplicate that unwrap in your application `main.py` once you depend on that release.
-

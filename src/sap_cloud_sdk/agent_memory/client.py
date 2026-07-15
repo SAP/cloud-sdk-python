@@ -9,6 +9,7 @@ Do not instantiate this class directly — use :func:`sap_cloud_sdk.agent_memory
 
 from __future__ import annotations
 
+import logging
 from typing import TYPE_CHECKING, Any, Callable, Optional
 
 if TYPE_CHECKING:
@@ -41,6 +42,8 @@ from sap_cloud_sdk.agent_memory.exceptions import (
     AgentMemoryValidationError,
 )
 from sap_cloud_sdk.core.telemetry import Module, Operation, record_metrics
+
+logger = logging.getLogger(__name__)
 
 
 def _require_non_empty(**fields: str) -> None:
@@ -81,9 +84,9 @@ class AgentMemoryClient:
         transport: HTTP transport loaded from the provider (``default``) binding,
             or from the subscriber binding when ``tenant`` is provided at init time.
         access_strategy: Default tenant access strategy for all operations.
-            Defaults to ``SUBSCRIBER_ONLY``. Can be overridden per method call.
+            Defaults to ``SUBSCRIBER``. Can be overridden per method call.
         tenant: Default subscriber tenant subdomain. Required when
-            ``access_strategy=SUBSCRIBER_ONLY``. Can be overridden per method call.
+            ``access_strategy=SUBSCRIBER``. Can be overridden per method call.
         config_loader: Callable that loads an ``AgentMemoryConfig`` for a named
             binding instance (e.g. ``_load_config_for_instance``). Required to
             support per-call tenant overrides that differ from the client default.
@@ -93,7 +96,7 @@ class AgentMemoryClient:
         self,
         transport: HttpTransport,
         *,
-        access_strategy: AccessStrategy = AccessStrategy.SUBSCRIBER_ONLY,
+        access_strategy: AccessStrategy = AccessStrategy.SUBSCRIBER,
         tenant: Optional[str] = None,
         config_loader: Optional[Callable[[str], "AgentMemoryConfig"]] = None,
     ) -> None:
@@ -101,7 +104,7 @@ class AgentMemoryClient:
         self._default_tenant = tenant
         self._config_loader = config_loader
         self._subscriber_transport_cache: dict[str, HttpTransport] = {}
-        if access_strategy is AccessStrategy.SUBSCRIBER_ONLY and tenant:
+        if access_strategy is AccessStrategy.SUBSCRIBER and tenant:
             # Pre-warm cache with the already-loaded subscriber transport
             self._subscriber_transport_cache[tenant] = transport
             self._provider_transport: Optional[HttpTransport] = None
@@ -135,7 +138,7 @@ class AgentMemoryClient:
 
         Raises:
             AgentMemoryValidationError: If the effective strategy is
-                ``SUBSCRIBER_ONLY`` but no tenant is available.
+                ``SUBSCRIBER`` but no tenant is available.
             AgentMemoryConfigError: If a per-call subscriber tenant requires a
                 new binding load but no ``config_loader`` is configured.
         """
@@ -146,10 +149,10 @@ class AgentMemoryClient:
         )
         effective_tenant = tenant if tenant is not None else self._default_tenant
 
-        if effective_strategy is AccessStrategy.SUBSCRIBER_ONLY:
+        if effective_strategy is AccessStrategy.SUBSCRIBER:
             if not effective_tenant:
                 raise AgentMemoryValidationError(
-                    "tenant is required when access_strategy=SUBSCRIBER_ONLY"
+                    "tenant is required when access_strategy=SUBSCRIBER"
                 )
             if effective_tenant not in self._subscriber_transport_cache:
                 if self._config_loader is None:
@@ -163,7 +166,11 @@ class AgentMemoryClient:
                 )
             return self._subscriber_transport_cache[effective_tenant]
 
-        # PROVIDER_ONLY
+        # PROVIDER
+        logger.warning(
+            "AccessStrategy.PROVIDER is active: no tenant isolation will be applied. "
+            "Only use this strategy for provider-owned operations."
+        )
         if self._provider_transport is None:
             if self._config_loader is None:
                 raise AgentMemoryConfigError(
@@ -198,14 +205,14 @@ class AgentMemoryClient:
             access_strategy: Tenant access strategy. Overrides the client default when
                 provided. Falls back to the default set on :func:`create_client`.
             tenant: Subscriber tenant subdomain. Overrides the client default when
-                provided. Required (at call or client level) when strategy is ``SUBSCRIBER_ONLY``.
+                provided. Required (at call or client level) when strategy is ``SUBSCRIBER``.
 
         Returns:
             The created :class:`Memory`.
 
         Raises:
             AgentMemoryValidationError: If any required field is empty or tenant is missing
-                for ``SUBSCRIBER_ONLY``.
+                for ``SUBSCRIBER``.
             AgentMemoryHttpError: If the request fails.
         """
         _require_non_empty(agent_id=agent_id, invoker_id=invoker_id, content=content)
@@ -235,7 +242,7 @@ class AgentMemoryClient:
             access_strategy: Tenant access strategy. Overrides the client default when
                 provided. Falls back to the default set on :func:`create_client`.
             tenant: Subscriber tenant subdomain. Overrides the client default when
-                provided. Required (at call or client level) when strategy is ``SUBSCRIBER_ONLY``.
+                provided. Required (at call or client level) when strategy is ``SUBSCRIBER``.
 
         Returns:
             The :class:`Memory`.
@@ -243,7 +250,7 @@ class AgentMemoryClient:
         Raises:
             AgentMemoryNotFoundError: If no memory with the given ID exists.
             AgentMemoryValidationError: If ``memory_id`` is empty or tenant is missing
-                for ``SUBSCRIBER_ONLY``.
+                for ``SUBSCRIBER``.
             AgentMemoryHttpError: If the request fails.
         """
         _require_non_empty(memory_id=memory_id)
@@ -270,12 +277,12 @@ class AgentMemoryClient:
             access_strategy: Tenant access strategy. Overrides the client default when
                 provided. Falls back to the default set on :func:`create_client`.
             tenant: Subscriber tenant subdomain. Overrides the client default when
-                provided. Required (at call or client level) when strategy is ``SUBSCRIBER_ONLY``.
+                provided. Required (at call or client level) when strategy is ``SUBSCRIBER``.
 
         Raises:
             AgentMemoryNotFoundError: If no memory with the given ID exists.
             AgentMemoryValidationError: If ``memory_id`` is empty, no fields are provided,
-                or tenant is missing for ``SUBSCRIBER_ONLY``.
+                or tenant is missing for ``SUBSCRIBER``.
             AgentMemoryHttpError: If the request fails.
         """
         _require_non_empty(memory_id=memory_id)
@@ -306,12 +313,12 @@ class AgentMemoryClient:
             access_strategy: Tenant access strategy. Overrides the client default when
                 provided. Falls back to the default set on :func:`create_client`.
             tenant: Subscriber tenant subdomain. Overrides the client default when
-                provided. Required (at call or client level) when strategy is ``SUBSCRIBER_ONLY``.
+                provided. Required (at call or client level) when strategy is ``SUBSCRIBER``.
 
         Raises:
             AgentMemoryNotFoundError: If no memory with the given ID exists.
             AgentMemoryValidationError: If ``memory_id`` is empty or tenant is missing
-                for ``SUBSCRIBER_ONLY``.
+                for ``SUBSCRIBER``.
             AgentMemoryHttpError: If the request fails.
         """
         _require_non_empty(memory_id=memory_id)
@@ -345,14 +352,14 @@ class AgentMemoryClient:
             access_strategy: Tenant access strategy. Overrides the client default when
                 provided. Falls back to the default set on :func:`create_client`.
             tenant: Subscriber tenant subdomain. Overrides the client default when
-                provided. Required (at call or client level) when strategy is ``SUBSCRIBER_ONLY``.
+                provided. Required (at call or client level) when strategy is ``SUBSCRIBER``.
 
         Returns:
             List of :class:`Memory` objects.
 
         Raises:
             AgentMemoryValidationError: If ``limit`` < 1, ``offset`` < 0, a filter
-                clause is invalid, or tenant is missing for ``SUBSCRIBER_ONLY``.
+                clause is invalid, or tenant is missing for ``SUBSCRIBER``.
             AgentMemoryHttpError: If the request fails.
         """
         if limit < 1:
@@ -392,13 +399,13 @@ class AgentMemoryClient:
             access_strategy: Tenant access strategy. Overrides the client default when
                 provided. Falls back to the default set on :func:`create_client`.
             tenant: Subscriber tenant subdomain. Overrides the client default when
-                provided. Required (at call or client level) when strategy is ``SUBSCRIBER_ONLY``.
+                provided. Required (at call or client level) when strategy is ``SUBSCRIBER``.
 
         Returns:
             Total number of matching memories.
 
         Raises:
-            AgentMemoryValidationError: If tenant is missing for ``SUBSCRIBER_ONLY``.
+            AgentMemoryValidationError: If tenant is missing for ``SUBSCRIBER``.
             AgentMemoryHttpError: If the request fails.
         """
         transport = self._get_transport(access_strategy, tenant)
@@ -434,7 +441,7 @@ class AgentMemoryClient:
             access_strategy: Tenant access strategy. Overrides the client default when
                 provided. Falls back to the default set on :func:`create_client`.
             tenant: Subscriber tenant subdomain. Overrides the client default when
-                provided. Required (at call or client level) when strategy is ``SUBSCRIBER_ONLY``.
+                provided. Required (at call or client level) when strategy is ``SUBSCRIBER``.
 
         Returns:
             List of :class:`SearchResult` objects.
@@ -442,7 +449,7 @@ class AgentMemoryClient:
         Raises:
             AgentMemoryValidationError: If required fields are empty, parameters are
                 out of range (``query`` must be 5–5000 chars, ``threshold`` 0.0–1.0,
-                ``limit`` 1–50), or tenant is missing for ``SUBSCRIBER_ONLY``.
+                ``limit`` 1–50), or tenant is missing for ``SUBSCRIBER``.
             AgentMemoryHttpError: If the request fails.
         """
         _require_non_empty(agent_id=agent_id, invoker_id=invoker_id, query=query)
@@ -496,14 +503,14 @@ class AgentMemoryClient:
             access_strategy: Tenant access strategy. Overrides the client default when
                 provided. Falls back to the default set on :func:`create_client`.
             tenant: Subscriber tenant subdomain. Overrides the client default when
-                provided. Required (at call or client level) when strategy is ``SUBSCRIBER_ONLY``.
+                provided. Required (at call or client level) when strategy is ``SUBSCRIBER``.
 
         Returns:
             The created :class:`Message`.
 
         Raises:
             AgentMemoryValidationError: If any required field is empty or tenant is missing
-                for ``SUBSCRIBER_ONLY``.
+                for ``SUBSCRIBER``.
             AgentMemoryHttpError: If the request fails.
         """
         _require_non_empty(
@@ -540,7 +547,7 @@ class AgentMemoryClient:
             access_strategy: Tenant access strategy. Overrides the client default when
                 provided. Falls back to the default set on :func:`create_client`.
             tenant: Subscriber tenant subdomain. Overrides the client default when
-                provided. Required (at call or client level) when strategy is ``SUBSCRIBER_ONLY``.
+                provided. Required (at call or client level) when strategy is ``SUBSCRIBER``.
 
         Returns:
             The :class:`Message`.
@@ -548,7 +555,7 @@ class AgentMemoryClient:
         Raises:
             AgentMemoryNotFoundError: If no message with the given ID exists.
             AgentMemoryValidationError: If ``message_id`` is empty or tenant is missing
-                for ``SUBSCRIBER_ONLY``.
+                for ``SUBSCRIBER``.
             AgentMemoryHttpError: If the request fails.
         """
         _require_non_empty(message_id=message_id)
@@ -571,12 +578,12 @@ class AgentMemoryClient:
             access_strategy: Tenant access strategy. Overrides the client default when
                 provided. Falls back to the default set on :func:`create_client`.
             tenant: Subscriber tenant subdomain. Overrides the client default when
-                provided. Required (at call or client level) when strategy is ``SUBSCRIBER_ONLY``.
+                provided. Required (at call or client level) when strategy is ``SUBSCRIBER``.
 
         Raises:
             AgentMemoryNotFoundError: If no message with the given ID exists.
             AgentMemoryValidationError: If ``message_id`` is empty or tenant is missing
-                for ``SUBSCRIBER_ONLY``.
+                for ``SUBSCRIBER``.
             AgentMemoryHttpError: If the request fails.
         """
         _require_non_empty(message_id=message_id)
@@ -614,14 +621,14 @@ class AgentMemoryClient:
             access_strategy: Tenant access strategy. Overrides the client default when
                 provided. Falls back to the default set on :func:`create_client`.
             tenant: Subscriber tenant subdomain. Overrides the client default when
-                provided. Required (at call or client level) when strategy is ``SUBSCRIBER_ONLY``.
+                provided. Required (at call or client level) when strategy is ``SUBSCRIBER``.
 
         Returns:
             List of :class:`Message` objects.
 
         Raises:
             AgentMemoryValidationError: If ``limit`` < 1, ``offset`` < 0, a filter
-                clause is invalid, or tenant is missing for ``SUBSCRIBER_ONLY``.
+                clause is invalid, or tenant is missing for ``SUBSCRIBER``.
             AgentMemoryHttpError: If the request fails.
         """
         if limit < 1:
@@ -661,13 +668,13 @@ class AgentMemoryClient:
             access_strategy: Tenant access strategy. Overrides the client default when
                 provided. Falls back to the default set on :func:`create_client`.
             tenant: Subscriber tenant subdomain. Overrides the client default when
-                provided. Required (at call or client level) when strategy is ``SUBSCRIBER_ONLY``.
+                provided. Required (at call or client level) when strategy is ``SUBSCRIBER``.
 
         Returns:
             The current :class:`RetentionConfig`.
 
         Raises:
-            AgentMemoryValidationError: If tenant is missing for ``SUBSCRIBER_ONLY``.
+            AgentMemoryValidationError: If tenant is missing for ``SUBSCRIBER``.
             AgentMemoryHttpError: If the request fails.
         """
         transport = self._get_transport(access_strategy, tenant)
@@ -697,11 +704,11 @@ class AgentMemoryClient:
             access_strategy: Tenant access strategy. Overrides the client default when
                 provided. Falls back to the default set on :func:`create_client`.
             tenant: Subscriber tenant subdomain. Overrides the client default when
-                provided. Required (at call or client level) when strategy is ``SUBSCRIBER_ONLY``.
+                provided. Required (at call or client level) when strategy is ``SUBSCRIBER``.
 
         Raises:
             AgentMemoryValidationError: If no fields are provided, any provided value is
-                negative, or tenant is missing for ``SUBSCRIBER_ONLY``.
+                negative, or tenant is missing for ``SUBSCRIBER``.
             AgentMemoryHttpError: If the request fails.
         """
         if message_days is None and memory_days is None and usage_log_days is None:

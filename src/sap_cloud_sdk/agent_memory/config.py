@@ -40,7 +40,7 @@ class AgentMemoryConfig:
         client_id: The OAuth2 client ID. Optional.
         client_secret: The OAuth2 client secret. Optional.
         identityzone: The provider tenant identity zone subdomain. Required when using
-                      ``SUBSCRIBER_ONLY`` access strategy so the subscriber token URL
+                      ``SUBSCRIBER`` access strategy so the subscriber token URL
                       can be derived by replacing this value in ``token_url``.
         timeout: Timeout in seconds for HTTP requests. Default is 30.0.
 

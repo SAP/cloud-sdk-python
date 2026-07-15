@@ -94,7 +94,7 @@ Feature: Agent Memory Service Integration (v1 API)
 
   # ──── Memory CRUD ─────────────────────────────────────────────────────────────
 
-  Scenario: Create a new memory using SUBSCRIBER_ONLY access strategy
+  Scenario: Create a new memory using SUBSCRIBER access strategy
     Given I use the configured subscriber tenant
     When I create a memory with agent "test-agent" and invoker "test-user" and content "User prefers dark mode"
     Then the memory should have a non-empty id
@@ -102,26 +102,26 @@ Feature: Agent Memory Service Integration (v1 API)
     And the memory should have invoker_id "test-user"
     And the memory should have content "User prefers dark mode"
 
-  Scenario: Get a memory using SUBSCRIBER_ONLY access strategy
+  Scenario: Get a memory using SUBSCRIBER access strategy
     Given I use the configured subscriber tenant
     And a memory exists with agent "test-agent" and invoker "test-user" and content "Test memory"
     When I get the memory by id
     Then the returned memory should match the created memory
 
-  Scenario: Update memory content using SUBSCRIBER_ONLY access strategy
+  Scenario: Update memory content using SUBSCRIBER access strategy
     Given I use the configured subscriber tenant
     And a memory exists with agent "test-agent" and invoker "test-user" and content "Original content"
     When I update the memory content to "Updated content"
     Then the memory should have content "Updated content"
 
-  Scenario: List memories using SUBSCRIBER_ONLY access strategy
+  Scenario: List memories using SUBSCRIBER access strategy
     Given I use the configured subscriber tenant
     And a memory exists with agent "test-agent" and invoker "test-user" and content "Listed memory"
     When I list memories filtered by agent "test-agent"
     Then the result should contain at least one memory
     And the total count should be a positive number
 
-  Scenario: Delete a memory using SUBSCRIBER_ONLY access strategy
+  Scenario: Delete a memory using SUBSCRIBER access strategy
     Given I use the configured subscriber tenant
     And a memory exists with agent "test-agent" and invoker "test-user" and content "To be deleted"
     When I delete the memory
@@ -129,7 +129,7 @@ Feature: Agent Memory Service Integration (v1 API)
 
   # ──── Memory search ───────────────────────────────────────────────────────────
 
-  Scenario: Search memories using SUBSCRIBER_ONLY access strategy
+  Scenario: Search memories using SUBSCRIBER access strategy
     Given I use the configured subscriber tenant
     And a memory exists with agent "test-agent" and invoker "test-user" and content "The user loves dark mode and dark themes"
     When I search for memories with query "dark mode preference"
@@ -138,21 +138,21 @@ Feature: Agent Memory Service Integration (v1 API)
 
   # ──── Message CRUD ────────────────────────────────────────────────────────────
 
-  Scenario: Create and get a message using SUBSCRIBER_ONLY access strategy
+  Scenario: Create and get a message using SUBSCRIBER access strategy
     Given I use the configured subscriber tenant
     When I create a message with agent "test-agent" invoker "test-user" group "conv-1" role "USER" content "Hello!"
     Then the message should have a non-empty id
     And the message should have role "USER"
     And the message should have content "Hello!"
 
-  Scenario: List messages using SUBSCRIBER_ONLY access strategy
+  Scenario: List messages using SUBSCRIBER access strategy
     Given I use the configured subscriber tenant
     And a message exists with agent "test-agent" invoker "test-user" group "conv-list" role "USER" content "Listed message"
     When I list messages filtered by agent "test-agent" and group "conv-list"
     Then the result should contain at least one message
     And the total count should be a positive number
 
-  Scenario: Delete a message using SUBSCRIBER_ONLY access strategy
+  Scenario: Delete a message using SUBSCRIBER access strategy
     Given I use the configured subscriber tenant
     And a message exists with agent "test-agent" invoker "test-user" group "conv-del" role "USER" content "To be deleted"
     When I delete the message
@@ -160,7 +160,7 @@ Feature: Agent Memory Service Integration (v1 API)
 
   # ──── Bulk / utility operations ───────────────────────────────────────────────
 
-  Scenario: Count memories using SUBSCRIBER_ONLY access strategy
+  Scenario: Count memories using SUBSCRIBER access strategy
     Given I use the configured subscriber tenant
     And a memory exists with agent "test-agent" and invoker "test-user" and content "Count test memory"
     When I count memories for agent "test-agent" and invoker "test-user"

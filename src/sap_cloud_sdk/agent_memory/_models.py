@@ -18,8 +18,8 @@ from typing import Any, Optional
 class AccessStrategy(str, Enum):
     """Access strategy for tenant-scoped Agent Memory operations."""
 
-    SUBSCRIBER_ONLY = "SUBSCRIBER_ONLY"
-    PROVIDER_ONLY = "PROVIDER_ONLY"
+    SUBSCRIBER = "SUBSCRIBER"
+    PROVIDER = "PROVIDER"
 
 
 class MessageRole(str, Enum):

@@ -19,7 +19,7 @@ Environment variable fallback (uppercase):
 from dataclasses import dataclass
 
 from sap_cloud_sdk.adms.exceptions import ConfigError
-from sap_cloud_sdk.core.secret_resolver.sdk_config import get_resolver
+from sap_cloud_sdk.core.secret_resolver import get_resolver
 
 _DEFAULT_INSTANCE = "default"
 _SECRET_MOUNT_BASE = "/etc/secrets/appfnd"

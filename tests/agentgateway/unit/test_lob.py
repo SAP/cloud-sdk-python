@@ -30,7 +30,10 @@ from sap_cloud_sdk.agentgateway._models import Agent, AgentCard, MCPTool
 from sap_cloud_sdk.agentgateway._token_cache import _GatewayUrlCache, _TokenCache
 from sap_cloud_sdk.agentgateway.config import ClientConfig
 from sap_cloud_sdk.destination import ConsumptionOptions, ConsumptionLevel
-from sap_cloud_sdk.agentgateway.exceptions import AgentGatewaySDKError, MCPServerNotFoundError
+from sap_cloud_sdk.agentgateway.exceptions import (
+    AgentGatewaySDKError,
+    MCPServerNotFoundError,
+)
 from sap_cloud_sdk.destination import ConsumptionLevel
 
 # Aliases for use in existing test assertions
@@ -110,7 +113,9 @@ class TestFetchAuthToken:
         mock_dest.auth_tokens[0].http_header = {"value": header_value}
         mock_dest.url = "https://agw.example.com/v1/mcp///"
 
-        with patch("sap_cloud_sdk.agentgateway._lob.create_destination_client") as mock_client:
+        with patch(
+            "sap_cloud_sdk.agentgateway._lob.create_destination_client"
+        ) as mock_client:
             mock_client.return_value.get_destination.return_value = mock_dest
 
             result = _fetch_auth_token("dest-name", "tenant-sub")
@@ -291,7 +296,9 @@ class TestGetIasUserFragmentName:
         fragment = MagicMock()
         fragment.name = "sap-managed-runtime-agw-subscriber-ias-user-abc123"
 
-        with patch("sap_cloud_sdk.agentgateway._fragments.create_fragment_client") as mock_client:
+        with patch(
+            "sap_cloud_sdk.agentgateway._fragments.create_fragment_client"
+        ) as mock_client:
             mock_client.return_value.list_instance_fragments.return_value = [fragment]
 
             result = get_ias_user_fragment_name("tenant-sub")
@@ -303,7 +310,9 @@ class TestGetIasUserFragmentName:
         fragment = MagicMock()
         fragment.name = "ias-user-fragment"
 
-        with patch("sap_cloud_sdk.agentgateway._fragments.create_fragment_client") as mock_client:
+        with patch(
+            "sap_cloud_sdk.agentgateway._fragments.create_fragment_client"
+        ) as mock_client:
             mock_client.return_value.list_instance_fragments.return_value = [fragment]
 
             get_ias_user_fragment_name("tenant-sub")
@@ -317,10 +326,14 @@ class TestGetIasUserFragmentName:
 
     def test_raises_when_no_fragment_found(self):
         """Raise MCPServerNotFoundError when no IAS user fragment exists."""
-        with patch("sap_cloud_sdk.agentgateway._fragments.create_fragment_client") as mock_client:
+        with patch(
+            "sap_cloud_sdk.agentgateway._fragments.create_fragment_client"
+        ) as mock_client:
             mock_client.return_value.list_instance_fragments.return_value = []
 
-            with pytest.raises(MCPServerNotFoundError, match="No IAS user fragment found"):
+            with pytest.raises(
+                MCPServerNotFoundError, match="No IAS user fragment found"
+            ):
                 get_ias_user_fragment_name("tenant-sub")
 
 
@@ -400,7 +413,9 @@ class TestFetchSystemAuth:
     async def test_raises_when_only_token_cache_provided(self):
         """Raise ValueError when token_cache given without gateway_url_cache."""
         with pytest.raises(ValueError, match="both be provided or both be None"):
-            await fetch_system_auth("tenant-sub", token_cache=_TokenCache(ClientConfig()))
+            await fetch_system_auth(
+                "tenant-sub", token_cache=_TokenCache(ClientConfig())
+            )
 
     @pytest.mark.asyncio
     async def test_raises_when_only_gateway_url_cache_provided(self):
@@ -425,10 +440,16 @@ class TestFetchUserAuth:
 
         with patch.dict(os.environ, {"APPFND_CONHOS_LANDSCAPE": "eu10"}):
             with (
-                patch("sap_cloud_sdk.agentgateway._lob.get_ias_user_fragment_name") as mock_ias_user,
-                patch("sap_cloud_sdk.agentgateway._lob._fetch_auth_token") as mock_fetch,
+                patch(
+                    "sap_cloud_sdk.agentgateway._lob.get_ias_user_fragment_name"
+                ) as mock_ias_user,
+                patch(
+                    "sap_cloud_sdk.agentgateway._lob._fetch_auth_token"
+                ) as mock_fetch,
             ):
-                mock_ias_user.return_value = "sap-managed-runtime-agw-subscriber-ias-user-abc"
+                mock_ias_user.return_value = (
+                    "sap-managed-runtime-agw-subscriber-ias-user-abc"
+                )
                 mock_fetch.return_value = (raw_token, gateway_url)
 
                 result = await fetch_user_auth("user-jwt", "tenant-sub")
@@ -441,7 +462,10 @@ class TestFetchUserAuth:
                 assert call_args[0][1] == "tenant-sub"
                 options = call_args[0][2]
                 assert options.user_token == "user-jwt"
-                assert options.fragment_name == "sap-managed-runtime-agw-subscriber-ias-user-abc"
+                assert (
+                    options.fragment_name
+                    == "sap-managed-runtime-agw-subscriber-ias-user-abc"
+                )
                 assert options.fragment_level == ConsumptionLevel.INSTANCE
 
     @pytest.mark.asyncio
@@ -482,13 +506,17 @@ class TestFetchUserAuth:
     async def test_raises_when_only_token_cache_provided(self):
         """Raise ValueError when token_cache given without gateway_url_cache."""
         with pytest.raises(ValueError, match="both be provided or both be None"):
-            await fetch_user_auth("user-jwt", "tenant-sub", token_cache=_TokenCache(ClientConfig()))
+            await fetch_user_auth(
+                "user-jwt", "tenant-sub", token_cache=_TokenCache(ClientConfig())
+            )
 
     @pytest.mark.asyncio
     async def test_raises_when_only_gateway_url_cache_provided(self):
         """Raise ValueError when gateway_url_cache given without token_cache."""
         with pytest.raises(ValueError, match="both be provided or both be None"):
-            await fetch_user_auth("user-jwt", "tenant-sub", gateway_url_cache=_GatewayUrlCache())
+            await fetch_user_auth(
+                "user-jwt", "tenant-sub", gateway_url_cache=_GatewayUrlCache()
+            )
 
 
 # ============================================================
@@ -802,15 +830,16 @@ class TestOrdIdFromUrl:
 
     def test_extracts_ord_id_from_standard_url(self):
         """Return the second-to-last path segment as ord_id."""
-        assert _ord_id_from_url(
-            "https://agw.example.com/v1/a2a/sap.s4:agent:v1/tenant-abc"
-        ) == "sap.s4:agent:v1"
+        assert (
+            _ord_id_from_url(
+                "https://agw.example.com/v1/a2a/sap.s4:agent:v1/tenant-abc"
+            )
+            == "sap.s4:agent:v1"
+        )
 
     def test_strips_trailing_slash(self):
         """Handle trailing slash on URL."""
-        assert _ord_id_from_url(
-            "https://agw.example.com/v1/a2a/ord-1/gt-1/"
-        ) == "ord-1"
+        assert _ord_id_from_url("https://agw.example.com/v1/a2a/ord-1/gt-1/") == "ord-1"
 
     def test_returns_empty_for_single_segment(self):
         """Return empty string when URL has only one path segment."""
@@ -832,7 +861,9 @@ class TestListA2aFragments:
         with patch(
             "sap_cloud_sdk.agentgateway._fragments.create_fragment_client"
         ) as mock_client:
-            mock_client.return_value.list_instance_fragments.return_value = [mock_fragment]
+            mock_client.return_value.list_instance_fragments.return_value = [
+                mock_fragment
+            ]
             result = list_a2a_fragments("tenant-sub")
 
         assert result == [mock_fragment]
@@ -916,7 +947,9 @@ class TestFetchAgentCard:
             mock_http.return_value.__aenter__.return_value = mock_http_instance
 
             with pytest.raises(AgentGatewaySDKError, match="404"):
-                await _fetch_agent_card("https://agw.example.com/base", "auth-token", 60.0)
+                await _fetch_agent_card(
+                    "https://agw.example.com/base", "auth-token", 60.0
+                )
 
     @pytest.mark.asyncio
     async def test_raises_on_request_error(self):
@@ -931,7 +964,9 @@ class TestFetchAgentCard:
             mock_http.return_value.__aenter__.return_value = mock_http_instance
 
             with pytest.raises(AgentGatewaySDKError, match="Agent card request failed"):
-                await _fetch_agent_card("https://agw.example.com/base", "auth-token", 60.0)
+                await _fetch_agent_card(
+                    "https://agw.example.com/base", "auth-token", 60.0
+                )
 
 
 # ============================================================
@@ -967,9 +1002,7 @@ class TestGetAgentCardsLob:
                 return_value=AgentCard(raw=card_payload),
             ),
         ):
-            result = await get_agent_cards_lob(
-                "tenant-sub", "system-token", 60.0
-            )
+            result = await get_agent_cards_lob("tenant-sub", "system-token", 60.0)
 
         assert len(result) == 1
         assert isinstance(result[0], Agent)
@@ -990,8 +1023,12 @@ class TestGetAgentCardsLob:
     @pytest.mark.asyncio
     async def test_filters_by_agent_names(self):
         """Fetch all cards then keep only those whose agent card name matches."""
-        frag_1 = self._make_fragment("frag-1", "https://agw.example.com/v1/a2a/ord-1/t1")
-        frag_2 = self._make_fragment("frag-2", "https://agw.example.com/v1/a2a/ord-2/t2")
+        frag_1 = self._make_fragment(
+            "frag-1", "https://agw.example.com/v1/a2a/ord-1/t1"
+        )
+        frag_2 = self._make_fragment(
+            "frag-2", "https://agw.example.com/v1/a2a/ord-2/t2"
+        )
 
         async def _cards_by_ord(fragment_url, token, timeout):
             if "ord-1" in fragment_url:
@@ -1019,8 +1056,12 @@ class TestGetAgentCardsLob:
     @pytest.mark.asyncio
     async def test_filters_by_ord_ids(self):
         """Only include fragments whose ordId (from URL) is in the ord_ids filter."""
-        frag_1 = self._make_fragment("frag-1", "https://agw.example.com/v1/a2a/ord-1/t1")
-        frag_2 = self._make_fragment("frag-2", "https://agw.example.com/v1/a2a/ord-2/t2")
+        frag_1 = self._make_fragment(
+            "frag-1", "https://agw.example.com/v1/a2a/ord-1/t1"
+        )
+        frag_2 = self._make_fragment(
+            "frag-2", "https://agw.example.com/v1/a2a/ord-2/t2"
+        )
 
         with (
             patch(
@@ -1112,8 +1153,14 @@ class TestGetIasClientIdLob:
         mock_dest_client.get_destination.return_value = mock_dest
 
         with (
-            patch("sap_cloud_sdk.agentgateway._lob._ias_dest_name", return_value="sap-managed-runtime-ias-eu10"),
-            patch("sap_cloud_sdk.agentgateway._lob.create_destination_client", return_value=mock_dest_client),
+            patch(
+                "sap_cloud_sdk.agentgateway._lob._ias_dest_name",
+                return_value="sap-managed-runtime-ias-eu10",
+            ),
+            patch(
+                "sap_cloud_sdk.agentgateway._lob.create_destination_client",
+                return_value=mock_dest_client,
+            ),
         ):
             result = get_ias_client_id_lob()
 
@@ -1129,10 +1176,18 @@ class TestGetIasClientIdLob:
         mock_dest_client.get_destination.return_value = None
 
         with (
-            patch("sap_cloud_sdk.agentgateway._lob._ias_dest_name", return_value="sap-managed-runtime-ias-eu10"),
-            patch("sap_cloud_sdk.agentgateway._lob.create_destination_client", return_value=mock_dest_client),
+            patch(
+                "sap_cloud_sdk.agentgateway._lob._ias_dest_name",
+                return_value="sap-managed-runtime-ias-eu10",
+            ),
+            patch(
+                "sap_cloud_sdk.agentgateway._lob.create_destination_client",
+                return_value=mock_dest_client,
+            ),
         ):
-            with pytest.raises(AgentGatewaySDKError, match="sap-managed-runtime-ias-eu10"):
+            with pytest.raises(
+                AgentGatewaySDKError, match="sap-managed-runtime-ias-eu10"
+            ):
                 get_ias_client_id_lob()
 
     def test_returns_empty_string_when_property_absent(self):
@@ -1142,14 +1197,23 @@ class TestGetIasClientIdLob:
         mock_dest_client.get_destination.return_value = mock_dest
 
         with (
-            patch("sap_cloud_sdk.agentgateway._lob._ias_dest_name", return_value="sap-managed-runtime-ias-eu10"),
-            patch("sap_cloud_sdk.agentgateway._lob.create_destination_client", return_value=mock_dest_client),
+            patch(
+                "sap_cloud_sdk.agentgateway._lob._ias_dest_name",
+                return_value="sap-managed-runtime-ias-eu10",
+            ),
+            patch(
+                "sap_cloud_sdk.agentgateway._lob.create_destination_client",
+                return_value=mock_dest_client,
+            ),
         ):
             result = get_ias_client_id_lob()
 
         assert result == ""
 
     def test_raises_when_landscape_env_not_set(self):
-        with patch("sap_cloud_sdk.agentgateway._lob._ias_dest_name", side_effect=EnvironmentError("APPFND_CONHOS_LANDSCAPE not set")):
+        with patch(
+            "sap_cloud_sdk.agentgateway._lob._ias_dest_name",
+            side_effect=EnvironmentError("APPFND_CONHOS_LANDSCAPE not set"),
+        ):
             with pytest.raises(EnvironmentError, match="APPFND_CONHOS_LANDSCAPE"):
                 get_ias_client_id_lob()

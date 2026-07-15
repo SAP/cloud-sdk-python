@@ -405,14 +405,12 @@ async def get_mcp_tools_lob(
                     fragment_name,
                 )
                 continue
-            # intentional: fragment failure must not abort remaining fragments
             logger.exception(
                 "Failed to load tools from fragment '%s' — skipping",
                 fragment_name,
             )
         # intentional: fragment failure must not abort remaining fragments
         except Exception:
-            # intentional: fragment failure must not abort remaining fragments
             logger.exception(
                 "Failed to load tools from fragment '%s' — skipping",
                 fragment_name,

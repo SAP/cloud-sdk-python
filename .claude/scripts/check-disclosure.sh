@@ -65,9 +65,19 @@ done
 # DIS-07/08: PR body
 if [ -n "$PR_BODY_FILE" ] && [ -f "$PR_BODY_FILE" ]; then
   body=$(cat "$PR_BODY_FILE")
-  # DIS-07: unfilled Closes #<issue_number> placeholder
+  # DIS-07: unfilled Closes #<issue_number> placeholder.
+  # Severity: BLOCK for PRs that change source code (they should be tracked by an
+  # issue); downgrade to FLAG for docs-only / chore PRs where no issue is required.
   if echo "$body" | grep -qE 'Closes #<issue_number>'; then
-    emit_finding "DIS-07" "BLOCK" "PR_BODY" 1 "PR body contains unfilled 'Closes #<issue_number>' placeholder" "" >> "$findings"
+    _src_changed=false
+    if [ -f "${DIFF_FILE:-/nonexistent}" ] && grep -qE 'diff --git a/src/' "${DIFF_FILE}" 2>/dev/null; then
+      _src_changed=true
+    elif echo "${diff_content:-}" | grep -qE 'diff --git a/src/'; then
+      _src_changed=true
+    fi
+    _dis07_sev="FLAG"
+    [ "$_src_changed" = "true" ] && _dis07_sev="BLOCK"
+    emit_finding "DIS-07" "$_dis07_sev" "PR_BODY" 1 "PR body contains unfilled 'Closes #<issue_number>' placeholder" "" >> "$findings"
   fi
   # DIS-08 (SHADOW): internal URLs / Jira in PR body
   if echo "$body" | grep -qEi '\.tools\.sap|\.wdf\.sap\.corp|jira\.tools\.sap'; then

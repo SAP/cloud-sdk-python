@@ -550,3 +550,147 @@ BODY
   [ "$count" = "1" ]
   rm -rf "$tmpd"
 }
+
+# ── Corpus-2026-07-15 batch ─────────────────────────────────────────────────
+
+@test "FP-P: SEC-07 does not fire on PEM stub in tests/ directory" {
+  [ -f "$SCRIPT_DIR/check-secrets.sh" ] || skip "check-secrets.sh not present"
+  tmpd=$(mktemp -d)
+  cat > "$tmpd/diff" <<'DIFF'
+diff --git a/tests/unit/test_auth.py b/tests/unit/test_auth.py
+new file mode 100644
+--- /dev/null
++++ b/tests/unit/test_auth.py
+@@ -0,0 +1,1 @@
++FAKE = "-----BEGIN PRIVATE KEY-----\ntest\n-----END PRIVATE KEY-----"
+DIFF
+  result=$(DIFF_FILE="$tmpd/diff" LANGUAGE=python bash "$SCRIPT_DIR/check-secrets.sh" 2>/dev/null)
+  count=$(echo "$result" | jq '[.findings[] | select(.rule=="SEC-07")] | length')
+  [ "$count" = "0" ]
+  rm -rf "$tmpd"
+}
+
+@test "FP-P: SEC-07 still fires on PEM in src/ (not a test file)" {
+  [ -f "$SCRIPT_DIR/check-secrets.sh" ] || skip "check-secrets.sh not present"
+  tmpd=$(mktemp -d)
+  cat > "$tmpd/diff" <<'DIFF'
+diff --git a/src/sap_cloud_sdk/module/client.py b/src/sap_cloud_sdk/module/client.py
+new file mode 100644
+--- /dev/null
++++ b/src/sap_cloud_sdk/module/client.py
+@@ -0,0 +1,1 @@
++REAL = "-----BEGIN EC PRIVATE KEY-----\nrealkeycontent\n-----END EC PRIVATE KEY-----"
+DIFF
+  result=$(DIFF_FILE="$tmpd/diff" LANGUAGE=python bash "$SCRIPT_DIR/check-secrets.sh" 2>/dev/null)
+  count=$(echo "$result" | jq '[.findings[] | select(.rule=="SEC-07")] | length')
+  [ "$count" = "1" ]
+  rm -rf "$tmpd"
+}
+
+@test "FP-Q: TD-10 does not fire for existing module touched but not newly created" {
+  [ -f "$SCRIPT_DIR/check-testing-depth.sh" ] || skip "check-testing-depth.sh not present"
+  tmpd=$(mktemp -d)
+  # Diff touches agentgateway but no new __init__.py
+  cat > "$tmpd/diff" <<'DIFF'
+diff --git a/src/sap_cloud_sdk/agentgateway/agw_client.py b/src/sap_cloud_sdk/agentgateway/agw_client.py
+--- a/src/sap_cloud_sdk/agentgateway/agw_client.py
++++ b/src/sap_cloud_sdk/agentgateway/agw_client.py
+@@ -1,1 +1,2 @@
+ existing_line = 1
++new_line = 2
+DIFF
+  result=$(DIFF_FILE="$tmpd/diff" LANGUAGE=python bash "$SCRIPT_DIR/check-testing-depth.sh" 2>/dev/null)
+  count=$(echo "$result" | jq '[.findings[] | select(.rule=="TD-10")] | length')
+  [ "$count" = "0" ]
+  rm -rf "$tmpd"
+}
+
+@test "FP-Q: TD-10 fires when __init__.py is added as new file mode" {
+  [ -f "$SCRIPT_DIR/check-testing-depth.sh" ] || skip "check-testing-depth.sh not present"
+  tmpd=$(mktemp -d)
+  cat > "$tmpd/diff" <<'DIFF'
+diff --git a/src/sap_cloud_sdk/newmod/__init__.py b/src/sap_cloud_sdk/newmod/__init__.py
+new file mode 100644
+--- /dev/null
++++ b/src/sap_cloud_sdk/newmod/__init__.py
+@@ -0,0 +1,1 @@
++"""New module."""
+DIFF
+  result=$(DIFF_FILE="$tmpd/diff" LANGUAGE=python bash "$SCRIPT_DIR/check-testing-depth.sh" 2>/dev/null)
+  count=$(echo "$result" | jq '[.findings[] | select(.rule=="TD-10")] | length')
+  [ "$count" = "1" ]
+  rm -rf "$tmpd"
+}
+
+@test "FP-N: HC-01 does not fire on *.example.com subdomain" {
+  [ -f "$SCRIPT_DIR/check-hardcode.sh" ] || skip "check-hardcode.sh not present"
+  tmpd=$(mktemp -d)
+  cat > "$tmpd/diff" <<'DIFF'
+diff --git a/src/sap_cloud_sdk/module/_models.py b/src/sap_cloud_sdk/module/_models.py
+new file mode 100644
+--- /dev/null
++++ b/src/sap_cloud_sdk/module/_models.py
+@@ -0,0 +1,1 @@
++    url: str = "https://storage.example.com/documents/file.pdf"
+DIFF
+  result=$(DIFF_FILE="$tmpd/diff" LANGUAGE=python bash "$SCRIPT_DIR/check-hardcode.sh" 2>/dev/null)
+  count=$(echo "$result" | jq '[.findings[] | select(.rule=="HC-01")] | length')
+  [ "$count" = "0" ]
+  rm -rf "$tmpd"
+}
+
+@test "FP-O: HC-01 does not fire on URL with <placeholder> token" {
+  [ -f "$SCRIPT_DIR/check-hardcode.sh" ] || skip "check-hardcode.sh not present"
+  tmpd=$(mktemp -d)
+  cat > "$tmpd/diff" <<'DIFF'
+diff --git a/src/sap_cloud_sdk/module/config.py b/src/sap_cloud_sdk/module/config.py
+new file mode 100644
+--- /dev/null
++++ b/src/sap_cloud_sdk/module/config.py
+@@ -0,0 +1,1 @@
++    url: str = "https://api.<region>.ngdpi.dpp.cloud.sap/v1"
+DIFF
+  result=$(DIFF_FILE="$tmpd/diff" LANGUAGE=python bash "$SCRIPT_DIR/check-hardcode.sh" 2>/dev/null)
+  count=$(echo "$result" | jq '[.findings[] | select(.rule=="HC-01")] | length')
+  [ "$count" = "0" ]
+  rm -rf "$tmpd"
+}
+
+@test "DIS-07 is FLAG (not BLOCK) for docs-only PR" {
+  [ -f "$SCRIPT_DIR/check-disclosure.sh" ] || skip "check-disclosure.sh not present"
+  tmpd=$(mktemp -d)
+  # Diff only touches docs/ — no src/
+  cat > "$tmpd/diff" <<'DIFF'
+diff --git a/docs/README.md b/docs/README.md
+--- a/docs/README.md
++++ b/docs/README.md
+@@ -1,1 +1,2 @@
++# Updated
+DIFF
+  cat > "$tmpd/body" <<'BODY'
+Closes #<issue_number>
+BODY
+  result=$(DIFF_FILE="$tmpd/diff" PR_BODY_FILE="$tmpd/body" LANGUAGE=python bash "$SCRIPT_DIR/check-disclosure.sh" 2>/dev/null)
+  severity=$(echo "$result" | jq -r '.findings[] | select(.rule=="DIS-07") | .severity')
+  [ "$severity" = "FLAG" ]
+  rm -rf "$tmpd"
+}
+
+@test "DIS-07 is BLOCK for PR that changes src/" {
+  [ -f "$SCRIPT_DIR/check-disclosure.sh" ] || skip "check-disclosure.sh not present"
+  tmpd=$(mktemp -d)
+  cat > "$tmpd/diff" <<'DIFF'
+diff --git a/src/sap_cloud_sdk/module/client.py b/src/sap_cloud_sdk/module/client.py
+--- a/src/sap_cloud_sdk/module/client.py
++++ b/src/sap_cloud_sdk/module/client.py
+@@ -1,1 +1,2 @@
++new_feature = True
+DIFF
+  cat > "$tmpd/body" <<'BODY'
+Closes #<issue_number>
+BODY
+  result=$(DIFF_FILE="$tmpd/diff" PR_BODY_FILE="$tmpd/body" LANGUAGE=python bash "$SCRIPT_DIR/check-disclosure.sh" 2>/dev/null)
+  severity=$(echo "$result" | jq -r '.findings[] | select(.rule=="DIS-07") | .severity')
+  [ "$severity" = "BLOCK" ]
+  rm -rf "$tmpd"
+}

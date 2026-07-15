@@ -91,12 +91,25 @@ echo "$diff_content" | awk -v ignore="$ignore_files" '
     [ -z "$url" ] && continue
     # allow-list: only IANA-reserved test/example TLDs and localhost
     # `.example` must be the terminal label (RFC 2606) — anchor at path/port/end.
-    # FP-B-01: also allowlist standard XML/POM/W3C namespace URLs which appear
-    # as identifiers in build files, not as network endpoints.
+    # FP-B-01: also allowlist standard XML/POM/W3C namespace URLs.
     if echo "$url" | grep -qE '^https?://(localhost|127\.0\.0\.1|example\.(com|org|net)|[^/]+\.example(/|:|$)|reserved\.)'; then
       continue
     fi
     if echo "$url" | grep -qE '^https?://(maven\.apache\.org/POM/|www\.w3\.org/[0-9]+/XMLSchema|schemas\.xmlsoap\.org/)'; then
+      continue
+    fi
+    # FP-N: *.example.com / *.example.org / *.example.net — RFC 2606 reserved subdomains
+    # used as placeholder values in Pydantic model examples and docstrings.
+    if echo "$url" | grep -qE '^https?://[^/]+\.example\.(com|org|net)(/|:|$|[?#])'; then
+      continue
+    fi
+    # FP-O: URLs containing <placeholder> tokens (e.g., <region>, <tenant>) or bare
+    # hostname tokens like "host" — these are documentation templates, not runtime URLs.
+    # Check the raw content line for <...> tokens before URL extraction truncates them.
+    if echo "$content" | grep -qE 'https?://[^ "'"'"'`]*<[^>]+>[^ "'"'"'`]*'; then
+      continue
+    fi
+    if echo "$url" | grep -qE '^https?://host(/|:|$)'; then
       continue
     fi
     emit_finding_if_touched "HC-01" "BLOCK" "$file" "$line_num" "Hardcoded URL '$url' in implementation — externalize to config" "" >> "$findings"

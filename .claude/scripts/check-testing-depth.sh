@@ -24,17 +24,24 @@ if [ "$LANGUAGE" = "python" ]; then
       "Add a focused unit test that reproduces the bug and asserts the fix" >> "$findings"
   fi
 
-  # TD-10: New module → integration test required
-  new_modules=$(echo "$diff_content" | awk '/^diff --git/ { flag=0 } /^new file mode/ { flag=1 } flag && /^\+\+\+ b\/src\/sap_cloud_sdk\/[a-z_]+\/[^\/]+\.py/ { print }' | { grep -oE 'src/sap_cloud_sdk/[a-z_]+/' 2>/dev/null || true; } | sed 's|src/sap_cloud_sdk/||; s|/$||' | sort -u)
+  # TD-10: New module → integration test required.
+  # FP-Q: Only fire when the module is GENUINELY NEW in this PR — detected by
+  # the presence of "new file mode" for the module's __init__.py in the diff.
+  # Firing on every PR that touches an existing module (which may have always
+  # lacked integration tests) is a false positive that blocks unrelated work.
+  new_modules=$(echo "$diff_content" | awk '
+    /^diff --git/ { flag=0; next }
+    /^new file mode/ { flag=1; next }
+    flag && /^\+\+\+ b\/src\/sap_cloud_sdk\/[a-z_]+\/__init__\.py/ {
+      match($0, /src\/sap_cloud_sdk\/[a-z_]+\//)
+      print substr($0, RSTART, RLENGTH)
+    }
+  ' | { grep -oE 'src/sap_cloud_sdk/[a-z_]+/' 2>/dev/null || true; } | sed 's|src/sap_cloud_sdk/||; s|/$||' | sort -u)
   while IFS= read -r mod; do
-    # Both conditions should skip the loop iteration. The previous
-    # A || B && continue form parses as (A || B) && continue, which is
-    # correct — but the `&& continue` under `set -e` short-circuits the
-    # loop body's exit status and hides errors. Explicit if is safer.
     if [ -z "$mod" ] || [ "$mod" = "core" ]; then
       continue
     fi
-    has_integration=$(echo "$diff_content" | grep -qE "tests/$mod/integration/" && echo yes || echo no)
+    has_integration=$({ grep -qE "tests/$mod/integration/" "${DIFF_FILE:-/dev/stdin}" 2>/dev/null; } && echo yes || echo no)
     if [ "$has_integration" = "no" ]; then
       emit_finding "TD-10" "BLOCK" "tests/$mod/integration/" 1 \
         "New module '$mod' has no integration test" "" >> "$findings"

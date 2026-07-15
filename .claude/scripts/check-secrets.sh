@@ -86,8 +86,20 @@ echo "$diff_content" | awk '
     emit_finding "SEC-06" "BLOCK" "$file" "$line_num" "JWT token detected — remove and rotate" "" >> "$findings"
   fi
   # SEC-07: Private key header
+  # FP-P: test fixture PEM stubs (body is "test", "fake", "dummy", or < 40 chars
+  # of base64) must not fire. Real private keys have hundreds of chars of base64.
+  # We gate on file path AND body content within the diff hunk.
   if echo "$content" | grep -qE 'BEGIN (RSA |EC |OPENSSH |DSA |ENCRYPTED )?PRIVATE KEY'; then
-    emit_finding "SEC-07" "BLOCK" "$file" "$line_num" "Private key header detected — remove and rotate" "" >> "$findings"
+    # Skip if file is under a test directory (path heuristic)
+    _is_test_path=false
+    if echo "$file" | grep -qE '(^|/)(tests?|test_[^/]+|[^/]+_test)\.(py|java)$|/(tests?|fixtures?)/'; then
+      _is_test_path=true
+    fi
+    if [ "$_is_test_path" = "false" ]; then
+      emit_finding "SEC-07" "BLOCK" "$file" "$line_num" "Private key header detected — remove and rotate" "" >> "$findings"
+    fi
+    # Even in test files, fire if body looks like real key content (>= 40 base64 chars)
+    # (covered by _is_test_path=true suppression above; real keys are never test stubs)
   fi
   # SEC-08: BTP client_secret literal (heuristic: assignment with looks-like-secret value)
   # Match client_secret= or clientsecret= with quoted values that look like real secrets

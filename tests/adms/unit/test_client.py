@@ -144,7 +144,7 @@ class TestAdmsClientInit:
 class TestCreateClientFactory:
     def test_raises_config_error_on_missing_binding(self):
         with patch(
-            "sap_cloud_sdk.adms.client.load_from_env_or_mount",
+            "sap_cloud_sdk.adms.client.load_secrets",
             side_effect=ConfigError("missing fields"),
         ):
             with pytest.raises(ConfigError, match="missing fields"):
@@ -157,7 +157,7 @@ class TestCreateClientFactory:
         "client creation failed".
         """
         with patch(
-            "sap_cloud_sdk.adms.client.load_from_env_or_mount",
+            "sap_cloud_sdk.adms.client.load_secrets",
             side_effect=RuntimeError("unexpected"),
         ):
             with pytest.raises(RuntimeError, match="unexpected"):
@@ -171,7 +171,7 @@ class TestCreateClientFactory:
             client_secret="cs",
         )
         with patch(
-            "sap_cloud_sdk.adms.client.load_from_env_or_mount",
+            "sap_cloud_sdk.adms.client.load_secrets",
             return_value=mock_config,
         ):
             client = create_client()
@@ -185,7 +185,7 @@ class TestCreateClientFactory:
             client_id="cid",
             client_secret="cs",
         )
-        with patch("sap_cloud_sdk.adms.client.load_from_env_or_mount") as mock_load:
+        with patch("sap_cloud_sdk.adms.client.load_secrets") as mock_load:
             client = create_client(config=mock_config)
 
         mock_load.assert_not_called()
@@ -199,7 +199,7 @@ class TestCreateClientFactory:
             client_secret="cs",
         )
         with patch(
-            "sap_cloud_sdk.adms.client.load_from_env_or_mount",
+            "sap_cloud_sdk.adms.client.load_secrets",
             return_value=mock_config,
         ):
             client = create_client(user_jwt="user-jwt-123")
@@ -445,7 +445,7 @@ class TestAsyncAdmsClient:
 class TestCreateAsyncClient:
     def test_raises_config_error_when_no_binding(self):
         with patch(
-            "sap_cloud_sdk.adms.client.load_from_env_or_mount",
+            "sap_cloud_sdk.adms.client.load_secrets",
             side_effect=ConfigError("no binding"),
         ):
             with pytest.raises(ConfigError):
@@ -453,14 +453,14 @@ class TestCreateAsyncClient:
 
     def test_returns_async_client(self, config):
         with patch(
-            "sap_cloud_sdk.adms.client.load_from_env_or_mount",
+            "sap_cloud_sdk.adms.client.load_secrets",
             return_value=config,
         ):
             client = create_async_client()
         assert isinstance(client, AsyncAdmsClient)
 
     def test_accepts_explicit_config(self, config):
-        with patch("sap_cloud_sdk.adms.client.load_from_env_or_mount") as mock_load:
+        with patch("sap_cloud_sdk.adms.client.load_secrets") as mock_load:
             client = create_async_client(config=config)
         mock_load.assert_not_called()
         assert isinstance(client, AsyncAdmsClient)

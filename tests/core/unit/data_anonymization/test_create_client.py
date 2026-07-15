@@ -46,7 +46,7 @@ class TestCreateClient:
 
         monkeypatch.setattr(
             data_anonymization,
-            "_load_config_from_env",
+            "_load_secrets",
             lambda instance: config,
         )
         monkeypatch.setattr(data_anonymization, "HttpTransport", lambda resolved: transport)
@@ -78,7 +78,7 @@ class TestCreateClient:
         def fail(instance: str):
             raise RuntimeError("boom")
 
-        monkeypatch.setattr(data_anonymization, "_load_config_from_env", fail)
+        monkeypatch.setattr(data_anonymization, "_load_secrets", fail)
 
         assert_raises(
             ClientCreationError,
@@ -118,7 +118,7 @@ class TestCreateClient:
         def fail(instance: str):
             raise RuntimeError("boom")
 
-        monkeypatch.setattr(data_anonymization, "_load_config_from_env", fail)
+        monkeypatch.setattr(data_anonymization, "_load_secrets", fail)
 
         with patch(
             "sap_cloud_sdk.core.telemetry.metrics_decorator.record_error_metric"

@@ -32,7 +32,8 @@ if [ "$LANGUAGE" = "python" ]; then
 else
   # FP-O-01: multi-module Maven puts tests at <module>/src/test/java, not
   # src/test/. Match src/test/ at any depth. Same for mocks/constants.
-  ignore_files="^(src/test/|.*/src/test/|mocks?/|docs?/|.*Constants\.java|.*/constants/|.*/user-guide\.md|README\.md|.*\.md$|.*\.ya?ml$|.*\.xml$|.*\.properties$|.*pom\.xml$|${LOCKFILE_PATTERNS}|${ENV_EXAMPLE_PATTERNS})"
+  # Also skip .hyperspace/ (CI bot config) and *.sh (shell scripts with example URLs).
+  ignore_files="^(src/test/|.*/src/test/|mocks?/|docs?/|.*Constants\.java|.*/constants/|.*/user-guide\.md|README\.md|.*\.md$|.*\.ya?ml$|.*\.xml$|.*\.properties$|.*pom\.xml$|.*\.sh$|\.hyperspace/|${LOCKFILE_PATTERNS}|${ENV_EXAMPLE_PATTERNS})"
 fi
 
 # FP-N-01: performance. A per-line shell loop over the full added-line set

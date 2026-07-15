@@ -327,11 +327,10 @@ async def list_server_tools(
                 result = await session.list_tools()
                 if result is None or result.tools is None:
                     logger.warning(
-                        "MCP server '%s' at '%s' returned no tools from list_tools() "
-                        "(response was None — often caused by OpenTelemetry MCP "
-                        "instrumentation swallowing errors). Skipping fragment.",
+                        "list_tools() returned no tools (response=%r); fragment %r skipped — "
+                        "check MCP server health and OTel instrumentation",
+                        result,
                         fragment_name,
-                        dest_url,
                     )
                     return []
                 return [

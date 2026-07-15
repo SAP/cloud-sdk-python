@@ -34,7 +34,6 @@ from sap_cloud_sdk.agentgateway.exceptions import (
     AgentGatewaySDKError,
     MCPServerNotFoundError,
 )
-from sap_cloud_sdk.destination import ConsumptionLevel
 
 # Aliases for use in existing test assertions
 _LABEL_KEY = LABEL_KEY
@@ -628,6 +627,50 @@ class TestGetMcpToolsLob:
             assert len(result) == 1
             assert result[0].name == "tool2"
 
+    @pytest.mark.asyncio
+    async def test_continues_when_fragment_returns_empty_from_none_guard(self):
+        """Continue processing when one fragment hits the list_tools None guard."""
+        fragment1 = MagicMock()
+        fragment1.name = "mcp-server1"
+        fragment1.properties = {"URL": "https://example1.com/mcp"}
+
+        fragment2 = MagicMock()
+        fragment2.name = "mcp-server2"
+        fragment2.properties = {"URL": "https://example2.com/mcp"}
+
+        mock_tool = MCPTool(
+            name="tool2",
+            server_name="server2",
+            description="Test",
+            input_schema={},
+            url="https://example2.com/mcp",
+            fragment_name="mcp-server2",
+        )
+
+        call_count = 0
+
+        async def mock_list_tools_fn(*args, **kwargs):
+            nonlocal call_count
+            call_count += 1
+            if call_count == 1:
+                return []
+            return [mock_tool]
+
+        with (
+            patch("sap_cloud_sdk.agentgateway._lob.list_mcp_fragments") as mock_list,
+            patch(
+                "sap_cloud_sdk.agentgateway._lob.list_server_tools",
+                side_effect=mock_list_tools_fn,
+            ),
+        ):
+            mock_list.return_value = [fragment1, fragment2]
+
+            result = await get_mcp_tools_lob("tenant-sub", "system-token", 60.0)
+
+            assert len(result) == 1
+            assert result[0].name == "tool2"
+
+
 
 # ============================================================
 # Test: list_server_tools
@@ -672,7 +715,7 @@ class TestListServerTools:
             )
 
             assert result == []
-            assert "returned no tools from list_tools()" in caplog.text
+            assert "list_tools() returned no tools" in caplog.text
 
     @pytest.mark.asyncio
     async def test_returns_empty_when_tools_attribute_is_none(self, caplog):
@@ -711,7 +754,7 @@ class TestListServerTools:
             )
 
             assert result == []
-            assert "returned no tools from list_tools()" in caplog.text
+            assert "list_tools() returned no tools" in caplog.text
 
 
 # ============================================================

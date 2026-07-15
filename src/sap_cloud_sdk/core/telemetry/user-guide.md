@@ -28,7 +28,8 @@ auto_instrument()
 from litellm import completion
 # LLM calls are now automatically traced
 ```
-If OpenTelemetry MCP instrumentation (`opentelemetry-instrumentation-mcp`) swallows protocol errors and `list_tools()` returns `None`, the Agent Gateway SDK logs a warning and skips that fragment instead of crashing (SDK 0.35.2+). Removing instrumentation is not recommended. Until upstream fixes land, agents may keep an application-side unwrap after `auto_instrument()` (see Agent Gateway user guide — OpenTelemetry and MCP).
+
+If OpenTelemetry MCP instrumentation (`opentelemetry-instrumentation-mcp`) swallows protocol errors during `list_mcp_tools()` discovery (the underlying MCP `session.list_tools()` may return `None`), the Agent Gateway SDK logs a warning and skips that fragment instead of crashing (SDK 0.35.3+). Removing instrumentation is not recommended. Until upstream fixes land, agents may keep an application-side unwrap after `auto_instrument()` (see Agent Gateway user guide — OpenTelemetry and MCP).
 
 
 ### 2. Add business context with a parent span

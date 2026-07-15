@@ -662,6 +662,42 @@ class TestGetMcpToolsLob:
             assert result == []
             assert "HTTP 403" in caplog.text
             assert "user_token" in caplog.text
+            assert "list_mcp_tools" in caplog.text
+            assert "Phase 2" not in caplog.text
+
+    @pytest.mark.asyncio
+    async def test_warns_when_all_fragments_fail_to_load(self, caplog):
+        """Log aggregate warning when every fragment fails tool discovery."""
+        import logging
+
+        caplog.set_level(logging.WARNING, logger="sap_cloud_sdk.agentgateway._lob")
+
+        fragment = MagicMock()
+        fragment.name = "mcp-server-a"
+        fragment.properties = {"URL": "https://example.com/mcp"}
+
+        response = MagicMock()
+        response.status_code = 403
+        exc = httpx.HTTPStatusError(
+            "Forbidden",
+            request=MagicMock(),
+            response=response,
+        )
+
+        with (
+            patch("sap_cloud_sdk.agentgateway._lob.list_mcp_fragments") as mock_list,
+            patch(
+                "sap_cloud_sdk.agentgateway._lob.list_server_tools",
+                new_callable=AsyncMock,
+                side_effect=exc,
+            ),
+        ):
+            mock_list.return_value = [fragment]
+
+            result = await get_mcp_tools_lob("tenant-sub", "system-token", 60.0)
+
+            assert result == []
+            assert "No MCP tools loaded from 1 fragment(s)" in caplog.text
 
     @pytest.mark.asyncio
     async def test_continues_when_fragment_returns_empty_from_none_guard(self):

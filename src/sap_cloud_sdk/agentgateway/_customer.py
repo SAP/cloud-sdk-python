@@ -466,8 +466,8 @@ async def _list_server_tools(
 
                 if result is None or result.tools is None:
                     logger.warning(
-                        "list_tools() returned no tools (response=%r); fragment %r skipped — "
-                        "check MCP server health and OTel instrumentation",
+                        "list_tools() returned no tools (response=%r); dependency %r skipped — "
+                        "check MCP server health",
                         result,
                         dependency.ord_id,
                     )

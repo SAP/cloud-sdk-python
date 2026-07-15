@@ -59,6 +59,10 @@ _AGW_RESOURCE_URN = "urn:sap:identity:application:provider:name:agent-gateway"
 _GRANT_TYPE_CLIENT_CREDENTIALS = "client_credentials"
 _GRANT_TYPE_JWT_BEARER = "urn:ietf:params:oauth:grant-type:jwt-bearer"
 
+# Token response field keys
+_TOKEN_FIELD_CLIENT_ID = "client_id"
+_TOKEN_FIELD_ACCESS_TOKEN = "access_token"
+
 
 def _cache_scope_key(credentials: CustomerCredentials) -> str:
     """Build a cache scope key for customer-flow tokens."""
@@ -324,7 +328,7 @@ def _request_token_mtls(
     ssl_context = _create_ssl_context(credentials.certificate, credentials.private_key)
 
     data = {
-        "client_id": credentials.client_id,
+        _TOKEN_FIELD_CLIENT_ID: credentials.client_id,
         "grant_type": grant_type,
         "resource": _AGW_RESOURCE_URN,
     }
@@ -363,7 +367,7 @@ def _request_token_mtls(
             )
 
         token_data = response.json()
-        access_token = token_data.get("access_token")
+        access_token = token_data.get(_TOKEN_FIELD_ACCESS_TOKEN)
 
         if not access_token:
             raise AgentGatewaySDKError(
@@ -374,7 +378,7 @@ def _request_token_mtls(
         return token_data
 
     except httpx.RequestError as e:
-        raise AgentGatewaySDKError(f"Token request failed: {e}")
+        raise AgentGatewaySDKError(f"Token request failed: {e}") from e
 
 
 def _request_token_transparent(
@@ -401,7 +405,7 @@ def _request_token_transparent(
         AgentGatewaySDKError: If token request fails.
     """
     data = {
-        "client_id": credentials.client_id,
+        _TOKEN_FIELD_CLIENT_ID: credentials.client_id,
         "grant_type": grant_type,
         "resource": _AGW_RESOURCE_URN,
     }
@@ -437,7 +441,7 @@ def _request_token_transparent(
             )
 
         token_data = response.json()
-        access_token = token_data.get("access_token")
+        access_token = token_data.get(_TOKEN_FIELD_ACCESS_TOKEN)
 
         if not access_token:
             raise AgentGatewaySDKError(
@@ -448,7 +452,7 @@ def _request_token_transparent(
         return token_data
 
     except httpx.RequestError as e:
-        raise AgentGatewaySDKError(f"Token request failed: {e}")
+        raise AgentGatewaySDKError(f"Token request failed: {e}") from e
 
 
 def get_system_token_mtls(
@@ -499,7 +503,7 @@ def get_system_token_mtls(
             extra_data={"response_type": "token"},
         )
 
-    access_token = token_data["access_token"]
+    access_token = token_data[_TOKEN_FIELD_ACCESS_TOKEN]
 
     if token_cache:
         token_cache.set_system_token(
@@ -571,7 +575,7 @@ def exchange_user_token(
             },
         )
 
-    access_token = token_data["access_token"]
+    access_token = token_data[_TOKEN_FIELD_ACCESS_TOKEN]
 
     if token_cache:
         token_cache.set_user_token(

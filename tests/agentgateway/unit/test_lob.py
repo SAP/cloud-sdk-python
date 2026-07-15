@@ -21,6 +21,7 @@ from sap_cloud_sdk.agentgateway._lob import (
     fetch_user_auth,
     get_ias_client_id_lob,
     get_mcp_tools_lob,
+    list_server_tools,
     get_agent_cards_lob,
     _fetch_agent_card,
     call_mcp_tool_lob,
@@ -598,6 +599,91 @@ class TestGetMcpToolsLob:
             # Should still get tools from second fragment
             assert len(result) == 1
             assert result[0].name == "tool2"
+
+
+# ============================================================
+# Test: list_server_tools
+# ============================================================
+
+
+class TestListServerTools:
+    """Tests for list_server_tools async function."""
+
+    @pytest.mark.asyncio
+    async def test_returns_empty_when_list_tools_returns_none(self, caplog):
+        """Return empty list when MCP list_tools response is None (OTel instrumentation)."""
+        import logging
+
+        caplog.set_level(logging.WARNING, logger="sap_cloud_sdk.agentgateway._lob")
+
+        with (
+            patch("sap_cloud_sdk.agentgateway._lob.httpx.AsyncClient") as mock_http,
+            patch(
+                "sap_cloud_sdk.agentgateway._lob.streamable_http_client"
+            ) as mock_stream,
+            patch("sap_cloud_sdk.agentgateway._lob.ClientSession") as mock_session,
+        ):
+            mock_http_instance = AsyncMock()
+            mock_http.return_value.__aenter__.return_value = mock_http_instance
+
+            mock_stream.return_value.__aenter__.return_value = (
+                AsyncMock(),
+                AsyncMock(),
+                None,
+            )
+
+            mock_session_instance = AsyncMock()
+            mock_init = MagicMock()
+            mock_init.serverInfo.name = "test-server"
+            mock_session_instance.initialize = AsyncMock(return_value=mock_init)
+            mock_session_instance.list_tools = AsyncMock(return_value=None)
+            mock_session.return_value.__aenter__.return_value = mock_session_instance
+
+            result = await list_server_tools(
+                "https://example.com/mcp", "auth-token", "frag-a", 60.0
+            )
+
+            assert result == []
+            assert "returned no tools from list_tools()" in caplog.text
+
+    @pytest.mark.asyncio
+    async def test_returns_empty_when_tools_attribute_is_none(self, caplog):
+        """Return empty list when list_tools result has tools=None."""
+        import logging
+
+        caplog.set_level(logging.WARNING, logger="sap_cloud_sdk.agentgateway._lob")
+
+        with (
+            patch("sap_cloud_sdk.agentgateway._lob.httpx.AsyncClient") as mock_http,
+            patch(
+                "sap_cloud_sdk.agentgateway._lob.streamable_http_client"
+            ) as mock_stream,
+            patch("sap_cloud_sdk.agentgateway._lob.ClientSession") as mock_session,
+        ):
+            mock_http_instance = AsyncMock()
+            mock_http.return_value.__aenter__.return_value = mock_http_instance
+
+            mock_stream.return_value.__aenter__.return_value = (
+                AsyncMock(),
+                AsyncMock(),
+                None,
+            )
+
+            mock_session_instance = AsyncMock()
+            mock_init = MagicMock()
+            mock_init.serverInfo.name = "test-server"
+            mock_session_instance.initialize = AsyncMock(return_value=mock_init)
+            mock_list_result = MagicMock()
+            mock_list_result.tools = None
+            mock_session_instance.list_tools = AsyncMock(return_value=mock_list_result)
+            mock_session.return_value.__aenter__.return_value = mock_session_instance
+
+            result = await list_server_tools(
+                "https://example.com/mcp", "auth-token", "frag-a", 60.0
+            )
+
+            assert result == []
+            assert "returned no tools from list_tools()" in caplog.text
 
 
 # ============================================================

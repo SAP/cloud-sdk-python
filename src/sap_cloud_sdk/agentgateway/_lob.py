@@ -404,6 +404,7 @@ async def get_mcp_tools_lob(
                     "with user_token when calling list_mcp_tools with principal context",
                     fragment_name,
                 )
+                continue
             logger.exception(
                 "Failed to load tools from fragment '%s' — skipping",
                 fragment_name,

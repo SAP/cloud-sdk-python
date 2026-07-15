@@ -19,7 +19,7 @@ from sap_cloud_sdk.objectstore.exceptions import (
 )
 from sap_cloud_sdk.objectstore._models import ObjectStoreBindingData, ObjectMetadata
 from sap_cloud_sdk.objectstore._s3 import ObjectStoreClient
-from sap_cloud_sdk.core.secret_resolver import read_from_mount_and_fallback_to_env_var
+from sap_cloud_sdk.core.secret_resolver import get_resolver
 
 
 def create_client(
@@ -53,13 +53,8 @@ def create_client(
 
     # Cloud mode: use secret resolver to load configuration
     config = ObjectStoreBindingData()
-    read_from_mount_and_fallback_to_env_var(
-        base_volume_mount="/etc/secrets/appfnd",
-        base_var_name="CLOUD_SDK_CFG",
-        module="objectstore",
-        instance=instance,
-        target=config,
-    )
+    get_resolver().resolve(module="objectstore", instance=instance, target=config)
+
     return ObjectStoreClient(config, disable_ssl=disable_ssl)
 
 

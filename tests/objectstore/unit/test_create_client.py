@@ -9,20 +9,20 @@ from sap_cloud_sdk.objectstore._models import ObjectStoreBindingData
 
 class TestCreateClient:
 
-    @patch('sap_cloud_sdk.objectstore.read_from_mount_and_fallback_to_env_var')
+    @patch('sap_cloud_sdk.objectstore.get_resolver')
     @patch('sap_cloud_sdk.objectstore.ObjectStoreClient')
-    def test_create_client_cloud_mode(self, mock_client_class, mock_resolver):
+    def test_create_client_cloud_mode(self, mock_client_class, mock_get_resolver):
         mock_client = Mock()
         mock_client_class.return_value = mock_client
 
         result = create_client("production", disable_ssl=True)
 
-        mock_resolver.assert_called_once()
-        call_args = mock_resolver.call_args
-        assert call_args[1]["module"] == "objectstore"
-        assert call_args[1]["instance"] == "production"
-        assert isinstance(call_args[1]["target"], ObjectStoreBindingData)
-        mock_client_class.assert_called_once_with(call_args[1]["target"], disable_ssl=True)
+        mock_get_resolver.return_value.resolve.assert_called_once()
+        call_kwargs = mock_get_resolver.return_value.resolve.call_args[1]
+        assert call_kwargs["module"] == "objectstore"
+        assert call_kwargs["instance"] == "production"
+        assert isinstance(call_kwargs["target"], ObjectStoreBindingData)
+        mock_client_class.assert_called_once_with(call_kwargs["target"], disable_ssl=True)
         assert result == mock_client
 
     def test_create_client_empty_instance_raises_error(self):

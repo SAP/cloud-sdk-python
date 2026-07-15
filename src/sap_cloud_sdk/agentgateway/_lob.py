@@ -327,11 +327,10 @@ async def list_server_tools(
                 result = await session.list_tools()
                 if result is None or result.tools is None:
                     logger.warning(
-                        "MCP server '%s' at '%s' returned no tools from list_tools() "
-                        "(response was None — often caused by OpenTelemetry MCP "
-                        "instrumentation swallowing errors). Skipping fragment.",
+                        "list_tools() returned no tools (response=%r); fragment %r skipped — "
+                        "check MCP server health and OTel instrumentation",
+                        result,
                         fragment_name,
-                        dest_url,
                     )
                     return []
                 return [
@@ -395,6 +394,18 @@ async def get_mcp_tools_lob(
             logger.debug(
                 "Loaded %d tool(s) from fragment '%s'",
                 len(server_tools),
+                fragment_name,
+            )
+        except httpx.HTTPStatusError as exc:
+            if exc.response.status_code == 403:
+                logger.warning(
+                    "HTTP 403 listing tools from fragment '%s' with system token — "
+                    "MCP list_tools may require a user-scoped token; use Phase 2 flow "
+                    "with user_token when calling list_mcp_tools with principal context",
+                    fragment_name,
+                )
+            logger.exception(
+                "Failed to load tools from fragment '%s' — skipping",
                 fragment_name,
             )
         except Exception:

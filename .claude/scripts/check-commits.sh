@@ -18,7 +18,7 @@ PR_TITLE="${PR_TITLE:-}"
 STARTED=$(now_iso)
 findings=$(mktemp); trap 'rm -f "$findings"' EXIT
 
-prefix_regex='^(feat|fix|refactor|chore|docs|test|ci|build|perf|style|revert)(\([a-z0-9_/-]+\))?!?:[[:space:]]+.+'
+prefix_regex='^(feat|fix|refactor|chore|docs|test|ci|build|perf|style|revert)(\([a-z0-9_/,.-]+\))?!?:[[:space:]]+.+'
 
 # Pick the single subject that will land on main after squash-merge.
 if [ -n "$PR_TITLE" ]; then

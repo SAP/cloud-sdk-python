@@ -398,7 +398,7 @@ async def get_mcp_tools_lob(
             )
         # intentional: fragment failure must not abort remaining fragments
         # (HTTPStatusError: 403 → warning + continue; other status → exception log + skip)
-        except httpx.HTTPStatusError as exc:
+        except httpx.HTTPStatusError as exc:  # sdk-review: ignore[el-02]
             if exc.response.status_code == 403:
                 logger.warning(
                     "HTTP 403 listing tools from fragment '%s' with system token — "

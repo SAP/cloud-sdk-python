@@ -126,7 +126,7 @@ def create_output_request_with_attachment(context):
         form_data={"field1": "value1"},
     )
 
-    attachment = AttachmentConfig(form_configuration=form_config)
+    attachment = AttachmentConfig(formConfiguration=form_config)
 
     email_config = EmailConfiguration(
         emailNotificationTemplateKey="TEST_TEMPLATE",

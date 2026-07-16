@@ -131,12 +131,12 @@ class OutputManagementServiceClient:
 
             error_type = self._map_status_code_to_error(status_code)
             if error_type:
-                return self._create_output_error_response(error_type, status_code)
+                return self._create_output_error_response(error_type, str(status_code))
             else:
                 logger.warning(
                     f"Unhandled status code: {status_code}. Using original status code and message."
                 )
-                return self._create_output_error_response(status_code, response_body)
+                return self._create_output_error_response(str(status_code), response_body)
 
         except Exception as e:
             logger.error(f"Exception occurred: {e}", exc_info=True)

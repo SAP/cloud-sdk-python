@@ -54,47 +54,41 @@ def create_client(
 
     - ``SUBSCRIBER`` with ``tenant="acme-corp"`` — loads the subscriber
       binding from ``/etc/secrets/appfnd/hana-agent-memory/acme-corp/`` (or
-      ``CLOUD_SDK_CFG_HANA_AGENT_MEMORY_ACME_CORP_*`` env vars). Per-call
-      tenant overrides load additional bindings lazily and cache them.
+      ``CLOUD_SDK_CFG_HANA_AGENT_MEMORY_ACME_CORP_*`` env vars).
     - ``PROVIDER`` — loads the provider binding from
       ``/etc/secrets/appfnd/hana-agent-memory/default/`` (or
       ``CLOUD_SDK_CFG_HANA_AGENT_MEMORY_DEFAULT_*`` env vars).
-    - Explicit ``config`` — uses the provided configuration for all calls.
-      Per-call tenant overrides are not supported when ``config`` is provided.
+    - Explicit ``config`` — uses the provided configuration directly.
 
     Args:
-        config: Optional explicit configuration. When provided, no binding
-                discovery is performed and per-call tenant overrides are disabled.
-        access_strategy: Default tenant access strategy for all client operations.
-                Defaults to ``SUBSCRIBER``. Individual method calls may override
-                this value.
-        tenant: Default subscriber tenant subdomain. Required when
-                ``access_strategy=SUBSCRIBER``. Individual method calls may
-                override this value.
+        config: Optional explicit configuration. When provided, binding
+                discovery is skipped.
+        access_strategy: Tenant access strategy for all operations.
+                Defaults to ``SUBSCRIBER``.
+        tenant: Subscriber tenant subdomain. Required when
+                ``access_strategy=SUBSCRIBER``.
 
     Returns:
         A ready-to-use :class:`AgentMemoryClient`.
 
     Raises:
         AgentMemoryConfigError: If configuration is missing or invalid.
+        AgentMemoryValidationError: If ``access_strategy=SUBSCRIBER`` and
+                ``tenant`` is not provided.
     """
     try:
         if config is not None:
-            initial_config = config
-            loader = None
+            resolved_config = config
         elif access_strategy is AccessStrategy.SUBSCRIBER and tenant:
-            initial_config = _load_config_for_instance(tenant)
-            loader = _load_config_for_instance
+            resolved_config = _load_config_for_instance(tenant)
         else:
-            initial_config = _load_config_from_env()
-            loader = _load_config_for_instance
+            resolved_config = _load_config_from_env()
 
-        transport = HttpTransport(initial_config)
+        transport = HttpTransport(resolved_config)
         return AgentMemoryClient(
             transport,
             access_strategy=access_strategy,
             tenant=tenant,
-            config_loader=loader,
         )
     except AgentMemoryConfigError:
         raise

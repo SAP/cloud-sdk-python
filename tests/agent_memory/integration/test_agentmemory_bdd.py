@@ -191,8 +191,6 @@ def memory_exists(context, agent_memory_client, agent_id, invoker_id, content):
     context["client"] = agent_memory_client
     context["memory"] = agent_memory_client.add_memory(
         agent_id, invoker_id, content,
-        access_strategy=context["access_strategy"],
-        tenant=context["tenant"],
     )
 
 
@@ -205,8 +203,6 @@ def message_exists(context, agent_memory_client, agent_id, invoker_id, group, ro
     context["client"] = agent_memory_client
     context["message"] = agent_memory_client.add_message(
         agent_id, invoker_id, group, role, content,
-        access_strategy=context["access_strategy"],
-        tenant=context["tenant"],
     )
 
 
@@ -220,8 +216,6 @@ def message_exists_with_metadata(context, agent_memory_client, agent_id, invoker
     context["message"] = agent_memory_client.add_message(
         agent_id, invoker_id, group, role, content,
         metadata={"tag": metadata_value},
-        access_strategy=context["access_strategy"],
-        tenant=context["tenant"],
     )
 
 
@@ -237,8 +231,6 @@ def add_memory(context, agent_id, invoker_id, content):
     client: AgentMemoryClient = context["client"]
     context["memory"] = client.add_memory(
         agent_id, invoker_id, content,
-        access_strategy=context["access_strategy"],
-        tenant=context["tenant"],
     )
 
 
@@ -247,8 +239,6 @@ def get_memory(context):
     client: AgentMemoryClient = context["client"]
     context["fetched_memory"] = client.get_memory(
         context["memory"].id,
-        access_strategy=context["access_strategy"],
-        tenant=context["tenant"],
     )
 
 
@@ -257,13 +247,9 @@ def update_memory(context, content):
     client: AgentMemoryClient = context["client"]
     client.update_memory(
         context["memory"].id, content=content,
-        access_strategy=context["access_strategy"],
-        tenant=context["tenant"],
     )
     context["memory"] = client.get_memory(
         context["memory"].id,
-        access_strategy=context["access_strategy"],
-        tenant=context["tenant"],
     )
 
 
@@ -272,13 +258,9 @@ def list_memories(context, agent_id):
     client: AgentMemoryClient = context["client"]
     context["memories"] = client.list_memories(
         agent_id=agent_id,
-        access_strategy=context["access_strategy"],
-        tenant=context["tenant"],
     )
     context["total"] = client.count_memories(
         agent_id=agent_id,
-        access_strategy=context["access_strategy"],
-        tenant=context["tenant"],
     )
 
 
@@ -287,8 +269,6 @@ def delete_memory(context):
     client: AgentMemoryClient = context["client"]
     client.delete_memory(
         context["memory"].id,
-        access_strategy=context["access_strategy"],
-        tenant=context["tenant"],
     )
     context["deleted_memory_id"] = context["memory"].id
 
@@ -302,8 +282,6 @@ def search_memories(context, query):
         query=query,
         threshold=0.5,
         limit=10,
-        access_strategy=context["access_strategy"],
-        tenant=context["tenant"],
     )
 
 
@@ -316,8 +294,6 @@ def add_message(context, agent_id, invoker_id, group, role, content):
     client: AgentMemoryClient = context["client"]
     context["message"] = client.add_message(
         agent_id, invoker_id, group, MessageRole(role), content,
-        access_strategy=context["access_strategy"],
-        tenant=context["tenant"],
     )
 
 
@@ -331,8 +307,6 @@ def list_messages(context, agent_id, group):
     context["messages"] = client.list_messages(
         agent_id=agent_id,
         message_group=group,
-        access_strategy=context["access_strategy"],
-        tenant=context["tenant"],
     )
     context["total"] = len(context["messages"])
 
@@ -342,8 +316,6 @@ def delete_message(context):
     client: AgentMemoryClient = context["client"]
     client.delete_message(
         context["message"].id,
-        access_strategy=context["access_strategy"],
-        tenant=context["tenant"],
     )
     context["deleted_message_id"] = context["message"].id
 
@@ -352,8 +324,6 @@ def delete_message(context):
 def get_retention_config(context):
     client: AgentMemoryClient = context["client"]
     context["retention_config"] = client.get_retention_config(
-        access_strategy=context["access_strategy"],
-        tenant=context["tenant"],
     )
 
 
@@ -362,12 +332,8 @@ def update_retention_config(context):
     client: AgentMemoryClient = context["client"]
     client.update_retention_config(
         message_days=30, memory_days=90,
-        access_strategy=context["access_strategy"],
-        tenant=context["tenant"],
     )
     context["retention_config"] = client.get_retention_config(
-        access_strategy=context["access_strategy"],
-        tenant=context["tenant"],
     )
 
 
@@ -381,8 +347,6 @@ def count_memories(context, agent_id, invoker_id):
     context["memory_count"] = client.count_memories(
         agent_id=agent_id,
         invoker_id=invoker_id,
-        access_strategy=context["access_strategy"],
-        tenant=context["tenant"],
     )
 
 
@@ -393,8 +357,6 @@ def list_memories_by_content(context, substring):
         agent_id="test-agent",
         invoker_id="test-user",
         filters=[FilterDefinition(target="content", contains=substring)],
-        access_strategy=context["access_strategy"],
-        tenant=context["tenant"],
     )
 
 
@@ -406,8 +368,6 @@ def list_messages_by_metadata(context, substring):
         invoker_id="test-user",
         message_group="conv-filter",
         filters=[FilterDefinition(target="metadata", contains=substring)],
-        access_strategy=context["access_strategy"],
-        tenant=context["tenant"],
     )
 
 
@@ -459,8 +419,6 @@ def check_memory_deleted(context):
     with pytest.raises(AgentMemoryNotFoundError):
         client.get_memory(
             context["deleted_memory_id"],
-            access_strategy=context["access_strategy"],
-            tenant=context["tenant"],
         )
 
 
@@ -503,8 +461,6 @@ def check_message_deleted(context):
     with pytest.raises(AgentMemoryNotFoundError):
         client.get_message(
             context["deleted_message_id"],
-            access_strategy=context["access_strategy"],
-            tenant=context["tenant"],
         )
 
 

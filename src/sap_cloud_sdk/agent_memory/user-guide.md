@@ -25,8 +25,8 @@ plain text, and the service makes it searchable by meaning.
   - [Multitenancy](#multitenancy)
     - [AccessStrategy](#accessstrategy)
     - [Configuring at client level](#configuring-at-client-level)
-    - [SUBSCRIBER\_ONLY (default)](#subscriber_only-default)
-    - [PROVIDER\_ONLY](#provider_only)
+    - [SUBSCRIBER (default)](#subscriber-default)
+    - [PROVIDER](#provider)
   - [Semantic Search: A Brief Primer](#semantic-search-a-brief-primer)
   - [Memories](#memories)
     - [Create a Memory](#create-a-memory)
@@ -72,6 +72,7 @@ plain text, and the service makes it searchable by meaning.
     - [Usage with LangGraph StateGraph](#usage-with-langgraph-stategraph)
     - [Usage with LangChain create\_agent](#usage-with-langchain-create_agent)
     - [Thread TTL](#thread-ttl)
+      - [Exposing TTL as a configurable parameter with `@agent_config`](#exposing-ttl-as-a-configurable-parameter-with-agent_config)
 
 ## Installation
 
@@ -206,46 +207,25 @@ memories = client.list_memories(agent_id="hr-assistant", invoker_id="user-42")
 count    = client.count_memories(agent_id="hr-assistant")
 ```
 
-A per-call value overrides the client default for that single call:
-
-```python
-# All calls use SUBSCRIBER / "acme-corp" except this one
-provider_memories = client.list_memories(
-    agent_id="hr-assistant",
-    invoker_id="user-42",
-    access_strategy=AccessStrategy.PROVIDER,  # overrides for this call only
-)
-```
-
 ### SUBSCRIBER (default)
 
-Pass the subscriber tenant subdomain via the `tenant` argument. Omitting `tenant` when
-the strategy is `SUBSCRIBER` raises `AgentMemoryValidationError`.
+Configure a subscriber tenant at client creation. All calls will use that tenant context.
 
 ```python
-memories = client.list_memories(
-    agent_id="hr-assistant",
-    invoker_id="user-42",
+client = create_client(
     access_strategy=AccessStrategy.SUBSCRIBER,
-    tenant="acme-corp",          # subscriber subdomain
+    tenant="acme-corp",
 )
+memories = client.list_memories(agent_id="hr-assistant", invoker_id="user-42")
 ```
-
-The subscriber token URL is derived by replacing the provider's `identityzone` segment
-in the configured `token_url` with the `tenant` value. This requires `identityzone` to
-be present in the service binding's UAA JSON (standard XSUAA field) or set explicitly in
-`AgentMemoryConfig`.
 
 ### PROVIDER
 
-No `tenant` argument is needed. All calls use the provider token.
+Configure a provider-only client. No tenant is needed; all calls use the provider binding.
 
 ```python
-memories = client.list_memories(
-    agent_id="hr-assistant",
-    invoker_id="user-42",
-    access_strategy=AccessStrategy.PROVIDER,
-)
+client = create_client(access_strategy=AccessStrategy.PROVIDER)
+memories = client.list_memories(agent_id="hr-assistant", invoker_id="user-42")
 ```
 
 > [!WARNING]

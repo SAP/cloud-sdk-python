@@ -19,6 +19,14 @@ MCP_TOOL_COMPLETED = "MCP_TOOL_COMPLETED"
 MCP_TOOL_FAILED = "MCP_TOOL_FAILED"
 
 
+def _resolve_tenant(tenant_subdomain: str | Callable[[], str] | None) -> str | None:
+    if isinstance(tenant_subdomain, str):
+        return tenant_subdomain
+    if tenant_subdomain is not None:
+        return tenant_subdomain()
+    return None
+
+
 def create_audit_client(
     tenant_subdomain: str | Callable[[], str] | None,
     module: Module,
@@ -27,12 +35,7 @@ def create_audit_client(
     """Create an audit client from a LoB destination. Returns None on failure."""
     if mode is AuditLogMode.DISABLED:
         return None
-    if isinstance(tenant_subdomain, str):
-        resolved: str | None = tenant_subdomain
-    elif tenant_subdomain is not None:
-        resolved = tenant_subdomain()
-    else:
-        resolved = None
+    resolved = _resolve_tenant(tenant_subdomain)
     if not resolved:
         return None
     try:

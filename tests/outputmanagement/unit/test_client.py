@@ -70,12 +70,12 @@ class TestOutputManagementClient:
             # send_email calls send_output_request internally, so both decorators fire
             # We verify that send_email's metric was recorded (it's the second call)
             assert mock_metric.call_count == 2
-            
+
             # First call is from send_output_request
             assert mock_metric.call_args_list[0] == (
                 (Module.OUTPUT_MANAGEMENT, None, Operation.OUTPUT_MANAGEMENT_SEND_OUTPUT_REQUEST, False),
             )
-            
+
             # Second call is from send_email
             assert mock_metric.call_args_list[1] == (
                 (Module.OUTPUT_MANAGEMENT, None, Operation.OUTPUT_MANAGEMENT_SEND_EMAIL, False),
@@ -111,7 +111,7 @@ class TestOutputManagementClient:
     async def test_send_email_with_mcp_records_request_metric(self):
         """Test that send_email_with_mcp records request metric."""
         from unittest.mock import AsyncMock
-        
+
         mock_service_client = Mock(spec=OutputManagementServiceClient)
         client = OutputManagementClient(service_client=mock_service_client)
 

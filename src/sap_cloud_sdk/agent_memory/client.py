@@ -35,7 +35,6 @@ from sap_cloud_sdk.agent_memory.utils._odata import (
     extract_value_and_count,
 )
 from sap_cloud_sdk.agent_memory.exceptions import (
-    AgentMemoryConfigError,
     AgentMemoryValidationError,
 )
 from sap_cloud_sdk.core.telemetry import Module, Operation, record_metrics

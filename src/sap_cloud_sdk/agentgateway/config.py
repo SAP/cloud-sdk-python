@@ -1,28 +1,16 @@
 """Configuration for Agent Gateway client."""
 
 from dataclasses import dataclass
-from enum import Enum
+
+from sap_cloud_sdk.core.auditlog_ng.helper import AuditLogMode
+
+__all__ = ["AuditLogMode", "ClientConfig"]
 
 DEFAULT_TIMEOUT_SECONDS = 60.0
 DEFAULT_FALLBACK_TOKEN_TTL_SECONDS = 300.0
 DEFAULT_TOKEN_EXPIRY_BUFFER_SECONDS = 30.0
 DEFAULT_MAX_SYSTEM_TOKEN_CACHE_SIZE = 32
 DEFAULT_MAX_USER_TOKEN_CACHE_SIZE = 256
-
-
-class AuditLogMode(Enum):
-    """Controls how audit logging failures are handled.
-
-    Attributes:
-        DISABLED: Audit logging is skipped entirely.
-        BEST_EFFORT: Failures are logged at WARNING level but never raised.
-            This is the default.
-        STRICT: Failures raise an exception, blocking the operation.
-    """
-
-    DISABLED = "disabled"
-    BEST_EFFORT = "best_effort"
-    STRICT = "strict"
 
 
 @dataclass

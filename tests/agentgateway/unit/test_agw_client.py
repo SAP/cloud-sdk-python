@@ -15,7 +15,7 @@ from sap_cloud_sdk.agentgateway import (
     AgentGatewaySDKError,
 )
 
-from sap_cloud_sdk.agentgateway._auditlog_helper import (
+from sap_cloud_sdk.agentgateway._implicit_auditlog import (
     send_audit_event_invoked,
     send_audit_event_completed,
     send_audit_event_failed,
@@ -1099,7 +1099,7 @@ class TestSendAuditEventInvoked:
         """send_audit_event_invoked is a no-op when get_tenant_id returns empty string."""
         mock_audit = MagicMock()
         with patch(
-            "sap_cloud_sdk.agentgateway._auditlog_helper.get_tenant_id",
+            "sap_cloud_sdk.core.auditlog_ng.helper.get_tenant_id",
             return_value="",
         ):
             send_audit_event_invoked(mock_audit, "tool-name")
@@ -1109,7 +1109,7 @@ class TestSendAuditEventInvoked:
         """send_audit_event_invoked builds and sends a ZzzCustomEvent with MCP_TOOL_INVOKED."""
         mock_audit = MagicMock()
         with patch(
-            "sap_cloud_sdk.agentgateway._auditlog_helper.get_tenant_id",
+            "sap_cloud_sdk.core.auditlog_ng.helper.get_tenant_id",
             return_value=_TENANT_UUID,
         ):
             send_audit_event_invoked(mock_audit, "my-tool", "user@example.com")
@@ -1123,7 +1123,7 @@ class TestSendAuditEventInvoked:
         """send_audit_event_invoked omits user_initiator_id when user_id is None."""
         mock_audit = MagicMock()
         with patch(
-            "sap_cloud_sdk.agentgateway._auditlog_helper.get_tenant_id",
+            "sap_cloud_sdk.core.auditlog_ng.helper.get_tenant_id",
             return_value=_TENANT_UUID,
         ):
             send_audit_event_invoked(mock_audit, "my-tool")
@@ -1135,7 +1135,7 @@ class TestSendAuditEventInvoked:
         mock_audit = MagicMock()
         mock_audit.send.side_effect = RuntimeError("send failed")
         with patch(
-            "sap_cloud_sdk.agentgateway._auditlog_helper.get_tenant_id",
+            "sap_cloud_sdk.core.auditlog_ng.helper.get_tenant_id",
             return_value=_TENANT_UUID,
         ):
             send_audit_event_invoked(mock_audit, "my-tool", mode=AuditLogMode.BEST_EFFORT)
@@ -1146,7 +1146,7 @@ class TestSendAuditEventInvoked:
         mock_audit.send.side_effect = RuntimeError("send failed")
         with (
             patch(
-                "sap_cloud_sdk.agentgateway._auditlog_helper.get_tenant_id",
+                "sap_cloud_sdk.core.auditlog_ng.helper.get_tenant_id",
                 return_value=_TENANT_UUID,
             ),
             pytest.raises(RuntimeError, match="send failed"),
@@ -1157,7 +1157,7 @@ class TestSendAuditEventInvoked:
         """send_audit_event_invoked does nothing in DISABLED mode."""
         mock_audit = MagicMock()
         with patch(
-            "sap_cloud_sdk.agentgateway._auditlog_helper.get_tenant_id",
+            "sap_cloud_sdk.core.auditlog_ng.helper.get_tenant_id",
             return_value=_TENANT_UUID,
         ):
             send_audit_event_invoked(mock_audit, "my-tool", mode=AuditLogMode.DISABLED)
@@ -1171,7 +1171,7 @@ class TestSendAuditEventCompleted:
         """send_audit_event_completed sends a ZzzCustomEvent with MCP_TOOL_COMPLETED."""
         mock_audit = MagicMock()
         with patch(
-            "sap_cloud_sdk.agentgateway._auditlog_helper.get_tenant_id",
+            "sap_cloud_sdk.core.auditlog_ng.helper.get_tenant_id",
             return_value=_TENANT_UUID,
         ):
             send_audit_event_completed(mock_audit, "my-tool", "user@example.com")
@@ -1185,7 +1185,7 @@ class TestSendAuditEventCompleted:
     def test_disabled_skips_send(self):
         mock_audit = MagicMock()
         with patch(
-            "sap_cloud_sdk.agentgateway._auditlog_helper.get_tenant_id",
+            "sap_cloud_sdk.core.auditlog_ng.helper.get_tenant_id",
             return_value=_TENANT_UUID,
         ):
             send_audit_event_completed(mock_audit, "my-tool", mode=AuditLogMode.DISABLED)
@@ -1199,7 +1199,7 @@ class TestSendAuditEventFailed:
         """send_audit_event_failed sends MCP_TOOL_FAILED with error_type in payload."""
         mock_audit = MagicMock()
         with patch(
-            "sap_cloud_sdk.agentgateway._auditlog_helper.get_tenant_id",
+            "sap_cloud_sdk.core.auditlog_ng.helper.get_tenant_id",
             return_value=_TENANT_UUID,
         ):
             send_audit_event_failed(mock_audit, "my-tool", "ValueError", "user@example.com")
@@ -1213,7 +1213,7 @@ class TestSendAuditEventFailed:
     def test_disabled_skips_send(self):
         mock_audit = MagicMock()
         with patch(
-            "sap_cloud_sdk.agentgateway._auditlog_helper.get_tenant_id",
+            "sap_cloud_sdk.core.auditlog_ng.helper.get_tenant_id",
             return_value=_TENANT_UUID,
         ):
             send_audit_event_failed(mock_audit, "my-tool", "RuntimeError", mode=AuditLogMode.DISABLED)
@@ -1235,11 +1235,11 @@ class TestCallMcpToolAuditLog:
         mock_audit = MagicMock()
         with (
             patch(
-                "sap_cloud_sdk.agentgateway._auditlog_helper.auditlog_ng.create_client",
+                "sap_cloud_sdk.core.auditlog_ng.helper.auditlog_ng.create_client",
                 return_value=mock_audit,
             ),
             patch(
-                "sap_cloud_sdk.agentgateway._auditlog_helper.get_tenant_id",
+                "sap_cloud_sdk.core.auditlog_ng.helper.get_tenant_id",
                 return_value=_TENANT_UUID,
             ),
             patch(
@@ -1278,11 +1278,11 @@ class TestCallMcpToolAuditLog:
         mock_audit = MagicMock()
         with (
             patch(
-                "sap_cloud_sdk.agentgateway._auditlog_helper.auditlog_ng.create_client",
+                "sap_cloud_sdk.core.auditlog_ng.helper.auditlog_ng.create_client",
                 return_value=mock_audit,
             ),
             patch(
-                "sap_cloud_sdk.agentgateway._auditlog_helper.get_tenant_id",
+                "sap_cloud_sdk.core.auditlog_ng.helper.get_tenant_id",
                 return_value=_TENANT_UUID,
             ),
             patch(
@@ -1320,11 +1320,11 @@ class TestCallMcpToolAuditLog:
         mock_audit = MagicMock()
         with (
             patch(
-                "sap_cloud_sdk.agentgateway._auditlog_helper.auditlog_ng.create_client",
+                "sap_cloud_sdk.core.auditlog_ng.helper.auditlog_ng.create_client",
                 return_value=mock_audit,
             ),
             patch(
-                "sap_cloud_sdk.agentgateway._auditlog_helper.get_tenant_id",
+                "sap_cloud_sdk.core.auditlog_ng.helper.get_tenant_id",
                 return_value=_TENANT_UUID,
             ),
             patch(
@@ -1361,11 +1361,11 @@ class TestCallMcpToolAuditLog:
         mock_audit = MagicMock()
         with (
             patch(
-                "sap_cloud_sdk.agentgateway._auditlog_helper.auditlog_ng.create_client",
+                "sap_cloud_sdk.core.auditlog_ng.helper.auditlog_ng.create_client",
                 return_value=mock_audit,
             ),
             patch(
-                "sap_cloud_sdk.agentgateway._auditlog_helper.get_tenant_id",
+                "sap_cloud_sdk.core.auditlog_ng.helper.get_tenant_id",
                 return_value=_TENANT_UUID,
             ),
             patch(

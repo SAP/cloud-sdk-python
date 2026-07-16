@@ -56,6 +56,11 @@ from sap_cloud_sdk.core.auditlog_ng.config import (
     AuditLogNGConfig,
     SCHEMA_URL,
 )
+from sap_cloud_sdk.core.auditlog_ng.helper import (
+    AuditLogMode,
+    create_audit_client,
+    send_event,
+)
 from sap_cloud_sdk.core.auditlog_ng.exceptions import (
     AuditLogNGError,
     ClientCreationError,
@@ -295,6 +300,10 @@ __all__ = [
     "create_client",
     # Client
     "AuditClient",
+    # Audit helpers
+    "AuditLogMode",
+    "create_audit_client",
+    "send_event",
     # Configuration
     "AuditLogNGConfig",
     # Exceptions

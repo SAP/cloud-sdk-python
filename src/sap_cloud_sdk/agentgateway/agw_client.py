@@ -34,7 +34,7 @@ from sap_cloud_sdk.agentgateway._models import (
     AuthResult,
     MCPTool,
 )
-from sap_cloud_sdk.agentgateway._auditlog_helper import (
+from sap_cloud_sdk.agentgateway._implicit_auditlog import (
     create_audit_client,
     send_audit_event_invoked,
     send_audit_event_completed,

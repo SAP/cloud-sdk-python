@@ -1,7 +1,7 @@
 """Audit log helper for custom events.
 
 Provides managed client creation and a ``ZzzCustomEvent`` send pattern —
-the SAP Audit Log v2 event type for application-defined audit events, 
+the SAP Audit Log v2 event type for application-defined audit events,
 which are not covered by the standard catalog.
 
 For standard catalog events (``DataAccess``, ``ConfigurationChange``,

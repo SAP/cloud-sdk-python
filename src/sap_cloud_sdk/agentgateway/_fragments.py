@@ -16,6 +16,7 @@ from sap_cloud_sdk.destination import (
 )
 
 from sap_cloud_sdk.agentgateway.exceptions import MCPServerNotFoundError
+from sap_cloud_sdk.core.telemetry import Module
 
 logger = logging.getLogger(__name__)
 
@@ -35,7 +36,10 @@ class FragmentLabel(str, Enum):
 
 
 def _list_fragments_by_label(label: FragmentLabel, tenant_subdomain: str) -> list:
-    client = create_fragment_client(instance=_DESTINATION_INSTANCE)
+    client = create_fragment_client(
+        instance=_DESTINATION_INSTANCE,
+        _telemetry_source=Module.AGENTGATEWAY,
+    )
     return client.list_instance_fragments(
         filter=ListOptions(filter_labels=[Label(key=LABEL_KEY, values=[label.value])]),
         tenant=tenant_subdomain,

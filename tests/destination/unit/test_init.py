@@ -17,6 +17,7 @@ from sap_cloud_sdk.destination.local_fragment_client import LocalDevFragmentClie
 from sap_cloud_sdk.destination.local_certificate_client import LocalDevCertificateClient
 from sap_cloud_sdk.destination.config import DestinationConfig
 from sap_cloud_sdk.destination.exceptions import ClientCreationError
+from sap_cloud_sdk.core.telemetry import Module
 
 _NO_MOCK_FILE = patch("sap_cloud_sdk.destination.os.path.isfile", new=lambda _: False)
 
@@ -364,3 +365,66 @@ class TestCreateCertificateClientLocalMode:
         mock_http.return_value = Mock()
         client = create_certificate_client()
         assert isinstance(client, CertificateClient)
+
+
+class TestCreateClientTelemetrySource:
+    """Verify _telemetry_source kwarg is stored on the client."""
+
+    @_NO_MOCK_FILE
+    @patch("sap_cloud_sdk.destination.load_from_env_or_mount")
+    @patch("sap_cloud_sdk.destination.TokenProvider")
+    @patch("sap_cloud_sdk.destination.DestinationHttp")
+    def test_default_source_is_none(self, mock_http, mock_tp, mock_load_config):
+        mock_load_config.return_value = Mock(spec=DestinationConfig)
+        assert create_client()._telemetry_source is None
+
+    @_NO_MOCK_FILE
+    @patch("sap_cloud_sdk.destination.load_from_env_or_mount")
+    @patch("sap_cloud_sdk.destination.TokenProvider")
+    @patch("sap_cloud_sdk.destination.DestinationHttp")
+    def test_explicit_source_is_stored(self, mock_http, mock_tp, mock_load_config):
+        mock_load_config.return_value = Mock(spec=DestinationConfig)
+        client = create_client(_telemetry_source=Module.AGENTGATEWAY)
+        assert client._telemetry_source is Module.AGENTGATEWAY
+
+
+class TestCreateFragmentClientTelemetrySource:
+    """Verify _telemetry_source kwarg is stored on the fragment client."""
+
+    @_NO_MOCK_FILE
+    @patch("sap_cloud_sdk.destination.load_from_env_or_mount")
+    @patch("sap_cloud_sdk.destination.TokenProvider")
+    @patch("sap_cloud_sdk.destination.DestinationHttp")
+    def test_default_source_is_none(self, mock_http, mock_tp, mock_load_config):
+        mock_load_config.return_value = Mock(spec=DestinationConfig)
+        assert create_fragment_client()._telemetry_source is None
+
+    @_NO_MOCK_FILE
+    @patch("sap_cloud_sdk.destination.load_from_env_or_mount")
+    @patch("sap_cloud_sdk.destination.TokenProvider")
+    @patch("sap_cloud_sdk.destination.DestinationHttp")
+    def test_explicit_source_is_stored(self, mock_http, mock_tp, mock_load_config):
+        mock_load_config.return_value = Mock(spec=DestinationConfig)
+        client = create_fragment_client(_telemetry_source=Module.AGENTGATEWAY)
+        assert client._telemetry_source is Module.AGENTGATEWAY
+
+
+class TestCreateCertificateClientTelemetrySource:
+    """Verify _telemetry_source kwarg is stored on the certificate client."""
+
+    @_NO_MOCK_FILE
+    @patch("sap_cloud_sdk.destination.load_from_env_or_mount")
+    @patch("sap_cloud_sdk.destination.TokenProvider")
+    @patch("sap_cloud_sdk.destination.DestinationHttp")
+    def test_default_source_is_none(self, mock_http, mock_tp, mock_load_config):
+        mock_load_config.return_value = Mock(spec=DestinationConfig)
+        assert create_certificate_client()._telemetry_source is None
+
+    @_NO_MOCK_FILE
+    @patch("sap_cloud_sdk.destination.load_from_env_or_mount")
+    @patch("sap_cloud_sdk.destination.TokenProvider")
+    @patch("sap_cloud_sdk.destination.DestinationHttp")
+    def test_explicit_source_is_stored(self, mock_http, mock_tp, mock_load_config):
+        mock_load_config.return_value = Mock(spec=DestinationConfig)
+        client = create_certificate_client(_telemetry_source=Module.DATA_ANONYMIZATION)
+        assert client._telemetry_source is Module.DATA_ANONYMIZATION

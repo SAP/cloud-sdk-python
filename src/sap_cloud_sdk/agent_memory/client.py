@@ -9,6 +9,7 @@ Do not instantiate this class directly — use :func:`sap_cloud_sdk.agent_memory
 
 from __future__ import annotations
 
+import logging
 from typing import Any, Optional
 
 from sap_cloud_sdk.agent_memory._endpoints import (
@@ -19,6 +20,7 @@ from sap_cloud_sdk.agent_memory._endpoints import (
 )
 from sap_cloud_sdk.agent_memory._http_transport import HttpTransport
 from sap_cloud_sdk.agent_memory._models import (
+    AccessStrategy,
     Memory,
     Message,
     MessageRole,
@@ -32,8 +34,12 @@ from sap_cloud_sdk.agent_memory.utils._odata import (
     build_message_filter,
     extract_value_and_count,
 )
-from sap_cloud_sdk.agent_memory.exceptions import AgentMemoryValidationError
+from sap_cloud_sdk.agent_memory.exceptions import (
+    AgentMemoryValidationError,
+)
 from sap_cloud_sdk.core.telemetry import Module, Operation, record_metrics
+
+logger = logging.getLogger(__name__)
 
 
 def _require_non_empty(**fields: str) -> None:
@@ -71,10 +77,31 @@ class AgentMemoryClient:
     Do not instantiate directly — use :func:`sap_cloud_sdk.agent_memory.create_client`.
 
     Args:
-        transport: HTTP transport layer (injected by ``create_client``).
+        transport: HTTP transport loaded from the binding for the configured
+            access strategy and tenant (resolved once at construction time by
+            :func:`sap_cloud_sdk.agent_memory.create_client`).
+        access_strategy: Tenant access strategy for all operations.
+            Defaults to ``SUBSCRIBER``.
+        tenant: Subscriber tenant subdomain. Required when
+            ``access_strategy=SUBSCRIBER``.
     """
 
-    def __init__(self, transport: HttpTransport) -> None:
+    def __init__(
+        self,
+        transport: HttpTransport,
+        *,
+        access_strategy: AccessStrategy = AccessStrategy.SUBSCRIBER,
+        tenant: Optional[str] = None,
+    ) -> None:
+        if access_strategy is AccessStrategy.SUBSCRIBER and not tenant:
+            raise AgentMemoryValidationError(
+                "tenant is required when access_strategy=SUBSCRIBER"
+            )
+        if access_strategy is AccessStrategy.PROVIDER:
+            logger.warning(
+                "AccessStrategy.PROVIDER is active: no tenant isolation will be applied. "
+                "Only use this strategy for provider-owned operations."
+            )
         self._transport = transport
 
     def close(self) -> None:
@@ -160,7 +187,8 @@ class AgentMemoryClient:
 
         Raises:
             AgentMemoryNotFoundError: If no memory with the given ID exists.
-            AgentMemoryValidationError: If ``memory_id`` is empty or no fields are provided.
+            AgentMemoryValidationError: If ``memory_id`` is empty, no fields are provided,
+                or tenant is missing for ``SUBSCRIBER``.
             AgentMemoryHttpError: If the request fails.
         """
         _require_non_empty(memory_id=memory_id)
@@ -217,8 +245,8 @@ class AgentMemoryClient:
             List of :class:`Memory` objects.
 
         Raises:
-            AgentMemoryValidationError: If ``limit`` < 1, ``offset`` < 0, or a
-                filter clause is invalid.
+            AgentMemoryValidationError: If ``limit`` < 1, ``offset`` < 0, a filter
+                clause is invalid, or tenant is missing for ``SUBSCRIBER``.
             AgentMemoryHttpError: If the request fails.
         """
         if limit < 1:
@@ -242,9 +270,7 @@ class AgentMemoryClient:
 
     @record_metrics(Module.AGENT_MEMORY, Operation.AGENT_MEMORY_COUNT_MEMORIES)
     def count_memories(
-        self,
-        agent_id: Optional[str] = None,
-        invoker_id: Optional[str] = None,
+        self, agent_id: Optional[str] = None, invoker_id: Optional[str] = None
     ) -> int:
         """Count memories matching the given filters.
 
@@ -289,9 +315,9 @@ class AgentMemoryClient:
             List of :class:`SearchResult` objects.
 
         Raises:
-            AgentMemoryValidationError: If required fields are empty or parameters are
+            AgentMemoryValidationError: If required fields are empty, parameters are
                 out of range (``query`` must be 5–5000 chars, ``threshold`` 0.0–1.0,
-                ``limit`` 1–50).
+                ``limit`` 1–50), or tenant is missing for ``SUBSCRIBER``.
             AgentMemoryHttpError: If the request fails.
         """
         _require_non_empty(agent_id=agent_id, invoker_id=invoker_id, query=query)
@@ -430,8 +456,8 @@ class AgentMemoryClient:
             List of :class:`Message` objects.
 
         Raises:
-            AgentMemoryValidationError: If ``limit`` < 1, ``offset`` < 0, or a
-                filter clause is invalid.
+            AgentMemoryValidationError: If ``limit`` < 1, ``offset`` < 0, a filter
+                clause is invalid, or tenant is missing for ``SUBSCRIBER``.
             AgentMemoryHttpError: If the request fails.
         """
         if limit < 1:
@@ -460,6 +486,8 @@ class AgentMemoryClient:
     @record_metrics(Module.AGENT_MEMORY, Operation.AGENT_MEMORY_GET_RETENTION_CONFIG)
     def get_retention_config(self) -> RetentionConfig:
         """Retrieve the data retention configuration (singleton).
+
+        Args:
 
         Returns:
             The current :class:`RetentionConfig`.
@@ -490,8 +518,8 @@ class AgentMemoryClient:
             usage_log_days: How long to keep access and search logs (days).
 
         Raises:
-            AgentMemoryValidationError: If no fields are provided, or any provided
-                value is negative.
+            AgentMemoryValidationError: If no fields are provided, any provided value is
+                negative, or tenant is missing for ``SUBSCRIBER``.
             AgentMemoryHttpError: If the request fails.
         """
         if message_days is None and memory_days is None and usage_log_days is None:

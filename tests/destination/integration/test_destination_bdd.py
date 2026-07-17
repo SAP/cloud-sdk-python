@@ -1615,10 +1615,15 @@ def send_get_request(context, path):
     import requests
     try:
         context.http_response = context.http_client.request("GET", path)
-    except requests.exceptions.ConnectionError as e:
+    except (requests.exceptions.ConnectionError, requests.exceptions.Timeout) as e:
         pytest.skip(f"External endpoint unreachable — skipping: {e}")
-    except requests.exceptions.Timeout as e:
-        pytest.skip(f"External endpoint timed out — skipping: {e}")
+
+    # skip if the echo service itself returned an error
+    if not context.http_response.ok:
+        pytest.skip(
+            f"External endpoint returned {context.http_response.status_code}: "
+            f"{context.http_response.text[:200]}"
+        )
 
 
 @then("the response contains an Authorization header")

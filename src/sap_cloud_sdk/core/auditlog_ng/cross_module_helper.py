@@ -20,6 +20,7 @@ from sap_cloud_sdk.core.auditlog_ng.gen.sap.auditlog.auditevent.v2 import (
     auditevent_pb2 as pb,
 )
 from sap_cloud_sdk.core.telemetry import Module, get_tenant_id
+from sap_cloud_sdk.ias import parse_token
 
 logger = logging.getLogger(__name__)
 
@@ -44,7 +45,7 @@ def _emit_custom_event(
     tenant_id: str,
     event_name: str,
     payload: dict,
-    user_id: str | None = None,
+    user_token: str | Callable[[], str] | None = None,
 ) -> None:
     """Build and send a ZzzCustomEvent to the audit log service.
 
@@ -54,12 +55,14 @@ def _emit_custom_event(
         event_name: Event identifier (e.g. ``"MCP_TOOL_INVOKED"``).
         payload: Arbitrary key/value pairs serialized into the custom struct.
             ``event_name`` is always included automatically.
-        user_id: Optional user initiator ID stamped on the event.
+        user_token: Optional user JWT. The user initiator ID is resolved from
+            ``scim_id`` or ``sub`` claims via ``_resolve_user_id``.
     """
     common = pb.Common()
     common.timestamp.FromDatetime(datetime.now(timezone.utc))
     common.tenant_id = tenant_id
     common.app_context["event_name"] = event_name
+    user_id = _resolve_user_id(user_token)
     if user_id:
         common.user_initiator_id = user_id
 
@@ -75,6 +78,17 @@ def _resolve_tenant(tenant_subdomain: str | Callable[[], str] | None) -> str | N
     if callable(tenant_subdomain):
         return tenant_subdomain()
     return None
+
+
+def _resolve_user_id(user_token: str | Callable[[], str] | None) -> str | None:
+    token = user_token() if callable(user_token) else user_token
+    if not token:
+        return None
+    try:
+        claims = parse_token(token)
+        return claims.scim_id or claims.sub or None
+    except Exception:
+        return None
 
 
 def create_audit_client(
@@ -118,7 +132,7 @@ def send_event(
     audit_client: AuditClient | None,
     event_name: str,
     payload: dict,
-    user_id: str | None = None,
+    user_token: str | Callable[[], str] | None = None,
     mode: AuditLogMode = AuditLogMode.BEST_EFFORT,
 ) -> None:
     """Send a ZzzCustomEvent to the audit log service.
@@ -131,7 +145,8 @@ def send_event(
         audit_client: Initialized AuditClient, or None to skip.
         event_name: Event identifier stamped on the event (e.g. ``"MCP_TOOL_INVOKED"``).
         payload: Arbitrary key/value pairs included in the custom struct.
-        user_id: Optional user initiator ID.
+        user_token: Optional user JWT. The user initiator ID is resolved from
+            ``scim_id`` or ``sub`` claims.
         mode: Controls failure handling.
     """
     if mode is AuditLogMode.DISABLED:
@@ -140,7 +155,7 @@ def send_event(
     if audit_client is None or not tenant_id:
         return
     try:
-        _emit_custom_event(audit_client, tenant_id, event_name, payload, user_id)
+        _emit_custom_event(audit_client, tenant_id, event_name, payload, user_token)
     except Exception:
         if mode is AuditLogMode.STRICT:
             raise

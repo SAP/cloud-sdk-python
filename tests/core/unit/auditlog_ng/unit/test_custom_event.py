@@ -2,7 +2,9 @@
 
 from unittest.mock import MagicMock
 
-from sap_cloud_sdk.core.auditlog_ng.cross_module_helper import _emit_custom_event as send_custom_event
+from sap_cloud_sdk.core.auditlog_ng.cross_module_helper import (
+    _emit_custom_event as send_custom_event,
+)
 from sap_cloud_sdk.core.auditlog_ng.gen.sap.auditlog.auditevent.v2 import (
     auditevent_pb2 as pb,
 )
@@ -31,14 +33,25 @@ class TestSendCustomEvent:
         assert fields["tool"].string_value == "my-tool"
 
     def test_sets_user_initiator_id_when_provided(self):
-        """send_custom_event stamps user_id on common.user_initiator_id."""
+        """send_custom_event stamps user_initiator_id resolved from token scim_id."""
+        from unittest.mock import patch, MagicMock as MM
+
         mock_client = MagicMock()
-        send_custom_event(mock_client, _TENANT_UUID, "MY_EVENT", {}, user_id="user@example.com")
+        mock_claims = MM()
+        mock_claims.scim_id = "user@example.com"
+        mock_claims.sub = None
+        with patch(
+            "sap_cloud_sdk.core.auditlog_ng.cross_module_helper.parse_token",
+            return_value=mock_claims,
+        ):
+            send_custom_event(
+                mock_client, _TENANT_UUID, "MY_EVENT", {}, user_token="fake.jwt.token"
+            )
         event = mock_client.send.call_args[0][0]
         assert event.common.user_initiator_id == "user@example.com"
 
     def test_omits_user_initiator_id_when_none(self):
-        """send_custom_event leaves user_initiator_id empty when user_id is None."""
+        """send_custom_event leaves user_initiator_id empty when user_token is None."""
         mock_client = MagicMock()
         send_custom_event(mock_client, _TENANT_UUID, "MY_EVENT", {})
         event = mock_client.send.call_args[0][0]

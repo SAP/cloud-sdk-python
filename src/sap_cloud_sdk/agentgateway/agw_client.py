@@ -499,7 +499,6 @@ class AgentGatewayClient:
         tool: MCPTool,
         user_token: str | Callable[[], str] | None = None,
         app_tid: str | None = None,
-        user_id: str | None = None,
         **kwargs,
     ) -> str:
         """Invoke an MCP tool.
@@ -524,8 +523,6 @@ class AgentGatewayClient:
                 for tenant-scoped token exchange.
                 TODO: This parameter's requirement is still being clarified with
                 the IBD team and may be removed if unnecessary.
-            user_id: User identifier recorded in the audit event when an
-                audit_client is configured on the client.
             **kwargs: Tool input parameters (passed directly to the tool).
 
         Returns:
@@ -568,7 +565,11 @@ class AgentGatewayClient:
                     auth = await self.get_system_auth(app_tid)
 
                 _send_audit_event(
-                    self._audit_client, McpToolEvent.INVOKED, {"tool": tool.name}, user_id, self._config.audit_log_mode
+                    self._audit_client,
+                    McpToolEvent.INVOKED,
+                    {"tool": tool.name},
+                    user_token,
+                    self._config.audit_log_mode,
                 )
                 try:
                     result = await call_mcp_tool_customer(
@@ -579,12 +580,16 @@ class AgentGatewayClient:
                         self._audit_client,
                         McpToolEvent.FAILED,
                         {"tool": tool.name, "error_type": type(e).__name__},
-                        user_id,
+                        user_token,
                         self._config.audit_log_mode,
                     )
                     raise
                 _send_audit_event(
-                    self._audit_client, McpToolEvent.COMPLETED, {"tool": tool.name}, user_id, self._config.audit_log_mode
+                    self._audit_client,
+                    McpToolEvent.COMPLETED,
+                    {"tool": tool.name},
+                    user_token,
+                    self._config.audit_log_mode,
                 )
                 return result
 
@@ -593,17 +598,30 @@ class AgentGatewayClient:
                 logger.warning("app_tid parameter ignored for LoB agent flow")
 
             auth = await self.get_user_auth(user_token, app_tid)
-            _send_audit_event(self._audit_client, McpToolEvent.INVOKED, {"tool": tool.name}, user_id)
+            _send_audit_event(
+                self._audit_client,
+                McpToolEvent.INVOKED,
+                {"tool": tool.name},
+                user_token,
+            )
             try:
                 result = await call_mcp_tool_lob(
                     tool, auth.access_token, self._config.timeout, **kwargs
                 )
             except Exception as e:
                 _send_audit_event(
-                    self._audit_client, McpToolEvent.FAILED, {"tool": tool.name, "error_type": type(e).__name__}, user_id
+                    self._audit_client,
+                    McpToolEvent.FAILED,
+                    {"tool": tool.name, "error_type": type(e).__name__},
+                    user_token,
                 )
                 raise
-            _send_audit_event(self._audit_client, McpToolEvent.COMPLETED, {"tool": tool.name}, user_id)
+            _send_audit_event(
+                self._audit_client,
+                McpToolEvent.COMPLETED,
+                {"tool": tool.name},
+                user_token,
+            )
             return result
 
         except AgentGatewaySDKError:

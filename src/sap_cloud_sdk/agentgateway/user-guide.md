@@ -193,8 +193,43 @@ agw_client = create_client(tenant_subdomain="my-tenant", config=config)
 - `token_expiry_buffer_seconds`: Safety buffer subtracted from explicit token expiries before a cached token is reused. Default: `30.0`.
 - `max_system_token_cache_size`: Maximum number of cached system tokens per client instance. Default: `32`.
 - `max_user_token_cache_size`: Maximum number of cached exchanged user tokens per client instance. Default: `256`.
+- `audit_log_mode`: Controls how audit logging failures are handled. Default: `AuditLogMode.BEST_EFFORT`.
 
 The SDK keeps token caches per `AgentGatewayClient` instance and reuses valid cached tokens for repeated authentication calls. System and user token caches are bounded independently with least-recently-used eviction.
+
+## Implicit Audit Logging
+
+The SDK automatically emits audit log events for every MCP tool invocation when the client is created with a `tenant_subdomain` (LoB flow). No additional configuration is required.
+
+Three events are emitted per invocation:
+
+| Event | When |
+|---|---|
+| `MCP_TOOL_INVOKED` | Before the tool call starts |
+| `MCP_TOOL_COMPLETED` | After the tool call succeeds |
+| `MCP_TOOL_FAILED` | When the tool call raises an exception (includes `error_type`) |
+
+Events are sent as `ZzzCustomEvent` to the SAP Audit Log Service v3 via the `AuditLogV3_Destination` destination.
+
+### AuditLogMode
+
+Use `AuditLogMode` in `ClientConfig` to control failure handling:
+
+```python
+from sap_cloud_sdk.agentgateway import ClientConfig, create_client
+from sap_cloud_sdk.agentgateway.config import AuditLogMode
+
+config = ClientConfig(audit_log_mode=AuditLogMode.STRICT)
+agw_client = create_client(tenant_subdomain="my-tenant", config=config)
+```
+
+| Mode | Behavior |
+|---|---|
+| `BEST_EFFORT` | Audit failures are logged as warnings and never raised. Default. |
+| `STRICT` | Audit failures raise an exception, blocking the operation. |
+| `DISABLED` | Audit logging is skipped entirely. |
+
+Audit logging is only active for LoB agents — Customer agents do not resolve a tenant subdomain at construction time and therefore emit no audit events.
 
 ### AgentGatewayClient
 

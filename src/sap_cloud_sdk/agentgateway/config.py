@@ -2,6 +2,10 @@
 
 from dataclasses import dataclass
 
+from sap_cloud_sdk.core.auditlog_ng.cross_module_helper import AuditLogMode
+
+__all__ = ["AuditLogMode", "ClientConfig"]
+
 DEFAULT_TIMEOUT_SECONDS = 60.0
 DEFAULT_FALLBACK_TOKEN_TTL_SECONDS = 300.0
 DEFAULT_TOKEN_EXPIRY_BUFFER_SECONDS = 30.0
@@ -22,6 +26,8 @@ class ClientConfig:
             token expiries before a cached token is considered stale.
         max_system_token_cache_size: Maximum number of cached system tokens.
         max_user_token_cache_size: Maximum number of cached user tokens.
+        audit_log_mode: Controls how audit logging failures are handled.
+            Defaults to BEST_EFFORT.
     """
 
     timeout: float = DEFAULT_TIMEOUT_SECONDS
@@ -29,6 +35,7 @@ class ClientConfig:
     token_expiry_buffer_seconds: float = DEFAULT_TOKEN_EXPIRY_BUFFER_SECONDS
     max_system_token_cache_size: int = DEFAULT_MAX_SYSTEM_TOKEN_CACHE_SIZE
     max_user_token_cache_size: int = DEFAULT_MAX_USER_TOKEN_CACHE_SIZE
+    audit_log_mode: AuditLogMode = AuditLogMode.BEST_EFFORT
 
     def __post_init__(self) -> None:
         if self.token_expiry_buffer_seconds >= self.fallback_token_ttl_seconds:

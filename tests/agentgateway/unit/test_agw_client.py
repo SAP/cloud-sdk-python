@@ -14,7 +14,10 @@ from sap_cloud_sdk.agentgateway import (
     MCPTool,
     AgentGatewaySDKError,
 )
+
 from sap_cloud_sdk.core.telemetry import Module
+
+_TENANT_UUID = "9e0d89c9-17cd-439d-8a8b-9c44d3d272f0"
 
 
 # ============================================================
@@ -122,14 +125,17 @@ class TestGetSystemAuth:
     @pytest.mark.asyncio
     async def test_lob_flow_returns_auth_result(self):
         """Return AuthResult from LoB flow."""
-        with patch(
-            "sap_cloud_sdk.agentgateway.agw_client.detect_customer_agent_credentials",
-            return_value=None,
-        ), patch(
-            "sap_cloud_sdk.agentgateway.agw_client.fetch_system_auth",
-            new_callable=AsyncMock,
-            return_value=("raw-system-jwt-token", "https://agw.example.com"),
-        ) as mock_auth:
+        with (
+            patch(
+                "sap_cloud_sdk.agentgateway.agw_client.detect_customer_agent_credentials",
+                return_value=None,
+            ),
+            patch(
+                "sap_cloud_sdk.agentgateway.agw_client.fetch_system_auth",
+                new_callable=AsyncMock,
+                return_value=("raw-system-jwt-token", "https://agw.example.com"),
+            ) as mock_auth,
+        ):
             agw_client = create_client(tenant_subdomain="my-tenant")
             token_cache = _client_token_cache(agw_client)
             gateway_url_cache = _client_gateway_url_cache(agw_client)
@@ -148,15 +154,19 @@ class TestGetSystemAuth:
     @pytest.mark.asyncio
     async def test_customer_flow_returns_auth_result(self):
         """Return AuthResult from customer flow."""
-        with patch(
-            "sap_cloud_sdk.agentgateway.agw_client.detect_customer_agent_credentials",
-            return_value="/path/to/credentials",
-        ), patch(
-            "sap_cloud_sdk.agentgateway.agw_client.load_customer_credentials",
-        ) as mock_load, patch(
-            "sap_cloud_sdk.agentgateway.agw_client.get_system_token_mtls",
-            return_value="customer-system-token",
-        ) as mock_mtls:
+        with (
+            patch(
+                "sap_cloud_sdk.agentgateway.agw_client.detect_customer_agent_credentials",
+                return_value="/path/to/credentials",
+            ),
+            patch(
+                "sap_cloud_sdk.agentgateway.agw_client.load_customer_credentials",
+            ) as mock_load,
+            patch(
+                "sap_cloud_sdk.agentgateway.agw_client.get_system_token_mtls",
+                return_value="customer-system-token",
+            ) as mock_mtls,
+        ):
             mock_creds = MagicMock()
             mock_creds.gateway_url = "https://agw.customer.com"
             mock_load.return_value = mock_creds
@@ -170,9 +180,7 @@ class TestGetSystemAuth:
             assert result.access_token == "customer-system-token"
             assert result.gateway_url == "https://agw.customer.com"
             mock_load.assert_called_once_with("/path/to/credentials")
-            mock_mtls.assert_called_once_with(
-                mock_creds, 60.0, "test-tid", token_cache
-            )
+            mock_mtls.assert_called_once_with(mock_creds, 60.0, "test-tid", token_cache)
 
     @pytest.mark.asyncio
     async def test_missing_tenant_raises_for_lob(self):
@@ -183,20 +191,25 @@ class TestGetSystemAuth:
         ):
             agw_client = create_client()
 
-            with pytest.raises(AgentGatewaySDKError, match="tenant_subdomain is required"):
+            with pytest.raises(
+                AgentGatewaySDKError, match="tenant_subdomain is required"
+            ):
                 await agw_client.get_system_auth()
 
     @pytest.mark.asyncio
     async def test_callable_tenant_subdomain(self):
         """Accept callable for tenant_subdomain in LoB flow."""
-        with patch(
-            "sap_cloud_sdk.agentgateway.agw_client.detect_customer_agent_credentials",
-            return_value=None,
-        ), patch(
-            "sap_cloud_sdk.agentgateway.agw_client.fetch_system_auth",
-            new_callable=AsyncMock,
-            return_value=("token", "https://agw.example.com"),
-        ) as mock_auth:
+        with (
+            patch(
+                "sap_cloud_sdk.agentgateway.agw_client.detect_customer_agent_credentials",
+                return_value=None,
+            ),
+            patch(
+                "sap_cloud_sdk.agentgateway.agw_client.fetch_system_auth",
+                new_callable=AsyncMock,
+                return_value=("token", "https://agw.example.com"),
+            ) as mock_auth,
+        ):
             get_tenant = lambda: "dynamic-tenant"
             agw_client = create_client(tenant_subdomain=get_tenant)
             token_cache = _client_token_cache(agw_client)
@@ -213,17 +226,22 @@ class TestGetSystemAuth:
     @pytest.mark.asyncio
     async def test_wraps_unexpected_errors(self):
         """Wrap unexpected errors in AgentGatewaySDKError."""
-        with patch(
-            "sap_cloud_sdk.agentgateway.agw_client.detect_customer_agent_credentials",
-            return_value=None,
-        ), patch(
-            "sap_cloud_sdk.agentgateway.agw_client.fetch_system_auth",
-            new_callable=AsyncMock,
-            side_effect=RuntimeError("unexpected"),
+        with (
+            patch(
+                "sap_cloud_sdk.agentgateway.agw_client.detect_customer_agent_credentials",
+                return_value=None,
+            ),
+            patch(
+                "sap_cloud_sdk.agentgateway.agw_client.fetch_system_auth",
+                new_callable=AsyncMock,
+                side_effect=RuntimeError("unexpected"),
+            ),
         ):
             agw_client = create_client(tenant_subdomain="my-tenant")
 
-            with pytest.raises(AgentGatewaySDKError, match="System auth acquisition failed"):
+            with pytest.raises(
+                AgentGatewaySDKError, match="System auth acquisition failed"
+            ):
                 await agw_client.get_system_auth()
 
 
@@ -238,14 +256,17 @@ class TestGetUserAuth:
     @pytest.mark.asyncio
     async def test_lob_flow_returns_auth_result(self):
         """Return AuthResult from LoB flow."""
-        with patch(
-            "sap_cloud_sdk.agentgateway.agw_client.detect_customer_agent_credentials",
-            return_value=None,
-        ), patch(
-            "sap_cloud_sdk.agentgateway.agw_client.fetch_user_auth",
-            new_callable=AsyncMock,
-            return_value=("raw-user-jwt-token", "https://agw.example.com"),
-        ) as mock_auth:
+        with (
+            patch(
+                "sap_cloud_sdk.agentgateway.agw_client.detect_customer_agent_credentials",
+                return_value=None,
+            ),
+            patch(
+                "sap_cloud_sdk.agentgateway.agw_client.fetch_user_auth",
+                new_callable=AsyncMock,
+                return_value=("raw-user-jwt-token", "https://agw.example.com"),
+            ) as mock_auth,
+        ):
             agw_client = create_client(tenant_subdomain="my-tenant")
             token_cache = _client_token_cache(agw_client)
             gateway_url_cache = _client_gateway_url_cache(agw_client)
@@ -265,15 +286,19 @@ class TestGetUserAuth:
     @pytest.mark.asyncio
     async def test_customer_flow_exchanges_token(self):
         """Exchange token via customer flow and return AuthResult."""
-        with patch(
-            "sap_cloud_sdk.agentgateway.agw_client.detect_customer_agent_credentials",
-            return_value="/path/to/credentials",
-        ), patch(
-            "sap_cloud_sdk.agentgateway.agw_client.load_customer_credentials",
-        ) as mock_load, patch(
-            "sap_cloud_sdk.agentgateway.agw_client.exchange_user_token",
-            return_value="exchanged-token",
-        ) as mock_exchange:
+        with (
+            patch(
+                "sap_cloud_sdk.agentgateway.agw_client.detect_customer_agent_credentials",
+                return_value="/path/to/credentials",
+            ),
+            patch(
+                "sap_cloud_sdk.agentgateway.agw_client.load_customer_credentials",
+            ) as mock_load,
+            patch(
+                "sap_cloud_sdk.agentgateway.agw_client.exchange_user_token",
+                return_value="exchanged-token",
+            ) as mock_exchange,
+        ):
             mock_creds = MagicMock()
             mock_creds.gateway_url = "https://agw.customer.com"
             mock_load.return_value = mock_creds
@@ -307,14 +332,17 @@ class TestGetUserAuth:
     @pytest.mark.asyncio
     async def test_callable_user_token(self):
         """Accept callable for user_token."""
-        with patch(
-            "sap_cloud_sdk.agentgateway.agw_client.detect_customer_agent_credentials",
-            return_value=None,
-        ), patch(
-            "sap_cloud_sdk.agentgateway.agw_client.fetch_user_auth",
-            new_callable=AsyncMock,
-            return_value=("token", "https://agw.example.com"),
-        ) as mock_auth:
+        with (
+            patch(
+                "sap_cloud_sdk.agentgateway.agw_client.detect_customer_agent_credentials",
+                return_value=None,
+            ),
+            patch(
+                "sap_cloud_sdk.agentgateway.agw_client.fetch_user_auth",
+                new_callable=AsyncMock,
+                return_value=("token", "https://agw.example.com"),
+            ) as mock_auth,
+        ):
             agw_client = create_client(tenant_subdomain="my-tenant")
             get_token = lambda: "dynamic-user-jwt"
             token_cache = _client_token_cache(agw_client)
@@ -338,19 +366,24 @@ class TestGetUserAuth:
         ):
             agw_client = create_client()
 
-            with pytest.raises(AgentGatewaySDKError, match="tenant_subdomain is required"):
+            with pytest.raises(
+                AgentGatewaySDKError, match="tenant_subdomain is required"
+            ):
                 await agw_client.get_user_auth(user_token="user-jwt")
 
     @pytest.mark.asyncio
     async def test_wraps_unexpected_errors(self):
         """Wrap unexpected errors in AgentGatewaySDKError."""
-        with patch(
-            "sap_cloud_sdk.agentgateway.agw_client.detect_customer_agent_credentials",
-            return_value=None,
-        ), patch(
-            "sap_cloud_sdk.agentgateway.agw_client.fetch_user_auth",
-            new_callable=AsyncMock,
-            side_effect=RuntimeError("unexpected"),
+        with (
+            patch(
+                "sap_cloud_sdk.agentgateway.agw_client.detect_customer_agent_credentials",
+                return_value=None,
+            ),
+            patch(
+                "sap_cloud_sdk.agentgateway.agw_client.fetch_user_auth",
+                new_callable=AsyncMock,
+                side_effect=RuntimeError("unexpected"),
+            ),
         ):
             agw_client = create_client(tenant_subdomain="my-tenant")
 
@@ -500,19 +533,24 @@ class TestListMcpTools:
     @pytest.mark.asyncio
     async def test_customer_flow_passes_system_token(self):
         """Customer flow passes pre-fetched system token to get_mcp_tools_customer."""
-        with patch(
-            "sap_cloud_sdk.agentgateway.agw_client.detect_customer_agent_credentials",
-            return_value="/path/to/credentials",
-        ), patch(
-            "sap_cloud_sdk.agentgateway.agw_client.load_customer_credentials",
-        ) as mock_load, patch(
-            "sap_cloud_sdk.agentgateway.agw_client.get_system_token_mtls",
-            return_value="customer-system-token",
-        ), patch(
-            "sap_cloud_sdk.agentgateway.agw_client.get_mcp_tools_customer",
-            new_callable=AsyncMock,
-            return_value=[],
-        ) as mock_customer:
+        with (
+            patch(
+                "sap_cloud_sdk.agentgateway.agw_client.detect_customer_agent_credentials",
+                return_value="/path/to/credentials",
+            ),
+            patch(
+                "sap_cloud_sdk.agentgateway.agw_client.load_customer_credentials",
+            ) as mock_load,
+            patch(
+                "sap_cloud_sdk.agentgateway.agw_client.get_system_token_mtls",
+                return_value="customer-system-token",
+            ),
+            patch(
+                "sap_cloud_sdk.agentgateway.agw_client.get_mcp_tools_customer",
+                new_callable=AsyncMock,
+                return_value=[],
+            ) as mock_customer,
+        ):
             mock_creds = MagicMock()
             mock_creds.gateway_url = "https://agw.customer.com"
             mock_load.return_value = mock_creds
@@ -554,19 +592,24 @@ class TestListMcpTools:
     @pytest.mark.asyncio
     async def test_customer_flow_with_user_token_uses_user_auth(self):
         """Customer flow uses user auth when user_token is provided."""
-        with patch(
-            "sap_cloud_sdk.agentgateway.agw_client.detect_customer_agent_credentials",
-            return_value="/path/to/credentials",
-        ), patch(
-            "sap_cloud_sdk.agentgateway.agw_client.load_customer_credentials",
-        ) as mock_load, patch(
-            "sap_cloud_sdk.agentgateway.agw_client.exchange_user_token",
-            return_value="exchanged-user-token",
-        ), patch(
-            "sap_cloud_sdk.agentgateway.agw_client.get_mcp_tools_customer",
-            new_callable=AsyncMock,
-            return_value=[],
-        ) as mock_customer:
+        with (
+            patch(
+                "sap_cloud_sdk.agentgateway.agw_client.detect_customer_agent_credentials",
+                return_value="/path/to/credentials",
+            ),
+            patch(
+                "sap_cloud_sdk.agentgateway.agw_client.load_customer_credentials",
+            ) as mock_load,
+            patch(
+                "sap_cloud_sdk.agentgateway.agw_client.exchange_user_token",
+                return_value="exchanged-user-token",
+            ),
+            patch(
+                "sap_cloud_sdk.agentgateway.agw_client.get_mcp_tools_customer",
+                new_callable=AsyncMock,
+                return_value=[],
+            ) as mock_customer,
+        ):
             mock_creds = MagicMock()
             mock_creds.gateway_url = "https://agw.customer.com"
             mock_load.return_value = mock_creds
@@ -738,9 +781,7 @@ class TestCallMcpTool:
             assert result == "customer result"
             # load_customer_credentials is called once in get_user_auth()
             mock_load.assert_called_once_with("/path/to/credentials")
-            mock_customer.assert_called_once_with(
-                mock_tool, "exchanged-token", 60.0
-            )
+            mock_customer.assert_called_once_with(mock_tool, "exchanged-token", 60.0)
 
     @pytest.mark.asyncio
     async def test_customer_flow_falls_back_to_system_token(self, mock_tool):
@@ -775,9 +816,7 @@ class TestCallMcpTool:
             )
 
             assert result == "result with system token"
-            mock_customer.assert_called_once_with(
-                mock_tool, "system-token", 60.0
-            )
+            mock_customer.assert_called_once_with(mock_tool, "system-token", 60.0)
 
     @pytest.mark.asyncio
     async def test_calls_lob_flow_with_exchanged_token(self, mock_tool):
@@ -903,7 +942,9 @@ class TestListAgentCards:
         ):
             agw_client = create_client(tenant_subdomain="my-tenant")
             await agw_client.list_agent_cards(
-                filter=AgentCardFilter(agent_names=["Billing Agent"], ord_ids=["sap.s4:agent:v1"])
+                filter=AgentCardFilter(
+                    agent_names=["Billing Agent"], ord_ids=["sap.s4:agent:v1"]
+                )
             )
 
         mock_lob.assert_called_once_with(
@@ -922,7 +963,9 @@ class TestListAgentCards:
             return_value="/path/to/credentials",
         ):
             agw_client = create_client()
-            with pytest.raises(AgentGatewaySDKError, match="not yet supported for customer agents"):
+            with pytest.raises(
+                AgentGatewaySDKError, match="not yet supported for customer agents"
+            ):
                 await agw_client.list_agent_cards()
 
     @pytest.mark.asyncio
@@ -979,7 +1022,9 @@ class TestListAgentCards:
             ),
         ):
             agw_client = create_client(tenant_subdomain="my-tenant")
-            with pytest.raises(AgentGatewaySDKError, match="Agent card discovery failed"):
+            with pytest.raises(
+                AgentGatewaySDKError, match="Agent card discovery failed"
+            ):
                 await agw_client.list_agent_cards()
 
 
@@ -1007,10 +1052,15 @@ class TestCreateClientTelemetrySource:
 # Test: get_ias_client_id
 # ============================================================
 
+
 _DEST_CREATE_PATCH = "sap_cloud_sdk.destination.create_client"
 _IAS_DEST_NAME_PATCH = "sap_cloud_sdk.agentgateway._lob._ias_dest_name"
-_GET_IAS_CLIENT_ID_LOB_PATCH = "sap_cloud_sdk.agentgateway.agw_client.get_ias_client_id_lob"
-_DETECT_CREDS_PATCH = "sap_cloud_sdk.agentgateway.agw_client.detect_customer_agent_credentials"
+_GET_IAS_CLIENT_ID_LOB_PATCH = (
+    "sap_cloud_sdk.agentgateway.agw_client.get_ias_client_id_lob"
+)
+_DETECT_CREDS_PATCH = (
+    "sap_cloud_sdk.agentgateway.agw_client.detect_customer_agent_credentials"
+)
 _LOAD_CREDS_PATCH = "sap_cloud_sdk.agentgateway.agw_client.load_customer_credentials"
 
 _NO_CUSTOMER_CREDS = patch(_DETECT_CREDS_PATCH, return_value=None)
@@ -1038,7 +1088,9 @@ class TestGetIasClientId:
             patch(_DETECT_CREDS_PATCH, return_value="/etc/ums/credentials/credentials"),
             patch(_LOAD_CREDS_PATCH, side_effect=Exception("parse error")),
         ):
-            with pytest.raises(AgentGatewaySDKError, match="Could not resolve IAS client ID"):
+            with pytest.raises(
+                AgentGatewaySDKError, match="Could not resolve IAS client ID"
+            ):
                 create_client().get_ias_client_id()
 
     # --- LoB flow ---
@@ -1052,7 +1104,12 @@ class TestGetIasClientId:
 
     @_NO_CUSTOMER_CREDS
     def test_lob_raises_when_destination_not_found(self, _mock_detect):
-        with patch(_GET_IAS_CLIENT_ID_LOB_PATCH, side_effect=AgentGatewaySDKError("IAS destination 'sap-managed-runtime-ias-eu10' not found")):
+        with patch(
+            _GET_IAS_CLIENT_ID_LOB_PATCH,
+            side_effect=AgentGatewaySDKError(
+                "IAS destination 'sap-managed-runtime-ias-eu10' not found"
+            ),
+        ):
             with pytest.raises(AgentGatewaySDKError, match="IAS destination"):
                 create_client(tenant_subdomain="my-tenant").get_ias_client_id()
 
@@ -1065,6 +1122,180 @@ class TestGetIasClientId:
 
     @_NO_CUSTOMER_CREDS
     def test_lob_raises_on_exception(self, _mock_detect):
-        with patch(_GET_IAS_CLIENT_ID_LOB_PATCH, side_effect=EnvironmentError("APPFND_CONHOS_LANDSCAPE not set")):
-            with pytest.raises(AgentGatewaySDKError, match="Could not resolve IAS client ID"):
+        with patch(
+            _GET_IAS_CLIENT_ID_LOB_PATCH,
+            side_effect=EnvironmentError("APPFND_CONHOS_LANDSCAPE not set"),
+        ):
+            with pytest.raises(
+                AgentGatewaySDKError, match="Could not resolve IAS client ID"
+            ):
                 create_client(tenant_subdomain="my-tenant").get_ias_client_id()
+
+
+# ============================================================
+# Test: call_mcp_tool audit logging
+# ============================================================
+
+
+class TestCallMcpToolAuditLog:
+    """Tests that call_mcp_tool emits audit events for the full tool lifecycle."""
+
+    @pytest.mark.asyncio
+    async def test_lob_flow_sends_invoked_and_completed(self, mock_tool):
+        """call_mcp_tool sends MCP_TOOL_INVOKED then MCP_TOOL_COMPLETED on success."""
+        mock_audit = MagicMock()
+        with (
+            patch(
+                "sap_cloud_sdk.core.auditlog_ng.cross_module_helper.auditlog_ng.create_client",
+                return_value=mock_audit,
+            ),
+            patch(
+                "sap_cloud_sdk.core.auditlog_ng.cross_module_helper.get_tenant_id",
+                return_value=_TENANT_UUID,
+            ),
+            patch(
+                "sap_cloud_sdk.agentgateway.agw_client.detect_customer_agent_credentials",
+                return_value=None,
+            ),
+            patch(
+                "sap_cloud_sdk.agentgateway.agw_client.fetch_user_auth",
+                new_callable=AsyncMock,
+                return_value=("user-token", "https://agw.example.com"),
+            ),
+            patch(
+                "sap_cloud_sdk.agentgateway.agw_client.call_mcp_tool_lob",
+                new_callable=AsyncMock,
+                return_value="result",
+            ),
+        ):
+            agw_client = create_client(tenant_subdomain="my-tenant")
+            await agw_client.call_mcp_tool(
+                tool=mock_tool,
+                user_token="user-jwt",
+            )
+
+        assert mock_audit.send.call_count == 2
+        invoked_event = mock_audit.send.call_args_list[0][0][0]
+        completed_event = mock_audit.send.call_args_list[1][0][0]
+        assert invoked_event.common.app_context["event_name"] == "MCP_TOOL_INVOKED"
+        assert invoked_event.common.tenant_id == _TENANT_UUID
+        assert completed_event.common.app_context["event_name"] == "MCP_TOOL_COMPLETED"
+
+    @pytest.mark.asyncio
+    async def test_customer_flow_no_audit_event(self, mock_tool):
+        """call_mcp_tool does not send audit events for customer agents (no tenant_subdomain)."""
+        mock_audit = MagicMock()
+        with (
+            patch(
+                "sap_cloud_sdk.core.auditlog_ng.cross_module_helper.auditlog_ng.create_client",
+                return_value=mock_audit,
+            ),
+            patch(
+                "sap_cloud_sdk.core.auditlog_ng.cross_module_helper.get_tenant_id",
+                return_value=_TENANT_UUID,
+            ),
+            patch(
+                "sap_cloud_sdk.agentgateway.agw_client.detect_customer_agent_credentials",
+                return_value="/path/to/credentials",
+            ),
+            patch(
+                "sap_cloud_sdk.agentgateway.agw_client.load_customer_credentials",
+            ) as mock_load,
+            patch(
+                "sap_cloud_sdk.agentgateway.agw_client.exchange_user_token",
+                return_value="exchanged-token",
+            ),
+            patch(
+                "sap_cloud_sdk.agentgateway.agw_client.call_mcp_tool_customer",
+                new_callable=AsyncMock,
+                return_value="result",
+            ),
+        ):
+            mock_creds = MagicMock()
+            mock_creds.gateway_url = "https://agw.customer.com"
+            mock_load.return_value = mock_creds
+
+            agw_client = create_client()
+            await agw_client.call_mcp_tool(
+                tool=mock_tool,
+                user_token="user-jwt",
+            )
+
+        mock_audit.send.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_lob_flow_sends_invoked_and_failed_on_error(self, mock_tool):
+        """call_mcp_tool sends MCP_TOOL_INVOKED then MCP_TOOL_FAILED when tool raises."""
+        mock_audit = MagicMock()
+        with (
+            patch(
+                "sap_cloud_sdk.core.auditlog_ng.cross_module_helper.auditlog_ng.create_client",
+                return_value=mock_audit,
+            ),
+            patch(
+                "sap_cloud_sdk.core.auditlog_ng.cross_module_helper.get_tenant_id",
+                return_value=_TENANT_UUID,
+            ),
+            patch(
+                "sap_cloud_sdk.agentgateway.agw_client.detect_customer_agent_credentials",
+                return_value=None,
+            ),
+            patch(
+                "sap_cloud_sdk.agentgateway.agw_client.fetch_user_auth",
+                new_callable=AsyncMock,
+                return_value=("user-token", "https://agw.example.com"),
+            ),
+            patch(
+                "sap_cloud_sdk.agentgateway.agw_client.call_mcp_tool_lob",
+                new_callable=AsyncMock,
+                side_effect=RuntimeError("invocation error"),
+            ),
+        ):
+            agw_client = create_client(tenant_subdomain="my-tenant")
+            with pytest.raises(AgentGatewaySDKError):
+                await agw_client.call_mcp_tool(
+                    tool=mock_tool,
+                    user_token="user-jwt",
+                )
+
+        assert mock_audit.send.call_count == 2
+        invoked_event = mock_audit.send.call_args_list[0][0][0]
+        failed_event = mock_audit.send.call_args_list[1][0][0]
+        assert invoked_event.common.app_context["event_name"] == "MCP_TOOL_INVOKED"
+        assert failed_event.common.app_context["event_name"] == "MCP_TOOL_FAILED"
+
+    @pytest.mark.asyncio
+    async def test_audit_event_uses_tool_name(self, mock_tool):
+        """call_mcp_tool stamps tool.name in the invoked audit event payload."""
+        mock_audit = MagicMock()
+        with (
+            patch(
+                "sap_cloud_sdk.core.auditlog_ng.cross_module_helper.auditlog_ng.create_client",
+                return_value=mock_audit,
+            ),
+            patch(
+                "sap_cloud_sdk.core.auditlog_ng.cross_module_helper.get_tenant_id",
+                return_value=_TENANT_UUID,
+            ),
+            patch(
+                "sap_cloud_sdk.agentgateway.agw_client.detect_customer_agent_credentials",
+                return_value=None,
+            ),
+            patch(
+                "sap_cloud_sdk.agentgateway.agw_client.fetch_user_auth",
+                new_callable=AsyncMock,
+                return_value=("user-token", "https://agw.example.com"),
+            ),
+            patch(
+                "sap_cloud_sdk.agentgateway.agw_client.call_mcp_tool_lob",
+                new_callable=AsyncMock,
+                return_value="ok",
+            ),
+        ):
+            agw_client = create_client(tenant_subdomain="my-tenant")
+            await agw_client.call_mcp_tool(tool=mock_tool, user_token="jwt")
+
+        invoked_event = mock_audit.send.call_args_list[0][0][0]
+        assert (
+            invoked_event.custom.struct_value.fields["tool"].string_value == "test-tool"
+        )

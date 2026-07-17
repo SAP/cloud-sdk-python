@@ -284,6 +284,56 @@ Events are validated against protobuf constraints using `protovalidate` before s
 
 ---
 
+## Sending Custom Events (ZzzCustomEvent)
+
+For application-defined events that have no typed protobuf equivalent, use `send_event` — a convenience wrapper around `ZzzCustomEvent`. For standard catalog events (`DataAccess`, `ConfigurationChange`, etc.), construct the protobuf directly and call `client.send()` as shown above.
+
+### Managed pattern (implicit audit logging)
+
+`send_event` resolves the tenant ID via `get_tenant_id()`, applies `AuditLogMode` semantics, and is a no-op when the client is `None` or no tenant is available — making it safe to call unconditionally:
+
+```python
+from sap_cloud_sdk.core.auditlog_ng import create_audit_client, send_event, AuditLogMode
+from sap_cloud_sdk.core.telemetry import Module
+
+client = create_audit_client(
+    tenant_subdomain="my-tenant",
+    module=Module.AGENTGATEWAY,
+    mode=AuditLogMode.BEST_EFFORT,
+)
+
+send_event(
+    audit_client=client,
+    event_name="MY_CUSTOM_EVENT",
+    payload={"resource": "order-123", "action": "processed"},
+    user_id="user@example.com",
+    mode=AuditLogMode.BEST_EFFORT,
+)
+```
+
+### AuditLogMode
+
+| Mode | Behavior |
+|---|---|
+| `BEST_EFFORT` | Failures are logged as warnings and never raised. Default. |
+| `STRICT` | Failures raise an exception, blocking the operation. |
+| `DISABLED` | Audit logging is skipped entirely. |
+
+### create_audit_client
+
+`create_audit_client` wraps `create_client` with mode and tenant resolution handling. Returns `None` when disabled or when the tenant subdomain is not resolvable — making it safe to store as an optional field:
+
+```python
+client = create_audit_client(
+    tenant_subdomain=lambda: get_current_tenant(),  # callable also accepted
+    module=Module.AGENTGATEWAY,
+    mode=AuditLogMode.BEST_EFFORT,
+)
+# client is None when tenant is not resolvable or mode is DISABLED
+```
+
+---
+
 ## Running the Unit Tests
 
 ```bash

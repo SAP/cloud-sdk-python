@@ -34,9 +34,19 @@ from sap_cloud_sdk.agentgateway._models import (
     AuthResult,
     MCPTool,
 )
+from sap_cloud_sdk.core.auditlog_ng import AuditClient
+from sap_cloud_sdk.core.auditlog_ng.cross_module_helper import (
+    create_audit_client,
+    send_event as _send_audit_event,
+)
+from sap_cloud_sdk.agentgateway._audit_events import McpToolEvent
 from sap_cloud_sdk.agentgateway._token_cache import _GatewayUrlCache, _TokenCache
 from sap_cloud_sdk.agentgateway.exceptions import AgentGatewaySDKError
-from sap_cloud_sdk.core.telemetry import Module, Operation, record_metrics
+from sap_cloud_sdk.core.telemetry import (
+    Module,
+    Operation,
+    record_metrics,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -123,6 +133,9 @@ class AgentGatewayClient:
         self._token_cache = _TokenCache(self._config)
         self._gateway_url_cache = _GatewayUrlCache()
         self._telemetry_source = _telemetry_source
+        self._audit_client: AuditClient | None = create_audit_client(
+            tenant_subdomain, Module.AGENTGATEWAY, self._config.audit_log_mode
+        )
 
     @staticmethod
     def _resolve_value(
@@ -549,18 +562,65 @@ class AgentGatewayClient:
                     )
                     auth = await self.get_system_auth(app_tid)
 
-                return await call_mcp_tool_customer(
-                    tool, auth.access_token, self._config.timeout, **kwargs
+                _send_audit_event(
+                    self._audit_client,
+                    McpToolEvent.INVOKED,
+                    {"tool": tool.name},
+                    user_token,
+                    self._config.audit_log_mode,
                 )
+                try:
+                    result = await call_mcp_tool_customer(
+                        tool, auth.access_token, self._config.timeout, **kwargs
+                    )
+                except Exception as e:
+                    _send_audit_event(
+                        self._audit_client,
+                        McpToolEvent.FAILED,
+                        {"tool": tool.name, "error_type": type(e).__name__},
+                        user_token,
+                        self._config.audit_log_mode,
+                    )
+                    raise
+                _send_audit_event(
+                    self._audit_client,
+                    McpToolEvent.COMPLETED,
+                    {"tool": tool.name},
+                    user_token,
+                    self._config.audit_log_mode,
+                )
+                return result
 
             # LoB flow - requires user_token and tenant_subdomain
             if app_tid:
                 logger.warning("app_tid parameter ignored for LoB agent flow")
 
             auth = await self.get_user_auth(user_token, app_tid)
-            return await call_mcp_tool_lob(
-                tool, auth.access_token, self._config.timeout, **kwargs
+            _send_audit_event(
+                self._audit_client,
+                McpToolEvent.INVOKED,
+                {"tool": tool.name},
+                user_token,
             )
+            try:
+                result = await call_mcp_tool_lob(
+                    tool, auth.access_token, self._config.timeout, **kwargs
+                )
+            except Exception as e:
+                _send_audit_event(
+                    self._audit_client,
+                    McpToolEvent.FAILED,
+                    {"tool": tool.name, "error_type": type(e).__name__},
+                    user_token,
+                )
+                raise
+            _send_audit_event(
+                self._audit_client,
+                McpToolEvent.COMPLETED,
+                {"tool": tool.name},
+                user_token,
+            )
+            return result
 
         except AgentGatewaySDKError:
             # Re-raise SDK errors as-is

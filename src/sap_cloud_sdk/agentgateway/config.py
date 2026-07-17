@@ -2,7 +2,7 @@
 
 from dataclasses import dataclass
 
-from sap_cloud_sdk.core.auditlog_ng.helper import AuditLogMode
+from sap_cloud_sdk.core.auditlog_ng.cross_module_helper import AuditLogMode
 
 __all__ = ["AuditLogMode", "ClientConfig"]
 

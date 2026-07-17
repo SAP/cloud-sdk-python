@@ -1,8 +1,8 @@
-"""Audit log helper for custom events.
+"""Implicit audit log helpers shared across SDK modules.
 
-Provides managed client creation and a ``ZzzCustomEvent`` send pattern —
-the SAP Audit Log v2 event type for application-defined audit events,
-which are not covered by the standard catalog.
+Provides managed client creation and a ``ZzzCustomEvent`` send pattern for
+modules that emit audit events implicitly without
+requiring callers to configure auditing directly.
 
 For standard catalog events (``DataAccess``, ``ConfigurationChange``,
 ``UserLoginSuccess``, etc.), construct the protobuf directly and call

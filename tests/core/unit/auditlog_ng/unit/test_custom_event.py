@@ -2,7 +2,7 @@
 
 from unittest.mock import MagicMock
 
-from sap_cloud_sdk.core.auditlog_ng.helper import _emit_custom_event as send_custom_event
+from sap_cloud_sdk.core.auditlog_ng.cross_module_helper import _emit_custom_event as send_custom_event
 from sap_cloud_sdk.core.auditlog_ng.gen.sap.auditlog.auditevent.v2 import (
     auditevent_pb2 as pb,
 )

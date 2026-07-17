@@ -34,15 +34,14 @@ from sap_cloud_sdk.agentgateway._models import (
     AuthResult,
     MCPTool,
 )
-from sap_cloud_sdk.agentgateway._implicit_auditlog import (
+from sap_cloud_sdk.core.auditlog_ng import AuditClient
+from sap_cloud_sdk.core.auditlog_ng.cross_module_helper import (
     create_audit_client,
-    send_audit_event_invoked,
-    send_audit_event_completed,
-    send_audit_event_failed,
+    send_event as _send_audit_event,
 )
+from sap_cloud_sdk.agentgateway._audit_events import McpToolEvent
 from sap_cloud_sdk.agentgateway._token_cache import _GatewayUrlCache, _TokenCache
 from sap_cloud_sdk.agentgateway.exceptions import AgentGatewaySDKError
-from sap_cloud_sdk.core.auditlog_ng import AuditClient
 from sap_cloud_sdk.core.telemetry import (
     Module,
     Operation,
@@ -568,24 +567,24 @@ class AgentGatewayClient:
                     )
                     auth = await self.get_system_auth(app_tid)
 
-                send_audit_event_invoked(
-                    self._audit_client, tool.name, user_id, self._config.audit_log_mode
+                _send_audit_event(
+                    self._audit_client, McpToolEvent.INVOKED, {"tool": tool.name}, user_id, self._config.audit_log_mode
                 )
                 try:
                     result = await call_mcp_tool_customer(
                         tool, auth.access_token, self._config.timeout, **kwargs
                     )
                 except Exception as e:
-                    send_audit_event_failed(
+                    _send_audit_event(
                         self._audit_client,
-                        tool.name,
-                        type(e).__name__,
+                        McpToolEvent.FAILED,
+                        {"tool": tool.name, "error_type": type(e).__name__},
                         user_id,
                         self._config.audit_log_mode,
                     )
                     raise
-                send_audit_event_completed(
-                    self._audit_client, tool.name, user_id, self._config.audit_log_mode
+                _send_audit_event(
+                    self._audit_client, McpToolEvent.COMPLETED, {"tool": tool.name}, user_id, self._config.audit_log_mode
                 )
                 return result
 
@@ -594,17 +593,17 @@ class AgentGatewayClient:
                 logger.warning("app_tid parameter ignored for LoB agent flow")
 
             auth = await self.get_user_auth(user_token, app_tid)
-            send_audit_event_invoked(self._audit_client, tool.name, user_id)
+            _send_audit_event(self._audit_client, McpToolEvent.INVOKED, {"tool": tool.name}, user_id)
             try:
                 result = await call_mcp_tool_lob(
                     tool, auth.access_token, self._config.timeout, **kwargs
                 )
             except Exception as e:
-                send_audit_event_failed(
-                    self._audit_client, tool.name, type(e).__name__, user_id
+                _send_audit_event(
+                    self._audit_client, McpToolEvent.FAILED, {"tool": tool.name, "error_type": type(e).__name__}, user_id
                 )
                 raise
-            send_audit_event_completed(self._audit_client, tool.name, user_id)
+            _send_audit_event(self._audit_client, McpToolEvent.COMPLETED, {"tool": tool.name}, user_id)
             return result
 
         except AgentGatewaySDKError:

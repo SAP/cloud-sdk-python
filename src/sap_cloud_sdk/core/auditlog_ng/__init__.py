@@ -56,7 +56,7 @@ from sap_cloud_sdk.core.auditlog_ng.config import (
     AuditLogNGConfig,
     SCHEMA_URL,
 )
-from sap_cloud_sdk.core.auditlog_ng.helper import (
+from sap_cloud_sdk.core.auditlog_ng.cross_module_helper import (
     AuditLogMode,
     create_audit_client,
     send_event,

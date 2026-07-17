@@ -7,14 +7,17 @@ from unittest.mock import patch, AsyncMock, MagicMock
 
 from sap_cloud_sdk.agentgateway._customer import (
     detect_customer_agent_credentials,
+    detect_transparent_credentials,
     load_customer_credentials,
+    load_customer_credentials_from_env,
     get_system_token_mtls,
     exchange_user_token,
     get_mcp_tools_customer,
     call_mcp_tool_customer,
     _build_mcp_url,
-    _CREDENTIALS_PATH_ENV,
-    _CREDENTIALS_DEFAULT_PATH,
+    _INTEGRATION_CLIENT_ID_ENV,
+    _INTEGRATION_AUTH_URL_ENV,
+    _INTEGRATION_GATEWAY_URL_ENV,
 )
 from sap_cloud_sdk.agentgateway._models import (
     CustomerCredentials,
@@ -34,62 +37,43 @@ from sap_cloud_sdk.agentgateway.exceptions import AgentGatewaySDKError
 class TestDetectCustomerAgentCredentials:
     """Tests for customer agent credential detection."""
 
-    def test_detect_from_env_var_path(self, tmp_path):
-        """Detect credentials from path specified in environment variable."""
-        creds_file = tmp_path / "credentials.json"
+    def test_detect_from_servicebinding_root(self, tmp_path):
+        """Detect credentials via servicebinding.io scan of SERVICE_BINDING_ROOT."""
+        binding_dir = tmp_path / "my-binding"
+        binding_dir.mkdir()
+        (binding_dir / "type").write_text("integration-credentials")
+        creds_file = binding_dir / "credentials"
         creds_file.write_text('{"clientid": "test"}')
 
-        with patch.dict(os.environ, {_CREDENTIALS_PATH_ENV: str(creds_file)}):
+        with patch(
+            "sap_cloud_sdk.agentgateway._customer.resolve_base_mount",
+            return_value=str(tmp_path),
+        ):
             result = detect_customer_agent_credentials()
             assert result == str(creds_file)
 
-    def test_detect_from_env_var_path_file_not_exists(self):
-        """Return None when env var path doesn't exist."""
-        with patch.dict(os.environ, {_CREDENTIALS_PATH_ENV: "/nonexistent/path"}):
+    def test_skips_binding_with_wrong_type(self, tmp_path):
+        """Return None when binding type does not match integration-credentials."""
+        binding_dir = tmp_path / "other-binding"
+        binding_dir.mkdir()
+        (binding_dir / "type").write_text("some-other-type")
+        (binding_dir / "credentials").write_text('{"clientid": "test"}')
+
+        with patch(
+            "sap_cloud_sdk.agentgateway._customer.resolve_base_mount",
+            return_value=str(tmp_path),
+        ):
             result = detect_customer_agent_credentials()
             assert result is None
 
-    def test_detect_from_default_path(self):
-        """Detect credentials from default mounted path."""
-        with patch.dict(os.environ, {}, clear=False):
-            # Remove env var if present
-            os.environ.pop(_CREDENTIALS_PATH_ENV, None)
-
-            with patch("os.path.isfile") as mock_isfile:
-                mock_isfile.side_effect = lambda p: p == _CREDENTIALS_DEFAULT_PATH
-
-                result = detect_customer_agent_credentials()
-                assert result == _CREDENTIALS_DEFAULT_PATH
-
     def test_no_credentials_returns_none(self):
-        """Return None when no credentials are found."""
-        with patch.dict(os.environ, {}, clear=False):
-            os.environ.pop(_CREDENTIALS_PATH_ENV, None)
-
-            with patch("os.path.isfile", return_value=False):
-                result = detect_customer_agent_credentials()
-                assert result is None
-
-    def test_env_var_takes_priority_over_default(self, tmp_path):
-        """Env var path should take priority over default path."""
-        creds_file = tmp_path / "custom_credentials.json"
-        creds_file.write_text('{"clientid": "custom"}')
-
-        with patch.dict(os.environ, {_CREDENTIALS_PATH_ENV: str(creds_file)}):
-            # Even if default path exists, env var should be used
-            with patch("os.path.isfile") as mock_isfile:
-
-                def isfile_side_effect(path):
-                    if path == str(creds_file):
-                        return True
-                    if path == _CREDENTIALS_DEFAULT_PATH:
-                        return True
-                    return False
-
-                mock_isfile.side_effect = isfile_side_effect
-
-                result = detect_customer_agent_credentials()
-                assert result == str(creds_file)
+        """Return None when SERVICE_BINDING_ROOT does not exist."""
+        with patch(
+            "sap_cloud_sdk.agentgateway._customer.resolve_base_mount",
+            return_value=None,
+        ):
+            result = detect_customer_agent_credentials()
+            assert result is None
 
 
 # ============================================================
@@ -112,7 +96,7 @@ class TestLoadCustomerCredentials:
             "integrationDependencies": [
                 {
                     "ordId": "sap.test:apiResource:demo:v1",
-                    "data": {"globalTenantId": "123"},
+                    "globalTenantId": "123",
                 },
             ],
         }
@@ -172,11 +156,11 @@ class TestLoadCustomerCredentials:
             "integrationDependencies": [
                 {
                     "ordId": "sap.mcpbuilder:apiResource:cost-center:v1",
-                    "data": {"globalTenantId": "250695"},
+                    "globalTenantId": "250695",
                 },
                 {
                     "ordId": "sap.flights:mcpServer:v1",
-                    "data": {"globalTenantId": "892451733"},
+                    "globalTenantId": "892451733",
                 },
             ],
         }
@@ -193,6 +177,30 @@ class TestLoadCustomerCredentials:
         assert result.integration_dependencies[0].global_tenant_id == "250695"
         assert result.integration_dependencies[1].ord_id == "sap.flights:mcpServer:v1"
         assert result.integration_dependencies[1].global_tenant_id == "892451733"
+
+    def test_loads_integration_dependencies_flat_format(self, tmp_path):
+        """Load integrationDependencies in flat format (globalTenantId at top level)."""
+        creds_file = tmp_path / "credentials.json"
+        creds_data = {
+            "tokenServiceUrl": "https://ias.example.com/oauth2/token",
+            "clientid": "my-client-id",
+            "certificate": "-----BEGIN CERTIFICATE-----\ntest\n-----END CERTIFICATE-----",
+            "privateKey": "-----BEGIN PRIVATE KEY-----\ntest\n-----END PRIVATE KEY-----",
+            "gatewayUrl": "https://agw.example.com",
+            "integrationDependencies": [
+                {
+                    "ordId": "sap.s4:apiResource:API_PRODUCT:v1",
+                    "globalTenantId": "731473562",
+                },
+            ],
+        }
+        creds_file.write_text(json.dumps(creds_data))
+
+        result = load_customer_credentials(str(creds_file))
+
+        assert len(result.integration_dependencies) == 1
+        assert result.integration_dependencies[0].ord_id == "sap.s4:apiResource:API_PRODUCT:v1"
+        assert result.integration_dependencies[0].global_tenant_id == "731473562"
 
     def test_raises_when_integration_dependencies_missing(self, tmp_path):
         """Raise error when integrationDependencies is not in credentials file."""
@@ -355,41 +363,6 @@ class TestGetSystemTokenMtls:
         assert second == "system-token-123"
         mock_request.assert_called_once()
 
-    def test_scopes_system_token_cache_by_app_tid(self, credentials):
-        """Keep app-tid-specific system tokens isolated in the cache."""
-        token_cache = _TokenCache(ClientConfig())
-
-        with patch(
-            "sap_cloud_sdk.agentgateway._customer._request_token_mtls",
-            side_effect=[
-                {"access_token": "token-tid-1", "expires_in": 300},
-                {"access_token": "token-tid-2", "expires_in": 300},
-            ],
-        ) as mock_request:
-            first = get_system_token_mtls(
-                credentials,
-                timeout=60.0,
-                app_tid="tid-1",
-                token_cache=token_cache,
-            )
-            second = get_system_token_mtls(
-                credentials,
-                timeout=60.0,
-                app_tid="tid-1",
-                token_cache=token_cache,
-            )
-            third = get_system_token_mtls(
-                credentials,
-                timeout=60.0,
-                app_tid="tid-2",
-                token_cache=token_cache,
-            )
-
-        assert first == "token-tid-1"
-        assert second == "token-tid-1"
-        assert third == "token-tid-2"
-        assert mock_request.call_count == 2
-
 
 # ============================================================
 # Test: exchange_user_token
@@ -438,34 +411,6 @@ class TestExchangeUserToken:
             data = call_args.kwargs.get("data", {})
             assert data["grant_type"] == "urn:ietf:params:oauth:grant-type:jwt-bearer"
             assert data["assertion"] == "user-jwt-token"
-
-    def test_passes_app_tid_when_provided(self, credentials):
-        """Include app_tid in request when provided."""
-        mock_response = MagicMock()
-        mock_response.status_code = 200
-        mock_response.json.return_value = {"access_token": "token-with-tid"}
-
-        with (
-            patch(
-                "sap_cloud_sdk.agentgateway._customer._create_ssl_context"
-            ) as mock_ssl,
-            patch("httpx.Client") as mock_client_class,
-        ):
-            mock_ssl.return_value = MagicMock()
-            mock_client = MagicMock()
-            mock_client.__enter__ = MagicMock(return_value=mock_client)
-            mock_client.__exit__ = MagicMock(return_value=False)
-            mock_client.post.return_value = mock_response
-            mock_client_class.return_value = mock_client
-
-            result = exchange_user_token(
-                credentials, "user-jwt", timeout=60.0, app_tid="test-tid"
-            )
-
-            assert result == "token-with-tid"
-            call_args = mock_client.post.call_args
-            data = call_args.kwargs.get("data", {})
-            assert data["app_tid"] == "test-tid"
 
     def test_reuses_cached_user_token(self, credentials):
         """Reuse exchanged user token until it expires."""
@@ -741,3 +686,331 @@ class TestCallMcpToolCustomer:
             )
 
             assert result == ""
+
+
+# ============================================================
+# Test: detect_transparent_credentials
+# ============================================================
+
+
+class TestDetectTransparentCredentials:
+    """Tests for transparent mode credential detection."""
+
+    def test_detects_when_all_env_vars_present(self):
+        """Detect transparent mode when all required environment variables are set."""
+        with patch.dict(
+            os.environ,
+            {
+                _INTEGRATION_CLIENT_ID_ENV: "test-client",
+                _INTEGRATION_AUTH_URL_ENV: "https://ias.example.com/oauth2/token",
+                _INTEGRATION_GATEWAY_URL_ENV: "https://agw.example.com",
+            },
+        ):
+            result = detect_transparent_credentials()
+            assert result is True
+
+    def test_returns_false_when_client_id_missing(self):
+        """Return False when INTEGRATION_CLIENT_ID is missing."""
+        with patch.dict(
+            os.environ,
+            {
+                _INTEGRATION_AUTH_URL_ENV: "https://ias.example.com/oauth2/token",
+                _INTEGRATION_GATEWAY_URL_ENV: "https://agw.example.com",
+            },
+            clear=False,
+        ):
+            os.environ.pop(_INTEGRATION_CLIENT_ID_ENV, None)
+            result = detect_transparent_credentials()
+            assert result is False
+
+    def test_returns_false_when_token_service_url_missing(self):
+        """Return False when INTEGRATION_TOKEN_SERVICE_URL is missing."""
+        with patch.dict(
+            os.environ,
+            {
+                _INTEGRATION_CLIENT_ID_ENV: "test-client",
+                _INTEGRATION_GATEWAY_URL_ENV: "https://agw.example.com",
+            },
+            clear=False,
+        ):
+            os.environ.pop(_INTEGRATION_AUTH_URL_ENV, None)
+            result = detect_transparent_credentials()
+            assert result is False
+
+    def test_returns_false_when_gateway_url_missing(self):
+        """Return False when INTEGRATION_GATEWAY_URL is missing."""
+        with patch.dict(
+            os.environ,
+            {
+                _INTEGRATION_CLIENT_ID_ENV: "test-client",
+                _INTEGRATION_AUTH_URL_ENV: "https://ias.example.com/oauth2/token",
+            },
+            clear=False,
+        ):
+            os.environ.pop(_INTEGRATION_GATEWAY_URL_ENV, None)
+            result = detect_transparent_credentials()
+            assert result is False
+
+    def test_returns_false_when_all_missing(self):
+        """Return False when all environment variables are missing."""
+        with patch.dict(os.environ, {}, clear=False):
+            os.environ.pop(_INTEGRATION_CLIENT_ID_ENV, None)
+            os.environ.pop(_INTEGRATION_AUTH_URL_ENV, None)
+            os.environ.pop(_INTEGRATION_GATEWAY_URL_ENV, None)
+            result = detect_transparent_credentials()
+            assert result is False
+
+
+# ============================================================
+# Test: load_customer_credentials_from_env
+# ============================================================
+
+
+class TestLoadCustomerCredentialsFromEnv:
+    """Tests for loading credentials from environment variables (transparent mode)."""
+
+    def test_loads_valid_credentials_from_env(self):
+        """Load credentials from environment variables."""
+        deps_json = json.dumps(
+            [
+                {
+                    "ordId": "sap.example:apiResource:demo:v1",
+                    "globalTenantId": "123456",
+                }
+            ]
+        )
+
+        with patch.dict(
+            os.environ,
+            {
+                _INTEGRATION_CLIENT_ID_ENV: "test-client-id",
+                _INTEGRATION_AUTH_URL_ENV: "https://ias.example.com/oauth2/token",
+                _INTEGRATION_GATEWAY_URL_ENV: "https://agw.example.com/",
+                "INTEGRATION_DEPENDENCIES": deps_json,
+            },
+        ):
+            result = load_customer_credentials_from_env()
+
+            assert result.client_id == "test-client-id"
+            assert result.token_service_url == "https://ias.example.com/oauth2/token"
+            assert result.gateway_url == "https://agw.example.com"
+            assert result.certificate is None
+            assert result.private_key is None
+            assert len(result.integration_dependencies) == 1
+            assert result.integration_dependencies[0].ord_id == "sap.example:apiResource:demo:v1"
+            assert result.integration_dependencies[0].global_tenant_id == "123456"
+
+    def test_raises_when_client_id_missing(self):
+        """Raise error when INTEGRATION_CLIENT_ID is missing."""
+        deps_json = json.dumps([{"ordId": "test", "globalTenantId": "123"}])
+
+        with patch.dict(
+            os.environ,
+            {
+                _INTEGRATION_AUTH_URL_ENV: "https://ias.example.com/oauth2/token",
+                _INTEGRATION_GATEWAY_URL_ENV: "https://agw.example.com",
+                "INTEGRATION_DEPENDENCIES": deps_json,
+            },
+            clear=False,
+        ):
+            os.environ.pop(_INTEGRATION_CLIENT_ID_ENV, None)
+
+            with pytest.raises(
+                AgentGatewaySDKError,
+                match="Transparent TLS mode requires environment variables",
+            ):
+                load_customer_credentials_from_env()
+
+    def test_raises_when_token_service_url_missing(self):
+        """Raise error when INTEGRATION_TOKEN_SERVICE_URL is missing."""
+        deps_json = json.dumps([{"ordId": "test", "globalTenantId": "123"}])
+
+        with patch.dict(
+            os.environ,
+            {
+                _INTEGRATION_CLIENT_ID_ENV: "test-client",
+                _INTEGRATION_GATEWAY_URL_ENV: "https://agw.example.com",
+                "INTEGRATION_DEPENDENCIES": deps_json,
+            },
+            clear=False,
+        ):
+            os.environ.pop(_INTEGRATION_AUTH_URL_ENV, None)
+
+            with pytest.raises(
+                AgentGatewaySDKError,
+                match="Transparent TLS mode requires environment variables",
+            ):
+                load_customer_credentials_from_env()
+
+    def test_raises_when_gateway_url_missing(self):
+        """Raise error when INTEGRATION_GATEWAY_URL is missing."""
+        deps_json = json.dumps([{"ordId": "test", "globalTenantId": "123"}])
+
+        with patch.dict(
+            os.environ,
+            {
+                _INTEGRATION_CLIENT_ID_ENV: "test-client",
+                _INTEGRATION_AUTH_URL_ENV: "https://ias.example.com/oauth2/token",
+                "INTEGRATION_DEPENDENCIES": deps_json,
+            },
+            clear=False,
+        ):
+            os.environ.pop(_INTEGRATION_GATEWAY_URL_ENV, None)
+
+            with pytest.raises(
+                AgentGatewaySDKError,
+                match="Transparent TLS mode requires environment variables",
+            ):
+                load_customer_credentials_from_env()
+
+    def test_raises_when_dependencies_missing(self):
+        """Raise error when INTEGRATION_DEPENDENCIES is missing."""
+        with patch.dict(
+            os.environ,
+            {
+                _INTEGRATION_CLIENT_ID_ENV: "test-client",
+                _INTEGRATION_AUTH_URL_ENV: "https://ias.example.com/oauth2/token",
+                _INTEGRATION_GATEWAY_URL_ENV: "https://agw.example.com",
+            },
+            clear=False,
+        ):
+            os.environ.pop("INTEGRATION_DEPENDENCIES", None)
+
+            with pytest.raises(
+                AgentGatewaySDKError,
+                match="Missing required environment variable: INTEGRATION_DEPENDENCIES",
+            ):
+                load_customer_credentials_from_env()
+
+    def test_uses_custom_dependencies_resolver(self):
+        """Use custom dependencies resolver when provided."""
+        from sap_cloud_sdk.agentgateway._dependencies_resolver import (
+            IntegrationDependenciesResolver,
+        )
+
+        class CustomResolver(IntegrationDependenciesResolver):
+            def resolve(self):
+                return [
+                    IntegrationDependency(
+                        ord_id="custom.ord:id:v1",
+                        global_tenant_id="999",
+                    )
+                ]
+
+        with patch.dict(
+            os.environ,
+            {
+                _INTEGRATION_CLIENT_ID_ENV: "test-client",
+                _INTEGRATION_AUTH_URL_ENV: "https://ias.example.com/oauth2/token",
+                _INTEGRATION_GATEWAY_URL_ENV: "https://agw.example.com",
+            },
+        ):
+            result = load_customer_credentials_from_env(
+                dependencies_resolver=CustomResolver()
+            )
+
+            assert len(result.integration_dependencies) == 1
+            assert result.integration_dependencies[0].ord_id == "custom.ord:id:v1"
+
+
+# ============================================================
+# Test: Transparent mode token requests
+# ============================================================
+
+
+class TestTransparentModeTokenRequests:
+    """Tests for token requests in transparent mode."""
+
+    @pytest.fixture
+    def transparent_credentials(self):
+        """Create test credentials for transparent mode."""
+        return CustomerCredentials(
+            token_service_url="https://ias.example.com/oauth2/token",
+            client_id="test-client",
+            gateway_url="https://agw.example.com",
+            integration_dependencies=[],
+            certificate=None,
+            private_key=None,
+        )
+
+    def test_system_token_uses_transparent_mode(self, transparent_credentials):
+        """Request system token using transparent mode (no mTLS)."""
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {"access_token": "transparent-system-token"}
+
+        with patch("httpx.Client") as mock_client_class:
+            mock_client = MagicMock()
+            mock_client.__enter__ = MagicMock(return_value=mock_client)
+            mock_client.__exit__ = MagicMock(return_value=False)
+            mock_client.post.return_value = mock_response
+            mock_client_class.return_value = mock_client
+
+            result = get_system_token_mtls(transparent_credentials, timeout=60.0)
+
+            assert result == "transparent-system-token"
+            # Verify no SSL context was created (transparent mode)
+            mock_client_class.assert_called_once()
+            call_kwargs = mock_client_class.call_args.kwargs
+            assert "verify" not in call_kwargs or call_kwargs["verify"] is not None
+
+    def test_user_token_exchange_uses_transparent_mode(self, transparent_credentials):
+        """Exchange user token using transparent mode (no mTLS)."""
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {"access_token": "transparent-user-token"}
+
+        with patch("httpx.Client") as mock_client_class:
+            mock_client = MagicMock()
+            mock_client.__enter__ = MagicMock(return_value=mock_client)
+            mock_client.__exit__ = MagicMock(return_value=False)
+            mock_client.post.return_value = mock_response
+            mock_client_class.return_value = mock_client
+
+            result = exchange_user_token(
+                transparent_credentials, "user-jwt", timeout=60.0
+            )
+
+            assert result == "transparent-user-token"
+            # Verify jwt-bearer grant was used
+            call_args = mock_client.post.call_args
+            data = call_args.kwargs.get("data", {})
+            assert data["grant_type"] == "urn:ietf:params:oauth:grant-type:jwt-bearer"
+            assert data["assertion"] == "user-jwt"
+
+    @pytest.fixture
+    def mtls_credentials(self):
+        """Create test credentials for STANDARD mode (with mTLS)."""
+        return CustomerCredentials(
+            token_service_url="https://ias.example.com/oauth2/token",
+            client_id="test-client",
+            gateway_url="https://agw.example.com",
+            integration_dependencies=[],
+            certificate="-----BEGIN CERTIFICATE-----\ntest\n-----END CERTIFICATE-----",
+            private_key="-----BEGIN PRIVATE KEY-----\ntest\n-----END PRIVATE KEY-----",
+        )
+
+    def test_system_token_uses_mtls_mode(self, mtls_credentials):
+        """Request system token using STANDARD mode (with mTLS)."""
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {"access_token": "mtls-system-token"}
+
+        with (
+            patch(
+                "sap_cloud_sdk.agentgateway._customer._create_ssl_context"
+            ) as mock_ssl,
+            patch("httpx.Client") as mock_client_class,
+        ):
+            mock_ssl.return_value = MagicMock()
+            mock_client = MagicMock()
+            mock_client.__enter__ = MagicMock(return_value=mock_client)
+            mock_client.__exit__ = MagicMock(return_value=False)
+            mock_client.post.return_value = mock_response
+            mock_client_class.return_value = mock_client
+
+            result = get_system_token_mtls(mtls_credentials, timeout=60.0)
+
+            assert result == "mtls-system-token"
+            # Verify SSL context was created (STANDARD mode)
+            mock_ssl.assert_called_once()

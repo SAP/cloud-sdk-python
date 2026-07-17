@@ -38,7 +38,7 @@ from sap_cloud_sdk.agentgateway._models import (
 )
 from sap_cloud_sdk.agentgateway._token_cache import _GatewayUrlCache, _TokenCache
 from sap_cloud_sdk.agentgateway.exceptions import AgentGatewaySDKError
-from sap_cloud_sdk.core._telemetry_compat import Module, Operation, record_metrics
+from sap_cloud_sdk.core.telemetry import Module, Operation, record_metrics
 
 logger = logging.getLogger(__name__)
 

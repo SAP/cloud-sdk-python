@@ -402,7 +402,7 @@ class AgentGatewayClient:
                     auth = await self.get_system_auth(app_tid=app_tid)
                 return await get_mcp_tools_customer(
                     credentials, auth.access_token, self._config.timeout
-                )   
+                )
 
             # LoB flow - requires tenant_subdomain
             if app_tid:

@@ -233,8 +233,7 @@ class AgentGatewayClient:
 
     @record_metrics(Module.AGENTGATEWAY, Operation.AGENTGATEWAY_GET_USER_AUTH)
     async def get_user_auth(
-        self,
-        user_token: str | Callable[[], str] | None
+        self, user_token: str | Callable[[], str] | None
     ) -> AuthResult:
         """Exchange a user token for AGW-scoped authentication (token exchange).
 
@@ -355,8 +354,7 @@ class AgentGatewayClient:
 
     @record_metrics(Module.AGENTGATEWAY, Operation.AGENTGATEWAY_LIST_MCP_TOOLS)
     async def list_mcp_tools(
-        self,
-        user_token: str | Callable[[], str] | None = None
+        self, user_token: str | Callable[[], str] | None = None
     ) -> list[MCPTool]:
         """List all MCP tools from MCP servers.
 
@@ -397,7 +395,7 @@ class AgentGatewayClient:
                 auth = await self.get_user_auth(user_token)
             else:
                 auth = await self.get_system_auth()
-        
+
             # Check for customer agent credentials
             credentials_path = detect_customer_agent_credentials()
             if credentials_path:
@@ -585,7 +583,6 @@ class AgentGatewayClient:
             raise AgentGatewaySDKError(
                 f"Tool invocation failed for '{tool_label}': {cause}"
             ) from e
-
 
 
 def _unwrap_exception_group(exc: BaseException) -> BaseException:

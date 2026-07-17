@@ -1014,4 +1014,3 @@ class TestTransparentModeTokenRequests:
             assert result == "mtls-system-token"
             # Verify SSL context was created (STANDARD mode)
             mock_ssl.assert_called_once()
-

@@ -325,6 +325,10 @@ def _request_token_mtls(
     Raises:
         AgentGatewaySDKError: If token request fails.
     """
+    if not credentials.certificate or not credentials.private_key:
+        raise AgentGatewaySDKError(
+            "Certificate and private key are required for mTLS token request."
+        )
     ssl_context = _create_ssl_context(credentials.certificate, credentials.private_key)
 
     data = {

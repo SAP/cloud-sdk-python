@@ -62,7 +62,7 @@ def _emit_custom_event(
     common.timestamp.FromDatetime(datetime.now(timezone.utc))
     common.tenant_id = tenant_id
     common.app_context["event_name"] = event_name
-    user_id = _resolve_user_id(user_token)
+    user_id = _get_user_id(user_token)
     if user_id:
         common.user_initiator_id = user_id
 
@@ -80,8 +80,16 @@ def _resolve_tenant(tenant_subdomain: str | Callable[[], str] | None) -> str | N
     return None
 
 
-def _resolve_user_id(user_token: str | Callable[[], str] | None) -> str | None:
-    token = user_token() if callable(user_token) else user_token
+def _resolve_user_token(user_token: str | Callable[[], str] | None) -> str | None:
+    if isinstance(user_token, str):
+        return user_token
+    if callable(user_token):
+        return user_token()
+    return None
+
+
+def _get_user_id(user_token: str | Callable[[], str] | None) -> str | None:
+    token = _resolve_user_token(user_token)
     if not token:
         return None
     try:

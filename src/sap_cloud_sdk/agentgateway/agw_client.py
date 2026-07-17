@@ -400,10 +400,9 @@ class AgentGatewayClient:
                     auth = await self.get_user_auth(user_token, app_tid)
                 else:
                     auth = await self.get_system_auth(app_tid=app_tid)
-                tools = await get_mcp_tools_customer(
+                return await get_mcp_tools_customer(
                     credentials, auth.access_token, self._config.timeout
-                )
-                return tools
+                )   
 
             # LoB flow - requires tenant_subdomain
             if app_tid:
@@ -414,10 +413,9 @@ class AgentGatewayClient:
                 auth = await self.get_user_auth(user_token)
             else:
                 auth = await self.get_system_auth()
-            tools = await get_mcp_tools_lob(
+            return await get_mcp_tools_lob(
                 tenant, auth.access_token, self._config.timeout
             )
-            return tools
 
         except AgentGatewaySDKError:
             # Re-raise SDK errors as-is

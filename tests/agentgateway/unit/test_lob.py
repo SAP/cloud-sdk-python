@@ -28,8 +28,9 @@ from sap_cloud_sdk.agentgateway._lob import (
 from sap_cloud_sdk.agentgateway._models import Agent, AgentCard, MCPTool
 from sap_cloud_sdk.agentgateway._token_cache import _GatewayUrlCache, _TokenCache
 from sap_cloud_sdk.agentgateway.config import ClientConfig
+from sap_cloud_sdk.destination import ConsumptionOptions, ConsumptionLevel
 from sap_cloud_sdk.agentgateway.exceptions import AgentGatewaySDKError, MCPServerNotFoundError
-from sap_cloud_sdk.destination import ConsumptionLevel, ConsumptionOptions
+from sap_cloud_sdk.destination import ConsumptionLevel
 
 # Aliases for use in existing test assertions
 _LABEL_KEY = LABEL_KEY
@@ -1066,4 +1067,3 @@ class TestGetIasClientIdLob:
         with patch("sap_cloud_sdk.agentgateway._lob._ias_dest_name", side_effect=EnvironmentError("APPFND_CONHOS_LANDSCAPE not set")):
             with pytest.raises(EnvironmentError, match="APPFND_CONHOS_LANDSCAPE"):
                 get_ias_client_id_lob()
-

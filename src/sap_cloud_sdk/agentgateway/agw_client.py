@@ -42,6 +42,8 @@ from sap_cloud_sdk.core._telemetry_compat import Module, Operation, record_metri
 
 logger = logging.getLogger(__name__)
 
+_LOG_TRANSPARENT_MODE = "Transparent mode credentials detected"
+
 
 class AgentGatewayClient:
     """Client for discovering and invoking MCP tools via SAP Agent Gateway.
@@ -197,7 +199,7 @@ class AgentGatewayClient:
 
             # Check for transparent mode
             if detect_transparent_credentials():
-                logger.info("Transparent mode credentials detected")
+                logger.info(_LOG_TRANSPARENT_MODE)
                 credentials = load_customer_credentials_from_env()
                 loop = asyncio.get_running_loop()
                 token = await loop.run_in_executor(
@@ -283,7 +285,7 @@ class AgentGatewayClient:
 
             # Check for transparent mode
             if detect_transparent_credentials():
-                logger.info("Transparent mode credentials detected")
+                logger.info(_LOG_TRANSPARENT_MODE)
                 credentials = load_customer_credentials_from_env()
                 loop = asyncio.get_running_loop()
                 token = await loop.run_in_executor(
@@ -406,7 +408,7 @@ class AgentGatewayClient:
 
             # Check for transparent mode
             if detect_transparent_credentials():
-                logger.info("Transparent mode credentials detected")
+                logger.info(_LOG_TRANSPARENT_MODE)
                 credentials = load_customer_credentials_from_env()
                 return await get_mcp_tools_customer(
                     credentials, auth.access_token, self._config.timeout
@@ -560,7 +562,7 @@ class AgentGatewayClient:
 
             # Check for transparent mode
             if detect_transparent_credentials():
-                logger.debug("Transparent mode credentials detected")
+                logger.debug(_LOG_TRANSPARENT_MODE)
 
                 return await call_mcp_tool_customer(
                     tool, auth.access_token, self._config.timeout, **kwargs

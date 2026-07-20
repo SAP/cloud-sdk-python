@@ -126,20 +126,20 @@ def _make_otel_instrumentor_mock(is_instrumented: bool = False) -> MagicMock:
 
 class TestHttpxInstrumentor:
     def test_instrument_delegates_to_otel(self):
-        from sap_cloud_sdk.core.telemetry.instrumentation import httpx as httpx_mod
+        from sap_cloud_sdk.core.telemetry.instrumentation.instrumentors import httpx as httpx_mod
         mock = _make_otel_instrumentor_mock()
         with patch.object(httpx_mod, "_instrumentor", mock):
             httpx_mod.HttpxInstrumentor().instrument()
         mock.instrument.assert_called_once()
 
     def test_is_instrumented_reflects_otel_state(self):
-        from sap_cloud_sdk.core.telemetry.instrumentation import httpx as httpx_mod
+        from sap_cloud_sdk.core.telemetry.instrumentation.instrumentors import httpx as httpx_mod
         mock = _make_otel_instrumentor_mock(is_instrumented=True)
         with patch.object(httpx_mod, "_instrumentor", mock):
             assert httpx_mod.HttpxInstrumentor().is_instrumented()
 
     def test_uninstrument_delegates_to_otel(self):
-        from sap_cloud_sdk.core.telemetry.instrumentation import httpx as httpx_mod
+        from sap_cloud_sdk.core.telemetry.instrumentation.instrumentors import httpx as httpx_mod
         mock = _make_otel_instrumentor_mock(is_instrumented=True)
         with patch.object(httpx_mod, "_instrumentor", mock):
             httpx_mod.HttpxInstrumentor().uninstrument()
@@ -148,14 +148,14 @@ class TestHttpxInstrumentor:
 
 class TestRequestsInstrumentor:
     def test_instrument_delegates_to_otel(self):
-        from sap_cloud_sdk.core.telemetry.instrumentation import requests as req_mod
+        from sap_cloud_sdk.core.telemetry.instrumentation.instrumentors import requests as req_mod
         mock = _make_otel_instrumentor_mock()
         with patch.object(req_mod, "_instrumentor", mock):
             req_mod.RequestsInstrumentorWrapper().instrument()
         mock.instrument.assert_called_once()
 
     def test_uninstrument_delegates_to_otel(self):
-        from sap_cloud_sdk.core.telemetry.instrumentation import requests as req_mod
+        from sap_cloud_sdk.core.telemetry.instrumentation.instrumentors import requests as req_mod
         mock = _make_otel_instrumentor_mock(is_instrumented=True)
         with patch.object(req_mod, "_instrumentor", mock):
             req_mod.RequestsInstrumentorWrapper().uninstrument()
@@ -164,7 +164,7 @@ class TestRequestsInstrumentor:
 
 class TestGrpcInstrumentor:
     def test_instrument_delegates_to_otel(self):
-        from sap_cloud_sdk.core.telemetry.instrumentation import grpc as grpc_mod
+        from sap_cloud_sdk.core.telemetry.instrumentation.instrumentors import grpc as grpc_mod
         client_mock = _make_otel_instrumentor_mock()
         server_mock = _make_otel_instrumentor_mock()
         with (
@@ -179,7 +179,7 @@ class TestGrpcInstrumentor:
 class TestStarletteInstrumentor:
     def test_instrument_delegates_to_otel(self):
         pytest.importorskip("starlette")
-        from sap_cloud_sdk.core.telemetry.instrumentation import starlette as starlette_mod
+        from sap_cloud_sdk.core.telemetry.instrumentation.instrumentors import starlette as starlette_mod
         mock = _make_otel_instrumentor_mock()
         with patch.object(starlette_mod, "_instrumentor", mock):
             starlette_mod.StarletteInstrumentorWrapper().instrument()
@@ -189,7 +189,7 @@ class TestStarletteInstrumentor:
 class TestFastAPIInstrumentor:
     def test_instrument_delegates_to_otel(self):
         pytest.importorskip("fastapi")
-        from sap_cloud_sdk.core.telemetry.instrumentation import fastapi as fastapi_mod
+        from sap_cloud_sdk.core.telemetry.instrumentation.instrumentors import fastapi as fastapi_mod
         mock = _make_otel_instrumentor_mock()
         with patch.object(fastapi_mod, "_instrumentor", mock):
             fastapi_mod.FastAPIInstrumentorWrapper().instrument()
@@ -199,10 +199,30 @@ class TestFastAPIInstrumentor:
 class TestAiohttpInstrumentor:
     def test_instrument_delegates_to_otel(self):
         pytest.importorskip("aiohttp")
-        from sap_cloud_sdk.core.telemetry.instrumentation import aiohttp as aiohttp_mod
+        from sap_cloud_sdk.core.telemetry.instrumentation.instrumentors import aiohttp as aiohttp_mod
         mock = _make_otel_instrumentor_mock()
         with patch.object(aiohttp_mod, "_instrumentor", mock):
             aiohttp_mod.AiohttpInstrumentor().instrument()
+        mock.instrument.assert_called_once()
+
+
+class TestSQLAlchemyInstrumentor:
+    def test_instrument_delegates_to_otel(self):
+        pytest.importorskip("sqlalchemy")
+        from sap_cloud_sdk.core.telemetry.instrumentation.instrumentors import sqlalchemy as sqlalchemy_mod
+        mock = _make_otel_instrumentor_mock()
+        with patch.object(sqlalchemy_mod, "_instrumentor", mock):
+            sqlalchemy_mod.SQLAlchemyInstrumentorWrapper().instrument()
+        mock.instrument.assert_called_once()
+
+
+class TestRedisInstrumentor:
+    def test_instrument_delegates_to_otel(self):
+        pytest.importorskip("redis")
+        from sap_cloud_sdk.core.telemetry.instrumentation.instrumentors import redis as redis_mod
+        mock = _make_otel_instrumentor_mock()
+        with patch.object(redis_mod, "_instrumentor", mock):
+            redis_mod.RedisInstrumentorWrapper().instrument()
         mock.instrument.assert_called_once()
 
 

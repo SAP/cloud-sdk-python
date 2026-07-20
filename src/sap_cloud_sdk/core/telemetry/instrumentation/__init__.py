@@ -24,6 +24,16 @@ try:
 except ImportError:
     pass
 
+try:
+    from sap_cloud_sdk.core.telemetry.instrumentation.instrumentors import sqlalchemy  # noqa: F401
+except ImportError:
+    pass
+
+try:
+    from sap_cloud_sdk.core.telemetry.instrumentation.instrumentors import redis  # noqa: F401
+except ImportError:
+    pass
+
 __all__ = [
     "LibraryInstrumentor",
     "register",

@@ -11,6 +11,7 @@ from sap_cloud_sdk.agent_memory._endpoints import (
 )
 from sap_cloud_sdk.agent_memory._http_transport import HttpTransport
 from sap_cloud_sdk.agent_memory._models import (
+    AccessStrategy,
     Memory,
     Message,
     MessageRole,
@@ -20,13 +21,29 @@ from sap_cloud_sdk.agent_memory._models import (
 from sap_cloud_sdk.agent_memory.client import AgentMemoryClient
 from sap_cloud_sdk.agent_memory import create_client, FilterDefinition
 from sap_cloud_sdk.agent_memory.config import AgentMemoryConfig
-from sap_cloud_sdk.agent_memory.exceptions import AgentMemoryValidationError
+from sap_cloud_sdk.agent_memory.exceptions import (
+    AgentMemoryConfigError,
+    AgentMemoryValidationError,
+)
 
 
 def _make_client() -> tuple[AgentMemoryClient, MagicMock]:
-    """Return an AgentMemoryClient with a mocked transport layer."""
+    """Return an AgentMemoryClient with a mocked provider transport."""
     transport = MagicMock(spec=HttpTransport)
-    client = AgentMemoryClient(transport)
+    client = AgentMemoryClient(transport, access_strategy=AccessStrategy.PROVIDER)
+    return client, transport
+
+
+def _make_subscriber_client(
+    tenant: str = "default-sub",
+) -> tuple[AgentMemoryClient, MagicMock]:
+    """Return a client with SUBSCRIBER default and a pre-warmed mock transport."""
+    transport = MagicMock(spec=HttpTransport)
+    client = AgentMemoryClient(
+        transport,
+        access_strategy=AccessStrategy.SUBSCRIBER,
+        tenant=tenant,
+    )
     return client, transport
 
 
@@ -36,26 +53,94 @@ def _make_client() -> tuple[AgentMemoryClient, MagicMock]:
 class TestCreateClient:
 
     def test_uses_provided_config(self):
-        """Factory accepts an explicit config object."""
+        """Factory with explicit config creates a client successfully."""
         config = AgentMemoryConfig(base_url="http://localhost:3000")
         with patch("sap_cloud_sdk.agent_memory.HttpTransport") as MockTransport:
             MockTransport.return_value = MagicMock(spec=HttpTransport)
-            client = create_client(config=config)
+            client = create_client(config=config, access_strategy=AccessStrategy.PROVIDER)
         assert isinstance(client, AgentMemoryClient)
+        assert client._transport is not None
 
-    def test_reads_env_when_no_config_provided(self, monkeypatch):
-        """Factory falls back to environment variables when no config given."""
+    def test_subscriber_strategy_loads_tenant_binding(self, monkeypatch):
+        """Factory with SUBSCRIBER loads the tenant binding."""
         import json
-        monkeypatch.setenv("CLOUD_SDK_CFG_HANA_AGENT_MEMORY_DEFAULT_APPLICATION_URL", "http://memory.example.com")
-        monkeypatch.setenv("CLOUD_SDK_CFG_HANA_AGENT_MEMORY_DEFAULT_UAA", json.dumps({
-            "url": "http://auth.example.com",
-            "clientid": "client-id",
-            "clientsecret": "client-secret",
-        }))
+        monkeypatch.setenv(
+            "CLOUD_SDK_CFG_HANA_AGENT_MEMORY_ACME_CORP_APPLICATION_URL",
+            "http://acme.memory.example.com",
+        )
+        monkeypatch.setenv(
+            "CLOUD_SDK_CFG_HANA_AGENT_MEMORY_ACME_CORP_UAA",
+            json.dumps({"url": "http://acme.auth.example.com", "clientid": "c", "clientsecret": "s"}),
+        )
         with patch("sap_cloud_sdk.agent_memory.HttpTransport") as MockTransport:
             MockTransport.return_value = MagicMock(spec=HttpTransport)
-            client = create_client()
+            client = create_client(
+                access_strategy=AccessStrategy.SUBSCRIBER,
+                tenant="acme-corp",
+            )
         assert isinstance(client, AgentMemoryClient)
+        assert client._transport is not None
+
+    def test_provider_strategy_loads_default_binding(self, monkeypatch):
+        """Factory with PROVIDER loads the default binding."""
+        import json
+        monkeypatch.setenv(
+            "CLOUD_SDK_CFG_HANA_AGENT_MEMORY_DEFAULT_APPLICATION_URL",
+            "http://memory.example.com",
+        )
+        monkeypatch.setenv(
+            "CLOUD_SDK_CFG_HANA_AGENT_MEMORY_DEFAULT_UAA",
+            json.dumps({"url": "http://auth.example.com", "clientid": "c", "clientsecret": "s"}),
+        )
+        with patch("sap_cloud_sdk.agent_memory.HttpTransport") as MockTransport:
+            MockTransport.return_value = MagicMock(spec=HttpTransport)
+            client = create_client(access_strategy=AccessStrategy.PROVIDER)
+        assert isinstance(client, AgentMemoryClient)
+        assert client._transport is not None
+
+
+# ── Access strategy and per-tenant transport routing ─────────────────────────
+
+
+class TestAccessStrategy:
+
+    # ── Construction-time validation ───────────────────────────────────────────
+
+    def test_subscriber_without_tenant_raises_at_construction(self):
+        """SUBSCRIBER without tenant raises AgentMemoryValidationError at construction."""
+        transport = MagicMock(spec=HttpTransport)
+        with pytest.raises(AgentMemoryValidationError, match="tenant"):
+            AgentMemoryClient(transport, access_strategy=AccessStrategy.SUBSCRIBER)
+
+    def test_subscriber_with_tenant_constructs_successfully(self):
+        """SUBSCRIBER with tenant constructs without error."""
+        client, _ = _make_subscriber_client("acme")
+        assert client._transport is not None
+
+    def test_provider_constructs_without_tenant(self):
+        """PROVIDER constructs without tenant."""
+        client, _ = _make_client()
+        assert client._transport is not None
+
+    # ── Transport routing ──────────────────────────────────────────────────────
+
+    def test_client_default_subscriber_uses_subscriber_transport(self):
+        """Client with SUBSCRIBER default uses the provided transport."""
+        client, sub_transport = _make_subscriber_client("acme")
+        sub_transport.post.return_value = {
+            "id": "m1", "agentID": "a", "invokerID": "u", "content": "x",
+        }
+        client.add_memory("a", "u", "x")
+        sub_transport.post.assert_called_once()
+
+    def test_provider_only_uses_provider_transport(self):
+        """PROVIDER uses the provided transport."""
+        client, provider_transport = _make_client()
+        provider_transport.post.return_value = {
+            "id": "m1", "agentID": "a", "invokerID": "u", "content": "x",
+        }
+        client.add_memory("a", "u", "x")
+        provider_transport.post.assert_called_once()
 
 
 # ── Memory CRUD operations ────────────────────────────────────────────────────
@@ -749,7 +834,7 @@ class TestContextManager:
     def test_context_manager_closes_on_exit(self):
         """Using the client as a context manager closes it on __exit__."""
         transport = MagicMock(spec=HttpTransport)
-        client = AgentMemoryClient(transport)
+        client = AgentMemoryClient(transport, access_strategy=AccessStrategy.PROVIDER)
 
         with client:
             pass

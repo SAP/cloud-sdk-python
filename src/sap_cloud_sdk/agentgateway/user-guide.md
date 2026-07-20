@@ -203,14 +203,12 @@ class AgentGatewayClient:
     async def list_mcp_tools(
         self,
         user_token: str | Callable[[], str] | None = None,
-        app_tid: str | None = None,
     ) -> list[MCPTool]
 
     async def call_mcp_tool(
         self,
         tool: MCPTool,
         user_token: str | Callable[[], str] | None = None,
-        app_tid: str | None = None,
         **kwargs,
     ) -> str
 

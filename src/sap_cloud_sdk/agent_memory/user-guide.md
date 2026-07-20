@@ -189,14 +189,11 @@ from sap_cloud_sdk.agent_memory import AccessStrategy
 
 ### Configuring at client level
 
-Pass `access_strategy` and `tenant` to `create_client()` to set defaults for the entire
-client instance. Every method call then inherits them, so you do not need to repeat them
-on each operation.
+Pass `access_strategy` and `tenant` to `create_client()` once — every method call inherits them automatically.
 
 ```python
 from sap_cloud_sdk.agent_memory import create_client, AccessStrategy
 
-# Tenant set once — all calls below use it automatically
 client = create_client(
     access_strategy=AccessStrategy.SUBSCRIBER,
     tenant="acme-corp",
@@ -206,46 +203,26 @@ memories = client.list_memories(agent_id="hr-assistant", invoker_id="user-42")
 count    = client.count_memories(agent_id="hr-assistant")
 ```
 
-A per-call value overrides the client default for that single call:
-
-```python
-# All calls use SUBSCRIBER / "acme-corp" except this one
-provider_memories = client.list_memories(
-    agent_id="hr-assistant",
-    invoker_id="user-42",
-    access_strategy=AccessStrategy.PROVIDER,  # overrides for this call only
-)
-```
-
 ### SUBSCRIBER (default)
 
-Pass the subscriber tenant subdomain via the `tenant` argument. Omitting `tenant` when
-the strategy is `SUBSCRIBER` raises `AgentMemoryValidationError`.
+Configure a subscriber tenant at `create_client()`. All calls use that tenant's token.
+Omitting `tenant` raises `AgentMemoryValidationError` at construction time.
 
 ```python
-memories = client.list_memories(
-    agent_id="hr-assistant",
-    invoker_id="user-42",
+client = create_client(
     access_strategy=AccessStrategy.SUBSCRIBER,
-    tenant="acme-corp",          # subscriber subdomain
+    tenant="acme-corp",
 )
+memories = client.list_memories(agent_id="hr-assistant", invoker_id="user-42")
 ```
-
-The subscriber token URL is derived by replacing the provider's `identityzone` segment
-in the configured `token_url` with the `tenant` value. This requires `identityzone` to
-be present in the service binding's UAA JSON (standard XSUAA field) or set explicitly in
-`AgentMemoryConfig`.
 
 ### PROVIDER
 
-No `tenant` argument is needed. All calls use the provider token.
+Configure a provider-only client. No `tenant` needed; all calls use the provider token.
 
 ```python
-memories = client.list_memories(
-    agent_id="hr-assistant",
-    invoker_id="user-42",
-    access_strategy=AccessStrategy.PROVIDER,
-)
+client = create_client(access_strategy=AccessStrategy.PROVIDER)
+memories = client.list_memories(agent_id="hr-assistant", invoker_id="user-42")
 ```
 
 > [!WARNING]

@@ -131,17 +131,12 @@ class AgentMemoryClient:
             invoker_id: Identifier of the user or invoker.
             content: The memory text content.
             metadata: Optional metadata dict (Map type in OData).
-            access_strategy: Tenant access strategy. Overrides the client default when
-                provided. Falls back to the default set on :func:`create_client`.
-            tenant: Subscriber tenant subdomain. Overrides the client default when
-                provided. Required (at call or client level) when strategy is ``SUBSCRIBER``.
 
         Returns:
             The created :class:`Memory`.
 
         Raises:
-            AgentMemoryValidationError: If any required field is empty or tenant is missing
-                for ``SUBSCRIBER``.
+            AgentMemoryValidationError: If any required field is empty.
             AgentMemoryHttpError: If the request fails.
         """
         _require_non_empty(agent_id=agent_id, invoker_id=invoker_id, content=content)
@@ -163,18 +158,13 @@ class AgentMemoryClient:
 
         Args:
             memory_id: The memory identifier (UUID).
-            access_strategy: Tenant access strategy. Overrides the client default when
-                provided. Falls back to the default set on :func:`create_client`.
-            tenant: Subscriber tenant subdomain. Overrides the client default when
-                provided. Required (at call or client level) when strategy is ``SUBSCRIBER``.
 
         Returns:
             The :class:`Memory`.
 
         Raises:
             AgentMemoryNotFoundError: If no memory with the given ID exists.
-            AgentMemoryValidationError: If ``memory_id`` is empty or tenant is missing
-                for ``SUBSCRIBER``.
+            AgentMemoryValidationError: If ``memory_id`` is empty.
             AgentMemoryHttpError: If the request fails.
         """
         _require_non_empty(memory_id=memory_id)
@@ -197,10 +187,6 @@ class AgentMemoryClient:
             memory_id: The memory identifier (UUID).
             content: New content to set.
             metadata: New metadata dict to set.
-            access_strategy: Tenant access strategy. Overrides the client default when
-                provided. Falls back to the default set on :func:`create_client`.
-            tenant: Subscriber tenant subdomain. Overrides the client default when
-                provided. Required (at call or client level) when strategy is ``SUBSCRIBER``.
 
         Raises:
             AgentMemoryNotFoundError: If no memory with the given ID exists.
@@ -228,15 +214,10 @@ class AgentMemoryClient:
 
         Args:
             memory_id: The memory identifier (UUID).
-            access_strategy: Tenant access strategy. Overrides the client default when
-                provided. Falls back to the default set on :func:`create_client`.
-            tenant: Subscriber tenant subdomain. Overrides the client default when
-                provided. Required (at call or client level) when strategy is ``SUBSCRIBER``.
 
         Raises:
             AgentMemoryNotFoundError: If no memory with the given ID exists.
-            AgentMemoryValidationError: If ``memory_id`` is empty or tenant is missing
-                for ``SUBSCRIBER``.
+            AgentMemoryValidationError: If ``memory_id`` is empty.
             AgentMemoryHttpError: If the request fails.
         """
         _require_non_empty(memory_id=memory_id)
@@ -266,10 +247,6 @@ class AgentMemoryClient:
                 key-value structured search is not supported.
             limit: Maximum number of memories to return. Default is ``50``.
             offset: Number of memories to skip (for pagination). Default is ``0``.
-            access_strategy: Tenant access strategy. Overrides the client default when
-                provided. Falls back to the default set on :func:`create_client`.
-            tenant: Subscriber tenant subdomain. Overrides the client default when
-                provided. Required (at call or client level) when strategy is ``SUBSCRIBER``.
 
         Returns:
             List of :class:`Memory` objects.
@@ -309,10 +286,6 @@ class AgentMemoryClient:
         Args:
             agent_id: Filter by agent identifier.
             invoker_id: Filter by invoker/user identifier.
-            access_strategy: Tenant access strategy. Overrides the client default when
-                provided. Falls back to the default set on :func:`create_client`.
-            tenant: Subscriber tenant subdomain. Overrides the client default when
-                provided. Required (at call or client level) when strategy is ``SUBSCRIBER``.
 
         Returns:
             Total number of matching memories.
@@ -349,10 +322,6 @@ class AgentMemoryClient:
             query: Natural-language search query (5–5000 characters).
             threshold: Minimum cosine similarity score (0.0–1.0). Default ``0.6``.
             limit: Maximum number of results (1–50). Default is ``10``.
-            access_strategy: Tenant access strategy. Overrides the client default when
-                provided. Falls back to the default set on :func:`create_client`.
-            tenant: Subscriber tenant subdomain. Overrides the client default when
-                provided. Required (at call or client level) when strategy is ``SUBSCRIBER``.
 
         Returns:
             List of :class:`SearchResult` objects.
@@ -410,17 +379,12 @@ class AgentMemoryClient:
             role: Author role (USER, ASSISTANT, SYSTEM, TOOL).
             content: The message text content.
             metadata: Optional metadata dict.
-            access_strategy: Tenant access strategy. Overrides the client default when
-                provided. Falls back to the default set on :func:`create_client`.
-            tenant: Subscriber tenant subdomain. Overrides the client default when
-                provided. Required (at call or client level) when strategy is ``SUBSCRIBER``.
 
         Returns:
             The created :class:`Message`.
 
         Raises:
-            AgentMemoryValidationError: If any required field is empty or tenant is missing
-                for ``SUBSCRIBER``.
+            AgentMemoryValidationError: If any required field is empty.
             AgentMemoryHttpError: If the request fails.
         """
         _require_non_empty(
@@ -449,18 +413,13 @@ class AgentMemoryClient:
 
         Args:
             message_id: The message identifier (UUID).
-            access_strategy: Tenant access strategy. Overrides the client default when
-                provided. Falls back to the default set on :func:`create_client`.
-            tenant: Subscriber tenant subdomain. Overrides the client default when
-                provided. Required (at call or client level) when strategy is ``SUBSCRIBER``.
 
         Returns:
             The :class:`Message`.
 
         Raises:
             AgentMemoryNotFoundError: If no message with the given ID exists.
-            AgentMemoryValidationError: If ``message_id`` is empty or tenant is missing
-                for ``SUBSCRIBER``.
+            AgentMemoryValidationError: If ``message_id`` is empty.
             AgentMemoryHttpError: If the request fails.
         """
         _require_non_empty(message_id=message_id)
@@ -475,15 +434,10 @@ class AgentMemoryClient:
 
         Args:
             message_id: The message identifier (UUID).
-            access_strategy: Tenant access strategy. Overrides the client default when
-                provided. Falls back to the default set on :func:`create_client`.
-            tenant: Subscriber tenant subdomain. Overrides the client default when
-                provided. Required (at call or client level) when strategy is ``SUBSCRIBER``.
 
         Raises:
             AgentMemoryNotFoundError: If no message with the given ID exists.
-            AgentMemoryValidationError: If ``message_id`` is empty or tenant is missing
-                for ``SUBSCRIBER``.
+            AgentMemoryValidationError: If ``message_id`` is empty.
             AgentMemoryHttpError: If the request fails.
         """
         _require_non_empty(message_id=message_id)
@@ -517,10 +471,6 @@ class AgentMemoryClient:
                 key-value structured search is not supported.
             limit: Maximum number of messages to return. Default is ``50``.
             offset: Number of messages to skip (for pagination). Default is ``0``.
-            access_strategy: Tenant access strategy. Overrides the client default when
-                provided. Falls back to the default set on :func:`create_client`.
-            tenant: Subscriber tenant subdomain. Overrides the client default when
-                provided. Required (at call or client level) when strategy is ``SUBSCRIBER``.
 
         Returns:
             List of :class:`Message` objects.
@@ -560,10 +510,6 @@ class AgentMemoryClient:
         """Retrieve the data retention configuration (singleton).
 
         Args:
-            access_strategy: Tenant access strategy. Overrides the client default when
-                provided. Falls back to the default set on :func:`create_client`.
-            tenant: Subscriber tenant subdomain. Overrides the client default when
-                provided. Required (at call or client level) when strategy is ``SUBSCRIBER``.
 
         Returns:
             The current :class:`RetentionConfig`.
@@ -593,10 +539,6 @@ class AgentMemoryClient:
             message_days: How long to keep messages (days).
             memory_days: How long to keep memories without access (days).
             usage_log_days: How long to keep access and search logs (days).
-            access_strategy: Tenant access strategy. Overrides the client default when
-                provided. Falls back to the default set on :func:`create_client`.
-            tenant: Subscriber tenant subdomain. Overrides the client default when
-                provided. Required (at call or client level) when strategy is ``SUBSCRIBER``.
 
         Raises:
             AgentMemoryValidationError: If no fields are provided, any provided value is

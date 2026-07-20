@@ -75,6 +75,9 @@ For Agent Memory integration tests, configure the following variables in `.env_i
 # Agent Memory Configuration
 CLOUD_SDK_CFG_HANA_AGENT_MEMORY_DEFAULT_APPLICATION_URL=https://your-agent-memory-api-url
 CLOUD_SDK_CFG_HANA_AGENT_MEMORY_DEFAULT_UAA='{"url":"https://your-auth-url","clientid":"your-client-id","clientsecret":"your-client-secret"}'
+
+## For the multi-tenant scenarios, set the subscriber tenant subdomain. When not set, those scenarios are automatically skipped
+CLOUD_SDK_CFG_HANA_AGENT_MEMORY_DEFAULT_SUBSCRIBER_TENANT=your-subscriber-tenant-subdomain-here
 ```
 
 ### AuditLog Integration Tests

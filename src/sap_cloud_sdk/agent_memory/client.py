@@ -77,13 +77,14 @@ class AgentMemoryClient:
     Do not instantiate directly — use :func:`sap_cloud_sdk.agent_memory.create_client`.
 
     Args:
-        transport: HTTP transport loaded from the binding for the configured
-            access strategy and tenant (resolved once at construction time by
+        transport: HTTP transport loaded from the default service binding
+            (resolved once at construction time by
             :func:`sap_cloud_sdk.agent_memory.create_client`).
         access_strategy: Tenant access strategy for all operations.
             Defaults to ``SUBSCRIBER``.
         tenant: Subscriber tenant subdomain. Required when
-            ``access_strategy=SUBSCRIBER``.
+            ``access_strategy=SUBSCRIBER``. The subscriber token URL is
+            derived from the provider binding's ``identityzone`` field.
     """
 
     def __init__(

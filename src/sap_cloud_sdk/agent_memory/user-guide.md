@@ -25,8 +25,8 @@ plain text, and the service makes it searchable by meaning.
   - [Multitenancy](#multitenancy)
     - [AccessStrategy](#accessstrategy)
     - [Configuring at client level](#configuring-at-client-level)
-    - [SUBSCRIBER\_ONLY (default)](#subscriber_only-default)
-    - [PROVIDER\_ONLY](#provider_only)
+    - [SUBSCRIBER (default)](#subscriber-default)
+    - [PROVIDER](#provider)
   - [Semantic Search: A Brief Primer](#semantic-search-a-brief-primer)
   - [Memories](#memories)
     - [Create a Memory](#create-a-memory)
@@ -72,6 +72,7 @@ plain text, and the service makes it searchable by meaning.
     - [Usage with LangGraph StateGraph](#usage-with-langgraph-stategraph)
     - [Usage with LangChain create\_agent](#usage-with-langchain-create_agent)
     - [Thread TTL](#thread-ttl)
+      - [Exposing TTL as a configurable parameter with `@agent_config`](#exposing-ttl-as-a-configurable-parameter-with-agent_config)
 
 ## Installation
 
@@ -189,7 +190,7 @@ from sap_cloud_sdk.agent_memory import AccessStrategy
 
 ### Configuring at client level
 
-Pass `access_strategy` and `tenant` to `create_client()` once — every method call inherits them automatically.
+Pass `access_strategy` and `tenant` to `create_client()` to set defaults for the entire client instance. Every method call then inherits them, so you do not need to repeat them on each operation.
 
 ```python
 from sap_cloud_sdk.agent_memory import create_client, AccessStrategy
@@ -205,8 +206,7 @@ count    = client.count_memories(agent_id="hr-assistant")
 
 ### SUBSCRIBER (default)
 
-Configure a subscriber tenant at `create_client()`. All calls use that tenant's token.
-Omitting `tenant` raises `AgentMemoryValidationError` at construction time.
+Configure a subscriber tenant at client creation. All calls will use that tenant context.
 
 ```python
 client = create_client(
@@ -218,7 +218,7 @@ memories = client.list_memories(agent_id="hr-assistant", invoker_id="user-42")
 
 ### PROVIDER
 
-Configure a provider-only client. No `tenant` needed; all calls use the provider token.
+Configure a provider-only client. No tenant is needed and all calls use the provider binding.
 
 ```python
 client = create_client(access_strategy=AccessStrategy.PROVIDER)

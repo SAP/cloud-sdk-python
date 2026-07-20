@@ -5,8 +5,10 @@ then normalises into an ``AgentMemoryConfig``.
 
 Mount path convention::
 
-    /etc/secrets/appfnd/hana-agent-memory/default/application_url
+    /etc/secrets/appfnd/hana-agent-memory/default/application_url     (provider)
+    /etc/secrets/appfnd/hana-agent-memory/<tenant>/application_url     (subscriber)
     /etc/secrets/appfnd/hana-agent-memory/default/uaa
+    /etc/secrets/appfnd/hana-agent-memory/<tenant>/uaa
 
 ``application_url`` is the Agent Memory service base URL (plain string).
 ``uaa`` is a JSON string with OAuth2 credentials containing at minimum:
@@ -16,6 +18,8 @@ Env fallback convention::
 
     CLOUD_SDK_CFG_HANA_AGENT_MEMORY_DEFAULT_APPLICATION_URL
     CLOUD_SDK_CFG_HANA_AGENT_MEMORY_DEFAULT_UAA
+    CLOUD_SDK_CFG_HANA_AGENT_MEMORY_<TENANT>_APPLICATION_URL
+    CLOUD_SDK_CFG_HANA_AGENT_MEMORY_<TENANT>_UAA
 """
 
 import json
@@ -136,6 +140,29 @@ def _load_config_from_env() -> AgentMemoryConfig:
     Raises:
         AgentMemoryConfigError: If configuration cannot be loaded or is incomplete.
     """
+    return _load_config_for_instance("default")
+
+
+def _load_config_for_instance(instance: str) -> AgentMemoryConfig:
+    """Load Agent Memory configuration for a named binding instance.
+
+    Uses the secret resolver with fallback order:
+    1. Mount at ``/etc/secrets/appfnd/hana-agent-memory/{instance}/``
+    2. Environment variables ``CLOUD_SDK_CFG_HANA_AGENT_MEMORY_{INSTANCE}_*``
+
+    This is used to load tenant-specific bindings when the runtime provisions
+    a dedicated service instance per subscriber tenant.
+
+    Args:
+        instance: The binding instance name — ``"default"`` for the provider,
+            or a tenant subdomain for a subscriber (e.g. ``"acme-corp"``).
+
+    Returns:
+        A validated ``AgentMemoryConfig``.
+
+    Raises:
+        AgentMemoryConfigError: If configuration cannot be loaded or is incomplete.
+    """
     from sap_cloud_sdk.core.secret_resolver import (
         read_from_mount_and_fallback_to_env_var,
     )
@@ -146,7 +173,7 @@ def _load_config_from_env() -> AgentMemoryConfig:
             base_volume_mount="/etc/secrets/appfnd",
             base_var_name="CLOUD_SDK_CFG",
             module="hana-agent-memory",
-            instance="default",
+            instance=instance,
             target=binding,
         )
         binding.validate()
@@ -155,5 +182,5 @@ def _load_config_from_env() -> AgentMemoryConfig:
         raise
     except Exception as exc:
         raise AgentMemoryConfigError(
-            f"Failed to load Agent Memory configuration: {exc}"
+            f"Failed to load Agent Memory configuration for instance '{instance}': {exc}"
         ) from exc

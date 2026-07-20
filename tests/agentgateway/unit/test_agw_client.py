@@ -45,6 +45,16 @@ def _client_gateway_url_cache(client: AgentGatewayClient):
     return getattr(client, "_gateway_url_cache")
 
 
+@pytest.fixture(autouse=True)
+def no_transparent_credentials():
+    """Prevent transparent mode from activating in tests that don't opt in."""
+    with patch(
+        "sap_cloud_sdk.agentgateway.agw_client.detect_transparent_credentials",
+        return_value=False,
+    ):
+        yield
+
+
 # ============================================================
 # Test: create_client factory
 # ============================================================
@@ -164,14 +174,14 @@ class TestGetSystemAuth:
             agw_client = create_client()
             token_cache = _client_token_cache(agw_client)
 
-            result = await agw_client.get_system_auth(app_tid="test-tid")
+            result = await agw_client.get_system_auth()
 
             assert isinstance(result, AuthResult)
             assert result.access_token == "customer-system-token"
             assert result.gateway_url == "https://agw.customer.com"
             mock_load.assert_called_once_with("/path/to/credentials")
             mock_mtls.assert_called_once_with(
-                mock_creds, 60.0, "test-tid", token_cache
+                mock_creds, 60.0, token_cache
             )
 
     @pytest.mark.asyncio
@@ -282,14 +292,14 @@ class TestGetUserAuth:
             token_cache = _client_token_cache(agw_client)
 
             result = await agw_client.get_user_auth(
-                user_token="user-jwt", app_tid="test-tid"
+                user_token="user-jwt"
             )
 
             assert isinstance(result, AuthResult)
             assert result.access_token == "exchanged-token"
             assert result.gateway_url == "https://agw.customer.com"
             mock_exchange.assert_called_once_with(
-                mock_creds, "user-jwt", 60.0, "test-tid", token_cache
+                mock_creds, "user-jwt", 60.0, token_cache
             )
 
     @pytest.mark.asyncio
@@ -519,7 +529,7 @@ class TestListMcpTools:
 
             agw_client = create_client()
 
-            await agw_client.list_mcp_tools(app_tid="tid")
+            await agw_client.list_mcp_tools()
 
             mock_customer.assert_called_once_with(
                 mock_creds, "customer-system-token", 60.0
@@ -548,7 +558,7 @@ class TestListMcpTools:
 
             await agw_client.list_mcp_tools(user_token="user-jwt")
 
-            mock_user_auth.assert_called_once()
+            assert mock_user_auth.call_count == 2
             mock_lob.assert_called_once_with("my-tenant", "user-token-xyz", 60.0)
 
     @pytest.mark.asyncio
@@ -573,7 +583,7 @@ class TestListMcpTools:
 
             agw_client = create_client()
 
-            await agw_client.list_mcp_tools(user_token="user-jwt", app_tid="tid")
+            await agw_client.list_mcp_tools(user_token="user-jwt")
 
             mock_customer.assert_called_once_with(
                 mock_creds, "exchanged-user-token", 60.0
@@ -594,6 +604,10 @@ class TestCallMcpTool:
         with patch(
             "sap_cloud_sdk.agentgateway.agw_client.detect_customer_agent_credentials",
             return_value=None,
+        ), patch(
+            "sap_cloud_sdk.agentgateway.agw_client.fetch_system_auth",
+            new_callable=AsyncMock,
+            return_value=("system-token", "https://agw.example.com"),
         ):
             agw_client = create_client(tenant_subdomain="my-tenant")
 
@@ -606,6 +620,10 @@ class TestCallMcpTool:
         with patch(
             "sap_cloud_sdk.agentgateway.agw_client.detect_customer_agent_credentials",
             return_value=None,
+        ), patch(
+            "sap_cloud_sdk.agentgateway.agw_client.fetch_system_auth",
+            new_callable=AsyncMock,
+            return_value=("system-token", "https://agw.example.com"),
         ):
             agw_client = create_client(tenant_subdomain="my-tenant")
 

@@ -19,7 +19,11 @@ from typing import Optional
 
 from sap_cloud_sdk.agent_memory._http_transport import HttpTransport
 from sap_cloud_sdk.agent_memory.client import AgentMemoryClient
-from sap_cloud_sdk.agent_memory.config import AgentMemoryConfig, _load_config_from_env
+from sap_cloud_sdk.agent_memory.config import (
+    AgentMemoryConfig,
+    _load_config_for_instance,
+    _load_config_from_env,
+)
 from sap_cloud_sdk.agent_memory.exceptions import (
     AgentMemoryConfigError,
     AgentMemoryError,
@@ -46,27 +50,40 @@ def create_client(
 ) -> AgentMemoryClient:
     """Create an :class:`AgentMemoryClient` with automatic credential detection.
 
+    The binding loaded depends on ``access_strategy`` and ``tenant``:
+
+    - ``SUBSCRIBER`` with ``tenant="acme-corp"`` — loads the subscriber
+      binding from ``/etc/secrets/appfnd/hana-agent-memory/acme-corp/`` (or
+      ``CLOUD_SDK_CFG_HANA_AGENT_MEMORY_ACME_CORP_*`` env vars).
+    - ``PROVIDER`` — loads the provider binding from
+      ``/etc/secrets/appfnd/hana-agent-memory/default/`` (or
+      ``CLOUD_SDK_CFG_HANA_AGENT_MEMORY_DEFAULT_*`` env vars).
+    - Explicit ``config`` — uses the provided configuration directly.
+
     Args:
-        config: Optional explicit configuration. If ``None``, credentials are
-                loaded from the mounted volume at
-                ``/etc/secrets/appfnd/hana-agent-memory/default/`` or from
-                ``CLOUD_SDK_CFG_AGENT_MEMORY_DEFAULT_*`` environment variables.
-        access_strategy: Default tenant access strategy for all client operations.
-                Defaults to ``SUBSCRIBER``. Individual method calls may override
-                this value.
-        tenant: Default subscriber tenant subdomain. Required when
-                ``access_strategy=SUBSCRIBER``. Individual method calls may
-                override this value.
+        config: Optional explicit configuration. When provided, binding
+                discovery is skipped.
+        access_strategy: Tenant access strategy for all operations.
+                Defaults to ``SUBSCRIBER``.
+        tenant: Subscriber tenant subdomain. Required when
+                ``access_strategy=SUBSCRIBER``.
 
     Returns:
         A ready-to-use :class:`AgentMemoryClient`.
 
     Raises:
-        AgentMemoryConfigError: If configuration is missing, invalid, or
-            ``access_strategy=SUBSCRIBER`` is used without a ``tenant``.
+        AgentMemoryConfigError: If configuration is missing or invalid.
+        AgentMemoryValidationError: If ``access_strategy=SUBSCRIBER`` and
+                ``tenant`` is not provided.
     """
     try:
-        resolved_config = config if config is not None else _load_config_from_env()
+        if config is not None:
+            resolved_config = config
+        elif access_strategy is AccessStrategy.SUBSCRIBER and tenant:
+            resolved_config = _load_config_for_instance(tenant)
+        else:
+            resolved_config = _load_config_from_env()
+
         transport = HttpTransport(resolved_config)
         return AgentMemoryClient(
             transport,

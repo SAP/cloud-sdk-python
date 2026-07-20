@@ -77,7 +77,9 @@ class AgentMemoryClient:
     Do not instantiate directly — use :func:`sap_cloud_sdk.agent_memory.create_client`.
 
     Args:
-        transport: HTTP transport layer (injected by ``create_client``).
+        transport: HTTP transport loaded from the binding for the configured
+            access strategy and tenant (resolved once at construction time by
+            :func:`sap_cloud_sdk.agent_memory.create_client`).
         access_strategy: Tenant access strategy for all operations.
             Defaults to ``SUBSCRIBER``.
         tenant: Subscriber tenant subdomain. Required when

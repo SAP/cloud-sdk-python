@@ -136,7 +136,9 @@ class OutputManagementServiceClient:
                 logger.warning(
                     f"Unhandled status code: {status_code}. Using original status code and message."
                 )
-                return self._create_output_error_response(str(status_code), response_body)
+                return self._create_output_error_response(
+                    str(status_code), response_body
+                )
 
         except Exception as e:
             logger.error(f"Exception occurred: {e}", exc_info=True)

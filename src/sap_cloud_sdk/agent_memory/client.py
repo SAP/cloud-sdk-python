@@ -294,7 +294,6 @@ class AgentMemoryClient:
             Total number of matching memories.
 
         Raises:
-            AgentMemoryValidationError: If tenant is missing for ``SUBSCRIBER``.
             AgentMemoryHttpError: If the request fails.
         """
         params = build_list_params(

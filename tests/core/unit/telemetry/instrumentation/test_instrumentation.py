@@ -226,6 +226,26 @@ class TestRedisInstrumentor:
         mock.instrument.assert_called_once()
 
 
+class TestDjangoInstrumentor:
+    def test_instrument_delegates_to_otel(self):
+        pytest.importorskip("django")
+        from sap_cloud_sdk.core.telemetry.instrumentation.instrumentors import django as django_mod
+        mock = _make_otel_instrumentor_mock()
+        with patch.object(django_mod, "_instrumentor", mock):
+            django_mod.DjangoInstrumentorWrapper().instrument()
+        mock.instrument.assert_called_once()
+
+
+class TestFlaskInstrumentor:
+    def test_instrument_delegates_to_otel(self):
+        pytest.importorskip("flask")
+        from sap_cloud_sdk.core.telemetry.instrumentation.instrumentors import flask as flask_mod
+        mock = _make_otel_instrumentor_mock()
+        with patch.object(flask_mod, "_instrumentor", mock):
+            flask_mod.FlaskInstrumentorWrapper().instrument()
+        mock.instrument.assert_called_once()
+
+
 # ---------------------------------------------------------------------------
 # auto_instrument integration
 # ---------------------------------------------------------------------------

@@ -34,6 +34,8 @@ dependencies = [
     "opentelemetry-instrumentation-aiohttp-client>=0.65b0",
     "opentelemetry-instrumentation-sqlalchemy>=0.65b0",
     "opentelemetry-instrumentation-redis>=0.65b0",
+    "opentelemetry-instrumentation-django>=0.65b0",
+    "opentelemetry-instrumentation-flask>=0.65b0",
     "mcp>=1.1.0",
 ]
 
@@ -44,6 +46,8 @@ fastapi = ["fastapi>=0.100.0"]
 aiohttp = ["aiohttp>=3.9.0"]
 sqlalchemy = ["sqlalchemy>=2.0.0"]
 redis = ["redis>=5.0.0"]
+django = ["django>=4.0"]
+flask = ["flask>=3.0"]
 langgraph = ["langgraph>=1.0.0"]
 
 [build-system]
@@ -70,6 +74,8 @@ dev = [
     "aiohttp>=3.9.0",
     "sqlalchemy>=2.0.0",
     "redis>=5.0.0",
+    "django>=4.0",
+    "flask>=3.0",
     "a2a-sdk>=0.2.0",
     "langchain-core>=1.2.7",
     "langgraph>=0.2.0",

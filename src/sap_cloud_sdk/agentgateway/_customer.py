@@ -1,11 +1,16 @@
 """Customer agent flow - file-based credentials with mTLS authentication.
 
-Customer agents read credentials from a file mounted on the pod filesystem.
-This flow is used when credential files are detected.
+Customer agents read credentials from a file mounted on the pod filesystem (STANDARD mode)
+or from environment variables (TRANSPARENT mode).
 
-Authentication flow:
+Authentication flow (STANDARD mode):
 - Tool discovery: mTLS client credentials → system-scoped token
 - Tool invocation: mTLS + jwt-bearer grant → user-scoped token (principal propagation)
+
+Authentication flow (TRANSPARENT mode):
+- Tool discovery: client credentials (no mTLS) → system-scoped token
+- Tool invocation: client credentials + jwt-bearer grant → user-scoped token
+- Gateway handles mTLS externally, SDK uses standard HTTPS
 """
 
 import json
@@ -19,6 +24,10 @@ import httpx
 from mcp import ClientSession
 from mcp.client.streamable_http import streamable_http_client
 
+from sap_cloud_sdk.agentgateway._dependencies_resolver import (
+    EnvironmentDependenciesResolver,
+    IntegrationDependenciesResolver,
+)
 from sap_cloud_sdk.agentgateway._models import (
     CustomerCredentials,
     IntegrationDependency,
@@ -26,14 +35,22 @@ from sap_cloud_sdk.agentgateway._models import (
 )
 from sap_cloud_sdk.agentgateway._token_cache import _TokenCache
 from sap_cloud_sdk.agentgateway.exceptions import AgentGatewaySDKError
+from sap_cloud_sdk.core.secret_resolver import resolve_base_mount
 
 logger = logging.getLogger(__name__)
 
-# Environment variable to override default credential path
-_CREDENTIALS_PATH_ENV = "AGW_CREDENTIALS_PATH"
+# servicebinding.io: scan $SERVICE_BINDING_ROOT for a binding whose 'type' file equals the expected type
+_BINDING_TYPE = "integration-credentials"
+_BINDING_TYPE_FILE = "type"
+_CREDENTIALS_FILE = "credentials"
 
-# Default credential path for Kyma production deployments
-_CREDENTIALS_DEFAULT_PATH = "/etc/ums/credentials/credentials"
+# Kyma default when SERVICE_BINDING_ROOT is not set
+_DEFAULT_BINDING_ROOT = "/bindings"
+
+# Environment variables for transparent mode
+_INTEGRATION_CLIENT_ID_ENV = "INTEGRATION_CLIENT_ID"
+_INTEGRATION_AUTH_URL_ENV = "INTEGRATION_AUTH_URL"
+_INTEGRATION_GATEWAY_URL_ENV = "INTEGRATION_GATEWAY_URL"
 
 # Resource URN for Agent Gateway token scope (hardcoded - production value)
 _AGW_RESOURCE_URN = "urn:sap:identity:application:provider:name:agent-gateway"
@@ -42,10 +59,14 @@ _AGW_RESOURCE_URN = "urn:sap:identity:application:provider:name:agent-gateway"
 _GRANT_TYPE_CLIENT_CREDENTIALS = "client_credentials"
 _GRANT_TYPE_JWT_BEARER = "urn:ietf:params:oauth:grant-type:jwt-bearer"
 
+# Token response field keys
+_TOKEN_FIELD_CLIENT_ID = "client_id"
+_TOKEN_FIELD_ACCESS_TOKEN = "access_token"
 
-def _cache_scope_key(credentials: CustomerCredentials, app_tid: str | None) -> str:
+
+def _cache_scope_key(credentials: CustomerCredentials) -> str:
     """Build a cache scope key for customer-flow tokens."""
-    return f"customer::{credentials.client_id}::{app_tid or ''}"
+    return f"customer::{credentials.client_id}"
 
 
 class _CredentialFields:
@@ -58,34 +79,105 @@ class _CredentialFields:
     GATEWAY_URL = "gatewayUrl"
     INTEGRATION_DEPENDENCIES = "integrationDependencies"
     ORD_ID = "ordId"
-    DATA = "data"
     GLOBAL_TENANT_ID = "globalTenantId"
 
 
 def detect_customer_agent_credentials() -> str | None:
     """Check if customer agent credentials file exists.
 
-    Checks for credential file in the following order:
-    1. Path specified in AGW_CREDENTIALS_PATH env var
-    2. Default mounted path: /etc/ums/credentials/credentials
+    $SERVICE_BINDING_ROOT (or /bindings if unset): scans all subdirectories for one whose
+       'type' file contains 'integration-credentials', then reads 'credentials' from that directory
 
     Returns:
         Path to credentials file if found, None otherwise.
     """
-    # Check env var first (path may be customized)
-    path_from_env = os.environ.get(_CREDENTIALS_PATH_ENV)
-    if path_from_env and os.path.isfile(path_from_env):
-        logger.debug("Customer credentials found at env var path: %s", path_from_env)
-        return path_from_env
 
-    # Check default mounted path
-    if os.path.isfile(_CREDENTIALS_DEFAULT_PATH):
-        logger.debug(
-            "Customer credentials found at default path: %s", _CREDENTIALS_DEFAULT_PATH
-        )
-        return _CREDENTIALS_DEFAULT_PATH
+    # servicebinding.io: scan $SERVICE_BINDING_ROOT for a binding whose 'type' file equals _BINDING_TYPE
+    sbr = resolve_base_mount(_DEFAULT_BINDING_ROOT)
+    if sbr and os.path.isdir(sbr):
+        for entry in os.scandir(sbr):
+            if not entry.is_dir():
+                continue
+            type_file = os.path.join(entry.path, _BINDING_TYPE_FILE)
+            if not os.path.isfile(type_file):
+                continue
+            with open(type_file) as f:
+                if f.read().strip() != _BINDING_TYPE:
+                    continue
+            credentials_path = os.path.join(entry.path, _CREDENTIALS_FILE)
+            if os.path.isfile(credentials_path):
+                logger.debug(
+                    "Customer credentials found via servicebinding.io type scan: %s",
+                    credentials_path,
+                )
+                return credentials_path
 
     return None
+
+
+def detect_transparent_credentials() -> bool:
+    """Check if transparent mode environment variables are present.
+
+    Checks for required environment variables:
+    - INTEGRATION_CLIENT_ID
+    - INTEGRATION_AUTH_URL
+    - INTEGRATION_GATEWAY_URL
+
+    Returns:
+        True if all required environment variables are present, False otherwise.
+    """
+    has_client_id = bool(os.environ.get(_INTEGRATION_CLIENT_ID_ENV))
+    has_auth_url = bool(os.environ.get(_INTEGRATION_AUTH_URL_ENV))
+    has_gateway_url = bool(os.environ.get(_INTEGRATION_GATEWAY_URL_ENV))
+    return has_client_id and has_auth_url and has_gateway_url
+
+
+def load_customer_credentials_from_env(
+    dependencies_resolver: IntegrationDependenciesResolver | None = None,
+) -> CustomerCredentials:
+    """Load customer credentials from environment variables (transparent mode).
+
+    Args:
+        dependencies_resolver: Optional custom resolver for integration dependencies.
+            If None, uses EnvironmentDependenciesResolver (INTEGRATION_DEPENDENCIES env var).
+
+    Returns:
+        CustomerCredentials configured for transparent mode.
+
+    Raises:
+        AgentGatewaySDKError: If required environment variables are missing or invalid.
+    """
+    logger.info("using transparent mode")
+
+    # Check required environment variables
+    required_vars = {
+        _INTEGRATION_CLIENT_ID_ENV: _TOKEN_FIELD_CLIENT_ID,
+        _INTEGRATION_AUTH_URL_ENV: "auth_url",
+        _INTEGRATION_GATEWAY_URL_ENV: "gateway_url",
+    }
+
+    missing = [var for var in required_vars if not os.environ.get(var)]
+    if missing:
+        raise AgentGatewaySDKError(
+            f"Transparent TLS mode requires environment variables: {', '.join(missing)}"
+        )
+
+    client_id = os.environ[_INTEGRATION_CLIENT_ID_ENV]
+    token_service_url = os.environ[_INTEGRATION_AUTH_URL_ENV]
+    gateway_url = os.environ[_INTEGRATION_GATEWAY_URL_ENV].rstrip("/")
+
+    # Resolve integration dependencies
+    resolver = dependencies_resolver or EnvironmentDependenciesResolver()
+    integration_dependencies = resolver.resolve()
+
+    return CustomerCredentials(
+        token_service_url=token_service_url,
+        client_id=client_id,
+        gateway_url=gateway_url,
+        integration_dependencies=integration_dependencies,
+        certificate=None,
+        private_key=None,
+    )
 
 
 def load_customer_credentials(path: str) -> CustomerCredentials:
@@ -112,7 +204,7 @@ def load_customer_credentials(path: str) -> CustomerCredentials:
     # Credential file uses camelCase, we use snake_case
     required_fields = {
         _CredentialFields.TOKEN_SERVICE_URL: "token_service_url",
-        _CredentialFields.CLIENT_ID: "client_id",
+        _CredentialFields.CLIENT_ID: _TOKEN_FIELD_CLIENT_ID,
         _CredentialFields.CERTIFICATE: "certificate",
         _CredentialFields.PRIVATE_KEY: "private_key",
         _CredentialFields.GATEWAY_URL: "gateway_url",
@@ -128,16 +220,14 @@ def load_customer_credentials(path: str) -> CustomerCredentials:
     if _CredentialFields.INTEGRATION_DEPENDENCIES not in data:
         raise AgentGatewaySDKError(
             "Credentials file missing required field: integrationDependencies. "
-            'Expected format: [{"ordId": "...", "data": {"globalTenantId": "..."}}]'
+            'Expected format: [{"ordId": "...", "globalTenantId": "..."}]'
         )
 
     try:
         integration_deps = [
             IntegrationDependency(
                 ord_id=dep[_CredentialFields.ORD_ID],
-                global_tenant_id=dep[_CredentialFields.DATA][
-                    _CredentialFields.GLOBAL_TENANT_ID
-                ],
+                global_tenant_id=dep[_CredentialFields.GLOBAL_TENANT_ID],
             )
             for dep in data[_CredentialFields.INTEGRATION_DEPENDENCIES]
         ]
@@ -148,21 +238,24 @@ def load_customer_credentials(path: str) -> CustomerCredentials:
     except (KeyError, TypeError) as e:
         raise AgentGatewaySDKError(
             f"Failed to parse integrationDependencies: {e}. "
-            'Expected format: [{"ordId": "...", "data": {"globalTenantId": "..."}}]'
+            'Expected format: [{"ordId": "...", "globalTenantId": "..."}]'
         )
 
     return CustomerCredentials(
         token_service_url=data[_CredentialFields.TOKEN_SERVICE_URL],
         client_id=data[_CredentialFields.CLIENT_ID],
-        certificate=data[_CredentialFields.CERTIFICATE],
-        private_key=data[_CredentialFields.PRIVATE_KEY],
         gateway_url=data[_CredentialFields.GATEWAY_URL].rstrip("/"),
         integration_dependencies=integration_deps,
+        certificate=data[_CredentialFields.CERTIFICATE],
+        private_key=data[_CredentialFields.PRIVATE_KEY],
     )
 
 
 def _create_ssl_context(certificate: str, private_key: str) -> ssl.SSLContext:
     """Create SSL context for mTLS from in-memory certificate and key.
+
+    Only used in STANDARD mode with file-based credentials.
+    In TRANSPARENT mode, standard HTTPS is used without custom SSL context.
 
     Uses temporary files as a bridge since ssl.SSLContext requires file paths
     or loaded certificate objects. The files are created with secure permissions
@@ -216,7 +309,6 @@ def _request_token_mtls(
     credentials: CustomerCredentials,
     grant_type: str,
     timeout: float,
-    app_tid: str | None = None,
     extra_data: dict | None = None,
 ) -> dict:
     """Make mTLS token request to IAS.
@@ -225,7 +317,6 @@ def _request_token_mtls(
         credentials: Customer credentials with certificate and private key.
         grant_type: OAuth2 grant type.
         timeout: HTTP timeout in seconds.
-        app_tid: BTP Application Tenant ID of subscriber (optional).
         extra_data: Additional form data for the token request.
 
     Returns:
@@ -234,18 +325,17 @@ def _request_token_mtls(
     Raises:
         AgentGatewaySDKError: If token request fails.
     """
+    if not credentials.certificate or not credentials.private_key:
+        raise AgentGatewaySDKError(
+            "Certificate and private key are required for mTLS token request."
+        )
     ssl_context = _create_ssl_context(credentials.certificate, credentials.private_key)
 
     data = {
-        "client_id": credentials.client_id,
+        _TOKEN_FIELD_CLIENT_ID: credentials.client_id,
         "grant_type": grant_type,
         "resource": _AGW_RESOURCE_URN,
     }
-
-    # TODO: app_tid requirement is still being clarified with the IBD team.
-    # This parameter may be removed if it turns out to be unnecessary.
-    if app_tid:
-        data["app_tid"] = app_tid
 
     if extra_data:
         data.update(extra_data)
@@ -281,7 +371,7 @@ def _request_token_mtls(
             )
 
         token_data = response.json()
-        access_token = token_data.get("access_token")
+        access_token = token_data.get(_TOKEN_FIELD_ACCESS_TOKEN)
 
         if not access_token:
             raise AgentGatewaySDKError(
@@ -292,44 +382,132 @@ def _request_token_mtls(
         return token_data
 
     except httpx.RequestError as e:
-        raise AgentGatewaySDKError(f"Token request failed: {e}")
+        raise AgentGatewaySDKError(f"Token request failed: {e}") from e
+
+
+def _request_token_transparent(
+    credentials: CustomerCredentials,
+    grant_type: str,
+    timeout: float,
+    extra_data: dict | None = None,
+) -> dict:
+    """Make standard HTTPS token request without mTLS (transparent mode).
+
+    Used in transparent mode where the gateway handles mTLS externally.
+    The SDK makes a standard HTTPS request without client certificates.
+
+    Args:
+        credentials: Customer credentials (certificate and private_key should be None).
+        grant_type: OAuth2 grant type.
+        timeout: HTTP timeout in seconds.
+        extra_data: Additional form data for the token request.
+
+    Returns:
+        Token response payload.
+
+    Raises:
+        AgentGatewaySDKError: If token request fails.
+    """
+    data = {
+        _TOKEN_FIELD_CLIENT_ID: credentials.client_id,
+        "grant_type": grant_type,
+        "resource": _AGW_RESOURCE_URN,
+    }
+
+    if extra_data:
+        data.update(extra_data)
+
+    logger.debug(
+        "Requesting token from %s with grant_type=%s (transparent mode)",
+        credentials.token_service_url,
+        grant_type,
+    )
+
+    try:
+        with httpx.Client(timeout=timeout) as client:
+            response = client.post(
+                credentials.token_service_url,
+                data=data,
+                headers={
+                    "Content-Type": "application/x-www-form-urlencoded",
+                    "Accept": "application/json",
+                },
+            )
+
+        if response.status_code != 200:
+            logger.error(
+                "Token request failed with status %d: %s",
+                response.status_code,
+                response.text[:500],
+            )
+            raise AgentGatewaySDKError(
+                f"Token request failed with status {response.status_code}: {response.text[:200]}"
+            )
+
+        token_data = response.json()
+        access_token = token_data.get(_TOKEN_FIELD_ACCESS_TOKEN)
+
+        if not access_token:
+            raise AgentGatewaySDKError(
+                f"Token response missing 'access_token'. Keys: {list(token_data.keys())}"
+            )
+
+        logger.debug("Token acquired successfully (length: %d)", len(access_token))
+        return token_data
+
+    except httpx.RequestError as e:
+        raise AgentGatewaySDKError(f"Token request failed: {e}") from e
 
 
 def get_system_token_mtls(
     credentials: CustomerCredentials,
     timeout: float,
-    app_tid: str | None = None,
     token_cache: _TokenCache | None = None,
 ) -> str:
-    """Get system-scoped token using mTLS client credentials flow.
+    """Get system-scoped token using client credentials flow.
+
+    Automatically selects authentication mode based on credentials:
+    - STANDARD mode: Uses mTLS with certificate and private key
+    - TRANSPARENT mode: Uses standard HTTPS (gateway handles mTLS)
 
     Used for tool discovery where user identity is not needed.
 
     Args:
         credentials: Customer credentials.
         timeout: HTTP timeout in seconds.
-        app_tid: BTP Application Tenant ID of subscriber (optional).
         token_cache: Optional token cache used to reuse still-valid tokens.
 
     Returns:
         System-scoped access token, fetched or served from cache.
     """
-    scope_key = _cache_scope_key(credentials, app_tid)
+    scope_key = _cache_scope_key(credentials)
     if token_cache:
         cached_token = token_cache.get_system_token(scope_key)
         if cached_token:
             logger.debug("Using cached system token for scope '%s'", scope_key)
             return cached_token
 
-    logger.info("Acquiring system token via mTLS client credentials")
-    token_data = _request_token_mtls(
-        credentials,
-        grant_type=_GRANT_TYPE_CLIENT_CREDENTIALS,
-        timeout=timeout,
-        app_tid=app_tid,
-        extra_data={"response_type": "token"},
-    )
-    access_token = token_data["access_token"]
+    # Determine which token request method to use based on credentials
+    if credentials.certificate and credentials.private_key:
+        # STANDARD mode: mTLS authentication
+        logger.info("Acquiring system token via mTLS client credentials")
+        token_data = _request_token_mtls(
+            credentials,
+            grant_type=_GRANT_TYPE_CLIENT_CREDENTIALS,
+            timeout=timeout,
+            extra_data={"response_type": "token"},
+        )
+    else:
+        # TRANSPARENT mode: standard HTTPS authentication
+        logger.info("Acquiring system token via transparent client credentials")
+        token_data = _request_token_transparent(
+            credentials,
+            grant_type=_GRANT_TYPE_CLIENT_CREDENTIALS,
+            timeout=timeout,
+            extra_data={"response_type": "token"},
+        )
+
+    access_token = token_data[_TOKEN_FIELD_ACCESS_TOKEN]
 
     if token_cache:
         token_cache.set_system_token(
@@ -345,10 +523,13 @@ def exchange_user_token(
     credentials: CustomerCredentials,
     user_token: str,
     timeout: float,
-    app_tid: str | None = None,
     token_cache: _TokenCache | None = None,
 ) -> str:
     """Exchange user token for AGW-scoped token using jwt-bearer grant.
+
+    Automatically selects authentication mode based on credentials:
+    - STANDARD mode: Uses mTLS with certificate and private key
+    - TRANSPARENT mode: Uses standard HTTPS (gateway handles mTLS)
 
     Used for tool invocation where user identity must be preserved
     for principal propagation.
@@ -357,32 +538,48 @@ def exchange_user_token(
         credentials: Customer credentials.
         user_token: User's JWT token to exchange.
         timeout: HTTP timeout in seconds.
-        app_tid: BTP Application Tenant ID of subscriber (optional).
         token_cache: Optional token cache used to reuse still-valid exchanged
             tokens.
 
     Returns:
         AGW-scoped access token with user identity, fetched or served from cache.
     """
-    scope_key = _cache_scope_key(credentials, app_tid)
+    scope_key = _cache_scope_key(credentials)
     if token_cache:
         cached_token = token_cache.get_user_token(user_token, scope_key)
         if cached_token:
             logger.debug("Using cached exchanged user token for scope '%s'", scope_key)
             return cached_token
 
-    logger.info("Exchanging user token for AGW-scoped token via jwt-bearer grant")
-    token_data = _request_token_mtls(
-        credentials,
-        grant_type=_GRANT_TYPE_JWT_BEARER,
-        timeout=timeout,
-        app_tid=app_tid,
-        extra_data={
-            "assertion": user_token,
-            "token_format": "jwt",
-        },
-    )
-    access_token = token_data["access_token"]
+    # Determine which token request method to use based on credentials
+    if credentials.certificate and credentials.private_key:
+        # STANDARD mode: mTLS authentication
+        logger.info("Exchanging user token for AGW-scoped token via jwt-bearer grant")
+        token_data = _request_token_mtls(
+            credentials,
+            grant_type=_GRANT_TYPE_JWT_BEARER,
+            timeout=timeout,
+            extra_data={
+                "assertion": user_token,
+                "token_format": "jwt",
+            },
+        )
+    else:
+        # TRANSPARENT mode: standard HTTPS authentication
+        logger.info(
+            "Exchanging user token for AGW-scoped token via transparent jwt-bearer grant"
+        )
+        token_data = _request_token_transparent(
+            credentials,
+            grant_type=_GRANT_TYPE_JWT_BEARER,
+            timeout=timeout,
+            extra_data={
+                "assertion": user_token,
+                "token_format": "jwt",
+            },
+        )
+
+    access_token = token_data[_TOKEN_FIELD_ACCESS_TOKEN]
 
     if token_cache:
         token_cache.set_user_token(
@@ -420,7 +617,6 @@ def _build_mcp_url(gateway_url: str, ord_id: str, gt_id: str) -> str:
 async def _list_server_tools(
     url: str,
     auth_token: str,
-    dependency: IntegrationDependency,
     timeout: float,
 ) -> list[MCPTool]:
     """List tools from a single MCP server.
@@ -518,7 +714,7 @@ async def get_mcp_tools_customer(
         )
 
         try:
-            server_tools = await _list_server_tools(url, system_token, dep, timeout)
+            server_tools = await _list_server_tools(url, system_token, timeout)
             tools.extend(server_tools)
             logger.debug("Loaded %d tool(s) from %s", len(server_tools), dep.ord_id)
         except Exception:

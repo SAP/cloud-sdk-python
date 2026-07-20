@@ -1,4 +1,4 @@
-"""Unit tests for AgentMemoryConfig, BindingData, and _load_config_from_env."""
+"""Unit tests for AgentMemoryConfig, BindingData, _load_config_from_env, and _load_config_for_instance."""
 
 import json
 from unittest.mock import patch
@@ -8,6 +8,7 @@ import pytest
 from sap_cloud_sdk.agent_memory.config import (
     AgentMemoryConfig,
     BindingData,
+    _load_config_for_instance,
     _load_config_from_env,
 )
 from sap_cloud_sdk.agent_memory.exceptions import AgentMemoryConfigError
@@ -50,6 +51,14 @@ class TestAgentMemoryConfig:
     def test_timeout_default(self):
         config = AgentMemoryConfig(base_url="http://localhost:8080")
         assert config.timeout == 30.0
+
+    def test_raises_when_identityzone_empty_string(self):
+        with pytest.raises(AgentMemoryConfigError, match="identityzone"):
+            AgentMemoryConfig(base_url="http://localhost", identityzone="")
+
+    def test_identityzone_defaults_to_none(self):
+        config = AgentMemoryConfig(base_url="http://localhost:8080")
+        assert config.identityzone is None
 
     def test_valid_config_with_all_fields_does_not_raise(self):
         AgentMemoryConfig(
@@ -102,6 +111,20 @@ class TestBindingData:
         with pytest.raises(AgentMemoryConfigError, match="Missing required field in uaa JSON"):
             BindingData(application_url="https://memory.example.com", uaa=uaa).extract_config()
 
+    def test_extract_config_maps_identityzone_when_present(self):
+        uaa = json.dumps({
+            "url": "https://my-zone.authentication.eu12.hana.ondemand.com",
+            "clientid": "c",
+            "clientsecret": "s",
+            "identityzone": "my-zone",
+        })
+        config = BindingData(application_url="https://memory.example.com", uaa=uaa).extract_config()
+        assert config.identityzone == "my-zone"
+
+    def test_extract_config_identityzone_is_none_when_absent(self):
+        config = BindingData(application_url="https://memory.example.com", uaa=_VALID_UAA).extract_config()
+        assert config.identityzone is None
+
     def test_extract_config_ignores_extra_uaa_fields(self):
         uaa = json.dumps({
             "apiurl": "https://api.authentication.eu12.hana.ondemand.com",
@@ -119,6 +142,7 @@ class TestBindingData:
         assert config.token_url == "https://auth.example.com/oauth/token"
         assert config.client_id == "my-client"
         assert config.client_secret == "my-secret"
+        assert config.identityzone == "my-zone"
 
     def test_extract_config_raises_on_empty_uaa_object(self):
         with pytest.raises(AgentMemoryConfigError, match="Missing required field in uaa JSON"):
@@ -187,3 +211,77 @@ class TestLoadConfigFromEnv:
         with patch("os.stat", side_effect=FileNotFoundError("no mount")):
             with pytest.raises(AgentMemoryConfigError, match="Failed to parse uaa JSON"):
                 _load_config_from_env()
+
+
+# ── _load_config_for_instance ─────────────────────────────────────────────────
+
+
+def _fill_binding_for_instance(instance_name: str):
+    """Return a side_effect that fills binding only when instance matches."""
+    def _fill(**kwargs):
+        assert kwargs["instance"] == instance_name
+        kwargs["target"].application_url = f"https://{instance_name}.memory.example.com"
+        kwargs["target"].uaa = json.dumps({
+            "url": f"https://{instance_name}.auth.example.com",
+            "clientid": f"{instance_name}-client",
+            "clientsecret": "secret",
+        })
+    return _fill
+
+
+class TestLoadConfigForInstance:
+
+    def test_loads_named_instance_binding(self):
+        """Loads config from the specified instance name (not 'default')."""
+        with patch(_RESOLVER, side_effect=_fill_binding_for_instance("acme-corp")):
+            config = _load_config_for_instance("acme-corp")
+
+        assert config.base_url == "https://acme-corp.memory.example.com"
+        assert config.token_url == "https://acme-corp.auth.example.com/oauth/token"
+        assert config.client_id == "acme-corp-client"
+
+    def test_calls_resolver_with_correct_instance(self):
+        """Resolver receives the exact instance name passed (not 'default')."""
+        with patch(_RESOLVER, side_effect=_fill_binding_for_instance("beta-tenant")) as mock_resolver:
+            _load_config_for_instance("beta-tenant")
+
+        _, kwargs = mock_resolver.call_args
+        assert kwargs["module"] == "hana-agent-memory"
+        assert kwargs["instance"] == "beta-tenant"
+
+    def test_default_instance_is_equivalent_to_load_config_from_env(self):
+        """_load_config_for_instance('default') produces the same result as _load_config_from_env."""
+        with patch(_RESOLVER, side_effect=_fill_binding_for_instance("default")):
+            config_instance = _load_config_for_instance("default")
+        with patch(_RESOLVER, side_effect=_fill_binding_for_instance("default")):
+            config_env = _load_config_from_env()
+
+        assert config_instance.base_url == config_env.base_url
+        assert config_instance.token_url == config_env.token_url
+
+    def test_raises_with_instance_name_in_message_when_binding_missing(self):
+        """Error message includes the instance name when the binding cannot be loaded."""
+        with patch(_RESOLVER, side_effect=RuntimeError("secrets not found")):
+            with pytest.raises(AgentMemoryConfigError, match="acme-corp"):
+                _load_config_for_instance("acme-corp")
+
+    def test_loads_from_env_vars_for_named_instance(self, monkeypatch):
+        """Subscriber binding loaded from env vars keyed by tenant name."""
+        monkeypatch.setenv(
+            "CLOUD_SDK_CFG_HANA_AGENT_MEMORY_ACME_CORP_APPLICATION_URL",
+            "https://acme-corp.memory.example.com",
+        )
+        monkeypatch.setenv(
+            "CLOUD_SDK_CFG_HANA_AGENT_MEMORY_ACME_CORP_UAA",
+            json.dumps({
+                "url": "https://acme-corp.auth.example.com",
+                "clientid": "acme-client",
+                "clientsecret": "secret",
+            }),
+        )
+
+        with patch("os.stat", side_effect=FileNotFoundError("no mount")):
+            config = _load_config_for_instance("acme-corp")
+
+        assert config.base_url == "https://acme-corp.memory.example.com"
+        assert config.client_id == "acme-client"

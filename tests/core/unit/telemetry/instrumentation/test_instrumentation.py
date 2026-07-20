@@ -112,6 +112,7 @@ class TestRegistry:
         assert "HttpxInstrumentor" in names
         assert "RequestsInstrumentorWrapper" in names
         assert "GrpcInstrumentorWrapper" in names
+        assert "LoggingInstrumentorWrapper" in names
 
 
 # ---------------------------------------------------------------------------
@@ -160,6 +161,15 @@ class TestRequestsInstrumentor:
         with patch.object(req_mod, "_instrumentor", mock):
             req_mod.RequestsInstrumentorWrapper().uninstrument()
         mock.uninstrument.assert_called_once()
+
+
+class TestLoggingInstrumentor:
+    def test_instrument_delegates_to_otel(self):
+        from sap_cloud_sdk.core.telemetry.instrumentation.instrumentors import logging as logging_mod
+        mock = _make_otel_instrumentor_mock()
+        with patch.object(logging_mod, "_instrumentor", mock):
+            logging_mod.LoggingInstrumentorWrapper().instrument()
+        mock.instrument.assert_called_once_with(set_logging_format=True)
 
 
 class TestGrpcInstrumentor:

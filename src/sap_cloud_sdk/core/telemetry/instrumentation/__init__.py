@@ -6,6 +6,7 @@ from sap_cloud_sdk.core.telemetry.instrumentation.instrumentors import (  # noqa
     httpx,
     requests,
     grpc,
+    logging,
 )
 
 # Optional — guarded so missing extras don't break the import.

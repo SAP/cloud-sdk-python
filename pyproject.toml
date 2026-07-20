@@ -29,6 +29,7 @@ dependencies = [
     "opentelemetry-instrumentation-httpx~=0.63b1",
     "opentelemetry-instrumentation-requests~=0.63b1",
     "opentelemetry-instrumentation-grpc~=0.63b1",
+    "opentelemetry-instrumentation-logging~=0.63b1",
     "opentelemetry-instrumentation-starlette~=0.63b1",
     "opentelemetry-instrumentation-fastapi~=0.63b1",
     "opentelemetry-instrumentation-aiohttp-client~=0.63b1",

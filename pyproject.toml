@@ -26,12 +26,17 @@ dependencies = [
     "grpcio>=1.60.0",
     "opentelemetry-api>=1.42.1",
     "opentelemetry-sdk>=1.42.1",
+    "opentelemetry-instrumentation-httpx>=0.43b0",
+    "opentelemetry-instrumentation-requests>=0.43b0",
+    "opentelemetry-instrumentation-grpc>=0.43b0",
     "mcp>=1.1.0",
 ]
 
 [project.optional-dependencies]
 extensibility = ["a2a-sdk>=0.2.0"]
-starlette = ["starlette>=0.40.0"]
+starlette = ["starlette>=0.40.0", "opentelemetry-instrumentation-starlette>=0.43b0"]
+fastapi = ["fastapi>=0.100.0", "opentelemetry-instrumentation-fastapi>=0.43b0"]
+aiohttp = ["aiohttp>=3.9.0", "opentelemetry-instrumentation-aiohttp-client>=0.43b0"]
 langchain = ["langchain-core>=1.2.7"]
 langgraph = ["langgraph>=1.0.0"]
 
@@ -55,6 +60,11 @@ dev = [
     "starlette>=0.40.0",
     "anyio>=3.6.2",
     "httpx>=0.27.0",
+    "fastapi>=0.100.0",
+    "aiohttp>=3.9.0",
+    "opentelemetry-instrumentation-starlette>=0.43b0",
+    "opentelemetry-instrumentation-fastapi>=0.43b0",
+    "opentelemetry-instrumentation-aiohttp-client>=0.43b0",
     "a2a-sdk>=0.2.0",
     "langchain-core>=1.2.7",
     "langgraph>=0.2.0",

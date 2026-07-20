@@ -36,6 +36,7 @@ from sap_cloud_sdk.core.telemetry.metrics_decorator import record_metrics
 from sap_cloud_sdk.core.telemetry.span_processors.propagated_attributes_processor import (
     PropagatedAttributesSpanProcessor,
 )
+from sap_cloud_sdk.core.telemetry.instrumentation import get_registry
 
 logger = logging.getLogger(__name__)
 
@@ -89,6 +90,8 @@ def auto_instrument(
 
     if middlewares:
         _register_middleware_processors(middlewares)
+
+    _instrument_libraries()
 
     logger.info("Cloud auto instrumentation initialized successfully")
 
@@ -157,6 +160,11 @@ def _register_middleware_processors(middlewares: list[TelemetryMiddleware]) -> N
     logger.info(
         "Registered MiddlewareSpanProcessor for %d middleware(s)", len(middlewares)
     )
+
+
+def _instrument_libraries() -> None:
+    for instrumentor in get_registry():
+        instrumentor.instrument()
 
 
 def _merge_resource_attrs_into_active_provider_if_wrapper_installed(

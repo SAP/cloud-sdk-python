@@ -11,6 +11,7 @@ from sap_cloud_sdk.core.telemetry.constants import (
 )
 from sap_cloud_sdk.core.telemetry.middleware.base import TelemetryMiddleware
 from sap_cloud_sdk.ias import parse_token
+from sap_cloud_sdk.ias._context import set_auth_context
 
 try:
     from starlette.middleware.base import BaseHTTPMiddleware
@@ -31,11 +32,13 @@ class _IASMiddleware(BaseHTTPMiddleware):
         self._attrs_var = attrs_var
 
     async def dispatch(self, request: Request, call_next: Any) -> Response:
+        set_auth_context(_parse_ias_claims(request))
         token = self._attrs_var.set(_extract_ias_attrs(request))
         try:
             return await call_next(request)
         finally:
             self._attrs_var.reset(token)
+            set_auth_context(None)
 
 
 class StarletteIASTelemetryMiddleware(TelemetryMiddleware):
@@ -76,6 +79,18 @@ class StarletteIASTelemetryMiddleware(TelemetryMiddleware):
     def get_attributes(self) -> Dict[str, Any]:
         """Return IAS JWT attributes extracted from the current request."""
         return self._attrs_var.get()
+
+
+def _parse_ias_claims(request: Request):
+    """Parse the Authorization header and return IASClaims, or None on failure."""
+    auth = request.headers.get("authorization", "")
+    if not auth:
+        return None
+    try:
+        return parse_token(auth)
+    except Exception as e:
+        logger.debug("IAS token parsing failed, skipping telemetry attrs: %s", e)
+        return None
 
 
 def _extract_ias_attrs(request: Request) -> Dict[str, Any]:

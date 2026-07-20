@@ -61,16 +61,17 @@ class TestCreateClient:
         assert isinstance(client, AgentMemoryClient)
         assert client._transport is not None
 
-    def test_subscriber_strategy_loads_tenant_binding(self, monkeypatch):
-        """Factory with SUBSCRIBER loads the tenant binding."""
+    def test_subscriber_strategy_loads_default_binding(self, monkeypatch):
+        """Factory with SUBSCRIBER loads the default binding (native implementation)."""
         import json
         monkeypatch.setenv(
-            "CLOUD_SDK_CFG_HANA_AGENT_MEMORY_ACME_CORP_APPLICATION_URL",
-            "http://acme.memory.example.com",
+            "CLOUD_SDK_CFG_HANA_AGENT_MEMORY_DEFAULT_APPLICATION_URL",
+            "http://memory.example.com",
         )
         monkeypatch.setenv(
-            "CLOUD_SDK_CFG_HANA_AGENT_MEMORY_ACME_CORP_UAA",
-            json.dumps({"url": "http://acme.auth.example.com", "clientid": "c", "clientsecret": "s"}),
+            "CLOUD_SDK_CFG_HANA_AGENT_MEMORY_DEFAULT_UAA",
+            json.dumps({"url": "http://auth.example.com", "clientid": "c", "clientsecret": "s",
+                        "identityzone": "provider-zone"}),
         )
         with patch("sap_cloud_sdk.agent_memory.HttpTransport") as MockTransport:
             MockTransport.return_value = MagicMock(spec=HttpTransport)
@@ -79,7 +80,7 @@ class TestCreateClient:
                 tenant="acme-corp",
             )
         assert isinstance(client, AgentMemoryClient)
-        assert client._transport is not None
+        assert client._tenant == "acme-corp"
 
     def test_provider_strategy_loads_default_binding(self, monkeypatch):
         """Factory with PROVIDER loads the default binding."""

@@ -334,7 +334,64 @@ export APPFND_CONHOS_SYSTEM_ROLE="S4HC"
 export SAP_SOLUTION_AREA="AFND"
 ```
 
-### ORD document ID
+---
+
+## Instrumenting SDK modules with `record_metrics`
+
+The `record_metrics` decorator records request and error counters for any SDK module operation. It is the standard way to add usage telemetry to a client method.
+
+```python
+from sap_cloud_sdk.core.telemetry import record_metrics
+
+class MyClient:
+    @record_metrics("my_module", "my_operation")
+    def my_method(self):
+        ...
+```
+
+Each call to the decorated method increments `sap.cloud_sdk.capability.requests`. On exception it increments `sap.cloud_sdk.capability.errors` and re-raises. Metrics are emitted only when `OTEL_EXPORTER_OTLP_ENDPOINT` is set — no-op otherwise.
+
+### Using the built-in enums
+
+For modules that live inside this package, use the `Module` and `Operation` enums:
+
+```python
+from sap_cloud_sdk.core.telemetry import record_metrics, Module, Operation
+
+class DestinationClient:
+    @record_metrics(Module.DESTINATION, Operation.DESTINATION_GET_DESTINATION)
+    def get_destination(self, name: str):
+        ...
+```
+
+### Using plain strings (external packages)
+
+External packages that depend on `sap-cloud-sdk` can pass plain strings directly without contributing to the enums in this repo:
+
+```python
+from sap_cloud_sdk.core.telemetry import record_metrics
+
+class MyExternalClient:
+    @record_metrics("my_module", "my_operation")
+    def my_method(self):
+        ...
+```
+
+The `Module` enum values are still the canonical form for OSS modules. Plain strings are the extension point for packages that have their own release lifecycle.
+
+### Source attribution
+
+When one SDK module creates a client from another internally, set `_telemetry_source` so the metric reflects the originating module:
+
+```python
+auditlog_client = AuditLogClient(_telemetry_source=Module.OBJECTSTORE)
+```
+
+The decorator reads `_telemetry_source` from `self` (or from `__init__` kwargs) and passes it as the `source` attribute on the metric.
+
+---
+
+## ORD document ID
 
 ```bash
 export ORD_DOCUMENT_ID="sap.foo:ord-doc:v1"

@@ -1,6 +1,7 @@
 """Tests for telemetry meter provider."""
 
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch, MagicMock, call
+import logging
 
 from opentelemetry.sdk.metrics import (
     Counter,
@@ -17,6 +18,8 @@ from sap_cloud_sdk.core.telemetry._provider import (
     shutdown,
     _setup_meter_provider,
     _create_metric_exporter,
+    setup_log_provider,
+    _create_log_exporter,
 )
 from sap_cloud_sdk.core.telemetry.config import InstrumentationConfig
 
@@ -187,3 +190,107 @@ class TestSetupMeterProvider:
                         with patch("sap_cloud_sdk.core.telemetry._provider.MeterProvider", return_value=mock_provider):
                             with patch("opentelemetry.metrics.set_meter_provider"):
                                 assert _setup_meter_provider() is mock_provider
+
+
+_LOGGING_HANDLER = "sap_cloud_sdk.core.telemetry._provider.LoggingHandler"
+_GRPC_LOG_EXPORTER = "sap_cloud_sdk.core.telemetry._provider.GRPCLogExporter"
+_HTTP_LOG_EXPORTER = "sap_cloud_sdk.core.telemetry._provider.HTTPLogExporter"
+
+
+class TestCreateLogExporter:
+    def test_grpc_by_default(self):
+        with patch(_GRPC_LOG_EXPORTER) as mock_grpc:
+            with patch(_HTTP_LOG_EXPORTER) as mock_http:
+                _create_log_exporter()
+                mock_grpc.assert_called_once_with()
+                mock_http.assert_not_called()
+
+    def test_grpc_explicit(self):
+        with patch(_GRPC_LOG_EXPORTER) as mock_grpc:
+            with patch(_HTTP_LOG_EXPORTER) as mock_http:
+                with patch.dict("os.environ", {"OTEL_EXPORTER_OTLP_PROTOCOL": "grpc"}):
+                    _create_log_exporter()
+                mock_grpc.assert_called_once_with()
+                mock_http.assert_not_called()
+
+    def test_http_protobuf(self):
+        with patch(_GRPC_LOG_EXPORTER) as mock_grpc:
+            with patch(_HTTP_LOG_EXPORTER) as mock_http:
+                with patch.dict("os.environ", {"OTEL_EXPORTER_OTLP_PROTOCOL": "http/protobuf"}):
+                    _create_log_exporter()
+                mock_http.assert_called_once_with()
+                mock_grpc.assert_not_called()
+
+    def test_unsupported_protocol_raises(self):
+        import pytest
+        with patch.dict("os.environ", {"OTEL_EXPORTER_OTLP_PROTOCOL": "http/json"}):
+            with pytest.raises(ValueError, match="Unsupported OTEL_EXPORTER_OTLP_PROTOCOL"):
+                _create_log_exporter()
+
+
+class TestSetupLogProvider:
+    def test_disabled_returns_none(self):
+        config = InstrumentationConfig(enabled=False)
+        with patch("sap_cloud_sdk.core.telemetry._provider.get_config", return_value=config):
+            assert setup_log_provider() is None
+
+    def test_returns_configured_provider(self):
+        mock_provider = MagicMock()
+        with patch("sap_cloud_sdk.core.telemetry._provider.get_config", return_value=_ENABLED_CONFIG):
+            with patch("sap_cloud_sdk.core.telemetry._provider.Resource"):
+                with patch("sap_cloud_sdk.core.telemetry._provider._create_log_exporter"):
+                    with patch("sap_cloud_sdk.core.telemetry._provider.BatchLogRecordProcessor"):
+                        with patch("sap_cloud_sdk.core.telemetry._provider.LoggerProvider", return_value=mock_provider):
+                            with patch("sap_cloud_sdk.core.telemetry._provider.set_logger_provider"):
+                                with patch(_LOGGING_HANDLER):
+                                    with patch("logging.getLogger"):
+                                        result = setup_log_provider()
+                                        assert result is mock_provider
+
+    def test_uses_shared_resource_attributes(self):
+        with patch("sap_cloud_sdk.core.telemetry._provider.get_config", return_value=_ENABLED_CONFIG):
+            with patch("sap_cloud_sdk.core.telemetry._provider.create_resource_attributes_from_env", return_value={"service.name": "svc"}) as mock_attrs:
+                with patch("sap_cloud_sdk.core.telemetry._provider.Resource") as mock_resource:
+                    with patch("sap_cloud_sdk.core.telemetry._provider._create_log_exporter"):
+                        with patch("sap_cloud_sdk.core.telemetry._provider.BatchLogRecordProcessor"):
+                            with patch("sap_cloud_sdk.core.telemetry._provider.LoggerProvider"):
+                                with patch("sap_cloud_sdk.core.telemetry._provider.set_logger_provider"):
+                                    with patch(_LOGGING_HANDLER):
+                                        with patch("logging.getLogger"):
+                                            setup_log_provider()
+                                            mock_attrs.assert_called_once()
+                                            mock_resource.create.assert_called_once_with({"service.name": "svc"})
+
+    def test_calls_set_logger_provider(self):
+        with patch("sap_cloud_sdk.core.telemetry._provider.get_config", return_value=_ENABLED_CONFIG):
+            with patch("sap_cloud_sdk.core.telemetry._provider.Resource"):
+                with patch("sap_cloud_sdk.core.telemetry._provider._create_log_exporter"):
+                    with patch("sap_cloud_sdk.core.telemetry._provider.BatchLogRecordProcessor"):
+                        mock_provider = MagicMock()
+                        with patch("sap_cloud_sdk.core.telemetry._provider.LoggerProvider", return_value=mock_provider):
+                            with patch("sap_cloud_sdk.core.telemetry._provider.set_logger_provider") as mock_set:
+                                with patch(_LOGGING_HANDLER):
+                                    with patch("logging.getLogger"):
+                                        setup_log_provider()
+                                        mock_set.assert_called_once_with(mock_provider)
+
+    def test_installs_handler_on_root_logger(self):
+        with patch("sap_cloud_sdk.core.telemetry._provider.get_config", return_value=_ENABLED_CONFIG):
+            with patch("sap_cloud_sdk.core.telemetry._provider.Resource"):
+                with patch("sap_cloud_sdk.core.telemetry._provider._create_log_exporter"):
+                    with patch("sap_cloud_sdk.core.telemetry._provider.BatchLogRecordProcessor"):
+                        with patch("sap_cloud_sdk.core.telemetry._provider.LoggerProvider"):
+                            with patch("sap_cloud_sdk.core.telemetry._provider.set_logger_provider"):
+                                mock_handler = MagicMock()
+                                with patch(_LOGGING_HANDLER, return_value=mock_handler):
+                                    mock_root = MagicMock()
+                                    with patch("logging.getLogger", return_value=mock_root) as mock_get_logger:
+                                        setup_log_provider()
+                                        mock_get_logger.assert_called_once_with()
+                                        mock_root.addHandler.assert_called_once_with(mock_handler)
+
+    def test_exception_returns_none(self):
+        with patch("sap_cloud_sdk.core.telemetry._provider.get_config", return_value=_ENABLED_CONFIG):
+            with patch("sap_cloud_sdk.core.telemetry._provider.Resource"):
+                with patch("sap_cloud_sdk.core.telemetry._provider._create_log_exporter", side_effect=Exception("boom")):
+                    assert setup_log_provider() is None

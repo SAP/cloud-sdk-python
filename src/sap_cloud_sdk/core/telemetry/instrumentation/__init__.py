@@ -1,5 +1,8 @@
 from sap_cloud_sdk.core.telemetry.instrumentation.base import LibraryInstrumentor
-from sap_cloud_sdk.core.telemetry.instrumentation._registry import register, get_registry
+from sap_cloud_sdk.core.telemetry.instrumentation._registry import (
+    register,
+    get_registry,
+)
 
 # Import concrete instrumentors to trigger their register() calls.
 from sap_cloud_sdk.core.telemetry.instrumentation.instrumentors import (  # noqa: F401

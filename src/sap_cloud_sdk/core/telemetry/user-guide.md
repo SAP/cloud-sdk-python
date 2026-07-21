@@ -144,6 +144,48 @@ GenAIOperation.INVOKE_AGENT
 
 ---
 
+## Logging
+
+`auto_instrument()` sets up OTel logs alongside traces and metrics. It installs a handler on the root stdlib logger so all existing `logging.getLogger(...)` calls in your app automatically ship log records to the OTel backend with the same resource attributes (service name, region, subaccount, etc.).
+
+No changes to your logging code are needed:
+
+```python
+import logging
+
+logger = logging.getLogger(__name__)
+
+logger.info("Destination fetched")
+logger.warning("Retrying request, attempt %d", attempt)
+logger.error("Failed to connect", exc_info=True)
+```
+
+### Structured fields
+
+Use `extra={}` to attach structured attributes to a log record:
+
+```python
+logger.info("Request completed", extra={"tenant_id": tid, "duration_ms": 120})
+```
+
+### Log level filtering
+
+By default all levels (`DEBUG` and above) flow through OTel. To restrict what gets exported, set the level on the root logger or any specific logger:
+
+```python
+# Only WARNING and above to OTel
+logging.getLogger().setLevel(logging.WARNING)
+
+# Or scope it to your app's logger tree
+logging.getLogger("my_app").setLevel(logging.INFO)
+```
+
+### Correlation with traces
+
+OTel logs emitted inside an active span are automatically correlated — the `trace_id` and `span_id` are injected into the log record. No extra work needed.
+
+---
+
 ## Adding attributes
 
 ### To the current span
@@ -200,6 +242,7 @@ Propagation is scoped: once the parent span exits, its attributes stop propagati
 ## Complete example
 
 ```python
+import logging
 from sap_cloud_sdk.core.telemetry import (
     auto_instrument,
     invoke_agent_span,
@@ -212,8 +255,12 @@ auto_instrument()
 
 from litellm import completion
 
+logger = logging.getLogger(__name__)
+
 async def handle_request(query: str, user_id: str):
     set_tenant_id("bh7sjh...")
+
+    logger.info("Handling request", extra={"user_id": user_id})
 
     # Parent span carries business context for the whole agent turn.
     # Autoinstrumentation creates the child LLM span automatically.
@@ -224,6 +271,7 @@ async def handle_request(query: str, user_id: str):
     ):
         documents = await retrieve_knowledge_base(query)
         add_span_attribute("documents.retrieved", len(documents))
+        logger.debug("Retrieved %d documents", len(documents))
 
         response = completion(
             model="gpt-4",
@@ -306,7 +354,7 @@ export OTEL_EXPORTER_OTLP_ENDPOINT="https://otel-collector.example.com"
 
 ### Transport protocol
 
-Both traces and metrics use gRPC by default. Switch to HTTP/protobuf by setting:
+Traces, metrics, and logs all use gRPC by default. Switch to HTTP/protobuf by setting:
 
 ```bash
 export OTEL_EXPORTER_OTLP_PROTOCOL="http/protobuf"

@@ -20,6 +20,7 @@ from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import ConsoleSpanExporter, SpanExporter
 from traceloop.sdk import Traceloop
 
+from sap_cloud_sdk.core.telemetry._provider import setup_log_provider
 from sap_cloud_sdk.core.telemetry.module import Module
 from sap_cloud_sdk.core.telemetry.operation import Operation
 from sap_cloud_sdk.core.telemetry.config import (
@@ -86,6 +87,8 @@ def auto_instrument(
 
     _set_baggage_processor()
     _set_propagated_attributes_processor()
+
+    setup_log_provider()
 
     if middlewares:
         _register_middleware_processors(middlewares)

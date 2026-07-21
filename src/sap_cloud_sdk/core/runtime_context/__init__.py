@@ -34,6 +34,7 @@ from sap_cloud_sdk.core.runtime_context._context import (
     sdk_context,
     set_context,
 )
+from sap_cloud_sdk.core.runtime_context._envelope import RequestEnvelope
 from sap_cloud_sdk.core.runtime_context._protocol import ContextProvider
 from sap_cloud_sdk.core.runtime_context._providers import IASContextProvider
 
@@ -41,6 +42,7 @@ __all__ = [
     "ContextProvider",
     "IASContextProvider",
     "RequestContext",
+    "RequestEnvelope",
     "async_sdk_context",
     "get_context",
     "sdk_context",

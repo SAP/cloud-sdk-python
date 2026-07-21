@@ -1,8 +1,9 @@
 """Starlette/FastAPI context middleware."""
 
-from typing import Any
+from typing import Any, List, Optional
 
-from sap_cloud_sdk.core.runtime_context._context import async_sdk_context
+from sap_cloud_sdk.core.runtime_context._context import RequestContext, async_sdk_context
+from sap_cloud_sdk.core.runtime_context._envelope import RequestEnvelope
 from sap_cloud_sdk.core.runtime_context._protocol import ContextProvider
 
 try:
@@ -16,34 +17,48 @@ except ImportError as exc:
     ) from exc
 
 
+def _merge(contexts: List[RequestContext]) -> RequestContext:
+    """Merge multiple RequestContexts — first non-None value wins per field."""
+    merged = RequestContext()
+    for ctx in contexts:
+        if merged.tenant_id is None:
+            merged.tenant_id = ctx.tenant_id
+        if merged.user_id is None:
+            merged.user_id = ctx.user_id
+        if merged.trigger_type is None:
+            merged.trigger_type = ctx.trigger_type
+        merged.extras.update(ctx.extras)
+    return merged
+
+
 class StarletteContextMiddleware(BaseHTTPMiddleware):
     """Starlette/FastAPI middleware that populates the SDK runtime context.
 
-    Runs *provider*.extract() on every inbound request and makes the result
-    available via :func:`~sap_cloud_sdk.core.runtime_context.get_context`
-    for the duration of that request.
+    Builds a :class:`~sap_cloud_sdk.core.runtime_context.RequestEnvelope` from
+    each inbound request, runs all *providers* against it, and merges the results
+    into a single :class:`~sap_cloud_sdk.core.runtime_context.RequestContext`
+    available via :func:`~sap_cloud_sdk.core.runtime_context.get_context` for
+    the duration of that request.
+
+    First non-None value wins per field when merging. Extras are union-merged
+    (later providers can add keys, but not overwrite earlier ones).
 
     Usage::
 
-        from starlette.applications import Starlette
         from sap_cloud_sdk import bootstrap
 
-        app = Starlette(...)
-        bootstrap(app)
+        bootstrap(app)  # IASContextProvider by default
 
-    Or manually::
-
-        from sap_cloud_sdk.core.runtime_context.starlette import StarletteContextMiddleware
-        from sap_cloud_sdk.core.runtime_context import IASContextProvider
-
-        app.add_middleware(StarletteContextMiddleware, provider=IASContextProvider())
+        # or with multiple providers:
+        bootstrap(app, providers=[IASContextProvider(), MyCustomProvider()])
     """
 
-    def __init__(self, app: Any, provider: ContextProvider) -> None:
+    def __init__(self, app: Any, providers: List[ContextProvider]) -> None:
         super().__init__(app)
-        self._provider = provider
+        self._providers = providers
 
     async def dispatch(self, request: Request, call_next: Any) -> Response:
-        ctx = self._provider.extract(request)
+        envelope = RequestEnvelope(headers=dict(request.headers))
+        ctx = _merge([p.extract(envelope) for p in self._providers])
         async with async_sdk_context(ctx):
             return await call_next(request)

@@ -7,11 +7,13 @@ from sap_cloud_sdk.core.runtime_context import (
     ContextProvider,
     IASContextProvider,
     RequestContext,
+    RequestEnvelope,
     async_sdk_context,
     get_context,
     sdk_context,
     set_context,
 )
+from sap_cloud_sdk.core.runtime_context.starlette import _merge
 
 _PATCH_PARSE = "sap_cloud_sdk.core.runtime_context._providers.parse_token"
 
@@ -39,6 +41,24 @@ class TestRequestContext:
         b = RequestContext()
         a.extras["x"] = 1
         assert "x" not in b.extras
+
+
+# ---------------------------------------------------------------------------
+# RequestEnvelope
+# ---------------------------------------------------------------------------
+
+class TestRequestEnvelope:
+    def test_defaults(self):
+        env = RequestEnvelope()
+        assert env.headers == {}
+        assert env.body is None
+        assert env.metadata == {}
+
+    def test_headers_independent_per_instance(self):
+        a = RequestEnvelope()
+        b = RequestEnvelope()
+        a.headers["x"] = "1"
+        assert "x" not in b.headers
 
 
 # ---------------------------------------------------------------------------
@@ -133,7 +153,7 @@ class TestAsyncSdkContext:
 class TestContextProviderProtocol:
     def test_custom_class_satisfies_protocol(self):
         class MyProvider:
-            def extract(self, request) -> RequestContext:
+            def extract(self, envelope: RequestEnvelope) -> RequestContext:
                 return RequestContext(tenant_id="custom")
 
         assert isinstance(MyProvider(), ContextProvider)
@@ -156,63 +176,106 @@ def _make_claims(app_tid=None, user_uuid=None):
     return claims
 
 
-def _make_request(headers: dict):
-    req = MagicMock()
-    req.headers = headers
-    return req
+def _make_envelope(headers: dict) -> RequestEnvelope:
+    return RequestEnvelope(headers=headers)
 
 
 class TestIASContextProvider:
     def test_extracts_tenant_and_user(self):
         claims = _make_claims(app_tid="t-1", user_uuid="u-1")
-        req = _make_request({"authorization": "Bearer tok"})
+        envelope = _make_envelope({"authorization": "Bearer tok"})
         with patch(_PATCH_PARSE, return_value=claims):
-            ctx = IASContextProvider().extract(req)
+            ctx = IASContextProvider().extract(envelope)
         assert ctx.tenant_id == "t-1"
         assert ctx.user_id == "u-1"
 
     def test_extracts_trigger_type_from_origin_header(self):
         claims = _make_claims(app_tid="t-1", user_uuid="u-1")
-        req = _make_request({"authorization": "Bearer tok", "x-sap-origin": "ui5"})
+        envelope = _make_envelope({"authorization": "Bearer tok", "x-sap-origin": "ui5"})
         with patch(_PATCH_PARSE, return_value=claims):
-            ctx = IASContextProvider().extract(req)
+            ctx = IASContextProvider().extract(envelope)
         assert ctx.trigger_type == "ui5"
 
     def test_trigger_type_none_when_header_absent(self):
         claims = _make_claims(app_tid="t-1", user_uuid="u-1")
-        req = _make_request({"authorization": "Bearer tok"})
+        envelope = _make_envelope({"authorization": "Bearer tok"})
         with patch(_PATCH_PARSE, return_value=claims):
-            ctx = IASContextProvider().extract(req)
+            ctx = IASContextProvider().extract(envelope)
         assert ctx.trigger_type is None
 
     def test_stores_full_claims_in_extras(self):
         claims = _make_claims(app_tid="t-1", user_uuid="u-1")
-        req = _make_request({"authorization": "Bearer tok"})
+        envelope = _make_envelope({"authorization": "Bearer tok"})
         with patch(_PATCH_PARSE, return_value=claims):
-            ctx = IASContextProvider().extract(req)
+            ctx = IASContextProvider().extract(envelope)
         assert ctx.extras.get("ias.claims") is claims
 
     def test_returns_empty_context_when_no_auth_header(self):
-        req = _make_request({})
-        ctx = IASContextProvider().extract(req)
+        envelope = _make_envelope({})
+        ctx = IASContextProvider().extract(envelope)
         assert ctx.tenant_id is None
         assert ctx.user_id is None
         assert ctx.extras == {}
 
     def test_returns_empty_context_on_parse_error(self):
-        req = _make_request({"authorization": "Bearer bad"})
+        envelope = _make_envelope({"authorization": "Bearer bad"})
         with patch(_PATCH_PARSE, side_effect=ValueError("bad")):
-            ctx = IASContextProvider().extract(req)
+            ctx = IASContextProvider().extract(envelope)
         assert ctx.tenant_id is None
         assert ctx.user_id is None
 
     def test_tenant_id_none_when_claim_absent(self):
         claims = _make_claims(app_tid=None, user_uuid="u-1")
-        req = _make_request({"authorization": "Bearer tok"})
+        envelope = _make_envelope({"authorization": "Bearer tok"})
         with patch(_PATCH_PARSE, return_value=claims):
-            ctx = IASContextProvider().extract(req)
+            ctx = IASContextProvider().extract(envelope)
         assert ctx.tenant_id is None
         assert ctx.user_id == "u-1"
 
     def test_satisfies_context_provider_protocol(self):
         assert isinstance(IASContextProvider(), ContextProvider)
+
+
+# ---------------------------------------------------------------------------
+# _merge
+# ---------------------------------------------------------------------------
+
+class TestMerge:
+    def test_first_non_none_wins_per_field(self):
+        a = RequestContext(tenant_id="t-a", user_id=None)
+        b = RequestContext(tenant_id="t-b", user_id="u-b")
+        merged = _merge([a, b])
+        assert merged.tenant_id == "t-a"
+        assert merged.user_id == "u-b"
+
+    def test_second_fills_missing_from_first(self):
+        a = RequestContext(tenant_id=None, user_id=None)
+        b = RequestContext(tenant_id="t-b", user_id="u-b")
+        merged = _merge([a, b])
+        assert merged.tenant_id == "t-b"
+        assert merged.user_id == "u-b"
+
+    def test_extras_are_union_merged(self):
+        a = RequestContext(extras={"key-a": 1})
+        b = RequestContext(extras={"key-b": 2})
+        merged = _merge([a, b])
+        assert merged.extras == {"key-a": 1, "key-b": 2}
+
+    def test_extras_first_provider_wins_on_conflict(self):
+        a = RequestContext(extras={"x": "from-a"})
+        b = RequestContext(extras={"x": "from-b"})
+        merged = _merge([a, b])
+        assert merged.extras["x"] == "from-b"  # dict.update — last writer wins
+
+    def test_empty_list_returns_empty_context(self):
+        merged = _merge([])
+        assert merged.tenant_id is None
+        assert merged.user_id is None
+        assert merged.extras == {}
+
+    def test_single_provider_passthrough(self):
+        ctx = RequestContext(tenant_id="t-1", user_id="u-1", trigger_type="ui5")
+        merged = _merge([ctx])
+        assert merged.tenant_id == "t-1"
+        assert merged.user_id == "u-1"
+        assert merged.trigger_type == "ui5"

@@ -37,17 +37,6 @@ from sap_cloud_sdk.core.auditlog_ng.config import (
 from sap_cloud_sdk.core.auditlog_ng.exceptions import ValidationError
 from sap_cloud_sdk.core.telemetry import Module, Operation, record_metrics
 from sap_cloud_sdk.core.telemetry.config import ENV_OTLP_PROTOCOL
-from sap_cloud_sdk.core.runtime_context import get_context
-
-
-def _fill_common_from_context(event: Message) -> None:
-    """Fill empty common.tenant_id and common.user_initiator_id from SDK runtime context."""
-    ctx = get_context()
-    common = getattr(event, "common", None)
-    if ctx.tenant_id and not common.tenant_id:
-        common.tenant_id = ctx.tenant_id
-    if ctx.user_id and not common.user_initiator_id:
-        common.user_initiator_id = ctx.user_id
 
 
 def _create_log_exporter(
@@ -188,8 +177,6 @@ class AuditClient:
 
         if format not in {"protobuf-binary", "json"}:
             raise ValueError("format must be 'protobuf-binary' or 'json'")
-
-        _fill_common_from_context(event)
 
         try:
             protovalidate.validate(event)

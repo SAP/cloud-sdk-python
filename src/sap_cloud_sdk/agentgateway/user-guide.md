@@ -156,6 +156,22 @@ The SDK discovers resources via BTP Destination Service fragments filtered by th
 | `subscriber.ias` | IAS credential fragment for system-scoped token acquisition |
 | `subscriber.ias.user` | IAS credential fragment for user-scoped token exchange |
 
+## Multi-tenancy
+
+- **Supported:** Yes (LoB flow); Partial (Customer flow)
+- **Authentication:** IAS (mTLS for Customer flow; IAS via Destination Service for LoB flow)
+- **How to use:**
+  - **LoB flow:** Pass `tenant_subdomain` to `create_client()`. All subsequent calls on that client instance use the subscriber tenant context.
+
+    ```python
+    from sap_cloud_sdk.agentgateway import create_client
+
+    client = create_client(tenant_subdomain="my-subscriber")
+    agent_cards = client.list_agent_cards()
+    ```
+
+  - **Customer flow:** Pass `app_tid` (the subscriber's BTP application tenant ID) to the individual auth methods (`get_system_auth`, `get_user_auth`, `list_mcp_tools`, `call_mcp_tool`).
+
 ## API
 
 ### Factory Function

@@ -469,15 +469,20 @@ while True:
 
 ## Multi-Tenancy
 
-All operations support an optional `tenant` parameter for subscriber-scoped requests. The SDK resolves the token URL by replacing the provider's identity zone with the tenant subdomain:
+- **Supported:** Yes
+- **Authentication:** XSUAA
+- **How to use:** Pass an optional `tenant` parameter to any operation. The SDK resolves a subscriber-scoped XSUAA token by replacing the provider's `identityzone` subdomain in the token URL. Omitting `tenant` uses the provider token (default).
 
-```python
-# Provider context (default)
-repos = client.get_all_repositories()
+  ```python
+  # Provider context (default)
+  repos = client.get_all_repositories()
 
-# Subscriber context
-repos = client.get_all_repositories(tenant="subscriber-subdomain")
-```
+  # Subscriber context
+  repos = client.get_all_repositories(tenant="subscriber-subdomain")
+  ```
+
+- **Further reading:**
+  - [Multitenancy with SAP Document Management Service — SAP Help Portal](https://help.sap.com/docs/DOCUMENT_MANAGEMENT/f6e70dd4bffa4b65965b43feed4c9429/0f6dd1bbaca342ee9177b9ece3fcaaa3.html)
 
 ---
 

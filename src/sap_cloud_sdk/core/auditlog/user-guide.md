@@ -328,6 +328,24 @@ security_event = SecurityEvent(
 client.log(security_event)
 ```
 
+## Multi-tenancy
+
+- **Supported:** N/A at auth level
+- **Authentication:** XSUAA
+- **How to use:** Tenant identity is expressed as an event-level field inside each logged event, not at the authentication layer. The provider always authenticates with its own XSUAA token. Pass `Tenant.SUBSCRIBER` or `Tenant.PROVIDER` when constructing events:
+
+  ```python
+  from sap_cloud_sdk.core.auditlog import Tenant
+
+  event = client.data_modification_event(tenant=Tenant.SUBSCRIBER)
+  ```
+
+  > [!NOTE]
+  > This module (auditlog v2) is deprecated. Use `core/auditlog_ng` for new integrations.
+
+- **Further reading:**
+  - [SAP Audit Log Service — SAP Help Portal](https://help.sap.com/docs/btp/sap-business-technology-platform/audit-log-service)
+
 ## Error Handling
 
 Always handle exceptions when logging audit events:

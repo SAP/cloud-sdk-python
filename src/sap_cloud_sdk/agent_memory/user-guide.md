@@ -23,10 +23,6 @@ plain text, and the service makes it searchable by meaning.
     - [`agent_id`](#agent_id)
     - [`invoker_id`](#invoker_id)
   - [Multitenancy](#multitenancy)
-    - [AccessStrategy](#accessstrategy)
-    - [Configuring at client level](#configuring-at-client-level)
-    - [SUBSCRIBER (default)](#subscriber-default)
-    - [PROVIDER](#provider)
   - [Semantic Search: A Brief Primer](#semantic-search-a-brief-primer)
   - [Memories](#memories)
     - [Create a Memory](#create-a-memory)
@@ -172,64 +168,36 @@ across create, read, and search calls is the implementer's responsibility.
 
 ## Multitenancy
 
-The Agent Memory service runs in a multi-tenant BTP environment. By default, every API
-call uses a **subscriber-scoped token** — meaning data is isolated to the subscriber tenant
-that your application serves. You control this behaviour with the `access_strategy` and
-`tenant` keyword arguments available on every client method.
+- **Supported:** Yes
+- **Authentication:** XSUAA
+- **How to use:** Pass `access_strategy` and `tenant` to `create_client()`. The strategy controls whether calls use a subscriber-scoped or provider-scoped XSUAA token. Every method on the client inherits the strategy set at construction time.
 
-### AccessStrategy
+  | Value                                 | Description                                                                                     |
+  | ------------------------------------- | ----------------------------------------------------------------------------------------------- |
+  | `AccessStrategy.SUBSCRIBER` (default) | Reads and writes against the subscriber tenant. Requires `tenant`.                              |
+  | `AccessStrategy.PROVIDER`             | Reads and writes against the provider tenant. No `tenant` needed. Provides no tenant isolation. |
 
-```python
-from sap_cloud_sdk.agent_memory import AccessStrategy
-```
+  > [!WARNING]
+  > `PROVIDER` strategy provides **no tenant isolation**, the provider token grants access to data in the provider subaccount. Only use this strategy for provider-owned operations (e.g., admin tasks, shared datasets). Never use it to serve subscriber-specific data.
 
-| Value                       | Description                                                                                                   |
-| --------------------------- | ------------------------------------------------------------------------------------------------------------- |
-| `SUBSCRIBER` (default) | Reads and writes against the subscriber tenant. Requires `tenant`.                                            |
-| `PROVIDER`             | Reads and writes against the provider tenant. No `tenant` needed. Caution: this provides no tenant isolation. |
+  ```python
+  from sap_cloud_sdk.agent_memory import create_client, AccessStrategy
 
-### Configuring at client level
+  # Subscriber context — all calls use the tenant set here
+  client = create_client(
+      access_strategy=AccessStrategy.SUBSCRIBER,
+      tenant="acme-corp",
+  )
+  memories = client.list_memories(agent_id="some-assistant", invoker_id="user-42")
 
-Pass `access_strategy` and `tenant` to `create_client()` to set defaults for the entire
-client instance. Every method call then inherits them, so you do not need to repeat them
-on each operation.
+  # Provider context — no tenant isolation
+  client = create_client(access_strategy=AccessStrategy.PROVIDER)
+  memories = client.list_memories(agent_id="some-assistant", invoker_id="user-42")
+  ```
 
-```python
-from sap_cloud_sdk.agent_memory import create_client, AccessStrategy
+- **Further reading:** N/A
 
-# Tenant set once — all calls below use it automatically
-client = create_client(
-    access_strategy=AccessStrategy.SUBSCRIBER,
-    tenant="acme-corp",
-)
-
-memories = client.list_memories(agent_id="hr-assistant", invoker_id="user-42")
-count    = client.count_memories(agent_id="hr-assistant")
-```
-
-### SUBSCRIBER (default)
-
-Configure a subscriber tenant at client creation. All calls will use that tenant context.
-
-```python
-client = create_client(
-    access_strategy=AccessStrategy.SUBSCRIBER,
-    tenant="acme-corp",
-)
-memories = client.list_memories(agent_id="hr-assistant", invoker_id="user-42")
-```
-
-### PROVIDER
-
-Configure a provider-only client. No tenant is needed; all calls use the provider binding.
-
-```python
-client = create_client(access_strategy=AccessStrategy.PROVIDER)
-memories = client.list_memories(agent_id="hr-assistant", invoker_id="user-42")
-```
-
-> [!WARNING]
-> `PROVIDER` provides **no tenant isolation** — the provider token grants access to data across all subscriber tenants Only use this strategy for provider-owned operations (e.g., admin tasks, shared datasets). Never use it to serve subscriber-specific data.
+  
 
 ## Semantic Search: A Brief Primer
 
@@ -568,10 +536,10 @@ See the [Content and metadata filtering](#content-and-metadata-filtering) note u
 
 ### Enums
 
-| Enum             | Values                                       |
-| ---------------- | -------------------------------------------- |
-| `MessageRole`    | `USER`, `ASSISTANT`, `SYSTEM`, `TOOL`        |
-| `AccessStrategy` | `SUBSCRIBER` (default), `PROVIDER` |
+| Enum             | Values                                |
+| ---------------- | ------------------------------------- |
+| `MessageRole`    | `USER`, `ASSISTANT`, `SYSTEM`, `TOOL` |
+| `AccessStrategy` | `SUBSCRIBER` (default), `PROVIDER`    |
 
 All models expose a `to_dict()` method that returns a plain dict for logging or forwarding.
 

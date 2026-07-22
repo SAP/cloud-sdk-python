@@ -6,6 +6,7 @@ from sap_cloud_sdk.core.runtime_context._protocol import ContextProvider
 from sap_cloud_sdk.core.runtime_context._registry import get_registry
 from sap_cloud_sdk.core.runtime_context import HeaderContextProvider, IASContextProvider
 
+
 def bootstrap(app: Any, providers: Optional[List[ContextProvider]] = None) -> None:
     """Wire the SDK runtime context into your application framework.
 

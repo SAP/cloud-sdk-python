@@ -173,7 +173,14 @@ New list/query operations: encapsulate pagination params like existing modules (
 New client methods: `@record_metrics(Module.X, Operation.Y)` from `core/telemetry`. New module: constant added to `core/telemetry/module.py` and operations to `core/telemetry/operation.py`. If module is called by other SDK modules: `_telemetry_source: Optional[Module] = None` param present.
 
 **D6: Multi-tenancy support**
-Multi-tenancy is a cross-cutting concern for most BTP applications. For new service modules, consider whether the underlying service supports a provider/subscriber model and, if so, whether the module should expose a way for callers to route requests to a subscriber tenant context. This is a **nice-to-have** (⚠️ if absent, not ❌), but must be a conscious decision either way — the `user-guide.md` must document whether support is present, planned, or intentionally out of scope (see E2a). Common patterns are XSUAA-based (subdomain replacement in token URL) and IAS-based (`app_tid` or Destination Service routing), but any reasonable mechanism is acceptable.
+Multi-tenancy is a cross-cutting concern for most BTP applications. For new service modules, consider the full scope of multi-tenancy — not just token routing, but also provisioning and tenant isolation:
+
+- **Provisioning:** Does the service require a subscription or onboarding step per tenant? Does the module need to support tenant lifecycle callbacks (subscribe/unsubscribe)?
+- **Tenant isolation:** Is data or configuration isolated per tenant at the service level? Does the module enforce or expose tenant boundaries correctly?
+- **Auth/routing:** Does the module need to route requests to a subscriber tenant context (e.g., XSUAA subdomain replacement, IAS `app_tid`, or Destination Service routing)?
+- **Infrastructure:** Is there any infrastructure work required (e.g., new service binding fields, SPII fragments, Subscription Manager integration)?
+
+This is a **nice-to-have** (⚠️ if absent, not ❌), but must be a conscious decision either way — the `user-guide.md` must document whether support is present, planned, or intentionally out of scope (see E2a).
 
 ---
 

@@ -172,6 +172,8 @@ The SDK discovers resources via BTP Destination Service fragments filtered by th
 
   - **Customer flow:** Pass `app_tid` (the subscriber's BTP application tenant ID) to the individual auth methods (`get_system_auth`, `get_user_auth`, `list_mcp_tools`, `call_mcp_tool`).
 
+- **Further reading:** N/A
+
 ## API
 
 ### Factory Function

@@ -184,6 +184,12 @@ logging.getLogger("my_app").setLevel(logging.INFO)
 
 OTel logs emitted inside an active span are automatically correlated — the `trace_id` and `span_id` are injected into the log record. No extra work needed.
 
+### Third-party logging libraries
+
+The OTel handler is installed on the root stdlib `logging` logger. Any library that propagates to stdlib works automatically.
+
+Libraries that bypass stdlib entirely need a custom sink that forwards records to `logging.getLogger(...).log(...)`. The OTel handler then picks them up from there.
+
 ---
 
 ## Adding attributes

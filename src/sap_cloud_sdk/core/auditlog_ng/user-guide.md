@@ -168,6 +168,8 @@ event.object_type = "resource"
 event.object_id = "resource-001"
 ```
 
+> **Tip:** When using `StarletteIASTelemetryMiddleware` (see [Automatic tenant and user injection](#automatic-tenant-and-user-injection)), `common.tenant_id` and `common.user_initiator_id` are filled automatically from the incoming IAS JWT. You only need to set them explicitly if you want to override the values from the token.
+
 ### Step 4: Send the Event
 
 **Binary protobuf:**
@@ -281,6 +283,55 @@ Events are validated against protobuf constraints using `protovalidate` before s
 - The event fails schema validation
 - The `tenant_id` is not a valid UUID
 - The client has already been closed
+
+---
+
+## Automatic tenant and user injection
+
+When `StarletteIASTelemetryMiddleware` is registered on your app, it parses the
+incoming `Authorization: Bearer <token>` header on every request and stores the
+IAS claims in the current async context.
+
+`AuditClient.send()` reads that context automatically before validation and
+back-fills two fields on the event's `common` block — only if they are not
+already set by the caller:
+
+| Field populated | IAS claim used |
+|---|---|
+| `common.tenant_id` | `app_tid` |
+| `common.user_initiator_id` | `user_uuid` |
+
+### Setup
+
+Register the middleware once when your app starts:
+
+```python
+from sap_cloud_sdk.core.telemetry import auto_instrument
+from sap_cloud_sdk.core.telemetry.middleware import StarletteIASTelemetryMiddleware
+
+app = FastAPI(...)
+auto_instrument(middlewares=[StarletteIASTelemetryMiddleware(app=app)])
+```
+
+### Usage
+
+With the middleware in place, you can omit `tenant_id` and `user_initiator_id`
+from every event — they are injected automatically:
+
+```python
+event = pb.DataAccess()
+event.common.timestamp.FromDatetime(datetime.now(timezone.utc))
+# tenant_id and user_initiator_id are filled from the IAS JWT automatically
+event.channel_type = "API"
+event.channel_id = "agent-v1"
+event.object_type = "resource"
+event.object_id = "resource-001"
+
+event_id = client.send(event)
+```
+
+If neither the middleware nor an explicit value provides `tenant_id`, the event
+will fail `protovalidate` validation and raise a `ValidationError`.
 
 ---
 

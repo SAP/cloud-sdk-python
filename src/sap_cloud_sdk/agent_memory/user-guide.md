@@ -197,7 +197,7 @@ across create, read, and search calls is the implementer's responsibility.
 
 - **Further reading:** N/A
 
-  
+
 
 ## Semantic Search: A Brief Primer
 

@@ -22,6 +22,7 @@ _PATCH_PARSE = "sap_cloud_sdk.core.runtime_context._providers.parse_token"
 # RequestContext
 # ---------------------------------------------------------------------------
 
+
 class TestRequestContext:
     def test_defaults_are_none(self):
         ctx = RequestContext()
@@ -47,6 +48,7 @@ class TestRequestContext:
 # RequestEnvelope
 # ---------------------------------------------------------------------------
 
+
 class TestRequestEnvelope:
     def test_defaults(self):
         env = RequestEnvelope()
@@ -64,6 +66,7 @@ class TestRequestEnvelope:
 # ---------------------------------------------------------------------------
 # get_context / set_context
 # ---------------------------------------------------------------------------
+
 
 class TestGetSetContext:
     def test_get_returns_empty_by_default(self):
@@ -83,6 +86,7 @@ class TestGetSetContext:
 # ---------------------------------------------------------------------------
 # sdk_context (sync)
 # ---------------------------------------------------------------------------
+
 
 class TestSdkContext:
     def test_sets_context_inside_block(self):
@@ -118,6 +122,7 @@ class TestSdkContext:
 # async_sdk_context
 # ---------------------------------------------------------------------------
 
+
 class TestAsyncSdkContext:
     @pytest.mark.anyio
     async def test_sets_context_inside_async_block(self):
@@ -150,6 +155,7 @@ class TestAsyncSdkContext:
 # ContextProvider protocol
 # ---------------------------------------------------------------------------
 
+
 class TestContextProviderProtocol:
     def test_custom_class_satisfies_protocol(self):
         class MyProvider:
@@ -168,6 +174,7 @@ class TestContextProviderProtocol:
 # ---------------------------------------------------------------------------
 # IASContextProvider
 # ---------------------------------------------------------------------------
+
 
 def _make_claims(app_tid=None, user_uuid=None):
     claims = MagicMock()
@@ -191,7 +198,9 @@ class TestIASContextProvider:
 
     def test_extracts_trigger_type_from_origin_header(self):
         claims = _make_claims(app_tid="t-1", user_uuid="u-1")
-        envelope = _make_envelope({"authorization": "Bearer tok", "x-sap-origin": "ui5"})
+        envelope = _make_envelope(
+            {"authorization": "Bearer tok", "x-sap-origin": "ui5"}
+        )
         with patch(_PATCH_PARSE, return_value=claims):
             ctx = IASContextProvider().extract(envelope)
         assert ctx.trigger_type == "ui5"
@@ -239,6 +248,7 @@ class TestIASContextProvider:
 # ---------------------------------------------------------------------------
 # _merge
 # ---------------------------------------------------------------------------
+
 
 class TestMerge:
     def test_first_non_none_wins_per_field(self):

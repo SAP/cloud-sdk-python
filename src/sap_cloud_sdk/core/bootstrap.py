@@ -17,8 +17,10 @@ def bootstrap(app: Any, providers: Optional[List[ContextProvider]] = None) -> No
     :func:`~sap_cloud_sdk.core.runtime_context.get_context` to read
     tenant/user information without knowing about headers or auth providers.
 
-    Supported frameworks (detected automatically from *app* type):
-      - Starlette / FastAPI
+    The framework is detected automatically from the *app* type. Supported
+    frameworks are determined by registered
+    :class:`~sap_cloud_sdk.core.runtime_context.FrameworkAdapter` instances —
+    new frameworks are added by registering an adapter, not by editing this file.
 
     Args:
         app:       The application instance to attach the middleware to.
@@ -26,7 +28,7 @@ def bootstrap(app: Any, providers: Optional[List[ContextProvider]] = None) -> No
                    instances. Defaults to ``[IASContextProvider()]``.
 
     Raises:
-        TypeError: If *app* is not a recognised framework application type.
+        TypeError: If no registered adapter recognises *app*.
 
     Example::
 
@@ -39,24 +41,29 @@ def bootstrap(app: Any, providers: Optional[List[ContextProvider]] = None) -> No
     """
     if not providers:
         from sap_cloud_sdk.core.runtime_context import IASContextProvider
+
         providers = [IASContextProvider()]
-    _attach(app, providers)
 
+    # Ensure all built-in adapters are registered before iterating.
+    _load_builtin_adapters()
 
-def _attach(app: Any, providers: List[ContextProvider]) -> None:
-    """Detect framework and register the appropriate context middleware."""
-    try:
-        from starlette.applications import Starlette
-        from sap_cloud_sdk.core.runtime_context.starlette import StarletteContextMiddleware
+    from sap_cloud_sdk.core.runtime_context._registry import get_registry
 
-        if isinstance(app, Starlette):
-            app.add_middleware(StarletteContextMiddleware, providers=providers)
+    for adapter in get_registry():
+        if adapter.matches(app):
+            adapter.attach(app, providers)
             return
-    except ImportError:
-        pass
 
     raise TypeError(
         f"bootstrap() does not recognise app type {type(app)!r}. "
-        "Supported frameworks: Starlette/FastAPI. "
-        "For other frameworks, register the middleware manually."
+        "Supported frameworks are determined by registered FrameworkAdapters. "
+        "For other frameworks, register a FrameworkAdapter or attach the middleware manually."
     )
+
+
+def _load_builtin_adapters() -> None:
+    """Import built-in framework adapter modules to trigger their register() calls."""
+    try:
+        import sap_cloud_sdk.core.runtime_context.starlette  # noqa: F401
+    except ImportError:
+        pass

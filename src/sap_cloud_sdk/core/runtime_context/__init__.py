@@ -9,7 +9,7 @@ Typical usage — wire once at app startup::
     from sap_cloud_sdk import bootstrap
     from sap_cloud_sdk.core.runtime_context import IASContextProvider
 
-    bootstrap(app, provider=IASContextProvider())
+    bootstrap(app, providers=[IASContextProvider()])
 
 Then read anywhere in the SDK or application code::
 
@@ -37,14 +37,17 @@ from sap_cloud_sdk.core.runtime_context._context import (
 from sap_cloud_sdk.core.runtime_context._envelope import RequestEnvelope
 from sap_cloud_sdk.core.runtime_context._protocol import ContextProvider
 from sap_cloud_sdk.core.runtime_context._providers import IASContextProvider
+from sap_cloud_sdk.core.runtime_context._registry import FrameworkAdapter, register
 
 __all__ = [
     "ContextProvider",
+    "FrameworkAdapter",
     "IASContextProvider",
     "RequestContext",
     "RequestEnvelope",
     "async_sdk_context",
     "get_context",
+    "register",
     "sdk_context",
     "set_context",
 ]

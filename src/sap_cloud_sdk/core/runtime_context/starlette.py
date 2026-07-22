@@ -1,10 +1,14 @@
-"""Starlette/FastAPI context middleware."""
+"""Starlette/FastAPI context middleware and framework adapter."""
 
-from typing import Any, List, Optional
+from typing import Any, List
 
-from sap_cloud_sdk.core.runtime_context._context import RequestContext, async_sdk_context
+from sap_cloud_sdk.core.runtime_context._context import (
+    RequestContext,
+    async_sdk_context,
+)
 from sap_cloud_sdk.core.runtime_context._envelope import RequestEnvelope
 from sap_cloud_sdk.core.runtime_context._protocol import ContextProvider
+from sap_cloud_sdk.core.runtime_context._registry import FrameworkAdapter, register
 
 try:
     from starlette.middleware.base import BaseHTTPMiddleware
@@ -41,16 +45,7 @@ class StarletteContextMiddleware(BaseHTTPMiddleware):
     the duration of that request.
 
     First non-None value wins per field when merging. Extras are union-merged
-    (later providers can add keys, but not overwrite earlier ones).
-
-    Usage::
-
-        from sap_cloud_sdk import bootstrap
-
-        bootstrap(app)  # IASContextProvider by default
-
-        # or with multiple providers:
-        bootstrap(app, providers=[IASContextProvider(), MyCustomProvider()])
+    across all providers.
     """
 
     def __init__(self, app: Any, providers: List[ContextProvider]) -> None:
@@ -62,3 +57,18 @@ class StarletteContextMiddleware(BaseHTTPMiddleware):
         ctx = _merge([p.extract(envelope) for p in self._providers])
         async with async_sdk_context(ctx):
             return await call_next(request)
+
+
+class _StarletteContextAdapter(FrameworkAdapter):
+    framework_name = "starlette"
+
+    def _matches(self, app) -> bool:
+        from starlette.applications import Starlette
+
+        return isinstance(app, Starlette)
+
+    def attach(self, app, providers: List[ContextProvider]) -> None:
+        app.add_middleware(StarletteContextMiddleware, providers=providers)
+
+
+register(_StarletteContextAdapter())

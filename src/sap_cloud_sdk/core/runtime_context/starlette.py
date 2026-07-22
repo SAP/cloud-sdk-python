@@ -22,17 +22,12 @@ except ImportError as exc:
 
 
 def _merge(contexts: List[RequestContext]) -> RequestContext:
-    """Merge multiple RequestContexts — first non-None value wins per field."""
-    merged = RequestContext()
+    """Merge multiple RequestContexts — first writer wins per key."""
+    merged: dict = {}
     for ctx in contexts:
-        if merged.tenant_id is None:
-            merged.tenant_id = ctx.tenant_id
-        if merged.user_id is None:
-            merged.user_id = ctx.user_id
-        if merged.trigger_type is None:
-            merged.trigger_type = ctx.trigger_type
-        merged.extras.update(ctx.extras)
-    return merged
+        for key, value in ctx._raw().items():
+            merged.setdefault(key, value)
+    return RequestContext(merged)
 
 
 class StarletteContextMiddleware(BaseHTTPMiddleware):

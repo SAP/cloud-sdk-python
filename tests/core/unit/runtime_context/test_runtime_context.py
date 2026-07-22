@@ -4,6 +4,7 @@ import pytest
 from unittest.mock import MagicMock, patch
 
 from sap_cloud_sdk.core.runtime_context import (
+    ContextKey,
     ContextProvider,
     IASContextProvider,
     RequestContext,
@@ -13,9 +14,33 @@ from sap_cloud_sdk.core.runtime_context import (
     sdk_context,
     set_context,
 )
+from sap_cloud_sdk.core.runtime_context._providers import (
+    IAS_CLAIMS,
+    TENANT_ID,
+    TRIGGER_TYPE,
+    USER_ID,
+)
 from sap_cloud_sdk.core.runtime_context.starlette import _merge
 
 _PATCH_PARSE = "sap_cloud_sdk.core.runtime_context._providers.parse_token"
+
+
+# ---------------------------------------------------------------------------
+# ContextKey
+# ---------------------------------------------------------------------------
+
+
+class TestContextKey:
+    def test_repr(self):
+        key = ContextKey[str]("my_key")
+        assert repr(key) == "ContextKey('my_key')"
+
+    def test_different_instances_are_different_keys(self):
+        a = ContextKey[str]("x")
+        b = ContextKey[str]("x")
+        ctx = RequestContext({a: "from-a"})
+        assert ctx.get(a) == "from-a"
+        assert ctx.get(b) is None
 
 
 # ---------------------------------------------------------------------------
@@ -24,24 +49,35 @@ _PATCH_PARSE = "sap_cloud_sdk.core.runtime_context._providers.parse_token"
 
 
 class TestRequestContext:
-    def test_defaults_are_none(self):
+    def test_empty_by_default(self):
         ctx = RequestContext()
-        assert ctx.tenant_id is None
-        assert ctx.user_id is None
-        assert ctx.trigger_type is None
-        assert ctx.extras == {}
+        key = ContextKey[str]("k")
+        assert ctx.get(key) is None
 
-    def test_fields_are_settable(self):
-        ctx = RequestContext(tenant_id="t1", user_id="u1", trigger_type="ui5")
-        assert ctx.tenant_id == "t1"
-        assert ctx.user_id == "u1"
-        assert ctx.trigger_type == "ui5"
+    def test_get_returns_set_value(self):
+        key = ContextKey[str]("k")
+        ctx = RequestContext({key: "v"})
+        assert ctx.get(key) == "v"
 
-    def test_extras_are_independent_per_instance(self):
-        a = RequestContext()
-        b = RequestContext()
-        a.extras["x"] = 1
-        assert "x" not in b.extras
+    def test_with_value_returns_new_instance(self):
+        key = ContextKey[str]("k")
+        ctx = RequestContext()
+        ctx2 = ctx.with_value(key, "v")
+        assert ctx2 is not ctx
+        assert ctx.get(key) is None
+        assert ctx2.get(key) == "v"
+
+    def test_immutable_original_unaffected_by_with_value(self):
+        key = ContextKey[str]("k")
+        ctx = RequestContext({key: "original"})
+        ctx.with_value(key, "new")
+        assert ctx.get(key) == "original"
+
+    def test_repr(self):
+        key = ContextKey[str]("tenant_id")
+        ctx = RequestContext({key: "t-1"})
+        assert "tenant_id" in repr(ctx)
+        assert "t-1" in repr(ctx)
 
 
 # ---------------------------------------------------------------------------
@@ -70,12 +106,12 @@ class TestRequestEnvelope:
 
 class TestGetSetContext:
     def test_get_returns_empty_by_default(self):
-        ctx = get_context()
-        assert ctx.tenant_id is None
-        assert ctx.user_id is None
+        key = ContextKey[str]("k")
+        assert get_context().get(key) is None
 
     def test_set_then_get_returns_same_object(self):
-        ctx = RequestContext(tenant_id="abc")
+        key = ContextKey[str]("k")
+        ctx = RequestContext({key: "v"})
         set_context(ctx)
         assert get_context() is ctx
 
@@ -90,27 +126,30 @@ class TestGetSetContext:
 
 class TestSdkContext:
     def test_sets_context_inside_block(self):
-        ctx = RequestContext(tenant_id="inside")
+        key = ContextKey[str]("k")
+        ctx = RequestContext({key: "inside"})
         with sdk_context(ctx):
-            assert get_context().tenant_id == "inside"
+            assert get_context().get(key) == "inside"
 
     def test_restores_previous_context_after_block(self):
-        outer = RequestContext(tenant_id="outer")
+        key = ContextKey[str]("k")
+        outer = RequestContext({key: "outer"})
         set_context(outer)
-        with sdk_context(RequestContext(tenant_id="inner")):
+        with sdk_context(RequestContext({key: "inner"})):
             pass
-        assert get_context().tenant_id == "outer"
+        assert get_context().get(key) == "outer"
 
     def test_restores_on_exception(self):
-        outer = RequestContext(tenant_id="outer")
+        key = ContextKey[str]("k")
+        outer = RequestContext({key: "outer"})
         set_context(outer)
         with pytest.raises(ValueError):
-            with sdk_context(RequestContext(tenant_id="inner")):
+            with sdk_context(RequestContext({key: "inner"})):
                 raise ValueError("boom")
-        assert get_context().tenant_id == "outer"
+        assert get_context().get(key) == "outer"
 
     def test_yields_the_context(self):
-        ctx = RequestContext(tenant_id="t1")
+        ctx = RequestContext()
         with sdk_context(ctx) as yielded:
             assert yielded is ctx
 
@@ -126,26 +165,29 @@ class TestSdkContext:
 class TestAsyncSdkContext:
     @pytest.mark.anyio
     async def test_sets_context_inside_async_block(self):
-        ctx = RequestContext(tenant_id="async-tenant")
+        key = ContextKey[str]("k")
+        ctx = RequestContext({key: "async-value"})
         async with async_sdk_context(ctx):
-            assert get_context().tenant_id == "async-tenant"
+            assert get_context().get(key) == "async-value"
 
     @pytest.mark.anyio
     async def test_restores_after_async_block(self):
-        outer = RequestContext(tenant_id="outer")
+        key = ContextKey[str]("k")
+        outer = RequestContext({key: "outer"})
         set_context(outer)
-        async with async_sdk_context(RequestContext(tenant_id="inner")):
+        async with async_sdk_context(RequestContext({key: "inner"})):
             pass
-        assert get_context().tenant_id == "outer"
+        assert get_context().get(key) == "outer"
 
     @pytest.mark.anyio
     async def test_restores_on_async_exception(self):
-        outer = RequestContext(tenant_id="outer")
+        key = ContextKey[str]("k")
+        outer = RequestContext({key: "outer"})
         set_context(outer)
         with pytest.raises(RuntimeError):
-            async with async_sdk_context(RequestContext(tenant_id="inner")):
+            async with async_sdk_context(RequestContext({key: "inner"})):
                 raise RuntimeError("boom")
-        assert get_context().tenant_id == "outer"
+        assert get_context().get(key) == "outer"
 
     def teardown_method(self):
         set_context(RequestContext())
@@ -160,7 +202,7 @@ class TestContextProviderProtocol:
     def test_custom_class_satisfies_protocol(self):
         class MyProvider:
             def extract(self, envelope: RequestEnvelope) -> RequestContext:
-                return RequestContext(tenant_id="custom")
+                return RequestContext()
 
         assert isinstance(MyProvider(), ContextProvider)
 
@@ -193,8 +235,8 @@ class TestIASContextProvider:
         envelope = _make_envelope({"authorization": "Bearer tok"})
         with patch(_PATCH_PARSE, return_value=claims):
             ctx = IASContextProvider().extract(envelope)
-        assert ctx.tenant_id == "t-1"
-        assert ctx.user_id == "u-1"
+        assert ctx.get(TENANT_ID) == "t-1"
+        assert ctx.get(USER_ID) == "u-1"
 
     def test_extracts_trigger_type_from_origin_header(self):
         claims = _make_claims(app_tid="t-1", user_uuid="u-1")
@@ -203,43 +245,43 @@ class TestIASContextProvider:
         )
         with patch(_PATCH_PARSE, return_value=claims):
             ctx = IASContextProvider().extract(envelope)
-        assert ctx.trigger_type == "ui5"
+        assert ctx.get(TRIGGER_TYPE) == "ui5"
 
     def test_trigger_type_none_when_header_absent(self):
         claims = _make_claims(app_tid="t-1", user_uuid="u-1")
         envelope = _make_envelope({"authorization": "Bearer tok"})
         with patch(_PATCH_PARSE, return_value=claims):
             ctx = IASContextProvider().extract(envelope)
-        assert ctx.trigger_type is None
+        assert ctx.get(TRIGGER_TYPE) is None
 
-    def test_stores_full_claims_in_extras(self):
+    def test_stores_full_claims(self):
         claims = _make_claims(app_tid="t-1", user_uuid="u-1")
         envelope = _make_envelope({"authorization": "Bearer tok"})
         with patch(_PATCH_PARSE, return_value=claims):
             ctx = IASContextProvider().extract(envelope)
-        assert ctx.extras.get("ias.claims") is claims
+        assert ctx.get(IAS_CLAIMS) is claims
 
     def test_returns_empty_context_when_no_auth_header(self):
         envelope = _make_envelope({})
         ctx = IASContextProvider().extract(envelope)
-        assert ctx.tenant_id is None
-        assert ctx.user_id is None
-        assert ctx.extras == {}
+        assert ctx.get(TENANT_ID) is None
+        assert ctx.get(USER_ID) is None
+        assert ctx.get(IAS_CLAIMS) is None
 
     def test_returns_empty_context_on_parse_error(self):
         envelope = _make_envelope({"authorization": "Bearer bad"})
         with patch(_PATCH_PARSE, side_effect=ValueError("bad")):
             ctx = IASContextProvider().extract(envelope)
-        assert ctx.tenant_id is None
-        assert ctx.user_id is None
+        assert ctx.get(TENANT_ID) is None
+        assert ctx.get(USER_ID) is None
 
     def test_tenant_id_none_when_claim_absent(self):
         claims = _make_claims(app_tid=None, user_uuid="u-1")
         envelope = _make_envelope({"authorization": "Bearer tok"})
         with patch(_PATCH_PARSE, return_value=claims):
             ctx = IASContextProvider().extract(envelope)
-        assert ctx.tenant_id is None
-        assert ctx.user_id == "u-1"
+        assert ctx.get(TENANT_ID) is None
+        assert ctx.get(USER_ID) == "u-1"
 
     def test_satisfies_context_provider_protocol(self):
         assert isinstance(IASContextProvider(), ContextProvider)
@@ -251,41 +293,29 @@ class TestIASContextProvider:
 
 
 class TestMerge:
-    def test_first_non_none_wins_per_field(self):
-        a = RequestContext(tenant_id="t-a", user_id=None)
-        b = RequestContext(tenant_id="t-b", user_id="u-b")
+    def test_first_writer_wins_per_key(self):
+        key = ContextKey[str]("k")
+        a = RequestContext({key: "from-a"})
+        b = RequestContext({key: "from-b"})
         merged = _merge([a, b])
-        assert merged.tenant_id == "t-a"
-        assert merged.user_id == "u-b"
+        assert merged.get(key) == "from-a"
 
     def test_second_fills_missing_from_first(self):
-        a = RequestContext(tenant_id=None, user_id=None)
-        b = RequestContext(tenant_id="t-b", user_id="u-b")
+        k1 = ContextKey[str]("k1")
+        k2 = ContextKey[str]("k2")
+        a = RequestContext({k1: "v1"})
+        b = RequestContext({k2: "v2"})
         merged = _merge([a, b])
-        assert merged.tenant_id == "t-b"
-        assert merged.user_id == "u-b"
-
-    def test_extras_are_union_merged(self):
-        a = RequestContext(extras={"key-a": 1})
-        b = RequestContext(extras={"key-b": 2})
-        merged = _merge([a, b])
-        assert merged.extras == {"key-a": 1, "key-b": 2}
-
-    def test_extras_first_provider_wins_on_conflict(self):
-        a = RequestContext(extras={"x": "from-a"})
-        b = RequestContext(extras={"x": "from-b"})
-        merged = _merge([a, b])
-        assert merged.extras["x"] == "from-b"  # dict.update — last writer wins
+        assert merged.get(k1) == "v1"
+        assert merged.get(k2) == "v2"
 
     def test_empty_list_returns_empty_context(self):
+        key = ContextKey[str]("k")
         merged = _merge([])
-        assert merged.tenant_id is None
-        assert merged.user_id is None
-        assert merged.extras == {}
+        assert merged.get(key) is None
 
-    def test_single_provider_passthrough(self):
-        ctx = RequestContext(tenant_id="t-1", user_id="u-1", trigger_type="ui5")
+    def test_single_context_passthrough(self):
+        key = ContextKey[str]("k")
+        ctx = RequestContext({key: "v"})
         merged = _merge([ctx])
-        assert merged.tenant_id == "t-1"
-        assert merged.user_id == "u-1"
-        assert merged.trigger_type == "ui5"
+        assert merged.get(key) == "v"

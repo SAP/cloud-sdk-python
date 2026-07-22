@@ -2,25 +2,46 @@
 
 from contextlib import asynccontextmanager, contextmanager
 from contextvars import ContextVar
-from dataclasses import dataclass, field
-from typing import Any, AsyncGenerator, Dict, Generator, Optional
+from typing import Any, AsyncGenerator, Dict, Generator, Optional, TypeVar
+
+from sap_cloud_sdk.core.runtime_context._keys import ContextKey
+
+T = TypeVar("T")
 
 
-@dataclass
 class RequestContext:
-    """Caller-identity snapshot for the current request.
+    """Immutable typed bag of per-request values set by context providers.
 
-    Attributes:
-        tenant_id:    Tenant identifier.
-        user_id:      User identifier.
-        trigger_type: Origin of the request (e.g. from ``x-sap-origin``).
-        extras:       Arbitrary additional data keyed by string.
+    Values are keyed by :class:`ContextKey` instances, which carry the
+    expected type. Use :meth:`get` to read a value and :meth:`with_value`
+    to produce a new context with an additional entry.
+
+    Example::
+
+        MY_KEY = ContextKey[str]("my_key")
+
+        ctx = RequestContext({MY_KEY: "hello"})
+        ctx.get(MY_KEY)  # -> "hello"
     """
 
-    tenant_id: Optional[str] = field(default=None)
-    user_id: Optional[str] = field(default=None)
-    trigger_type: Optional[str] = field(default=None)
-    extras: Dict[str, Any] = field(default_factory=dict)
+    def __init__(self, values: Optional[Dict[ContextKey, Any]] = None) -> None:
+        self._values: Dict[ContextKey, Any] = dict(values) if values else {}
+
+    def get(self, key: ContextKey[T]) -> Optional[T]:
+        """Return the value for *key*, or ``None`` if not set."""
+        return self._values.get(key)
+
+    def with_value(self, key: ContextKey[T], value: T) -> "RequestContext":
+        """Return a new RequestContext with *key* set to *value*."""
+        return RequestContext({**self._values, key: value})
+
+    def _raw(self) -> Dict[ContextKey, Any]:
+        """Return a shallow copy of the internal values dict."""
+        return dict(self._values)
+
+    def __repr__(self) -> str:
+        pairs = ", ".join(f"{k.name}={v!r}" for k, v in self._values.items())
+        return f"RequestContext({{{pairs}}})"
 
 
 _EMPTY = RequestContext()
@@ -38,8 +59,7 @@ def set_context(ctx: RequestContext) -> None:
 def get_context() -> RequestContext:
     """Return the runtime context for the current async/thread scope.
 
-    Returns an empty :class:`RequestContext` (all fields ``None``) when no
-    context has been set.
+    Returns an empty :class:`RequestContext` when no context has been set.
     """
     return _context_var.get()
 

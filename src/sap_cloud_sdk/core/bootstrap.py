@@ -4,8 +4,7 @@ from typing import Any, List, Optional
 
 from sap_cloud_sdk.core.runtime_context._protocol import ContextProvider
 from sap_cloud_sdk.core.runtime_context._registry import get_registry
-from sap_cloud_sdk.core.runtime_context import IASContextProvider
-
+from sap_cloud_sdk.core.runtime_context import HeaderContextProvider, IASContextProvider
 
 def bootstrap(app: Any, providers: Optional[List[ContextProvider]] = None) -> None:
     """Wire the SDK runtime context into your application framework.
@@ -42,7 +41,7 @@ def bootstrap(app: Any, providers: Optional[List[ContextProvider]] = None) -> No
         bootstrap(app, providers=[IASContextProvider(), MyCustomProvider()])
     """
     if not providers:
-        providers = [IASContextProvider()]
+        providers = [IASContextProvider(), HeaderContextProvider()]
 
     for adapter in get_registry():
         if adapter.matches(app):

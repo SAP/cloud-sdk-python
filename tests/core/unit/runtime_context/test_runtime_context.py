@@ -6,23 +6,24 @@ from unittest.mock import MagicMock, patch
 from sap_cloud_sdk.core.runtime_context import (
     ContextKey,
     ContextProvider,
+    HeaderContextProvider,
     IASContextProvider,
     RequestContext,
     RequestEnvelope,
+    TRIGGER_TYPE,
     async_sdk_context,
     get_context,
     sdk_context,
     set_context,
 )
-from sap_cloud_sdk.core.runtime_context._providers import (
+from sap_cloud_sdk.core.runtime_context.providers._ias import (
     IAS_CLAIMS,
     TENANT_ID,
-    TRIGGER_TYPE,
     USER_ID,
 )
 from sap_cloud_sdk.core.runtime_context.starlette import _merge
 
-_PATCH_PARSE = "sap_cloud_sdk.core.runtime_context._providers.parse_token"
+_PATCH_PARSE = "sap_cloud_sdk.core.runtime_context.providers._ias.parse_token"
 
 
 # ---------------------------------------------------------------------------
@@ -238,18 +239,11 @@ class TestIASContextProvider:
         assert ctx.get(TENANT_ID) == "t-1"
         assert ctx.get(USER_ID) == "u-1"
 
-    def test_extracts_trigger_type_from_origin_header(self):
+    def test_does_not_set_trigger_type(self):
         claims = _make_claims(app_tid="t-1", user_uuid="u-1")
         envelope = _make_envelope(
             {"authorization": "Bearer tok", "x-sap-origin": "ui5"}
         )
-        with patch(_PATCH_PARSE, return_value=claims):
-            ctx = IASContextProvider().extract(envelope)
-        assert ctx.get(TRIGGER_TYPE) == "ui5"
-
-    def test_trigger_type_none_when_header_absent(self):
-        claims = _make_claims(app_tid="t-1", user_uuid="u-1")
-        envelope = _make_envelope({"authorization": "Bearer tok"})
         with patch(_PATCH_PARSE, return_value=claims):
             ctx = IASContextProvider().extract(envelope)
         assert ctx.get(TRIGGER_TYPE) is None
@@ -285,6 +279,26 @@ class TestIASContextProvider:
 
     def test_satisfies_context_provider_protocol(self):
         assert isinstance(IASContextProvider(), ContextProvider)
+
+
+# ---------------------------------------------------------------------------
+# HeaderContextProvider
+# ---------------------------------------------------------------------------
+
+
+class TestHeaderContextProvider:
+    def test_extracts_trigger_type(self):
+        envelope = _make_envelope({"x-sap-origin": "ui5"})
+        ctx = HeaderContextProvider().extract(envelope)
+        assert ctx.get(TRIGGER_TYPE) == "ui5"
+
+    def test_trigger_type_none_when_header_absent(self):
+        envelope = _make_envelope({})
+        ctx = HeaderContextProvider().extract(envelope)
+        assert ctx.get(TRIGGER_TYPE) is None
+
+    def test_satisfies_context_provider_protocol(self):
+        assert isinstance(HeaderContextProvider(), ContextProvider)
 
 
 # ---------------------------------------------------------------------------

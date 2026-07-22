@@ -35,24 +35,32 @@ from sap_cloud_sdk.core.runtime_context._context import (
     set_context,
 )
 from sap_cloud_sdk.core.runtime_context._envelope import RequestEnvelope
-from sap_cloud_sdk.core.runtime_context._keys import ContextKey
+from sap_cloud_sdk.core.runtime_context._keys import ContextKey, TRIGGER_TYPE
 from sap_cloud_sdk.core.runtime_context._protocol import ContextProvider
-from sap_cloud_sdk.core.runtime_context._providers import IASContextProvider
 from sap_cloud_sdk.core.runtime_context._registry import FrameworkAdapter, register
+from sap_cloud_sdk.core.runtime_context.providers import (
+    HeaderContextProvider,
+    IASContextProvider,
+    IAS_CLAIMS,
+    TENANT_ID,
+    USER_ID,
+)
 
 # Register built-in framework adapters (guarded so missing extras don't break the import).
-try:
-    import sap_cloud_sdk.core.runtime_context.starlette  # noqa: F401
-except ImportError:
-    pass
+import sap_cloud_sdk.core.runtime_context.adapters  # noqa: F401
 
 __all__ = [
     "ContextKey",
     "ContextProvider",
     "FrameworkAdapter",
+    "HeaderContextProvider",
+    "IAS_CLAIMS",
     "IASContextProvider",
     "RequestContext",
     "RequestEnvelope",
+    "TENANT_ID",
+    "TRIGGER_TYPE",
+    "USER_ID",
     "async_sdk_context",
     "get_context",
     "register",

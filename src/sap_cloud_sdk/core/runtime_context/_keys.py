@@ -24,3 +24,7 @@ class ContextKey(Generic[T]):
 
     def __repr__(self) -> str:
         return f"ContextKey({self.name!r})"
+
+
+# SDK-standard keys — not tied to any specific auth provider.
+TRIGGER_TYPE = ContextKey[str]("trigger_type")

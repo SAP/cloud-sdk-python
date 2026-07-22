@@ -1,4 +1,4 @@
-"""Starlette/FastAPI context middleware and framework adapter."""
+"""Starlette/FastAPI context middleware."""
 
 from typing import Any, List
 
@@ -8,7 +8,6 @@ from sap_cloud_sdk.core.runtime_context._context import (
 )
 from sap_cloud_sdk.core.runtime_context._envelope import RequestEnvelope
 from sap_cloud_sdk.core.runtime_context._protocol import ContextProvider
-from sap_cloud_sdk.core.runtime_context._registry import FrameworkAdapter, register
 
 try:
     from starlette.middleware.base import BaseHTTPMiddleware
@@ -39,8 +38,7 @@ class StarletteContextMiddleware(BaseHTTPMiddleware):
     available via :func:`~sap_cloud_sdk.core.runtime_context.get_context` for
     the duration of that request.
 
-    First non-None value wins per field when merging. Extras are union-merged
-    across all providers.
+    First writer wins per key when merging across providers.
     """
 
     def __init__(self, app: Any, providers: List[ContextProvider]) -> None:
@@ -52,16 +50,3 @@ class StarletteContextMiddleware(BaseHTTPMiddleware):
         ctx = _merge([p.extract(envelope) for p in self._providers])
         async with async_sdk_context(ctx):
             return await call_next(request)
-
-
-class _StarletteContextAdapter(FrameworkAdapter):
-    def _matches(self, app) -> bool:
-        from starlette.applications import Starlette
-
-        return isinstance(app, Starlette)
-
-    def attach(self, app, providers: List[ContextProvider]) -> None:
-        app.add_middleware(StarletteContextMiddleware, providers=providers)
-
-
-register(_StarletteContextAdapter())

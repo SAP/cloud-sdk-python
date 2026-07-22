@@ -8,7 +8,7 @@ import json
 import os
 import uuid
 from datetime import datetime, timezone
-from typing import Optional
+from typing import Any, Optional, cast
 
 import protovalidate
 from protovalidate import ValidationError as ProtoValidationError
@@ -51,7 +51,7 @@ def _fill_common_from_auth_context(event: Message) -> None:
     """
     if not hasattr(event, "common"):
         return
-    common = event.common
+    common = cast(Any, event.common)
     claims = get_auth_context()
     if claims is not None:
         if claims.app_tid and not common.tenant_id:

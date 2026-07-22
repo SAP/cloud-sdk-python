@@ -29,7 +29,7 @@ from sap_cloud_sdk.core.runtime_context._registry import FrameworkAdapter, regis
 from sap_cloud_sdk.core.runtime_context.providers import (
     HeaderContextProvider,
     IASContextProvider,
-    IAS_CLAIMS,
+    GLOBAL_TENANT_ID,
     TENANT_ID,
     USER_ID,
 )
@@ -41,8 +41,8 @@ __all__ = [
     "ContextKey",
     "ContextProvider",
     "FrameworkAdapter",
+    "GLOBAL_TENANT_ID",
     "HeaderContextProvider",
-    "IAS_CLAIMS",
     "IASContextProvider",
     "RuntimeContext",
     "RequestEnvelope",

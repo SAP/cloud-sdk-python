@@ -1,6 +1,6 @@
 """IAS context provider and its typed keys."""
 
-from sap_cloud_sdk.core.runtime_context._context import RequestContext
+from sap_cloud_sdk.core.runtime_context._context import RuntimeContext
 from sap_cloud_sdk.core.runtime_context._envelope import RequestEnvelope
 from sap_cloud_sdk.core.runtime_context._keys import ContextKey
 from sap_cloud_sdk.core.runtime_context._protocol import ContextProvider
@@ -24,7 +24,7 @@ class IASContextProvider(ContextProvider):
       - :data:`IAS_CLAIMS` full :class:`~sap_cloud_sdk.ias.IASClaims` object
     """
 
-    def extract(self, envelope: RequestEnvelope) -> RequestContext:
+    def extract(self, envelope: RequestEnvelope) -> RuntimeContext:
         auth = envelope.headers.get("authorization", "")
 
         claims = None
@@ -42,4 +42,4 @@ class IASContextProvider(ContextProvider):
                 values[USER_ID] = claims.user_uuid
             values[IAS_CLAIMS] = claims
 
-        return RequestContext(values)
+        return RuntimeContext(values)

@@ -3,7 +3,7 @@
 from typing import Any, List
 
 from sap_cloud_sdk.core.runtime_context._context import (
-    RequestContext,
+    RuntimeContext,
     async_sdk_context,
 )
 from sap_cloud_sdk.core.runtime_context._envelope import RequestEnvelope
@@ -20,13 +20,13 @@ except ImportError as exc:
     ) from exc
 
 
-def _merge(contexts: List[RequestContext]) -> RequestContext:
-    """Merge multiple RequestContexts — first writer wins per key."""
+def _merge(contexts: List[RuntimeContext]) -> RuntimeContext:
+    """Merge multiple RuntimeContexts — first writer wins per key."""
     merged: dict = {}
     for ctx in contexts:
         for key, value in ctx._raw().items():
             merged.setdefault(key, value)
-    return RequestContext(merged)
+    return RuntimeContext(merged)
 
 
 class StarletteContextMiddleware(BaseHTTPMiddleware):
@@ -34,7 +34,7 @@ class StarletteContextMiddleware(BaseHTTPMiddleware):
 
     Builds a :class:`~sap_cloud_sdk.core.runtime_context.RequestEnvelope` from
     each inbound request, runs all *providers* against it, and merges the results
-    into a single :class:`~sap_cloud_sdk.core.runtime_context.RequestContext`
+    into a single :class:`~sap_cloud_sdk.core.runtime_context.RuntimeContext`
     available via :func:`~sap_cloud_sdk.core.runtime_context.get_context` for
     the duration of that request.
 

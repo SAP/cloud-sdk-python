@@ -19,14 +19,14 @@ Then read anywhere::
 
 In tests or scripts without a framework::
 
-    from sap_cloud_sdk.core.runtime_context import sdk_context, RequestContext, TENANT_ID
+    from sap_cloud_sdk.core.runtime_context import sdk_context, RuntimeContext, TENANT_ID
 
-    with sdk_context(RequestContext({TENANT_ID: "test-tenant"})):
+    with sdk_context(RuntimeContext({TENANT_ID: "test-tenant"})):
         ...
 """
 
 from sap_cloud_sdk.core.runtime_context._context import (
-    RequestContext,
+    RuntimeContext,
     async_sdk_context,
     get_context,
     sdk_context,
@@ -54,7 +54,7 @@ __all__ = [
     "HeaderContextProvider",
     "IAS_CLAIMS",
     "IASContextProvider",
-    "RequestContext",
+    "RuntimeContext",
     "RequestEnvelope",
     "TENANT_ID",
     "TRIGGER_TYPE",

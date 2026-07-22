@@ -9,7 +9,7 @@ from sap_cloud_sdk.core.runtime_context._keys import ContextKey
 T = TypeVar("T")
 
 
-class RequestContext:
+class RuntimeContext:
     """Immutable typed bag of caller-identity values for the current execution.
 
     Values are keyed by :class:`ContextKey` instances, which carry the
@@ -20,7 +20,7 @@ class RequestContext:
 
         MY_KEY = ContextKey[str]("my_key")
 
-        ctx = RequestContext({MY_KEY: "hello"})
+        ctx = RuntimeContext({MY_KEY: "hello"})
         ctx.get(MY_KEY)  # -> "hello"
     """
 
@@ -31,9 +31,9 @@ class RequestContext:
         """Return the value for *key*, or ``None`` if not set."""
         return self._values.get(key)
 
-    def with_value(self, key: ContextKey[T], value: T) -> "RequestContext":
-        """Return a new RequestContext with *key* set to *value*."""
-        return RequestContext({**self._values, key: value})
+    def with_value(self, key: ContextKey[T], value: T) -> "RuntimeContext":
+        """Return a new RuntimeContext with *key* set to *value*."""
+        return RuntimeContext({**self._values, key: value})
 
     def _raw(self) -> Dict[ContextKey, Any]:
         """Return a shallow copy of the internal values dict."""
@@ -41,31 +41,31 @@ class RequestContext:
 
     def __repr__(self) -> str:
         pairs = ", ".join(f"{k.name}={v!r}" for k, v in self._values.items())
-        return f"RequestContext({{{pairs}}})"
+        return f"RuntimeContext({{{pairs}}})"
 
 
-_EMPTY = RequestContext()
+_EMPTY = RuntimeContext()
 
-_context_var: ContextVar[RequestContext] = ContextVar(
+_context_var: ContextVar[RuntimeContext] = ContextVar(
     "sap_sdk_request_context", default=_EMPTY
 )
 
 
-def set_context(ctx: RequestContext) -> None:
+def set_context(ctx: RuntimeContext) -> None:
     """Set the runtime context for the current async/thread scope."""
     _context_var.set(ctx)
 
 
-def get_context() -> RequestContext:
+def get_context() -> RuntimeContext:
     """Return the runtime context for the current async/thread scope.
 
-    Returns an empty :class:`RequestContext` when no context has been set.
+    Returns an empty :class:`RuntimeContext` when no context has been set.
     """
     return _context_var.get()
 
 
 @contextmanager
-def sdk_context(ctx: RequestContext) -> Generator[RequestContext, None, None]:
+def sdk_context(ctx: RuntimeContext) -> Generator[RuntimeContext, None, None]:
     """Sync context manager that sets *ctx* for the duration of the block."""
     token = _context_var.set(ctx)
     try:
@@ -76,8 +76,8 @@ def sdk_context(ctx: RequestContext) -> Generator[RequestContext, None, None]:
 
 @asynccontextmanager
 async def async_sdk_context(
-    ctx: RequestContext,
-) -> AsyncGenerator[RequestContext, None]:
+    ctx: RuntimeContext,
+) -> AsyncGenerator[RuntimeContext, None]:
     """Async context manager that sets *ctx* for the duration of the block."""
     token = _context_var.set(ctx)
     try:

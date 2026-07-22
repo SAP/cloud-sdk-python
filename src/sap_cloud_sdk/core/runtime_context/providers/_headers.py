@@ -1,6 +1,6 @@
 """SAP standard headers context provider."""
 
-from sap_cloud_sdk.core.runtime_context._context import RequestContext
+from sap_cloud_sdk.core.runtime_context._context import RuntimeContext
 from sap_cloud_sdk.core.runtime_context._envelope import RequestEnvelope
 from sap_cloud_sdk.core.runtime_context._keys import TRIGGER_TYPE
 from sap_cloud_sdk.core.runtime_context._protocol import ContextProvider
@@ -15,9 +15,9 @@ class HeaderContextProvider(ContextProvider):
         from ``x-sap-origin``
     """
 
-    def extract(self, envelope: RequestEnvelope) -> RequestContext:
+    def extract(self, envelope: RequestEnvelope) -> RuntimeContext:
         values = {}
         origin = envelope.headers.get("x-sap-origin")
         if origin:
             values[TRIGGER_TYPE] = origin
-        return RequestContext(values)
+        return RuntimeContext(values)

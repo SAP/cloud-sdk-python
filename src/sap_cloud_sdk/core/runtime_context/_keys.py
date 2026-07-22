@@ -1,4 +1,4 @@
-"""Typed context key for RequestContext."""
+"""Typed context key for RuntimeContext."""
 
 from typing import Generic, TypeVar
 
@@ -6,16 +6,16 @@ T = TypeVar("T")
 
 
 class ContextKey(Generic[T]):
-    """A typed key for reading and writing values in a :class:`RequestContext`.
+    """A typed key for reading and writing values in a :class:`RuntimeContext`.
 
     Each provider defines its own keys. The type parameter ensures consumers
-    get the right type back from :meth:`RequestContext.get`.
+    get the right type back from :meth:`RuntimeContext.get`.
 
     Example::
 
         MY_KEY = ContextKey[str]("my_key")
 
-        ctx = RequestContext({MY_KEY: "value"})
+        ctx = RuntimeContext({MY_KEY: "value"})
         ctx.get(MY_KEY)  # -> "value"
     """
 

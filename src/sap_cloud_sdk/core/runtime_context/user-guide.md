@@ -13,7 +13,7 @@ information came from or what framework is running.
 ```
 bootstrap(app)
   └─ registers middleware on your framework
-       └─ on each invocation: providers extract → RequestContext set in ContextVar
+       └─ on each invocation: providers extract → RuntimeContext set in ContextVar
             └─ anywhere: get_context().get(TENANT_ID)
 ```
 
@@ -73,7 +73,7 @@ keys. Always import the key from the module that defined it.
 
 ## Providers
 
-A provider extracts a `RequestContext` from a `RequestEnvelope` — a
+A provider extracts a `RuntimeContext` from a `RequestEnvelope` — a
 framework-agnostic carrier of whatever signals were available at invocation time
 (headers, body, metadata). The provider doesn't know which framework built the
 envelope; the framework adapter doesn't know what the provider does with it.
@@ -94,15 +94,15 @@ metadata or a message queue envelope — as long as the adapter populates
 
 ```python
 from sap_cloud_sdk.core.runtime_context import (
-    ContextKey, ContextProvider, RequestContext, RequestEnvelope
+    ContextKey, ContextProvider, RuntimeContext, RequestEnvelope
 )
 
 CORRELATION_ID = ContextKey[str]("correlation_id")
 
 class CorrelationIdProvider(ContextProvider):
-    def extract(self, envelope: RequestEnvelope) -> RequestContext:
+    def extract(self, envelope: RequestEnvelope) -> RuntimeContext:
         value = envelope.headers.get("x-correlation-id")
-        return RequestContext({CORRELATION_ID: value} if value else {})
+        return RuntimeContext({CORRELATION_ID: value} if value else {})
 ```
 
 Pass it to `bootstrap`:
@@ -159,16 +159,16 @@ When there is no framework to bootstrap — unit tests, CLI tools, background
 jobs — set the context directly for the duration of a block:
 
 ```python
-from sap_cloud_sdk.core.runtime_context import sdk_context, RequestContext, TENANT_ID, USER_ID
+from sap_cloud_sdk.core.runtime_context import sdk_context, RuntimeContext, TENANT_ID, USER_ID
 
 # Sync:
-with sdk_context(RequestContext({TENANT_ID: "test-tenant", USER_ID: "test-user"})):
+with sdk_context(RuntimeContext({TENANT_ID: "test-tenant", USER_ID: "test-user"})):
     result = some_sdk_call()
 
 # Async:
 from sap_cloud_sdk.core.runtime_context import async_sdk_context
 
-async with async_sdk_context(RequestContext({TENANT_ID: "test-tenant"})):
+async with async_sdk_context(RuntimeContext({TENANT_ID: "test-tenant"})):
     result = await some_async_sdk_call()
 ```
 

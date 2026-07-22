@@ -1,30 +1,28 @@
-"""SDK-wide per-request runtime context.
+"""SDK-wide runtime context for the current execution.
 
-Provides a provider-agnostic way for SDK modules to access caller-identity
-fields (tenant, user, trigger type) without coupling to a specific auth
-provider or HTTP framework.
+Lets SDK modules read caller-identity information (tenant, user, trigger type)
+without knowing about the invocation source — HTTP, gRPC, message queue, etc.
 
-Typical usage — wire once at app startup::
+Wire once at startup::
 
     from sap_cloud_sdk import bootstrap
-    from sap_cloud_sdk.core.runtime_context import IASContextProvider
 
-    bootstrap(app, providers=[IASContextProvider()])
+    bootstrap(app)  # defaults to IASContextProvider + HeaderContextProvider
 
-Then read anywhere in the SDK or application code::
+Then read anywhere::
 
-    from sap_cloud_sdk.core.runtime_context import get_context
+    from sap_cloud_sdk.core.runtime_context import get_context, TENANT_ID, USER_ID
 
     ctx = get_context()
-    print(ctx.tenant_id)    # e.g. "abc-123"
-    print(ctx.user_id)      # e.g. "user-uuid"
+    ctx.get(TENANT_ID)   # -> "abc-123" or None
+    ctx.get(USER_ID)     # -> "user-uuid" or None
 
-For tests or CLI usage without HTTP::
+In tests or scripts without a framework::
 
-    from sap_cloud_sdk.core.runtime_context import sdk_context, RequestContext
+    from sap_cloud_sdk.core.runtime_context import sdk_context, RequestContext, TENANT_ID
 
-    with sdk_context(RequestContext(tenant_id="test-tenant")):
-        ...  # get_context() returns that context here
+    with sdk_context(RequestContext({TENANT_ID: "test-tenant"})):
+        ...
 """
 
 from sap_cloud_sdk.core.runtime_context._context import (

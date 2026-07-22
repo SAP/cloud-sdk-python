@@ -6,17 +6,17 @@ from typing import Any, Dict, Optional
 
 @dataclass
 class RequestEnvelope:
-    """Normalized view of an inbound request, independent of framework.
+    """Framework-agnostic view of an inbound request passed to providers.
 
-    Framework middlewares build this from their native request object.
-    :class:`~sap_cloud_sdk.core.runtime_context.ContextProvider` implementations
-    read from it — they never touch framework-specific types.
+    The framework middleware populates this; providers read from it. This
+    means providers work identically regardless of whether the request came
+    from Starlette, Flask, gRPC, or a test.
 
     Attributes:
-        headers:  Case-insensitive HTTP headers (or equivalent for gRPC/etc.).
-        body:     Raw request body bytes. ``None`` if not extracted.
-        metadata: Catch-all for framework extras (query params, gRPC metadata,
-                  connection info, etc.). Reserved for future providers.
+        headers:  Request headers as a plain dict (lowercased keys recommended).
+        body:     Raw request body. ``None`` if not needed by any provider.
+        metadata: Framework-specific extras — query params, gRPC metadata, etc.
+                  Currently unused; reserved for future providers.
     """
 
     headers: Dict[str, str] = field(default_factory=dict)

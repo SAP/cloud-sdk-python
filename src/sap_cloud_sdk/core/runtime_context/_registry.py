@@ -21,10 +21,10 @@ def get_registry() -> List["FrameworkAdapter"]:
 
 
 class FrameworkAdapter(ABC):
-    """Base class for framework-specific context middleware adapters.
+    """Connects a framework or invocation source to the SDK runtime context.
 
-    Subclasses know how to detect a framework's app object and attach the
-    appropriate context middleware to it. Register at module level so that
+    Subclasses know how to detect a specific app type and attach the SDK's
+    context pipeline to it. Register at module level so that
     :func:`~sap_cloud_sdk.core.bootstrap.bootstrap` can discover them without
     importing framework-specific code directly.
 

@@ -9,24 +9,19 @@ from sap_cloud_sdk.core.runtime_context import HeaderContextProvider, IASContext
 def bootstrap(app: Any, providers: Optional[List[ContextProvider]] = None) -> None:
     """Wire the SDK runtime context into your application framework.
 
-    Call this once at application startup. The SDK will attach a middleware
-    to *app* that populates :class:`~sap_cloud_sdk.core.runtime_context.RequestContext`
-    on every inbound request by running all *providers* against it and merging
-    the results.
+    Call once at startup. On every inbound request the SDK will run all
+    *providers* against the request, merge the results, and make them
+    available via :func:`~sap_cloud_sdk.core.runtime_context.get_context`.
 
-    After bootstrapping, any SDK module (auditlog, telemetry, etc.) can call
-    :func:`~sap_cloud_sdk.core.runtime_context.get_context` to read
-    tenant/user information without knowing about headers or auth providers.
-
-    The framework is detected automatically from the *app* type. Supported
-    frameworks are determined by registered
-    :class:`~sap_cloud_sdk.core.runtime_context.FrameworkAdapter` instances —
-    new frameworks are added by registering an adapter, not by editing this file.
+    The framework is detected automatically from the *app* type via the
+    registered :class:`~sap_cloud_sdk.core.runtime_context.FrameworkAdapter`
+    instances — adding support for a new framework never requires editing
+    this function.
 
     Args:
         app:       The application instance to attach the middleware to.
-        providers: One or more :class:`~sap_cloud_sdk.core.runtime_context.ContextProvider`
-                   instances. Defaults to ``[IASContextProvider()]``.
+        providers: Context providers to run on each request. Defaults to
+                   ``[IASContextProvider(), HeaderContextProvider()]``.
 
     Raises:
         TypeError: If no registered adapter recognises *app*.
@@ -35,10 +30,10 @@ def bootstrap(app: Any, providers: Optional[List[ContextProvider]] = None) -> No
 
         from sap_cloud_sdk import bootstrap
 
-        bootstrap(app)  # IASContextProvider by default
+        bootstrap(app)  # IAS + SAP headers by default
 
-        # multiple providers:
-        bootstrap(app, providers=[IASContextProvider(), MyCustomProvider()])
+        # custom providers:
+        bootstrap(app, providers=[IASContextProvider(), MyProvider()])
     """
     if not providers:
         providers = [IASContextProvider(), HeaderContextProvider()]

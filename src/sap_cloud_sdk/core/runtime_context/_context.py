@@ -10,7 +10,7 @@ T = TypeVar("T")
 
 
 class RequestContext:
-    """Immutable typed bag of per-request values set by context providers.
+    """Immutable typed bag of caller-identity values for the current execution.
 
     Values are keyed by :class:`ContextKey` instances, which carry the
     expected type. Use :meth:`get` to read a value and :meth:`with_value`

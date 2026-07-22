@@ -276,6 +276,14 @@ with create_client(
 
 ---
 
+## Multi-tenancy
+
+- **Supported:** N/A at auth level
+- **Authentication:** None (uses Destination Service / SPII for transport)
+- **How to use:** Tenant identity is embedded in each event payload via the `tenant_id` field. Transport and auth are handled by the Destination Service / SPII. This module is only available through SAP for ME.
+- **Further reading:**
+  - [SAP Audit Log Service — SAP Help Portal](https://help.sap.com/docs/btp/sap-business-technology-platform/audit-log-service)
+
 ## Validation
 
 Events are validated against protobuf constraints using `protovalidate` before sending. A `ValueError` is raised if:

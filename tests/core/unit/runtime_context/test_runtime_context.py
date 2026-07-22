@@ -11,8 +11,10 @@ from sap_cloud_sdk.core.runtime_context import (
     RuntimeContext,
     RequestEnvelope,
     TRIGGER_TYPE,
-    async_sdk_context,
     get_context,
+)
+from sap_cloud_sdk.core.runtime_context._context import (
+    async_sdk_context,
     sdk_context,
     set_context,
 )

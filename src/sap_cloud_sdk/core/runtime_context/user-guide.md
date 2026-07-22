@@ -153,27 +153,6 @@ register(FlaskContextAdapter())
 
 ---
 
-## Manual usage (tests, CLI, scripts)
-
-When there is no framework to bootstrap — unit tests, CLI tools, background
-jobs — set the context directly for the duration of a block:
-
-```python
-from sap_cloud_sdk.core.runtime_context import sdk_context, RuntimeContext, TENANT_ID, USER_ID
-
-# Sync:
-with sdk_context(RuntimeContext({TENANT_ID: "test-tenant", USER_ID: "test-user"})):
-    result = some_sdk_call()
-
-# Async:
-from sap_cloud_sdk.core.runtime_context import async_sdk_context
-
-async with async_sdk_context(RuntimeContext({TENANT_ID: "test-tenant"})):
-    result = await some_async_sdk_call()
-```
-
----
-
 ## Running the tests
 
 ```bash

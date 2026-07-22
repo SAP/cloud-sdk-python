@@ -179,22 +179,6 @@ across create, read, and search calls is the implementer's responsibility.
 
   > [!WARNING]
   > `PROVIDER` strategy provides **no tenant isolation**, the provider token grants access to data in the provider subaccount. Only use this strategy for provider-owned operations (e.g., admin tasks, shared datasets). Never use it to serve subscriber-specific data.
-
-  ```python
-  from sap_cloud_sdk.agent_memory import create_client, AccessStrategy
-
-  # Subscriber context — all calls use the tenant set here
-  client = create_client(
-      access_strategy=AccessStrategy.SUBSCRIBER,
-      tenant="acme-corp",
-  )
-  memories = client.list_memories(agent_id="some-assistant", invoker_id="user-42")
-
-  # Provider context — no tenant isolation
-  client = create_client(access_strategy=AccessStrategy.PROVIDER)
-  memories = client.list_memories(agent_id="some-assistant", invoker_id="user-42")
-  ```
-
 - **Further reading:** N/A
 
 

@@ -162,16 +162,7 @@ The SDK discovers resources via BTP Destination Service fragments filtered by th
 - **Authentication:** IAS (IAS via Destination Service for LoB flow; mTLS for Customer flow)
 - **How to use:**
   - **LoB flow:** Pass `tenant_subdomain` to `create_client()`. All subsequent calls on that client instance use the subscriber tenant context.
-
-    ```python
-    from sap_cloud_sdk.agentgateway import create_client
-
-    client = create_client(tenant_subdomain="my-subscriber")
-    agent_cards = client.list_agent_cards()
-    ```
-
   - **Customer flow:** N/A
-
 - **Further reading:** N/A
 
 ## API

@@ -3,6 +3,8 @@
 from typing import Any, List, Optional
 
 from sap_cloud_sdk.core.runtime_context._protocol import ContextProvider
+from sap_cloud_sdk.core.runtime_context._registry import get_registry
+from sap_cloud_sdk.core.runtime_context import IASContextProvider
 
 
 def bootstrap(app: Any, providers: Optional[List[ContextProvider]] = None) -> None:
@@ -40,14 +42,7 @@ def bootstrap(app: Any, providers: Optional[List[ContextProvider]] = None) -> No
         bootstrap(app, providers=[IASContextProvider(), MyCustomProvider()])
     """
     if not providers:
-        from sap_cloud_sdk.core.runtime_context import IASContextProvider
-
         providers = [IASContextProvider()]
-
-    # Ensure all built-in adapters are registered before iterating.
-    _load_builtin_adapters()
-
-    from sap_cloud_sdk.core.runtime_context._registry import get_registry
 
     for adapter in get_registry():
         if adapter.matches(app):
@@ -59,11 +54,3 @@ def bootstrap(app: Any, providers: Optional[List[ContextProvider]] = None) -> No
         "Supported frameworks are determined by registered FrameworkAdapters. "
         "For other frameworks, register a FrameworkAdapter or attach the middleware manually."
     )
-
-
-def _load_builtin_adapters() -> None:
-    """Import built-in framework adapter modules to trigger their register() calls."""
-    try:
-        import sap_cloud_sdk.core.runtime_context.starlette  # noqa: F401
-    except ImportError:
-        pass

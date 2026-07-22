@@ -39,6 +39,12 @@ from sap_cloud_sdk.core.runtime_context._protocol import ContextProvider
 from sap_cloud_sdk.core.runtime_context._providers import IASContextProvider
 from sap_cloud_sdk.core.runtime_context._registry import FrameworkAdapter, register
 
+# Register built-in framework adapters (guarded so missing extras don't break the import).
+try:
+    import sap_cloud_sdk.core.runtime_context.starlette  # noqa: F401
+except ImportError:
+    pass
+
 __all__ = [
     "ContextProvider",
     "FrameworkAdapter",

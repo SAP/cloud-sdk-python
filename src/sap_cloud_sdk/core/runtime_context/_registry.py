@@ -1,6 +1,5 @@
 """Framework adapter base class and registry for bootstrap()."""
 
-import importlib.util
 import logging
 from abc import ABC, abstractmethod
 from typing import List
@@ -32,9 +31,7 @@ class FrameworkAdapter(ABC):
     Example::
 
         class FlaskContextAdapter(FrameworkAdapter):
-            framework_name = "flask"
-
-            def matches(self, app) -> bool:
+            def _matches(self, app) -> bool:
                 from flask import Flask
                 return isinstance(app, Flask)
 
@@ -44,19 +41,15 @@ class FrameworkAdapter(ABC):
         register(FlaskContextAdapter())
     """
 
-    #: Import name of the framework (e.g. "starlette", "flask").
-    framework_name: str
-
     def matches(self, app) -> bool:
-        if not self._is_framework_installed():
+        """Return True if this adapter handles *app*'s framework type."""
+        try:
+            return self._matches(app)
+        except ImportError:
             return False
-        return self._matches(app)
 
     @abstractmethod
     def _matches(self, app) -> bool: ...
 
     @abstractmethod
     def attach(self, app, providers: List[ContextProvider]) -> None: ...
-
-    def _is_framework_installed(self) -> bool:
-        return importlib.util.find_spec(self.framework_name) is not None

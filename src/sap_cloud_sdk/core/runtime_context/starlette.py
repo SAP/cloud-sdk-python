@@ -60,8 +60,6 @@ class StarletteContextMiddleware(BaseHTTPMiddleware):
 
 
 class _StarletteContextAdapter(FrameworkAdapter):
-    framework_name = "starlette"
-
     def _matches(self, app) -> bool:
         from starlette.applications import Starlette
 

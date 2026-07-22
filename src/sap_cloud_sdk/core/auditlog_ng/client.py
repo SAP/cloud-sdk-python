@@ -7,6 +7,7 @@ Supports mTLS (client certificates) and insecure (no-auth) modes for gRPC.
 import json
 import os
 import uuid
+from datetime import datetime, timezone
 from typing import Optional
 
 import protovalidate
@@ -41,17 +42,24 @@ from sap_cloud_sdk.ias._context import get_auth_context
 
 
 def _fill_common_from_auth_context(event: Message) -> None:
-    """Back-fill tenant_id and user_initiator_id from the request auth context."""
+    """Back-fill common fields from the request auth context.
+
+    Accesses event.common directly — protobuf creates the sub-message on first
+    mutation, so callers that never touched common still get it populated.
+    Sets tenant_id and user_initiator_id from IAS claims (if present and not
+    already set), and sets timestamp to now if the caller left it at zero.
+    """
+    if not hasattr(event, "common"):
+        return
+    common = event.common
     claims = get_auth_context()
-    if claims is None:
-        return
-    common = getattr(event, "common", None)
-    if common is None:
-        return
-    if claims.app_tid and not getattr(common, "tenant_id", None):
-        common.tenant_id = claims.app_tid
-    if claims.user_uuid and not getattr(common, "user_initiator_id", None):
-        common.user_initiator_id = claims.user_uuid
+    if claims is not None:
+        if claims.app_tid and not common.tenant_id:
+            common.tenant_id = claims.app_tid
+        if claims.user_uuid and not common.user_initiator_id:
+            common.user_initiator_id = claims.user_uuid
+    if common.timestamp.seconds == 0:
+        common.timestamp.FromDatetime(datetime.now(timezone.utc))
 
 
 def _create_log_exporter(

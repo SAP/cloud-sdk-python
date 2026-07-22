@@ -190,14 +190,11 @@ from sap_cloud_sdk.agent_memory import AccessStrategy
 
 ### Configuring at client level
 
-Pass `access_strategy` and `tenant` to `create_client()` to set defaults for the entire
-client instance. Every method call then inherits them, so you do not need to repeat them
-on each operation.
+Pass `access_strategy` and `tenant` to `create_client()` to set defaults for the entire client instance. Every method call then inherits them, so you do not need to repeat them on each operation.
 
 ```python
 from sap_cloud_sdk.agent_memory import create_client, AccessStrategy
 
-# Tenant set once — all calls below use it automatically
 client = create_client(
     access_strategy=AccessStrategy.SUBSCRIBER,
     tenant="acme-corp",
@@ -221,7 +218,7 @@ memories = client.list_memories(agent_id="hr-assistant", invoker_id="user-42")
 
 ### PROVIDER
 
-Configure a provider-only client. No tenant is needed; all calls use the provider binding.
+Configure a provider-only client. No tenant is needed and all calls use the provider binding.
 
 ```python
 client = create_client(access_strategy=AccessStrategy.PROVIDER)

@@ -61,16 +61,17 @@ class TestCreateClient:
         assert isinstance(client, AgentMemoryClient)
         assert client._transport is not None
 
-    def test_subscriber_strategy_loads_tenant_binding(self, monkeypatch):
-        """Factory with SUBSCRIBER loads the tenant binding."""
+    def test_subscriber_strategy_loads_default_binding(self, monkeypatch):
+        """Factory with SUBSCRIBER loads the default binding (native implementation)."""
         import json
         monkeypatch.setenv(
-            "CLOUD_SDK_CFG_HANA_AGENT_MEMORY_ACME_CORP_APPLICATION_URL",
-            "http://acme.memory.example.com",
+            "CLOUD_SDK_CFG_HANA_AGENT_MEMORY_DEFAULT_APPLICATION_URL",
+            "http://memory.example.com",
         )
         monkeypatch.setenv(
-            "CLOUD_SDK_CFG_HANA_AGENT_MEMORY_ACME_CORP_UAA",
-            json.dumps({"url": "http://acme.auth.example.com", "clientid": "c", "clientsecret": "s"}),
+            "CLOUD_SDK_CFG_HANA_AGENT_MEMORY_DEFAULT_UAA",
+            json.dumps({"url": "http://auth.example.com", "clientid": "c", "clientsecret": "s",
+                        "identityzone": "provider-zone"}),
         )
         with patch("sap_cloud_sdk.agent_memory.HttpTransport") as MockTransport:
             MockTransport.return_value = MagicMock(spec=HttpTransport)
@@ -79,7 +80,7 @@ class TestCreateClient:
                 tenant="acme-corp",
             )
         assert isinstance(client, AgentMemoryClient)
-        assert client._transport is not None
+        assert client._tenant == "acme-corp"
 
     def test_provider_strategy_loads_default_binding(self, monkeypatch):
         """Factory with PROVIDER loads the default binding."""
@@ -143,11 +144,72 @@ class TestAccessStrategy:
         provider_transport.post.assert_called_once()
 
 
+# ── Access strategy ───────────────────────────────────────────────────────────
+
+
+class TestAccessStrategy:
+    # ── Init-time validation ──────────────────────────────────────────────────
+
+    def test_subscriber_without_tenant_raises_at_init(self):
+        """SUBSCRIBER without tenant raises AgentMemoryValidationError at construction."""
+        transport = MagicMock(spec=HttpTransport)
+        with pytest.raises(AgentMemoryValidationError, match="tenant"):
+            AgentMemoryClient(transport, access_strategy=AccessStrategy.SUBSCRIBER)
+
+    def test_subscriber_with_tenant_constructs_successfully(self):
+        """SUBSCRIBER with tenant constructs without error and stores tenant."""
+        client, _ = _make_subscriber_client("acme")
+        assert client._tenant == "acme"
+
+    def test_provider_constructs_without_tenant(self):
+        """PROVIDER constructs without tenant and stores None."""
+        client, _ = _make_client()
+        assert client._tenant is None
+
+    # ── Transport routing ─────────────────────────────────────────────────────
+
+    def test_subscriber_passes_tenant_to_transport(self):
+        """SUBSCRIBER client passes tenant_subdomain to transport on every call."""
+        client, transport = _make_subscriber_client("acme")
+        transport.post.return_value = {
+            "id": "m1",
+            "agentID": "a",
+            "invokerID": "u",
+            "content": "x",
+        }
+
+        client.add_memory("a", "u", "x")
+
+        assert transport.post.call_args[1]["tenant_subdomain"] == "acme"
+
+    def test_provider_passes_none_tenant_to_transport(self):
+        """PROVIDER client passes tenant_subdomain=None to transport."""
+        client, transport = _make_client()
+        transport.post.return_value = {
+            "id": "m1",
+            "agentID": "a",
+            "invokerID": "u",
+            "content": "x",
+        }
+
+        client.add_memory("a", "u", "x")
+
+        assert transport.post.call_args[1]["tenant_subdomain"] is None
+
+    def test_list_memories_passes_tenant_to_transport(self):
+        """list_memories passes tenant_subdomain from client config."""
+        client, transport = _make_subscriber_client("sub")
+        transport.get.return_value = {"value": []}
+
+        client.list_memories(agent_id="a")
+
+        assert transport.get.call_args[1]["tenant_subdomain"] == "sub"
+
+
 # ── Memory CRUD operations ────────────────────────────────────────────────────
 
 
 class TestMemoryCRUD:
-
     def test_add_memory_posts_correct_payload(self):
         """add_memory sends required and optional fields in the POST body."""
         client, mock_transport = _make_client()
@@ -172,7 +234,10 @@ class TestMemoryCRUD:
         """Optional metadata is included in the POST body when provided."""
         client, mock_transport = _make_client()
         mock_transport.post.return_value = {
-            "id": "mem-1", "agentID": "a", "invokerID": "u", "content": "x",
+            "id": "mem-1",
+            "agentID": "a",
+            "invokerID": "u",
+            "content": "x",
         }
 
         client.add_memory("a", "u", "x", metadata={"key": "val"})
@@ -184,7 +249,10 @@ class TestMemoryCRUD:
         """None-valued optional fields are omitted from the POST body."""
         client, mock_transport = _make_client()
         mock_transport.post.return_value = {
-            "id": "mem-1", "agentID": "a", "invokerID": "u", "content": "x",
+            "id": "mem-1",
+            "agentID": "a",
+            "invokerID": "u",
+            "content": "x",
         }
 
         client.add_memory("a", "u", "x")
@@ -197,7 +265,10 @@ class TestMemoryCRUD:
         """add_memory sends the POST to the MEMORIES endpoint."""
         client, mock_transport = _make_client()
         mock_transport.post.return_value = {
-            "id": "mem-1", "agentID": "a", "invokerID": "u", "content": "x",
+            "id": "mem-1",
+            "agentID": "a",
+            "invokerID": "u",
+            "content": "x",
         }
 
         client.add_memory("a", "u", "x")
@@ -209,7 +280,10 @@ class TestMemoryCRUD:
         """get_memory constructs the correct path with the memory ID."""
         client, mock_transport = _make_client()
         mock_transport.get.return_value = {
-            "id": "mem-1", "agentID": "a", "invokerID": "u", "content": "hello",
+            "id": "mem-1",
+            "agentID": "a",
+            "invokerID": "u",
+            "content": "hello",
         }
 
         memory = client.get_memory("mem-1")
@@ -262,7 +336,6 @@ class TestMemoryCRUD:
 
 
 class TestListMemories:
-
     def test_returns_list_of_memories(self):
         """list_memories returns a list of Memory objects."""
         client, mock_transport = _make_client()
@@ -408,7 +481,6 @@ class TestListMemories:
 
 
 class TestCountMemories:
-
     def test_returns_count_from_response(self):
         """count_memories returns the @odata.count value."""
         client, mock_transport = _make_client()
@@ -454,14 +526,25 @@ class TestCountMemories:
 
 
 class TestSearchMemories:
-
     def test_returns_results_in_api_order(self):
         """search_memories returns results in the order returned by the API."""
         client, mock_transport = _make_client()
         mock_transport.post.return_value = {
             "value": [
-                {"id": "m1", "agentID": "a", "invokerID": "u", "content": "first", "similarity": 0.5},
-                {"id": "m2", "agentID": "a", "invokerID": "u", "content": "second", "similarity": 0.9},
+                {
+                    "id": "m1",
+                    "agentID": "a",
+                    "invokerID": "u",
+                    "content": "first",
+                    "similarity": 0.5,
+                },
+                {
+                    "id": "m2",
+                    "agentID": "a",
+                    "invokerID": "u",
+                    "content": "second",
+                    "similarity": 0.9,
+                },
             ]
         }
 
@@ -514,7 +597,6 @@ class TestSearchMemories:
 
 
 class TestMessageCRUD:
-
     def test_add_message_posts_correct_payload(self):
         """add_message sends required fields in the POST body."""
         client, mock_transport = _make_client()
@@ -528,7 +610,11 @@ class TestMessageCRUD:
         }
 
         message = client.add_message(
-            "agent-a", "user-b", "conv-1", MessageRole.USER, "Hello!",
+            "agent-a",
+            "user-b",
+            "conv-1",
+            MessageRole.USER,
+            "Hello!",
         )
 
         assert isinstance(message, Message)
@@ -545,8 +631,12 @@ class TestMessageCRUD:
         """add_message sends the POST to the MESSAGES endpoint."""
         client, mock_transport = _make_client()
         mock_transport.post.return_value = {
-            "id": "msg-1", "agentID": "a", "invokerID": "u",
-            "messageGroup": "g", "role": "USER", "content": "hi",
+            "id": "msg-1",
+            "agentID": "a",
+            "invokerID": "u",
+            "messageGroup": "g",
+            "role": "USER",
+            "content": "hi",
         }
 
         client.add_message("a", "u", "g", MessageRole.USER, "hi")
@@ -558,12 +648,18 @@ class TestMessageCRUD:
         """Optional metadata is included when provided."""
         client, mock_transport = _make_client()
         mock_transport.post.return_value = {
-            "id": "msg-1", "agentID": "a", "invokerID": "u",
-            "messageGroup": "g", "role": "USER", "content": "hi",
+            "id": "msg-1",
+            "agentID": "a",
+            "invokerID": "u",
+            "messageGroup": "g",
+            "role": "USER",
+            "content": "hi",
             "metadata": {"key": "val"},
         }
 
-        client.add_message("a", "u", "g", MessageRole.USER, "hi", metadata={"key": "val"})
+        client.add_message(
+            "a", "u", "g", MessageRole.USER, "hi", metadata={"key": "val"}
+        )
 
         payload = mock_transport.post.call_args[1]["json"]
         assert payload["metadata"] == {"key": "val"}
@@ -572,8 +668,12 @@ class TestMessageCRUD:
         """None-valued metadata is omitted from the POST body."""
         client, mock_transport = _make_client()
         mock_transport.post.return_value = {
-            "id": "msg-1", "agentID": "a", "invokerID": "u",
-            "messageGroup": "g", "role": "USER", "content": "hi",
+            "id": "msg-1",
+            "agentID": "a",
+            "invokerID": "u",
+            "messageGroup": "g",
+            "role": "USER",
+            "content": "hi",
         }
 
         client.add_message("a", "u", "g", MessageRole.USER, "hi")
@@ -585,8 +685,12 @@ class TestMessageCRUD:
         """get_message constructs the correct path with the message ID."""
         client, mock_transport = _make_client()
         mock_transport.get.return_value = {
-            "id": "msg-1", "agentID": "a", "invokerID": "u",
-            "messageGroup": "g", "role": "USER", "content": "hi",
+            "id": "msg-1",
+            "agentID": "a",
+            "invokerID": "u",
+            "messageGroup": "g",
+            "role": "USER",
+            "content": "hi",
         }
 
         message = client.get_message("msg-1")
@@ -610,15 +714,18 @@ class TestMessageCRUD:
 
 
 class TestListMessages:
-
     def test_returns_list_of_messages(self):
         """list_messages returns a list of Message objects."""
         client, mock_transport = _make_client()
         mock_transport.get.return_value = {
             "value": [
                 {
-                    "id": "msg-1", "agentID": "a", "invokerID": "u",
-                    "messageGroup": "g", "role": "USER", "content": "hi",
+                    "id": "msg-1",
+                    "agentID": "a",
+                    "invokerID": "u",
+                    "messageGroup": "g",
+                    "role": "USER",
+                    "content": "hi",
                 },
             ],
         }
@@ -634,8 +741,10 @@ class TestListMessages:
         mock_transport.get.return_value = {"value": []}
 
         client.list_messages(
-            agent_id="a", invoker_id="u",
-            message_group="conv-1", role="USER",
+            agent_id="a",
+            invoker_id="u",
+            message_group="conv-1",
+            role="USER",
         )
 
         params = mock_transport.get.call_args[1]["params"]
@@ -772,12 +881,13 @@ class TestListMessages:
 
 
 class TestRetentionConfig:
-
     def test_get_retention_config(self):
         """get_retention_config sends GET to the retentionConfig endpoint."""
         client, mock_transport = _make_client()
         mock_transport.get.return_value = {
-            "id": 1, "messageDays": 30, "memoryDays": 90,
+            "id": 1,
+            "messageDays": 30,
+            "memoryDays": 90,
             "usageLogDays": 180,
             "createTimestamp": "2025-01-01T00:00:00Z",
             "updateTimestamp": "2025-01-02T00:00:00Z",
@@ -822,7 +932,6 @@ class TestRetentionConfig:
 
 
 class TestContextManager:
-
     def test_close_delegates_to_transport(self):
         """close() delegates to the transport's close method."""
         client, mock_transport = _make_client()
@@ -846,7 +955,6 @@ class TestContextManager:
 
 
 class TestMemoryValidation:
-
     def test_add_memory_raises_for_empty_agent_id(self):
         """add_memory raises AgentMemoryValidationError when agent_id is empty."""
         client, _ = _make_client()
@@ -903,7 +1011,6 @@ class TestMemoryValidation:
 
 
 class TestSearchMemoriesValidation:
-
     def test_raises_for_empty_agent_id(self):
         """search_memories raises AgentMemoryValidationError when agent_id is empty."""
         client, _ = _make_client()
@@ -964,7 +1071,6 @@ class TestSearchMemoriesValidation:
 
 
 class TestMessageValidation:
-
     def test_add_message_raises_for_empty_agent_id(self):
         """add_message raises AgentMemoryValidationError when agent_id is empty."""
         client, _ = _make_client()
@@ -1015,7 +1121,6 @@ class TestMessageValidation:
 
 
 class TestRetentionConfigValidation:
-
     def test_update_raises_when_no_fields_provided(self):
         """update_retention_config raises AgentMemoryValidationError when no fields are provided."""
         client, _ = _make_client()
@@ -1053,7 +1158,6 @@ class TestRetentionConfigValidation:
 
 
 class TestFilterDefinitionValidation:
-
     def test_list_memories_raises_for_unsupported_target(self):
         """list_memories raises AgentMemoryValidationError for an unknown target."""
         client, _ = _make_client()

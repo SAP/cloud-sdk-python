@@ -6,9 +6,7 @@ import logging
 import warnings
 from typing import Any, Dict, List, Optional, Callable, TypeVar
 
-# Conditional telemetry import - works even when telemetry packages are not installed
-from sap_cloud_sdk.core._telemetry_compat import Module, Operation, record_metrics
-
+from sap_cloud_sdk.core.telemetry import Module, Operation, record_metrics
 from sap_cloud_sdk.core.secret_resolver import read_from_mount_and_fallback_to_env_var
 from sap_cloud_sdk.destination._http import DestinationHttp, API_V1, API_V2
 from sap_cloud_sdk.destination._models import (
@@ -97,7 +95,12 @@ class DestinationClient:
         ```
     """
 
-    def __init__(self, http: DestinationHttp, use_default_proxy: bool = False) -> None:
+    def __init__(
+        self,
+        http: DestinationHttp,
+        use_default_proxy: bool = False,
+        _telemetry_source: Optional[Module] = None,
+    ) -> None:
         """Initialize DestinationClient with dependency injection.
 
         Note:
@@ -110,6 +113,7 @@ class DestinationClient:
             use_default_proxy: Whether to use the default transparent proxy for all get operations.
                               When True, will attempt to load transparent proxy configuration from
                               APPFND_CONHOS_TRANSP_PROXY environment variable. Defaults to False.
+            _telemetry_source: Internal telemetry source identifier. Not intended for external use.
 
         Raises:
             DestinationOperationError: If initialization fails.
@@ -117,6 +121,7 @@ class DestinationClient:
         self._http = http
         self._client_proxy_enabled = use_default_proxy
         self._transparent_proxy = load_transparent_proxy()
+        self._telemetry_source = _telemetry_source
 
     def set_proxy(self, transparent_proxy: TransparentProxy) -> None:
         """Set or update the transparent proxy configuration for this client.

@@ -101,14 +101,39 @@ def check_el_02(path: str, tree: ast.Module) -> None:
         # last statement is Raise → PASS
         if isinstance(last, ast.Raise):
             continue
-        # last statement is Return of a variable named e / err / exc → likely intentional propagation → PASS
+        # last statement is Return of a variable named e / err / exc → intentional propagation → PASS
         if (
             isinstance(last, ast.Return)
             and isinstance(last.value, ast.Name)
             and last.value.id in {"e", "err", "exc"}
         ):
             continue
-        # explicit `pass` and only `pass` in body → obvious swallow → FLAG
+        # Bare `return False` / `return None` when catching ImportError is the
+        # canonical Python optional-dependency pattern — PASS.
+        handler_type = getattr(node.type, "id", None)
+        if handler_type == "ImportError" and isinstance(last, ast.Return):
+            continue
+        # `pass`-only body catching ImportError → optional-dependency pattern → PASS.
+        if handler_type == "ImportError" and len(node.body) == 1 and isinstance(last, ast.Pass):
+            continue
+        # Block contains a logger.exception / logger.error / logger.warning / logger.debug
+        # call AND the exception was bound to a name → documented suppression → PASS.
+        # The logger call itself is the documentation that failure was observed.
+        if node.name is not None:  # `except SomeError as e:`
+            def _has_logger_call(stmts: list) -> bool:
+                for s in stmts:
+                    for sub in ast.walk(s):
+                        if (
+                            isinstance(sub, ast.Call)
+                            and isinstance(sub.func, ast.Attribute)
+                            and sub.func.attr in {"exception", "error", "warning", "info", "debug"}
+                            and isinstance(sub.func.value, ast.Name)
+                            and sub.func.value.id in {"logger", "log", "logging", "_logger", "_log"}
+                        ):
+                            return True
+                return False
+            if _has_logger_call(node.body):
+                continue
         emit(
             "PY-EL-02",
             "FLAG",

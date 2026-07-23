@@ -38,7 +38,7 @@ from sap_cloud_sdk.agentgateway._models import (
 )
 from sap_cloud_sdk.agentgateway._token_cache import _GatewayUrlCache, _TokenCache
 from sap_cloud_sdk.agentgateway.exceptions import AgentGatewaySDKError
-from sap_cloud_sdk.core._telemetry_compat import Module, Operation, record_metrics
+from sap_cloud_sdk.core.telemetry import Module, Operation, record_metrics
 
 logger = logging.getLogger(__name__)
 
@@ -111,6 +111,7 @@ class AgentGatewayClient:
         self,
         tenant_subdomain: str | Callable[[], str] | None = None,
         config: ClientConfig | None = None,
+        _telemetry_source: Module | None = None,
     ):
         """Initialize the Agent Gateway client.
 
@@ -119,11 +120,13 @@ class AgentGatewayClient:
                 Can be a string or a callable returning a string.
                 Required for LoB agents, ignored for Customer agents.
             config: Client configuration. Uses defaults if not provided.
+            _telemetry_source: Internal telemetry source identifier. Not intended for external use.
         """
         self._tenant_subdomain = tenant_subdomain
         self._config = config or ClientConfig()
         self._token_cache = _TokenCache(self._config)
         self._gateway_url_cache = _GatewayUrlCache()
+        self._telemetry_source = _telemetry_source
 
     @staticmethod
     def _resolve_value(
@@ -230,8 +233,7 @@ class AgentGatewayClient:
 
     @record_metrics(Module.AGENTGATEWAY, Operation.AGENTGATEWAY_GET_USER_AUTH)
     async def get_user_auth(
-        self,
-        user_token: str | Callable[[], str] | None
+        self, user_token: str | Callable[[], str] | None
     ) -> AuthResult:
         """Exchange a user token for AGW-scoped authentication (token exchange).
 
@@ -352,8 +354,7 @@ class AgentGatewayClient:
 
     @record_metrics(Module.AGENTGATEWAY, Operation.AGENTGATEWAY_LIST_MCP_TOOLS)
     async def list_mcp_tools(
-        self,
-        user_token: str | Callable[[], str] | None = None
+        self, user_token: str | Callable[[], str] | None = None
     ) -> list[MCPTool]:
         """List all MCP tools from MCP servers.
 
@@ -394,7 +395,7 @@ class AgentGatewayClient:
                 auth = await self.get_user_auth(user_token)
             else:
                 auth = await self.get_system_auth()
-        
+
             # Check for customer agent credentials
             credentials_path = detect_customer_agent_credentials()
             if credentials_path:
@@ -584,7 +585,6 @@ class AgentGatewayClient:
             ) from e
 
 
-
 def _unwrap_exception_group(exc: BaseException) -> BaseException:
     """Unwrap nested ExceptionGroups to present meaningful error messages."""
     while isinstance(exc, BaseExceptionGroup) and exc.exceptions:
@@ -595,6 +595,8 @@ def _unwrap_exception_group(exc: BaseException) -> BaseException:
 def create_client(
     tenant_subdomain: str | Callable[[], str] | None = None,
     config: ClientConfig | None = None,
+    *,
+    _telemetry_source: Module | None = None,
 ) -> AgentGatewayClient:
     """Create an Agent Gateway client for discovering and invoking MCP tools.
 
@@ -606,6 +608,7 @@ def create_client(
             Can be a string or a callable returning a string.
             Required for LoB agents, ignored for Customer agents.
         config: Client configuration. Uses defaults if not provided.
+        _telemetry_source: Internal telemetry source identifier. Not intended for external use.
 
     Returns:
         AgentGatewayClient instance.
@@ -659,4 +662,8 @@ def create_client(
         user_auth = await agw_client.get_user_auth(user_token="user-jwt")
         ```
     """
-    return AgentGatewayClient(tenant_subdomain=tenant_subdomain, config=config)
+    return AgentGatewayClient(
+        tenant_subdomain=tenant_subdomain,
+        config=config,
+        _telemetry_source=_telemetry_source,
+    )

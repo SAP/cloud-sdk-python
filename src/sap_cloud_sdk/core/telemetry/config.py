@@ -18,6 +18,7 @@ from sap_cloud_sdk.core.telemetry.constants import (
     ATTR_SAP_SOLUTION_AREA,
     ATTR_MLFLOW_EXPERIMENT_ID,
     ATTR_SAP_ORD_ID,
+    ATTR_SAP_SERVICE_DISPLAY_NAME,
     SDK_NAME,
 )
 
@@ -35,6 +36,7 @@ ENV_SYSTEM_ROLE = "APPFND_CONHOS_SYSTEM_ROLE"
 ENV_SOLUTION_AREA = "SAP_SOLUTION_AREA"
 ENV_MLFLOW_EXPERIMENT_ID = "MLFLOW_EXPERIMENT_ID"
 ENV_ORD_DOCUMENT_ID = "ORD_DOCUMENT_ID"
+ENV_SERVICE_DISPLAY_NAME = "SAP_SERVICE_DISPLAY_NAME"
 
 # OTEL environment variable keys
 ENV_OTLP_ENDPOINT = "OTEL_EXPORTER_OTLP_ENDPOINT"
@@ -110,6 +112,16 @@ def _get_ord_id() -> Optional[str]:
     return value if value else None
 
 
+def _get_service_display_name() -> Optional[str]:
+    """Get service display name from environment.
+
+    Returns:
+        Value of SAP_SERVICE_DISPLAY_NAME, or None if the env var is missing or empty.
+    """
+    value = os.getenv(ENV_SERVICE_DISPLAY_NAME)
+    return value if value else None
+
+
 def create_resource_attributes_from_env() -> dict:
     """Create OpenTelemetry Resource with SDK attributes.
 
@@ -131,6 +143,7 @@ def create_resource_attributes_from_env() -> dict:
         - sap.solution_area (from SAP_SOLUTION_AREA, defaults to "unknown")
         - mlflow.experiment_id (from MLFLOW_EXPERIMENT_ID, omitted when unset or empty)
         - sap.ord.id (from ORD_DOCUMENT_ID, omitted when unset or empty)
+        - sap.service.display_name (from SAP_SERVICE_DISPLAY_NAME, omitted when unset or empty)
     """
 
     attributes = {
@@ -154,6 +167,10 @@ def create_resource_attributes_from_env() -> dict:
     ord_id = _get_ord_id()
     if ord_id is not None:
         attributes[ATTR_SAP_ORD_ID] = ord_id
+
+    service_display_name = _get_service_display_name()
+    if service_display_name is not None:
+        attributes[ATTR_SAP_SERVICE_DISPLAY_NAME] = service_display_name
 
     return attributes
 

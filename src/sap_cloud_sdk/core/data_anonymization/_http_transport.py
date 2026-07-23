@@ -357,13 +357,16 @@ class HttpTransport(Transport):
     def _cert_from_destination(self, name: str) -> str:
         """Resolve a combined PEM bundle via Destination and write it to a temp file."""
         try:
+            from sap_cloud_sdk.core.telemetry import Module
             from sap_cloud_sdk.destination import (
                 AccessStrategy,
                 create_certificate_client,
                 create_client,
             )
 
-            destination_client = create_client()
+            destination_client = create_client(
+                _telemetry_source=Module.DATA_ANONYMIZATION,
+            )
             destination = destination_client.get_instance_destination(name)
             if destination is None:
                 destination = destination_client.get_subaccount_destination(
@@ -376,7 +379,9 @@ class HttpTransport(Transport):
             key_store_location = self._get_destination_keystore_location(
                 destination, name
             )
-            cert_client = create_certificate_client()
+            cert_client = create_certificate_client(
+                _telemetry_source=Module.DATA_ANONYMIZATION,
+            )
             cert = cert_client.get_instance_certificate(key_store_location)
             if cert is None:
                 cert = cert_client.get_subaccount_certificate(

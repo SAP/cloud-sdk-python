@@ -139,6 +139,9 @@ class Operation(str, Enum):
     ADMS_CONFIG_GET_APP_TENANT = "config_get_app_tenant"
     ADMS_CONFIG_DELETE_APP_TENANT = "config_delete_app_tenant"
 
+    # Bootstrap Operations
+    BOOTSTRAP = "bootstrap"
+
     # AI Core Operations
     AICORE_SET_CONFIG = "set_aicore_config"
     AICORE_AUTO_INSTRUMENT = "auto_instrument"

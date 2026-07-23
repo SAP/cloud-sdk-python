@@ -14,7 +14,7 @@ class LoggingInstrumentorWrapper(LibraryInstrumentor):
     def is_instrumented(self) -> bool:
         return _instrumentor.is_instrumented_by_opentelemetry
 
-    def _instrument(self) -> None:
+    def _instrument(self, **kwargs) -> None:
         _instrumentor.instrument(set_logging_format=True)
 
     def _uninstrument(self) -> None:

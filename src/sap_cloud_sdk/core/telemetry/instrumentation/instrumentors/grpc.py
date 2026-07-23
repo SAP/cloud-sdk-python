@@ -21,7 +21,7 @@ class GrpcInstrumentorWrapper(LibraryInstrumentor):
             or _server_instrumentor.is_instrumented_by_opentelemetry
         )
 
-    def _instrument(self) -> None:
+    def _instrument(self, **kwargs) -> None:
         _client_instrumentor.instrument()
         _server_instrumentor.instrument()
 

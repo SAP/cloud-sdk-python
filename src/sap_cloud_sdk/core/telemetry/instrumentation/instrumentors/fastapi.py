@@ -18,8 +18,12 @@ class FastAPIInstrumentorWrapper(LibraryInstrumentor):
     def is_instrumented(self) -> bool:
         return _instrumentor.is_instrumented_by_opentelemetry
 
-    def _instrument(self) -> None:
-        _instrumentor.instrument()
+    def _instrument(self, **kwargs) -> None:
+        app = kwargs.get("app")
+        if app is not None:
+            FastAPIInstrumentor.instrument_app(app)
+        else:
+            _instrumentor.instrument()
 
     def _uninstrument(self) -> None:
         _instrumentor.uninstrument()

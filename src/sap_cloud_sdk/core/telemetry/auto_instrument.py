@@ -45,6 +45,7 @@ logger = logging.getLogger(__name__)
 def auto_instrument(
     disable_batch: bool = False,
     middlewares: list[TelemetryMiddleware] | None = None,
+    app=None,
 ):
     """
     Initialize meta-instrumentation for GenAI tracing. Should be initialized before any AI frameworks.
@@ -62,6 +63,10 @@ def auto_instrument(
                      the middlewares appear as attributes on every span.
                      Must be called before the ASGI application begins serving
                      requests so that register() runs before the first request.
+        app: Optional ASGI app instance (Starlette, FastAPI). When provided, framework
+             instrumentors call instrument_app(app) instead of the global instrument(),
+             which is required when the app is already constructed before auto_instrument()
+             is called. Use from within a lifespan handler to ensure correct ordering.
     """
     otel_endpoint = os.getenv(ENV_OTLP_ENDPOINT, "")
     console_traces = os.getenv(ENV_TRACES_EXPORTER, "").lower() == "console"
@@ -91,7 +96,7 @@ def auto_instrument(
     if middlewares:
         _register_middleware_processors(middlewares)
 
-    _instrument_libraries()
+    _instrument_libraries(app=app) if app is not None else _instrument_libraries()
 
     logger.info("Cloud auto instrumentation initialized successfully")
 
@@ -162,9 +167,9 @@ def _register_middleware_processors(middlewares: list[TelemetryMiddleware]) -> N
     )
 
 
-def _instrument_libraries() -> None:
+def _instrument_libraries(**kwargs) -> None:
     for instrumentor in get_registry():
-        instrumentor.instrument()
+        instrumentor.instrument(**kwargs)
 
 
 def _merge_resource_attrs_into_active_provider_if_wrapper_installed(

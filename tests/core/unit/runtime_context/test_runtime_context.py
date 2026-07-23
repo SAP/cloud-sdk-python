@@ -6,6 +6,8 @@ from unittest.mock import MagicMock, patch
 from sap_cloud_sdk.core.runtime_context import (
     ContextKey,
     ContextProvider,
+    DWC_SUBDOMAIN,
+    DWC_TENANT,
     HeaderContextProvider,
     IASContextProvider,
     RuntimeContext,
@@ -299,6 +301,22 @@ class TestHeaderContextProvider:
         envelope = _make_envelope({})
         ctx = HeaderContextProvider().extract(envelope)
         assert ctx.get(TRIGGER_TYPE) is None
+
+    def test_extracts_dwc_subdomain(self):
+        envelope = _make_envelope({"dwc-subdomain": "my-subdomain"})
+        ctx = HeaderContextProvider().extract(envelope)
+        assert ctx.get(DWC_SUBDOMAIN) == "my-subdomain"
+
+    def test_extracts_dwc_tenant(self):
+        envelope = _make_envelope({"dwc-tenant": "my-tenant"})
+        ctx = HeaderContextProvider().extract(envelope)
+        assert ctx.get(DWC_TENANT) == "my-tenant"
+
+    def test_returns_empty_when_no_headers(self):
+        envelope = _make_envelope({})
+        ctx = HeaderContextProvider().extract(envelope)
+        assert ctx.get(DWC_SUBDOMAIN) is None
+        assert ctx.get(DWC_TENANT) is None
 
     def test_satisfies_context_provider_protocol(self):
         assert isinstance(HeaderContextProvider(), ContextProvider)

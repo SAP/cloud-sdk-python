@@ -28,3 +28,5 @@ class ContextKey(Generic[T]):
 
 # SDK-standard keys — not tied to any specific auth provider.
 TRIGGER_TYPE = ContextKey[str]("trigger_type")
+DWC_SUBDOMAIN = ContextKey[str]("dwc_subdomain")
+DWC_TENANT = ContextKey[str]("dwc_tenant")

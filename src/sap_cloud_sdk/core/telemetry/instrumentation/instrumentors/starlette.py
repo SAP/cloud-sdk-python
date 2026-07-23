@@ -19,16 +19,16 @@ class StarletteInstrumentorWrapper(LibraryInstrumentor):
         return _instrumentor.is_instrumented_by_opentelemetry
 
     def _instrument(self, **kwargs) -> None:
+        from starlette.applications import Starlette
         app = kwargs.get("app")
-        if app is not None:
-            from starlette.applications import Starlette
-            if not isinstance(app, Starlette):
-                raise TypeError(
-                    f"StarletteInstrumentorWrapper expects a Starlette instance, got {type(app).__name__}"
-                )
-            _instrumentor.instrument_app(app)
-        else:
+        if app is None:
             _instrumentor.instrument()
+            return
+        if not isinstance(app, Starlette):
+            raise TypeError(
+                f"StarletteInstrumentorWrapper expects a Starlette instance, got {type(app).__name__}"
+            )
+        _instrumentor.instrument_app(app)
 
     def _uninstrument(self) -> None:
         _instrumentor.uninstrument()

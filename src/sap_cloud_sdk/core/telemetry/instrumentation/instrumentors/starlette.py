@@ -21,6 +21,11 @@ class StarletteInstrumentorWrapper(LibraryInstrumentor):
     def _instrument(self, **kwargs) -> None:
         app = kwargs.get("app")
         if app is not None:
+            from starlette.applications import Starlette
+            if not isinstance(app, Starlette):
+                raise TypeError(
+                    f"StarletteInstrumentorWrapper expects a Starlette instance, got {type(app).__name__}"
+                )
             _instrumentor.instrument_app(app)
         else:
             _instrumentor.instrument()

@@ -30,7 +30,13 @@ class LibraryInstrumentor(ABC):
         if self.is_instrumented():
             logger.debug("%s already instrumented", self.library_name)
             return
-        self._instrument(**kwargs)
+        try:
+            self._instrument(**kwargs)
+        except ImportError:
+            logger.debug(
+                "%s instrumentation skipped — library not importable", self.library_name
+            )
+            return
         logger.debug("Instrumented %s", self.library_name)
 
     def uninstrument(self) -> None:

@@ -19,8 +19,13 @@ class FastAPIInstrumentorWrapper(LibraryInstrumentor):
         return _instrumentor.is_instrumented_by_opentelemetry
 
     def _instrument(self, **kwargs) -> None:
+        from fastapi import FastAPI
         app = kwargs.get("app")
         if app is not None:
+            if not isinstance(app, FastAPI):
+                raise TypeError(
+                    f"FastAPIInstrumentorWrapper expects a FastAPI instance, got {type(app).__name__}"
+                )
             FastAPIInstrumentor.instrument_app(app)
         else:
             _instrumentor.instrument()

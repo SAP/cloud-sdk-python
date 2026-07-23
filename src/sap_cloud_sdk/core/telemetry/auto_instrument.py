@@ -96,7 +96,7 @@ def auto_instrument(
     if middlewares:
         _register_middleware_processors(middlewares)
 
-    _instrument_libraries(app=app) if app is not None else _instrument_libraries()
+    _instrument_libraries(app=app)
 
     logger.info("Cloud auto instrumentation initialized successfully")
 

@@ -390,6 +390,14 @@ set_aicore_config()
 
 ---
 
+## Multi-tenancy
+
+- **Supported:** No
+- **Authentication:** XSUAA (written to litellm environment variables)
+- **How to use:** Not supported. This module is a process-level bootstrap that writes XSUAA credentials to environment variables consumed by litellm. Multi-tenant routing is out of scope at this layer.
+- **Further reading:**
+  - [SAP AI Core — SAP Help Portal](https://help.sap.com/docs/sap-ai-core)
+
 ## Error Handling
 
 Always handle potential configuration errors:

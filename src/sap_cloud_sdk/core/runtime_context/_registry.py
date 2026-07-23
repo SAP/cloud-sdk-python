@@ -1,5 +1,7 @@
 """Framework adapter base class and registry for bootstrap()."""
 
+from __future__ import annotations
+
 import logging
 from abc import ABC, abstractmethod
 from typing import List
@@ -8,15 +10,15 @@ from sap_cloud_sdk.core.runtime_context._protocol import ContextProvider
 
 logger = logging.getLogger(__name__)
 
-_registry: List["FrameworkAdapter"] = []
+_registry: List[FrameworkAdapter] = []
 
 
-def register(adapter: "FrameworkAdapter") -> None:
+def register(adapter: FrameworkAdapter) -> None:
     """Register a framework adapter with the bootstrap registry."""
     _registry.append(adapter)
 
 
-def get_registry() -> List["FrameworkAdapter"]:
+def get_registry() -> List[FrameworkAdapter]:
     return list(_registry)
 
 

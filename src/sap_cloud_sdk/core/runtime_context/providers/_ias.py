@@ -1,10 +1,14 @@
 """IAS context provider and its typed keys."""
 
+import logging
+
 from sap_cloud_sdk.core.runtime_context._context import RuntimeContext
 from sap_cloud_sdk.core.runtime_context._envelope import RequestEnvelope
 from sap_cloud_sdk.core.runtime_context._keys import ContextKey
 from sap_cloud_sdk.core.runtime_context._protocol import ContextProvider
 from sap_cloud_sdk.ias import parse_token
+
+logger = logging.getLogger(__name__)
 
 TENANT_ID = ContextKey[str]("ias.app_tid")
 GLOBAL_TENANT_ID = ContextKey[str]("ias.sap_gtid")
@@ -31,8 +35,8 @@ class IASContextProvider(ContextProvider):
         if auth:
             try:
                 claims = parse_token(auth)
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug("IAS token parsing failed, context will be empty: %s", e)
 
         values = {}
         if claims:

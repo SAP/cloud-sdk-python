@@ -27,6 +27,7 @@ dependencies = [
     "opentelemetry-api>=1.42.1",
     "opentelemetry-sdk>=1.42.1",
     "mcp>=1.1.0",
+    "python-odata>=0.7.0",
 ]
 
 [project.optional-dependencies]
@@ -61,6 +62,7 @@ dev = [
     "langchain-community>=0.3.0",
     "litellm>=1.40.0",
     "langchain-litellm>=0.6.6",
+    "responses>=0.25",
 ]
 
 [tool.pytest.ini_options]

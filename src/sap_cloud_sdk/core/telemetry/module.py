@@ -14,6 +14,7 @@ class Module(str, Enum):
     AUDITLOG_NG = "auditlog_ng"
     DATA_ANONYMIZATION = "data_anonymization"
     DESTINATION = "destination"
+    DPI_NG = "dpi_ng"
     DMS = "dms"
     EXTENSIBILITY = "extensibility"
     OBJECTSTORE = "objectstore"

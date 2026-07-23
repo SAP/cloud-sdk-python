@@ -4,7 +4,7 @@
 
 ## About this project
 
-This SDK provides consistent interfaces for interacting with foundational services such as object storage, destination management, audit logging, data anonymization, telemetry, and secure credential handling.
+This SDK provides consistent interfaces for interacting with foundational services such as object storage, destination management, audit logging, data anonymization, data privacy integration, telemetry, and secure credential handling.
 
 The Python SDK offers a clean, type-safe API following Python best practices while maintaining compatibility with the SAP Application Foundation ecosystem.
 
@@ -24,6 +24,7 @@ The Python SDK offers a clean, type-safe API following Python best practices whi
 - **Secret Resolver**
 - **Telemetry & Observability**
 - **Data Anonymization Service**
+- **Data Privacy Integration Service**
 - **Print Service**
 
 ## Requirements and Setup
@@ -80,6 +81,7 @@ Each module has comprehensive usage guides:
 - [Telemetry](src/sap_cloud_sdk/core/telemetry/user-guide.md)
 - [Print](src/sap_cloud_sdk/print/user-guide.md)
 - [Data Anonymization](src/sap_cloud_sdk/core/data_anonymization/user-guide.md)
+- [Data Privacy Integration](src/sap_cloud_sdk/core/dpi_ng/consent/user-guide.md)
 
 ## Support, Feedback, Contributing
 

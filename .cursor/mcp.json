@@ -1,0 +1,21 @@
+{
+  "mcpServers": {
+    "filesystem-tek-cloud-sdk-python": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-filesystem",
+        "/Users/I768366/Documents/TEK/IA/cloud-sdk-python/"
+      ],
+      "env": {}
+    },
+    "context7": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@upstash/context7-mcp@latest"
+      ],
+      "env": {}
+    }
+  }
+}

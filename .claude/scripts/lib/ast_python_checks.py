@@ -5,7 +5,7 @@ Called from bash check-*.sh scripts. Reads source files, emits JSONL findings
 to stdout (one JSON object per line).
 
 Usage:
-    python3 ast_python_checks.py <check-name> <file1> [<file2> ...]
+    python3 ast-python-checks.py <check-name> <file1> [<file2> ...]
 
 Where <check-name> is one of:
     el-01, el-02          exception chaining / swallow
@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import ast
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -100,14 +101,39 @@ def check_el_02(path: str, tree: ast.Module) -> None:
         # last statement is Raise → PASS
         if isinstance(last, ast.Raise):
             continue
-        # last statement is Return of a variable named e / err / exc → likely intentional propagation → PASS
+        # last statement is Return of a variable named e / err / exc → intentional propagation → PASS
         if (
             isinstance(last, ast.Return)
             and isinstance(last.value, ast.Name)
             and last.value.id in {"e", "err", "exc"}
         ):
             continue
-        # explicit `pass` and only `pass` in body → obvious swallow → FLAG
+        # Bare `return False` / `return None` when catching ImportError is the
+        # canonical Python optional-dependency pattern — PASS.
+        handler_type = getattr(node.type, "id", None)
+        if handler_type == "ImportError" and isinstance(last, ast.Return):
+            continue
+        # `pass`-only body catching ImportError → optional-dependency pattern → PASS.
+        if handler_type == "ImportError" and len(node.body) == 1 and isinstance(last, ast.Pass):
+            continue
+        # Block contains a logger.exception / logger.error / logger.warning / logger.debug
+        # call AND the exception was bound to a name → documented suppression → PASS.
+        # The logger call itself is the documentation that failure was observed.
+        if node.name is not None:  # `except SomeError as e:`
+            def _has_logger_call(stmts: list) -> bool:
+                for s in stmts:
+                    for sub in ast.walk(s):
+                        if (
+                            isinstance(sub, ast.Call)
+                            and isinstance(sub.func, ast.Attribute)
+                            and sub.func.attr in {"exception", "error", "warning", "info", "debug"}
+                            and isinstance(sub.func.value, ast.Name)
+                            and sub.func.value.id in {"logger", "log", "logging", "_logger", "_log"}
+                        ):
+                            return True
+                return False
+            if _has_logger_call(node.body):
+                continue
         emit(
             "PY-EL-02",
             "FLAG",
@@ -212,31 +238,122 @@ def check_pt_08(path: str, tree: ast.Module) -> None:
 def check_con_01(
     path: str, tree: ast.Module, threshold: int = 3, min_len: int = 4
 ) -> None:
+    # FP-D-01: skip generated/model files where schema keys legitimately repeat.
+    GENERATED_PATTERNS = ("_models.py", "_generated.py")
+    GENERATED_API_SUFFIX = "_api.py"
+    fname = Path(path).name
+    if fname.endswith(GENERATED_PATTERNS):
+        return
+    # `_<something>_api.py` (starts with underscore, ends with _api.py) → generated OpenAPI client
+    if fname.startswith("_") and fname.endswith(GENERATED_API_SUFFIX):
+        return
     # Skip prefixes: URLs, test/example placeholders, SPDX/doc markers.
     # Must be exact URL scheme match — not `httpx` or `http_pool`.
     URL_PREFIXES = ("http://", "https://", "ftp://", "sftp://", "ssh://", "file://")
     SKIP_PREFIXES = ("test-", "SPDX", "@example")
+    # FP-D-01: minimum length 4 (was 4; enforce hard floor of 3 per plan)
+    effective_min_len = max(min_len, 3)
+    # FP-D-01: per-file cap
+    MAX_PER_FILE = 3
+
+    # FP-K-01: load the PR's added-lines set (if orchestrate provided it) so
+    # we only count string occurrences that the PR actually introduces. Prevents
+    # penalizing an unrelated edit for pre-existing repetitions.
+    added_lines_for_file: set[int] | None = None
+    added_lines_file = os.environ.get("ADDED_LINES_FILE", "")
+    if added_lines_file and Path(added_lines_file).is_file():
+        added_lines_for_file = set()
+        try:
+            with open(added_lines_file, encoding="utf-8") as fh:
+                for entry in fh:
+                    entry = entry.strip()
+                    if not entry or ":" not in entry:
+                        continue
+                    p, _, ln = entry.rpartition(":")
+                    if p == path:
+                        try:
+                            added_lines_for_file.add(int(ln))
+                        except ValueError:
+                            continue
+        except OSError:
+            added_lines_for_file = None
+    # If the caller didn't provide a diff scope, fall back to legacy behavior
+    # (count all occurrences). Bats tests exercise the check without an
+    # orchestrate wrapper, so we keep backward-compat.
+
     counts: dict[str, list[int]] = {}
     for node in ast.walk(tree):
         if isinstance(node, ast.Constant) and isinstance(node.value, str):
             v = node.value
-            if len(v) < min_len:
+            if len(v) < effective_min_len:
                 continue
             if v.startswith(URL_PREFIXES):
                 continue
             if v.startswith(SKIP_PREFIXES):
                 continue
             counts.setdefault(v, []).append(node.lineno)
+    emitted = 0
     for literal, lines in counts.items():
-        if len(lines) >= threshold:
-            emit(
-                "PY-CON-01",
-                "FLAG",
-                path,
-                lines[0],
-                f"String literal {literal!r} appears {len(lines)}× — extract module-level constant",
-                suggestion=f"e.g., _CONSTANT_NAME = {literal!r}",
-            )
+        if emitted >= MAX_PER_FILE:
+            break
+        if len(lines) < threshold:
+            continue
+        # FP-K-01: require at least one occurrence to live on a PR-added line.
+        # Without this, an unrelated edit is credited for the repetition that
+        # already existed. If we have no diff scope, allow the legacy path.
+        if added_lines_for_file is not None:
+            added_occurrences = [ln for ln in lines if ln in added_lines_for_file]
+            if not added_occurrences:
+                continue
+            anchor_line = added_occurrences[0]
+        else:
+            anchor_line = lines[0]
+        emit(
+            "PY-CON-01",
+            "FLAG",
+            path,
+            anchor_line,
+            f"String literal {literal!r} appears {len(lines)}× — extract module-level constant",
+            suggestion=f"e.g., _CONSTANT_NAME = {literal!r}",
+        )
+        emitted += 1
+
+
+# ---------- PY-PT-04: module has any Exception subclass (AST-based) ----------
+
+
+def check_pt_04(module_dir: str) -> bool:
+    """FP-C-02: return True if any .py file in the module directory (recursive)
+    defines a class subclassing Exception (directly or via a name ending in
+    'Error' / 'Exception'). Callers can use this as a soft check before
+    emitting PY-PT-04.
+    """
+    p = Path(module_dir)
+    if not p.is_dir():
+        return False
+    for py in p.rglob("*.py"):
+        if "__pycache__" in py.parts:
+            continue
+        tree = parse_file(str(py))
+        if tree is None:
+            continue
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.ClassDef):
+                continue
+            for base in node.bases:
+                base_name = None
+                if isinstance(base, ast.Name):
+                    base_name = base.id
+                elif isinstance(base, ast.Attribute):
+                    base_name = base.attr
+                if not base_name:
+                    continue
+                if base_name == "Exception" or base_name == "BaseException":
+                    return True
+                # accept anything ending in Error/Exception as an exception hierarchy
+                if base_name.endswith("Error") or base_name.endswith("Exception"):
+                    return True
+    return False
 
 
 # ---------- PY-PT-01: create_client factory exists ----------
@@ -285,19 +402,27 @@ def extract_all(tree: ast.Module) -> list[str]:
 
 def extract_public_class_methods(
     tree: ast.Module,
-) -> dict[str, dict[str, tuple[list[str], list[str], list[str], str | None]]]:
-    """Return {ClassName: {method_name: (positional_args, kwonly_args, vararg_kwarg_flags, return_ann)}}.
+) -> dict[str, dict[str, tuple]]:
+    """Return {ClassName: {method_name: signature_tuple}}.
 
-    positional_args: names of positional args (self/cls excluded)
-    kwonly_args: names of keyword-only args
-    vararg_kwarg_flags: ["*args", "**kwargs"] if present (for tracking their addition/removal)
-    return_ann: repr of return annotation, or None
+    signature_tuple = (
+        positional_args,        # names of positional args (self/cls excluded)
+        kwonly_args,            # names of keyword-only args
+        vararg_kwarg_flags,     # ["*args", "**kwargs"] if present
+        return_ann,             # repr of return annotation, or None
+        num_pos_defaults,       # count of positional args with a default value
+        num_kwonly_required,    # count of keyword-only args WITHOUT a default
+    )
     """
     result: dict[str, dict] = {}
     for node in ast.walk(tree):
         if not isinstance(node, ast.ClassDef):
             continue
         if node.name.startswith("_"):
+            continue
+        # FP-V-01: skip test classes (Test*, *Test, *TestCase) — they are not
+        # public API and removing/renaming test methods never breaks SDK consumers.
+        if node.name.startswith("Test") or node.name.endswith("Test") or node.name.endswith("TestCase"):
             continue
         methods: dict = {}
         for item in node.body:
@@ -313,7 +438,22 @@ def extract_public_class_methods(
             if item.args.kwarg:
                 varflags.append(f"**{item.args.kwarg.arg}")
             ret = ast.unparse(item.returns) if item.returns else None
-            methods[item.name] = (pos_args, kwonly, varflags, ret)
+            # Count of positional args that have a default value. Needed by
+            # the breaking-change detector to tell an additive change (new
+            # optional trailing arg) from a breaking one (new required arg).
+            num_pos_defaults = len(item.args.defaults)
+            # kwonly defaults: kw_defaults has None entries for required kwonly
+            num_kwonly_required = sum(
+                1 for d in item.args.kw_defaults if d is None
+            )
+            methods[item.name] = (
+                pos_args,
+                kwonly,
+                varflags,
+                ret,
+                num_pos_defaults,
+                num_kwonly_required,
+            )
         if methods:
             result[node.name] = methods
     return result
@@ -377,12 +517,76 @@ CHECKS = {
 def main(argv: list[str]) -> int:
     if len(argv) < 3:
         print(
-            "Usage: ast_python_checks.py <check-name> <file1> [<file2> ...]",
+            "Usage: ast-python-checks.py <check-name> <file1> [<file2> ...]",
             file=sys.stderr,
         )
         return 2
     check_name = argv[1]
     files = argv[2:]
+
+    # FP-C-02: pt-04 has a different signature (module dir, not files) and
+    # returns a boolean via exit code (0 = has exceptions, 1 = none found).
+    if check_name == "pt-04":
+        module_dir = files[0]
+        return 0 if check_pt_04(module_dir) else 1
+
+    # FP-R-01: docstring-lines prints "1" for every line number that falls
+    # inside a module/class/function docstring, so line-based checks (e.g.
+    # check-hardcode HC-01) can skip URLs that live in documentation examples.
+    if check_name == "docstring-lines":
+        for f in files:
+            tree = parse_file(f)
+            if tree is None:
+                continue
+            for node in ast.walk(tree):
+                if not isinstance(
+                    node, (ast.Module, ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef)
+                ):
+                    continue
+                doc = ast.get_docstring(node, clean=False)
+                if not doc:
+                    continue
+                # The docstring is the first statement's Constant node.
+                body = getattr(node, "body", [])
+                if not body:
+                    continue
+                first = body[0]
+                if (
+                    isinstance(first, ast.Expr)
+                    and isinstance(first.value, ast.Constant)
+                    and isinstance(first.value.value, str)
+                ):
+                    start = first.value.lineno
+                    end = getattr(first.value, "end_lineno", start)
+                    for ln in range(start, end + 1):
+                        print(ln)
+        return 0
+
+    # FP-S-01: http-session-lines prints the line number of every
+    # requests.Session()/httpx.Client()/AsyncClient() call that is NOT inside
+    # __init__ (or a module/class-level assignment). A session created in
+    # __init__ is the RECOMMENDED pattern, so HTTP-01 must not fire on it.
+    # Only lines printed here are per-invocation sessions worth flagging.
+    if check_name == "http-session-lines":
+        SESSION_CTORS = {"Session", "Client", "AsyncClient"}
+        for f in files:
+            tree = parse_file(f)
+            if tree is None:
+                continue
+            # Map every function def to whether it is __init__.
+            for node in ast.walk(tree):
+                if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                    continue
+                if node.name == "__init__":
+                    continue  # sessions here are the correct pattern
+                for sub in ast.walk(node):
+                    if (
+                        isinstance(sub, ast.Call)
+                        and isinstance(sub.func, ast.Attribute)
+                        and sub.func.attr in SESSION_CTORS
+                    ):
+                        print(sub.lineno)
+        return 0
 
     if check_name not in CHECKS:
         print(f"ERROR: unknown check {check_name}", file=sys.stderr)

@@ -180,6 +180,14 @@ client.delete_object("non-existent.txt")  # This won't raise an error
 
 ---
 
+## Multi-tenancy
+
+- **Supported:** No (Object Store is not multi-tenant aware)
+- **Authentication:** N/A
+- **How to use:** Multi-tenancy is not supported by this service. Object Store uses static access key credentials. Each service binding is scoped to a single dedicated bucket. To serve multiple tenants, provision a separate service instance per tenant.
+- **Further reading:**
+  - [SAP Object Store Service — SAP Help Portal](https://help.sap.com/docs/object-store)
+
 ## Error Handling
 
 The ObjectStore module provides specific exceptions for different error scenarios:

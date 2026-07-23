@@ -7,7 +7,8 @@ Supports mTLS (client certificates) and insecure (no-auth) modes for gRPC.
 import json
 import os
 import uuid
-from typing import Optional
+from datetime import datetime, timezone
+from typing import Any, Optional, cast
 
 import protovalidate
 from protovalidate import ValidationError as ProtoValidationError
@@ -37,6 +38,38 @@ from sap_cloud_sdk.core.auditlog_ng.config import (
 from sap_cloud_sdk.core.auditlog_ng.exceptions import ValidationError
 from sap_cloud_sdk.core.telemetry import Module, Operation, record_metrics
 from sap_cloud_sdk.core.telemetry.config import ENV_OTLP_PROTOCOL
+from sap_cloud_sdk.core.runtime_context import get_context
+from sap_cloud_sdk.core.runtime_context.providers import TENANT_ID, USER_ID
+from sap_cloud_sdk.ias._context import get_auth_context
+
+
+def _fill_common_from_auth_context(event: Message) -> None:
+    """Back-fill common fields from the request auth context.
+
+    Accesses event.common directly — protobuf creates the sub-message on first
+    mutation, so callers that never touched common still get it populated.
+    Sets tenant_id and user_initiator_id from IAS claims (if present and not
+    already set), and sets timestamp to now if the caller left it at zero.
+
+    Reads from the SDK runtime context first (populated by bootstrap()), then
+    falls back to the legacy IAS auth context for apps not yet using bootstrap().
+    """
+    if not hasattr(event, "common"):
+        return
+    common = cast(Any, event.common)
+
+    ctx = get_context()
+    claims = get_auth_context()
+
+    tenant_id = ctx.get(TENANT_ID) or (claims and claims.app_tid)
+    user_id = ctx.get(USER_ID) or (claims and claims.user_uuid)
+
+    if tenant_id and not common.tenant_id:
+        common.tenant_id = tenant_id
+    if user_id and not common.user_initiator_id:
+        common.user_initiator_id = user_id
+    if common.timestamp.seconds == 0:
+        common.timestamp.FromDatetime(datetime.now(timezone.utc))
 
 
 def _create_log_exporter(
@@ -177,6 +210,8 @@ class AuditClient:
 
         if format not in {"protobuf-binary", "json"}:
             raise ValueError("format must be 'protobuf-binary' or 'json'")
+
+        _fill_common_from_auth_context(event)
 
         try:
             protovalidate.validate(event)

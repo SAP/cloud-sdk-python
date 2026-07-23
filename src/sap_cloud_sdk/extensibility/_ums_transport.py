@@ -23,6 +23,7 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 import httpx
 
+from sap_cloud_sdk.core.telemetry import Module
 from sap_cloud_sdk.destination import ConsumptionLevel
 from sap_cloud_sdk.destination import create_client as create_destination_client
 from sap_cloud_sdk.extensibility._models import (
@@ -450,7 +451,8 @@ class UmsTransport:
         self._config = config
         self._destination_name = _ums_destination_name(config.destination_name)
         self._dest_client = create_destination_client(
-            instance=config.destination_instance
+            instance=config.destination_instance,
+            _telemetry_source=Module.EXTENSIBILITY,
         )
         self._cache: collections.OrderedDict[
             tuple[str, str],

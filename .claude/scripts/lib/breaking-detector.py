@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import ast
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -92,12 +93,123 @@ def files_changed(base: str, head: str) -> list[str]:
         text=True,
         check=False,
     )
-    return [f for f in out.stdout.strip().split("\n") if f]
+    files = [f for f in out.stdout.strip().split("\n") if f]
+    # FP-Q-01: when the PR branch is behind main, `base..head` also surfaces
+    # files that MAIN changed after the merge-base — the PR never touched them.
+    # Comparing base-vs-head on those makes main's additions look like PR
+    # deletions. Restrict to files the PR actually modified, taken from the
+    # PR's own diff (ADDED_LINES_FILE lists "path:line" for every added line).
+    added_lines_file = os.environ.get("ADDED_LINES_FILE", "")
+    if added_lines_file and os.path.isfile(added_lines_file):
+        pr_files: set[str] = set()
+        try:
+            with open(added_lines_file, encoding="utf-8") as fh:
+                for entry in fh:
+                    entry = entry.strip()
+                    if ":" in entry:
+                        pr_files.add(entry.rpartition(":")[0])
+        except OSError:
+            pr_files = set()
+        if pr_files:
+            files = [f for f in files if f in pr_files]
+    return files
+
+
+def _is_breaking_sig_change(base_sig: tuple, head_sig: tuple) -> bool:
+    """Return True only if the signature change breaks existing callers.
+
+    Signature tuple layout (see ast_python_checks.extract_public_class_methods):
+      (pos_args, kwonly_args, var_flags, return_ann,
+       num_pos_defaults, num_kwonly_required)
+
+    ADDITIVE (not breaking):
+      - Appending new positional args that all have defaults.
+      - Adding keyword-only args that have defaults.
+      - (var_flags unchanged, return unchanged, no existing arg renamed/removed/reordered)
+
+    BREAKING:
+      - Removing/renaming/reordering any existing positional arg.
+      - Adding a positional arg WITHOUT a default (new required arg).
+      - Adding a required keyword-only arg.
+      - Removing *args/**kwargs.
+      - Changing the return annotation.
+    """
+    base_pos, base_kw, base_var, base_ret = base_sig[0], base_sig[1], base_sig[2], base_sig[3]
+    head_pos, head_kw, head_var, head_ret = head_sig[0], head_sig[1], head_sig[2], head_sig[3]
+    # Older signature tuples (4-element) had no default counts — treat any
+    # change as breaking to stay conservative for legacy callers.
+    if len(base_sig) < 6 or len(head_sig) < 6:
+        return base_sig != head_sig
+    head_pos_defaults = head_sig[4]
+    head_kwonly_required = head_sig[5]
+    base_kwonly_required = base_sig[5]
+
+    # Return type change → breaking.
+    if base_ret != head_ret:
+        return True
+    # Removing *args/**kwargs → breaking (callers may rely on them).
+    if set(base_var) - set(head_var):
+        return True
+    # Existing positional args must be preserved as a prefix, in order.
+    if head_pos[: len(base_pos)] != base_pos:
+        return True  # a prefix arg was removed, renamed, or reordered
+    # Any NEW positional args (beyond the base prefix) must all have defaults.
+    num_new_pos = len(head_pos) - len(base_pos)
+    if num_new_pos > 0:
+        # head_pos_defaults counts trailing defaulted positionals. For the new
+        # args to be additive, there must be at least num_new_pos defaults.
+        if head_pos_defaults < num_new_pos:
+            return True  # added a required positional arg → breaking
+    elif num_new_pos < 0:
+        return True  # positional args were removed
+    # Keyword-only: any newly-required kwonly arg is breaking.
+    if head_kwonly_required > base_kwonly_required:
+        return True
+    # Removing an existing kwonly arg is breaking.
+    if set(base_kw) - set(head_kw):
+        return True
+    # Everything else is additive or a no-op.
+    return False
+
+
+def _load_pr_removed_text() -> str | None:
+    """Concatenate all '-' (removed) lines from the PR's own diff.
+
+    FP-Q-01 (enum/field/method variant): AST comparison of the full base vs
+    head file treats symbols that MAIN added (but the behind-main PR lacks) as
+    PR deletions. A real deletion by THIS PR must appear on a '-' line in the
+    PR's diff. We load that removed-text once and gate every deletion finding
+    on the symbol name appearing there. Returns None when no diff is available
+    (then we fall back to the AST-only behavior, i.e. no gating).
+    """
+    diff_file = os.environ.get("DIFF_FILE", "")
+    if not diff_file or not os.path.isfile(diff_file):
+        return None
+    removed: list[str] = []
+    try:
+        with open(diff_file, encoding="utf-8", errors="replace") as fh:
+            for ln in fh:
+                # Real removed lines start with '-' but not '---' (file header)
+                if ln.startswith("-") and not ln.startswith("---"):
+                    removed.append(ln[1:])
+    except OSError:
+        return None
+    return "".join(removed)
 
 
 def detect(base: str, head: str) -> dict:
     details: list[dict] = []
     kinds: set[str] = set()
+
+    # FP-Q-01: text of all lines this PR removed (None if no diff available).
+    pr_removed_text = _load_pr_removed_text()
+
+    def pr_actually_removed(symbol_leaf: str) -> bool:
+        """True if the PR's diff removed a line mentioning this symbol leaf.
+        When we have no diff context, don't gate (return True)."""
+        if pr_removed_text is None:
+            return True
+        return symbol_leaf in pr_removed_text
 
     changed = files_changed(base, head)
 
@@ -133,6 +245,8 @@ def detect(base: str, head: str) -> dict:
         head_all = set(extract_all(head_tree))
         removed = base_all - head_all
         for name in removed:
+            if not pr_actually_removed(name):
+                continue
             details.append(
                 {
                     "kind": "api_removal_detected",
@@ -150,6 +264,10 @@ def detect(base: str, head: str) -> dict:
             head_methods = head_classes.get(cls_name, {})
             for mname, base_sig in base_methods.items():
                 if mname not in head_methods:
+                    # FP-Q-01: only a real deletion if the PR removed a line
+                    # mentioning this method (guards against behind-main branches).
+                    if not pr_actually_removed(mname):
+                        continue
                     details.append(
                         {
                             "kind": "method_deletion_on_public_class",
@@ -161,9 +279,9 @@ def detect(base: str, head: str) -> dict:
                     kinds.add("method_deletion_on_public_class")
                 else:
                     head_sig = head_methods[mname]
-                    # Compare all four elements of the signature tuple:
-                    # (pos_args, kwonly_args, vararg_flags, return_annotation)
-                    if base_sig != head_sig:
+                    # Compare signatures, but only flag CALLER-BREAKING changes.
+                    # Adding a trailing optional arg is additive, not breaking.
+                    if _is_breaking_sig_change(base_sig, head_sig):
                         details.append(
                             {
                                 "kind": "public_method_signature_change",
@@ -193,6 +311,8 @@ def detect(base: str, head: str) -> dict:
             head_fields = set(head_dcs.get(dc_name, []))
             for field in base_fields:
                 if field not in head_fields:
+                    if not pr_actually_removed(field):
+                        continue
                     details.append(
                         {
                             "kind": "dataclass_field_deletion_on_public_model",
@@ -210,6 +330,8 @@ def detect(base: str, head: str) -> dict:
             head_values = set(head_enums.get(enum_name, []))
             for val in base_values:
                 if val not in head_values:
+                    if not pr_actually_removed(val):
+                        continue
                     details.append(
                         {
                             "kind": "enum_value_deletion_on_public_enum",

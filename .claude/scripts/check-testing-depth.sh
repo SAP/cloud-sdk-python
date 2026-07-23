@@ -1,0 +1,72 @@
+#!/usr/bin/env bash
+# check-testing-depth.sh — test names, tests-added checkbox truthfulness, integration test present.
+set -euo pipefail
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/lib/json-emit.sh"
+
+LANGUAGE="${LANGUAGE:-python}"
+DIFF_FILE="${DIFF_FILE:-/dev/stdin}"
+PR_BODY_FILE="${PR_BODY_FILE:-}"
+
+STARTED=$(now_iso)
+findings=$(mktemp); trap 'rm -f "$findings"' EXIT
+
+diff_content=$(cat "$DIFF_FILE" 2>/dev/null || echo "")
+
+# TD-01: If PR title is fix: AND src/ changed AND no test file changed → FLAG
+if [ "$LANGUAGE" = "python" ]; then
+  fix_commit=$(git log HEAD --format=%s -n 1 2>/dev/null | grep -qE '^fix' && echo yes || echo no)
+  src_changed=$(echo "$diff_content" | grep -qE 'src/sap_cloud_sdk/' && echo yes || echo no)
+  test_changed=$(echo "$diff_content" | grep -qE 'tests?/.*/test_' && echo yes || echo no)
+  if [ "$fix_commit" = "yes" ] && [ "$src_changed" = "yes" ] && [ "$test_changed" = "no" ]; then
+    emit_finding "TD-01" "FLAG" "tests/" 1 \
+      "Bug-fix PR touches src/ but no test files changed" \
+      "Add a focused unit test that reproduces the bug and asserts the fix" >> "$findings"
+  fi
+
+  # TD-10: New module → integration test required.
+  # FP-Q: Only fire when the module is GENUINELY NEW in this PR — detected by
+  # the presence of "new file mode" for the module's __init__.py in the diff.
+  # Firing on every PR that touches an existing module (which may have always
+  # lacked integration tests) is a false positive that blocks unrelated work.
+  new_modules=$(echo "$diff_content" | awk '
+    /^diff --git/ { flag=0; next }
+    /^new file mode/ { flag=1; next }
+    flag && /^\+\+\+ b\/src\/sap_cloud_sdk\/[a-z_]+\/__init__\.py/ {
+      match($0, /src\/sap_cloud_sdk\/[a-z_]+\//)
+      print substr($0, RSTART, RLENGTH)
+    }
+  ' | { grep -oE 'src/sap_cloud_sdk/[a-z_]+/' 2>/dev/null || true; } | sed 's|src/sap_cloud_sdk/||; s|/$||' | sort -u)
+  while IFS= read -r mod; do
+    if [ -z "$mod" ] || [ "$mod" = "core" ]; then
+      continue
+    fi
+    has_integration=$({ grep -qE "tests/$mod/integration/" "${DIFF_FILE:-/dev/stdin}" 2>/dev/null; } && echo yes || echo no)
+    if [ "$has_integration" = "no" ]; then
+      emit_finding "TD-10" "BLOCK" "tests/$mod/integration/" 1 \
+        "New module '$mod' has no integration test" "" >> "$findings"
+    fi
+  done <<< "$new_modules"
+fi
+
+# TD-checkbox: PR body says "tests added" but no test files touched
+if [ -n "$PR_BODY_FILE" ] && [ -f "$PR_BODY_FILE" ]; then
+  body=$(cat "$PR_BODY_FILE")
+  if echo "$body" | grep -qE '\-[[:space:]]*\[[xX]\][[:space:]].*(added|updated).*tests'; then
+    # FP-U-01: multi-module Maven layouts put tests at <module>/src/test/… or
+    # <module>/tests?/, not at the root. Allow an optional module-path prefix
+    # before the test-folder segment (Adwitiya Sushant I743000, JV#5 feedback):
+    #   old: diff --git a/(tests?/|src/test/)          — requires root-level path
+    #   new: diff --git a/([^ ]*/)?( tests?/|src/test/) — module prefix optional
+    # Use grep on $DIFF_FILE directly (not echo "$diff_content") so large diffs
+    # aren't truncated by shell argument expansion.
+    _diff_src="${DIFF_FILE:-/dev/stdin}"
+    if ! grep -qE 'diff --git a/([^ ]*/)?(tests?/|src/test/)' "${_diff_src}" 2>/dev/null; then
+      emit_finding "TD-checkbox" "FLAG" "PR_BODY" 1 \
+        "PR body ticks 'added tests' checkbox but no test files changed" "" >> "$findings"
+    fi
+  fi
+fi
+
+status=$(status_from_findings < "$findings")
+emit_report "testing-depth" "$LANGUAGE" "$status" "$STARTED" < "$findings"

@@ -283,6 +283,13 @@ Typical file pseudonymization responses:
 | `filename`     | `str \| None`    | Filename from the `Content-Disposition` header, if present. |
 | `raw`          | `dict`           | Parsed JSON payload when available and suitable for response inspection. |
 
+## Multi-tenancy
+
+- **Supported:** No
+- **Authentication:** N/A
+- **How to use:** This module has no multi-tenancy model.
+- **Further reading:** N/A
+
 ## Error Handling
 
 Always catch `DataAnonymizationError` or its subclasses around calls:

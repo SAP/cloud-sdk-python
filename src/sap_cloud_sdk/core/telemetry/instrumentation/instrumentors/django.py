@@ -7,6 +7,8 @@ _instrumentor = DjangoInstrumentor()
 
 
 class DjangoInstrumentorWrapper(LibraryInstrumentor):
+    """Instruments Django with OTel spans for inbound HTTP requests and baggage extraction."""
+
     library_name = "django"
 
     def is_instrumented(self) -> bool:

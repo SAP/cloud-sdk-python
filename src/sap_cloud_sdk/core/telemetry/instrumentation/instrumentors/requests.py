@@ -7,6 +7,8 @@ _instrumentor = RequestsInstrumentor()
 
 
 class RequestsInstrumentorWrapper(LibraryInstrumentor):
+    """Instruments the requests library with OTel spans and W3C header propagation."""
+
     library_name = "requests"
 
     def is_instrumented(self) -> bool:

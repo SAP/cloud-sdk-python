@@ -7,6 +7,8 @@ _instrumentor = SQLAlchemyInstrumentor()
 
 
 class SQLAlchemyInstrumentorWrapper(LibraryInstrumentor):
+    """Instruments SQLAlchemy with OTel spans for database queries."""
+
     library_name = "sqlalchemy"
 
     def is_instrumented(self) -> bool:

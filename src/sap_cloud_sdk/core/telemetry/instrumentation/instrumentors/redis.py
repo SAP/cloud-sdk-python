@@ -7,6 +7,8 @@ _instrumentor = RedisInstrumentor()
 
 
 class RedisInstrumentorWrapper(LibraryInstrumentor):
+    """Instruments the redis client with OTel spans for commands and pipeline operations."""
+
     library_name = "redis"
 
     def is_instrumented(self) -> bool:

@@ -7,6 +7,8 @@ _instrumentor = FlaskInstrumentor()
 
 
 class FlaskInstrumentorWrapper(LibraryInstrumentor):
+    """Instruments Flask with OTel spans for inbound HTTP requests and baggage extraction."""
+
     library_name = "flask"
 
     def is_instrumented(self) -> bool:

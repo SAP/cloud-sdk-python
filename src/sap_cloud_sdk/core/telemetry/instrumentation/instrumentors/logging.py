@@ -7,6 +7,8 @@ _instrumentor = LoggingInstrumentor()
 
 
 class LoggingInstrumentorWrapper(LibraryInstrumentor):
+    """Injects trace_id and span_id into every stdlib log record for log-trace correlation."""
+
     library_name = "logging"
 
     def is_instrumented(self) -> bool:

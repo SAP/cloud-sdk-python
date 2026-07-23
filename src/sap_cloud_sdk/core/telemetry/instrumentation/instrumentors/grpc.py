@@ -11,6 +11,8 @@ _server_instrumentor = GrpcInstrumentorServer()
 
 
 class GrpcInstrumentorWrapper(LibraryInstrumentor):
+    """Instruments gRPC client and server interceptors with OTel spans."""
+
     library_name = "grpc"
 
     def is_instrumented(self) -> bool:

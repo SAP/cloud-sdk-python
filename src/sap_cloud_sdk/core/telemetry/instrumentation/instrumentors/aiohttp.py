@@ -7,6 +7,8 @@ _instrumentor = AioHttpClientInstrumentor()
 
 
 class AiohttpInstrumentor(LibraryInstrumentor):
+    """Instruments aiohttp client sessions with OTel spans and W3C header propagation."""
+
     library_name = "aiohttp"
 
     def is_instrumented(self) -> bool:

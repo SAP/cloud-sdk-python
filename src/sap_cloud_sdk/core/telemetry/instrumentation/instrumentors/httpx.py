@@ -7,6 +7,8 @@ _instrumentor = HTTPXClientInstrumentor()
 
 
 class HttpxInstrumentor(LibraryInstrumentor):
+    """Instruments httpx sync and async clients with OTel spans and W3C header propagation."""
+
     library_name = "httpx"
 
     def is_instrumented(self) -> bool:

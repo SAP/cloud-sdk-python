@@ -23,7 +23,12 @@ from sap_cloud_sdk.core.runtime_context._context import (
     get_context,
 )
 from sap_cloud_sdk.core.runtime_context._envelope import RequestEnvelope
-from sap_cloud_sdk.core.runtime_context._keys import ContextKey, DWC_SUBDOMAIN, DWC_TENANT, TRIGGER_TYPE
+from sap_cloud_sdk.core.runtime_context._keys import (
+    ContextKey,
+    DWC_SUBDOMAIN,
+    DWC_TENANT,
+    TRIGGER_TYPE,
+)
 from sap_cloud_sdk.core.runtime_context._protocol import ContextProvider
 from sap_cloud_sdk.core.runtime_context._registry import FrameworkAdapter, register
 from sap_cloud_sdk.core.runtime_context.providers import (

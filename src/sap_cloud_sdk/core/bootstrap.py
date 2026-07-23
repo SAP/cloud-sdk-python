@@ -5,8 +5,11 @@ from typing import Any, List, Optional
 from sap_cloud_sdk.core.runtime_context._protocol import ContextProvider
 from sap_cloud_sdk.core.runtime_context._registry import get_registry
 from sap_cloud_sdk.core.runtime_context import HeaderContextProvider, IASContextProvider
+from sap_cloud_sdk.core.telemetry import Module, Operation
+from sap_cloud_sdk.core.telemetry.metrics_decorator import record_metrics
 
 
+@record_metrics(Module.BOOTSTRAP, Operation.BOOTSTRAP)
 def bootstrap(app: Any, providers: Optional[List[ContextProvider]] = None) -> None:
     """Wire the SDK runtime context into your application framework.
 

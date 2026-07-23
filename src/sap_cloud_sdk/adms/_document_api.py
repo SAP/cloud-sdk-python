@@ -115,7 +115,7 @@ class _DocumentApi:
         document_relation_id: str,
         *,
         is_active_entity: bool = True,
-        doc_content_version_id: str,
+        doc_content_version_id: str | None = None,
     ) -> str:
         """Return a time-limited presigned download URL for a document.
 
@@ -125,6 +125,7 @@ class _DocumentApi:
             document_relation_id: UUID of the parent DocumentRelation.
             is_active_entity: Active vs draft entity flag.
             doc_content_version_id: Content version to download (e.g. ``"1.0"``).
+                If ``None``, the latest version is downloaded.
 
         Returns:
             Presigned URL string.
@@ -153,10 +154,13 @@ class _DocumentApi:
                 f"Downloads are only permitted when state is CLEAN."
             )
 
-        fn_key = (
-            f"{rel_key}/DownloadDocument("
-            f"DocContentVersionID={quote_odata_string_key(doc_content_version_id)})"
-        )
+        if doc_content_version_id is not None:
+            fn_key = (
+                f"{rel_key}/com.sap.adm.DocumentService.DownloadDocument("
+                f"DocContentVersionID={quote_odata_string_key(doc_content_version_id)})"
+            )
+        else:
+            fn_key = f"{rel_key}/com.sap.adm.DocumentService.DownloadDocument()"
         resp = self._http.get(fn_key, service_base=_SERVICE_PATH)
         return resp.json().get("value", "")
 
@@ -170,29 +174,21 @@ class _DocumentApi:
     ) -> Document:
         """Update document metadata via the bound ``UpdateDocument`` action.
 
-        ADM's UpdateDocument action returns only the changed fields.  This
-        method transparently follows up with a GET to return the full Document.
-
         Args:
             document_relation_id: UUID of the parent DocumentRelation.
             update_input: Fields to update (only non-None fields are sent).
             is_active_entity: Active vs draft entity flag.
 
         Returns:
-            Full updated :class:`~sap_cloud_sdk.adms._models.Document`.
+            Partial :class:`~sap_cloud_sdk.adms._models.Document` as returned
+            by the ADM ``UpdateDocument`` action (only changed fields populated).
         """
         path = (
             build_relation_key_path(document_relation_id, is_active_entity)
-            + "/UpdateDocument"
+            + "/com.sap.adm.DocumentService.UpdateDocument"
         )
         payload = {"Document": update_input.to_odata_dict()}
-        self._http.post(path, json=payload, service_base=_SERVICE_PATH)
-        # UpdateDocument returns only changed fields — fetch the full entity.
-        full_path = (
-            build_relation_key_path(document_relation_id, is_active_entity)
-            + "/Document"
-        )
-        resp = self._http.get(full_path, service_base=_SERVICE_PATH)
+        resp = self._http.post(path, json=payload, service_base=_SERVICE_PATH)
         return Document.from_dict(resp.json())
 
     @record_metrics(Module.ADMS, Operation.ADMS_DOCUMENTS_RESTORE_CONTENT_VERSION)
@@ -217,7 +213,7 @@ class _DocumentApi:
         """
         path = (
             build_relation_key_path(document_relation_id, is_active_entity)
-            + "/RestoreDocumentContentVersion"
+            + "/com.sap.adm.DocumentService.RestoreDocumentContentVersion"
         )
         payload: dict = {
             "DocumentContentVersion": {
@@ -246,7 +242,7 @@ class _DocumentApi:
         """
         path = (
             build_relation_key_path(document_relation_id, is_active_entity)
-            + "/DeleteDocumentContentVersion"
+            + "/com.sap.adm.DocumentService.DeleteDocumentContentVersion"
         )
         self._http.post(
             path,
@@ -316,7 +312,7 @@ class _AsyncDocumentApi:
         document_relation_id: str,
         *,
         is_active_entity: bool = True,
-        doc_content_version_id: str,
+        doc_content_version_id: str | None = None,
     ) -> str:
         """Async download URL fetch with scan-state gate."""
         rel_key = build_relation_key_path(document_relation_id, is_active_entity)
@@ -339,10 +335,13 @@ class _AsyncDocumentApi:
                 f"Downloads are only permitted when state is CLEAN."
             )
 
-        fn_key = (
-            f"{rel_key}/DownloadDocument("
-            f"DocContentVersionID={quote_odata_string_key(doc_content_version_id)})"
-        )
+        if doc_content_version_id is not None:
+            fn_key = (
+                f"{rel_key}/com.sap.adm.DocumentService.DownloadDocument("
+                f"DocContentVersionID={quote_odata_string_key(doc_content_version_id)})"
+            )
+        else:
+            fn_key = f"{rel_key}/com.sap.adm.DocumentService.DownloadDocument()"
         resp = await self._http.get(fn_key, service_base=_SERVICE_PATH)
         return resp.json().get("value", "")
 
@@ -357,15 +356,10 @@ class _AsyncDocumentApi:
         """Async variant of :meth:`_DocumentApi.update` — same semantics."""
         path = (
             build_relation_key_path(document_relation_id, is_active_entity)
-            + "/UpdateDocument"
+            + "/com.sap.adm.DocumentService.UpdateDocument"
         )
         payload = {"Document": update.to_odata_dict()}
-        await self._http.post(path, json=payload, service_base=_SERVICE_PATH)
-        full_path = (
-            build_relation_key_path(document_relation_id, is_active_entity)
-            + "/Document"
-        )
-        resp = await self._http.get(full_path, service_base=_SERVICE_PATH)
+        resp = await self._http.post(path, json=payload, service_base=_SERVICE_PATH)
         return Document.from_dict(resp.json())
 
     @record_metrics(Module.ADMS, Operation.ADMS_DOCUMENTS_DELETE_CONTENT_VERSION)
@@ -379,7 +373,7 @@ class _AsyncDocumentApi:
         """Async variant of :meth:`_DocumentApi.delete_content_version` — same semantics."""
         path = (
             build_relation_key_path(document_relation_id, is_active_entity)
-            + "/DeleteDocumentContentVersion"
+            + "/com.sap.adm.DocumentService.DeleteDocumentContentVersion"
         )
         await self._http.post(
             path,
@@ -399,7 +393,7 @@ class _AsyncDocumentApi:
         """Async variant of :meth:`_DocumentApi.restore_content_version` — same semantics."""
         path = (
             build_relation_key_path(document_relation_id, is_active_entity)
-            + "/RestoreDocumentContentVersion"
+            + "/com.sap.adm.DocumentService.RestoreDocumentContentVersion"
         )
         payload: dict = {
             "DocumentContentVersion": {

@@ -11,12 +11,19 @@ class ContextKey(Generic[T]):
     Each provider defines its own keys. The type parameter ensures consumers
     get the right type back from :meth:`RuntimeContext.get`.
 
+    Keys use object identity for lookup — two ``ContextKey`` instances with the
+    same name are **different keys**. Always import the canonical key from the
+    module that defined it; never create a second instance with the same name.
+
     Example::
 
         MY_KEY = ContextKey[str]("my_key")
 
         ctx = RuntimeContext({MY_KEY: "value"})
         ctx.get(MY_KEY)  # -> "value"
+
+        other = ContextKey[str]("my_key")
+        ctx.get(other)   # -> None  (different key object)
     """
 
     def __init__(self, name: str) -> None:

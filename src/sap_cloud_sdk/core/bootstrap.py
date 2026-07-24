@@ -4,7 +4,11 @@ from typing import Any, List, Optional
 
 from sap_cloud_sdk.core.runtime_context._protocol import ContextProvider
 from sap_cloud_sdk.core.runtime_context._registry import get_registry
-from sap_cloud_sdk.core.runtime_context import HeaderContextProvider, IASContextProvider
+from sap_cloud_sdk.core.runtime_context import (
+    DWCContextProvider,
+    IASContextProvider,
+    SAPTriggerContextProvider,
+)
 from sap_cloud_sdk.core.telemetry import Module, Operation
 from sap_cloud_sdk.core.telemetry.metrics_decorator import record_metrics
 
@@ -25,7 +29,7 @@ def bootstrap(app: Any, providers: Optional[List[ContextProvider]] = None) -> No
     Args:
         app:       The application instance to attach the middleware to.
         providers: Context providers to run on each request. Defaults to
-                   ``[IASContextProvider(), HeaderContextProvider()]``.
+                   ``[IASContextProvider(), SAPTriggerContextProvider(), DWCContextProvider()]``.
 
     Raises:
         TypeError: If no registered adapter recognises *app*.
@@ -34,13 +38,13 @@ def bootstrap(app: Any, providers: Optional[List[ContextProvider]] = None) -> No
 
         from sap_cloud_sdk import bootstrap
 
-        bootstrap(app)  # IAS + SAP headers by default
+        bootstrap(app)  # IAS + SAP trigger + DWC by default
 
         # custom providers:
         bootstrap(app, providers=[IASContextProvider(), MyProvider()])
     """
     if not providers:
-        providers = [IASContextProvider(), HeaderContextProvider()]
+        providers = [IASContextProvider(), SAPTriggerContextProvider(), DWCContextProvider()]
 
     for adapter in get_registry():
         if adapter.matches(app):

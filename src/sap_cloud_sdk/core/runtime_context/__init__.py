@@ -7,7 +7,7 @@ Wire once at startup::
 
     from sap_cloud_sdk import bootstrap
 
-    bootstrap(app)  # defaults to IASContextProvider + HeaderContextProvider
+    bootstrap(app)  # defaults to IASContextProvider + SAPTriggerContextProvider + DWCContextProvider
 
 Then read anywhere::
 
@@ -32,8 +32,9 @@ from sap_cloud_sdk.core.runtime_context._keys import (
 from sap_cloud_sdk.core.runtime_context._protocol import ContextProvider
 from sap_cloud_sdk.core.runtime_context._registry import FrameworkAdapter, register
 from sap_cloud_sdk.core.runtime_context.providers import (
-    HeaderContextProvider,
+    DWCContextProvider,
     IASContextProvider,
+    SAPTriggerContextProvider,
     GLOBAL_TENANT_ID,
     TENANT_ID,
     USER_ID,
@@ -47,12 +48,13 @@ __all__ = [
     "ContextProvider",
     "DWC_SUBDOMAIN",
     "DWC_TENANT",
+    "DWCContextProvider",
     "FrameworkAdapter",
     "GLOBAL_TENANT_ID",
-    "HeaderContextProvider",
     "IASContextProvider",
     "RuntimeContext",
     "RequestEnvelope",
+    "SAPTriggerContextProvider",
     "TENANT_ID",
     "TRIGGER_TYPE",
     "USER_ID",

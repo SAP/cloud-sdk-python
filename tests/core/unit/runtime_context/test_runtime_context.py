@@ -8,10 +8,11 @@ from sap_cloud_sdk.core.runtime_context import (
     ContextProvider,
     DWC_SUBDOMAIN,
     DWC_TENANT,
-    HeaderContextProvider,
+    DWCContextProvider,
     IASContextProvider,
     RuntimeContext,
     RequestEnvelope,
+    SAPTriggerContextProvider,
     TRIGGER_TYPE,
     get_context,
 )
@@ -287,39 +288,49 @@ class TestIASContextProvider:
 
 
 # ---------------------------------------------------------------------------
-# HeaderContextProvider
+# SAPTriggerContextProvider
 # ---------------------------------------------------------------------------
 
 
-class TestHeaderContextProvider:
+class TestSAPTriggerContextProvider:
     def test_extracts_trigger_type(self):
         envelope = _make_envelope({"x-sap-origin": "ui5"})
-        ctx = HeaderContextProvider().extract(envelope)
+        ctx = SAPTriggerContextProvider().extract(envelope)
         assert ctx.get(TRIGGER_TYPE) == "ui5"
 
     def test_trigger_type_none_when_header_absent(self):
         envelope = _make_envelope({})
-        ctx = HeaderContextProvider().extract(envelope)
+        ctx = SAPTriggerContextProvider().extract(envelope)
         assert ctx.get(TRIGGER_TYPE) is None
 
+    def test_satisfies_context_provider_protocol(self):
+        assert isinstance(SAPTriggerContextProvider(), ContextProvider)
+
+
+# ---------------------------------------------------------------------------
+# DWCContextProvider
+# ---------------------------------------------------------------------------
+
+
+class TestDWCContextProvider:
     def test_extracts_dwc_subdomain(self):
         envelope = _make_envelope({"dwc-subdomain": "my-subdomain"})
-        ctx = HeaderContextProvider().extract(envelope)
+        ctx = DWCContextProvider().extract(envelope)
         assert ctx.get(DWC_SUBDOMAIN) == "my-subdomain"
 
     def test_extracts_dwc_tenant(self):
         envelope = _make_envelope({"dwc-tenant": "my-tenant"})
-        ctx = HeaderContextProvider().extract(envelope)
+        ctx = DWCContextProvider().extract(envelope)
         assert ctx.get(DWC_TENANT) == "my-tenant"
 
     def test_returns_empty_when_no_headers(self):
         envelope = _make_envelope({})
-        ctx = HeaderContextProvider().extract(envelope)
+        ctx = DWCContextProvider().extract(envelope)
         assert ctx.get(DWC_SUBDOMAIN) is None
         assert ctx.get(DWC_TENANT) is None
 
     def test_satisfies_context_provider_protocol(self):
-        assert isinstance(HeaderContextProvider(), ContextProvider)
+        assert isinstance(DWCContextProvider(), ContextProvider)
 
 
 # ---------------------------------------------------------------------------

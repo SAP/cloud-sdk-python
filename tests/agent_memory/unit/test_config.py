@@ -128,7 +128,7 @@ class TestBindingData:
 # ── _load_config_from_env ─────────────────────────────────────────────────────
 
 
-def _fill_binding(module, instance, target) -> None:
+def _fill_binding(service_name, instance, target) -> None:
     target.application_url = "https://memory.example.com"
     target.uaa = _VALID_UAA
 
@@ -150,7 +150,7 @@ class TestLoadConfigFromEnv:
             _load_secrets()
 
         mock_get_resolver.return_value.resolve.assert_called_once_with(
-            module="agent_memory", instance="default", target=mock_get_resolver.return_value.resolve.call_args[1]["target"]
+            service_name="agent_memory", instance="default", target=mock_get_resolver.return_value.resolve.call_args[1]["target"]
         )
 
     def test_raises_config_error_when_resolver_fails(self):
@@ -160,7 +160,7 @@ class TestLoadConfigFromEnv:
                 _load_secrets()
 
     def test_raises_config_error_when_binding_incomplete(self):
-        def partial_fill(module, instance, target):
+        def partial_fill(service_name, instance, target):
             target.application_url = "https://memory.example.com"
             # uaa remains empty → validate() raises
 
@@ -170,7 +170,7 @@ class TestLoadConfigFromEnv:
                 _load_secrets()
 
     def test_raises_config_error_when_uaa_json_invalid(self):
-        def fill_invalid_uaa(module, instance, target):
+        def fill_invalid_uaa(service_name, instance, target):
             target.application_url = "https://memory.example.com"
             target.uaa = "not-valid-json"
 

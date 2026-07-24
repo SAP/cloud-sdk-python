@@ -196,7 +196,7 @@ class TestLoadConfigFromEnv:
 
     @patch('sap_cloud_sdk.core.auditlog.config.get_resolver')
     def test_load_config_success(self, mock_get_resolver):
-        def fill_binding(module, instance, target):
+        def fill_binding(service_name, instance, target):
             target.url = "https://service.example.com"
             target.uaa = '{"clientid": "test", "clientsecret": "secret", "url": "oauth"}'
 
@@ -210,12 +210,12 @@ class TestLoadConfigFromEnv:
         assert config.service_url == "https://service.example.com"
 
         mock_get_resolver.return_value.resolve.assert_called_once_with(
-            module="auditlog", instance="default", target=mock_get_resolver.return_value.resolve.call_args[1]["target"]
+            service_name="auditlog", instance="default", target=mock_get_resolver.return_value.resolve.call_args[1]["target"]
         )
 
     @patch('sap_cloud_sdk.core.auditlog.config.get_resolver')
     def test_load_config_validation_error(self, mock_get_resolver):
-        def fill_binding(module, instance, target):
+        def fill_binding(service_name, instance, target):
             target.url = ""
             target.uaa = ""
 
@@ -233,7 +233,7 @@ class TestLoadConfigFromEnv:
 
     @patch('sap_cloud_sdk.core.auditlog.config.get_resolver')
     def test_load_config_invalid_uaa(self, mock_get_resolver):
-        def fill_binding(module, instance, target):
+        def fill_binding(service_name, instance, target):
             target.url = "https://service.example.com"
             target.uaa = "invalid json"
 

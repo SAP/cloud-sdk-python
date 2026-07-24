@@ -20,7 +20,7 @@ class TestLoadFromEnvOrMount:
 
     @patch(_RESOLVER)
     def test_returns_print_config(self, mock_get_resolver):
-        def fill_binding(module, instance, target):
+        def fill_binding(service_name, instance, target):
             target.url = "https://api.eu10.print.services.sap"
             target.uaa = _uaa_json()
 
@@ -36,7 +36,7 @@ class TestLoadFromEnvOrMount:
 
     @patch(_RESOLVER)
     def test_uses_default_instance(self, mock_get_resolver):
-        def fill_binding(module, instance, target):
+        def fill_binding(service_name, instance, target):
             target.url = "https://api.eu10.print.services.sap"
             target.uaa = _uaa_json()
 
@@ -44,12 +44,12 @@ class TestLoadFromEnvOrMount:
 
         load_secrets()
         mock_get_resolver.return_value.resolve.assert_called_once_with(
-            module="print", instance="default", target=mock_get_resolver.return_value.resolve.call_args[1]["target"]
+            service_name="print", instance="default", target=mock_get_resolver.return_value.resolve.call_args[1]["target"]
         )
 
     @patch(_RESOLVER)
     def test_uses_provided_instance(self, mock_get_resolver):
-        def fill_binding(module, instance, target):
+        def fill_binding(service_name, instance, target):
             target.url = "https://api.eu10.print.services.sap"
             target.uaa = _uaa_json()
 
@@ -57,12 +57,12 @@ class TestLoadFromEnvOrMount:
 
         load_secrets(instance="prod")
         mock_get_resolver.return_value.resolve.assert_called_once_with(
-            module="print", instance="prod", target=mock_get_resolver.return_value.resolve.call_args[1]["target"]
+            service_name="print", instance="prod", target=mock_get_resolver.return_value.resolve.call_args[1]["target"]
         )
 
     @patch(_RESOLVER)
     def test_missing_url_raises_config_error(self, mock_get_resolver):
-        def fill_binding(module, instance, target):
+        def fill_binding(service_name, instance, target):
             target.url = ""
             target.uaa = _uaa_json()
 
@@ -73,7 +73,7 @@ class TestLoadFromEnvOrMount:
 
     @patch(_RESOLVER)
     def test_invalid_uaa_json_raises_config_error(self, mock_get_resolver):
-        def fill_binding(module, instance, target):
+        def fill_binding(service_name, instance, target):
             target.url = "https://api.eu10.print.services.sap"
             target.uaa = "not-valid-json"
 
@@ -84,7 +84,7 @@ class TestLoadFromEnvOrMount:
 
     @patch(_RESOLVER)
     def test_missing_clientid_raises_config_error(self, mock_get_resolver):
-        def fill_binding(module, instance, target):
+        def fill_binding(service_name, instance, target):
             target.url = "https://api.eu10.print.services.sap"
             target.uaa = _uaa_json(clientid="")
 
@@ -95,7 +95,7 @@ class TestLoadFromEnvOrMount:
 
     @patch(_RESOLVER)
     def test_missing_clientsecret_raises_config_error(self, mock_get_resolver):
-        def fill_binding(module, instance, target):
+        def fill_binding(service_name, instance, target):
             target.url = "https://api.eu10.print.services.sap"
             target.uaa = _uaa_json(clientsecret="")
 
@@ -106,7 +106,7 @@ class TestLoadFromEnvOrMount:
 
     @patch(_RESOLVER)
     def test_missing_uaa_url_raises_config_error(self, mock_get_resolver):
-        def fill_binding(module, instance, target):
+        def fill_binding(service_name, instance, target):
             target.url = "https://api.eu10.print.services.sap"
             target.uaa = _uaa_json(url="")
 

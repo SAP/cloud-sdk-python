@@ -19,7 +19,7 @@ class TestCreateClient:
 
         mock_get_resolver.return_value.resolve.assert_called_once()
         call_kwargs = mock_get_resolver.return_value.resolve.call_args[1]
-        assert call_kwargs["module"] == "objectstore"
+        assert call_kwargs["service_name"] == "objectstore"
         assert call_kwargs["instance"] == "production"
         assert isinstance(call_kwargs["target"], ObjectStoreBindingData)
         mock_client_class.assert_called_once_with(call_kwargs["target"], disable_ssl=True)

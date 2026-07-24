@@ -106,7 +106,7 @@ class TestLoadFromEnvOrMount:
     def test_load_success_default_instance(self, mock_get_resolver):
         mock_resolver = MagicMock()
 
-        def fake_resolve(module, instance, target):
+        def fake_resolve(service_name, instance, target):
             assert isinstance(target, BindingData)
             target.clientid = "cid"
             target.clientsecret = "csecret"
@@ -126,14 +126,14 @@ class TestLoadFromEnvOrMount:
         assert sb.identityzone == "provider-zone"
 
         mock_resolver.resolve.assert_called_once_with(
-            module="destination", instance="default", target=mock_resolver.resolve.call_args[1]["target"]
+            service_name="destination", instance="default", target=mock_resolver.resolve.call_args[1]["target"]
         )
 
     @patch("sap_cloud_sdk.destination.config.get_resolver")
     def test_load_success_custom_instance(self, mock_get_resolver):
         mock_resolver = MagicMock()
 
-        def fake_resolve(module, instance, target):
+        def fake_resolve(service_name, instance, target):
             target.clientid = "cid"
             target.clientsecret = "csecret"
             target.url = "https://auth.example.com"
@@ -146,14 +146,14 @@ class TestLoadFromEnvOrMount:
         sb = load_secrets("custom")
         assert isinstance(sb, DestinationConfig)
         mock_resolver.resolve.assert_called_once_with(
-            module="destination", instance="custom", target=mock_resolver.resolve.call_args[1]["target"]
+            service_name="destination", instance="custom", target=mock_resolver.resolve.call_args[1]["target"]
         )
 
     @patch("sap_cloud_sdk.destination.config.get_resolver")
     def test_load_validation_error_propagates_as_config_error(self, mock_get_resolver):
         mock_resolver = MagicMock()
 
-        def fake_resolve(module, instance, target):
+        def fake_resolve(service_name, instance, target):
             target.clientid = ""
             target.clientsecret = ""
             target.url = ""

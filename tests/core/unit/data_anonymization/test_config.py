@@ -125,8 +125,8 @@ class TestBindingData:
 
 class TestLoadConfigFromEnv:
     def test_load_config_success(self) -> None:
-        def fake_resolve(module, instance, target):
-            assert module == "data-anonymization"
+        def fake_resolve(service_name, instance, target):
+            assert service_name == "data-anonymization"
             assert instance == "custom-instance"
             target.url = "https://service.example.com"
             target.destination_name = "anon-destination"

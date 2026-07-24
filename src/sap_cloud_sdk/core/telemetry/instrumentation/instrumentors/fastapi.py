@@ -20,6 +20,7 @@ class FastAPIInstrumentorWrapper(LibraryInstrumentor):
 
     def _instrument(self, **kwargs) -> None:
         from fastapi import FastAPI
+
         app = kwargs.get("app")
         if app is None:
             _instrumentor.instrument()

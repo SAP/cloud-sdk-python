@@ -24,7 +24,7 @@ class _ConcreteInstrumentor(LibraryInstrumentor):
     def is_instrumented(self) -> bool:
         return self._instrumented
 
-    def _instrument(self) -> None:
+    def _instrument(self, **kwargs) -> None:
         self._instrumented = True
 
     def _uninstrument(self) -> None:
@@ -40,7 +40,7 @@ class _MissingLibraryInstrumentor(LibraryInstrumentor):
     def is_instrumented(self) -> bool:
         return self._instrumented
 
-    def _instrument(self) -> None:
+    def _instrument(self, **kwargs) -> None:
         self._instrumented = True
 
     def _uninstrument(self) -> None:

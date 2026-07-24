@@ -20,6 +20,7 @@ class StarletteInstrumentorWrapper(LibraryInstrumentor):
 
     def _instrument(self, **kwargs) -> None:
         from starlette.applications import Starlette
+
         app = kwargs.get("app")
         if app is None:
             _instrumentor.instrument()

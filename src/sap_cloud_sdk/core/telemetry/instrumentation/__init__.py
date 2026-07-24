@@ -34,7 +34,7 @@ except ImportError:
     pass
 
 try:
-    from sap_cloud_sdk.core.telemetry.instrumentation.instrumentors import redis  # noqa: F401
+    from sap_cloud_sdk.core.telemetry.instrumentation.instrumentors import redis  # noqa: F401  # ty: ignore[unresolved-import]
 except ImportError:
     pass
 

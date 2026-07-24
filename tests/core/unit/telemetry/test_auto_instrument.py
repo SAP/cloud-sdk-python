@@ -25,6 +25,7 @@ def mock_traceloop_components():
             'get_tracer_provider': stack.enter_context(patch('sap_cloud_sdk.core.telemetry.auto_instrument.trace.get_tracer_provider', return_value=create_autospec(SDKTracerProvider))),
             'create_resource': stack.enter_context(patch('sap_cloud_sdk.core.telemetry.auto_instrument.create_resource_attributes_from_env')),
             'get_app_name': stack.enter_context(patch('sap_cloud_sdk.core.telemetry.auto_instrument._get_app_name')),
+            'setup_log_provider': stack.enter_context(patch('sap_cloud_sdk.core.telemetry.auto_instrument.setup_log_provider')),
         }
         yield mocks
 
@@ -405,3 +406,29 @@ class TestAutoInstrumentMiddlewares:
 
         # add_span_processor called 3 times: baggage, propagated attributes, middleware
         assert mock_traceloop_components['get_tracer_provider'].return_value.add_span_processor.call_count == 3
+
+
+class TestAutoInstrumentLogging:
+    def test_setup_log_provider_called_on_instrument(self, mock_traceloop_components):
+        mock_traceloop_components['get_app_name'].return_value = 'test-app'
+        mock_traceloop_components['create_resource'].return_value = {}
+
+        with patch.dict('os.environ', {'OTEL_EXPORTER_OTLP_ENDPOINT': 'http://localhost:4317'}, clear=True):
+            auto_instrument()
+
+            mock_traceloop_components['setup_log_provider'].assert_called_once()
+
+    def test_setup_log_provider_not_called_when_no_endpoint(self):
+        with patch.dict('os.environ', {}, clear=True):
+            with patch('sap_cloud_sdk.core.telemetry.auto_instrument.setup_log_provider') as mock_log:
+                auto_instrument()
+                mock_log.assert_not_called()
+
+    def test_setup_log_provider_called_with_console_exporter(self, mock_traceloop_components):
+        mock_traceloop_components['get_app_name'].return_value = 'test-app'
+        mock_traceloop_components['create_resource'].return_value = {}
+
+        with patch.dict('os.environ', {'OTEL_TRACES_EXPORTER': 'console'}, clear=True):
+            auto_instrument()
+
+            mock_traceloop_components['setup_log_provider'].assert_called_once()

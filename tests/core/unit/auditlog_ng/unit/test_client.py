@@ -2,15 +2,18 @@
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from typing import TypedDict, Unpack
 from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 
-from sap_cloud_sdk.core.auditlog_ng.client import AuditClient
+from sap_cloud_sdk.core.auditlog_ng.client import AuditClient, _fill_common_from_auth_context
 from sap_cloud_sdk.core.auditlog_ng.config import AuditLogNGConfig, SCHEMA_URL
 from sap_cloud_sdk.core.auditlog_ng.exceptions import ValidationError
+from sap_cloud_sdk.core.auditlog_ng.gen.sap.auditlog.auditevent.v2 import auditevent_pb2 as pb
 from sap_cloud_sdk.core.telemetry import Module, Operation
+from sap_cloud_sdk.ias._context import set_auth_context
 
 
 class ConfigKwargs(TypedDict, total=False):
@@ -335,3 +338,57 @@ class TestAuditClientProtocol:
         monkeypatch.setenv("OTEL_EXPORTER_OTLP_PROTOCOL", "http/json")
         with pytest.raises(ValueError, match="Unsupported OTEL_EXPORTER_OTLP_PROTOCOL"):
             AuditClient(_make_config())
+
+
+class TestFillCommonFromAuthContext:
+    def setup_method(self):
+        set_auth_context(None)
+
+    def teardown_method(self):
+        set_auth_context(None)
+
+    def _make_claims(self, app_tid="tid-123", user_uuid="uid-456"):
+        claims = MagicMock()
+        claims.app_tid = app_tid
+        claims.user_uuid = user_uuid
+        return claims
+
+    def test_no_context_sets_timestamp_only(self):
+        event = pb.DataAccess()
+        _fill_common_from_auth_context(event)
+        assert event.common.timestamp.seconds > 0
+        assert event.common.tenant_id == ""
+        assert event.common.user_initiator_id == ""
+
+    def test_with_context_fills_tenant_and_user(self):
+        set_auth_context(self._make_claims())
+        event = pb.DataAccess()
+        _fill_common_from_auth_context(event)
+        assert event.common.tenant_id == "tid-123"
+        assert event.common.user_initiator_id == "uid-456"
+        assert event.common.timestamp.seconds > 0
+
+    def test_does_not_overwrite_explicit_tenant(self):
+        set_auth_context(self._make_claims(app_tid="ctx-tid"))
+        event = pb.DataAccess()
+        event.common.tenant_id = "explicit-tid"
+        _fill_common_from_auth_context(event)
+        assert event.common.tenant_id == "explicit-tid"
+
+    def test_does_not_overwrite_explicit_user(self):
+        set_auth_context(self._make_claims(user_uuid="ctx-uid"))
+        event = pb.DataAccess()
+        event.common.user_initiator_id = "explicit-uid"
+        _fill_common_from_auth_context(event)
+        assert event.common.user_initiator_id == "explicit-uid"
+
+    def test_does_not_overwrite_explicit_timestamp(self):
+        fixed = datetime(2024, 1, 1, tzinfo=timezone.utc)
+        event = pb.DataAccess()
+        event.common.timestamp.FromDatetime(fixed)
+        _fill_common_from_auth_context(event)
+        assert event.common.timestamp.seconds == int(fixed.timestamp())
+
+    def test_event_without_common_field_is_skipped(self):
+        event = MagicMock(spec=[])  # no 'common' attribute
+        _fill_common_from_auth_context(event)  # must not raise

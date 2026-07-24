@@ -7,7 +7,8 @@ Supports mTLS (client certificates) and insecure (no-auth) modes for gRPC.
 import json
 import os
 import uuid
-from typing import Optional
+from datetime import datetime, timezone
+from typing import Any, Optional, cast
 
 import protovalidate
 from protovalidate import ValidationError as ProtoValidationError
@@ -37,6 +38,28 @@ from sap_cloud_sdk.core.auditlog_ng.config import (
 from sap_cloud_sdk.core.auditlog_ng.exceptions import ValidationError
 from sap_cloud_sdk.core.telemetry import Module, Operation, record_metrics
 from sap_cloud_sdk.core.telemetry.config import ENV_OTLP_PROTOCOL
+from sap_cloud_sdk.ias._context import get_auth_context
+
+
+def _fill_common_from_auth_context(event: Message) -> None:
+    """Back-fill common fields from the request auth context.
+
+    Accesses event.common directly — protobuf creates the sub-message on first
+    mutation, so callers that never touched common still get it populated.
+    Sets tenant_id and user_initiator_id from IAS claims (if present and not
+    already set), and sets timestamp to now if the caller left it at zero.
+    """
+    if not hasattr(event, "common"):
+        return
+    common = cast(Any, event.common)
+    claims = get_auth_context()
+    if claims is not None:
+        if claims.app_tid and not common.tenant_id:
+            common.tenant_id = claims.app_tid
+        if claims.user_uuid and not common.user_initiator_id:
+            common.user_initiator_id = claims.user_uuid
+    if common.timestamp.seconds == 0:
+        common.timestamp.FromDatetime(datetime.now(timezone.utc))
 
 
 def _create_log_exporter(
@@ -177,6 +200,8 @@ class AuditClient:
 
         if format not in {"protobuf-binary", "json"}:
             raise ValueError("format must be 'protobuf-binary' or 'json'")
+
+        _fill_common_from_auth_context(event)
 
         try:
             protovalidate.validate(event)

@@ -309,6 +309,13 @@ auto_instrument(middlewares=[StarletteIASTelemetryMiddleware(app=app)])
 
 ---
 
+## Multi-tenancy
+
+- **Supported:** N/A
+- **Authentication:** N/A
+- **How to use:** This is an infrastructure module. `set_tenant_id()` and `StarletteIASTelemetryMiddleware` allow attaching a tenant identifier to OpenTelemetry spans as metadata, but this is observability context.
+- **Further reading:** N/A
+
 ## Configuration
 
 ### Production

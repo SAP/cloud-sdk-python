@@ -52,6 +52,31 @@ def handle_request(request):
 
 ---
 
+## Library instrumentation
+
+`auto_instrument()` automatically instruments any supported library that is already installed in the service — no extra configuration needed. If a library is not installed, it is silently skipped.
+
+**Supported libraries:**
+
+| Library      | What is traced                           |
+|--------------|------------------------------------------|
+| `httpx`      | Outbound HTTP requests (sync and async)  |
+| `requests`   | Outbound HTTP requests                   |
+| `grpcio`     | gRPC client and server calls             |
+| `starlette`  | Inbound HTTP requests                    |
+| `fastapi`    | Inbound HTTP requests with route details |
+| `aiohttp`    | Outbound async HTTP requests             |
+| `django`     | Inbound HTTP requests                    |
+| `flask`      | Inbound HTTP requests                    |
+| `sqlalchemy` | Database queries                         |
+| `logging`    | Injects `trace_id` and `span_id` into every log record for log-trace correlation |
+
+Instrumentation activates based on what is installed in the service, not on what extras were used to install the SDK. If your service has `django` in its own requirements, the SDK will instrument it automatically.
+
+The SDK ships `opentelemetry-instrumentation-*` packages for all of the above as hard dependencies. The target frameworks themselves are optional — install them via your service's own requirements or via the SDK's convenience extras (e.g. `sap-cloud-sdk[django]`).
+
+---
+
 ## Span functions
 
 For operations following [OpenTelemetry GenAI conventions](https://opentelemetry.io/docs/specs/semconv/gen-ai/gen-ai-agent-spans/):

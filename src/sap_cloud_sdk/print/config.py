@@ -98,7 +98,7 @@ def load_secrets(instance: Optional[str] = None) -> PrintConfig:
     binding = _BindingData()
 
     try:
-        get_resolver().resolve(module="print", instance=inst, target=binding)
+        get_resolver().resolve(service_name="print", instance=inst, target=binding)
 
         binding.validate()
         return binding.to_config()

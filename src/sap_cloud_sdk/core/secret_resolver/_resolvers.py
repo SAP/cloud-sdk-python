@@ -30,11 +30,11 @@ class Resolver(Protocol):
     protocol — no inheritance required.
     """
 
-    def resolve(self, module: str, instance: str, target: Any) -> None:
-        """Populate ``target`` with credentials for ``module``/``instance``.
+    def resolve(self, service_name: str, instance: str, target: Any) -> None:
+        """Populate ``target`` with credentials for ``service_name``/``instance``.
 
         Args:
-            module: Service module name (e.g. ``"destination"``).
+            service_name: Service module name (e.g. ``"destination"``).
             instance: Instance identifier (e.g. ``"default"``).
             target: Dataclass instance whose ``str`` fields will be set.
 
@@ -65,7 +65,7 @@ class ChainedResolver:
         self._resolvers = resolvers
         self._base_var_name = base_var_name
 
-    def resolve(self, module: str, instance: str, target: Any) -> None:
+    def resolve(self, service_name: str, instance: str, target: Any) -> None:
         """Try each resolver in order; raise on total failure."""
         if not is_dataclass(target) or isinstance(target, type):
             raise TypeError("target must be a dataclass instance")
@@ -78,15 +78,15 @@ class ChainedResolver:
         errors: list[str] = []
         for resolver in self._resolvers:
             try:
-                resolver.resolve(module, instance, target)
+                resolver.resolve(service_name, instance, target)
                 return
             except Exception as e:
                 label = type(resolver).__name__
                 errors.append(f"{label} failed: {e}")
 
         raise RuntimeError(
-            f"module={module!r} instance={instance!r} failed to read secrets from all resolvers: "
+            f"module={service_name!r} instance={instance!r} failed to read secrets from all resolvers: "
             f"{errors}. "
             "Options: mount secrets under the service binding path, set environment variables "
-            f"like {self._base_var_name}_{module}_{instance}_<KEY> (uppercased), or set VCAP_SERVICES."
+            f"like {self._base_var_name}_{service_name}_{instance}_<KEY> (uppercased)"
         )

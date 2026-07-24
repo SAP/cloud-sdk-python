@@ -109,7 +109,7 @@ def load_secrets(instance: str | None = None) -> AdmsConfig:
     instance = instance or _DEFAULT_INSTANCE
     raw = _BindingData()
     try:
-        get_resolver().resolve(module="adms", instance=instance, target=raw)
+        get_resolver().resolve(service_name="adms", instance=instance, target=raw)
 
     except Exception as exc:
         raise ConfigError(

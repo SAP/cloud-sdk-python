@@ -53,7 +53,7 @@ def create_client(
 
     # Cloud mode: use secret resolver to load configuration
     config = ObjectStoreBindingData()
-    get_resolver().resolve(module="objectstore", instance=instance, target=config)
+    get_resolver().resolve(service_name="objectstore", instance=instance, target=config)
 
     return ObjectStoreClient(config, disable_ssl=disable_ssl)
 

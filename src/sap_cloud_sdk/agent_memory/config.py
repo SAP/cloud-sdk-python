@@ -130,7 +130,7 @@ def _load_secrets() -> AgentMemoryConfig:
     try:
         binding = BindingData()
         get_resolver().resolve(
-            module="agent_memory", instance="default", target=binding
+            service_name="agent_memory", instance="default", target=binding
         )
 
         binding.validate()

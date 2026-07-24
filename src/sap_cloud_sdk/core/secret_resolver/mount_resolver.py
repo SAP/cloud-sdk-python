@@ -13,7 +13,7 @@ from sap_cloud_sdk.core.secret_resolver.constants import (
 class MountResolver:
     """Resolves bindings from a mounted volume path.
 
-    Reads secret files at ``{base_volume_mount}/{module}/{instance}/{field_key}``.
+    Reads secret files at ``{base_volume_mount}/{service_name}/{instance}/{field_key}``.
     Respects the ``SERVICE_BINDING_ROOT`` environment variable (servicebinding.io
     spec) as an override for ``base_volume_mount``.
 
@@ -25,40 +25,22 @@ class MountResolver:
     def __init__(self, base_volume_mount: str = BASE_MOUNT_PATH) -> None:
         self._base_volume_mount = base_volume_mount
 
-    def resolve(self, module: str, instance: str, target: Any) -> None:
+    def resolve(self, service_name: str, instance: str, target: Any) -> None:
         """Load secrets from the mounted volume path."""
-        effective_base = resolve_base_mount(self._base_volume_mount)
-        _load_from_mount(effective_base, module, instance, target)
-
-
-def resolve_base_mount(base_volume_mount: str = BASE_MOUNT_PATH) -> str:
-    """Resolve the base mount path for service binding discovery.
-
-    Checks the ``SERVICE_BINDING_ROOT`` environment variable first (as defined
-    by the `servicebinding.io <https://servicebinding.io/spec/core/1.1.0/>`_
-    specification). Falls back to ``base_volume_mount`` when the env var is
-    absent.
-
-    Args:
-        base_volume_mount: Default base path used when ``SERVICE_BINDING_ROOT``
-            is not set. Defaults to ``/etc/secrets/appfnd``.
-
-    Returns:
-        The effective base path for secret mount resolution.
-    """
-    return os.environ.get(SERVICE_BINDING_ROOT, base_volume_mount)
+        effective_base = os.environ.get(SERVICE_BINDING_ROOT, self._base_volume_mount)
+        _load_from_mount(effective_base, service_name, instance, target)
 
 
 def _load_from_mount(
-    base_volume_mount: str, module: str, instance: str, target: Any
+    base_volume_mount: str, service_name: str, instance: str, target: Any
 ) -> None:
     """
     Load secrets from files at:
-        {base_volume_mount}/{module}/{instance}/{field_key}
+        {base_volume_mount}/{service_name}/{instance}/{field_key}
 
     Sets string attributes directly on the dataclass instance.
     """
-    secret_dir = os.path.join(base_volume_mount, module, instance)
+    secret_dir = os.path.join(base_volume_mount, service_name, instance)
     _validate_path(secret_dir)
 
     field_map = _get_field_map(target)

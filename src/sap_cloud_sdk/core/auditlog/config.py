@@ -107,7 +107,7 @@ def _load_secrets() -> AuditLogConfig:
         binding_data: BindingData = BindingData("", "")
 
         get_resolver().resolve(
-            module="auditlog", instance="default", target=binding_data
+            service_name="auditlog", instance="default", target=binding_data
         )
 
         binding_data.validate()

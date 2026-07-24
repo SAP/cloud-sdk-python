@@ -114,7 +114,7 @@ def load_sdm_config_from_env_or_mount(instance: Optional[str] = None) -> DMSCred
     )  # Initialize with empty values; will be populated by resolver
 
     try:
-        get_resolver().resolve(module="sdm", instance=inst, target=binding)
+        get_resolver().resolve(service_name="sdm", instance=inst, target=binding)
 
         binding.validate()
         return binding.to_credentials()

@@ -146,27 +146,6 @@ print(binding.clientid)
 
 ---
 
-## Legacy API
-
-The function-based API from earlier SDK versions is still supported:
-
-```python
-from sap_cloud_sdk.core.secret_resolver import read_from_mount_and_fallback_to_env_var
-
-read_from_mount_and_fallback_to_env_var(
-    base_volume_mount="/etc/secrets/appfnd",
-    base_var_name="CLOUD_SDK_CFG",
-    module="destination",
-    instance="default",
-    target=binding,
-)
-```
-
-Prefer the class-based API for new code — it is more composable and supports
-process-wide configuration.
-
----
-
 ## Error handling
 
 | Situation | Exception raised |

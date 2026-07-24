@@ -131,7 +131,7 @@ def _load_secrets(instance: str = "default") -> DataAnonymizationConfig:
     try:
         binding = _BindingData("")
         get_resolver().resolve(
-            module="data-anonymization", instance=instance, target=binding
+            service_name="data-anonymization", instance=instance, target=binding
         )
         binding.validate()
         return binding.extract_config()

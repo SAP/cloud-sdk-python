@@ -17,8 +17,7 @@ Usage::
     ))
 
 If no configuration is set, all modules fall back to the default chain:
-``ChainedResolver([MountResolver(), EnvVarResolver()])``, which is identical
-to the previous ``read_from_mount_and_fallback_to_env_var()`` behaviour.
+``ChainedResolver([MountResolver(), EnvVarResolver()])``.
 """
 
 from __future__ import annotations
@@ -32,7 +31,7 @@ from sap_cloud_sdk.core.secret_resolver._resolvers import (
     ChainedResolver,
 )
 
-from sap_cloud_sdk.core.secret_resolver.env_resolver import EnvVarResolver
+from sap_cloud_sdk.core.secret_resolver.sdk_env_resolver import SdkEnvVarResolver
 from sap_cloud_sdk.core.secret_resolver.mount_resolver import MountResolver
 
 _lock = threading.Lock()
@@ -44,7 +43,7 @@ class SdkConfig:
     """Process-wide SDK configuration.
 
     Attributes:
-        resolver: The :class:`BindingResolver` that all ``create_client()`` calls
+        resolver: The :class:`Resolver` that all ``create_client()`` calls
             use when no explicit config is passed. ``None`` means each module uses
             the default ``ChainedResolver([MountResolver(), EnvVarResolver()])`` chain.
     """
@@ -66,7 +65,7 @@ def configure(config: SdkConfig) -> None:
         _sdk_config = config
 
 
-def get_sdk_config() -> Optional[SdkConfig]:
+def get() -> Optional[SdkConfig]:
     """Return the current process-wide SDK configuration, or ``None`` if unset."""
     return _sdk_config
 
@@ -88,7 +87,7 @@ def get_resolver() -> Resolver:
     installed; otherwise returns a fresh default
     ``ChainedResolver([MountResolver(), EnvVarResolver()])``.
     """
-    cfg = get_sdk_config()
+    cfg = get()
     if cfg is not None and cfg.resolver is not None:
         return cfg.resolver
-    return ChainedResolver([MountResolver(), EnvVarResolver()])
+    return ChainedResolver([MountResolver(), SdkEnvVarResolver()])

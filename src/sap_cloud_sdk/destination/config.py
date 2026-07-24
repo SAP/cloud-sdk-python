@@ -122,7 +122,9 @@ def load_secrets(instance: Optional[str] = None) -> DestinationConfig:
     binding = BindingData()
 
     try:
-        get_resolver().resolve(module="destination", instance=inst, target=binding)
+        get_resolver().resolve(
+            service_name="destination", instance=inst, target=binding
+        )
 
         binding.validate()
         return binding.to_binding()

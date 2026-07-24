@@ -22,13 +22,9 @@ class FastAPIInstrumentorWrapper(LibraryInstrumentor):
         from fastapi import FastAPI
 
         app = kwargs.get("app")
-        if app is None:
+        if app is None or not isinstance(app, FastAPI):
             _instrumentor.instrument()
             return
-        if not isinstance(app, FastAPI):
-            raise TypeError(
-                f"FastAPIInstrumentorWrapper expects a FastAPI instance, got {type(app).__name__}"
-            )
         FastAPIInstrumentor.instrument_app(app)
 
     def _uninstrument(self) -> None:

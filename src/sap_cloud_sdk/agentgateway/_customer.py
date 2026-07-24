@@ -689,16 +689,12 @@ async def get_mcp_tools_customer(
 
     Returns:
         List of MCPTool objects from all servers.
-
-    Raises:
-        AgentGatewaySDKError: If integrationDependencies is empty.
     """
     dependencies = credentials.integration_dependencies
 
     if not dependencies:
-        raise AgentGatewaySDKError(
-            "integrationDependencies is empty in credentials — no MCP servers configured."
-        )
+        logger.debug("integrationDependencies is empty in credentials — no MCP servers configured.")
+        return []
 
     logger.info("Discovering tools from %d MCP server(s)", len(dependencies))
 

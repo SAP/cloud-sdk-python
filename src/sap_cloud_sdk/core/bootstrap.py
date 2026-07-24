@@ -44,7 +44,11 @@ def bootstrap(app: Any, providers: Optional[List[ContextProvider]] = None) -> No
         bootstrap(app, providers=[IASContextProvider(), MyProvider()])
     """
     if not providers:
-        providers = [IASContextProvider(), SAPTriggerContextProvider(), DWCContextProvider()]
+        providers = [
+            IASContextProvider(),
+            SAPTriggerContextProvider(),
+            DWCContextProvider(),
+        ]
 
     for adapter in get_registry():
         if adapter.matches(app):

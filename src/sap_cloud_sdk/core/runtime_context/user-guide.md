@@ -31,8 +31,9 @@ app = Starlette(...)
 bootstrap(app)
 ```
 
-By default `bootstrap` registers `IASContextProvider` (reads IAS JWT) and
-`HeaderContextProvider` (reads SAP standard headers like `x-sap-origin`).
+By default `bootstrap` registers `IASContextProvider` (reads IAS JWT),
+`SAPTriggerContextProvider` (reads `x-sap-origin`), and `DWCContextProvider`
+(reads `dwc-subdomain` and `dwc-tenant`).
 
 ### 2. Read context anywhere
 
@@ -55,7 +56,7 @@ defined them.
 
 ```python
 # IAS-owned keys:
-from sap_cloud_sdk.core.runtime_context import TENANT_ID, USER_ID, IAS_CLAIMS
+from sap_cloud_sdk.core.runtime_context import TENANT_ID, USER_ID, GLOBAL_TENANT_ID
 
 # SDK-standard keys (not tied to any specific source):
 from sap_cloud_sdk.core.runtime_context import TRIGGER_TYPE
@@ -87,8 +88,9 @@ metadata or a message queue envelope — as long as the adapter populates
 
 | Provider | Reads | Sets |
 |---|---|---|
-| `IASContextProvider` | `Authorization: Bearer <JWT>` | `TENANT_ID`, `USER_ID`, `IAS_CLAIMS` |
-| `HeaderContextProvider` | `x-sap-origin` | `TRIGGER_TYPE` |
+| `IASContextProvider` | `Authorization: Bearer <JWT>` | `TENANT_ID`, `USER_ID`, `GLOBAL_TENANT_ID` |
+| `SAPTriggerContextProvider` | `x-sap-origin` | `TRIGGER_TYPE` |
+| `DWCContextProvider` | `dwc-subdomain`, `dwc-tenant` | `DWC_SUBDOMAIN`, `DWC_TENANT` |
 
 ### Custom providers
 
@@ -108,9 +110,13 @@ class CorrelationIdProvider(ContextProvider):
 Pass it to `bootstrap`:
 
 ```python
-from sap_cloud_sdk.core.runtime_context import IASContextProvider, HeaderContextProvider
+from sap_cloud_sdk.core.runtime_context import (
+    IASContextProvider,
+    SAPTriggerContextProvider,
+    DWCContextProvider,
+)
 
-bootstrap(app, providers=[IASContextProvider(), HeaderContextProvider(), CorrelationIdProvider()])
+bootstrap(app, providers=[IASContextProvider(), SAPTriggerContextProvider(), DWCContextProvider(), CorrelationIdProvider()])
 ```
 
 ### Merging

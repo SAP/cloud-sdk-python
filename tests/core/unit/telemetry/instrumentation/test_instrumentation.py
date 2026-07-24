@@ -225,17 +225,6 @@ class TestSQLAlchemyInstrumentor:
             sqlalchemy_mod.SQLAlchemyInstrumentorWrapper().instrument()
         mock.instrument.assert_called_once()
 
-
-class TestRedisInstrumentor:
-    def test_instrument_delegates_to_otel(self):
-        pytest.importorskip("redis")
-        from sap_cloud_sdk.core.telemetry.instrumentation.instrumentors import redis as redis_mod
-        mock = _make_otel_instrumentor_mock()
-        with patch.object(redis_mod, "_instrumentor", mock):
-            redis_mod.RedisInstrumentorWrapper().instrument()
-        mock.instrument.assert_called_once()
-
-
 class TestDjangoInstrumentor:
     def test_instrument_delegates_to_otel(self):
         pytest.importorskip("django")

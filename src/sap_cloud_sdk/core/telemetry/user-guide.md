@@ -69,7 +69,6 @@ def handle_request(request):
 | `django`     | Inbound HTTP requests                    |
 | `flask`      | Inbound HTTP requests                    |
 | `sqlalchemy` | Database queries                         |
-| `redis`      | Redis commands                           |
 | `logging`    | Injects `trace_id` and `span_id` into every log record for log-trace correlation |
 
 Instrumentation activates based on what is installed in the service, not on what extras were used to install the SDK. If your service has `django` in its own requirements, the SDK will instrument it automatically.

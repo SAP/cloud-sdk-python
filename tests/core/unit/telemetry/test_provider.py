@@ -2,6 +2,7 @@
 
 from unittest.mock import patch, MagicMock, call
 import logging
+import pytest
 
 from opentelemetry.sdk.metrics import (
     Counter,
@@ -229,6 +230,13 @@ class TestCreateLogExporter:
 
 
 class TestSetupLogProvider:
+    @pytest.fixture(autouse=True)
+    def reset_log_provider(self):
+        import sap_cloud_sdk.core.telemetry._provider as provider_module
+        provider_module._log_provider = None
+        yield
+        provider_module._log_provider = None
+
     def test_disabled_returns_none(self):
         config = InstrumentationConfig(enabled=False)
         with patch("sap_cloud_sdk.core.telemetry._provider.get_config", return_value=config):

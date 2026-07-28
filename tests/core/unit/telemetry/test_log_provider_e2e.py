@@ -32,6 +32,9 @@ def log_exporter(monkeypatch):
     _logs_internal._LOGGER_PROVIDER_SET_ONCE._done = False
     _logs_internal._LOGGER_PROVIDER = None
 
+    import sap_cloud_sdk.core.telemetry._provider as provider_module
+    provider_module._log_provider = None
+
     exporter = InMemoryLogRecordExporter()
 
     monkeypatch.setattr(
@@ -73,6 +76,7 @@ def log_exporter(monkeypatch):
     # Reset singleton again so the next test starts clean
     _logs_internal._LOGGER_PROVIDER_SET_ONCE._done = False
     _logs_internal._LOGGER_PROVIDER = None
+    provider_module._log_provider = None
 
 
 @pytest.fixture()

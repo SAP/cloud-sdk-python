@@ -220,6 +220,13 @@ max_retries = int(api_config.retries)
 
 ---
 
+## Multi-tenancy
+
+- **Supported:** N/A
+- **Authentication:** N/A
+- **How to use:** This is an infrastructure module for reading service bindings. It has no multi-tenancy concept of its own.
+- **Further reading:** N/A
+
 ## Error Handling
 
 The Secret Resolver handles missing secrets gracefully by leaving default values unchanged:

@@ -1,0 +1,57 @@
+"""Framework adapter base class and registry for bootstrap()."""
+
+from __future__ import annotations
+
+import logging
+from abc import ABC, abstractmethod
+from typing import List
+
+from sap_cloud_sdk.core.runtime_context._protocol import ContextProvider
+
+logger = logging.getLogger(__name__)
+
+_registry: List[FrameworkAdapter] = []
+
+
+def register(adapter: FrameworkAdapter) -> None:
+    """Register a framework adapter with the bootstrap registry."""
+    _registry.append(adapter)
+
+
+def get_registry() -> List[FrameworkAdapter]:
+    return list(_registry)
+
+
+class FrameworkAdapter(ABC):
+    """Connects a framework or invocation source to the SDK runtime context.
+
+    Subclasses know how to detect a specific app type and attach the SDK's
+    context pipeline to it. Register at module level so that
+    :func:`~sap_cloud_sdk.core.bootstrap.bootstrap` can discover them without
+    importing framework-specific code directly.
+
+    Example::
+
+        class FlaskContextAdapter(FrameworkAdapter):
+            def _matches(self, app) -> bool:
+                from flask import Flask
+                return isinstance(app, Flask)
+
+            def attach(self, app, providers) -> None:
+                app.before_request(lambda: ...)
+
+        register(FlaskContextAdapter())
+    """
+
+    def matches(self, app) -> bool:
+        """Return True if this adapter handles *app*'s framework type."""
+        try:
+            return self._matches(app)
+        except ImportError:
+            return False
+
+    @abstractmethod
+    def _matches(self, app) -> bool: ...
+
+    @abstractmethod
+    def attach(self, app, providers: List[ContextProvider]) -> None: ...

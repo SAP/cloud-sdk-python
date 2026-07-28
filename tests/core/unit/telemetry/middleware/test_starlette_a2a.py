@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, AsyncMock, patch
 from sap_cloud_sdk.core.telemetry.constants import ATTR_SAP_TRIGGER_TYPE, ATTR_SAP_TENANT_ID, ATTR_USER_ID
 from sap_cloud_sdk.core.telemetry.middleware.starlette_a2a import (
     StarletteIASTelemetryMiddleware,
-    _extract_ias_attrs,
+    _parse_request,
 )
 
 _PATCH_PARSE = "sap_cloud_sdk.core.telemetry.middleware.starlette_a2a.parse_token"
@@ -55,19 +55,19 @@ class TestStarletteIASTelemetryMiddleware:
             mw2._attrs_var.reset(t2)
 
 
-class TestExtractIasAttrs:
+class TestParseRequest:
     def test_extracts_tenant_and_user(self):
         claims = _make_claims(sap_gtid="t1", user_uuid="u1")
         request = _make_request({"authorization": "Bearer tok"})
         with patch(_PATCH_PARSE, return_value=claims):
-            result = _extract_ias_attrs(request)
+            _, result = _parse_request(request)
         assert result == {ATTR_SAP_TENANT_ID: "t1", ATTR_USER_ID: "u1"}
 
     def test_omits_missing_tenant(self):
         claims = _make_claims(sap_gtid=None, user_uuid="u1")
         request = _make_request({"authorization": "Bearer tok"})
         with patch(_PATCH_PARSE, return_value=claims):
-            result = _extract_ias_attrs(request)
+            _, result = _parse_request(request)
         assert result == {ATTR_USER_ID: "u1"}
         assert ATTR_SAP_TENANT_ID not in result
 
@@ -75,43 +75,52 @@ class TestExtractIasAttrs:
         claims = _make_claims(sap_gtid="t1", user_uuid=None)
         request = _make_request({"authorization": "Bearer tok"})
         with patch(_PATCH_PARSE, return_value=claims):
-            result = _extract_ias_attrs(request)
+            _, result = _parse_request(request)
         assert result == {ATTR_SAP_TENANT_ID: "t1"}
         assert ATTR_USER_ID not in result
 
     def test_returns_empty_when_no_auth_header(self):
         request = _make_request({})
         with patch(_PATCH_PARSE) as mock_parse:
-            result = _extract_ias_attrs(request)
+            parsed_claims, result = _parse_request(request)
         mock_parse.assert_not_called()
         assert result == {}
+        assert parsed_claims is None
 
     def test_returns_empty_on_parse_error(self):
         request = _make_request({"authorization": "Bearer bad"})
         with patch(_PATCH_PARSE, side_effect=ValueError("bad token")):
-            result = _extract_ias_attrs(request)
+            parsed_claims, result = _parse_request(request)
         assert result == {}
+        assert parsed_claims is None
 
     def test_returns_empty_when_both_claims_absent(self):
         claims = _make_claims(sap_gtid=None, user_uuid=None)
         request = _make_request({"authorization": "Bearer tok"})
         with patch(_PATCH_PARSE, return_value=claims):
-            result = _extract_ias_attrs(request)
+            _, result = _parse_request(request)
         assert result == {}
 
     def test_includes_origin_header_when_present(self):
         claims = _make_claims(sap_gtid="t1", user_uuid="u1")
         request = _make_request({"authorization": "Bearer tok", "x-sap-origin": "ui5"})
         with patch(_PATCH_PARSE, return_value=claims):
-            result = _extract_ias_attrs(request)
+            _, result = _parse_request(request)
         assert result[ATTR_SAP_TRIGGER_TYPE] == "ui5"
 
     def test_omits_origin_attr_when_header_absent(self):
         claims = _make_claims(sap_gtid="t1", user_uuid="u1")
         request = _make_request({"authorization": "Bearer tok"})
         with patch(_PATCH_PARSE, return_value=claims):
-            result = _extract_ias_attrs(request)
+            _, result = _parse_request(request)
         assert ATTR_SAP_TRIGGER_TYPE not in result
+
+    def test_returns_claims_object(self):
+        claims = _make_claims(sap_gtid="t1", user_uuid="u1")
+        request = _make_request({"authorization": "Bearer tok"})
+        with patch(_PATCH_PARSE, return_value=claims):
+            parsed_claims, _ = _parse_request(request)
+        assert parsed_claims is claims
 
 
 class TestInnerMiddlewareDispatch:

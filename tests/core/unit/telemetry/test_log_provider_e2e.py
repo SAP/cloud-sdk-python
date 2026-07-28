@@ -35,6 +35,12 @@ def log_exporter(monkeypatch):
     import sap_cloud_sdk.core.telemetry._provider as provider_module
     provider_module._log_provider = None
 
+    # Remove any stale LoggingHandlers left by previous tests
+    root = logging.getLogger()
+    for h in list(root.handlers):
+        if isinstance(h, LoggingHandler):
+            root.removeHandler(h)
+
     exporter = InMemoryLogRecordExporter()
 
     monkeypatch.setattr(

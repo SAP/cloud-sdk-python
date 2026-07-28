@@ -250,10 +250,11 @@ class TestSetupLogProvider:
                     with patch("sap_cloud_sdk.core.telemetry._provider.BatchLogRecordProcessor"):
                         with patch("sap_cloud_sdk.core.telemetry._provider.LoggerProvider", return_value=mock_provider):
                             with patch("sap_cloud_sdk.core.telemetry._provider.set_logger_provider"):
-                                with patch(_LOGGING_HANDLER):
-                                    with patch("logging.getLogger"):
-                                        result = setup_log_provider()
-                                        assert result is mock_provider
+                                with patch("sap_cloud_sdk.core.telemetry._provider.get_logger_provider", return_value=mock_provider):
+                                    with patch(_LOGGING_HANDLER):
+                                        with patch("logging.getLogger"):
+                                            result = setup_log_provider()
+                                            assert result is mock_provider
 
     def test_uses_shared_resource_attributes(self):
         with patch("sap_cloud_sdk.core.telemetry._provider.get_config", return_value=_ENABLED_CONFIG):
@@ -287,15 +288,17 @@ class TestSetupLogProvider:
             with patch("sap_cloud_sdk.core.telemetry._provider.Resource"):
                 with patch("sap_cloud_sdk.core.telemetry._provider._create_log_exporter"):
                     with patch("sap_cloud_sdk.core.telemetry._provider.BatchLogRecordProcessor"):
-                        with patch("sap_cloud_sdk.core.telemetry._provider.LoggerProvider"):
+                        mock_provider = MagicMock()
+                        with patch("sap_cloud_sdk.core.telemetry._provider.LoggerProvider", return_value=mock_provider):
                             with patch("sap_cloud_sdk.core.telemetry._provider.set_logger_provider"):
-                                mock_handler = MagicMock()
-                                with patch(_LOGGING_HANDLER, return_value=mock_handler):
-                                    mock_root = MagicMock()
-                                    with patch("logging.getLogger", return_value=mock_root) as mock_get_logger:
-                                        setup_log_provider()
-                                        mock_get_logger.assert_called_once_with()
-                                        mock_root.addHandler.assert_called_once_with(mock_handler)
+                                with patch("sap_cloud_sdk.core.telemetry._provider.get_logger_provider", return_value=mock_provider):
+                                    mock_handler = MagicMock()
+                                    with patch(_LOGGING_HANDLER, return_value=mock_handler):
+                                        mock_root = MagicMock()
+                                        with patch("logging.getLogger", return_value=mock_root) as mock_get_logger:
+                                            setup_log_provider()
+                                            mock_get_logger.assert_called_once_with()
+                                            mock_root.addHandler.assert_called_once_with(mock_handler)
 
     def test_exception_returns_none(self):
         with patch("sap_cloud_sdk.core.telemetry._provider.get_config", return_value=_ENABLED_CONFIG):

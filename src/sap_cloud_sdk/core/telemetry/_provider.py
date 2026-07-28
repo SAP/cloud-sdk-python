@@ -5,7 +5,7 @@ import os
 from typing import Optional
 
 from opentelemetry import metrics
-from opentelemetry._logs import set_logger_provider
+from opentelemetry._logs import get_logger_provider, set_logger_provider
 from opentelemetry.exporter.otlp.proto.grpc._log_exporter import (
     OTLPLogExporter as GRPCLogExporter,
 )
@@ -108,9 +108,13 @@ def setup_log_provider() -> Optional[LoggerProvider]:
     try:
         resource = Resource.create(create_resource_attributes_from_env())
         exporter = _create_log_exporter()
-        provider = LoggerProvider(resource=resource)
-        provider.add_log_record_processor(BatchLogRecordProcessor(exporter))
-        set_logger_provider(provider)
+        candidate = LoggerProvider(resource=resource)
+        candidate.add_log_record_processor(BatchLogRecordProcessor(exporter))
+        set_logger_provider(candidate)
+
+        provider = get_logger_provider()
+        if provider is not candidate:
+            provider.add_log_record_processor(BatchLogRecordProcessor(exporter))
 
         handler = LoggingHandler(logger_provider=provider)
         logging.getLogger().addHandler(handler)

@@ -98,6 +98,9 @@ def setup_log_provider() -> Optional[LoggerProvider]:
     """
     global _log_provider
 
+    if _log_provider is not None:
+        return _log_provider
+
     config = get_config()
     if not config.enabled:
         return None

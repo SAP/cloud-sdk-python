@@ -3,8 +3,6 @@
 
 """Comprehensive tests for output management module."""
 
-import pytest
-
 from sap_cloud_sdk.outputmanagement import (
     OutputResponse,
     EmailConfiguration,
@@ -34,7 +32,7 @@ class TestPydanticModelFeatures:
         config = EmailConfiguration(
             emailNotificationTemplateKey="TEST_TEMPLATE",
             emailTemplateLanguage="en",
-            to=["test@example.com"]
+            to=["test@example.com"],
         )
 
         assert hasattr(config, "to")
@@ -55,8 +53,7 @@ class TestPydanticModelFeatures:
     def test_pre_generated_attachment_fields(self):
         """Test PreGeneratedAttachment has expected fields."""
         attachment = PreGeneratedAttachment(
-            url="https://dms.example.com/path/file.pdf",
-            source="DMS"
+            url="https://dms.example.com/path/file.pdf", source="DMS"
         )
 
         assert hasattr(attachment, "url")
@@ -73,7 +70,7 @@ class TestModelValidation:
         config = EmailConfiguration(
             emailNotificationTemplateKey="TEST_TEMPLATE",
             emailTemplateLanguage="en",
-            to=["user@example.com"]
+            to=["user@example.com"],
         )
         assert len(config.to) > 0
 
@@ -102,7 +99,7 @@ class TestEdgeCases:
         config = EmailConfiguration(
             emailNotificationTemplateKey="MASS_EMAIL_TEMPLATE",
             emailTemplateLanguage="en",
-            to=many_recipients
+            to=many_recipients,
         )
         assert len(config.to) == 100
 
@@ -111,7 +108,7 @@ class TestEdgeCases:
         config = EmailConfiguration(
             emailNotificationTemplateKey="TEST_TEMPLATE_2024",
             emailTemplateLanguage="en",
-            to=["user@example.com"]
+            to=["user@example.com"],
         )
         assert "2024" in config.email_notification_template_key
 
@@ -135,16 +132,19 @@ class TestEdgeCases:
         """Test PreGeneratedAttachment URL validation."""
         # Valid URL
         attachment = PreGeneratedAttachment(
-            url="https://dms.example.com/file.pdf",
-            source="DMS"
+            url="https://dms.example.com/file.pdf", source="DMS"
         )
         assert attachment.url.startswith("https://")
 
     def test_attachment_config_with_multiple_pre_generated(self):
         """Test AttachmentConfig with multiple pre-generated attachments."""
         attachments = [
-            PreGeneratedAttachment(url="https://dms.example.com/file1.pdf", source="DMS"),
-            PreGeneratedAttachment(url="https://dms.example.com/file2.pdf", source="DMS"),
+            PreGeneratedAttachment(
+                url="https://dms.example.com/file1.pdf", source="DMS"
+            ),
+            PreGeneratedAttachment(
+                url="https://dms.example.com/file2.pdf", source="DMS"
+            ),
         ]
         config = AttachmentConfig(preGeneratedAttachments=attachments)
 
@@ -198,16 +198,13 @@ class TestModelComparisons:
     def test_pre_generated_attachment_equality(self):
         """Test PreGeneratedAttachment equality."""
         att1 = PreGeneratedAttachment(
-            url="https://dms.example.com/file.pdf",
-            source="DMS"
+            url="https://dms.example.com/file.pdf", source="DMS"
         )
         att2 = PreGeneratedAttachment(
-            url="https://dms.example.com/file.pdf",
-            source="DMS"
+            url="https://dms.example.com/file.pdf", source="DMS"
         )
         att3 = PreGeneratedAttachment(
-            url="https://dms.example.com/other.pdf",
-            source="DMS"
+            url="https://dms.example.com/other.pdf", source="DMS"
         )
 
         assert att1 == att2
@@ -230,7 +227,7 @@ class TestModelSerialization:
         config = EmailConfiguration(
             emailNotificationTemplateKey="TEST_TEMPLATE",
             emailTemplateLanguage="en",
-            to=["user@example.com"]
+            to=["user@example.com"],
         )
         config_dict = config.model_dump()
 
@@ -241,8 +238,7 @@ class TestModelSerialization:
     def test_pre_generated_attachment_to_dict(self):
         """Test converting PreGeneratedAttachment to dictionary."""
         attachment = PreGeneratedAttachment(
-            url="https://dms.example.com/file.pdf",
-            source="DMS"
+            url="https://dms.example.com/file.pdf", source="DMS"
         )
         att_dict = attachment.model_dump()
 
@@ -258,7 +254,7 @@ class TestRealWorldScenarios:
         """Test sending an email with form-generated PDF attachment."""
         form_config = FormConfiguration(
             form_id="invoice_form_2024",
-            form_data={"invoice_number": "2024-001", "amount": 50000}
+            form_data={"invoice_number": "2024-001", "amount": 50000},
         )
 
         attachment = AttachmentConfig(formConfiguration=form_config)
@@ -268,7 +264,7 @@ class TestRealWorldScenarios:
             emailTemplateLanguage="en",
             to=["customer@company.com"],
             cc=["accounting@company.com"],
-            attachment=attachment
+            attachment=attachment,
         )
 
         assert email.attachment is not None
@@ -289,7 +285,7 @@ class TestRealWorldScenarios:
         email = EmailConfiguration(
             emailNotificationTemplateKey="NEWSLETTER_TEMPLATE",
             emailTemplateLanguage="en",
-            to=recipients
+            to=recipients,
         )
 
         assert len(email.to) == 50
@@ -298,16 +294,13 @@ class TestRealWorldScenarios:
         """Test email with multiple DMS attachments."""
         attachments = [
             PreGeneratedAttachment(
-                url="https://dms.example.com/summary.pdf",
-                source="DMS"
+                url="https://dms.example.com/summary.pdf", source="DMS"
             ),
             PreGeneratedAttachment(
-                url="https://dms.example.com/data.xlsx",
-                source="DMS"
+                url="https://dms.example.com/data.xlsx", source="DMS"
             ),
             PreGeneratedAttachment(
-                url="https://dms.example.com/notes.txt",
-                source="DMS"
+                url="https://dms.example.com/notes.txt", source="DMS"
             ),
         ]
 
@@ -317,10 +310,12 @@ class TestRealWorldScenarios:
             emailNotificationTemplateKey="REPORT_PACKAGE_TEMPLATE",
             emailTemplateLanguage="en",
             to=["manager@company.com"],
-            attachment=attachment_config
+            attachment=attachment_config,
         )
 
         assert email.attachment is not None
         assert email.attachment.pre_generated_attachments is not None
         assert len(email.attachment.pre_generated_attachments) == 3
-        assert all(att.source == "DMS" for att in email.attachment.pre_generated_attachments)
+        assert all(
+            att.source == "DMS" for att in email.attachment.pre_generated_attachments
+        )

@@ -16,7 +16,6 @@ from sap_cloud_sdk.outputmanagement import (
     OutputManagementInfo,
     OutputRequest,
     OutputRequestData,
-    create_client,
 )
 
 logger = logging.getLogger(__name__)
@@ -111,8 +110,8 @@ def create_output_request(context, doc_type, doc_id):
     )
 
     context["output_request"] = OutputRequest(
-        source="/test/integration",
-        type=f"{doc_type}.Created.v1",
+        source=f"/region/sap/{doc_type}",
+        type=f"{doc_type}.Created.v1.notification",
         data=data,
     )
     logger.info(f"Created output request for {doc_type} with ID {doc_id}")
@@ -155,8 +154,8 @@ def create_output_request_with_attachment(context):
     )
 
     context["output_request"] = OutputRequest(
-        source="/test/integration",
-        type="com.sap.test.Document.Created.v1",
+        source="/region/sap/Document",
+        type="com.sap.test.Document.Created.v1.notification",
         data=data,
     )
     logger.info("Created output request with form attachment")
@@ -177,7 +176,9 @@ def submit_output_request(context):
         response = client.send_output_request(output_request)
         context["response"] = response
         context["error"] = None
-        logger.info(f"Output request submitted successfully: {response.output_request_id}")
+        logger.info(
+            f"Output request submitted successfully: {response.output_request_id}"
+        )
     except Exception as e:
         context["error"] = e
         context["response"] = None
@@ -199,14 +200,12 @@ def send_email_notification(context):
                     "content": "Test notification",
                 }
             },
-            business_document_type="com.sap.test.Document",
-            business_document_id="TEST-001",
-            source="/test/integration",
-            event_type="com.sap.test.Document.Created.v1",
         )
         context["response"] = response
         context["error"] = None
-        logger.info(f"Email notification sent successfully: {response.output_request_id}")
+        logger.info(
+            f"Email notification sent successfully: {response.output_request_id}"
+        )
     except Exception as e:
         context["error"] = e
         context["response"] = None
@@ -233,7 +232,9 @@ def request_successful(context):
 def response_contains_request_id(context):
     """Verify the response contains an output request ID."""
     response = context["response"]
-    assert response.output_request_id is not None, "Response does not contain an output request ID"
+    assert response.output_request_id is not None, (
+        "Response does not contain an output request ID"
+    )
     assert len(response.output_request_id) > 0, "Output request ID is empty"
     logger.info(f"Response contains output request ID: {response.output_request_id}")
 
@@ -254,8 +255,12 @@ def verify_request_id_pattern(context, pattern):
 
     # Simple pattern matching - check if it's a UUID-like string
     if pattern == "UUID":
-        assert len(request_id) == 36, f"Request ID does not match UUID length: {request_id}"
-        assert request_id.count("-") == 4, f"Request ID does not have UUID format: {request_id}"
+        assert len(request_id) == 36, (
+            f"Request ID does not match UUID length: {request_id}"
+        )
+        assert request_id.count("-") == 4, (
+            f"Request ID does not have UUID format: {request_id}"
+        )
 
     logger.info(f"Output request ID matches pattern {pattern}: {request_id}")
 

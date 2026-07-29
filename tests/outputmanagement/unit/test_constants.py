@@ -3,8 +3,6 @@
 
 """Unit tests for output management constants."""
 
-import pytest
-
 from sap_cloud_sdk.outputmanagement.constants import (
     Constants,
     FileFormat,

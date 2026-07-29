@@ -684,6 +684,14 @@ mocks/certificates.json
 
 Entries with a `"tenant"` field are treated as subscriber-specific. Entries without `"tenant"` are provider entries.
 
+## Multi-tenancy
+
+- **Supported:** Yes
+- **Authentication:** XSUAA
+- **How to use:** Pass `access_strategy` and `tenant` to the methods. The `AccessStrategy` enum controls whether the SDK fetches a subscriber-scoped or provider-scoped token by replacing the `identityzone` subdomain in the token URL.
+- **Further reading:**
+  - [Multitenancy in the Destination Service — SAP Help Portal](https://help.sap.com/docs/CP_CONNECTIVITY/cca91383641e40ffbe03bdc78f00f681/4e07f250fe5d441cab09f69e22909198.html)
+
 ## Error Handling
 
 - `DestinationNotFoundError`: mapped from HTTP 404 where applicable

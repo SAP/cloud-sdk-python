@@ -42,7 +42,13 @@ class TestPydanticModelFeatures:
 
     def test_attachment_config_fields(self):
         """Test AttachmentConfig has expected fields."""
-        form_config = FormConfiguration(form_id="test-form")
+        form_config = FormConfiguration(
+            form_id="test-form",
+            formName="TestForm",
+            formTemplateName="TEST_TEMPLATE",
+            formLanguage="en",
+            fileFormat="PDF"
+        )
         attachment = AttachmentConfig(formConfiguration=form_config)
 
         assert hasattr(attachment, "form_configuration")
@@ -76,7 +82,13 @@ class TestModelValidation:
 
     def test_attachment_with_form_configuration(self):
         """Test that attachment can have form configuration."""
-        form_config = FormConfiguration(form_id="document-form")
+        form_config = FormConfiguration(
+            form_id="document-form",
+            formName="DocumentForm",
+            formTemplateName="DOCUMENT_TEMPLATE",
+            formLanguage="en",
+            fileFormat="PDF"
+        )
         attachment = AttachmentConfig(formConfiguration=form_config)
 
         assert attachment.form_configuration is not None
@@ -254,6 +266,10 @@ class TestRealWorldScenarios:
         """Test sending an email with form-generated PDF attachment."""
         form_config = FormConfiguration(
             form_id="invoice_form_2024",
+            formName="InvoiceForm",
+            formTemplateName="INVOICE_TEMPLATE",
+            formLanguage="en",
+            fileFormat="PDF",
             form_data={"invoice_number": "2024-001", "amount": 50000},
         )
 

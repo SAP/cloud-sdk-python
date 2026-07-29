@@ -23,7 +23,13 @@ def sample_attachment():
     """Provide a sample attachment for testing."""
     from sap_cloud_sdk.outputmanagement import AttachmentConfig, FormConfiguration
 
-    form_config = FormConfiguration(form_id="test-form")
+    form_config = FormConfiguration(
+        form_id="test-form",
+        formName="TestForm",
+        formTemplateName="TEST_TEMPLATE",
+        formLanguage="en",
+        fileFormat="PDF"
+    )
     return AttachmentConfig(formConfiguration=form_config)
 
 

@@ -102,7 +102,13 @@ class TestEmailConfiguration:
 
     def test_email_configuration_with_attachment(self):
         """Test EmailConfiguration with attachment."""
-        form_config = FormConfiguration(form_id="test-form-123")
+        form_config = FormConfiguration(
+            form_id="test-form-123",
+            formName="TestForm",
+            formTemplateName="TEST_TEMPLATE",
+            formLanguage="en",
+            fileFormat="PDF"
+        )
         attachment = AttachmentConfig(formConfiguration=form_config)
         config = EmailConfiguration(
             emailNotificationTemplateKey="TEST_TEMPLATE",
@@ -140,7 +146,13 @@ class TestAttachmentConfig:
 
     def test_attachment_config_with_form_configuration(self):
         """Test AttachmentConfig with form configuration."""
-        form_config = FormConfiguration(form_id="test-form-123")
+        form_config = FormConfiguration(
+            form_id="test-form-123",
+            formName="TestForm",
+            formTemplateName="TEST_TEMPLATE",
+            formLanguage="en",
+            fileFormat="PDF"
+        )
         attachment = AttachmentConfig(formConfiguration=form_config)
 
         assert attachment.form_configuration is not None
@@ -162,7 +174,13 @@ class TestAttachmentConfig:
 
     def test_attachment_config_with_both(self):
         """Test AttachmentConfig with both form configuration and pre-generated attachments."""
-        form_config = FormConfiguration(form_id="form-456")
+        form_config = FormConfiguration(
+            form_id="form-456",
+            formName="Form456",
+            formTemplateName="FORM_TEMPLATE",
+            formLanguage="en",
+            fileFormat="PDF"
+        )
         pre_gen = PreGeneratedAttachment(
             url="https://dms.example.com/doc.pdf", source="DMS"
         )

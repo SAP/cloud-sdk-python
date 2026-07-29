@@ -24,7 +24,13 @@ class TestOutputManagementIntegration:
     def test_end_to_end_email_workflow(self):
         """Test complete email sending workflow."""
         # Create form configuration for attachment
-        form_config = FormConfiguration(form_id="monthly-report-form")
+        form_config = FormConfiguration(
+            form_id="monthly-report-form",
+            formName="MonthlyReportForm",
+            formTemplateName="MONTHLY_REPORT_TEMPLATE",
+            formLanguage="en",
+            fileFormat="PDF"
+        )
         attachment = AttachmentConfig(formConfiguration=form_config)
 
         email_config = EmailConfiguration(

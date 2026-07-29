@@ -14,8 +14,9 @@ from http.server import HTTPServer, BaseHTTPRequestHandler
 import pytest
 from dotenv import load_dotenv
 
-from sap_cloud_sdk.outputmanagement import create_client, OutputManagementClient
+from sap_cloud_sdk.outputmanagement import create_client, OutputManagementClient, DestinationCredentialConfig
 from sap_cloud_sdk.outputmanagement._service_client import OutputManagementServiceClient
+from sap_cloud_sdk.destination.config import DestinationConfig
 
 logger = logging.getLogger(__name__)
 
@@ -108,8 +109,11 @@ def output_management_client():
     """Create an Output Management client for testing.
 
     Supports two modes:
-    1. Local mode (CLOUD_SDK_OMS_TEST_MODE=local): Uses mock HTTP server
-    2. Cloud mode (default): Uses real BTP Output Management service
+    1. Cloud mode (default): Uses real BTP Output Management service
+    2. Local mode (CLOUD_SDK_OMS_TEST_MODE=local): Uses mock HTTP server
+
+    Cloud mode is the default for proper integration testing.
+    Set CLOUD_SDK_OMS_TEST_MODE=local for development without credentials.
     """
     _setup_environment()
 

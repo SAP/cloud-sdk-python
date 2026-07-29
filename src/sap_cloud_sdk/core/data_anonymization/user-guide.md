@@ -53,9 +53,7 @@ client = create_client()
 
 # Anonymize – irreversible PII removal
 result = client.anonymize_text(
-    AnonymizeTextRequest(
-        text="Please contact John Doe at john@example.com"
-    )
+    AnonymizeTextRequest(text="Please contact John Doe at john@example.com")
 )
 assert result.result is not None
 
@@ -73,7 +71,8 @@ Pass a `DataAnonymizationConfig` directly when the base64-encoded client certifi
 
 ```python
 from sap_cloud_sdk.core.data_anonymization import (
-    create_client, DataAnonymizationConfig,
+    create_client,
+    DataAnonymizationConfig,
 )
 
 config = DataAnonymizationConfig(
@@ -130,7 +129,8 @@ Irreversible. All detected PII entities are replaced with category placeholders 
 
 ```python
 from sap_cloud_sdk.core.data_anonymization import (
-    create_client, AnonymizeTextRequest,
+    create_client,
+    AnonymizeTextRequest,
 )
 
 client = create_client()
@@ -139,7 +139,7 @@ request = AnonymizeTextRequest(
     text="Employee Alice Smith (alice@corp.com, +1-555-0100) submitted the report.",
     entities=["profile-person", "profile-email", "profile-phone"],
     allowlist="Alice Smith",
-    enable_default_allowlist=False
+    enable_default_allowlist=False,
 )
 
 result = client.anonymize_text(request)
@@ -163,7 +163,8 @@ Reversible. Each PII entity is replaced with a consistent token. The mapping bet
 
 ```python
 from sap_cloud_sdk.core.data_anonymization import (
-    create_client, PseudonymizeTextRequest,
+    create_client,
+    PseudonymizeTextRequest,
 )
 
 client = create_client()
@@ -201,8 +202,7 @@ from sap_cloud_sdk.core.data_anonymization import (
 client = create_client()
 
 request = AnonymizeFileRequest(
-    file_path="sample.pdf",
-    entities=["profile-person", "profile-email"]
+    file_path="sample.pdf", entities=["profile-person", "profile-email"]
 )
 
 result = client.anonymize_file(request)

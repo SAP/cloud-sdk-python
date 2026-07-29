@@ -44,7 +44,7 @@ from sap_cloud_sdk.objectstore import create_client
 # Custom configuration with SSL disabled
 client = create_client(
     "my-instance",
-    disable_ssl=True  # Disable SSL (default is False)
+    disable_ssl=True,  # Disable SSL (default is False)
 )
 ```
 
@@ -61,11 +61,7 @@ client = create_client(
 ```python
 # Upload binary data directly
 data = b"Hello, World!"
-client.put_object_from_bytes(
-    name="hello.txt",
-    data=data,
-    content_type="text/plain"
-)
+client.put_object_from_bytes(name="hello.txt", data=data, content_type="text/plain")
 ```
 
 ### From File
@@ -75,7 +71,7 @@ client.put_object_from_bytes(
 client.put_object_from_file(
     name="document.pdf",
     file_path="/path/to/local/document.pdf",
-    content_type="application/pdf"
+    content_type="application/pdf",
 )
 ```
 
@@ -90,20 +86,18 @@ client.put_object(
     name="stream.txt",
     stream=stream,
     size=len(b"Streamed content"),
-    content_type="text/plain"
+    content_type="text/plain",
 )
 
 # Or with a real file object
 with open("/path/to/file.txt", "rb") as f:
     # Get file size
     import os
+
     size = os.path.getsize("/path/to/file.txt")
 
     client.put_object(
-        name="uploaded.txt",
-        stream=f,
-        size=size,
-        content_type="text/plain"
+        name="uploaded.txt", stream=f, size=size, content_type="text/plain"
     )
 ```
 
@@ -119,7 +113,7 @@ response = client.get_object("hello.txt")
 
 # Read the content
 content = response.read()  # Returns bytes
-text_content = content.decode('utf-8')  # Convert to string if needed
+text_content = content.decode("utf-8")  # Convert to string if needed
 
 # Don't forget to close the response
 response.close()
@@ -197,7 +191,7 @@ from sap_cloud_sdk.objectstore import (
     ObjectNotFoundError,
     ObjectOperationError,
     ClientCreationError,
-    ListObjectsError
+    ListObjectsError,
 )
 
 try:

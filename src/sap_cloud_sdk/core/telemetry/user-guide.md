@@ -36,7 +36,9 @@ Wrap your LLM calls to add the context autoinstrumentation can't provide:
 ```python
 from sap_cloud_sdk.core.telemetry import invoke_agent_span
 
-with invoke_agent_span(provider="openai", agent_name="SupportBot", conversation_id="conv-123"):
+with invoke_agent_span(
+    provider="openai", agent_name="SupportBot", conversation_id="conv-123"
+):
     # autoinstrumented LLM call is a child of this span
     response = client.chat.completions.create(...)
 ```
@@ -45,6 +47,7 @@ with invoke_agent_span(provider="openai", agent_name="SupportBot", conversation_
 
 ```python
 from sap_cloud_sdk.core.telemetry import set_tenant_id
+
 
 def handle_request(request):
     set_tenant_id(extract_tenant_from_jwt(request))
@@ -85,7 +88,9 @@ For operations following [OpenTelemetry GenAI conventions](https://opentelemetry
 from sap_cloud_sdk.core.telemetry import chat_span, execute_tool_span, invoke_agent_span
 
 # Agent invocation — top-level parent span for an agent turn
-with invoke_agent_span(provider="openai", agent_name="SupportBot", conversation_id="cid"):
+with invoke_agent_span(
+    provider="openai", agent_name="SupportBot", conversation_id="cid"
+):
     response = client.beta.threads.runs.create(...)
 
 # LLM chat call — use when autoinstrumentation is not available
@@ -93,7 +98,9 @@ with chat_span(model="gpt-4", provider="openai", conversation_id="cid") as span:
     response = client.chat.completions.create(...)
 
 # Tool execution
-with execute_tool_span(tool_name="get_weather", tool_type="mcp", tool_description="weather mcp server"):
+with execute_tool_span(
+    tool_name="get_weather", tool_type="mcp", tool_description="weather mcp server"
+):
     result = call_weather_api(location)
 ```
 
@@ -133,8 +140,8 @@ with extension_context(
 Available extension types:
 
 ```python
-ExtensionType.TOOL          # MCP tool call (default)
-ExtensionType.INSTRUCTION   # Instruction/prompt injection
+ExtensionType.TOOL  # MCP tool call (default)
+ExtensionType.INSTRUCTION  # Instruction/prompt injection
 ```
 
 In downstream services, read the propagated context:
@@ -144,9 +151,9 @@ from sap_cloud_sdk.core.telemetry import get_extension_context
 
 ext_ctx = get_extension_context()
 if ext_ctx:
-    print(ext_ctx["capability_id"])       # "default"
-    print(ext_ctx["extension_name"])      # "ServiceNow Extension"
-    print(ext_ctx["extension_type"])      # "tool"
+    print(ext_ctx["capability_id"])  # "default"
+    print(ext_ctx["extension_name"])  # "ServiceNow Extension"
+    print(ext_ctx["extension_type"])  # "tool"
 ```
 
 The extension baggage span processor (registered automatically by `auto_instrument()`)
@@ -202,7 +209,7 @@ with invoke_agent_span(
     provider="openai",
     agent_name="SupportBot",
     attributes={"user.id": "u-456"},
-    propagate=True
+    propagate=True,
 ):
     # child spans automatically receive user.id
     with execute_tool_span("search"):
@@ -237,15 +244,14 @@ auto_instrument()
 
 from litellm import completion
 
+
 async def handle_request(query: str, user_id: str):
     set_tenant_id("bh7sjh...")
 
     # Parent span carries business context for the whole agent turn.
     # Autoinstrumentation creates the child LLM span automatically.
     with invoke_agent_span(
-        provider="openai",
-        agent_name="SupportBot",
-        attributes={"user.id": user_id}
+        provider="openai", agent_name="SupportBot", attributes={"user.id": user_id}
     ):
         documents = await retrieve_knowledge_base(query)
         add_span_attribute("documents.retrieved", len(documents))
@@ -254,8 +260,8 @@ async def handle_request(query: str, user_id: str):
             model="gpt-4",
             messages=[
                 {"role": "system", "content": f"Context: {documents}"},
-                {"role": "user", "content": query}
-            ]
+                {"role": "user", "content": query},
+            ],
         )
 
         return response
@@ -273,6 +279,7 @@ You can write your own by subclassing `TelemetryMiddleware`:
 
 ```python
 from sap_cloud_sdk.core.telemetry.middleware.base import TelemetryMiddleware
+
 
 class MyMiddleware(TelemetryMiddleware):
     def register(self) -> None:

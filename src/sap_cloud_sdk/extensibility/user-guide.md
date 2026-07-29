@@ -192,8 +192,8 @@ async def call_hook_agw(
 ```python
 @dataclass
 class N8nWorkflowConfig:
-    workflow_id: str                # Workflow ID
-    method: HTTPMethod              # HTTP method used by webhook execution
+    workflow_id: str  # Workflow ID
+    method: HTTPMethod  # HTTP method used by webhook execution
 ```
 
 #### `HookConfig`
@@ -203,9 +203,9 @@ Runtime invocation config required by `call_hook()`.
 ```python
 @dataclass
 class HookConfig:
-    endpoint: str                   # Full URL of the hook MCP endpoint
-    auth_token: Optional[str]       # Bearer token for authentication
-    payload: Optional[dict]         # Optional JSON payload
+    endpoint: str  # Full URL of the hook MCP endpoint
+    auth_token: Optional[str]  # Bearer token for authentication
+    payload: Optional[dict]  # Optional JSON payload
 ```
 
 ### `build_extension_capabilities()`
@@ -236,12 +236,14 @@ Design-time declaration for A2A card serialization.
 ```python
 @dataclass
 class ExtensionCapability:
-    display_name: str                    # Human-readable name
-    description: str                     # Description of the capability
-    id: str = "default"                  # Capability identifier (only "default" currently supported)
-    tools: Tools = ...                   # Tool config (default: Tools(additions=ToolAdditions(enabled=True)))
-    instruction_supported: bool = True   # Whether custom instructions are supported
-    supported_hooks: List[HookCapability] # List of supported hooks
+    display_name: str  # Human-readable name
+    description: str  # Description of the capability
+    id: str = "default"  # Capability identifier (only "default" currently supported)
+    tools: Tools = (
+        ...
+    )  # Tool config (default: Tools(additions=ToolAdditions(enabled=True)))
+    instruction_supported: bool = True  # Whether custom instructions are supported
+    supported_hooks: List[HookCapability]  # List of supported hooks
 ```
 
 #### `Tools`
@@ -271,7 +273,6 @@ Configuration for supported hook addition at an extension capability.
 ```python
 @dataclass
 class HookCapability:
-
     id: str
     type: str
     display_name: str
@@ -285,11 +286,11 @@ Runtime result returned by `ExtensibilityClient.get_extension_capability_impleme
 ```python
 @dataclass
 class ExtensionCapabilityImplementation:
-    capability_id: str                          # e.g. "default"
-    extension_names: List[str] = []             # Names of contributing extensions
-    mcp_servers: List[McpServer] = []           # MCP servers from the extension(s)
-    instruction: Optional[str] = None           # Custom instruction text
-    hooks: List[Hook] = []                     # Custom hooks registered as BEFORE or AFTER
+    capability_id: str  # e.g. "default"
+    extension_names: List[str] = []  # Names of contributing extensions
+    mcp_servers: List[McpServer] = []  # MCP servers from the extension(s)
+    instruction: Optional[str] = None  # Custom instruction text
+    hooks: List[Hook] = []  # Custom hooks registered as BEFORE or AFTER
 ```
 
 #### `McpServer`
@@ -299,9 +300,9 @@ An MCP server contributed by an extension.
 ```python
 @dataclass
 class McpServer:
-    ord_id: str                                  # ORD ID, e.g. "sap.mcp:apiResource:serviceNow:v1"
-    global_tenant_id: str                        # Global tenant ID of the MCP server
-    tool_names: Optional[List[str]] = None       # Approved tools (None = all approved)
+    ord_id: str  # ORD ID, e.g. "sap.mcp:apiResource:serviceNow:v1"
+    global_tenant_id: str  # Global tenant ID of the MCP server
+    tool_names: Optional[List[str]] = None  # Approved tools (None = all approved)
 ```
 
 - `global_tenant_id` is the global tenant ID of the MCP server.
@@ -315,17 +316,19 @@ A workflow created as a hook to be executed.
 ```python
 @dataclass
 class Hook:
-    hook_id: str                                 # Developer-facing hook key (not guaranteed unique)
-    id: str                                      # Hook ID (UUID)
-    name: str                                    # Human-readable name
-    type: HookType                               # Hook type (BEFORE, AFTER)
-    deployment_type: DeploymentType              # Deployment type (N8N, SERVERLESS)
-    n8n_workflow_config: N8nWorkflowConfig       # Workflow config (workflow ID + HTTP method)
-    timeout: int                                 # Timeout in seconds
-    execution_mode: ExecutionMode                # Execution mode (SYNC, ASYNC)
-    on_failure: OnFailure                        # Failure behavior (CONTINUE, BLOCK)
-    order: int                                   # Execution order
-    can_short_circuit: bool                      # Whether hook can short-circuit execution
+    hook_id: str  # Developer-facing hook key (not guaranteed unique)
+    id: str  # Hook ID (UUID)
+    name: str  # Human-readable name
+    type: HookType  # Hook type (BEFORE, AFTER)
+    deployment_type: DeploymentType  # Deployment type (N8N, SERVERLESS)
+    n8n_workflow_config: (
+        N8nWorkflowConfig  # Workflow config (workflow ID + HTTP method)
+    )
+    timeout: int  # Timeout in seconds
+    execution_mode: ExecutionMode  # Execution mode (SYNC, ASYNC)
+    on_failure: OnFailure  # Failure behavior (CONTINUE, BLOCK)
+    order: int  # Execution order
+    can_short_circuit: bool  # Whether hook can short-circuit execution
 ```
 
 #### Hook Enums
@@ -336,24 +339,24 @@ The `Hook` class uses several enums for type-safe field values:
 
 ```python
 class HookType(Enum):
-    BEFORE = "BEFORE"      # Hook executed before an operation
-    AFTER = "AFTER"        # Hook executed after an operation
+    BEFORE = "BEFORE"  # Hook executed before an operation
+    AFTER = "AFTER"  # Hook executed after an operation
 ```
 
 **DeploymentType**
 
 ```python
 class DeploymentType(Enum):
-    N8N = "N8N"                    # Hook deployed on N8N platform
-    SERVERLESS = "SERVERLESS"      # Hook deployed as Serverless function
+    N8N = "N8N"  # Hook deployed on N8N platform
+    SERVERLESS = "SERVERLESS"  # Hook deployed as Serverless function
 ```
 
 **ExecutionMode**
 
 ```python
 class ExecutionMode(Enum):
-    SYNC = "SYNC"      # Synchronous execution - waits for hook to complete
-    ASYNC = "ASYNC"    # Asynchronous execution - does not wait for completion
+    SYNC = "SYNC"  # Synchronous execution - waits for hook to complete
+    ASYNC = "ASYNC"  # Asynchronous execution - does not wait for completion
 ```
 
 **OnFailure**
@@ -361,7 +364,7 @@ class ExecutionMode(Enum):
 ```python
 class OnFailure(Enum):
     CONTINUE = "CONTINUE"  # Continue execution despite hook failure
-    BLOCK = "BLOCK"        # Block execution when hook fails
+    BLOCK = "BLOCK"  # Block execution when hook fails
 ```
 
 **HTTPMethod**
@@ -382,8 +385,8 @@ Optional configuration overrides for the extensibility service connection.
 ```python
 @dataclass
 class ExtensibilityConfig:
-    destination_name: Optional[str] = None           # Optional destination name override
-    destination_instance: str = "default"             # Destination service instance name
+    destination_name: Optional[str] = None  # Optional destination name override
+    destination_instance: str = "default"  # Destination service instance name
 ```
 
 ### Constants
@@ -521,7 +524,11 @@ if before_hooks:
         payload=Message(
             message_id="msg-hook-call-001",
             role=Role.user,
-            parts=[TextPart(text="Tool execution starting: create_ticket with priority=high")],
+            parts=[
+                TextPart(
+                    text="Tool execution starting: create_ticket with priority=high"
+                )
+            ],
         ),
     )
 
@@ -802,7 +809,9 @@ Then use `create_client()` as usual -- it will automatically detect the file:
 ```python
 from sap_cloud_sdk.extensibility import create_client
 
-client = create_client("sap.ai:agent:myAgent:v1")  # Uses mocks/extensibility.json automatically
+client = create_client(
+    "sap.ai:agent:myAgent:v1"
+)  # Uses mocks/extensibility.json automatically
 ext = client.get_extension_capability_implementation(tenant=tenant_id)
 ```
 
@@ -819,7 +828,9 @@ export CLOUD_SDK_LOCAL_EXTENSIBILITY_FILE=path/to/my/extensions.json
 ```python
 from sap_cloud_sdk.extensibility import create_client
 
-client = create_client("sap.ai:agent:myAgent:v1")  # Uses the file from the environment variable
+client = create_client(
+    "sap.ai:agent:myAgent:v1"
+)  # Uses the file from the environment variable
 ext = client.get_extension_capability_implementation(tenant=tenant_id)
 ```
 

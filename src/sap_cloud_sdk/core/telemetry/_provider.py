@@ -113,8 +113,6 @@ def setup_log_provider() -> Optional[LoggerProvider]:
         set_logger_provider(candidate)
 
         provider = get_logger_provider()
-        if provider is not candidate:
-            provider.add_log_record_processor(BatchLogRecordProcessor(exporter))
 
         handler = LoggingHandler(logger_provider=provider)
         logging.getLogger().addHandler(handler)

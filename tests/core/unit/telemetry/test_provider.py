@@ -305,3 +305,24 @@ class TestSetupLogProvider:
             with patch("sap_cloud_sdk.core.telemetry._provider.Resource"):
                 with patch("sap_cloud_sdk.core.telemetry._provider._create_log_exporter", side_effect=Exception("boom")):
                     assert setup_log_provider() is None
+
+    def test_external_provider_wins_no_second_exporter(self):
+        external_provider = MagicMock()
+        candidate = MagicMock()
+        with patch("sap_cloud_sdk.core.telemetry._provider.get_config", return_value=_ENABLED_CONFIG):
+            with patch("sap_cloud_sdk.core.telemetry._provider.Resource"):
+                with patch("sap_cloud_sdk.core.telemetry._provider._create_log_exporter"):
+                    with patch("sap_cloud_sdk.core.telemetry._provider.BatchLogRecordProcessor") as mock_proc:
+                        with patch("sap_cloud_sdk.core.telemetry._provider.LoggerProvider", return_value=candidate):
+                            with patch("sap_cloud_sdk.core.telemetry._provider.set_logger_provider"):
+                                with patch("sap_cloud_sdk.core.telemetry._provider.get_logger_provider", return_value=external_provider):
+                                    with patch(_LOGGING_HANDLER) as mock_handler_cls:
+                                        with patch("logging.getLogger"):
+                                            result = setup_log_provider()
+
+                                            # returns the external provider, not our candidate
+                                            assert result is external_provider
+                                            # BatchLogRecordProcessor only called once (for candidate setup)
+                                            mock_proc.assert_called_once()
+                                            # handler wired to external provider
+                                            mock_handler_cls.assert_called_once_with(logger_provider=external_provider)

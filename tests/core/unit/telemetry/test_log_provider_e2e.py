@@ -145,3 +145,65 @@ class TestLogProviderEndToEnd:
         r = log_exporter.get_finished_logs()[0]
         assert r.log_record.trace_id == 0
         assert r.log_record.span_id == 0
+
+
+class TestLogProviderClashingProvider:
+    """When another library claims the global LoggerProvider first, our processor
+    must still be attached so logs reach the SAP OTLP endpoint."""
+
+    def test_logs_reach_our_exporter_when_provider_already_set(self, monkeypatch):
+        from opentelemetry._logs import _internal as _logs_internal
+        from opentelemetry.sdk._logs.export import InMemoryLogRecordExporter, SimpleLogRecordProcessor
+        import sap_cloud_sdk.core.telemetry._provider as provider_module
+
+        # Reset OTel singleton
+        _logs_internal._LOGGER_PROVIDER_SET_ONCE._done = False
+        _logs_internal._LOGGER_PROVIDER = None
+        provider_module._log_provider = None
+
+        # Remove stale LoggingHandlers
+        root = logging.getLogger()
+        for h in list(root.handlers):
+            if isinstance(h, LoggingHandler):
+                root.removeHandler(h)
+
+        # Simulate another library claiming the provider first
+        external_exporter = InMemoryLogRecordExporter()
+        external_provider = LoggerProvider()
+        external_provider.add_log_record_processor(SimpleLogRecordProcessor(external_exporter))
+        from opentelemetry._logs import set_logger_provider
+        set_logger_provider(external_provider)
+
+        # Now our SDK runs setup_log_provider
+        our_exporter = InMemoryLogRecordExporter()
+        monkeypatch.setattr("sap_cloud_sdk.core.telemetry._provider._create_log_exporter", lambda: our_exporter)
+        monkeypatch.setattr("sap_cloud_sdk.core.telemetry._provider.BatchLogRecordProcessor", SimpleLogRecordProcessor)
+        monkeypatch.setattr(
+            "sap_cloud_sdk.core.telemetry._provider.get_config",
+            lambda: __import__(
+                "sap_cloud_sdk.core.telemetry.config", fromlist=["InstrumentationConfig"]
+            ).InstrumentationConfig(enabled=True, service_name="test-svc", otlp_endpoint="http://localhost:4317"),
+        )
+        monkeypatch.setenv("APPFND_CONHOS_APP_NAME", "test-svc")
+        monkeypatch.setenv("APPFND_CONHOS_REGION", "eu10")
+        monkeypatch.setenv("APPFND_CONHOS_SUBACCOUNTID", "sub-123")
+        monkeypatch.setenv("APPFND_CONHOS_SYSTEM_ROLE", "TEST")
+        monkeypatch.setenv("SAP_SOLUTION_AREA", "AFND")
+
+        provider = setup_log_provider()
+        assert provider is external_provider
+
+        root.setLevel(logging.DEBUG)
+        logging.getLogger("test.clash").warning("hello from sdk")
+
+        our_records = our_exporter.get_finished_logs()
+        assert len(our_records) == 1
+        assert our_records[0].log_record.body == "hello from sdk"
+
+        # Cleanup
+        for h in list(root.handlers):
+            if isinstance(h, LoggingHandler):
+                root.removeHandler(h)
+        _logs_internal._LOGGER_PROVIDER_SET_ONCE._done = False
+        _logs_internal._LOGGER_PROVIDER = None
+        provider_module._log_provider = None

@@ -306,7 +306,7 @@ class TestSetupLogProvider:
                 with patch("sap_cloud_sdk.core.telemetry._provider._create_log_exporter", side_effect=Exception("boom")):
                     assert setup_log_provider() is None
 
-    def test_external_provider_wins_no_second_exporter(self):
+    def test_external_provider_gets_our_processor_attached(self):
         external_provider = MagicMock()
         candidate = MagicMock()
         with patch("sap_cloud_sdk.core.telemetry._provider.get_config", return_value=_ENABLED_CONFIG):
@@ -322,7 +322,9 @@ class TestSetupLogProvider:
 
                                             # returns the external provider, not our candidate
                                             assert result is external_provider
-                                            # BatchLogRecordProcessor only called once (for candidate setup)
-                                            mock_proc.assert_called_once()
+                                            # BatchLogRecordProcessor called twice: once for our candidate,
+                                            # once to attach our processor to the external provider
+                                            assert mock_proc.call_count == 2
+                                            external_provider.add_log_record_processor.assert_called_once()
                                             # handler wired to external provider
                                             mock_handler_cls.assert_called_once_with(logger_provider=external_provider)

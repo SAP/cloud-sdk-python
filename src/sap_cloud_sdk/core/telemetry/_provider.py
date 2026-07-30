@@ -114,6 +114,13 @@ def setup_log_provider() -> Optional[LoggerProvider]:
 
         provider = get_logger_provider()
 
+        if provider is not candidate:
+            logger.warning(
+                "Global LoggerProvider was already set by another library. "
+                "Attaching SAP log processor to the existing provider."
+            )
+            provider.add_log_record_processor(BatchLogRecordProcessor(exporter))
+
         handler = LoggingHandler(logger_provider=provider)
         logging.getLogger().addHandler(handler)
 

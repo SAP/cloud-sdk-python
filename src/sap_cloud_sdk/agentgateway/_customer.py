@@ -672,6 +672,21 @@ async def _list_server_tools(
                 ]
 
 
+def _log_mcp_server_error(ord_id: str, exc: BaseException) -> None:
+    # Unwrap ExceptionGroup from anyio to surface the real HTTP error body
+    if isinstance(exc, BaseExceptionGroup):
+        for inner in exc.exceptions:
+            _log_mcp_server_error(ord_id, inner)
+        return
+    if isinstance(exc, httpx.HTTPStatusError):
+        logger.error(
+            "Failed to load tools from %s (HTTP %d): %s",
+            ord_id, exc.response.status_code, exc.response.text[:500],
+        )
+    else:
+        logger.exception("Failed to load tools from %s — skipping", ord_id, exc_info=exc)
+
+
 async def get_mcp_tools_customer(
     credentials: CustomerCredentials,
     system_token: str,
@@ -713,8 +728,8 @@ async def get_mcp_tools_customer(
             server_tools = await _list_server_tools(url, system_token, timeout)
             tools.extend(server_tools)
             logger.debug("Loaded %d tool(s) from %s", len(server_tools), dep.ord_id)
-        except Exception:
-            logger.exception("Failed to load tools from %s — skipping", dep.ord_id)
+        except Exception as exc:
+            _log_mcp_server_error(dep.ord_id, exc)
 
     logger.info(
         "Loaded %d MCP tool(s) from %d server(s)", len(tools), len(dependencies)
@@ -765,4 +780,9 @@ async def call_mcp_tool_customer(
                     return ""
 
                 first = result.content[0]
-                return str(getattr(first, "text", ""))
+                text = str(getattr(first, "text", ""))
+
+                if result.isError:
+                    logger.error("Tool '%s' returned an error: %s", tool.name, text)
+
+                return text

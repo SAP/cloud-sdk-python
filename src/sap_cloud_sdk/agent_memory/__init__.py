@@ -21,6 +21,7 @@ from sap_cloud_sdk.agent_memory._http_transport import HttpTransport
 from sap_cloud_sdk.agent_memory.client import AgentMemoryClient
 from sap_cloud_sdk.agent_memory.config import (
     AgentMemoryConfig,
+    _load_config_for_instance,
     _load_config_from_env,
 )
 from sap_cloud_sdk.agent_memory.exceptions import (
@@ -51,11 +52,12 @@ def create_client(
 
     The binding loaded depends on ``access_strategy`` and ``tenant``:
 
-    - ``SUBSCRIBER`` with ``tenant="acme-corp"`` — loads credentials from
+    - ``SUBSCRIBER`` with ``tenant="acme-corp"`` — loads the subscriber
+      binding from ``/etc/secrets/appfnd/hana-agent-memory/acme-corp/`` (or
+      ``CLOUD_SDK_CFG_HANA_AGENT_MEMORY_ACME_CORP_*`` env vars).
+    - ``PROVIDER`` — loads the provider binding from
       ``/etc/secrets/appfnd/hana-agent-memory/default/`` (or
-      ``CLOUD_SDK_CFG_HANA_AGENT_MEMORY_DEFAULT_*`` env vars) and derives the
-      subscriber token URL using the ``identityzone`` field.
-    - ``PROVIDER`` — same binding, uses provider token directly.
+      ``CLOUD_SDK_CFG_HANA_AGENT_MEMORY_DEFAULT_*`` env vars).
     - Explicit ``config`` — uses the provided configuration directly.
 
     Args:
@@ -77,6 +79,8 @@ def create_client(
     try:
         if config is not None:
             resolved_config = config
+        elif access_strategy is AccessStrategy.SUBSCRIBER and tenant:
+            resolved_config = _load_config_for_instance(tenant)
         else:
             resolved_config = _load_config_from_env()
 

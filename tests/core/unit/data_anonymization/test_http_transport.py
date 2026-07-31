@@ -279,7 +279,6 @@ class TestHttpTransport:
         transport._tmp_key_file = None
 
         cert_path = transport._resolve_cert()
-        assert isinstance(cert_path, str)
 
         assert Path(cert_path).exists()
         assert "BEGIN RSA PRIVATE KEY" in Path(cert_path).read_text(encoding="utf-8")
@@ -329,7 +328,6 @@ class TestHttpTransport:
         transport._tmp_key_file = None
 
         cert_path = transport._resolve_cert()
-        assert isinstance(cert_path, str)
 
         assert Path(cert_path).exists()
         assert "BEGIN CERTIFICATE" in Path(cert_path).read_text(encoding="utf-8")
@@ -375,7 +373,7 @@ class TestHttpTransport:
 
     def test_resolve_cert_without_config_raises(self) -> None:
         transport = object.__new__(HttpTransport)
-        transport._config = types.SimpleNamespace(  # ty: ignore[invalid-assignment]
+        transport._config = types.SimpleNamespace(
             cert=None,
             key=None,
             cert_path=None,

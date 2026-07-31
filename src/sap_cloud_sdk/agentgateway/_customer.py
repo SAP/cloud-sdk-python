@@ -642,7 +642,7 @@ async def _list_server_tools(
         async with streamable_http_client(url, http_client=http_client) as (
             read,
             write,
-            _,
+            *_,
         ):
             async with ClientSession(read, write) as session:
                 init_result = await session.initialize()
@@ -754,7 +754,7 @@ async def call_mcp_tool_customer(
         async with streamable_http_client(tool.url, http_client=http_client) as (
             read,
             write,
-            _,
+            *_,
         ):
             async with ClientSession(read, write) as session:
                 await session.initialize()

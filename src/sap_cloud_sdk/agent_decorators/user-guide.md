@@ -21,6 +21,7 @@ from sap_cloud_sdk.agent_decorators import (
 ```python
 from sap_cloud_sdk.agent_decorators import prompt_section, agent_model
 
+
 # Define a prompt with a coded default
 @prompt_section(
     key="prompts.system",
@@ -29,6 +30,7 @@ from sap_cloud_sdk.agent_decorators import prompt_section, agent_model
 )
 def system_prompt() -> str:
     return "You are a helpful assistant."
+
 
 # Define the model selection
 @agent_model(key="config.model", label="LLM Model")
@@ -44,6 +46,7 @@ Expose a prompt section for editing.
 
 ```python
 from sap_cloud_sdk.agent_decorators import prompt_section
+
 
 @prompt_section(
     key="prompts.identity",
@@ -62,6 +65,7 @@ Expose a configuration value for editing.
 ```python
 from sap_cloud_sdk.agent_decorators import agent_config
 
+
 @agent_config(
     key="config.temperature",
     label="Temperature",
@@ -78,6 +82,7 @@ Expose a model selection. The `description` parameter is optional.
 ```python
 from sap_cloud_sdk.agent_decorators import agent_model
 
+
 @agent_model(
     key="config.model",
     label="Default Model",
@@ -93,6 +98,7 @@ def default_model() -> str:
 from sap_cloud_sdk.agent_decorators.exceptions import AgentDecoratorError
 
 try:
+
     @prompt_section(key="", label="L", description="D")
     def bad():
         return ""

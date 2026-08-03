@@ -100,7 +100,9 @@ The destination `url` is used as the OTLP endpoint. The lookup is always perform
 
 ```python
 from sap_cloud_sdk.core.auditlog_ng import create_client, AuditLogNGConfig
-from sap_cloud_sdk.core.auditlog_ng.gen.sap.auditlog.auditevent.v2 import auditevent_pb2 as pb
+from sap_cloud_sdk.core.auditlog_ng.gen.sap.auditlog.auditevent.v2 import (
+    auditevent_pb2 as pb,
+)
 ```
 
 ### Step 2: Initialize the Client
@@ -202,7 +204,9 @@ client.close()
 
 ```python
 from sap_cloud_sdk.core.auditlog_ng import create_client
-from sap_cloud_sdk.core.auditlog_ng.gen.sap.auditlog.auditevent.v2 import auditevent_pb2 as pb
+from sap_cloud_sdk.core.auditlog_ng.gen.sap.auditlog.auditevent.v2 import (
+    auditevent_pb2 as pb,
+)
 from datetime import datetime, timezone
 
 

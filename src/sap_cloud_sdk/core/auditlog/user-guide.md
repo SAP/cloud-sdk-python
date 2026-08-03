@@ -22,7 +22,7 @@ from sap_cloud_sdk.core.auditlog import (
     Tenant,
     SecurityEventAttribute,
     DataAccessAttribute,
-    ChangeAttribute
+    ChangeAttribute,
 )
 ```
 
@@ -45,10 +45,7 @@ client = create_client()
 
 # Create and log a security event
 security_event = SecurityEvent(
-    data="User login attempt",
-    success=True,
-    user="john.doe",
-    tenant=Tenant.PROVIDER
+    data="User login attempt", success=True, user="john.doe", tenant=Tenant.PROVIDER
 )
 
 client.log(security_event)
@@ -65,7 +62,7 @@ config = AuditLogConfig(
     service_url="https://api.auditlog.cf.example.com/audit-log/oauth2/v2",
     oauth_url="https://example.authentication.com/oauth/token",
     client_id="your-client-id",
-    client_secret="your-client-secret"
+    client_secret="your-client-secret",
 )
 
 client = create_client(config=config)
@@ -98,7 +95,10 @@ Security events record authentication attempts, authorization failures, and othe
 
 ```python
 from sap_cloud_sdk.core.auditlog import (
-    create_client, SecurityEvent, SecurityEventAttribute, Tenant
+    create_client,
+    SecurityEvent,
+    SecurityEventAttribute,
+    Tenant,
 )
 
 client = create_client()
@@ -112,8 +112,8 @@ security_event = SecurityEvent(
     ip="192.168.1.100",
     attributes=[
         SecurityEventAttribute("login_method", "password"),
-        SecurityEventAttribute("failure_reason", "invalid_credentials")
-    ]
+        SecurityEventAttribute("failure_reason", "invalid_credentials"),
+    ],
 )
 
 client.log(security_event)
@@ -130,7 +130,10 @@ Data access events record when personal or sensitive data is read or accessed. T
 
 ```python
 from sap_cloud_sdk.core.auditlog import (
-    create_client, DataAccessEvent, DataAccessAttribute, Tenant
+    create_client,
+    DataAccessEvent,
+    DataAccessAttribute,
+    Tenant,
 )
 
 client = create_client()
@@ -144,11 +147,11 @@ data_access = DataAccessEvent(
     subject_role="end_user",
     attributes=[
         DataAccessAttribute("email", successful=True),
-        DataAccessAttribute("phone_number", successful=True)
+        DataAccessAttribute("phone_number", successful=True),
     ],
     user="service-account",
     tenant=Tenant.PROVIDER,
-    identity_provider="OAuth2"
+    identity_provider="OAuth2",
 )
 
 client.log(data_access)
@@ -169,7 +172,10 @@ Data modification events record when personal or sensitive data is created, upda
 
 ```python
 from sap_cloud_sdk.core.auditlog import (
-    create_client, DataModificationEvent, ChangeAttribute, Tenant
+    create_client,
+    DataModificationEvent,
+    ChangeAttribute,
+    Tenant,
 )
 
 client = create_client()
@@ -183,10 +189,10 @@ data_modification = DataModificationEvent(
     subject_role="customer",
     attributes=[
         ChangeAttribute("email", "new@example.com", "old@example.com"),
-        ChangeAttribute("phone", "+0987654321", "+1234567890")
+        ChangeAttribute("phone", "+0987654321", "+1234567890"),
     ],
     user="admin-user",
-    tenant=Tenant.PROVIDER
+    tenant=Tenant.PROVIDER,
 )
 
 client.log(data_modification)
@@ -207,7 +213,10 @@ Configuration change events record when system configurations, settings, or othe
 
 ```python
 from sap_cloud_sdk.core.auditlog import (
-    create_client, ConfigurationChangeEvent, ChangeAttribute, Tenant
+    create_client,
+    ConfigurationChangeEvent,
+    ChangeAttribute,
+    Tenant,
 )
 
 client = create_client()
@@ -218,11 +227,11 @@ config_change = ConfigurationChangeEvent(
     object_id={"component": "authentication", "setting": "timeout"},
     attributes=[
         ChangeAttribute("session_timeout", "60", "30"),
-        ChangeAttribute("max_attempts", "5", "3")
+        ChangeAttribute("max_attempts", "5", "3"),
     ],
     user="system-admin",
     tenant=Tenant.PROVIDER,
-    id="config-change-001"
+    id="config-change-001",
 )
 
 client.log(config_change)
@@ -241,7 +250,10 @@ Data deletion events are specialized for tracking when personal or sensitive dat
 
 ```python
 from sap_cloud_sdk.core.auditlog import (
-    create_client, DataDeletionEvent, DeletedAttribute, Tenant
+    create_client,
+    DataDeletionEvent,
+    DeletedAttribute,
+    Tenant,
 )
 
 client = create_client()
@@ -256,10 +268,10 @@ data_deletion = DataDeletionEvent(
     attributes=[
         DeletedAttribute("email", "deleted@example.com"),
         DeletedAttribute("phone", "+1234567890"),
-        DeletedAttribute("personal_notes")
+        DeletedAttribute("personal_notes"),
     ],
     user="admin-user",
-    tenant=Tenant.PROVIDER
+    tenant=Tenant.PROVIDER,
 )
 
 client.log(data_deletion)
@@ -280,7 +292,10 @@ Configuration deletion events track when system configurations or settings are r
 
 ```python
 from sap_cloud_sdk.core.auditlog import (
-    create_client, ConfigurationDeletionEvent, DeletedAttribute, Tenant
+    create_client,
+    ConfigurationDeletionEvent,
+    DeletedAttribute,
+    Tenant,
 )
 
 client = create_client()
@@ -292,11 +307,11 @@ config_deletion = ConfigurationDeletionEvent(
     attributes=[
         DeletedAttribute("enabled", "true"),
         DeletedAttribute("rollout_percentage", "50"),
-        DeletedAttribute("target_users")
+        DeletedAttribute("target_users"),
     ],
     user="system-admin",
     tenant=Tenant.PROVIDER,
-    id="config-deletion-001"
+    id="config-deletion-001",
 )
 
 client.log(config_deletion)
@@ -321,8 +336,8 @@ security_event = SecurityEvent(
         "request_id": "req-123",
         "correlation_id": "corr-456",
         "source_ip": "10.0.0.1",
-        "user_agent": "MyApp/1.0"
-    }
+        "user_agent": "MyApp/1.0",
+    },
 )
 
 client.log(security_event)
@@ -346,10 +361,7 @@ from sap_cloud_sdk.core.auditlog.exceptions import AuditLogError
 
 client = create_client()
 
-security_event = SecurityEvent(
-    data="Login attempt",
-    success=False
-)
+security_event = SecurityEvent(data="Login attempt", success=False)
 
 try:
     client.log(security_event)
@@ -367,7 +379,10 @@ The audit client supports batch logging for efficiency when logging multiple eve
 
 ```python
 from sap_cloud_sdk.core.auditlog import (
-    create_client, SecurityEvent, DataAccessEvent, DataAccessAttribute
+    create_client,
+    SecurityEvent,
+    DataAccessEvent,
+    DataAccessAttribute,
 )
 
 client = create_client()
@@ -382,8 +397,8 @@ events = [
         subject_type="user",
         subject_id={"id": "456"},
         subject_role="user",
-        attributes=[DataAccessAttribute("email", successful=True)]
-    )
+        attributes=[DataAccessAttribute("email", successful=True)],
+    ),
 ]
 
 # Log all events in a batch

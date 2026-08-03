@@ -290,6 +290,26 @@ async def fetch_user_auth(
     return token, gateway_url
 
 
+def _log_mcp_server_error(fragment_name: str, exc: BaseException) -> None:
+    if isinstance(exc, BaseExceptionGroup):
+        for inner in exc.exceptions:
+            _log_mcp_server_error(fragment_name, inner)
+        return
+    if isinstance(exc, httpx.HTTPStatusError):
+        logger.error(
+            "Failed to load tools from fragment '%s' (HTTP %d): %s",
+            fragment_name,
+            exc.response.status_code,
+            exc.response.text[:500],
+        )
+    else:
+        logger.exception(
+            "Failed to load tools from fragment '%s' — skipping",
+            fragment_name,
+            exc_info=exc,
+        )
+
+
 async def list_server_tools(
     dest_url: str, auth_token: str, fragment_name: str, timeout: float
 ) -> list[MCPTool]:
@@ -313,7 +333,7 @@ async def list_server_tools(
         async with streamable_http_client(dest_url, http_client=http_client) as (
             read,
             write,
-            _,
+            *_,
         ):
             async with ClientSession(read, write) as session:
                 init_result = await session.initialize()
@@ -388,11 +408,8 @@ async def get_mcp_tools_lob(
                 len(server_tools),
                 fragment_name,
             )
-        except Exception:
-            logger.exception(
-                "Failed to load tools from fragment '%s' — skipping",
-                fragment_name,
-            )
+        except Exception as exc:
+            _log_mcp_server_error(fragment_name, exc)
 
     logger.info("Loaded %d MCP tool(s) from %d fragment(s)", len(tools), len(fragments))
     return tools
@@ -427,7 +444,7 @@ async def call_mcp_tool_lob(
         async with streamable_http_client(tool.url, http_client=http_client) as (
             read,
             write,
-            _,
+            *_,
         ):
             async with ClientSession(read, write) as session:
                 await session.initialize()
@@ -436,7 +453,12 @@ async def call_mcp_tool_lob(
                     logger.warning("Tool '%s' returned empty content", tool.name)
                     return ""
                 first = result.content[0]
-                return str(getattr(first, "text", ""))
+                text = str(getattr(first, "text", ""))
+
+                if result.isError:
+                    logger.error("Tool '%s' returned an error: %s", tool.name, text)
+
+                return text
 
 
 async def _fetch_agent_card(

@@ -19,12 +19,14 @@ Use `parse_token` to decode an IAS JWT token into a typed dataclass. All standar
 ```python
 from sap_cloud_sdk.ias import parse_token
 
-claims = parse_token(request.headers["Authorization"])  # accepts "Bearer <token>" or raw token
+claims = parse_token(
+    request.headers["Authorization"]
+)  # accepts "Bearer <token>" or raw token
 
-print(claims.app_tid)           # tenant ID (multitenant scenarios)
-print(claims.scim_id)           # SCIM-based user ID in SAP Cloud Identity Services
-print(claims.sub)               # OIDC subject identifier
-print(claims.email)             # user email (when email scope was requested)
+print(claims.app_tid)  # tenant ID (multitenant scenarios)
+print(claims.scim_id)  # SCIM-based user ID in SAP Cloud Identity Services
+print(claims.sub)  # OIDC subject identifier
+print(claims.email)  # user email (when email scope was requested)
 ```
 
 ### Claims Reference

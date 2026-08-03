@@ -34,7 +34,7 @@ Tip:
 ## Type Check
 
 ```bash
-uvx ty check .
+uv run ty check .
 ```
 
 ## Code Quality Checks
@@ -49,8 +49,11 @@ uv run ruff check .
 uv run ruff format --check .
 
 # Type check
-uvx ty check .
+uv run ty check .
 ```
+
+> **Linter versions are pinned.** `ruff` and `ty` are pinned to exact versions in the
+> `pyproject.toml` `[dependency-groups] dev` section (and locked in `uv.lock`) for consistent runs across local and CI.
 
 ## Pre-commit Hooks (Recommended)
 

@@ -464,8 +464,8 @@ class TestGetMcpToolsCustomer:
         )
 
     @pytest.mark.asyncio
-    async def test_raises_when_empty_dependencies(self):
-        """Raise error when integrationDependencies is empty."""
+    async def test_returns_empty_when_empty_dependencies(self):
+        """Return empty list when integrationDependencies is empty."""
         credentials = CustomerCredentials(
             token_service_url="https://ias.example.com/oauth2/token",
             client_id="test-client",
@@ -474,10 +474,8 @@ class TestGetMcpToolsCustomer:
             gateway_url="https://agw.example.com",
             integration_dependencies=[],
         )
-        with pytest.raises(
-            AgentGatewaySDKError, match="integrationDependencies is empty"
-        ):
-            await get_mcp_tools_customer(credentials, "system-token", 60.0)
+        result = await get_mcp_tools_customer(credentials, "system-token", 60.0)
+        assert result == []
 
     @pytest.mark.asyncio
     async def test_discovers_tools_from_credentials(self, credentials):

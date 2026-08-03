@@ -681,10 +681,14 @@ def _log_mcp_server_error(ord_id: str, exc: BaseException) -> None:
     if isinstance(exc, httpx.HTTPStatusError):
         logger.error(
             "Failed to load tools from %s (HTTP %d): %s",
-            ord_id, exc.response.status_code, exc.response.text[:500],
+            ord_id,
+            exc.response.status_code,
+            exc.response.text[:500],
         )
     else:
-        logger.exception("Failed to load tools from %s — skipping", ord_id, exc_info=exc)
+        logger.exception(
+            "Failed to load tools from %s — skipping", ord_id, exc_info=exc
+        )
 
 
 async def get_mcp_tools_customer(
@@ -708,7 +712,9 @@ async def get_mcp_tools_customer(
     dependencies = credentials.integration_dependencies
 
     if not dependencies:
-        logger.debug("integrationDependencies is empty in credentials — no MCP servers configured.")
+        logger.debug(
+            "integrationDependencies is empty in credentials — no MCP servers configured."
+        )
         return []
 
     logger.info("Discovering tools from %d MCP server(s)", len(dependencies))

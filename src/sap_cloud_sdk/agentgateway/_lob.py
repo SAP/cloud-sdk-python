@@ -298,11 +298,15 @@ def _log_mcp_server_error(fragment_name: str, exc: BaseException) -> None:
     if isinstance(exc, httpx.HTTPStatusError):
         logger.error(
             "Failed to load tools from fragment '%s' (HTTP %d): %s",
-            fragment_name, exc.response.status_code, exc.response.text[:500],
+            fragment_name,
+            exc.response.status_code,
+            exc.response.text[:500],
         )
     else:
         logger.exception(
-            "Failed to load tools from fragment '%s' — skipping", fragment_name, exc_info=exc
+            "Failed to load tools from fragment '%s' — skipping",
+            fragment_name,
+            exc_info=exc,
         )
 
 

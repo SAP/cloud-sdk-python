@@ -45,6 +45,7 @@ relation = client.relations.create(
 
 # Upload bytes to the presigned URL (outside SDK)
 import requests
+
 upload_url = relation.document.document_content_upload_urls[0]
 requests.put(upload_url, data=open("Invoice.pdf", "rb"))
 ```
@@ -82,6 +83,7 @@ client = create_client(user_jwt=request.headers["Authorization"].split()[1])
 ```python
 from sap_cloud_sdk.adms import create_client, TokenCache
 
+
 # By default tokens are cached in-process via InMemoryTokenCache.
 # For multi-instance deployments (Kyma replicas > 1, CF instances > 1),
 # implement your own TokenCache subclass backed by the shared cache your
@@ -91,13 +93,21 @@ class MySharedCache(TokenCache):
     def set(self, key, token, ttl_seconds): ...
     def delete(self, key): ...
 
+
 client = create_client(token_cache=MySharedCache())
 ```
 
 ## Async Client
 
 ```python
-from sap_cloud_sdk.adms import create_async_client, BaseType, CreateDocumentInput, CreateDocumentRelationInput, RelationQueryOptions
+from sap_cloud_sdk.adms import (
+    create_async_client,
+    BaseType,
+    CreateDocumentInput,
+    CreateDocumentRelationInput,
+    RelationQueryOptions,
+)
+
 
 async def main():
     async with create_async_client() as client:
@@ -203,6 +213,7 @@ job = client.jobs.start_zip_download(params)
 
 # Poll until terminal state
 import time
+
 while not job.job_status or not job.job_status.is_terminal():
     time.sleep(2)
     job = client.jobs.get_status(job.job_id)

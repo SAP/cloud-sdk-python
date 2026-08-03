@@ -250,7 +250,7 @@ from sap_cloud_sdk.agentgateway import AgentCardFilter
 
 AgentCardFilter(
     agent_names=[],  # agent card names to include (matched against card JSON `name`); empty = no filter
-    ord_ids=[],      # ORD IDs to include (extracted from fragment URL); empty = no filter
+    ord_ids=[],  # ORD IDs to include (extracted from fragment URL); empty = no filter
 )
 ```
 
@@ -261,12 +261,14 @@ Both fields default to empty lists. Filters are applied with AND semantics: if b
 ```python
 @dataclass
 class Agent:
-    ord_id: str       # ORD ID from fragment ordId property
+    ord_id: str  # ORD ID from fragment ordId property
     agent_card: AgentCard
+
 
 @dataclass
 class AgentCard:
-    raw: dict         # full parsed JSON from /.well-known/agent-card.json
+    raw: dict  # full parsed JSON from /.well-known/agent-card.json
+
 
 @dataclass
 class MCPTool:

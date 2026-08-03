@@ -38,12 +38,17 @@ By default `bootstrap` registers `IASContextProvider` (reads IAS JWT),
 ### 2. Read context anywhere
 
 ```python
-from sap_cloud_sdk.core.runtime_context import get_context, TENANT_ID, USER_ID, TRIGGER_TYPE
+from sap_cloud_sdk.core.runtime_context import (
+    get_context,
+    TENANT_ID,
+    USER_ID,
+    TRIGGER_TYPE,
+)
 
 ctx = get_context()
-ctx.get(TENANT_ID)    # -> "abc-123" or None
-ctx.get(USER_ID)      # -> "user-uuid" or None
-ctx.get(TRIGGER_TYPE) # -> "ui5" or None
+ctx.get(TENANT_ID)  # -> "abc-123" or None
+ctx.get(USER_ID)  # -> "user-uuid" or None
+ctx.get(TRIGGER_TYPE)  # -> "ui5" or None
 ```
 
 ---
@@ -96,10 +101,14 @@ metadata or a message queue envelope — as long as the adapter populates
 
 ```python
 from sap_cloud_sdk.core.runtime_context import (
-    ContextKey, ContextProvider, RuntimeContext, RequestEnvelope
+    ContextKey,
+    ContextProvider,
+    RuntimeContext,
+    RequestEnvelope,
 )
 
 CORRELATION_ID = ContextKey[str]("correlation_id")
+
 
 class CorrelationIdProvider(ContextProvider):
     def extract(self, envelope: RequestEnvelope) -> RuntimeContext:
@@ -116,7 +125,15 @@ from sap_cloud_sdk.core.runtime_context import (
     DWCContextProvider,
 )
 
-bootstrap(app, providers=[IASContextProvider(), SAPTriggerContextProvider(), DWCContextProvider(), CorrelationIdProvider()])
+bootstrap(
+    app,
+    providers=[
+        IASContextProvider(),
+        SAPTriggerContextProvider(),
+        DWCContextProvider(),
+        CorrelationIdProvider(),
+    ],
+)
 ```
 
 ### Merging
@@ -143,16 +160,24 @@ editing `bootstrap`.
 ### Adding a new framework or invocation source
 
 ```python
-from sap_cloud_sdk.core.runtime_context import ContextProvider, FrameworkAdapter, register
+from sap_cloud_sdk.core.runtime_context import (
+    ContextProvider,
+    FrameworkAdapter,
+    register,
+)
+
 
 class FlaskContextAdapter(FrameworkAdapter):
     def _matches(self, app) -> bool:
         from flask import Flask
+
         return isinstance(app, Flask)
 
     def attach(self, app, providers: list[ContextProvider]) -> None:
         from my_flask_middleware import FlaskContextMiddleware
+
         app.before_request(FlaskContextMiddleware(providers).handle)
+
 
 register(FlaskContextAdapter())
 ```

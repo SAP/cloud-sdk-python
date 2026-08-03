@@ -17,14 +17,29 @@ See further information about installation in the [main documentation](/README.m
 ```python
 from sap_cloud_sdk.dms import create_client
 from sap_cloud_sdk.dms.model import (
-    InternalRepoRequest, UpdateRepoRequest, Repository,
-    CreateConfigRequest, UpdateConfigRequest, RepositoryConfig, ConfigName,
-    UserClaim, Ace, Acl, Folder, Document, CmisObject, ChildrenPage,
+    InternalRepoRequest,
+    UpdateRepoRequest,
+    Repository,
+    CreateConfigRequest,
+    UpdateConfigRequest,
+    RepositoryConfig,
+    ConfigName,
+    UserClaim,
+    Ace,
+    Acl,
+    Folder,
+    Document,
+    CmisObject,
+    ChildrenPage,
 )
 from sap_cloud_sdk.dms.exceptions import (
-    DMSError, DMSObjectNotFoundException, DMSPermissionDeniedException,
-    DMSInvalidArgumentException, DMSConflictException,
-    DMSConnectionError, DMSRuntimeException,
+    DMSError,
+    DMSObjectNotFoundException,
+    DMSPermissionDeniedException,
+    DMSInvalidArgumentException,
+    DMSConflictException,
+    DMSConnectionError,
+    DMSRuntimeException,
 )
 ```
 
@@ -295,7 +310,7 @@ new_content = io.BytesIO(b"Updated content for v2")
 
 doc = client.check_in(
     repository_id="cmis-repo-id",
-    document_id=pwc.object_id,      # the PWC objectId
+    document_id=pwc.object_id,  # the PWC objectId
     major=True,
     file=new_content,
     file_name="hello.txt",
@@ -436,7 +451,9 @@ page = client.get_children(
     order_by="cmis:creationDate ASC",
 )
 
-print(f"Items: {len(page.objects)}, hasMore: {page.has_more_items}, total: {page.num_items}")
+print(
+    f"Items: {len(page.objects)}, hasMore: {page.has_more_items}, total: {page.num_items}"
+)
 
 for obj in page.objects:
     kind = "Folder" if isinstance(obj, Folder) else "Document"

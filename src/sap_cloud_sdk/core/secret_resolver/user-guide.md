@@ -23,6 +23,7 @@ The Secret Resolver loads configuration into dataclass objects using a hierarchi
 from dataclasses import dataclass
 from sap_cloud_sdk.secret_resolver import read_from_mount_and_fallback_to_env_var
 
+
 @dataclass
 class DatabaseConfig:
     host: str = ""
@@ -30,14 +31,15 @@ class DatabaseConfig:
     username: str = ""
     password: str = ""
 
+
 # Load configuration
 config = DatabaseConfig()
 read_from_mount_and_fallback_to_env_var(
-    base_volume_mount="/etc/secrets",      # Base mount path
-    base_var_name="DB",                    # Environment variable prefix
-    module="database",                     # Module/service name
-    instance="primary",                    # Instance name
-    target=config                          # Target dataclass instance
+    base_volume_mount="/etc/secrets",  # Base mount path
+    base_var_name="DB",  # Environment variable prefix
+    module="database",  # Module/service name
+    instance="primary",  # Instance name
+    target=config,  # Target dataclass instance
 )
 
 print(f"Database: {config.username}@{config.host}:{config.port}")
@@ -114,12 +116,14 @@ This is how the ObjectStore module uses the Secret Resolver internally:
 from dataclasses import dataclass
 from sap_cloud_sdk.secret_resolver import read_from_mount_and_fallback_to_env_var
 
+
 @dataclass
 class ObjectStoreConfig:
     access_key_id: str = ""
     secret_access_key: str = ""
     bucket: str = ""
     host: str = ""
+
 
 # Load ObjectStore credentials
 config = ObjectStoreConfig()
@@ -128,7 +132,7 @@ read_from_mount_and_fallback_to_env_var(
     base_var_name="OBJECTSTORE",
     module="objectstore",
     instance="credentials",
-    target=config
+    target=config,
 )
 ```
 
@@ -157,14 +161,16 @@ export OBJECTSTORE_OBJECTSTORE_CREDENTIALS_HOST="s3.amazonaws.com"
 from dataclasses import dataclass
 from sap_cloud_sdk.secret_resolver import read_from_mount_and_fallback_to_env_var
 
+
 @dataclass
 class DatabaseConfig:
     host: str = ""
-    port: str = "5432"           # Default value
+    port: str = "5432"  # Default value
     database: str = ""
     username: str = ""
     password: str = ""
-    ssl_mode: str = "require"    # Default value
+    ssl_mode: str = "require"  # Default value
+
 
 # Load primary database config
 primary_db = DatabaseConfig()
@@ -173,7 +179,7 @@ read_from_mount_and_fallback_to_env_var(
     base_var_name="APP",
     module="database",
     instance="primary",
-    target=primary_db
+    target=primary_db,
 )
 
 # Load read replica config
@@ -183,7 +189,7 @@ read_from_mount_and_fallback_to_env_var(
     base_var_name="APP",
     module="database",
     instance="replica",
-    target=replica_db
+    target=replica_db,
 )
 
 print(f"Primary DB: {primary_db.username}@{primary_db.host}")
@@ -196,12 +202,14 @@ print(f"Replica DB: {replica_db.username}@{replica_db.host}")
 from dataclasses import dataclass
 from sap_cloud_sdk.secret_resolver import read_from_mount_and_fallback_to_env_var
 
+
 @dataclass
 class ApiConfig:
     base_url: str = ""
     api_key: str = ""
     timeout: str = "30"
     retries: str = "3"
+
 
 # Load external API configuration
 api_config = ApiConfig()
@@ -210,7 +218,7 @@ read_from_mount_and_fallback_to_env_var(
     base_var_name="EXTERNAL",
     module="payment",
     instance="stripe",
-    target=api_config
+    target=api_config,
 )
 
 # Convert string values to appropriate types
@@ -235,12 +243,14 @@ The Secret Resolver handles missing secrets gracefully by leaving default values
 from dataclasses import dataclass
 from sap_cloud_sdk.secret_resolver import read_from_mount_and_fallback_to_env_var
 
+
 @dataclass
 class ServiceConfig:
     api_key: str = ""
-    timeout: str = "30"     # Default value
-    retries: str = "3"      # Default value
-    debug: str = "false"    # Default value
+    timeout: str = "30"  # Default value
+    retries: str = "3"  # Default value
+    debug: str = "false"  # Default value
+
 
 config = ServiceConfig()
 
@@ -250,7 +260,7 @@ read_from_mount_and_fallback_to_env_var(
     base_var_name="API",
     module="external",
     instance="service",
-    target=config
+    target=config,
 )
 
 # Check if required values were loaded

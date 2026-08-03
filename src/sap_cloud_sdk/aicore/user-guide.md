@@ -30,8 +30,7 @@ set_aicore_config()
 from litellm import completion
 
 response = completion(
-    model="sap/gpt-4",
-    messages=[{"role": "user", "content": "Hello!"}]
+    model="sap/gpt-4", messages=[{"role": "user", "content": "Hello!"}]
 )
 ```
 
@@ -115,25 +114,31 @@ from sap_cloud_sdk.aicore import (
     set_filtering,
 )
 
-set_filtering(ContentFiltering(
-    input_filtering=InputFiltering(filters=[
-        AzureContentFilter(
-            hate=Severity.STRICT,
-            violence=Severity.STRICT,
-            sexual=Severity.STRICT,
-            self_harm=Severity.STRICT,
-            prompt_shield=True,
+set_filtering(
+    ContentFiltering(
+        input_filtering=InputFiltering(
+            filters=[
+                AzureContentFilter(
+                    hate=Severity.STRICT,
+                    violence=Severity.STRICT,
+                    sexual=Severity.STRICT,
+                    self_harm=Severity.STRICT,
+                    prompt_shield=True,
+                ),
+            ]
         ),
-    ]),
-    output_filtering=OutputFiltering(filters=[
-        AzureContentFilter(
-            hate=Severity.MEDIUM,
-            violence=Severity.MEDIUM,
-            sexual=Severity.MEDIUM,
-            self_harm=Severity.MEDIUM,
+        output_filtering=OutputFiltering(
+            filters=[
+                AzureContentFilter(
+                    hate=Severity.MEDIUM,
+                    violence=Severity.MEDIUM,
+                    sexual=Severity.MEDIUM,
+                    self_harm=Severity.MEDIUM,
+                ),
+            ]
         ),
-    ]),
-))
+    )
+)
 ```
 
 To re-apply env-based config (e.g. after changing `AICORE_FILTER_*`):
@@ -161,12 +166,16 @@ from sap_cloud_sdk.aicore import (
     set_filtering,
 )
 
-set_filtering(ContentFiltering(
-    input_filtering=InputFiltering(filters=[
-        AzureContentFilter(prompt_shield=True),
-        LlamaGuard38bFilter(hate=True, violent_crimes=True),
-    ]),
-))
+set_filtering(
+    ContentFiltering(
+        input_filtering=InputFiltering(
+            filters=[
+                AzureContentFilter(prompt_shield=True),
+                LlamaGuard38bFilter(hate=True, violent_crimes=True),
+            ]
+        ),
+    )
+)
 ```
 
 `LlamaGuard38bFilter` takes 14 boolean category toggles (`hate`,
@@ -239,15 +248,23 @@ set_filtering(hate=0, violence=0)
 
 # After (aicore namespace with class API):
 from sap_cloud_sdk.aicore import (
-    AzureContentFilter, ContentFiltering, InputFiltering,
-    Severity, ContentFilteredError, set_filtering,
+    AzureContentFilter,
+    ContentFiltering,
+    InputFiltering,
+    Severity,
+    ContentFilteredError,
+    set_filtering,
 )
 
-set_filtering(ContentFiltering(
-    input_filtering=InputFiltering(filters=[
-        AzureContentFilter(hate=Severity.STRICT, violence=Severity.STRICT),
-    ]),
-))
+set_filtering(
+    ContentFiltering(
+        input_filtering=InputFiltering(
+            filters=[
+                AzureContentFilter(hate=Severity.STRICT, violence=Severity.STRICT),
+            ]
+        ),
+    )
+)
 ```
 
 Env vars also renamed: `ORCH_FILTER_*` → `AICORE_FILTER_*`. The
@@ -283,8 +300,8 @@ response = completion(
     model="sap/gpt-4",
     messages=[
         {"role": "system", "content": "You are a helpful assistant."},
-        {"role": "user", "content": "What is SAP AI Core?"}
-    ]
+        {"role": "user", "content": "What is SAP AI Core?"},
+    ],
 )
 
 print(response.choices[0].message.content)
@@ -301,7 +318,7 @@ set_aicore_config()
 response = completion(
     model="sap/gpt-4",
     messages=[{"role": "user", "content": "Tell me a story"}],
-    stream=True
+    stream=True,
 )
 
 for chunk in response:
@@ -319,14 +336,12 @@ set_aicore_config()
 
 # Chat completion
 chat_response = completion(
-    model="sap/gpt-4",
-    messages=[{"role": "user", "content": "Hello!"}]
+    model="sap/gpt-4", messages=[{"role": "user", "content": "Hello!"}]
 )
 
 # Text embeddings
 embedding_response = embedding(
-    model="sap/text-embedding-ada-002",
-    input=["Hello world", "How are you?"]
+    model="sap/text-embedding-ada-002", input=["Hello world", "How are you?"]
 )
 ```
 
@@ -356,10 +371,10 @@ try:
         model="sap/gpt-4",
         messages=[
             {"role": "system", "content": "You are a helpful AI assistant."},
-            {"role": "user", "content": "Explain SAP AI Core in one sentence."}
+            {"role": "user", "content": "Explain SAP AI Core in one sentence."},
         ],
         temperature=0.7,
-        max_tokens=100
+        max_tokens=100,
     )
 
     print(f"Response: {response.choices[0].message.content}")

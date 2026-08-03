@@ -24,7 +24,9 @@ fragment_client = create_fragment_client(instance="default")
 certificate_client = create_certificate_client(instance="default")
 
 # Instance-level read
-dest = client.get_instance_destination("my-destination")  # deprecated: use get_destination()
+dest = client.get_instance_destination(
+    "my-destination"
+)  # deprecated: use get_destination()
 fragment = fragment_client.get_instance_fragment("my-fragment")
 cert = certificate_client.get_instance_certificate("my-cert")
 
@@ -39,20 +41,46 @@ fragments = fragment_client.list_instance_fragments(tenant="tenant-subdomain")
 certificates = certificate_client.list_instance_certificates(tenant="tenant-subdomain")
 
 # Subaccount-level read: provider only (no tenant required)
-dest = client.get_subaccount_destination("my-destination", access_strategy=AccessStrategy.PROVIDER_ONLY)  # deprecated: use get_destination()
-fragment = fragment_client.get_subaccount_fragment("my-fragment", access_strategy=AccessStrategy.PROVIDER_ONLY)
-cert = certificate_client.get_subaccount_certificate("my-cert", access_strategy=AccessStrategy.PROVIDER_ONLY)
+dest = client.get_subaccount_destination(
+    "my-destination", access_strategy=AccessStrategy.PROVIDER_ONLY
+)  # deprecated: use get_destination()
+fragment = fragment_client.get_subaccount_fragment(
+    "my-fragment", access_strategy=AccessStrategy.PROVIDER_ONLY
+)
+cert = certificate_client.get_subaccount_certificate(
+    "my-cert", access_strategy=AccessStrategy.PROVIDER_ONLY
+)
 
 # Subaccount-level read: subscriber-first (tenant required), fallback to provider
-dest = client.get_subaccount_destination("my-destination", access_strategy=AccessStrategy.SUBSCRIBER_FIRST, tenant="tenant-subdomain")  # deprecated: use get_destination()
-fragment = fragment_client.get_subaccount_fragment("my-fragment", access_strategy=AccessStrategy.SUBSCRIBER_FIRST, tenant="tenant-subdomain")
-cert = certificate_client.get_subaccount_certificate("my-cert", access_strategy=AccessStrategy.SUBSCRIBER_FIRST, tenant="tenant-subdomain")
+dest = client.get_subaccount_destination(
+    "my-destination",
+    access_strategy=AccessStrategy.SUBSCRIBER_FIRST,
+    tenant="tenant-subdomain",
+)  # deprecated: use get_destination()
+fragment = fragment_client.get_subaccount_fragment(
+    "my-fragment",
+    access_strategy=AccessStrategy.SUBSCRIBER_FIRST,
+    tenant="tenant-subdomain",
+)
+cert = certificate_client.get_subaccount_certificate(
+    "my-cert",
+    access_strategy=AccessStrategy.SUBSCRIBER_FIRST,
+    tenant="tenant-subdomain",
+)
 
 # Fragment write operations with tenant (subscriber context)
-new_fragment = Fragment(name="my-fragment", properties={"URL": "https://api.example.com"})
-fragment_client.create_fragment(new_fragment, level=Level.SUB_ACCOUNT, tenant="tenant-subdomain")
-fragment_client.update_fragment(new_fragment, level=Level.SUB_ACCOUNT, tenant="tenant-subdomain")
-fragment_client.delete_fragment("my-fragment", level=Level.SUB_ACCOUNT, tenant="tenant-subdomain")
+new_fragment = Fragment(
+    name="my-fragment", properties={"URL": "https://api.example.com"}
+)
+fragment_client.create_fragment(
+    new_fragment, level=Level.SUB_ACCOUNT, tenant="tenant-subdomain"
+)
+fragment_client.update_fragment(
+    new_fragment, level=Level.SUB_ACCOUNT, tenant="tenant-subdomain"
+)
+fragment_client.delete_fragment(
+    "my-fragment", level=Level.SUB_ACCOUNT, tenant="tenant-subdomain"
+)
 
 # Fragment write operations without tenant (provider context)
 fragment_client.create_fragment(new_fragment, level=Level.SUB_ACCOUNT)
@@ -73,10 +101,17 @@ client.delete_destination("my-dest", level=Level.SUB_ACCOUNT)
 # Certificate write operations with tenant (subscriber context)
 from sap_cloud_sdk.destination import create_certificate_client
 from sap_cloud_sdk.destination._models import Certificate
+
 new_cert = Certificate(name="my-cert.pem", content="base64-encoded-content", type="PEM")
-certificate_client.create_certificate(new_cert, level=Level.SUB_ACCOUNT, tenant="tenant-subdomain")
-certificate_client.update_certificate(new_cert, level=Level.SUB_ACCOUNT, tenant="tenant-subdomain")
-certificate_client.delete_certificate("my-cert.pem", level=Level.SUB_ACCOUNT, tenant="tenant-subdomain")
+certificate_client.create_certificate(
+    new_cert, level=Level.SUB_ACCOUNT, tenant="tenant-subdomain"
+)
+certificate_client.update_certificate(
+    new_cert, level=Level.SUB_ACCOUNT, tenant="tenant-subdomain"
+)
+certificate_client.delete_certificate(
+    "my-cert.pem", level=Level.SUB_ACCOUNT, tenant="tenant-subdomain"
+)
 
 # Certificate write operations without tenant (provider context)
 certificate_client.create_certificate(new_cert, level=Level.SUB_ACCOUNT)
@@ -85,18 +120,34 @@ certificate_client.delete_certificate("my-cert.pem", level=Level.SUB_ACCOUNT)
 
 # Label management with tenant (subscriber context)
 from sap_cloud_sdk.destination import Label, PatchLabels
+
 labels = [Label(key="env", values=["prod", "eu"])]
 
-client.update_destination_labels("my-dest", labels, level=Level.SUB_ACCOUNT, tenant="tenant-subdomain")
-client.patch_destination_labels("my-dest", PatchLabels(action="ADD", labels=labels), level=Level.SUB_ACCOUNT, tenant="tenant-subdomain")
-retrieved = client.get_destination_labels("my-dest", level=Level.SUB_ACCOUNT, tenant="tenant-subdomain")
+client.update_destination_labels(
+    "my-dest", labels, level=Level.SUB_ACCOUNT, tenant="tenant-subdomain"
+)
+client.patch_destination_labels(
+    "my-dest",
+    PatchLabels(action="ADD", labels=labels),
+    level=Level.SUB_ACCOUNT,
+    tenant="tenant-subdomain",
+)
+retrieved = client.get_destination_labels(
+    "my-dest", level=Level.SUB_ACCOUNT, tenant="tenant-subdomain"
+)
 
-fragment_client.update_fragment_labels("my-fragment", labels, level=Level.SUB_ACCOUNT, tenant="tenant-subdomain")
-certificate_client.get_certificate_labels("my-cert.pem", level=Level.SUB_ACCOUNT, tenant="tenant-subdomain")
+fragment_client.update_fragment_labels(
+    "my-fragment", labels, level=Level.SUB_ACCOUNT, tenant="tenant-subdomain"
+)
+certificate_client.get_certificate_labels(
+    "my-cert.pem", level=Level.SUB_ACCOUNT, tenant="tenant-subdomain"
+)
 
 # Label management without tenant (provider context)
 client.update_destination_labels("my-dest", labels, level=Level.SUB_ACCOUNT)
-client.patch_destination_labels("my-dest", PatchLabels(action="DELETE", labels=labels), level=Level.SUB_ACCOUNT)
+client.patch_destination_labels(
+    "my-dest", PatchLabels(action="DELETE", labels=labels), level=Level.SUB_ACCOUNT
+)
 ```
 
 ## Concepts
@@ -126,21 +177,79 @@ The client produced by `create_client()` exposes the following operations:
 ```python
 class DestinationClient:
     # V1 Admin API - Read operations for destinations
-    def get_instance_destination(self, name: str, proxy_enabled: Optional[bool] = None) -> Optional[Destination | TransparentProxyDestination]: ...  # deprecated: use get_destination()
-    def get_subaccount_destination(self, name: str, access_strategy: AccessStrategy = AccessStrategy.SUBSCRIBER_FIRST, tenant: Optional[str] = None, proxy_enabled: Optional[bool] = None) -> Optional[Destination | TransparentProxyDestination]: ...  # deprecated: use get_destination()
-    def list_instance_destinations(self, tenant: Optional[str] = None, filter: Optional[ListOptions] = None) -> PagedResult[Destination]: ...
-    def list_subaccount_destinations(self, access_strategy: AccessStrategy = AccessStrategy.SUBSCRIBER_FIRST, tenant: Optional[str] = None, filter: Optional[ListOptions] = None) -> PagedResult[Destination]: ...
+    def get_instance_destination(
+        self, name: str, proxy_enabled: Optional[bool] = None
+    ) -> Optional[
+        Destination | TransparentProxyDestination
+    ]: ...  # deprecated: use get_destination()
+    def get_subaccount_destination(
+        self,
+        name: str,
+        access_strategy: AccessStrategy = AccessStrategy.SUBSCRIBER_FIRST,
+        tenant: Optional[str] = None,
+        proxy_enabled: Optional[bool] = None,
+    ) -> Optional[
+        Destination | TransparentProxyDestination
+    ]: ...  # deprecated: use get_destination()
+    def list_instance_destinations(
+        self, tenant: Optional[str] = None, filter: Optional[ListOptions] = None
+    ) -> PagedResult[Destination]: ...
+    def list_subaccount_destinations(
+        self,
+        access_strategy: AccessStrategy = AccessStrategy.SUBSCRIBER_FIRST,
+        tenant: Optional[str] = None,
+        filter: Optional[ListOptions] = None,
+    ) -> PagedResult[Destination]: ...
 
     # V1 Admin API - Write operations
-    def create_destination(self, dest: Destination, level: Optional[Level] = Level.SUB_ACCOUNT, tenant: Optional[str] = None) -> None: ...
-    def update_destination(self, dest: Destination, level: Optional[Level] = Level.SUB_ACCOUNT, tenant: Optional[str] = None) -> None: ...
-    def delete_destination(self, name: str, level: Optional[Level] = Level.SUB_ACCOUNT, tenant: Optional[str] = None) -> None: ...
-    def get_destination_labels(self, name: str, level: Optional[Level] = Level.SUB_ACCOUNT, tenant: Optional[str] = None) -> List[Label]: ...
-    def update_destination_labels(self, name: str, labels: List[Label], level: Optional[Level] = Level.SUB_ACCOUNT, tenant: Optional[str] = None) -> None: ...
-    def patch_destination_labels(self, name: str, patch: PatchLabels, level: Optional[Level] = Level.SUB_ACCOUNT, tenant: Optional[str] = None) -> None: ...
+    def create_destination(
+        self,
+        dest: Destination,
+        level: Optional[Level] = Level.SUB_ACCOUNT,
+        tenant: Optional[str] = None,
+    ) -> None: ...
+    def update_destination(
+        self,
+        dest: Destination,
+        level: Optional[Level] = Level.SUB_ACCOUNT,
+        tenant: Optional[str] = None,
+    ) -> None: ...
+    def delete_destination(
+        self,
+        name: str,
+        level: Optional[Level] = Level.SUB_ACCOUNT,
+        tenant: Optional[str] = None,
+    ) -> None: ...
+    def get_destination_labels(
+        self,
+        name: str,
+        level: Optional[Level] = Level.SUB_ACCOUNT,
+        tenant: Optional[str] = None,
+    ) -> List[Label]: ...
+    def update_destination_labels(
+        self,
+        name: str,
+        labels: List[Label],
+        level: Optional[Level] = Level.SUB_ACCOUNT,
+        tenant: Optional[str] = None,
+    ) -> None: ...
+    def patch_destination_labels(
+        self,
+        name: str,
+        patch: PatchLabels,
+        level: Optional[Level] = Level.SUB_ACCOUNT,
+        tenant: Optional[str] = None,
+    ) -> None: ...
 
     # V2 Runtime API - Destination consumption with automatic token retrieval
-    def get_destination(self, name: str, level: Optional[ConsumptionLevel] = None, options: Optional[ConsumptionOptions] = None, proxy_enabled: Optional[bool] = None, tenant: Optional[str] = None) -> Optional[Destination | TransparentProxyDestination]: ...
+    def get_destination(
+        self,
+        name: str,
+        level: Optional[ConsumptionLevel] = None,
+        options: Optional[ConsumptionOptions] = None,
+        proxy_enabled: Optional[bool] = None,
+        tenant: Optional[str] = None,
+    ) -> Optional[Destination | TransparentProxyDestination]: ...
 ```
 
 ### Fragment Client
@@ -150,15 +259,59 @@ The fragment client produced by `create_fragment_client()` exposes the following
 ```python
 class FragmentClient:
     def get_instance_fragment(self, name: str) -> Optional[Fragment]: ...
-    def get_subaccount_fragment(self, name: str, access_strategy: AccessStrategy = AccessStrategy.SUBSCRIBER_FIRST, tenant: Optional[str] = None) -> Optional[Fragment]: ...
-    def list_instance_fragments(self, tenant: Optional[str] = None, filter: Optional[ListOptions] = None) -> List[Fragment]: ...
-    def list_subaccount_fragments(self, access_strategy: AccessStrategy = AccessStrategy.SUBSCRIBER_FIRST, tenant: Optional[str] = None, filter: Optional[ListOptions] = None) -> List[Fragment]: ...
-    def create_fragment(self, fragment: Fragment, level: Optional[Level] = Level.SUB_ACCOUNT, tenant: Optional[str] = None) -> None: ...
-    def update_fragment(self, fragment: Fragment, level: Optional[Level] = Level.SUB_ACCOUNT, tenant: Optional[str] = None) -> None: ...
-    def delete_fragment(self, name: str, level: Optional[Level] = Level.SUB_ACCOUNT, tenant: Optional[str] = None) -> None: ...
-    def get_fragment_labels(self, name: str, level: Optional[Level] = Level.SUB_ACCOUNT, tenant: Optional[str] = None) -> List[Label]: ...
-    def update_fragment_labels(self, name: str, labels: List[Label], level: Optional[Level] = Level.SUB_ACCOUNT, tenant: Optional[str] = None) -> None: ...
-    def patch_fragment_labels(self, name: str, patch: PatchLabels, level: Optional[Level] = Level.SUB_ACCOUNT, tenant: Optional[str] = None) -> None: ...
+    def get_subaccount_fragment(
+        self,
+        name: str,
+        access_strategy: AccessStrategy = AccessStrategy.SUBSCRIBER_FIRST,
+        tenant: Optional[str] = None,
+    ) -> Optional[Fragment]: ...
+    def list_instance_fragments(
+        self, tenant: Optional[str] = None, filter: Optional[ListOptions] = None
+    ) -> List[Fragment]: ...
+    def list_subaccount_fragments(
+        self,
+        access_strategy: AccessStrategy = AccessStrategy.SUBSCRIBER_FIRST,
+        tenant: Optional[str] = None,
+        filter: Optional[ListOptions] = None,
+    ) -> List[Fragment]: ...
+    def create_fragment(
+        self,
+        fragment: Fragment,
+        level: Optional[Level] = Level.SUB_ACCOUNT,
+        tenant: Optional[str] = None,
+    ) -> None: ...
+    def update_fragment(
+        self,
+        fragment: Fragment,
+        level: Optional[Level] = Level.SUB_ACCOUNT,
+        tenant: Optional[str] = None,
+    ) -> None: ...
+    def delete_fragment(
+        self,
+        name: str,
+        level: Optional[Level] = Level.SUB_ACCOUNT,
+        tenant: Optional[str] = None,
+    ) -> None: ...
+    def get_fragment_labels(
+        self,
+        name: str,
+        level: Optional[Level] = Level.SUB_ACCOUNT,
+        tenant: Optional[str] = None,
+    ) -> List[Label]: ...
+    def update_fragment_labels(
+        self,
+        name: str,
+        labels: List[Label],
+        level: Optional[Level] = Level.SUB_ACCOUNT,
+        tenant: Optional[str] = None,
+    ) -> None: ...
+    def patch_fragment_labels(
+        self,
+        name: str,
+        patch: PatchLabels,
+        level: Optional[Level] = Level.SUB_ACCOUNT,
+        tenant: Optional[str] = None,
+    ) -> None: ...
 ```
 
 ### Certificate Client
@@ -168,15 +321,59 @@ The certificate client produced by `create_certificate_client()` exposes the fol
 ```python
 class CertificateClient:
     def get_instance_certificate(self, name: str) -> Optional[Certificate]: ...
-    def get_subaccount_certificate(self, name: str, access_strategy: AccessStrategy = AccessStrategy.SUBSCRIBER_FIRST, tenant: Optional[str] = None) -> Optional[Certificate]: ...
-    def list_instance_certificates(self, tenant: Optional[str] = None, filter: Optional[ListOptions] = None) -> PagedResult[Certificate]: ...
-    def list_subaccount_certificates(self, access_strategy: AccessStrategy = AccessStrategy.SUBSCRIBER_FIRST, tenant: Optional[str] = None, filter: Optional[ListOptions] = None) -> PagedResult[Certificate]: ...
-    def create_certificate(self, certificate: Certificate, level: Optional[Level] = Level.SUB_ACCOUNT, tenant: Optional[str] = None) -> None: ...
-    def update_certificate(self, certificate: Certificate, level: Optional[Level] = Level.SUB_ACCOUNT, tenant: Optional[str] = None) -> None: ...
-    def delete_certificate(self, name: str, level: Optional[Level] = Level.SUB_ACCOUNT, tenant: Optional[str] = None) -> None: ...
-    def get_certificate_labels(self, name: str, level: Optional[Level] = Level.SUB_ACCOUNT, tenant: Optional[str] = None) -> List[Label]: ...
-    def update_certificate_labels(self, name: str, labels: List[Label], level: Optional[Level] = Level.SUB_ACCOUNT, tenant: Optional[str] = None) -> None: ...
-    def patch_certificate_labels(self, name: str, patch: PatchLabels, level: Optional[Level] = Level.SUB_ACCOUNT, tenant: Optional[str] = None) -> None: ...
+    def get_subaccount_certificate(
+        self,
+        name: str,
+        access_strategy: AccessStrategy = AccessStrategy.SUBSCRIBER_FIRST,
+        tenant: Optional[str] = None,
+    ) -> Optional[Certificate]: ...
+    def list_instance_certificates(
+        self, tenant: Optional[str] = None, filter: Optional[ListOptions] = None
+    ) -> PagedResult[Certificate]: ...
+    def list_subaccount_certificates(
+        self,
+        access_strategy: AccessStrategy = AccessStrategy.SUBSCRIBER_FIRST,
+        tenant: Optional[str] = None,
+        filter: Optional[ListOptions] = None,
+    ) -> PagedResult[Certificate]: ...
+    def create_certificate(
+        self,
+        certificate: Certificate,
+        level: Optional[Level] = Level.SUB_ACCOUNT,
+        tenant: Optional[str] = None,
+    ) -> None: ...
+    def update_certificate(
+        self,
+        certificate: Certificate,
+        level: Optional[Level] = Level.SUB_ACCOUNT,
+        tenant: Optional[str] = None,
+    ) -> None: ...
+    def delete_certificate(
+        self,
+        name: str,
+        level: Optional[Level] = Level.SUB_ACCOUNT,
+        tenant: Optional[str] = None,
+    ) -> None: ...
+    def get_certificate_labels(
+        self,
+        name: str,
+        level: Optional[Level] = Level.SUB_ACCOUNT,
+        tenant: Optional[str] = None,
+    ) -> List[Label]: ...
+    def update_certificate_labels(
+        self,
+        name: str,
+        labels: List[Label],
+        level: Optional[Level] = Level.SUB_ACCOUNT,
+        tenant: Optional[str] = None,
+    ) -> None: ...
+    def patch_certificate_labels(
+        self,
+        name: str,
+        patch: PatchLabels,
+        level: Optional[Level] = Level.SUB_ACCOUNT,
+        tenant: Optional[str] = None,
+    ) -> None: ...
 ```
 
 ### Models
@@ -310,7 +507,9 @@ from sap_cloud_sdk.destination import create_client, TransparentProxy
 client = create_client(instance="default")
 
 # Set custom proxy configuration
-transparent_proxy = TransparentProxy(proxy_name="my-destination", namespace="my-namespace")
+transparent_proxy = TransparentProxy(
+    proxy_name="my-destination", namespace="my-namespace"
+)
 client.set_proxy(transparent_proxy)
 ```
 
@@ -350,15 +549,16 @@ dest = client.get_instance_destination("my-destination", proxy_enabled=True)
 
 # Example 3: Update proxy after creation
 client = create_client(instance="default")
-transparent_proxy = TransparentProxy(proxy_name="my-destination", namespace="my-namespace")
+transparent_proxy = TransparentProxy(
+    proxy_name="my-destination", namespace="my-namespace"
+)
 client.set_proxy(transparent_proxy)
 dest = client.get_instance_destination("my-destination", proxy_enabled=True)
 
 # Example 4: Subaccount destination with proxy
 client = create_client(instance="default", use_default_proxy=True)
 dest = client.get_subaccount_destination(
-    name="my-destination",
-    access_strategy=AccessStrategy.PROVIDER_ONLY
+    name="my-destination", access_strategy=AccessStrategy.PROVIDER_ONLY
 )
 # Uses proxy by default (client's use_default_proxy=True)
 
@@ -391,7 +591,9 @@ dest = client.get_destination("my-api")
 
 # Example 9: Combine level with options
 options = ConsumptionOptions(fragment_name="production", tenant="tenant-1")
-dest = client.get_destination("my-api", level=ConsumptionLevel.SUBACCOUNT, options=options)
+dest = client.get_destination(
+    "my-api", level=ConsumptionLevel.SUBACCOUNT, options=options
+)
 
 # Example 9b: Fragment with level hint
 options = ConsumptionOptions(
@@ -453,9 +655,9 @@ When `proxy_enabled=True` (either as client default or per-request override), th
 
 client = create_client(instance="default", use_default_proxy=True)
 proxy_dest = client.get_instance_destination("my-destination")
-print(proxy_dest.name)      # "my-destination"
-print(proxy_dest.url)       # "http://connectivity-proxy.my-namespace"
-print(proxy_dest.headers)   # {"X-destination-name": "my-destination"}
+print(proxy_dest.name)  # "my-destination"
+print(proxy_dest.url)  # "http://connectivity-proxy.my-namespace"
+print(proxy_dest.headers)  # {"X-destination-name": "my-destination"}
 ```
 
 ### Setting Custom Headers
@@ -463,20 +665,14 @@ print(proxy_dest.headers)   # {"X-destination-name": "my-destination"}
 The `TransparentProxyDestination` class provides a `set_header()` method to add or update headers required by the transparent proxy. Use the `TransparentProxyHeader` enum to ensure type-safe header names:
 
 ```python
-from sap_cloud_sdk.destination import (
-    create_client,
-    TransparentProxyHeader
-)
+from sap_cloud_sdk.destination import create_client, TransparentProxyHeader
 
 # Get a transparent proxy destination
 client = create_client(instance="default", use_default_proxy=True)
 proxy_dest = client.get_instance_destination("my-destination")
 
 # Set additional headers using the enum
-proxy_dest.set_header(
-    TransparentProxyHeader.AUTHORIZATION,
-    "Bearer token123"
-)
+proxy_dest.set_header(TransparentProxyHeader.AUTHORIZATION, "Bearer token123")
 
 # Access the updated headers
 print(proxy_dest.headers)
@@ -550,8 +746,13 @@ All three accept an optional `tenant` parameter (like the create/update/delete m
 
 ```python
 from sap_cloud_sdk.destination import (
-    create_client, create_fragment_client, create_certificate_client,
-    Label, PatchLabels, ListOptions, Level
+    create_client,
+    create_fragment_client,
+    create_certificate_client,
+    Label,
+    PatchLabels,
+    ListOptions,
+    Level,
 )
 
 client = create_client(instance="default")
@@ -562,11 +763,15 @@ certificate_client = create_certificate_client(instance="default")
 labels = client.get_destination_labels("my-dest", level=Level.SUB_ACCOUNT)
 
 # Get labels in subscriber context
-labels = client.get_destination_labels("my-dest", level=Level.SUB_ACCOUNT, tenant="tenant-subdomain")
+labels = client.get_destination_labels(
+    "my-dest", level=Level.SUB_ACCOUNT, tenant="tenant-subdomain"
+)
 
 # Replace all labels (PUT)
 new_labels = [Label(key="env", values=["prod"]), Label(key="team", values=["platform"])]
-client.update_destination_labels("my-dest", new_labels, level=Level.SUB_ACCOUNT, tenant="tenant-subdomain")
+client.update_destination_labels(
+    "my-dest", new_labels, level=Level.SUB_ACCOUNT, tenant="tenant-subdomain"
+)
 
 # Add labels incrementally (PATCH ADD — upserts existing keys)
 client.patch_destination_labels(
@@ -584,7 +789,9 @@ client.patch_destination_labels(
 )
 
 # Fragment and certificate label operations follow the same pattern
-fragment_client.update_fragment_labels("my-fragment", new_labels, level=Level.SUB_ACCOUNT, tenant="tenant-subdomain")
+fragment_client.update_fragment_labels(
+    "my-fragment", new_labels, level=Level.SUB_ACCOUNT, tenant="tenant-subdomain"
+)
 certificate_client.patch_certificate_labels(
     "my-cert.pem",
     PatchLabels(action="ADD", labels=[Label(key="env", values=["staging"])]),
@@ -593,6 +800,7 @@ certificate_client.patch_certificate_labels(
 
 # Filter list results by label
 from sap_cloud_sdk.destination import ListOptions
+
 filter_opts = ListOptions(filter_labels=[Label(key="env", values=["prod"])])
 result = client.list_subaccount_destinations(filter=filter_opts)
 fragments = fragment_client.list_instance_fragments(filter=filter_opts)

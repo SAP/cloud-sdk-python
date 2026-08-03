@@ -712,7 +712,7 @@ async def get_mcp_tools_customer(
     dependencies = credentials.integration_dependencies
 
     if not dependencies:
-        logger.debug(
+        logger.warning(
             "integrationDependencies is empty in credentials — no MCP servers configured."
         )
         return []

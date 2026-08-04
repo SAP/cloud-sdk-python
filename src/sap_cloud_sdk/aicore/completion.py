@@ -14,15 +14,20 @@ wrappers fix it by catching the wrapped exception inside the SDK and
 re-raising as :class:`ContentFilteredError` so callers can rely on a
 single exception type for "filter blocked you."
 
-Credential rotation handling
-----------------------------
-When a credential (client_secret or mTLS certificate) is rotated while the
-pod is running, LiteLLM's cached token becomes invalid and the next token
-refresh attempt raises ``litellm.AuthenticationError``. The wrappers
-intercept this error, reload credentials from the mounted secret volume via
-:func:`reload_aicore_credentials`, and retry the call once. The caller is
-unaffected — rotation is transparent. If the retry also fails, the
-``AuthenticationError`` propagates normally.
+Credential handling
+-------------------
+CLIENT_SECRET minimisation (AFSDK-4291):
+After the first successful LiteLLM call, ``AICORE_CLIENT_SECRET`` is removed
+from ``os.environ``. LiteLLM has already captured the secret inside its token
+creator closure at that point and no longer needs the env var. This minimises
+the window of exposure to child processes and container introspection.
+
+Credential rotation (reactive reload):
+When a credential is rotated while the pod is running, LiteLLM's cached token
+becomes invalid and the next token refresh raises ``litellm.AuthenticationError``.
+The wrappers intercept this, reload credentials from the mounted secret volume
+via :func:`reload_aicore_credentials`, and retry once. The secret is cleared
+again after the retry succeeds.
 
 Usage::
 
@@ -50,6 +55,8 @@ adoption of the SDK.
 from __future__ import annotations
 
 import logging
+import os
+import threading
 from typing import Any
 
 import litellm
@@ -57,6 +64,36 @@ import litellm
 from .filtering.filters import _parse_input_filter_error
 
 logger = logging.getLogger(__name__)
+
+# Tracks whether AICORE_CLIENT_SECRET has already been cleared after the first
+# successful LiteLLM call. Reset when credentials are reloaded so the secret
+# is cleared again after the retry succeeds.
+_secret_lock = threading.Lock()
+_secret_cleared = False
+
+
+def _clear_client_secret() -> None:
+    """Remove AICORE_CLIENT_SECRET from env after LiteLLM has cached the token.
+
+    Safe to call multiple times — subsequent calls are no-ops once cleared.
+    No-op in transparent TLS mode (secret was never written).
+    """
+    global _secret_cleared
+    with _secret_lock:
+        if not _secret_cleared:
+            if os.environ.pop("AICORE_CLIENT_SECRET", None) is not None:
+                logger.info(
+                    "AICORE_CLIENT_SECRET cleared from environment "
+                    "after token acquisition (AFSDK-4291)"
+                )
+            _secret_cleared = True
+
+
+def _reset_secret_cleared() -> None:
+    """Allow _clear_client_secret() to fire again after a credential reload."""
+    global _secret_cleared
+    with _secret_lock:
+        _secret_cleared = False
 
 
 def reload_aicore_credentials() -> None:
@@ -71,6 +108,7 @@ def reload_aicore_credentials() -> None:
     """
     # Import here to avoid a circular import: completion ← __init__ ← completion
     from sap_cloud_sdk.aicore import set_aicore_config
+    _reset_secret_cleared()
     logger.info("AI Core credentials reloading after authentication failure")
     set_aicore_config()
 
@@ -92,15 +130,22 @@ def completion(*args: Any, **kwargs: Any) -> Any:
     """Wrapper around :func:`litellm.completion` that normalises filter errors
     and handles credential rotation transparently.
 
+    After the first successful call, ``AICORE_CLIENT_SECRET`` is removed from
+    ``os.environ`` — LiteLLM has captured it in its token creator closure and
+    no longer needs the env var (AFSDK-4291).
+
     On ``AuthenticationError`` (e.g. rotated client_secret or mTLS cert),
     reloads credentials from the mounted secret volume and retries once.
-    All other exceptions surface verbatim after the filter-error translation.
     """
     try:
-        return litellm.completion(*args, **kwargs)
+        result = litellm.completion(*args, **kwargs)
+        _clear_client_secret()
+        return result
     except litellm.AuthenticationError:
         reload_aicore_credentials()
-        return litellm.completion(*args, **kwargs)
+        result = litellm.completion(*args, **kwargs)
+        _clear_client_secret()
+        return result
     except Exception as exc:
         translated = _maybe_translate_filter_error(exc)
         if translated is exc:
@@ -111,13 +156,17 @@ def completion(*args: Any, **kwargs: Any) -> Any:
 async def acompletion(*args: Any, **kwargs: Any) -> Any:
     """Async wrapper around :func:`litellm.acompletion`.
 
-    Same translation and credential-rotation semantics as :func:`completion`.
+    Same credential-minimisation and rotation semantics as :func:`completion`.
     """
     try:
-        return await litellm.acompletion(*args, **kwargs)
+        result = await litellm.acompletion(*args, **kwargs)
+        _clear_client_secret()
+        return result
     except litellm.AuthenticationError:
         reload_aicore_credentials()
-        return await litellm.acompletion(*args, **kwargs)
+        result = await litellm.acompletion(*args, **kwargs)
+        _clear_client_secret()
+        return result
     except Exception as exc:
         translated = _maybe_translate_filter_error(exc)
         if translated is exc:

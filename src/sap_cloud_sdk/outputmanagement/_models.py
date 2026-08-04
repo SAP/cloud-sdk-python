@@ -20,11 +20,25 @@ class FormConfiguration(BaseModel):
 
     Attributes:
         form_id: Form identifier
+        form_name: Form name (required by Output Management service)
+        form_template_name: Form template name (required by Output Management service)
+        form_language: Form language code (required by Output Management service)
+        file_format: File format for the generated form (required by Output Management service)
         form_data: Optional form data
         callback_url: Optional callback URL for form submission
     """
 
     form_id: str = Field(..., min_length=1, description="Form identifier")
+    form_name: str = Field(..., min_length=1, description="Form name", alias="formName")
+    form_template_name: str = Field(
+        ..., min_length=1, description="Form template name", alias="formTemplateName"
+    )
+    form_language: str = Field(
+        ..., min_length=1, description="Form language code", alias="formLanguage"
+    )
+    file_format: str = Field(
+        ..., min_length=1, description="File format (e.g., PDF)", alias="fileFormat"
+    )
     form_data: Optional[Dict[str, Any]] = Field(None, description="Form data")
     callback_url: Optional[str] = Field(
         None, description="Callback URL for form submission"
@@ -34,6 +48,7 @@ class FormConfiguration(BaseModel):
         """Pydantic configuration."""
 
         str_strip_whitespace = True
+        populate_by_name = True
 
 
 # ============================================================================

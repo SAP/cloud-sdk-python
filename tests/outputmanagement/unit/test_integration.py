@@ -4,10 +4,8 @@
 """Integration-style unit tests for output management module."""
 
 import pytest
-from unittest.mock import Mock, patch, MagicMock
 
 from sap_cloud_sdk.outputmanagement import (
-    OutputManagementClient,
     DestinationCredentialConfig,
     EmailConfiguration,
     AttachmentConfig,
@@ -17,7 +15,6 @@ from sap_cloud_sdk.outputmanagement import (
     OutputManagementException,
     ValidationException,
 )
-from sap_cloud_sdk.outputmanagement._service_client import OutputManagementServiceClient
 from sap_cloud_sdk.outputmanagement._models import ErrorResponse
 
 
@@ -27,7 +24,13 @@ class TestOutputManagementIntegration:
     def test_end_to_end_email_workflow(self):
         """Test complete email sending workflow."""
         # Create form configuration for attachment
-        form_config = FormConfiguration(form_id="monthly-report-form")
+        form_config = FormConfiguration(
+            form_id="monthly-report-form",
+            formName="MonthlyReportForm",
+            formTemplateName="MONTHLY_REPORT_TEMPLATE",
+            formLanguage="en",
+            fileFormat="PDF"
+        )
         attachment = AttachmentConfig(formConfiguration=form_config)
 
         email_config = EmailConfiguration(
@@ -35,7 +38,7 @@ class TestOutputManagementIntegration:
             emailTemplateLanguage="en",
             to=["recipient@example.com"],
             cc=["cc@example.com"],
-            attachment=attachment
+            attachment=attachment,
         )
 
         # Verify configuration is created correctly
@@ -44,7 +47,9 @@ class TestOutputManagementIntegration:
         assert email_config.email_notification_template_key == "MONTHLY_REPORT_TEMPLATE"
         assert email_config.attachment is not None
         assert email_config.attachment.form_configuration is not None
-        assert email_config.attachment.form_configuration.form_id == "monthly-report-form"
+        assert (
+            email_config.attachment.form_configuration.form_id == "monthly-report-form"
+        )
 
     def test_end_to_end_output_request_workflow(self):
         """Test complete output request workflow."""
@@ -58,25 +63,21 @@ class TestOutputManagementIntegration:
     def test_configuration_creation_workflow(self):
         """Test configuration creation workflow."""
         # Test with destination name only
-        config1 = DestinationCredentialConfig(
-            destination_name="output-management-dest"
-        )
+        config1 = DestinationCredentialConfig(destination_name="output-management-dest")
         assert config1.destination_name == "output-management-dest"
         assert config1.access_strategy is None
         assert config1.instance is None
 
         # Test with destination name and access strategy
         config2 = DestinationCredentialConfig(
-            destination_name="output-management-dest",
-            access_strategy="PROVIDER_ONLY"
+            destination_name="output-management-dest", access_strategy="PROVIDER_ONLY"
         )
         assert config2.destination_name == "output-management-dest"
         assert config2.access_strategy == "PROVIDER_ONLY"
 
         # Test with destination name and instance
         config3 = DestinationCredentialConfig(
-            destination_name="output-management-dest",
-            instance="custom-instance"
+            destination_name="output-management-dest", instance="custom-instance"
         )
         assert config3.destination_name == "output-management-dest"
         assert config3.instance == "custom-instance"
@@ -85,16 +86,13 @@ class TestOutputManagementIntegration:
         """Test workflow with multiple DMS attachments."""
         dms_attachments = [
             PreGeneratedAttachment(
-                url="https://dms.example.com/report1.pdf",
-                source="DMS"
+                url="https://dms.example.com/report1.pdf", source="DMS"
             ),
             PreGeneratedAttachment(
-                url="https://dms.example.com/data.csv",
-                source="DMS"
+                url="https://dms.example.com/data.csv", source="DMS"
             ),
             PreGeneratedAttachment(
-                url="https://dms.example.com/summary.txt",
-                source="DMS"
+                url="https://dms.example.com/summary.txt", source="DMS"
             ),
         ]
 
@@ -104,26 +102,25 @@ class TestOutputManagementIntegration:
             emailNotificationTemplateKey="MULTI_ATTACHMENT_TEMPLATE",
             emailTemplateLanguage="en",
             to=["recipient@example.com"],
-            attachment=attachment_config
+            attachment=attachment_config,
         )
 
         assert email_config.attachment is not None
         assert email_config.attachment.pre_generated_attachments is not None
         assert len(email_config.attachment.pre_generated_attachments) == 3
-        assert all(att.source == "DMS" for att in email_config.attachment.pre_generated_attachments)
+        assert all(
+            att.source == "DMS"
+            for att in email_config.attachment.pre_generated_attachments
+        )
 
     def test_multiple_recipients_workflow(self):
         """Test workflow with multiple recipients."""
         email_config = EmailConfiguration(
             emailNotificationTemplateKey="TEAM_UPDATE_TEMPLATE",
             emailTemplateLanguage="en",
-            to=[
-                "user1@example.com",
-                "user2@example.com",
-                "user3@example.com"
-            ],
+            to=["user1@example.com", "user2@example.com", "user3@example.com"],
             cc=["manager@example.com"],
-            bcc=["archive@example.com"]
+            bcc=["archive@example.com"],
         )
 
         assert len(email_config.to) == 3
@@ -159,12 +156,10 @@ class TestOutputManagementIntegration:
         # Create DMS attachments
         dms_attachments = [
             PreGeneratedAttachment(
-                url="https://dms.example.com/invoice.pdf",
-                source="DMS"
+                url="https://dms.example.com/invoice.pdf", source="DMS"
             ),
             PreGeneratedAttachment(
-                url="https://dms.example.com/details.csv",
-                source="DMS"
+                url="https://dms.example.com/details.csv", source="DMS"
             ),
         ]
 
@@ -177,7 +172,7 @@ class TestOutputManagementIntegration:
             to=["customer@example.com", "billing@example.com"],
             cc=["manager@example.com"],
             bcc=["archive@example.com", "audit@example.com"],
-            attachment=attachment_config
+            attachment=attachment_config,
         )
 
         # Verify all components
@@ -198,7 +193,9 @@ class TestOutputManagementIntegration:
         assert success.error is None
 
         # Error state
-        error_response = ErrorResponse(message="Failed to generate output", code="ERR_001")
+        error_response = ErrorResponse(
+            message="Failed to generate output", code="ERR_001"
+        )
         error = OutputResponse(error=error_response)
         assert error.output_request_id is None
         assert error.error is not None

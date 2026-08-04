@@ -73,12 +73,22 @@ class TestOutputManagementClient:
 
             # First call is from send_output_request
             assert mock_metric.call_args_list[0] == (
-                (Module.OUTPUT_MANAGEMENT, None, Operation.OUTPUT_MANAGEMENT_SEND_OUTPUT_REQUEST, False),
+                (
+                    Module.OUTPUT_MANAGEMENT,
+                    None,
+                    Operation.OUTPUT_MANAGEMENT_SEND_OUTPUT_REQUEST,
+                    False,
+                ),
             )
 
             # Second call is from send_email
             assert mock_metric.call_args_list[1] == (
-                (Module.OUTPUT_MANAGEMENT, None, Operation.OUTPUT_MANAGEMENT_SEND_EMAIL, False),
+                (
+                    Module.OUTPUT_MANAGEMENT,
+                    None,
+                    Operation.OUTPUT_MANAGEMENT_SEND_EMAIL,
+                    False,
+                ),
             )
 
             assert response.output_request_id == "req-123"

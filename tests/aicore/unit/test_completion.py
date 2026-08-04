@@ -23,12 +23,18 @@ from __future__ import annotations
 
 import asyncio
 import json
-from unittest.mock import MagicMock, call, patch
+import os
+from unittest.mock import MagicMock, patch
 
 import litellm
 import pytest
 
 from sap_cloud_sdk.aicore import acompletion, completion
+from sap_cloud_sdk.aicore.completion import (
+    reload_aicore_credentials,
+    _clear_client_secret,
+    _reset_secret_cleared,
+)
 from sap_cloud_sdk.aicore.filtering.exceptions import ContentFilteredError
 
 
@@ -202,8 +208,130 @@ class TestACompletionWrapper:
         assert ei.value is raised
 
 
+
+
 # ---------------------------------------------------------------------------
-# Reactive reload on AuthenticationError — sync
+# reload_aicore_credentials()
+# ---------------------------------------------------------------------------
+
+
+class TestReloadAICoreCredentials:
+    def test_calls_set_aicore_config(self):
+        with patch("sap_cloud_sdk.aicore.set_aicore_config") as mock_config:
+            reload_aicore_credentials()
+        mock_config.assert_called_once_with()
+
+    def test_resets_secret_cleared_flag(self):
+        """After reload, _clear_client_secret() must be able to clear the secret again."""
+        # Simulate: secret was cleared once already
+        with patch.dict("os.environ", {"AICORE_CLIENT_SECRET": "old"}):
+            _clear_client_secret()
+        # Flag is now True — a second clear would be a no-op
+        with patch("sap_cloud_sdk.aicore.set_aicore_config"):
+            reload_aicore_credentials()
+        # After reload the flag is reset — clearing works again
+        with patch.dict("os.environ", {"AICORE_CLIENT_SECRET": "new"}):
+            _clear_client_secret()
+            assert "AICORE_CLIENT_SECRET" not in os.environ
+
+
+# ---------------------------------------------------------------------------
+# CLIENT_SECRET minimisation — _clear_client_secret()
+# ---------------------------------------------------------------------------
+
+
+class TestClearClientSecret:
+    def setup_method(self):
+        _reset_secret_cleared()
+
+    def test_removes_secret_from_env(self):
+        with patch.dict("os.environ", {"AICORE_CLIENT_SECRET": "s3cr3t"}):
+            _clear_client_secret()
+            assert "AICORE_CLIENT_SECRET" not in os.environ
+
+    def test_noop_when_secret_absent(self):
+        env = {}
+        with patch.dict("os.environ", env, clear=True):
+            _clear_client_secret()  # must not raise
+
+    def test_idempotent_second_call_is_noop(self):
+        with patch.dict("os.environ", {"AICORE_CLIENT_SECRET": "s3cr3t"}):
+            _clear_client_secret()
+            os.environ["AICORE_CLIENT_SECRET"] = "restored"
+            _clear_client_secret()
+            # second call must not remove the restored value
+            assert os.environ.get("AICORE_CLIENT_SECRET") == "restored"
+
+    def test_reset_allows_clear_again(self):
+        with patch.dict("os.environ", {"AICORE_CLIENT_SECRET": "s3cr3t"}):
+            _clear_client_secret()
+            _reset_secret_cleared()
+            os.environ["AICORE_CLIENT_SECRET"] = "new-secret"
+            _clear_client_secret()
+            assert "AICORE_CLIENT_SECRET" not in os.environ
+
+
+# ---------------------------------------------------------------------------
+# completion() clears secret on success
+# ---------------------------------------------------------------------------
+
+
+class TestCompletionClearsSecret:
+    def setup_method(self):
+        _reset_secret_cleared()
+
+    def test_secret_cleared_after_successful_call(self):
+        sentinel = object()
+        with (
+            patch("sap_cloud_sdk.aicore.completion.litellm.completion", return_value=sentinel),
+            patch.dict("os.environ", {"AICORE_CLIENT_SECRET": "s3cr3t"}),
+        ):
+            result = completion(model="sap/x", messages=[])
+        assert result is sentinel
+        assert "AICORE_CLIENT_SECRET" not in os.environ
+
+    def test_secret_not_cleared_on_filter_error(self):
+        """Filter errors are not successful calls — secret stays until next success."""
+        from sap_cloud_sdk.aicore.filtering.exceptions import ContentFilteredError
+        raised = ContentFilteredError(direction="input", details={}, request_id="r")
+        secret_present_after = {}
+        with patch.dict("os.environ", {"AICORE_CLIENT_SECRET": "s3cr3t"}):
+            with pytest.raises(ContentFilteredError):
+                with patch(
+                    "sap_cloud_sdk.aicore.completion.litellm.completion",
+                    side_effect=raised,
+                ):
+                    completion(model="sap/x", messages=[])
+            secret_present_after["value"] = os.environ.get("AICORE_CLIENT_SECRET")
+        assert secret_present_after["value"] == "s3cr3t"
+
+    def test_secret_cleared_after_auth_error_and_retry(self):
+        """After reload + successful retry, secret must be cleared."""
+        sentinel = object()
+        auth_err = litellm.AuthenticationError(
+            message="401", llm_provider="sap", model="sap/x"
+        )
+        call_returns = [auth_err, sentinel]
+
+        def fake_completion(*args, **kwargs):
+            result = call_returns.pop(0)
+            if isinstance(result, Exception):
+                raise result
+            return result
+
+        with (
+            patch("sap_cloud_sdk.aicore.completion.litellm.completion", side_effect=fake_completion),
+            patch("sap_cloud_sdk.aicore.set_aicore_config"),
+            patch.dict("os.environ", {"AICORE_CLIENT_SECRET": "s3cr3t"}),
+        ):
+            result = completion(model="sap/x", messages=[])
+
+        assert result is sentinel
+        assert "AICORE_CLIENT_SECRET" not in os.environ
+
+
+# ---------------------------------------------------------------------------
+
 # ---------------------------------------------------------------------------
 
 

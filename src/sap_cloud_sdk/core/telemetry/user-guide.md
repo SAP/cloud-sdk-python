@@ -4,7 +4,7 @@
 
 Telemetry has two layers that work together:
 
-- **Auto-instrumentation** handles the *what*: LLM calls, token counts, latency, model names — automatically, by calling auto_instrument() once.
+- **Auto-instrumentation** handles the *what*: LLM calls, token counts, latency, model names — automatically at startup.
 - **Custom spans** handle the *who* and *why*: which agent, which user, which operation — context that autoinstrumentation can't infer.
 
 The primary pattern is to wrap autoinstrumented calls in a parent span that carries your business context:
@@ -14,50 +14,34 @@ invoke_agent span  ← you create this (agent name, tenant, session, operation t
   └─ chat span     ← autoinstrumentation creates this (model, tokens, latency)
 ```
 
+Telemetry is initialized by calling `_instrument()` once at startup, before importing any AI libraries.
+
+---
+
 ## Quick start
 
-### 1. Enable auto-instrumentation
-
-Call before importing AI libraries:
+Call `_instrument()` once before importing AI libraries:
 
 ```python
-from sap_cloud_sdk.core.telemetry import auto_instrument
+from sap_cloud_sdk.core.telemetry._instrument import _instrument
 
-auto_instrument()
+_instrument()
 
 from litellm import completion
 # LLM calls are now automatically traced
 ```
 
-### 2. Add business context with a parent span
-
-Wrap your LLM calls to add the context autoinstrumentation can't provide:
+For scripts or background workers with no web framework this is all that's needed. When used inside a web app, pass the app instance so framework instrumentors can hook in correctly:
 
 ```python
-from sap_cloud_sdk.core.telemetry import invoke_agent_span
-
-with invoke_agent_span(
-    provider="openai", agent_name="SupportBot", conversation_id="conv-123"
-):
-    # autoinstrumented LLM call is a child of this span
-    response = client.chat.completions.create(...)
-```
-
-### 3. Set tenant ID at the request boundary
-
-```python
-from sap_cloud_sdk.core.telemetry import set_tenant_id
-
-
-def handle_request(request):
-    set_tenant_id(extract_tenant_from_jwt(request))
+_instrument(app=app)
 ```
 
 ---
 
 ## Library instrumentation
 
-`auto_instrument()` automatically instruments any supported library that is already installed in the service — no extra configuration needed. If a library is not installed, it is silently skipped.
+At startup, the SDK automatically instruments any supported library that is already installed in the service — no extra configuration needed. If a library is not installed, it is silently skipped.
 
 **Supported libraries:**
 
@@ -80,7 +64,31 @@ The SDK ships `opentelemetry-instrumentation-*` packages for all of the above as
 
 ---
 
+## Tenant and user attributes on spans
+
+When the SDK is wired into a Starlette/FastAPI app, it automatically extracts the IAS JWT from the `Authorization` header and the trigger type from `x-sap-origin` on each request. These are stamped as span attributes on every span in that request:
+
+- `sap.tenancy.tenant_id` from the `sap_gtid` claim
+- `user.id` from the `user_uuid` claim
+- `sap.ai.agent.trigger.type` from the `x-sap-origin` header
+
+No extra configuration needed.
+
+---
+
 ## Span functions
+
+Add business context with a parent span that wraps your LLM calls:
+
+```python
+from sap_cloud_sdk.core.telemetry import invoke_agent_span
+
+with invoke_agent_span(
+    provider="openai", agent_name="SupportBot", conversation_id="conv-123"
+):
+    # autoinstrumented LLM call is a child of this span
+    response = client.chat.completions.create(...)
+```
 
 For operations following [OpenTelemetry GenAI conventions](https://opentelemetry.io/docs/specs/semconv/gen-ai/gen-ai-agent-spans/):
 
@@ -156,10 +164,7 @@ if ext_ctx:
     print(ext_ctx["extension_type"])  # "tool"
 ```
 
-The extension baggage span processor (registered automatically by `auto_instrument()`)
-stamps `sap.extension.*` attributes on all spans created inside an
-`extension_context()` block, including spans from third-party instrumentation.
-It uses a built-in `BaggageSpanProcessor` under the hood to stamp baggage keys.
+The extension baggage span processor stamps `sap.extension.*` attributes on all spans created inside an `extension_context()` block, including spans from third-party instrumentation. It uses a built-in `BaggageSpanProcessor` under the hood to stamp baggage keys.
 
 ### Available operations
 
@@ -233,23 +238,15 @@ Propagation is scoped: once the parent span exits, its attributes stop propagati
 
 ```python
 from sap_cloud_sdk.core.telemetry import (
-    auto_instrument,
     invoke_agent_span,
-    execute_tool_span,
-    set_tenant_id,
     add_span_attribute,
 )
-
-auto_instrument()
 
 from litellm import completion
 
 
 async def handle_request(query: str, user_id: str):
-    set_tenant_id("bh7sjh...")
-
-    # Parent span carries business context for the whole agent turn.
-    # Autoinstrumentation creates the child LLM span automatically.
+    # tenant_id and user.id are stamped automatically from the IAS JWT
     with invoke_agent_span(
         provider="openai", agent_name="SupportBot", attributes={"user.id": user_id}
     ):
@@ -267,60 +264,13 @@ async def handle_request(query: str, user_id: str):
         return response
 ```
 
-## Request-scoped telemetry with middlewares
-
-`auto_instrument` accepts a `middlewares` list for injecting per-request attributes into spans — things like tenant ID and user ID that live in the incoming request but aren't visible to autoinstrumentation.
-
-Each middleware implements two methods:
-- `register()` — called once at startup to hook into the web framework
-- `get_attributes()` — called on every span to retrieve the current request's attributes
-
-You can write your own by subclassing `TelemetryMiddleware`:
-
-```python
-from sap_cloud_sdk.core.telemetry.middleware.base import TelemetryMiddleware
-
-
-class MyMiddleware(TelemetryMiddleware):
-    def register(self) -> None:
-        # hook into your framework here
-        ...
-
-    def get_attributes(self) -> dict:
-        # return attributes for the current request
-        return {"my.attribute": ...}
-```
-
-Pass it to `auto_instrument`:
-
-```python
-auto_instrument(middlewares=[MyMiddleware(app=app)])
-```
-
-### Built-in: `StarletteIASTelemetryMiddleware`
-
-For Starlette/FastAPI apps with IAS authentication, the SDK ships a ready-to-use middleware that reads the `Authorization: Bearer <token>` header on each request, parses it as an IAS JWT, and injects:
-- `sap.tenancy.tenant_id` from the `sap_gtid` claim
-- `user.id` from the `user_uuid` claim
-
-If the header is absent or the token cannot be parsed, no attributes are set and the request continues normally.
-
-```python
-from starlette.applications import Starlette
-from sap_cloud_sdk.core.telemetry import auto_instrument
-from sap_cloud_sdk.core.telemetry.middleware import StarletteIASTelemetryMiddleware
-
-app = Starlette(...)
-auto_instrument(middlewares=[StarletteIASTelemetryMiddleware(app=app)])
-```
-
 ---
 
 ## Multi-tenancy
 
 - **Supported:** N/A
 - **Authentication:** N/A
-- **How to use:** This is an infrastructure module. `set_tenant_id()` and `StarletteIASTelemetryMiddleware` allow attaching a tenant identifier to OpenTelemetry spans as metadata, but this is observability context.
+- **How to use:** This is an infrastructure module. Tenant and user identifiers are extracted automatically from the IAS JWT and attached to every span as `sap.tenancy.tenant_id` and `user.id`.
 - **Further reading:** N/A
 
 ## Configuration
@@ -355,10 +305,10 @@ Supported values: `grpc` (default), `http/protobuf`.
 
 ### Span processor
 
-By default, `auto_instrument` uses `BatchSpanProcessor`, which exports spans asynchronously in a background thread and is recommended for production workloads. If you need synchronous span processing (e.g. in short-lived scripts or tests where the process may exit before the batch is flushed), pass `disable_batch=True`:
+By default, the SDK uses `BatchSpanProcessor`, which exports spans asynchronously in a background thread and is recommended for production workloads. For short-lived scripts or tests where the process may exit before the batch is flushed, pass `disable_batch=True`:
 
 ```python
-auto_instrument(disable_batch=True)
+_instrument(disable_batch=True)
 ```
 
 ### System role

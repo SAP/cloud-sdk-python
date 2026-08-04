@@ -6,12 +6,13 @@ The runtime context lets SDK modules read caller-identity information (tenant,
 user, trigger type) for the current execution — without knowing where that
 information came from or what framework is running.
 
-- **`bootstrap(app)`** wires the SDK into your framework once at startup.
+- **`bootstrap(app)`** is the single entry point — wires the SDK into your framework and initializes telemetry at startup.
 - **Providers** extract context from the current invocation (HTTP request, gRPC call, Kubernetes event, etc.).
 - **`get_context()`** lets any module read that context via typed keys.
 
 ```
 bootstrap(app)
+  └─ initializes telemetry
   └─ registers middleware on your framework
        └─ on each invocation: providers extract → RuntimeContext set in ContextVar
             └─ anywhere: get_context().get(TENANT_ID)

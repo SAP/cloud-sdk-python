@@ -2,8 +2,6 @@ import logging
 import os
 from collections.abc import Mapping
 
-from sap_cloud_sdk.core.telemetry.middleware.base import TelemetryMiddleware
-
 from opentelemetry import trace
 from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import (
     OTLPSpanExporter as GRPCSpanExporter,
@@ -36,37 +34,30 @@ from sap_cloud_sdk.core.telemetry.metrics_decorator import record_metrics
 from sap_cloud_sdk.core.telemetry.span_processors.propagated_attributes_processor import (
     PropagatedAttributesSpanProcessor,
 )
+from sap_cloud_sdk.core.telemetry.span_processors.runtime_context_span_processor import (
+    RuntimeContextSpanProcessor,
+)
 from sap_cloud_sdk.core.telemetry.instrumentation import get_registry
 
 logger = logging.getLogger(__name__)
 
 
 @record_metrics(Module.TELEMETRY, Operation.AICORE_AUTO_INSTRUMENT)
-def auto_instrument(
-    disable_batch: bool = False,
-    middlewares: list[TelemetryMiddleware] | None = None,
-    app=None,
-):
-    """
-    Initialize meta-instrumentation for GenAI tracing. Should be initialized before any AI frameworks.
+def _instrument(disable_batch: bool = False, app=None):
+    """Initialize OpenTelemetry tracing for GenAI workloads.
 
-    Traces are exported to the OTEL collector endpoint configured in environment with
-    OTEL_EXPORTER_OTLP_ENDPOINT, or printed to console when OTEL_TRACES_EXPORTER=console.
+    Called internally by :func:`~sap_cloud_sdk.core.bootstrap.bootstrap`.
+    Should be called before any AI framework is imported.
+
+    Traces are exported to the OTEL collector endpoint configured via
+    ``OTEL_EXPORTER_OTLP_ENDPOINT``, or printed to console when
+    ``OTEL_TRACES_EXPORTER=console``.
 
     Args:
-        disable_batch: If True, uses SimpleSpanProcessor (synchronous, lower throughput).
-                       Defaults to False, which uses BatchSpanProcessor (asynchronous,
-                       recommended for production workloads).
-        middlewares: Optional list of TelemetryMiddleware instances. When provided,
-                     each middleware is registered with its application and a
-                     MiddlewareSpanProcessor is added so that headers extracted by
-                     the middlewares appear as attributes on every span.
-                     Must be called before the ASGI application begins serving
-                     requests so that register() runs before the first request.
-        app: Optional ASGI app instance (Starlette, FastAPI). When provided, framework
-             instrumentors call instrument_app(app) instead of the global instrument(),
-             which is required when the app is already constructed before auto_instrument()
-             is called. Use from within a lifespan handler to ensure correct ordering.
+        disable_batch: Use SimpleSpanProcessor instead of BatchSpanProcessor.
+                       Only useful in tests or low-throughput environments.
+        app: Optional ASGI app instance. When provided, framework instrumentors
+             call ``instrument_app(app)`` instead of the global ``instrument()``.
     """
     otel_endpoint = os.getenv(ENV_OTLP_ENDPOINT, "")
     console_traces = os.getenv(ENV_TRACES_EXPORTER, "").lower() == "console"
@@ -92,18 +83,16 @@ def auto_instrument(
 
     _set_baggage_processor()
     _set_propagated_attributes_processor()
-
-    if middlewares:
-        _register_middleware_processors(middlewares)
+    _set_runtime_context_processor()
 
     _instrument_libraries(app=app)
 
-    logger.info("Cloud auto instrumentation initialized successfully")
+    logger.info("Cloud instrumentation initialized successfully")
 
 
 def _create_exporter() -> SpanExporter:
     if os.getenv(ENV_TRACES_EXPORTER, "").lower() == "console":
-        logger.info("Initializing auto instrumentation with console exporter")
+        logger.info("Initializing instrumentation with console exporter")
         return ConsoleSpanExporter()
 
     endpoint = os.getenv(ENV_OTLP_ENDPOINT, "")
@@ -116,7 +105,7 @@ def _create_exporter() -> SpanExporter:
         )
 
     logger.info(
-        f"Initializing auto instrumentation with endpoint: {endpoint} "
+        f"Initializing instrumentation with endpoint: {endpoint} "
         f"(protocol: {protocol})"
     )
     return exporters[protocol]()
@@ -146,24 +135,17 @@ def _set_propagated_attributes_processor():
     )
 
 
-def _register_middleware_processors(middlewares: list[TelemetryMiddleware]) -> None:
-    from sap_cloud_sdk.core.telemetry.middleware.span_processor import (
-        MiddlewareSpanProcessor,
-    )
-
+def _set_runtime_context_processor():
     provider = trace.get_tracer_provider()
     if not isinstance(provider, TracerProvider):
         logger.warning(
-            "Unknown TracerProvider type. Skipping MiddlewareSpanProcessor registration"
+            "Unknown TracerProvider type. Skipping RuntimeContextSpanProcessor"
         )
         return
 
-    for middleware in middlewares:
-        middleware.register()
-
-    provider.add_span_processor(MiddlewareSpanProcessor(middlewares))
+    provider.add_span_processor(RuntimeContextSpanProcessor())
     logger.info(
-        "Registered MiddlewareSpanProcessor for %d middleware(s)", len(middlewares)
+        "Registered RuntimeContextSpanProcessor for runtime context attribute propagation"
     )
 
 

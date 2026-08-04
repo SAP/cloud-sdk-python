@@ -246,12 +246,12 @@ class TestFlaskInstrumentor:
 
 
 # ---------------------------------------------------------------------------
-# auto_instrument integration
+# _instrument integration
 # ---------------------------------------------------------------------------
 
 class TestAutoInstrumentCallsRegistry:
     def test_instrument_libraries_calls_all_registered(self):
-        from sap_cloud_sdk.core.telemetry.auto_instrument import _instrument_libraries
+        from sap_cloud_sdk.core.telemetry._instrument import _instrument_libraries
         from sap_cloud_sdk.core.telemetry.instrumentation import _registry as registry_mod
 
         mock_inst = MagicMock(spec=LibraryInstrumentor)

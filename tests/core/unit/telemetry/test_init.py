@@ -22,9 +22,6 @@ class TestTelemetryExports:
         # Decorator
         assert hasattr(telemetry, 'record_metrics')
 
-        # Auto-instrumentation
-        assert hasattr(telemetry, 'auto_instrument')
-
         # Tracer utilities
         assert hasattr(telemetry, 'context_overlay')
         assert hasattr(telemetry, 'get_current_span')
@@ -41,7 +38,6 @@ class TestTelemetryExports:
             'record_metrics',
             'record_request_metric',
             'record_error_metric',
-            'auto_instrument',
             'context_overlay',
             'get_current_span',
             'add_span_attribute',
@@ -60,7 +56,6 @@ class TestTelemetryExports:
             Operation,
             GenAIOperation,
             record_metrics,
-            auto_instrument,
             context_overlay,
             get_current_span,
             add_span_attribute,
@@ -70,7 +65,6 @@ class TestTelemetryExports:
         assert callable(record_request_metric)
         assert callable(record_error_metric)
         assert callable(record_metrics)
-        assert callable(auto_instrument)
         assert callable(context_overlay)
         assert callable(get_current_span)
         assert callable(add_span_attribute)
@@ -98,7 +92,6 @@ class TestTelemetryExports:
         assert 'record_metrics' in test_module.__dict__
         assert 'record_request_metric' in test_module.__dict__
         assert 'record_error_metric' in test_module.__dict__
-        assert 'auto_instrument' in test_module.__dict__
         assert 'context_overlay' in test_module.__dict__
         assert 'get_current_span' in test_module.__dict__
         assert 'add_span_attribute' in test_module.__dict__

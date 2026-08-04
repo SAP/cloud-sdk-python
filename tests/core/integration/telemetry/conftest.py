@@ -12,7 +12,7 @@ from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 
 from sap_cloud_sdk.aicore import set_aicore_config
-from sap_cloud_sdk.core.telemetry.auto_instrument import auto_instrument
+from sap_cloud_sdk.core.telemetry._instrument import _instrument
 from sap_cloud_sdk.core.telemetry.genai_attribute_transformer import (
     GenAIAttributeTransformer,
 )
@@ -24,7 +24,7 @@ if _env_file.exists():
 
 @pytest.fixture(scope="session")
 def memory_exporter() -> InMemorySpanExporter:
-    """Initialize auto_instrument once per session and inject an in-memory exporter.
+    """Initialize _instrument once per session and inject an in-memory exporter.
 
     Uses OTEL_TRACES_EXPORTER=console so Traceloop.init runs for real without
     needing a real collector endpoint. A second SimpleSpanProcessor backed by
@@ -32,7 +32,7 @@ def memory_exporter() -> InMemorySpanExporter:
     """
     raw_exporter = InMemorySpanExporter()
     with patch.dict(os.environ, {"OTEL_TRACES_EXPORTER": "console"}, clear=False):
-        auto_instrument(disable_batch=True)
+        _instrument(disable_batch=True)
     provider = trace.get_tracer_provider()
     assert isinstance(provider, TracerProvider)
     provider.add_span_processor(SimpleSpanProcessor(raw_exporter))

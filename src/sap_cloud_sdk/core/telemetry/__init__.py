@@ -8,8 +8,6 @@ functions for SDK operations, plus automatic HTTP client instrumentation.
 from sap_cloud_sdk.core.telemetry.telemetry import (
     record_request_metric,
     record_error_metric,
-    set_tenant_id,
-    get_tenant_id,
 )
 from sap_cloud_sdk.core.telemetry.module import Module
 from sap_cloud_sdk.core.telemetry.operation import Operation
@@ -62,8 +60,6 @@ __all__ = [
     "record_metrics",
     "record_request_metric",
     "record_error_metric",
-    "set_tenant_id",
-    "get_tenant_id",
     "context_overlay",
     "get_current_span",
     "add_span_attribute",

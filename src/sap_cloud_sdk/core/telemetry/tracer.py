@@ -3,7 +3,7 @@ Context overlay utilities for application-level instrumentation.
 
 This module provides a simple API for users to create context overlays and add
 attributes to traces, complementing the automatic instrumentation provided
-by auto_instrument().
+by _instrument().
 """
 
 from contextlib import contextmanager, nullcontext
@@ -14,11 +14,9 @@ from opentelemetry.trace import Status, StatusCode, Span
 
 from sap_cloud_sdk.core.telemetry.genai_operation import GenAIOperation
 from sap_cloud_sdk.core.telemetry.telemetry import (
-    get_tenant_id,
     get_propagated_attributes,
     _propagated_attrs_var,
 )
-from sap_cloud_sdk.core.telemetry.constants import ATTR_SAP_TENANT_ID
 
 # OpenTelemetry GenAI semantic attribute names (avoid duplicate string literals)
 _ATTR_GEN_AI_OPERATION_NAME = "gen_ai.operation.name"
@@ -85,9 +83,6 @@ def context_overlay(
     propagated = get_propagated_attributes()
     span_attrs = {**propagated, **(attributes or {})}
     span_attrs[_ATTR_GEN_AI_OPERATION_NAME] = span_name
-    tenant_id = get_tenant_id()
-    if tenant_id:
-        span_attrs[ATTR_SAP_TENANT_ID] = tenant_id
 
     ctx = _propagate_attributes(span_attrs) if propagate else nullcontext()
     with ctx:
@@ -153,10 +148,6 @@ def chat_span(
         base_attrs[_ATTR_GEN_AI_CONVERSATION_ID] = conversation_id
     if server_address is not None:
         base_attrs[_ATTR_SERVER_ADDRESS] = server_address
-    # Add tenant_id if set
-    tenant_id = get_tenant_id()
-    if tenant_id:
-        base_attrs[ATTR_SAP_TENANT_ID] = tenant_id
     # Propagated attrs (lowest), user attrs, required semantic keys (highest)
     propagated = get_propagated_attributes()
     span_attrs = {**propagated, **(attributes or {}), **base_attrs}
@@ -223,10 +214,6 @@ def execute_tool_span(
         base_attrs[_ATTR_GEN_AI_TOOL_TYPE] = tool_type
     if tool_description is not None:
         base_attrs[_ATTR_GEN_AI_TOOL_DESCRIPTION] = tool_description
-    # Add tenant_id if set
-    tenant_id = get_tenant_id()
-    if tenant_id:
-        base_attrs[ATTR_SAP_TENANT_ID] = tenant_id
     # Propagated attrs (lowest), user attrs, required semantic keys (highest)
     propagated = get_propagated_attributes()
     span_attrs = {**propagated, **(attributes or {}), **base_attrs}
@@ -316,10 +303,6 @@ def invoke_agent_span(
         base_attrs[_ATTR_GEN_AI_CONVERSATION_ID] = conversation_id
     if server_address is not None:
         base_attrs[_ATTR_SERVER_ADDRESS] = server_address
-    # Add tenant_id if set
-    tenant_id = get_tenant_id()
-    if tenant_id:
-        base_attrs[ATTR_SAP_TENANT_ID] = tenant_id
     # Propagated attrs (lowest), user attrs, required semantic keys (highest)
     propagated = get_propagated_attributes()
     span_attrs = {**propagated, **(attributes or {}), **base_attrs}

@@ -132,10 +132,10 @@ from sap_cloud_sdk.destination._models import ListOptions
 
 # Create filter with pagination
 filter_opts = ListOptions(
-    page=1,              # Page number (1-based)
-    page_size=10,        # Number of items per page
-    page_count=True,     # Request total page count in response headers
-    entity_count=True    # Request total entity count in response headers
+    page=1,  # Page number (1-based)
+    page_size=10,  # Number of items per page
+    page_count=True,  # Request total page count in response headers
+    entity_count=True,  # Request total entity count in response headers
 )
 
 # List destinations with pagination
@@ -169,11 +169,7 @@ filter_opts = ListOptions(filter_names=["dest1", "dest2", "dest3"])
 destinations = client.list_instance_destinations(filter=filter_opts)
 
 # Combine filter with pagination
-filter_opts = ListOptions(
-    filter_names=["dest1", "dest2"],
-    page=1,
-    page_size=10
-)
+filter_opts = ListOptions(filter_names=["dest1", "dest2"], page=1, page_size=10)
 destinations = client.list_instance_destinations(filter=filter_opts)
 ```
 
@@ -218,7 +214,7 @@ try:
     dest = client.get_subaccount_destination(
         "my-dest",
         access_strategy=AccessStrategy.SUBSCRIBER_ONLY,
-        tenant=None  # Error: tenant required for subscriber access
+        tenant=None,  # Error: tenant required for subscriber access
     )
 except DestinationOperationError as e:
     print(f"Operation error: {e}")

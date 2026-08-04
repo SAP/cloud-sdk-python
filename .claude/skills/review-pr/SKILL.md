@@ -7,7 +7,7 @@ compatibility: gh CLI ≥ 2.0, git, GitHub access to SAP/cloud-sdk-python
 
 # PR Review: SAP Cloud SDK for Python
 
-Reviews a PR against 23 criteria across 6 sections. Run from the root of the `cloud-sdk-python` repository.
+Reviews a PR against 25 criteria across 6 sections. Run from the root of the `cloud-sdk-python` repository.
 
 ---
 
@@ -172,6 +172,16 @@ New list/query operations: encapsulate pagination params like existing modules (
 **D5: Telemetry instrumentation**
 New client methods: `@record_metrics(Module.X, Operation.Y)` from `core/telemetry`. New module: constant added to `core/telemetry/module.py` and operations to `core/telemetry/operation.py`. If module is called by other SDK modules: `_telemetry_source: Optional[Module] = None` param present.
 
+**D6: Multi-tenancy support**
+Multi-tenancy is a cross-cutting concern for most BTP applications. For new service modules, consider the full scope of multi-tenancy — not just token routing, but also provisioning and tenant isolation:
+
+- **Provisioning:** Does the service require a subscription or onboarding step per tenant? Does the module need to support tenant lifecycle callbacks (subscribe/unsubscribe)?
+- **Tenant isolation:** Is data or configuration isolated per tenant at the service level? Does the module enforce or expose tenant boundaries correctly?
+- **Auth/routing:** Does the module need to route requests to a subscriber tenant context (e.g., XSUAA subdomain replacement, IAS `app_tid`, or Destination Service routing)?
+- **Infrastructure:** Is there any infrastructure work required (e.g., new service binding fields, SPII fragments, Subscription Manager integration)?
+
+This is a **nice-to-have** (⚠️ if absent, not ❌), but must be a conscious decision either way — the `user-guide.md` must document whether support is present, planned, or intentionally out of scope (see E2a).
+
 ---
 
 ### Section E: Tests & Documentation
@@ -181,6 +191,15 @@ Every changed `src/` file → corresponding change in `tests/`. Unit: `tests/[mo
 
 **E2: Documentation quality**
 New modules: `user-guide.md` with overview, quick start, config examples, API examples, troubleshooting. Changed public APIs: docstrings updated (Google/NumPy style: `Args:`, `Returns:`, `Raises:`). Sub-audience features not mixed into the general user guide.
+
+**E2a: Multi-tenancy documentation**
+Every new or modified `user-guide.md` must contain a `## Multi-tenancy` section with all four fields:
+- **Supported:** Yes / No / Not yet / N/A
+- **Authentication:** XSUAA / IAS / Other / —
+- **How to use:** explanation (or "Not applicable")
+- **Further reading:** link(s) or "—"
+
+If the module exposes XSUAA or IAS authentication, the section must describe the actual mechanism (e.g., `access_strategy` param, `tenant` param, token URL replacement). A placeholder or missing section → ⚠️. If the module is a new service module with no section at all → ❌.
 
 **E3: Module structure compliance**
 New modules follow:
@@ -246,12 +265,14 @@ tests/[module]/integration/  (optional, BDD)
 | D3 | Breaking changes marked | | |
 | D4 | Pagination & tenant filtering | | |
 | D5 | Telemetry instrumentation | | |
+| D6 | Multi-tenancy support | | |
 
 ### E: Tests & Documentation
 | # | Criterion | Status | Finding |
 |---|-----------|--------|---------|
 | E1 | Tests added/updated | | |
 | E2 | Documentation quality | | |
+| E2a | Multi-tenancy documentation | | |
 | E3 | Module structure compliance | | |
 
 ---

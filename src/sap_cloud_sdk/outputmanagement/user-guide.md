@@ -32,7 +32,7 @@ See further information about installation in the [main documentation](/README.m
 
 ### Required Setup
 
-1. **SAP BTP Destination**: Configure a destination in SAP BTP Destination Service pointing to your Output Management service
+1. **SAP BTP Destination**: Configure a destination in SAP BTP Destination Service pointing to your Output Management service.
 2. **ANS Template**: Create notification templates in Ariba Notification Service (ANS)
 3. **Python Environment**: Python 3.11 or higher
 4. **SAP Cloud SDK**: Install the SAP Cloud SDK for Python

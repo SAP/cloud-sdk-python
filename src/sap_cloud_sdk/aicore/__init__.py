@@ -31,6 +31,16 @@ from .filtering import (
 
 logger = logging.getLogger(__name__)
 
+# When set, the infrastructure sidecar adds the mTLS certificate transparently.
+# The SDK calls the XSUAA token endpoint over plain HTTPS with only client_id.
+# No client_secret or certificate material is required in the service binding.
+TRANSPARENT_TLS_ENV_VAR = "AICORE_TRANSPARENT_TLS"
+
+
+def _is_transparent_tls() -> bool:
+    """Return True when transparent TLS proxy mode is active."""
+    return os.environ.get(TRANSPARENT_TLS_ENV_VAR, "").strip().lower() in ("1", "true", "yes")
+
 
 def _get_secret(
     env_var_name: str,
@@ -124,9 +134,14 @@ def set_aicore_config(instance_name: str = "aicore-instance") -> None:
 
     File mappings based on the Kubernetes secret structure:
         clientid → AICORE_CLIENT_ID
-        clientsecret → AICORE_CLIENT_SECRET
+        clientsecret → AICORE_CLIENT_SECRET  (skipped in transparent TLS mode)
         url → AICORE_AUTH_URL
         serviceurls (JSON with AI_API_URL) → AICORE_BASE_URL
+
+    When ``AICORE_TRANSPARENT_TLS=true`` is set, the infrastructure sidecar
+    adds the mTLS certificate on the SDK's behalf. In this mode the SDK omits
+    ``AICORE_CLIENT_SECRET`` from the environment — LiteLLM will use plain
+    HTTPS to the token endpoint and the sidecar will attach the certificate.
 
     After credentials are loaded, content filtering is activated on every
     ``sap/*`` LiteLLM call at the configured thresholds (default: severity
@@ -136,11 +151,10 @@ def set_aicore_config(instance_name: str = "aicore-instance") -> None:
     to turn filtering off at runtime, or set ``AICORE_FILTER_ENABLED=false``
     to keep it off entirely.
     """
+    transparent_tls = _is_transparent_tls()
+
     # Load secrets
     client_id = _get_secret("AICORE_CLIENT_ID", "clientid", instance_name=instance_name)
-    client_secret = _get_secret(
-        "AICORE_CLIENT_SECRET", "clientsecret", instance_name=instance_name
-    )
     auth_url = _get_secret("AICORE_AUTH_URL", "url", instance_name=instance_name)
     base_url = _get_aicore_base_url(instance_name)
     resource_group = _get_secret(
@@ -157,14 +171,23 @@ def set_aicore_config(instance_name: str = "aicore-instance") -> None:
     # Set environment variables for LiteLLM
     if client_id:
         os.environ["AICORE_CLIENT_ID"] = client_id
-    if client_secret:
-        os.environ["AICORE_CLIENT_SECRET"] = client_secret
     if auth_url:
         os.environ["AICORE_AUTH_URL"] = auth_url
     if base_url:
         os.environ["AICORE_BASE_URL"] = base_url
     if resource_group:
         os.environ["AICORE_RESOURCE_GROUP"] = resource_group
+
+    if transparent_tls:
+        # Remove any stale client_secret — the sidecar provides the mTLS cert.
+        os.environ.pop("AICORE_CLIENT_SECRET", None)
+        logger.info("AI Core transparent TLS mode active — client_secret not required")
+    else:
+        client_secret = _get_secret(
+            "AICORE_CLIENT_SECRET", "clientsecret", instance_name=instance_name
+        )
+        if client_secret:
+            os.environ["AICORE_CLIENT_SECRET"] = client_secret
 
     # Log configuration completion (excluding sensitive information)
     logger.info("AI Core configuration has been set successfully")

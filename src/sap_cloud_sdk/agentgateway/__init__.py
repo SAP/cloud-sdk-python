@@ -64,6 +64,7 @@ from sap_cloud_sdk.agentgateway.config import ClientConfig
 from sap_cloud_sdk.agentgateway.agw_client import create_client, AgentGatewayClient
 from sap_cloud_sdk.agentgateway.exceptions import (
     AgentGatewaySDKError,
+    AgentGatewayServerError,
     MCPServerNotFoundError,
 )
 
@@ -84,5 +85,6 @@ __all__ = [
     "AgentCardFilter",
     # Exceptions
     "AgentGatewaySDKError",
+    "AgentGatewayServerError",
     "MCPServerNotFoundError",
 ]

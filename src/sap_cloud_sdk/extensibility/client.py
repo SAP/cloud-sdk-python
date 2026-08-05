@@ -612,7 +612,9 @@ class ExtensibilityClient:
                 )
             ```
         """
-        agw_client = create_agw_client(tenant_subdomain)
+        agw_client = create_agw_client(
+            tenant_subdomain, _telemetry_source=Module.EXTENSIBILITY
+        )
         execute_tool, get_exec_tool = await self._discover_n8n_tools(
             agw_client, user_token
         )

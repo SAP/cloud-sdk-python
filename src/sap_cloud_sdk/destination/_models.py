@@ -510,6 +510,10 @@ class ConsumptionOptions:
         chain_vars: Key-value pairs for destination chain variables (X-chain-var-<name>).
             Each entry is sent as a separate "X-chain-var-<key>" header. Only applicable
             when chain_name is provided.
+        skip_token_retrieval: When True, instructs the Destination Service to skip the
+            OAuth2 token exchange and return only the destination configuration properties
+            ($skipTokenRetrieval query parameter). Useful when only destination metadata
+            is needed and token retrieval would be wasteful or cause unnecessary errors.
 
     Example:
         ```python
@@ -560,6 +564,7 @@ class ConsumptionOptions:
     code_verifier: Optional[str] = None
     chain_name: Optional[str] = None
     chain_vars: Optional[dict] = None
+    skip_token_retrieval: bool = False
 
 
 @dataclass
@@ -1000,3 +1005,8 @@ class TransparentProxyDestination:
             ```
         """
         self.headers[header.value] = value
+
+
+@dataclass
+class _DestinationInstanceConfig:
+    instanceid: str = ""

@@ -15,6 +15,7 @@ from sap_cloud_sdk.agentgateway import (
     MCPToolFilter,
     AgentGatewaySDKError,
 )
+from sap_cloud_sdk.core.telemetry import Module
 
 
 # ============================================================
@@ -43,6 +44,16 @@ def _client_token_cache(client: AgentGatewayClient):
 def _client_gateway_url_cache(client: AgentGatewayClient):
     """Access the client-owned gateway URL cache for white-box tests."""
     return getattr(client, "_gateway_url_cache")
+
+
+@pytest.fixture(autouse=True)
+def no_transparent_credentials():
+    """Prevent transparent mode from activating in tests that don't opt in."""
+    with patch(
+        "sap_cloud_sdk.agentgateway.agw_client.detect_transparent_credentials",
+        return_value=False,
+    ):
+        yield
 
 
 # ============================================================
@@ -164,14 +175,14 @@ class TestGetSystemAuth:
             agw_client = create_client()
             token_cache = _client_token_cache(agw_client)
 
-            result = await agw_client.get_system_auth(app_tid="test-tid")
+            result = await agw_client.get_system_auth()
 
             assert isinstance(result, AuthResult)
             assert result.access_token == "customer-system-token"
             assert result.gateway_url == "https://agw.customer.com"
             mock_load.assert_called_once_with("/path/to/credentials")
             mock_mtls.assert_called_once_with(
-                mock_creds, 60.0, "test-tid", token_cache
+                mock_creds, 60.0, token_cache
             )
 
     @pytest.mark.asyncio
@@ -282,14 +293,14 @@ class TestGetUserAuth:
             token_cache = _client_token_cache(agw_client)
 
             result = await agw_client.get_user_auth(
-                user_token="user-jwt", app_tid="test-tid"
+                user_token="user-jwt"
             )
 
             assert isinstance(result, AuthResult)
             assert result.access_token == "exchanged-token"
             assert result.gateway_url == "https://agw.customer.com"
             mock_exchange.assert_called_once_with(
-                mock_creds, "user-jwt", 60.0, "test-tid", token_cache
+                mock_creds, "user-jwt", 60.0, token_cache
             )
 
     @pytest.mark.asyncio
@@ -523,7 +534,7 @@ class TestListMcpTools:
 
             agw_client = create_client()
 
-            await agw_client.list_mcp_tools(app_tid="tid")
+            await agw_client.list_mcp_tools()
 
             mock_customer.assert_called_once_with(
                 mock_creds, "customer-system-token", 60.0, filter=None
@@ -552,7 +563,7 @@ class TestListMcpTools:
 
             await agw_client.list_mcp_tools(user_token="user-jwt")
 
-            mock_user_auth.assert_called_once()
+            assert mock_user_auth.call_count == 2
             mock_lob.assert_called_once_with(
                 "my-tenant", "user-token-xyz", 60.0, filter=None
             )
@@ -579,7 +590,7 @@ class TestListMcpTools:
 
             agw_client = create_client()
 
-            await agw_client.list_mcp_tools(user_token="user-jwt", app_tid="tid")
+            await agw_client.list_mcp_tools(user_token="user-jwt")
 
             mock_customer.assert_called_once_with(
                 mock_creds, "exchanged-user-token", 60.0, filter=None
@@ -699,6 +710,10 @@ class TestCallMcpTool:
         with patch(
             "sap_cloud_sdk.agentgateway.agw_client.detect_customer_agent_credentials",
             return_value=None,
+        ), patch(
+            "sap_cloud_sdk.agentgateway.agw_client.fetch_system_auth",
+            new_callable=AsyncMock,
+            return_value=("system-token", "https://agw.example.com"),
         ):
             agw_client = create_client(tenant_subdomain="my-tenant")
 
@@ -711,6 +726,10 @@ class TestCallMcpTool:
         with patch(
             "sap_cloud_sdk.agentgateway.agw_client.detect_customer_agent_credentials",
             return_value=None,
+        ), patch(
+            "sap_cloud_sdk.agentgateway.agw_client.fetch_system_auth",
+            new_callable=AsyncMock,
+            return_value=("system-token", "https://agw.example.com"),
         ):
             agw_client = create_client(tenant_subdomain="my-tenant")
 
@@ -1086,3 +1105,90 @@ class TestListAgentCards:
             agw_client = create_client(tenant_subdomain="my-tenant")
             with pytest.raises(AgentGatewaySDKError, match="Agent card discovery failed"):
                 await agw_client.list_agent_cards()
+
+
+# ============================================================
+# Test: _telemetry_source wiring
+# ============================================================
+
+
+class TestCreateClientTelemetrySource:
+    """Verify _telemetry_source kwarg is stored on the AgentGatewayClient."""
+
+    def test_default_source_is_none(self):
+        agw_client = create_client(tenant_subdomain="my-tenant")
+        assert agw_client._telemetry_source is None
+
+    def test_explicit_source_is_stored(self):
+        agw_client = create_client(
+            tenant_subdomain="my-tenant",
+            _telemetry_source=Module.EXTENSIBILITY,
+        )
+        assert agw_client._telemetry_source is Module.EXTENSIBILITY
+
+
+# ============================================================
+# Test: get_ias_client_id
+# ============================================================
+
+_DEST_CREATE_PATCH = "sap_cloud_sdk.destination.create_client"
+_IAS_DEST_NAME_PATCH = "sap_cloud_sdk.agentgateway._lob._ias_dest_name"
+_GET_IAS_CLIENT_ID_LOB_PATCH = "sap_cloud_sdk.agentgateway.agw_client.get_ias_client_id_lob"
+_DETECT_CREDS_PATCH = "sap_cloud_sdk.agentgateway.agw_client.detect_customer_agent_credentials"
+_LOAD_CREDS_PATCH = "sap_cloud_sdk.agentgateway.agw_client.load_customer_credentials"
+
+_NO_CUSTOMER_CREDS = patch(_DETECT_CREDS_PATCH, return_value=None)
+
+
+class TestGetIasClientId:
+    """Tests for AgentGatewayClient.get_ias_client_id()."""
+
+    # --- Customer flow ---
+
+    def test_customer_returns_client_id_from_credentials(self):
+        mock_creds = MagicMock()
+        mock_creds.client_id = "customer-client-id"
+
+        with (
+            patch(_DETECT_CREDS_PATCH, return_value="/etc/ums/credentials/credentials"),
+            patch(_LOAD_CREDS_PATCH, return_value=mock_creds),
+        ):
+            result = create_client().get_ias_client_id()
+
+        assert result == "customer-client-id"
+
+    def test_customer_raises_on_load_failure(self):
+        with (
+            patch(_DETECT_CREDS_PATCH, return_value="/etc/ums/credentials/credentials"),
+            patch(_LOAD_CREDS_PATCH, side_effect=Exception("parse error")),
+        ):
+            with pytest.raises(AgentGatewaySDKError, match="Could not resolve IAS client ID"):
+                create_client().get_ias_client_id()
+
+    # --- LoB flow ---
+
+    @_NO_CUSTOMER_CREDS
+    def test_lob_returns_client_id_from_destination_properties(self, _mock_detect):
+        with patch(_GET_IAS_CLIENT_ID_LOB_PATCH, return_value="lob-client-id"):
+            result = create_client(tenant_subdomain="my-tenant").get_ias_client_id()
+
+        assert result == "lob-client-id"
+
+    @_NO_CUSTOMER_CREDS
+    def test_lob_raises_when_destination_not_found(self, _mock_detect):
+        with patch(_GET_IAS_CLIENT_ID_LOB_PATCH, side_effect=AgentGatewaySDKError("IAS destination 'sap-managed-runtime-ias-eu10' not found")):
+            with pytest.raises(AgentGatewaySDKError, match="IAS destination"):
+                create_client(tenant_subdomain="my-tenant").get_ias_client_id()
+
+    @_NO_CUSTOMER_CREDS
+    def test_lob_returns_empty_string_when_property_absent(self, _mock_detect):
+        with patch(_GET_IAS_CLIENT_ID_LOB_PATCH, return_value=""):
+            result = create_client(tenant_subdomain="my-tenant").get_ias_client_id()
+
+        assert result == ""
+
+    @_NO_CUSTOMER_CREDS
+    def test_lob_raises_on_exception(self, _mock_detect):
+        with patch(_GET_IAS_CLIENT_ID_LOB_PATCH, side_effect=EnvironmentError("APPFND_CONHOS_LANDSCAPE not set")):
+            with pytest.raises(AgentGatewaySDKError, match="Could not resolve IAS client ID"):
+                create_client(tenant_subdomain="my-tenant").get_ias_client_id()

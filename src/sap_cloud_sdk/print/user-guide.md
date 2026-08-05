@@ -16,10 +16,17 @@ See further information about installation in the [main documentation](/README.m
 ```python
 from sap_cloud_sdk.print import create_client
 from sap_cloud_sdk.print import (
-    PrintQueue, PrintProfile, PrintContent, PrintTask, PrintTaskMetadata,
+    PrintQueue,
+    PrintProfile,
+    PrintContent,
+    PrintTask,
+    PrintTaskMetadata,
 )
 from sap_cloud_sdk.print.exceptions import (
-    ClientCreationError, ConfigError, PrintOperationError, HttpError,
+    ClientCreationError,
+    ConfigError,
+    PrintOperationError,
+    HttpError,
 )
 ```
 
@@ -212,6 +219,14 @@ client.create_print_task(task)
 ```
 
 ---
+
+## Multi-tenancy
+
+- **Supported:** Not yet
+- **Authentication:** XSUAA
+- **How to use:** Multi-tenancy is not yet implemented in this module.
+- **Further reading:**
+  - [SAP Print Service — SAP Help Portal](https://help.sap.com/docs/SCP_PRINT_SERVICE)
 
 ## Error Handling
 

@@ -72,26 +72,28 @@ class IntegrationDependency:
 
 @dataclass
 class CustomerCredentials:
-    """Credentials for customer agent mTLS authentication.
+    """Credentials for customer agent authentication.
 
-    Loaded from the credentials file mounted on the pod filesystem.
+    Loaded from the credentials file mounted on the pod filesystem (STANDARD mode)
+    or from environment variables (TRANSPARENT mode).
     Used internally by the customer agent flow.
 
     Attributes:
         token_service_url: IAS token service endpoint URL
         client_id: IAS client ID
-        certificate: PEM-encoded client certificate
-        private_key: PEM-encoded private key
+        certificate: PEM-encoded client certificate (required for STANDARD mode, None for TRANSPARENT)
+        private_key: PEM-encoded private key (required for STANDARD mode, None for TRANSPARENT)
         gateway_url: Agent Gateway base URL
         integration_dependencies: List of MCP servers with their ord_id and global_tenant_id.
+        tls_mode: TLS authentication mode (STANDARD or TRANSPARENT)
     """
 
     token_service_url: str
     client_id: str
-    certificate: str
-    private_key: str
     gateway_url: str
     integration_dependencies: list[IntegrationDependency]
+    certificate: str | None = None
+    private_key: str | None = None
 
 
 @dataclass

@@ -57,16 +57,22 @@ class FragmentClient:
         ```
     """
 
-    def __init__(self, http: DestinationHttp) -> None:
+    def __init__(
+        self,
+        http: DestinationHttp,
+        _telemetry_source: Optional[Module] = None,
+    ) -> None:
         """Initialize FragmentClient with dependency injection.
 
         Args:
             http: Configured HTTP transport for the Destination Service.
+            _telemetry_source: Internal telemetry source identifier. Not intended for external use.
 
         Raises:
             DestinationOperationError: If initialization fails.
         """
         self._http = http
+        self._telemetry_source = _telemetry_source
 
     # ---------- Read operations ----------
 

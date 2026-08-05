@@ -27,6 +27,7 @@ class Operation(str, Enum):
     DESTINATION_UPDATE_DESTINATION = "update_destination"
     DESTINATION_DELETE_DESTINATION = "delete_destination"
     DESTINATION_GET_DESTINATION = "get_destination"
+    DESTINATION_GET_SERVICE_INSTANCE_ID = "get_service_instance_id"
 
     # Destination Label Operations
     DESTINATION_GET_LABELS = "get_destination_labels"
@@ -138,6 +139,9 @@ class Operation(str, Enum):
     ADMS_CONFIG_GET_APP_TENANT = "config_get_app_tenant"
     ADMS_CONFIG_DELETE_APP_TENANT = "config_delete_app_tenant"
 
+    # Bootstrap Operations
+    BOOTSTRAP = "bootstrap"
+
     # AI Core Operations
     AICORE_SET_CONFIG = "set_aicore_config"
     AICORE_AUTO_INSTRUMENT = "auto_instrument"
@@ -188,6 +192,7 @@ class Operation(str, Enum):
     AGENTGATEWAY_GET_SYSTEM_AUTH = "get_system_auth"
     AGENTGATEWAY_GET_USER_AUTH = "get_user_auth"
     AGENTGATEWAY_LIST_AGENT_CARDS = "list_agent_cards"
+    AGENTGATEWAY_GET_IAS_CLIENT_ID = "get_ias_client_id"
 
     # Agent Memory Operations
     AGENT_MEMORY_ADD_MEMORY = "add_memory"
@@ -203,6 +208,11 @@ class Operation(str, Enum):
     AGENT_MEMORY_LIST_MESSAGES = "list_messages"
     AGENT_MEMORY_GET_RETENTION_CONFIG = "get_retention_config"
     AGENT_MEMORY_UPDATE_RETENTION_CONFIG = "update_retention_config"
+
+    # Output Management Operations
+    OUTPUT_MANAGEMENT_SEND_EMAIL = "send_email"
+    OUTPUT_MANAGEMENT_SEND_EMAIL_WITH_MCP = "send_email_with_mcp"
+    OUTPUT_MANAGEMENT_SEND_OUTPUT_REQUEST = "send_output_request"
 
     def __str__(self) -> str:
         return self.value

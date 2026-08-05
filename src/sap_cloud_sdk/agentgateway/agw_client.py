@@ -418,7 +418,10 @@ class AgentGatewayClient:
                 )
                 credentials = load_customer_credentials(credentials_path)
                 return await get_mcp_tools_customer(
-                    credentials, auth.access_token, self._config.timeout
+                    credentials,
+                    auth.access_token,
+                    self._config.timeout,
+                    filter=filter,
                 )
 
             # Check for transparent mode

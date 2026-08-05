@@ -10,6 +10,7 @@ from sap_cloud_sdk.core.runtime_context import (
     SAPTriggerContextProvider,
 )
 from sap_cloud_sdk.core.telemetry import Module, Operation
+from sap_cloud_sdk.core.telemetry.auto_instrument import auto_instrument
 from sap_cloud_sdk.core.telemetry.metrics_decorator import record_metrics
 
 
@@ -25,6 +26,10 @@ def bootstrap(app: Any, providers: Optional[List[ContextProvider]] = None) -> No
     registered :class:`~sap_cloud_sdk.core.runtime_context.FrameworkAdapter`
     instances — adding support for a new framework never requires editing
     this function.
+
+    Also calls :func:`~sap_cloud_sdk.core.telemetry.auto_instrument` automatically.
+    Telemetry is a no-op unless ``OTEL_EXPORTER_OTLP_ENDPOINT`` or
+    ``OTEL_TRACES_EXPORTER=console`` is set in the environment.
 
     Args:
         app:       The application instance to attach the middleware to.
@@ -43,6 +48,8 @@ def bootstrap(app: Any, providers: Optional[List[ContextProvider]] = None) -> No
         # custom providers:
         bootstrap(app, providers=[IASContextProvider(), MyProvider()])
     """
+    auto_instrument(app=app)
+
     if not providers:
         providers = [
             IASContextProvider(),

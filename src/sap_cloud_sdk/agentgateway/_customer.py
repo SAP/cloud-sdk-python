@@ -722,7 +722,6 @@ async def get_mcp_tools_customer(
         )
         return []
 
-    # Pre-fetch filter: ORD ID is extractable from the URL without fetching tools
     if f.ord_ids:
         ord_ids_set = set(f.ord_ids)
         dependencies = [d for d in dependencies if d.ord_id in ord_ids_set]

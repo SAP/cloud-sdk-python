@@ -290,28 +290,37 @@ async def fetch_user_auth(
     return token, gateway_url
 
 
-def _log_mcp_server_error(fragment_name: str, exc: BaseException) -> None:
+def _log_mcp_server_error(
+    fragment_name: str, exc: BaseException, correlation_id: str
+) -> None:
     if isinstance(exc, BaseExceptionGroup):
         for inner in exc.exceptions:
-            _log_mcp_server_error(fragment_name, inner)
+            _log_mcp_server_error(fragment_name, inner, correlation_id)
         return
+    correlation_id_tag = f" [correlation-id={correlation_id}]"
     if isinstance(exc, httpx.HTTPStatusError):
         logger.error(
-            "Failed to load tools from fragment '%s' (HTTP %d): %s",
+            "Failed to load tools from fragment '%s' (HTTP %d)%s: %s",
             fragment_name,
             exc.response.status_code,
+            correlation_id_tag,
             exc.response.text[:500],
         )
     else:
         logger.exception(
-            "Failed to load tools from fragment '%s' — skipping",
+            "Failed to load tools from fragment '%s'%s — skipping",
             fragment_name,
+            correlation_id_tag,
             exc_info=exc,
         )
 
 
 async def list_server_tools(
-    dest_url: str, auth_token: str, fragment_name: str, timeout: float
+    dest_url: str,
+    auth_token: str,
+    fragment_name: str,
+    timeout: float,
+    correlation_id: str,
 ) -> list[MCPTool]:
     """List tools from a single MCP server.
 
@@ -319,14 +328,21 @@ async def list_server_tools(
         dest_url: MCP endpoint URL.
         auth_token: Raw access token for the request.
         fragment_name: Fragment name for reference.
+        correlation_id: Outbound x-correlation-id for this request.
 
     Returns:
         List of MCPTool objects from this server.
     """
+    logger.debug(
+        "Listing tools from fragment '%s' [correlation-id=%s, path=%s]",
+        fragment_name,
+        correlation_id,
+        dest_url,
+    )
     async with httpx.AsyncClient(
         headers={
             "Authorization": f"Bearer {auth_token}",
-            "x-correlation-id": str(uuid.uuid4()),
+            "x-correlation-id": correlation_id,
         },
         timeout=timeout,
     ) as http_client:
@@ -398,9 +414,10 @@ async def get_mcp_tools_lob(
             )
             continue
 
+        correlation_id = str(uuid.uuid4())
         try:
             server_tools = await list_server_tools(
-                mcp_url, system_token, fragment_name, timeout
+                mcp_url, system_token, fragment_name, timeout, correlation_id
             )
             tools.extend(server_tools)
             logger.debug(
@@ -409,7 +426,7 @@ async def get_mcp_tools_lob(
                 fragment_name,
             )
         except Exception as exc:
-            _log_mcp_server_error(fragment_name, exc)
+            _log_mcp_server_error(fragment_name, exc, correlation_id)
 
     logger.info("Loaded %d MCP tool(s) from %d fragment(s)", len(tools), len(fragments))
     return tools
@@ -434,10 +451,17 @@ async def call_mcp_tool_lob(
     Returns:
         Tool execution result as string.
     """
+    correlation_id = str(uuid.uuid4())
+    logger.debug(
+        "Calling tool '%s' [correlation-id=%s, path=%s]",
+        tool.name,
+        correlation_id,
+        tool.url,
+    )
     async with httpx.AsyncClient(
         headers={
             "Authorization": f"Bearer {user_auth_token}",
-            "x-correlation-id": str(uuid.uuid4()),
+            "x-correlation-id": correlation_id,
         },
         timeout=timeout,
     ) as http_client:
@@ -456,7 +480,13 @@ async def call_mcp_tool_lob(
                 text = str(getattr(first, "text", ""))
 
                 if result.isError:
-                    logger.error("Tool '%s' returned an error: %s", tool.name, text)
+                    logger.error(
+                        "Tool '%s' returned an error [correlation-id=%s, path=%s]: %s",
+                        tool.name,
+                        correlation_id,
+                        tool.url,
+                        text,
+                    )
 
                 return text
 
@@ -482,12 +512,17 @@ async def _fetch_agent_card(
         AgentGatewaySDKError: If the request fails or returns a non-200 status.
     """
     url = f"{fragment_url.rstrip('/')}/.well-known/agent-card.json"
-    logger.debug("Fetching agent card from '%s'", url)
+    correlation_id = str(uuid.uuid4())
+    logger.debug(
+        "Fetching agent card [correlation-id=%s, path=%s]",
+        correlation_id,
+        url,
+    )
 
     async with httpx.AsyncClient(
         headers={
             "Authorization": f"Bearer {auth_token}",
-            "x-correlation-id": str(uuid.uuid4()),
+            "x-correlation-id": correlation_id,
         },
         timeout=timeout,
     ) as client:
@@ -495,20 +530,22 @@ async def _fetch_agent_card(
             response = await client.get(url)
         except httpx.RequestError as e:
             raise AgentGatewaySDKError(
-                f"Agent card request failed for '{fragment_url}': {e}"
+                f"Agent card request failed for '{fragment_url}' "
+                f"[correlation-id={correlation_id}]: {e}"
             ) from e
 
     if response.status_code != 200:
         raise AgentGatewaySDKError(
             f"Agent card request returned status {response.status_code} "
-            f"for '{fragment_url}': {response.text[:200]}"
+            f"for '{fragment_url}' [correlation-id={correlation_id}]: {response.text[:200]}"
         )
 
     try:
         payload = response.json()
     except Exception as e:
         raise AgentGatewaySDKError(
-            f"Failed to parse agent card JSON for '{fragment_url}': {e}"
+            f"Failed to parse agent card JSON for '{fragment_url}' "
+            f"[correlation-id={correlation_id}]: {e}"
         ) from e
 
     return AgentCard(raw=payload)

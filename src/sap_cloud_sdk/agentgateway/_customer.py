@@ -618,13 +618,14 @@ async def _list_server_tools(
     url: str,
     auth_token: str,
     timeout: float,
+    correlation_id: str,
 ) -> list[MCPTool]:
     """List tools from a single MCP server.
 
     Args:
         url: MCP server endpoint URL.
         auth_token: Authorization token.
-        dependency: Integration dependency (for metadata).
+        correlation_id: Outbound x-correlation-id for this request.
 
     Returns:
         List of MCPTool objects from this server.
@@ -632,10 +633,15 @@ async def _list_server_tools(
     Raises:
         AgentGatewaySDKError: If server does not provide serverInfo.name.
     """
+    logger.debug(
+        "Listing tools from server [correlation-id=%s, path=%s]",
+        correlation_id,
+        url,
+    )
     async with httpx.AsyncClient(
         headers={
             "Authorization": f"Bearer {auth_token}",
-            "x-correlation-id": str(uuid.uuid4()),
+            "x-correlation-id": correlation_id,
         },
         timeout=timeout,
     ) as http_client:
@@ -653,7 +659,8 @@ async def _list_server_tools(
                     and init_result.serverInfo.name
                 ):
                     raise AgentGatewaySDKError(
-                        f"MCP server at '{url}' did not provide serverInfo.name. "
+                        f"MCP server at '{url}' did not provide serverInfo.name "
+                        f"[correlation-id={correlation_id}]. "
                         "This is required by the MCP protocol."
                     )
 
@@ -672,22 +679,27 @@ async def _list_server_tools(
                 ]
 
 
-def _log_mcp_server_error(ord_id: str, exc: BaseException) -> None:
+def _log_mcp_server_error(ord_id: str, exc: BaseException, correlation_id: str) -> None:
     # Unwrap ExceptionGroup from anyio to surface the real HTTP error body
     if isinstance(exc, BaseExceptionGroup):
         for inner in exc.exceptions:
-            _log_mcp_server_error(ord_id, inner)
+            _log_mcp_server_error(ord_id, inner, correlation_id)
         return
+    correlation_id_tag = f" [correlation-id={correlation_id}]"
     if isinstance(exc, httpx.HTTPStatusError):
         logger.error(
-            "Failed to load tools from %s (HTTP %d): %s",
+            "Failed to load tools from %s (HTTP %d)%s: %s",
             ord_id,
             exc.response.status_code,
+            correlation_id_tag,
             exc.response.text[:500],
         )
     else:
         logger.exception(
-            "Failed to load tools from %s — skipping", ord_id, exc_info=exc
+            "Failed to load tools from %s%s — skipping",
+            ord_id,
+            correlation_id_tag,
+            exc_info=exc,
         )
 
 
@@ -730,12 +742,15 @@ async def get_mcp_tools_customer(
             dep.global_tenant_id,
         )
 
+        correlation_id = str(uuid.uuid4())
         try:
-            server_tools = await _list_server_tools(url, system_token, timeout)
+            server_tools = await _list_server_tools(
+                url, system_token, timeout, correlation_id
+            )
             tools.extend(server_tools)
             logger.debug("Loaded %d tool(s) from %s", len(server_tools), dep.ord_id)
         except Exception as exc:
-            _log_mcp_server_error(dep.ord_id, exc)
+            _log_mcp_server_error(dep.ord_id, exc, correlation_id)
 
     logger.info(
         "Loaded %d MCP tool(s) from %d server(s)", len(tools), len(dependencies)
@@ -765,10 +780,17 @@ async def call_mcp_tool_customer(
     """
     logger.info("Calling tool '%s' on server '%s'", tool.name, tool.server_name)
 
+    correlation_id = str(uuid.uuid4())
+    logger.debug(
+        "Calling tool '%s' [correlation-id=%s, path=%s]",
+        tool.name,
+        correlation_id,
+        tool.url,
+    )
     async with httpx.AsyncClient(
         headers={
             "Authorization": f"Bearer {auth_token}",
-            "x-correlation-id": str(uuid.uuid4()),
+            "x-correlation-id": correlation_id,
         },
         timeout=timeout,
     ) as http_client:
@@ -789,6 +811,12 @@ async def call_mcp_tool_customer(
                 text = str(getattr(first, "text", ""))
 
                 if result.isError:
-                    logger.error("Tool '%s' returned an error: %s", tool.name, text)
+                    logger.error(
+                        "Tool '%s' returned an error [correlation-id=%s, path=%s]: %s",
+                        tool.name,
+                        correlation_id,
+                        tool.url,
+                        text,
+                    )
 
                 return text

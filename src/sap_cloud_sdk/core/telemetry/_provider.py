@@ -2,7 +2,7 @@
 
 import logging
 import os
-from typing import Optional
+from typing import Optional, cast
 
 from opentelemetry import metrics
 from opentelemetry._logs import get_logger_provider, set_logger_provider
@@ -112,7 +112,7 @@ def setup_log_provider() -> Optional[LoggerProvider]:
         candidate.add_log_record_processor(BatchLogRecordProcessor(exporter))
         set_logger_provider(candidate)
 
-        provider = get_logger_provider()
+        provider = cast(LoggerProvider, get_logger_provider())
 
         if provider is not candidate:
             logger.warning(

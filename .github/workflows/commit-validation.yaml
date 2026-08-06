@@ -17,12 +17,12 @@ jobs:
     runs-on: ${{ contains(github.server_url, 'github.com') && 'ubuntu-latest' || fromJSON('["self-hosted"]') }}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v7
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
       - name: Setup node
-        uses: actions/setup-node@v7
+        uses: actions/setup-node@v4
         with:
           node-version: 22
 

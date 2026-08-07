@@ -11,10 +11,10 @@ Wire once at startup::
 
 Then read anywhere::
 
-    from sap_cloud_sdk.core.runtime_context import get_context, TENANT_ID, USER_ID
+    from sap_cloud_sdk.core.runtime_context import get_context, APP_TENANT_ID, USER_ID
 
     ctx = get_context()
-    ctx.get(TENANT_ID)   # -> "abc-123" or None
+    ctx.get(APP_TENANT_ID)   # -> "abc-123" or None
     ctx.get(USER_ID)     # -> "user-uuid" or None
 """
 
@@ -35,8 +35,8 @@ from sap_cloud_sdk.core.runtime_context.providers import (
     DWCContextProvider,
     IASContextProvider,
     SAPTriggerContextProvider,
+    APP_TENANT_ID,
     GLOBAL_TENANT_ID,
-    TENANT_ID,
     USER_ID,
 )
 
@@ -44,6 +44,7 @@ from sap_cloud_sdk.core.runtime_context.providers import (
 import sap_cloud_sdk.core.runtime_context.adapters  # noqa: F401
 
 __all__ = [
+    "APP_TENANT_ID",
     "ContextKey",
     "ContextProvider",
     "DWC_SUBDOMAIN",
@@ -55,7 +56,6 @@ __all__ = [
     "RuntimeContext",
     "RequestEnvelope",
     "SAPTriggerContextProvider",
-    "TENANT_ID",
     "TRIGGER_TYPE",
     "USER_ID",
     "get_context",

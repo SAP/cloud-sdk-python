@@ -403,5 +403,5 @@ class TestAutoInstrumentMiddlewares:
         with patch.dict('os.environ', {'OTEL_EXPORTER_OTLP_ENDPOINT': 'http://localhost:4317'}, clear=True):
             auto_instrument(middlewares=[middleware])
 
-        # add_span_processor called 3 times: baggage, propagated attributes, middleware
-        assert mock_traceloop_components['get_tracer_provider'].return_value.add_span_processor.call_count == 3
+        # add_span_processor called 4 times: baggage, propagated attributes, runtime context, middleware
+        assert mock_traceloop_components['get_tracer_provider'].return_value.add_span_processor.call_count == 4

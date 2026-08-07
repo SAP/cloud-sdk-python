@@ -32,6 +32,7 @@ from sap_cloud_sdk.agentgateway._models import (
     CustomerCredentials,
     IntegrationDependency,
     MCPTool,
+    MCPToolFilter,
 )
 from sap_cloud_sdk.agentgateway._token_cache import _TokenCache
 from sap_cloud_sdk.agentgateway.exceptions import AgentGatewaySDKError
@@ -695,6 +696,7 @@ async def get_mcp_tools_customer(
     credentials: CustomerCredentials,
     system_token: str,
     timeout: float,
+    filter: MCPToolFilter | None = None,
 ) -> list[MCPTool]:
     """List all MCP tools from servers defined in credentials.
 
@@ -705,10 +707,13 @@ async def get_mcp_tools_customer(
         credentials: Customer credentials with integrationDependencies.
         system_token: Pre-fetched raw system token for authentication.
         timeout: HTTP timeout in seconds for MCP server calls.
+        filter: Optional MCPToolFilter narrowing results by tool name or ORD ID.
+            If None or empty, all tools are included.
 
     Returns:
         List of MCPTool objects from all servers.
     """
+    f = filter or MCPToolFilter()
     dependencies = credentials.integration_dependencies
 
     if not dependencies:
@@ -716,6 +721,10 @@ async def get_mcp_tools_customer(
             "integrationDependencies is empty in credentials — no MCP servers configured."
         )
         return []
+
+    if f.ord_ids:
+        ord_ids_set = set(f.ord_ids)
+        dependencies = [d for d in dependencies if d.ord_id in ord_ids_set]
 
     logger.info("Discovering tools from %d MCP server(s)", len(dependencies))
 
@@ -736,6 +745,11 @@ async def get_mcp_tools_customer(
             logger.debug("Loaded %d tool(s) from %s", len(server_tools), dep.ord_id)
         except Exception as exc:
             _log_mcp_server_error(dep.ord_id, exc)
+
+    # Post-fetch filter: tool names are only known after fetching
+    if f.names:
+        names_set = set(f.names)
+        tools = [t for t in tools if t.name in names_set]
 
     logger.info(
         "Loaded %d MCP tool(s) from %d server(s)", len(tools), len(dependencies)

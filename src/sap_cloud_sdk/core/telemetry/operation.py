@@ -193,6 +193,7 @@ class Operation(str, Enum):
     AGENTGATEWAY_GET_USER_AUTH = "get_user_auth"
     AGENTGATEWAY_LIST_AGENT_CARDS = "list_agent_cards"
     AGENTGATEWAY_GET_IAS_CLIENT_ID = "get_ias_client_id"
+    AGENTGATEWAY_LIST_ACTIVE_INTEGRATIONS = "list_active_integrations"
 
     # Agent Memory Operations
     AGENT_MEMORY_ADD_MEMORY = "add_memory"

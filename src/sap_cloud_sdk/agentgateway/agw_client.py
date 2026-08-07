@@ -38,6 +38,7 @@ from sap_cloud_sdk.agentgateway._models import (
 )
 from sap_cloud_sdk.agentgateway._token_cache import _GatewayUrlCache, _TokenCache
 from sap_cloud_sdk.agentgateway.exceptions import AgentGatewaySDKError
+from sap_cloud_sdk.agentgateway import _fragments
 from sap_cloud_sdk.core.telemetry import Module, Operation, record_metrics
 
 logger = logging.getLogger(__name__)
@@ -497,6 +498,36 @@ class AgentGatewayClient:
         except Exception as e:
             logger.exception("Unexpected error during agent card discovery")
             raise AgentGatewaySDKError(f"Agent card discovery failed: {e}") from e
+
+    @record_metrics(Module.AGENTGATEWAY, Operation.AGENTGATEWAY_LIST_ACTIVE_INTEGRATIONS)
+    def list_active_integrations(self) -> list[dict]:
+        """List all active backend system integrations for the current tenant.
+
+        Returns the connected backend systems (e.g. SAP PCE, SAP S/4HANA) that
+        are currently active for this tenant. Use this to determine which systems
+        are connected and which GTIDs to pass when loading MCP tools.
+
+        Requires tenant_subdomain to be configured on the client.
+
+        Returns:
+            List of dicts, each with:
+                - global_tenant_id: GTID of the connected partner system.
+                - system_type: Application namespace (e.g. "sap.pce", "sap.s4").
+                - integration_dependency: ORD ID fulfilled by this integration.
+            Returns empty list if no active integrations exist.
+
+        Raises:
+            AgentGatewaySDKError: If tenant_subdomain is not configured.
+
+        Example:
+            ```python
+            integrations = agw_client.list_active_integrations()
+            for i in integrations:
+                print(i["system_type"], i["global_tenant_id"])
+            ```
+        """
+        tenant = self._resolve_tenant_subdomain()
+        return _fragments.list_active_integrations(tenant)
 
     @record_metrics(Module.AGENTGATEWAY, Operation.AGENTGATEWAY_CALL_MCP_TOOL)
     async def call_mcp_tool(

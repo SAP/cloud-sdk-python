@@ -196,7 +196,7 @@ class TestUmsTransportGetExtCapImpl:
             transport.get_extension_capability_implementation()
 
         dest_client.get_destination.assert_called_once_with(
-            "sap-managed-runtime-ums-exttest-dev-eu12", level=ANY
+            "sap-managed-runtime-ums-exttest-dev-eu12", level=ANY, options=ANY
         )
 
     def test_sends_correct_graphql_query(self):
@@ -477,9 +477,9 @@ class TestUmsTransportTenant:
 
             transport.get_extension_capability_implementation(tenant="my-subscriber")
 
-        # get_destination is called without any ConsumptionOptions
+        # get_destination is called with skip_token_retrieval option
         dest_client.get_destination.assert_called_once_with(
-            "sap-managed-runtime-ums-exttest-dev-eu12", level=ANY
+            "sap-managed-runtime-ums-exttest-dev-eu12", level=ANY, options=ANY
         )
 
     def test_tenant_included_in_agent_filter(self):

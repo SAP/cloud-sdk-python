@@ -22,7 +22,6 @@ from http import HTTPMethod
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 import httpx
-
 from sap_cloud_sdk.core.telemetry import Module
 from sap_cloud_sdk.destination import ConsumptionLevel
 from sap_cloud_sdk.destination import create_client as create_destination_client
@@ -41,6 +40,7 @@ from sap_cloud_sdk.extensibility._models import (
     OnFailure,
 )
 from sap_cloud_sdk.extensibility.exceptions import TransportError
+from sap_cloud_sdk.destination import ConsumptionOptions
 
 if TYPE_CHECKING:
     from sap_cloud_sdk.extensibility.config import ExtensibilityConfig
@@ -53,7 +53,9 @@ logger = logging.getLogger(__name__)
 
 ENV_CONHOS_LANDSCAPE = "APPFND_CONHOS_LANDSCAPE"
 ENV_UMS_DESTINATION_NAME = "APPFND_UMS_DESTINATION_NAME"
+ENV_UMS_URL = "APPFND_CONHOS_UMS_URL"
 _UMS_DESTINATION_PREFIX = "sap-managed-runtime-ums-"
+_IAS_DESTINATION_PREFIX = "sap-managed-runtime-ias-"
 
 # ---------------------------------------------------------------------------
 # GraphQL query
@@ -182,24 +184,26 @@ def _parse_method_safe(value: str) -> HTTPMethod:
 
 
 def _ums_destination_name(config_override: Optional[str] = None) -> Optional[str]:
-    """Construct the UMS destination name from configuration or environment.
+    """Construct the UMS (or IAS) destination name from configuration or environment.
 
     Resolution order:
 
     1. **Config override** -- if ``config.destination_name`` is set, use
        it directly.
     2. **Explicit env var override** -- if ``APPFND_UMS_DESTINATION_NAME``
-       is set, use its value directly.  This is useful in subaccounts
-       where the UMS destination follows a non-standard naming convention.
-    3. **Landscape-based construction** -- the destination name is built as
-       ``sap-managed-runtime-ums-{APPFND_CONHOS_LANDSCAPE}``.
+       is set, use its value directly.
+    3. **Landscape-based construction** -- if ``APPFND_CONHOS_UMS_URL`` is
+       set, the destination is built as
+       ``sap-managed-runtime-ias-{APPFND_CONHOS_LANDSCAPE}`` (new flow);
+       otherwise as ``sap-managed-runtime-ums-{APPFND_CONHOS_LANDSCAPE}``
+       (legacy flow).
 
     Args:
         config_override: Optional destination name from
             :class:`ExtensibilityConfig`.  Takes highest priority when set.
 
     Returns:
-        The resolved UMS destination name, or ``None`` if no configuration
+        The resolved destination name, or ``None`` if no configuration
         or environment variables are available to determine it.
     """
     # 0. Config-level override takes highest priority
@@ -232,12 +236,20 @@ def _ums_destination_name(config_override: Optional[str] = None) -> Optional[str
         )
         return None
 
-    destination_name = f"{_UMS_DESTINATION_PREFIX}{landscape}"
-    logger.debug(
-        "Resolved UMS destination name from %s: %s",
-        ENV_CONHOS_LANDSCAPE,
-        destination_name,
-    )
+    if os.environ.get(ENV_UMS_URL):
+        destination_name = f"{_IAS_DESTINATION_PREFIX}{landscape}"
+        logger.debug(
+            "Resolved IAS destination name from %s: %s",
+            ENV_CONHOS_LANDSCAPE,
+            destination_name,
+        )
+    else:
+        destination_name = f"{_UMS_DESTINATION_PREFIX}{landscape}"
+        logger.debug(
+            "Resolved UMS destination name from %s: %s",
+            ENV_CONHOS_LANDSCAPE,
+            destination_name,
+        )
     return destination_name
 
 
@@ -428,17 +440,28 @@ def _transform_ums_response(
 class UmsTransport:
     """UMS GraphQL transport for the extensibility service.
 
-    Resolves the UMS destination via the Destination SDK, then sends
-    a GraphQL query to the UMS ``/graphql`` endpoint and transforms
-    the response into an :class:`ExtensionCapabilityImplementation`.
+    Resolves the UMS destination, then sends a GraphQL query to the UMS
+    ``/graphql`` endpoint and transforms the response into an
+    :class:`ExtensionCapabilityImplementation`.
 
-    The destination name is resolved in order:
+    **Destination name** is resolved in order:
 
     1. ``config.destination_name`` (explicit config override).
     2. ``APPFND_UMS_DESTINATION_NAME`` environment variable.
-    3. ``sap-managed-runtime-ums-{APPFND_CONHOS_LANDSCAPE}`` (constructed).
+    3. Landscape-based construction:
 
-    If none of the above are available, resolution fails with a warning.
+       * ``sap-managed-runtime-ias-{APPFND_CONHOS_LANDSCAPE}`` when
+         ``APPFND_CONHOS_UMS_URL`` is set (new flow).
+       * ``sap-managed-runtime-ums-{APPFND_CONHOS_LANDSCAPE}`` otherwise
+         (legacy flow).
+
+    **Base URL** is resolved as:
+
+    * ``APPFND_CONHOS_UMS_URL`` environment variable when set (new flow).
+    * The URL configured on the resolved destination otherwise (legacy flow).
+
+    In both cases the **mTLS certificate** is taken from the resolved
+    destination.
 
     Args:
         agent_ord_id: ORD ID of the agent.
@@ -502,15 +525,6 @@ class UmsTransport:
             TransportError: If destination resolution, HTTP communication,
                 or response parsing fails.
         """
-        # Guard: destination name must be resolved
-        if self._destination_name is None:
-            raise TransportError(
-                "UMS destination name could not be resolved. "
-                "Set the APPFND_UMS_DESTINATION_NAME or "
-                "APPFND_CONHOS_LANDSCAPE environment variable, or provide "
-                "a destination_name in ExtensibilityConfig."
-            )
-
         # 0. Cache lookup ------------------------------------------------
         cache_key = (tenant, capability_id)
         all_edges: List[Dict[str, Any]] = []
@@ -541,10 +555,19 @@ class UmsTransport:
                     )
 
         # 1. Resolve destination -----------------------------------------
+        if self._destination_name is None:
+            raise TransportError(
+                "UMS destination name could not be resolved. "
+                "Set the APPFND_UMS_DESTINATION_NAME or "
+                "APPFND_CONHOS_LANDSCAPE environment variable, or provide "
+                "a destination_name in ExtensibilityConfig."
+            )
+
         try:
             dest = self._dest_client.get_destination(
                 self._destination_name,
                 level=ConsumptionLevel.PROVIDER_SUBACCOUNT,
+                options=ConsumptionOptions(skip_token_retrieval=True) 
             )
         except Exception as exc:
             raise TransportError(
@@ -556,13 +579,28 @@ class UmsTransport:
                 f"Destination '{self._destination_name}' not found in Destination Service."
             )
 
-        base_url = dest.url
-        if base_url is None:
-            raise TransportError(
-                f"Destination '{self._destination_name}' has no URL configured."
+        # 2. Resolve base URL --------------------------------------------
+        #    New flow: use APPFND_CONHOS_UMS_URL env var directly.
+        #    Legacy flow: use the URL from the destination itself.
+        ums_url_override = os.environ.get(ENV_UMS_URL)
+        if ums_url_override:
+            base_url = ums_url_override
+            logger.debug(
+                "Using UMS URL from %s: %s", ENV_UMS_URL, base_url
+            )
+        else:
+            base_url = dest.url
+            if base_url is None:
+                raise TransportError(
+                    f"Destination '{self._destination_name}' has no URL configured."
+                )
+            logger.debug(
+                "Using UMS URL from destination '%s': %s",
+                self._destination_name,
+                base_url,
             )
 
-        # 2. Extract client certificate ----------------------------------
+        # 3. Extract client certificate ----------------------------------
         if not dest.certificates:
             raise TransportError(
                 f"Destination '{self._destination_name}' has no "
@@ -578,7 +616,7 @@ class UmsTransport:
                 f"Failed to decode client certificate '{cert.name}': {exc}"
             ) from exc
 
-        # 3. Build GraphQL request --------------------------------------
+        # 4. Build GraphQL request --------------------------------------
         url = f"{base_url.rstrip('/')}{_UMS_GRAPHQL_PATH}"
 
         agent_filter: dict[str, Any] = {
@@ -599,7 +637,7 @@ class UmsTransport:
             "X-Tenant": tenant,
         }
 
-        # 4. Send paginated requests with mTLS --------------------------
+        # 5. Send paginated requests with mTLS --------------------------
         all_edges = []
         cursor: Optional[str] = None
         try:
@@ -626,7 +664,7 @@ class UmsTransport:
                             headers=request_headers,
                         )
 
-                        # 5. Parse response ---------------------------------
+                        # 6. Parse response ---------------------------------
                         try:
                             response.raise_for_status()
                         except httpx.HTTPStatusError as exc:
@@ -674,7 +712,7 @@ class UmsTransport:
         except Exception as exc:
             raise TransportError(f"HTTP request to UMS endpoint failed: {exc}") from exc
 
-        # 6. Populate cache ----------------------------------------------
+        # 7. Populate cache ----------------------------------------------
         now = time.monotonic()
 
         with self._cache_lock:
@@ -693,7 +731,7 @@ class UmsTransport:
 
             self._cache[cache_key] = (now, all_edges)
 
-        # 7. Transform -----------------------------------------------------------
+        # 8. Transform -----------------------------------------------------------
         combined_data: Dict[str, Any] = {
             "EXTHUB__ExtCapImplementationInstances": {"edges": all_edges},
         }

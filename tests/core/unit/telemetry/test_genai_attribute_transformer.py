@@ -46,6 +46,7 @@ class TestNormalizeAttributes:
 
         result = transformer._normalize_attributes(span)
 
+        assert result.attributes is not None
         assert result.attributes['gen_ai.request.model'] == 'gpt-4'
         assert result.attributes['gen_ai.provider.name'] == 'openai'
         # Fallback: response.model should be set from request.model
@@ -63,6 +64,7 @@ class TestNormalizeAttributes:
 
         result = transformer._normalize_attributes(span)
 
+        assert result.attributes is not None
         assert result.attributes['gen_ai.request.model'] == 'gpt-4'
         # Should preserve the existing response.model
         assert result.attributes['gen_ai.response.model'] == 'gpt-4-turbo'
@@ -79,6 +81,7 @@ class TestNormalizeAttributes:
 
         result = transformer._normalize_attributes(span)
 
+        assert result.attributes is not None
         assert result.attributes['gen_ai.request.model'] == 'gpt-4'
         # Should replace "unknown" with actual model name
         assert result.attributes['gen_ai.response.model'] == 'gpt-4'
@@ -97,6 +100,7 @@ class TestNormalizeAttributes:
 
         result = transformer._normalize_attributes(span)
 
+        assert result.attributes is not None
         assert result.attributes['gen_ai.usage.total_tokens'] == 150
         assert result.attributes['gen_ai.usage.input_tokens'] == 100
         assert result.attributes['gen_ai.usage.output_tokens'] == 50
@@ -114,6 +118,7 @@ class TestNormalizeAttributes:
 
         result = transformer._normalize_attributes(span)
 
+        assert result.attributes is not None
         assert result.attributes['gen_ai.usage.input_tokens'] == 100
         assert result.attributes['gen_ai.usage.output_tokens'] == 50
 
@@ -129,6 +134,7 @@ class TestNormalizeAttributes:
 
         result = transformer._normalize_attributes(span)
 
+        assert result.attributes is not None
         assert result.attributes['gen_ai.usage.cache_read_input_tokens'] == 25
 
     def test_normalize_attributes_removes_standard_traceloop_attributes(self):
@@ -146,6 +152,7 @@ class TestNormalizeAttributes:
 
         result = transformer._normalize_attributes(span)
 
+        assert result.attributes is not None
         # Standard traceloop.* attributes should be removed
         assert 'traceloop.association.properties.ls_model_name' not in result.attributes
         assert 'traceloop.association.properties.ls_provider' not in result.attributes
@@ -172,6 +179,7 @@ class TestNormalizeAttributes:
 
         result = transformer._normalize_attributes(span)
 
+        assert result.attributes is not None
         # Standard llm.usage.* attributes should be removed after transformation
         assert 'llm.usage.total_tokens' not in result.attributes
         assert 'llm.usage.input_tokens' not in result.attributes
@@ -235,6 +243,7 @@ class TestNormalizeAttributes:
 
         result = transformer._normalize_attributes(span)
 
+        assert result.attributes is not None
         # Should not add gen_ai attributes for non-string values
         assert 'gen_ai.request.model' not in result.attributes
         assert 'gen_ai.provider.name' not in result.attributes
@@ -251,6 +260,7 @@ class TestNormalizeAttributes:
 
         result = transformer._normalize_attributes(span)
 
+        assert result.attributes is not None
         # Should not add gen_ai attributes for empty strings
         assert 'gen_ai.request.model' not in result.attributes
         assert 'gen_ai.provider.name' not in result.attributes
@@ -466,11 +476,12 @@ class TestTransformMessages:
 
         result = transformer._normalize_attributes(span)
 
+        assert result.attributes is not None
         # Check that gen_ai.input.messages was created
         assert 'gen_ai.input.messages' in result.attributes
 
         # Parse and verify the JSON structure
-        messages = json.loads(result.attributes['gen_ai.input.messages'])
+        messages = json.loads(str(result.attributes['gen_ai.input.messages']))
         assert len(messages) == 2
 
         assert messages[0]['role'] == 'user'
@@ -498,11 +509,12 @@ class TestTransformMessages:
 
         result = transformer._normalize_attributes(span)
 
+        assert result.attributes is not None
         # Check that gen_ai.output.messages was created
         assert 'gen_ai.output.messages' in result.attributes
 
         # Parse and verify the JSON structure
-        messages = json.loads(result.attributes['gen_ai.output.messages'])
+        messages = json.loads(str(result.attributes['gen_ai.output.messages']))
         assert len(messages) == 1
 
         assert messages[0]['role'] == 'assistant'
@@ -528,7 +540,8 @@ class TestTransformMessages:
 
         result = transformer._normalize_attributes(span)
 
-        messages = json.loads(result.attributes['gen_ai.output.messages'])
+        assert result.attributes is not None
+        messages = json.loads(str(result.attributes['gen_ai.output.messages']))
         assert len(messages) == 2
         assert messages[0]['parts'][0]['content'] == 'First response'
         assert messages[1]['parts'][0]['content'] == 'Second response'
@@ -545,6 +558,7 @@ class TestTransformMessages:
 
         result = transformer._normalize_attributes(span)
 
+        assert result.attributes is not None
         # Should not create message attributes
         assert 'gen_ai.input.messages' not in result.attributes
         assert 'gen_ai.output.messages' not in result.attributes
@@ -563,7 +577,8 @@ class TestTransformMessages:
 
         result = transformer._normalize_attributes(span)
 
-        messages = json.loads(result.attributes['gen_ai.input.messages'])
+        assert result.attributes is not None
+        messages = json.loads(str(result.attributes['gen_ai.input.messages']))
         assert messages[0]['custom_field'] == 'custom_value'
 
 

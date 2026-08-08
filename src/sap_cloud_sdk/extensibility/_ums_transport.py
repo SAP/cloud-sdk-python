@@ -39,7 +39,7 @@ from sap_cloud_sdk.extensibility._models import (
     N8nWorkflowConfig,
     OnFailure,
 )
-from sap_cloud_sdk.extensibility.exceptions import ConfigurationError, TransportError
+from sap_cloud_sdk.extensibility.exceptions import TransportError
 from sap_cloud_sdk.destination import ConsumptionOptions
 
 if TYPE_CHECKING:
@@ -193,8 +193,8 @@ def _ums_destination_name(config_override: Optional[str] = None) -> Optional[str
        is set, use its value directly.
     3. **Landscape-based construction** -- built as
        ``sap-managed-runtime-ias-{APPFND_CONHOS_LANDSCAPE}``.
-       ``APPFND_CONHOS_UMS_URL`` must be set; a :class:`ConfigurationError`
-       is raised if it is absent.
+       ``APPFND_CONHOS_UMS_URL`` must be set; a warning is logged and
+       ``None`` is returned if it is absent.
 
     Args:
         config_override: Optional destination name from
@@ -235,9 +235,14 @@ def _ums_destination_name(config_override: Optional[str] = None) -> Optional[str
         return None
 
     if not os.environ.get(ENV_UMS_URL):
-        raise ConfigurationError(
-            f"{ENV_UMS_URL} is not set; cannot construct IAS destination name."
+        logger.warning(
+            "%s is not set; cannot construct IAS destination name. "
+            "Set %s or %s to configure the destination name.",
+            ENV_UMS_URL,
+            ENV_UMS_DESTINATION_NAME,
+            ENV_UMS_URL,
         )
+        return None
     destination_name = f"{_IAS_DESTINATION_PREFIX}{landscape}"
     logger.debug(
         "Resolved IAS destination name from %s: %s",
@@ -445,8 +450,8 @@ class UmsTransport:
     3. Landscape-based construction:
 
        * ``sap-managed-runtime-ias-{APPFND_CONHOS_LANDSCAPE}`` (requires
-         ``APPFND_CONHOS_UMS_URL`` to be set; raises :class:`ConfigurationError`
-         otherwise).
+         ``APPFND_CONHOS_UMS_URL`` to be set; logs a warning and returns
+         ``None`` otherwise).
 
     **Base URL** is resolved as:
 
@@ -551,9 +556,10 @@ class UmsTransport:
         if self._destination_name is None:
             raise TransportError(
                 "UMS destination name could not be resolved. "
-                "Set the APPFND_UMS_DESTINATION_NAME or "
-                "APPFND_CONHOS_LANDSCAPE environment variable, or provide "
-                "a destination_name in ExtensibilityConfig."
+                "Either set APPFND_UMS_DESTINATION_NAME directly, "
+                "or set both APPFND_CONHOS_LANDSCAPE and APPFND_CONHOS_UMS_URL "
+                "to construct the IAS destination name, "
+                "or provide a destination_name in ExtensibilityConfig."
             )
 
         try:

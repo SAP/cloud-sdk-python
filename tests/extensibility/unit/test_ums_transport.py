@@ -19,7 +19,7 @@ from sap_cloud_sdk.extensibility._ums_transport import (
     _GRAPHQL_QUERY,
 )
 from sap_cloud_sdk.extensibility.config import ExtensibilityConfig
-from sap_cloud_sdk.extensibility.exceptions import ConfigurationError, TransportError
+from sap_cloud_sdk.extensibility.exceptions import TransportError
 
 from tests.extensibility.unit._ums_test_helpers import (
     AGENT_ORD_ID,
@@ -57,12 +57,11 @@ class TestUmsDestinationName:
         monkeypatch.setenv(ENV_CONHOS_LANDSCAPE, "")
         assert _ums_destination_name() is None
 
-    def test_raises_when_ums_url_not_set(self, monkeypatch):
+    def test_returns_none_when_ums_url_not_set(self, monkeypatch):
         monkeypatch.delenv(ENV_UMS_DESTINATION_NAME, raising=False)
         monkeypatch.setenv(ENV_CONHOS_LANDSCAPE, "exttest-dev-eu12")
         monkeypatch.delenv(ENV_UMS_URL, raising=False)
-        with pytest.raises(ConfigurationError, match="APPFND_CONHOS_UMS_URL"):
-            _ums_destination_name()
+        assert _ums_destination_name() is None
 
     def test_override_env_takes_precedence(self, monkeypatch):
         monkeypatch.setenv(ENV_UMS_DESTINATION_NAME, "ums-exttest-dev-eu12")

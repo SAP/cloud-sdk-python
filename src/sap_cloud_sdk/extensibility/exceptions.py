@@ -13,12 +13,6 @@ class ClientCreationError(ExtensibilityError):
     pass
 
 
-class ConfigurationError(ExtensibilityError):
-    """Raised when required configuration or environment variables are missing."""
-
-    pass
-
-
 class TransportError(ExtensibilityError):
     """Raised when transport operations fail.
 

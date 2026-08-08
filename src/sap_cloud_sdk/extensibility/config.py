@@ -20,15 +20,11 @@ class ExtensibilityConfig:
 
     Attributes:
         destination_name: Optional override for the UMS destination name.
-            When set, the legacy flow is used exclusively: the base URL and
-            mTLS certificate are read from this destination, bypassing the
-            new IAS-based flow entirely.
-            When ``None`` (the default), the new flow is attempted first
-            (URL from ``APPFND_CONHOS_UMS_URL``, cert from the IAS
-            destination ``sap-managed-runtime-ias-{APPFND_CONHOS_LANDSCAPE}``),
-            falling back to the legacy UMS destination resolved via
-            ``APPFND_UMS_DESTINATION_NAME`` or
-            ``sap-managed-runtime-ums-{APPFND_CONHOS_LANDSCAPE}``.
+            When set, it is used directly, bypassing automatic resolution.
+            When ``None`` (the default), the destination name is resolved via
+            ``APPFND_UMS_DESTINATION_NAME`` or constructed as
+            ``sap-managed-runtime-ias-{APPFND_CONHOS_LANDSCAPE}`` (requires
+            ``APPFND_CONHOS_UMS_URL`` to be set).
         destination_instance: Destination service instance name. When ``"default"``,
             resolves to the default destination service instance. Specify a name
             only if your deployment binds the destination service under a

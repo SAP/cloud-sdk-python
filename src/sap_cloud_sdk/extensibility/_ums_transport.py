@@ -39,7 +39,7 @@ from sap_cloud_sdk.extensibility._models import (
     N8nWorkflowConfig,
     OnFailure,
 )
-from sap_cloud_sdk.extensibility.exceptions import TransportError
+from sap_cloud_sdk.extensibility.exceptions import ConfigurationError, TransportError
 from sap_cloud_sdk.destination import ConsumptionOptions
 
 if TYPE_CHECKING:
@@ -54,7 +54,6 @@ logger = logging.getLogger(__name__)
 ENV_CONHOS_LANDSCAPE = "APPFND_CONHOS_LANDSCAPE"
 ENV_UMS_DESTINATION_NAME = "APPFND_UMS_DESTINATION_NAME"
 ENV_UMS_URL = "APPFND_CONHOS_UMS_URL"
-_UMS_DESTINATION_PREFIX = "sap-managed-runtime-ums-"
 _IAS_DESTINATION_PREFIX = "sap-managed-runtime-ias-"
 
 # ---------------------------------------------------------------------------
@@ -184,7 +183,7 @@ def _parse_method_safe(value: str) -> HTTPMethod:
 
 
 def _ums_destination_name(config_override: Optional[str] = None) -> Optional[str]:
-    """Construct the UMS (or IAS) destination name from configuration or environment.
+    """Construct the IAS destination name from configuration or environment.
 
     Resolution order:
 
@@ -192,11 +191,10 @@ def _ums_destination_name(config_override: Optional[str] = None) -> Optional[str
        it directly.
     2. **Explicit env var override** -- if ``APPFND_UMS_DESTINATION_NAME``
        is set, use its value directly.
-    3. **Landscape-based construction** -- if ``APPFND_CONHOS_UMS_URL`` is
-       set, the destination is built as
-       ``sap-managed-runtime-ias-{APPFND_CONHOS_LANDSCAPE}`` (new flow);
-       otherwise as ``sap-managed-runtime-ums-{APPFND_CONHOS_LANDSCAPE}``
-       (legacy flow).
+    3. **Landscape-based construction** -- built as
+       ``sap-managed-runtime-ias-{APPFND_CONHOS_LANDSCAPE}``.
+       ``APPFND_CONHOS_UMS_URL`` must be set; a :class:`ConfigurationError`
+       is raised if it is absent.
 
     Args:
         config_override: Optional destination name from
@@ -236,20 +234,16 @@ def _ums_destination_name(config_override: Optional[str] = None) -> Optional[str
         )
         return None
 
-    if os.environ.get(ENV_UMS_URL):
-        destination_name = f"{_IAS_DESTINATION_PREFIX}{landscape}"
-        logger.debug(
-            "Resolved IAS destination name from %s: %s",
-            ENV_CONHOS_LANDSCAPE,
-            destination_name,
+    if not os.environ.get(ENV_UMS_URL):
+        raise ConfigurationError(
+            f"{ENV_UMS_URL} is not set; cannot construct IAS destination name."
         )
-    else:
-        destination_name = f"{_UMS_DESTINATION_PREFIX}{landscape}"
-        logger.debug(
-            "Resolved UMS destination name from %s: %s",
-            ENV_CONHOS_LANDSCAPE,
-            destination_name,
-        )
+    destination_name = f"{_IAS_DESTINATION_PREFIX}{landscape}"
+    logger.debug(
+        "Resolved IAS destination name from %s: %s",
+        ENV_CONHOS_LANDSCAPE,
+        destination_name,
+    )
     return destination_name
 
 
@@ -450,10 +444,9 @@ class UmsTransport:
     2. ``APPFND_UMS_DESTINATION_NAME`` environment variable.
     3. Landscape-based construction:
 
-       * ``sap-managed-runtime-ias-{APPFND_CONHOS_LANDSCAPE}`` when
-         ``APPFND_CONHOS_UMS_URL`` is set (new flow).
-       * ``sap-managed-runtime-ums-{APPFND_CONHOS_LANDSCAPE}`` otherwise
-         (legacy flow).
+       * ``sap-managed-runtime-ias-{APPFND_CONHOS_LANDSCAPE}`` (requires
+         ``APPFND_CONHOS_UMS_URL`` to be set; raises :class:`ConfigurationError`
+         otherwise).
 
     **Base URL** is resolved as:
 

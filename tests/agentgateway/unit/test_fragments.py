@@ -1,15 +1,12 @@
-"""Unit tests for agentgateway._fragments — list_active_integrations and helpers."""
+"""Unit tests for agentgateway._fragments — _list_active_integrations and helpers."""
 
 from unittest.mock import MagicMock, patch
 
 import pytest
 
-from sap_cloud_sdk.agentgateway._fragments import (
-    _parse_integration_from_url,
-    list_active_integrations,
-)
+from sap_cloud_sdk.agentgateway._fragments import _list_active_integrations
 from sap_cloud_sdk.agentgateway import create_client, AgentGatewaySDKError
-from sap_cloud_sdk.destination._models import Fragment
+from sap_cloud_sdk.destination._models import Fragment, Label, Level
 
 
 # ============================================================
@@ -17,96 +14,55 @@ from sap_cloud_sdk.destination._models import Fragment
 # ============================================================
 
 
-def _fragment(url: str, name: str = "sap-managed-runtime-agw-mcp-abc") -> Fragment:
-    return Fragment(name=name, properties={"URL": url})
+def _fragment(name: str = "sap-managed-runtime-agw-mcp-abc") -> Fragment:
+    return Fragment(name=name, properties={})
+
+
+def _label(key: str, value: str) -> Label:
+    return Label(key=key, values=[value])
+
+
+def _full_labels(gtid: str, system_type: str, ord_id: str) -> list[Label]:
+    return [
+        _label("sap-managed-runtime-gtid", gtid),
+        _label("sap-managed-runtime-system-type", system_type),
+        _label("sap-managed-runtime-ordid", ord_id),
+        _label("sap-managed-runtime-type", "agw.mcp.server"),
+    ]
 
 
 # ============================================================
-# Tests: _parse_integration_from_url
-# ============================================================
-
-
-class TestParseIntegrationFromUrl:
-    def test_mcp_url_returns_correct_fields(self):
-        url = "https://agw.example.com/v1/mcp/sap.pce:apiResource:PA:v1/gtid-123"
-        result = _parse_integration_from_url(url)
-        assert result == {
-            "global_tenant_id": "gtid-123",
-            "system_type": "sap.pce",
-            "integration_dependency": "sap.pce:apiResource:PA:v1",
-        }
-
-    def test_a2a_url_returns_correct_fields(self):
-        url = "https://agw.example.com/v1/a2a/sap.s4:apiResource:BP:v1/gtid-456"
-        result = _parse_integration_from_url(url)
-        assert result == {
-            "global_tenant_id": "gtid-456",
-            "system_type": "sap.s4",
-            "integration_dependency": "sap.s4:apiResource:BP:v1",
-        }
-
-    def test_ord_id_with_slash_segments(self):
-        url = "https://agw.example.com/v1/mcp/sap.sf:apiResource:jobs/v1/gtid-789"
-        result = _parse_integration_from_url(url)
-        assert result == {
-            "global_tenant_id": "gtid-789",
-            "system_type": "sap.sf",
-            "integration_dependency": "sap.sf:apiResource:jobs/v1",
-        }
-
-    def test_trailing_slash_is_ignored(self):
-        url = "https://agw.example.com/v1/mcp/sap.pce:apiResource:PA:v1/gtid-123/"
-        result = _parse_integration_from_url(url)
-        assert result is not None
-        assert result["global_tenant_id"] == "gtid-123"
-
-    def test_returns_none_for_url_without_v1_mode(self):
-        url = "https://agw.example.com/some/other/path/gtid-123"
-        assert _parse_integration_from_url(url) is None
-
-    def test_returns_none_for_empty_url(self):
-        assert _parse_integration_from_url("") is None
-
-    def test_returns_none_when_nothing_after_mode(self):
-        url = "https://agw.example.com/v1/mcp/"
-        assert _parse_integration_from_url(url) is None
-
-    def test_returns_none_when_only_gtid_after_mode(self):
-        # mode_idx + 2 > len(parts) - 1  →  no ord_id between mode and gtid
-        url = "https://agw.example.com/v1/mcp/gtid-only"
-        assert _parse_integration_from_url(url) is None
-
-
-# ============================================================
-# Tests: list_active_integrations (module-level function)
+# Tests: _list_active_integrations (module-level function)
 # ============================================================
 
 
 class TestListActiveIntegrations:
-    def test_returns_parsed_entries_for_matching_fragments(self):
-        fragments = [
-            _fragment("https://agw.example.com/v1/mcp/sap.pce:apiResource:PA:v1/gtid-1"),
-            _fragment("https://agw.example.com/v1/a2a/sap.s4:apiResource:BP:v1/gtid-2"),
-        ]
+    def test_returns_entries_from_fragment_labels(self):
+        frag1 = _fragment("frag-mcp-1")
+        frag2 = _fragment("frag-a2a-2")
         mock_client = MagicMock()
-        mock_client.list_instance_fragments.return_value = fragments
+        mock_client.list_instance_fragments.return_value = [frag1, frag2]
+        mock_client.get_fragment_labels.side_effect = [
+            _full_labels("gtid-1", "sap.pce", "sap-pce-apiResource-PA-v1"),
+            _full_labels("gtid-2", "sap.s4", "sap-s4-apiResource-BP-v1"),
+        ]
 
         with patch(
             "sap_cloud_sdk.agentgateway._fragments.create_fragment_client",
             return_value=mock_client,
         ):
-            result = list_active_integrations("my-tenant")
+            result = _list_active_integrations("my-tenant")
 
         assert len(result) == 2
         assert result[0] == {
             "global_tenant_id": "gtid-1",
             "system_type": "sap.pce",
-            "integration_dependency": "sap.pce:apiResource:PA:v1",
+            "integration_dependency": "sap-pce-apiResource-PA-v1",
         }
         assert result[1] == {
             "global_tenant_id": "gtid-2",
             "system_type": "sap.s4",
-            "integration_dependency": "sap.s4:apiResource:BP:v1",
+            "integration_dependency": "sap-s4-apiResource-BP-v1",
         }
 
     def test_returns_empty_list_when_no_fragments(self):
@@ -117,55 +73,121 @@ class TestListActiveIntegrations:
             "sap_cloud_sdk.agentgateway._fragments.create_fragment_client",
             return_value=mock_client,
         ):
-            result = list_active_integrations("my-tenant")
+            result = _list_active_integrations("my-tenant")
 
         assert result == []
+        mock_client.get_fragment_labels.assert_not_called()
 
-    def test_skips_fragments_with_unparseable_url(self):
-        fragments = [
-            _fragment("https://agw.example.com/some/unrelated/path"),
-            _fragment("https://agw.example.com/v1/mcp/sap.pce:apiResource:PA:v1/gtid-1"),
-        ]
+    def test_skips_fragment_missing_system_type(self):
+        frag = _fragment("frag-no-systype")
         mock_client = MagicMock()
-        mock_client.list_instance_fragments.return_value = fragments
+        mock_client.list_instance_fragments.return_value = [frag]
+        mock_client.get_fragment_labels.return_value = [
+            _label("sap-managed-runtime-gtid", "gtid-1"),
+            _label("sap-managed-runtime-ordid", "sap-pce-apiResource-PA-v1"),
+        ]
 
         with patch(
             "sap_cloud_sdk.agentgateway._fragments.create_fragment_client",
             return_value=mock_client,
         ):
-            result = list_active_integrations("my-tenant")
+            result = _list_active_integrations("my-tenant")
+
+        assert result == []
+
+    def test_includes_fragment_missing_gtid(self):
+        """GTID and ORD ID are expected to always be present; missing system_type is the only skip condition."""
+        frag = _fragment("frag-no-gtid")
+        mock_client = MagicMock()
+        mock_client.list_instance_fragments.return_value = [frag]
+        mock_client.get_fragment_labels.return_value = [
+            _label("sap-managed-runtime-system-type", "sap.pce"),
+            _label("sap-managed-runtime-ordid", "sap-pce-apiResource-PA-v1"),
+        ]
+
+        with patch(
+            "sap_cloud_sdk.agentgateway._fragments.create_fragment_client",
+            return_value=mock_client,
+        ):
+            result = _list_active_integrations("my-tenant")
 
         assert len(result) == 1
-        assert result[0]["global_tenant_id"] == "gtid-1"
+        assert result[0]["global_tenant_id"] is None
 
-    def test_skips_fragments_with_missing_url_property(self):
-        fragment = Fragment(name="sap-managed-runtime-agw-mcp-abc", properties={})
+    def test_partial_failure_returns_valid_entries_only(self):
+        frag_ok = _fragment("frag-ok")
+        frag_bad = _fragment("frag-bad")
         mock_client = MagicMock()
-        mock_client.list_instance_fragments.return_value = [fragment]
+        mock_client.list_instance_fragments.return_value = [frag_ok, frag_bad]
+        mock_client.get_fragment_labels.side_effect = [
+            _full_labels("gtid-ok", "sap.pce", "sap-pce-apiResource-PA-v1"),
+            [_label("sap-managed-runtime-gtid", "gtid-bad")],  # missing system_type
+        ]
 
         with patch(
             "sap_cloud_sdk.agentgateway._fragments.create_fragment_client",
             return_value=mock_client,
         ):
-            result = list_active_integrations("my-tenant")
+            result = _list_active_integrations("my-tenant")
 
-        assert result == []
+        assert len(result) == 1
+        assert result[0]["global_tenant_id"] == "gtid-ok"
 
-    def test_passes_tenant_subdomain_to_fragment_client(self):
+    def test_passes_tenant_subdomain_to_list_and_get_labels(self):
+        frag = _fragment("frag-abc")
         mock_client = MagicMock()
-        mock_client.list_instance_fragments.return_value = []
+        mock_client.list_instance_fragments.return_value = [frag]
+        mock_client.get_fragment_labels.return_value = _full_labels(
+            "gtid-1", "sap.pce", "sap-pce-apiResource-PA-v1"
+        )
 
         with patch(
             "sap_cloud_sdk.agentgateway._fragments.create_fragment_client",
             return_value=mock_client,
         ):
-            list_active_integrations("specific-tenant")
+            _list_active_integrations("specific-tenant")
 
-        call_kwargs = mock_client.list_instance_fragments.call_args.kwargs
-        assert call_kwargs["tenant"] == "specific-tenant"
+        list_kwargs = mock_client.list_instance_fragments.call_args.kwargs
+        assert list_kwargs["tenant"] == "specific-tenant"
+
+        get_kwargs = mock_client.get_fragment_labels.call_args.kwargs
+        assert get_kwargs["tenant"] == "specific-tenant"
+
+    def test_get_fragment_labels_called_with_service_instance_level(self):
+        frag = _fragment("frag-abc")
+        mock_client = MagicMock()
+        mock_client.list_instance_fragments.return_value = [frag]
+        mock_client.get_fragment_labels.return_value = _full_labels(
+            "gtid-1", "sap.pce", "sap-pce-apiResource-PA-v1"
+        )
+
+        with patch(
+            "sap_cloud_sdk.agentgateway._fragments.create_fragment_client",
+            return_value=mock_client,
+        ):
+            _list_active_integrations("my-tenant")
+
+        get_kwargs = mock_client.get_fragment_labels.call_args.kwargs
+        assert get_kwargs["level"] == Level.SERVICE_INSTANCE
+
+    def test_get_fragment_labels_called_once_per_fragment(self):
+        frags = [_fragment(f"frag-{i}") for i in range(3)]
+        mock_client = MagicMock()
+        mock_client.list_instance_fragments.return_value = frags
+        mock_client.get_fragment_labels.return_value = _full_labels(
+            "gtid-x", "sap.pce", "sap-pce-apiResource-PA-v1"
+        )
+
+        with patch(
+            "sap_cloud_sdk.agentgateway._fragments.create_fragment_client",
+            return_value=mock_client,
+        ):
+            _list_active_integrations("my-tenant")
+
+        assert mock_client.get_fragment_labels.call_count == 3
 
     def test_filters_by_mcp_and_a2a_label_types(self):
-        from sap_cloud_sdk.destination._models import Label, ListOptions
+        from sap_cloud_sdk.destination._models import ListOptions
 
         mock_client = MagicMock()
         mock_client.list_instance_fragments.return_value = []
@@ -174,7 +196,7 @@ class TestListActiveIntegrations:
             "sap_cloud_sdk.agentgateway._fragments.create_fragment_client",
             return_value=mock_client,
         ):
-            list_active_integrations("my-tenant")
+            _list_active_integrations("my-tenant")
 
         call_kwargs = mock_client.list_instance_fragments.call_args.kwargs
         filter_obj: ListOptions = call_kwargs["filter"]
@@ -197,7 +219,7 @@ class TestAgentGatewayClientListActiveIntegrations:
             {
                 "global_tenant_id": "gtid-1",
                 "system_type": "sap.pce",
-                "integration_dependency": "sap.pce:apiResource:PA:v1",
+                "integration_dependency": "sap-pce-apiResource-PA-v1",
             }
         ]
         with (
@@ -206,8 +228,8 @@ class TestAgentGatewayClientListActiveIntegrations:
                 return_value=False,
             ),
             patch.object(
-                __import__("sap_cloud_sdk.agentgateway._fragments", fromlist=["list_active_integrations"]),
-                "list_active_integrations",
+                __import__("sap_cloud_sdk.agentgateway._fragments", fromlist=["_list_active_integrations"]),
+                "_list_active_integrations",
                 return_value=expected,
             ) as mock_fn,
         ):
@@ -224,8 +246,8 @@ class TestAgentGatewayClientListActiveIntegrations:
                 return_value=False,
             ),
             patch.object(
-                __import__("sap_cloud_sdk.agentgateway._fragments", fromlist=["list_active_integrations"]),
-                "list_active_integrations",
+                __import__("sap_cloud_sdk.agentgateway._fragments", fromlist=["_list_active_integrations"]),
+                "_list_active_integrations",
                 return_value=[],
             ),
         ):

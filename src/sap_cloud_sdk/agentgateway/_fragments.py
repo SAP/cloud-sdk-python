@@ -9,13 +9,14 @@ Centralises all BTP Destination Service fragment operations:
 
 import logging
 from enum import Enum
-from typing import Optional
+from typing import TypedDict
 
 from sap_cloud_sdk.destination import (
     create_fragment_client,
     Label,
     ListOptions,
 )
+from sap_cloud_sdk.destination._models import Level
 
 from sap_cloud_sdk.agentgateway.exceptions import MCPServerNotFoundError
 from sap_cloud_sdk.core.telemetry import Module
@@ -25,10 +26,12 @@ logger = logging.getLogger(__name__)
 # Shared label key for all managed-runtime fragment types
 LABEL_KEY = "sap-managed-runtime-type"
 
-_DESTINATION_INSTANCE = "default"
+# Label keys for integration metadata stored on system fragments
+_LABEL_GTID = "sap-managed-runtime-gtid"
+_LABEL_ORD_ID = "sap-managed-runtime-ordid"
+_LABEL_SYSTEM_TYPE = "sap-managed-runtime-system-type"
 
-# URL mode path segments used by system integration fragments
-_INTEGRATION_URL_MODES = ("mcp", "a2a")
+_DESTINATION_INSTANCE = "default"
 
 
 class FragmentLabel(str, Enum):
@@ -125,22 +128,31 @@ def get_ias_user_fragment_name(tenant_subdomain: str) -> str:
     return fragments[0].name
 
 
-def list_active_integrations(tenant_subdomain: str) -> list[dict]:
+class ActiveIntegration(TypedDict):
+    """Metadata for a connected backend system integration."""
+
+    global_tenant_id: str
+    system_type: str
+    integration_dependency: str
+
+
+def _list_active_integrations(tenant_subdomain: str) -> list[ActiveIntegration]:
     """List all active backend system integrations for the given tenant.
 
     Reads Destination Service instance fragments to discover active backend
     system integrations for the given tenant. Each fragment represents a
     connected backend system (e.g. SAP PCE, SAP S/4HANA).
 
-    Extracts integration details from the fragment URL, which always has the form:
-        {agw_base_url}/v1/mcp/{ord_id}/{gtid}   (MCP integrations)
-        {agw_base_url}/v1/a2a/{ord_id}/{gtid}   (A2A integrations)
+    Retrieves integration metadata from fragment labels:
+        - sap-managed-runtime-gtid: GTID of the connected partner system.
+        - sap-managed-runtime-system-type: Application namespace (e.g. "sap.pce").
+        - sap-managed-runtime-ordid: Sanitized ORD ID of the integration dependency.
 
     Args:
         tenant_subdomain: Subscriber tenant subdomain.
 
     Returns:
-        List of dicts, each with keys:
+        List of ActiveIntegration dicts, each with keys:
             - global_tenant_id: GTID of the connected partner system.
             - system_type: Application namespace of the partner (e.g. "sap.pce").
             - integration_dependency: ORD ID of the integration dependency fulfilled.
@@ -162,52 +174,33 @@ def list_active_integrations(tenant_subdomain: str) -> list[dict]:
         tenant=tenant_subdomain,
     )
 
-    result = []
+    result: list[ActiveIntegration] = []
     for fragment in fragments:
-        url = fragment.properties.get("URL", "")
-        entry = _parse_integration_from_url(url)
-        if entry is not None:
-            result.append(entry)
+        labels = {
+            lbl.key: lbl.values[0] if lbl.values else None
+            for lbl in client.get_fragment_labels(
+                name=fragment.name,
+                level=Level.SERVICE_INSTANCE,
+                tenant=tenant_subdomain,
+            )
+        }
+        gtid = labels.get(_LABEL_GTID)
+        system_type = labels.get(_LABEL_SYSTEM_TYPE)
+        ord_id = labels.get(_LABEL_ORD_ID)
+
+        if not system_type:
+            logger.debug(
+                "Skipping fragment '%s': missing system_type label (gtid=%s, ord_id=%s)",
+                fragment.name, gtid, ord_id,
+            )
+            continue
+
+        result.append(
+            ActiveIntegration(
+                global_tenant_id=gtid,
+                system_type=system_type,
+                integration_dependency=ord_id,
+            )
+        )
+
     return result
-
-
-def _parse_integration_from_url(url: str) -> Optional[dict]:
-    """Extract integration metadata from a system fragment URL.
-
-    Fragment URLs have the form:
-        {base}/v1/{mode}/{ord_id}/{gtid}
-    where mode is "mcp" or "a2a", ord_id may contain colons and slashes,
-    and gtid is the last path segment.
-
-    Args:
-        url: The fragment URL property value.
-
-    Returns:
-        Dict with global_tenant_id, system_type, integration_dependency,
-        or None if the URL does not match the expected pattern.
-    """
-    parts = url.rstrip("/").split("/")
-
-    mode_idx = None
-    for i, part in enumerate(parts):
-        if i > 0 and parts[i - 1] == "v1" and part in _INTEGRATION_URL_MODES:
-            mode_idx = i
-            break
-
-    if mode_idx is None or mode_idx + 2 > len(parts) - 1:
-        logger.debug("Skipping fragment with unexpected URL pattern: %s", url)
-        return None
-
-    gtid = parts[-1]
-    ord_id = "/".join(parts[mode_idx + 1 : -1])
-    system_type = ord_id.split(":")[0]
-
-    if not gtid or not ord_id:
-        logger.debug("Skipping fragment with empty gtid or ord_id in URL: %s", url)
-        return None
-
-    return {
-        "global_tenant_id": gtid,
-        "system_type": system_type,
-        "integration_dependency": ord_id,
-    }

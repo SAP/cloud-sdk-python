@@ -39,6 +39,7 @@ from sap_cloud_sdk.agentgateway._models import (
 from sap_cloud_sdk.agentgateway._token_cache import _GatewayUrlCache, _TokenCache
 from sap_cloud_sdk.agentgateway.exceptions import AgentGatewaySDKError
 from sap_cloud_sdk.agentgateway import _fragments
+from sap_cloud_sdk.agentgateway._fragments import ActiveIntegration
 from sap_cloud_sdk.core.telemetry import Module, Operation, record_metrics
 
 logger = logging.getLogger(__name__)
@@ -500,7 +501,7 @@ class AgentGatewayClient:
             raise AgentGatewaySDKError(f"Agent card discovery failed: {e}") from e
 
     @record_metrics(Module.AGENTGATEWAY, Operation.AGENTGATEWAY_LIST_ACTIVE_INTEGRATIONS)
-    def list_active_integrations(self) -> list[dict]:
+    def list_active_integrations(self) -> list[ActiveIntegration]:
         """List all active backend system integrations for the current tenant.
 
         Returns the connected backend systems (e.g. SAP PCE, SAP S/4HANA) that
@@ -527,7 +528,7 @@ class AgentGatewayClient:
             ```
         """
         tenant = self._resolve_tenant_subdomain()
-        return _fragments.list_active_integrations(tenant)
+        return _fragments._list_active_integrations(tenant)
 
     @record_metrics(Module.AGENTGATEWAY, Operation.AGENTGATEWAY_CALL_MCP_TOOL)
     async def call_mcp_tool(

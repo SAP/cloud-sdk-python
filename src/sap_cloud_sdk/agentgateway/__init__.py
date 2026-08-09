@@ -59,6 +59,7 @@ from sap_cloud_sdk.agentgateway._models import (
     AgentCard,
     AgentCardFilter,
 )
+from sap_cloud_sdk.agentgateway._fragments import ActiveIntegration
 from sap_cloud_sdk.agentgateway.config import ClientConfig
 from sap_cloud_sdk.agentgateway.agw_client import create_client, AgentGatewayClient
 from sap_cloud_sdk.agentgateway.exceptions import (
@@ -81,6 +82,8 @@ __all__ = [
     "Agent",
     "AgentCard",
     "AgentCardFilter",
+    # Integration metadata
+    "ActiveIntegration",
     # Exceptions
     "AgentGatewaySDKError",
     "AgentGatewayServerError",

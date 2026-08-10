@@ -230,6 +230,37 @@ class TestListMcpFragments:
             assert filter_opt.filter_labels[0].key == _LABEL_KEY
             assert filter_opt.filter_labels[0].values == [_MCP_LABEL_VALUE]
 
+    def test_adds_gtid_label_when_gtids_provided(self):
+        """When gtids is set, add a gtid label to the filter."""
+        with patch(
+            "sap_cloud_sdk.agentgateway._fragments.create_fragment_client"
+        ) as mock_client:
+            mock_client.return_value.list_instance_fragments.return_value = []
+
+            list_mcp_fragments("tenant-sub", gtids=["gtid-a", "gtid-b"])
+
+            call_args = mock_client.return_value.list_instance_fragments.call_args
+            filter_opt = call_args.kwargs.get("filter")
+            assert len(filter_opt.filter_labels) == 2
+            gtid_label = next(
+                lb for lb in filter_opt.filter_labels if lb.key == "sap-managed-runtime-gtid"
+            )
+            assert gtid_label.values == ["gtid-a", "gtid-b"]
+
+    def test_omits_gtid_label_when_gtids_is_empty(self):
+        """Empty list is treated the same as None — no gtid label added."""
+        with patch(
+            "sap_cloud_sdk.agentgateway._fragments.create_fragment_client"
+        ) as mock_client:
+            mock_client.return_value.list_instance_fragments.return_value = []
+
+            list_mcp_fragments("tenant-sub", gtids=[])
+
+            call_args = mock_client.return_value.list_instance_fragments.call_args
+            filter_opt = call_args.kwargs.get("filter")
+            assert len(filter_opt.filter_labels) == 1
+            assert filter_opt.filter_labels[0].key == _LABEL_KEY
+
 
 # ============================================================
 # Test: get_ias_fragment_name
@@ -785,6 +816,40 @@ class TestGetMcpToolsLob:
             )
 
             assert [t.name for t in result] == ["get-sales-order"]
+
+    @pytest.mark.asyncio
+    async def test_gtids_filter_passed_to_list_mcp_fragments(self):
+        """MCPToolFilter.gtids is forwarded to list_mcp_fragments for server-side filtering."""
+        with patch("sap_cloud_sdk.agentgateway._lob.list_mcp_fragments") as mock_list:
+            mock_list.return_value = []
+
+            await get_mcp_tools_lob(
+                "tenant-sub",
+                "system-token",
+                60.0,
+                filter=MCPToolFilter(gtids=["gtid-1", "gtid-2"]),
+            )
+
+        mock_list.assert_called_once()
+        _, call_gtids = mock_list.call_args.args
+        assert call_gtids == ["gtid-1", "gtid-2"]
+
+    @pytest.mark.asyncio
+    async def test_empty_gtids_passes_none_to_list_mcp_fragments(self):
+        """Empty MCPToolFilter.gtids passes None (no filter) to list_mcp_fragments."""
+        with patch("sap_cloud_sdk.agentgateway._lob.list_mcp_fragments") as mock_list:
+            mock_list.return_value = []
+
+            await get_mcp_tools_lob(
+                "tenant-sub",
+                "system-token",
+                60.0,
+                filter=MCPToolFilter(gtids=[]),
+            )
+
+        mock_list.assert_called_once()
+        _, call_gtids = mock_list.call_args.args
+        assert call_gtids is None
 
 
 # ============================================================

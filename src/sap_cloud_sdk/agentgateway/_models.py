@@ -1,7 +1,32 @@
 """Data models for Agent Gateway MCP tools."""
 
 from dataclasses import dataclass, field
-from typing import Any
+from enum import Enum
+from typing import Any, Optional, TypedDict
+
+
+class FragmentLabel(str, Enum):
+    """Label values for the sap-managed-runtime-type fragment label key."""
+
+    MCP = "agw.mcp.server"
+    A2A = "agw.a2a.server"
+    IAS = "subscriber.ias"
+    IAS_USER = "subscriber.ias.user"
+
+
+class ConnectedSystem(TypedDict):
+    """Metadata for a connected backend system integration.
+
+    Attributes:
+        global_tenant_id: GTID of the connected partner system.
+        system_type: Application namespace of the partner (e.g. ``"sap.pce"``).
+            May be ``None`` for older integrations missing the label.
+        integration_dependency: ORD ID of the integration dependency fulfilled.
+    """
+
+    global_tenant_id: Optional[str]
+    system_type: Optional[str]
+    integration_dependency: Optional[str]
 
 
 @dataclass
@@ -169,6 +194,9 @@ class MCPToolFilter:
             agents, or matched against IntegrationDependency.ord_id for
             customer agents). Applied before fetching, skipping non-matching
             fragments.
+        gtids: Global tenant IDs of the connected systems whose tools should be
+            listed. Only supported in the LoB flow; the Destination Service
+            filters fragments server-side. Ignored by the customer flow.
 
     Example:
         ```python
@@ -178,6 +206,7 @@ class MCPToolFilter:
             filter=MCPToolFilter(
                 names=["get-sales-order"],
                 ord_ids=["sap.s4:apiAccess:salesOrder:v1"],
+                gtids=["9e88a0c4-ab32-46d8-b1d3-07cbcac11831"],
             )
         )
         ```
@@ -185,3 +214,4 @@ class MCPToolFilter:
 
     names: list[str] = field(default_factory=list)
     ord_ids: list[str] = field(default_factory=list)
+    gtids: list[str] = field(default_factory=list)

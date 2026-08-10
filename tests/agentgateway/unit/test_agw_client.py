@@ -448,6 +448,73 @@ class TestListMcpTools:
             )
 
     @pytest.mark.asyncio
+    async def test_forwards_gtids_from_filter_to_lob(self):
+        """MCPToolFilter.gtids should reach get_mcp_tools_lob."""
+        with (
+            patch(
+                "sap_cloud_sdk.agentgateway.agw_client.detect_customer_agent_credentials",
+                return_value=None,
+            ),
+            patch(
+                "sap_cloud_sdk.agentgateway.agw_client.detect_transparent_credentials",
+                return_value=False,
+            ),
+            patch(
+                "sap_cloud_sdk.agentgateway.agw_client.fetch_system_auth",
+                new_callable=AsyncMock,
+                return_value=("system-token", "https://agw.example.com"),
+            ),
+            patch(
+                "sap_cloud_sdk.agentgateway.agw_client.get_mcp_tools_lob",
+                new_callable=AsyncMock,
+                return_value=[],
+            ) as mock_lob,
+        ):
+            agw_client = create_client(tenant_subdomain="my-tenant")
+
+            await agw_client.list_mcp_tools(
+                filter=MCPToolFilter(gtids=["gtid-a", "gtid-b"]),
+            )
+
+            mock_lob.assert_called_once_with(
+                "my-tenant",
+                "system-token",
+                60.0,
+                filter=MCPToolFilter(gtids=["gtid-a", "gtid-b"]),
+            )
+
+    @pytest.mark.asyncio
+    async def test_empty_filter_is_equivalent_to_no_filter(self):
+        """MCPToolFilter() with no fields set should not restrict results."""
+        with (
+            patch(
+                "sap_cloud_sdk.agentgateway.agw_client.detect_customer_agent_credentials",
+                return_value=None,
+            ),
+            patch(
+                "sap_cloud_sdk.agentgateway.agw_client.detect_transparent_credentials",
+                return_value=False,
+            ),
+            patch(
+                "sap_cloud_sdk.agentgateway.agw_client.fetch_system_auth",
+                new_callable=AsyncMock,
+                return_value=("system-token", "https://agw.example.com"),
+            ),
+            patch(
+                "sap_cloud_sdk.agentgateway.agw_client.get_mcp_tools_lob",
+                new_callable=AsyncMock,
+                return_value=[],
+            ) as mock_lob,
+        ):
+            agw_client = create_client(tenant_subdomain="my-tenant")
+
+            await agw_client.list_mcp_tools(filter=MCPToolFilter())
+
+            mock_lob.assert_called_once_with(
+                "my-tenant", "system-token", 60.0, filter=MCPToolFilter()
+            )
+
+    @pytest.mark.asyncio
     async def test_calls_lob_flow_with_system_token(self):
         """list_mcp_tools should call LoB flow with system token."""
         with (

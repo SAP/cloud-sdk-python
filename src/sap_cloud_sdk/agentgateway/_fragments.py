@@ -37,11 +37,11 @@ _DESTINATION_INSTANCE = "default"
 def _list_fragments_by_label(
     label: FragmentLabel,
     tenant_subdomain: str,
-    global_tenant_ids: list[str] | None = None,
+    gtids: list[str] | None = None,
 ) -> list:
     filter_labels = [Label(key=LABEL_KEY, values=[label.value])]
-    if global_tenant_ids:
-        filter_labels.append(Label(key=_LABEL_GTID, values=global_tenant_ids))
+    if gtids:
+        filter_labels.append(Label(key=_LABEL_GTID, values=gtids))
     client = create_fragment_client(
         instance=_DESTINATION_INSTANCE,
         _telemetry_source=Module.AGENTGATEWAY,
@@ -54,13 +54,13 @@ def _list_fragments_by_label(
 
 def list_mcp_fragments(
     tenant_subdomain: str,
-    global_tenant_ids: list[str] | None = None,
+    gtids: list[str] | None = None,
 ) -> list:
     """List destination fragments with MCP server label.
 
     Args:
         tenant_subdomain: Tenant subdomain for multi-tenant lookup.
-        global_tenant_ids: Optional list of global tenant IDs of integrated
+        gtids: Optional list of global tenant IDs of integrated
             systems to filter by. When set, only fragments whose
             ``sap-managed-runtime-gtid`` label matches one of these values are
             returned (filter is applied server-side by the Destination Service).
@@ -71,7 +71,7 @@ def list_mcp_fragments(
     """
     logger.debug("Fetching MCP fragments for tenant '%s'", tenant_subdomain)
     return _list_fragments_by_label(
-        FragmentLabel.MCP, tenant_subdomain, global_tenant_ids
+        FragmentLabel.MCP, tenant_subdomain, gtids
     )
 
 
@@ -135,9 +135,6 @@ def get_ias_user_fragment_name(tenant_subdomain: str) -> str:
         )
     return fragments[0].name
 
-
-# Backward-compatible alias
-ActiveIntegration = ConnectedSystem
 
 
 def _list_active_integrations(tenant_subdomain: str) -> list[ConnectedSystem]:

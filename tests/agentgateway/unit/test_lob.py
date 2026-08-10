@@ -230,31 +230,31 @@ class TestListMcpFragments:
             assert filter_opt.filter_labels[0].key == _LABEL_KEY
             assert filter_opt.filter_labels[0].values == [_MCP_LABEL_VALUE]
 
-    def test_adds_gtid_label_when_global_tenant_ids_provided(self):
-        """When global_tenant_ids is set, add a gtid label to the filter."""
+    def test_adds_gtid_label_when_gtids_provided(self):
+        """When gtids is set, add a gtid label to the filter."""
         with patch(
             "sap_cloud_sdk.agentgateway._fragments.create_fragment_client"
         ) as mock_client:
             mock_client.return_value.list_instance_fragments.return_value = []
 
-            list_mcp_fragments("tenant-sub", global_tenant_ids=["gtid-a", "gtid-b"])
+            list_mcp_fragments("tenant-sub", gtids=["gtid-a", "gtid-b"])
 
             call_args = mock_client.return_value.list_instance_fragments.call_args
             filter_opt = call_args.kwargs.get("filter")
             assert len(filter_opt.filter_labels) == 2
             gtid_label = next(
-                lb for lb in filter_opt.filter_labels if lb.key == GTID_LABEL_KEY
+                lb for lb in filter_opt.filter_labels if lb.key == "sap-managed-runtime-gtid"
             )
             assert gtid_label.values == ["gtid-a", "gtid-b"]
 
-    def test_omits_gtid_label_when_global_tenant_ids_is_empty(self):
+    def test_omits_gtid_label_when_gtids_is_empty(self):
         """Empty list is treated the same as None — no gtid label added."""
         with patch(
             "sap_cloud_sdk.agentgateway._fragments.create_fragment_client"
         ) as mock_client:
             mock_client.return_value.list_instance_fragments.return_value = []
 
-            list_mcp_fragments("tenant-sub", global_tenant_ids=[])
+            list_mcp_fragments("tenant-sub", gtids=[])
 
             call_args = mock_client.return_value.list_instance_fragments.call_args
             filter_opt = call_args.kwargs.get("filter")

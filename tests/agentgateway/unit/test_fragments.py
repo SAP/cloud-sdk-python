@@ -36,7 +36,7 @@ def _full_labels(gtid: str, system_type: str, ord_id: str) -> list[Label]:
 # ============================================================
 
 
-class TestListActiveIntegrations:
+class TestListConnectedSystems:
     def test_returns_entries_from_fragment_labels(self):
         frag1 = _fragment("frag-mcp-1")
         frag2 = _fragment("frag-a2a-2")
@@ -209,7 +209,7 @@ class TestListActiveIntegrations:
 # ============================================================
 
 
-class TestAgentGatewayClientListActiveIntegrations:
+class TestAgentGatewayClientListConnectedSystems:
     def test_delegates_to_fragments_helper(self):
         expected = [
             {

@@ -403,7 +403,7 @@ class AgentGatewayClient:
                 filter=MCPToolFilter(
                     names=["get-sales-order"],
                     ord_ids=["sap.s4:apiAccess:salesOrder:v1"],
-                    global_tenant_ids=["<gtid>"],
+                    gtids=["<gtid>"],
                 )
             )
             ```

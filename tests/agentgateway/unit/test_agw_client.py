@@ -448,8 +448,8 @@ class TestListMcpTools:
             )
 
     @pytest.mark.asyncio
-    async def test_forwards_global_tenant_ids_from_filter_to_lob(self):
-        """MCPToolFilter.global_tenant_ids should reach get_mcp_tools_lob."""
+    async def test_forwards_gtids_from_filter_to_lob(self):
+        """MCPToolFilter.gtids should reach get_mcp_tools_lob."""
         with (
             patch(
                 "sap_cloud_sdk.agentgateway.agw_client.detect_customer_agent_credentials",
@@ -473,14 +473,14 @@ class TestListMcpTools:
             agw_client = create_client(tenant_subdomain="my-tenant")
 
             await agw_client.list_mcp_tools(
-                filter=MCPToolFilter(global_tenant_ids=["gtid-a", "gtid-b"]),
+                filter=MCPToolFilter(gtids=["gtid-a", "gtid-b"]),
             )
 
             mock_lob.assert_called_once_with(
                 "my-tenant",
                 "system-token",
                 60.0,
-                filter=MCPToolFilter(global_tenant_ids=["gtid-a", "gtid-b"]),
+                filter=MCPToolFilter(gtids=["gtid-a", "gtid-b"]),
             )
 
     @pytest.mark.asyncio

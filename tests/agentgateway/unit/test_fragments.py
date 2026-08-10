@@ -181,7 +181,7 @@ class TestListActiveIntegrations:
 
         assert mock_client.get_fragment_labels.call_count == 3
 
-    def test_filters_by_mcp_and_a2a_label_types(self):
+    def test_filters_by_mcp_label_type_only(self):
         from sap_cloud_sdk.destination._models import ListOptions
 
         mock_client = MagicMock()
@@ -196,11 +196,12 @@ class TestListActiveIntegrations:
         call_kwargs = mock_client.list_instance_fragments.call_args.kwargs
         filter_obj: ListOptions = call_kwargs["filter"]
         assert filter_obj is not None
+        assert filter_obj.filter_labels is not None
         assert len(filter_obj.filter_labels) == 1
         label: Label = filter_obj.filter_labels[0]
         assert label.key == "sap-managed-runtime-type"
         assert "agw.mcp.server" in label.values
-        assert "agw.a2a.server" in label.values
+        assert "agw.a2a.server" not in label.values
 
 
 # ============================================================
@@ -218,6 +219,10 @@ class TestAgentGatewayClientListActiveIntegrations:
             }
         ]
         with (
+            patch(
+                "sap_cloud_sdk.agentgateway.agw_client.detect_customer_agent_credentials",
+                return_value=None,
+            ),
             patch(
                 "sap_cloud_sdk.agentgateway.agw_client.detect_transparent_credentials",
                 return_value=False,
@@ -237,6 +242,10 @@ class TestAgentGatewayClientListActiveIntegrations:
     def test_returns_empty_list_when_no_integrations(self):
         with (
             patch(
+                "sap_cloud_sdk.agentgateway.agw_client.detect_customer_agent_credentials",
+                return_value=None,
+            ),
+            patch(
                 "sap_cloud_sdk.agentgateway.agw_client.detect_transparent_credentials",
                 return_value=False,
             ),
@@ -252,10 +261,46 @@ class TestAgentGatewayClientListActiveIntegrations:
         assert result == []
 
     def test_raises_when_tenant_subdomain_not_configured(self):
-        with patch(
-            "sap_cloud_sdk.agentgateway.agw_client.detect_transparent_credentials",
-            return_value=False,
+        with (
+            patch(
+                "sap_cloud_sdk.agentgateway.agw_client.detect_customer_agent_credentials",
+                return_value=None,
+            ),
+            patch(
+                "sap_cloud_sdk.agentgateway.agw_client.detect_transparent_credentials",
+                return_value=False,
+            ),
         ):
             client = create_client()
             with pytest.raises(AgentGatewaySDKError):
+                client.list_active_integrations()
+
+    def test_raises_for_standard_customer_agent(self):
+        with (
+            patch(
+                "sap_cloud_sdk.agentgateway.agw_client.detect_customer_agent_credentials",
+                return_value="/etc/secrets/credentials.json",
+            ),
+            patch(
+                "sap_cloud_sdk.agentgateway.agw_client.detect_transparent_credentials",
+                return_value=False,
+            ),
+        ):
+            client = create_client(tenant_subdomain="my-tenant")
+            with pytest.raises(AgentGatewaySDKError, match="not supported for customer agents"):
+                client.list_active_integrations()
+
+    def test_raises_for_transparent_customer_agent(self):
+        with (
+            patch(
+                "sap_cloud_sdk.agentgateway.agw_client.detect_customer_agent_credentials",
+                return_value=None,
+            ),
+            patch(
+                "sap_cloud_sdk.agentgateway.agw_client.detect_transparent_credentials",
+                return_value=True,
+            ),
+        ):
+            client = create_client(tenant_subdomain="my-tenant")
+            with pytest.raises(AgentGatewaySDKError, match="not supported for customer agents"):
                 client.list_active_integrations()

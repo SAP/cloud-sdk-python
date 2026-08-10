@@ -6,7 +6,6 @@ from unittest.mock import patch, MagicMock, AsyncMock
 import pytest
 
 from sap_cloud_sdk.agentgateway._fragments import (
-    GTID_LABEL_KEY,
     LABEL_KEY,
     FragmentLabel,
     get_ias_fragment_name,
@@ -819,8 +818,8 @@ class TestGetMcpToolsLob:
             assert [t.name for t in result] == ["get-sales-order"]
 
     @pytest.mark.asyncio
-    async def test_passes_global_tenant_ids_to_list_mcp_fragments(self):
-        """global_tenant_ids in MCPToolFilter should be forwarded to list_mcp_fragments."""
+    async def test_gtids_filter_passed_to_list_mcp_fragments(self):
+        """MCPToolFilter.gtids is forwarded to list_mcp_fragments for server-side filtering."""
         with patch("sap_cloud_sdk.agentgateway._lob.list_mcp_fragments") as mock_list:
             mock_list.return_value = []
 
@@ -828,22 +827,29 @@ class TestGetMcpToolsLob:
                 "tenant-sub",
                 "system-token",
                 60.0,
-                filter=MCPToolFilter(global_tenant_ids=["gtid-a", "gtid-b"]),
+                filter=MCPToolFilter(gtids=["gtid-1", "gtid-2"]),
             )
 
-            mock_list.assert_called_once_with(
-                "tenant-sub", ["gtid-a", "gtid-b"]
-            )
+        mock_list.assert_called_once()
+        _, call_gtids = mock_list.call_args.args
+        assert call_gtids == ["gtid-1", "gtid-2"]
 
     @pytest.mark.asyncio
-    async def test_default_global_tenant_ids_is_none(self):
-        """Without global_tenant_ids filter, list_mcp_fragments is called with None."""
+    async def test_empty_gtids_passes_none_to_list_mcp_fragments(self):
+        """Empty MCPToolFilter.gtids passes None (no filter) to list_mcp_fragments."""
         with patch("sap_cloud_sdk.agentgateway._lob.list_mcp_fragments") as mock_list:
             mock_list.return_value = []
 
-            await get_mcp_tools_lob("tenant-sub", "system-token", 60.0)
+            await get_mcp_tools_lob(
+                "tenant-sub",
+                "system-token",
+                60.0,
+                filter=MCPToolFilter(gtids=[]),
+            )
 
-            mock_list.assert_called_once_with("tenant-sub", None)
+        mock_list.assert_called_once()
+        _, call_gtids = mock_list.call_args.args
+        assert call_gtids is None
 
 
 # ============================================================

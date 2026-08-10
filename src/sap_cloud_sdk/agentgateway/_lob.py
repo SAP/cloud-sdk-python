@@ -22,7 +22,6 @@ from sap_cloud_sdk.core.telemetry import Module
 
 from sap_cloud_sdk.agentgateway._fragments import (
     LABEL_KEY,
-    FragmentLabel,
     get_ias_fragment_name,
     get_ias_user_fragment_name,
     list_mcp_fragments,
@@ -32,6 +31,7 @@ from sap_cloud_sdk.agentgateway._models import (
     Agent,
     AgentCard,
     AgentCardFilter,
+    FragmentLabel,
     MCPTool,
     MCPToolFilter,
 )
@@ -379,9 +379,9 @@ async def get_mcp_tools_lob(
         system_token: Pre-fetched raw system token (from get_system_auth).
         timeout: HTTP timeout in seconds for MCP server calls.
         filter: Optional MCPToolFilter narrowing results by tool name, ORD ID,
-            or global tenant ID. If None or empty, all tools are included.
-            ``global_tenant_ids`` filters fragments server-side via the
-            Destination Service. ``ord_ids`` filters before fetching.
+            or GTID. If None or empty, all tools are included.
+            ``gtids`` filters fragments server-side via the Destination Service.
+            ``ord_ids`` filters before fetching.
             ``names`` filters after fetching.
 
     Returns:
@@ -394,7 +394,7 @@ async def get_mcp_tools_lob(
     logger.info("Listing MCP fragments for tenant '%s'", tenant_subdomain)
 
     fragments = await loop.run_in_executor(
-        None, list_mcp_fragments, tenant_subdomain, f.global_tenant_ids or None
+        None, list_mcp_fragments, tenant_subdomain, f.gtids or None
     )
 
     if not fragments:

@@ -8,8 +8,7 @@ Centralises all BTP Destination Service fragment operations:
 """
 
 import logging
-from enum import Enum
-from typing import Optional, TypedDict
+from typing import Optional
 
 from sap_cloud_sdk.destination import (
     create_fragment_client,
@@ -19,6 +18,7 @@ from sap_cloud_sdk.destination import (
 from sap_cloud_sdk.destination._models import Level
 
 from sap_cloud_sdk.agentgateway.exceptions import MCPServerNotFoundError
+from sap_cloud_sdk.agentgateway._models import ConnectedSystem, FragmentLabel
 from sap_cloud_sdk.core.telemetry import Module
 
 logger = logging.getLogger(__name__)
@@ -32,15 +32,6 @@ _LABEL_ORD_ID = "sap-managed-runtime-ordid"
 _LABEL_SYSTEM_TYPE = "sap-managed-runtime-system-type"
 
 _DESTINATION_INSTANCE = "default"
-
-
-class FragmentLabel(str, Enum):
-    """Label values for the sap-managed-runtime-type fragment label key."""
-
-    MCP = "agw.mcp.server"
-    A2A = "agw.a2a.server"
-    IAS = "subscriber.ias"
-    IAS_USER = "subscriber.ias.user"
 
 
 def _list_fragments_by_label(
@@ -145,15 +136,11 @@ def get_ias_user_fragment_name(tenant_subdomain: str) -> str:
     return fragments[0].name
 
 
-class ActiveIntegration(TypedDict):
-    """Metadata for a connected backend system integration."""
-
-    global_tenant_id: str
-    system_type: Optional[str]
-    integration_dependency: str
+# Backward-compatible alias
+ActiveIntegration = ConnectedSystem
 
 
-def _list_active_integrations(tenant_subdomain: str) -> list[ActiveIntegration]:
+def _list_active_integrations(tenant_subdomain: str) -> list[ConnectedSystem]:
     """List all active backend system integrations for the given tenant.
 
     Reads Destination Service instance fragments to discover active backend
@@ -169,7 +156,7 @@ def _list_active_integrations(tenant_subdomain: str) -> list[ActiveIntegration]:
         tenant_subdomain: Subscriber tenant subdomain.
 
     Returns:
-        List of ActiveIntegration dicts, each with keys:
+        List of ConnectedSystem dicts, each with keys:
             - global_tenant_id: GTID of the connected partner system.
             - system_type: Application namespace of the partner (e.g. "sap.pce").
             - integration_dependency: ORD ID of the integration dependency fulfilled.
@@ -184,14 +171,14 @@ def _list_active_integrations(tenant_subdomain: str) -> list[ActiveIntegration]:
             filter_labels=[
                 Label(
                     key=LABEL_KEY,
-                    values=[FragmentLabel.MCP.value, FragmentLabel.A2A.value],
+                    values=[FragmentLabel.MCP.value],
                 )
             ]
         ),
         tenant=tenant_subdomain,
     )
 
-    result: list[ActiveIntegration] = []
+    result: list[ConnectedSystem] = []
     for fragment in fragments:
         labels = {
             lbl.key: lbl.values[0] if lbl.values else None
@@ -212,7 +199,7 @@ def _list_active_integrations(tenant_subdomain: str) -> list[ActiveIntegration]:
             )
 
         result.append(
-            ActiveIntegration(
+            ConnectedSystem(
                 global_tenant_id=gtid,
                 system_type=system_type,
                 integration_dependency=ord_id,

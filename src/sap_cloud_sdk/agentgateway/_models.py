@@ -1,7 +1,17 @@
 """Data models for Agent Gateway MCP tools."""
 
 from dataclasses import dataclass, field
-from typing import Any
+from enum import Enum
+from typing import Any, Optional, TypedDict
+
+
+class FragmentLabel(str, Enum):
+    """Label values for the sap-managed-runtime-type fragment label key."""
+
+    MCP = "agw.mcp.server"
+    A2A = "agw.a2a.server"
+    IAS = "subscriber.ias"
+    IAS_USER = "subscriber.ias.user"
 
 
 @dataclass
@@ -169,13 +179,9 @@ class MCPToolFilter:
             agents, or matched against IntegrationDependency.ord_id for
             customer agents). Applied before fetching, skipping non-matching
             fragments.
-        global_tenant_ids: Global tenant IDs of the integrated systems whose
-            tools should be listed. Only supported in the LoB flow, where each
-            MCP fragment carries a ``sap-managed-runtime-gtid`` label written
-            by SPII at provisioning time. When set, the Destination Service
-            filters fragments server-side. Ignored by the customer flow (which
-            already scopes tools by the ``integrationDependencies`` in the
-            credentials file).
+        gtids: Global tenant IDs of the connected systems whose tools should be
+            listed. Only supported in the LoB flow; the Destination Service
+            filters fragments server-side. Ignored by the customer flow.
 
     Example:
         ```python
@@ -185,7 +191,7 @@ class MCPToolFilter:
             filter=MCPToolFilter(
                 names=["get-sales-order"],
                 ord_ids=["sap.s4:apiAccess:salesOrder:v1"],
-                global_tenant_ids=["9e88a0c4-ab32-46d8-b1d3-07cbcac11831"],
+                gtids=["9e88a0c4-ab32-46d8-b1d3-07cbcac11831"],
             )
         )
         ```
@@ -193,4 +199,4 @@ class MCPToolFilter:
 
     names: list[str] = field(default_factory=list)
     ord_ids: list[str] = field(default_factory=list)
-    global_tenant_ids: list[str] = field(default_factory=list)
+    gtids: list[str] = field(default_factory=list)

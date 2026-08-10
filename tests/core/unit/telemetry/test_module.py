@@ -67,6 +67,7 @@ class TestModule:
         assert Module.AUDITLOG in all_modules
         assert Module.AUDITLOG_NG in all_modules
         assert Module.BOOTSTRAP in all_modules
+        assert Module.CACHE in all_modules
         assert Module.DATA_ANONYMIZATION in all_modules
         assert Module.DESTINATION in all_modules
         assert Module.DMS in all_modules

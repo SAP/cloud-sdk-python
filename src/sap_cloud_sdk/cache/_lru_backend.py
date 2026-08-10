@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import threading
+import time
 from typing import Any, Callable
 
 from cachetools import TTLCache
@@ -75,8 +76,6 @@ class InMemoryLRUBackend(CacheBackend):
         self._lock = threading.Lock()
 
     def get(self, key: str) -> Any | None:
-        import time
-
         with self._lock:
             entry = self._cache.get(key)
             if entry is None:
@@ -91,8 +90,6 @@ class InMemoryLRUBackend(CacheBackend):
             return value
 
     def set(self, key: str, value: Any, ttl_seconds: int) -> None:
-        import time
-
         expires_at = time.monotonic() + max(ttl_seconds, 1)
         with self._lock:
             self._cache[key] = (value, expires_at)

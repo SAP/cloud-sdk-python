@@ -17,11 +17,13 @@ By default every SDK client uses an in-process LRU cache with sensible defaults.
 ```python
 from sap_cloud_sdk.cache import CacheConfig, configure_cache
 
-configure_cache(CacheConfig(
-    default_ttl_seconds=600,
-    expiry_buffer_seconds=60,
-    max_size=2000,
-))
+configure_cache(
+    CacheConfig(
+        default_ttl_seconds=600,
+        expiry_buffer_seconds=60,
+        max_size=2000,
+    )
+)
 ```
 
 Call `configure_cache()` **once at startup**, before any SDK client is created. Changes made after client construction have no effect on already-instantiated clients.
@@ -76,8 +78,10 @@ from sap_cloud_sdk.cache import CacheConfig, configure_cache
 
 logger = logging.getLogger(__name__)
 
+
 def on_evict(key: str, reason: str) -> None:
     logger.info("cache evicted key=%s reason=%s", key, reason)
+
 
 configure_cache(CacheConfig(on_evict=on_evict))
 ```
@@ -131,6 +135,13 @@ The default backend. Thread-safe, LRU + TTL eviction, backed by `cachetools.TTLC
 ### `class IsolationStrategy`
 
 Enum with values `TENANT` and `TENANT_USER`. See [Isolation Strategy](#isolation-strategy) above.
+
+## Multi-tenancy
+
+- **Supported:** Yes, `TENANT` and `TENANT_USER` isolation strategies
+- **Authentication:** N/A, the cache module does not perform BTP authentication
+- **How to use:** Set `isolation_strategy` in `CacheConfig`. Auto-selection uses `TENANT_USER` when a `user_id` is provided to `Cache.get()`/`Cache.set()`, otherwise `TENANT`
+- **Further reading:** N/A
 
 ## Error Handling
 

@@ -19,6 +19,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
+from sap_cloud_sdk.cache._backend import CacheBackend
 from sap_cloud_sdk.cache._config import CacheConfig, get_cache_config
 from sap_cloud_sdk.cache._isolation import build_isolation_key
 from sap_cloud_sdk.cache._lru_backend import InMemoryLRUBackend
@@ -151,7 +152,7 @@ class Cache:
     # Private helpers
     # ------------------------------------------------------------------
 
-    def _resolve_backend(self) -> Any:
+    def _resolve_backend(self) -> CacheBackend:
         if self._config.backend is not None:
             return self._config.backend
         return InMemoryLRUBackend(

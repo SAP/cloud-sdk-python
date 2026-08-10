@@ -543,7 +543,7 @@ class UmsTransport:
             dest = self._dest_client.get_destination(
                 self._destination_name,
                 level=ConsumptionLevel.PROVIDER_SUBACCOUNT,
-                options=ConsumptionOptions(skip_token_retrieval=True) 
+                options=ConsumptionOptions(skip_token_retrieval=True),
             )
         except Exception as exc:
             raise TransportError(

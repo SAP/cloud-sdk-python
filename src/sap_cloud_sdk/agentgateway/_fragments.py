@@ -43,28 +43,45 @@ class FragmentLabel(str, Enum):
     IAS_USER = "subscriber.ias.user"
 
 
-def _list_fragments_by_label(label: FragmentLabel, tenant_subdomain: str) -> list:
+def _list_fragments_by_label(
+    label: FragmentLabel,
+    tenant_subdomain: str,
+    global_tenant_ids: list[str] | None = None,
+) -> list:
+    filter_labels = [Label(key=LABEL_KEY, values=[label.value])]
+    if global_tenant_ids:
+        filter_labels.append(Label(key=_LABEL_GTID, values=global_tenant_ids))
     client = create_fragment_client(
         instance=_DESTINATION_INSTANCE,
         _telemetry_source=Module.AGENTGATEWAY,
     )
     return client.list_instance_fragments(
-        filter=ListOptions(filter_labels=[Label(key=LABEL_KEY, values=[label.value])]),
+        filter=ListOptions(filter_labels=filter_labels),
         tenant=tenant_subdomain,
     )
 
 
-def list_mcp_fragments(tenant_subdomain: str) -> list:
+def list_mcp_fragments(
+    tenant_subdomain: str,
+    global_tenant_ids: list[str] | None = None,
+) -> list:
     """List destination fragments with MCP server label.
 
     Args:
         tenant_subdomain: Tenant subdomain for multi-tenant lookup.
+        global_tenant_ids: Optional list of global tenant IDs of integrated
+            systems to filter by. When set, only fragments whose
+            ``sap-managed-runtime-gtid`` label matches one of these values are
+            returned (filter is applied server-side by the Destination Service).
 
     Returns:
-        List of fragments with sap-managed-runtime-type=agw.mcp.server label.
+        List of fragments with sap-managed-runtime-type=agw.mcp.server label
+        (and, if provided, matching one of the requested global tenant IDs).
     """
     logger.debug("Fetching MCP fragments for tenant '%s'", tenant_subdomain)
-    return _list_fragments_by_label(FragmentLabel.MCP, tenant_subdomain)
+    return _list_fragments_by_label(
+        FragmentLabel.MCP, tenant_subdomain, global_tenant_ids
+    )
 
 
 def list_a2a_fragments(tenant_subdomain: str) -> list:

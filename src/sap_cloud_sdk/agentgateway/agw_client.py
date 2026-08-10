@@ -378,8 +378,9 @@ class AgentGatewayClient:
             user_token: User's JWT for principal propagation.
                 Can be a string or a callable returning a string.
                 If provided, uses user-scoped auth instead of system auth.
-            filter: Optional filter to narrow results by tool name or ORD ID.
-                If None or empty, all tools are included.
+            filter: Optional filter to narrow results by tool name, ORD ID, or
+                global tenant ID. If None or empty, all tools are included.
+                See :class:`MCPToolFilter` for supported fields.
 
         Returns:
             List of MCPTool objects from all MCP servers.
@@ -402,6 +403,7 @@ class AgentGatewayClient:
                 filter=MCPToolFilter(
                     names=["get-sales-order"],
                     ord_ids=["sap.s4:apiAccess:salesOrder:v1"],
+                    global_tenant_ids=["<gtid>"],
                 )
             )
             ```

@@ -378,8 +378,11 @@ async def get_mcp_tools_lob(
         tenant_subdomain: Tenant subdomain for multi-tenant lookup.
         system_token: Pre-fetched raw system token (from get_system_auth).
         timeout: HTTP timeout in seconds for MCP server calls.
-        filter: Optional MCPToolFilter narrowing results by tool name or ORD ID.
-            If None or empty, all tools are included.
+        filter: Optional MCPToolFilter narrowing results by tool name, ORD ID,
+            or global tenant ID. If None or empty, all tools are included.
+            ``global_tenant_ids`` filters fragments server-side via the
+            Destination Service. ``ord_ids`` filters before fetching.
+            ``names`` filters after fetching.
 
     Returns:
         List of MCPTool objects from all MCP servers.
@@ -390,7 +393,9 @@ async def get_mcp_tools_lob(
 
     logger.info("Listing MCP fragments for tenant '%s'", tenant_subdomain)
 
-    fragments = await loop.run_in_executor(None, list_mcp_fragments, tenant_subdomain)
+    fragments = await loop.run_in_executor(
+        None, list_mcp_fragments, tenant_subdomain, f.global_tenant_ids or None
+    )
 
     if not fragments:
         logger.debug(

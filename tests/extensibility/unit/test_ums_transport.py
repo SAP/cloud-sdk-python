@@ -14,7 +14,6 @@ from sap_cloud_sdk.extensibility._ums_transport import (
     UmsTransport,
     _ums_destination_name,
     ENV_CONHOS_LANDSCAPE,
-    ENV_UMS_DESTINATION_NAME,
     ENV_UMS_URL,
     _GRAPHQL_QUERY,
 )
@@ -36,61 +35,34 @@ from tests.extensibility.unit._ums_test_helpers import (
 
 class TestUmsDestinationName:
     def test_constructs_from_landscape_env(self, monkeypatch):
-        monkeypatch.delenv(ENV_UMS_DESTINATION_NAME, raising=False)
         monkeypatch.setenv(ENV_CONHOS_LANDSCAPE, "exttest-dev-eu12")
         monkeypatch.setenv(ENV_UMS_URL, "https://ums.example.com")
         assert _ums_destination_name() == "sap-managed-runtime-ias-exttest-dev-eu12"
 
     def test_constructs_from_landscape_env_prod(self, monkeypatch):
-        monkeypatch.delenv(ENV_UMS_DESTINATION_NAME, raising=False)
         monkeypatch.setenv(ENV_CONHOS_LANDSCAPE, "myagent-prod-eu10")
         monkeypatch.setenv(ENV_UMS_URL, "https://ums.example.com")
         assert _ums_destination_name() == "sap-managed-runtime-ias-myagent-prod-eu10"
 
     def test_returns_none_when_env_not_set(self, monkeypatch):
-        monkeypatch.delenv(ENV_UMS_DESTINATION_NAME, raising=False)
         monkeypatch.delenv(ENV_CONHOS_LANDSCAPE, raising=False)
         assert _ums_destination_name() is None
 
     def test_returns_none_when_env_empty(self, monkeypatch):
-        monkeypatch.delenv(ENV_UMS_DESTINATION_NAME, raising=False)
         monkeypatch.setenv(ENV_CONHOS_LANDSCAPE, "")
         assert _ums_destination_name() is None
 
     def test_returns_none_when_ums_url_not_set(self, monkeypatch):
-        monkeypatch.delenv(ENV_UMS_DESTINATION_NAME, raising=False)
         monkeypatch.setenv(ENV_CONHOS_LANDSCAPE, "exttest-dev-eu12")
         monkeypatch.delenv(ENV_UMS_URL, raising=False)
         assert _ums_destination_name() is None
 
-    def test_override_env_takes_precedence(self, monkeypatch):
-        monkeypatch.setenv(ENV_UMS_DESTINATION_NAME, "ums-exttest-dev-eu12")
-        monkeypatch.setenv(ENV_CONHOS_LANDSCAPE, "exttest-dev-eu12")
-        assert _ums_destination_name() == "ums-exttest-dev-eu12"
-
-    def test_override_env_without_landscape(self, monkeypatch):
-        monkeypatch.setenv(ENV_UMS_DESTINATION_NAME, "my-custom-dest")
-        monkeypatch.delenv(ENV_CONHOS_LANDSCAPE, raising=False)
-        assert _ums_destination_name() == "my-custom-dest"
-
-    def test_empty_override_falls_through_to_landscape(self, monkeypatch):
-        monkeypatch.setenv(ENV_UMS_DESTINATION_NAME, "")
-        monkeypatch.setenv(ENV_CONHOS_LANDSCAPE, "exttest-dev-eu12")
-        monkeypatch.setenv(ENV_UMS_URL, "https://ums.example.com")
-        assert _ums_destination_name() == "sap-managed-runtime-ias-exttest-dev-eu12"
-
     def test_config_override_takes_highest_priority(self, monkeypatch):
-        monkeypatch.setenv(ENV_UMS_DESTINATION_NAME, "env-override")
         monkeypatch.setenv(ENV_CONHOS_LANDSCAPE, "exttest-dev-eu12")
         assert _ums_destination_name(config_override="config-dest") == "config-dest"
 
-    def test_config_override_none_falls_through(self, monkeypatch):
-        monkeypatch.setenv(ENV_UMS_DESTINATION_NAME, "env-override")
-        assert _ums_destination_name(config_override=None) == "env-override"
-
     def test_config_override_empty_falls_through(self, monkeypatch):
         monkeypatch.setenv(ENV_CONHOS_LANDSCAPE, "exttest-dev-eu12")
-        monkeypatch.delenv(ENV_UMS_DESTINATION_NAME, raising=False)
         monkeypatch.setenv(ENV_UMS_URL, "https://ums.example.com")
         assert (
             _ums_destination_name(config_override="")
@@ -105,7 +77,6 @@ class TestUmsDestinationName:
 class TestUmsTransportInit:
     @patch("sap_cloud_sdk.extensibility._ums_transport.create_destination_client")
     def test_valid_config(self, mock_dest_client, monkeypatch):
-        monkeypatch.delenv(ENV_UMS_DESTINATION_NAME, raising=False)
         monkeypatch.setenv(ENV_CONHOS_LANDSCAPE, "exttest-dev-eu12")
         monkeypatch.setenv(ENV_UMS_URL, "https://ums.example.com")
         config = _make_config()
@@ -119,7 +90,6 @@ class TestUmsTransportInit:
     def test_destination_name_none_when_env_not_set(
         self, mock_dest_client, monkeypatch
     ):
-        monkeypatch.delenv(ENV_UMS_DESTINATION_NAME, raising=False)
         monkeypatch.delenv(ENV_CONHOS_LANDSCAPE, raising=False)
         config = _make_config()
         transport = UmsTransport(AGENT_ORD_ID, config)
@@ -160,7 +130,6 @@ class TestUmsTransportGetExtCapImpl:
         self, mock_dest_client, monkeypatch
     ):
         monkeypatch.delenv(ENV_CONHOS_LANDSCAPE, raising=False)
-        monkeypatch.delenv(ENV_UMS_DESTINATION_NAME, raising=False)
         config = _make_config()
         transport = UmsTransport(AGENT_ORD_ID, config)
         assert transport._destination_name is None

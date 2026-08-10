@@ -52,7 +52,6 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 ENV_CONHOS_LANDSCAPE = "APPFND_CONHOS_LANDSCAPE"
-ENV_UMS_DESTINATION_NAME = "APPFND_UMS_DESTINATION_NAME"
 ENV_UMS_URL = "APPFND_CONHOS_UMS_URL"
 _IAS_DESTINATION_PREFIX = "sap-managed-runtime-ias-"
 
@@ -189,9 +188,7 @@ def _ums_destination_name(config_override: Optional[str] = None) -> Optional[str
 
     1. **Config override** -- if ``config.destination_name`` is set, use
        it directly.
-    2. **Explicit env var override** -- if ``APPFND_UMS_DESTINATION_NAME``
-       is set, use its value directly.
-    3. **Landscape-based construction** -- built as
+    2. **Landscape-based construction** -- built as
        ``sap-managed-runtime-ias-{APPFND_CONHOS_LANDSCAPE}``.
        ``APPFND_CONHOS_UMS_URL`` must be set; a warning is logged and
        ``None`` is returned if it is absent.
@@ -212,34 +209,18 @@ def _ums_destination_name(config_override: Optional[str] = None) -> Optional[str
         )
         return config_override
 
-    # 1. Explicit env var override takes precedence
-    override = os.environ.get(ENV_UMS_DESTINATION_NAME)
-    if override:
-        logger.debug(
-            "Using UMS destination name from %s: %s",
-            ENV_UMS_DESTINATION_NAME,
-            override,
-        )
-        return override
-
     # 2. Construct from landscape (existing logic)
     landscape = os.environ.get(ENV_CONHOS_LANDSCAPE)
     if not landscape:
         logger.warning(
-            "%s is not set; cannot construct UMS destination name. "
-            "Set %s or %s to configure the UMS destination name.",
-            ENV_CONHOS_LANDSCAPE,
-            ENV_UMS_DESTINATION_NAME,
+            "%s is not set; cannot construct UMS destination name.",
             ENV_CONHOS_LANDSCAPE,
         )
         return None
 
     if not os.environ.get(ENV_UMS_URL):
         logger.warning(
-            "%s is not set; cannot construct IAS destination name. "
-            "Set %s or %s to configure the destination name.",
-            ENV_UMS_URL,
-            ENV_UMS_DESTINATION_NAME,
+            "%s is not set; cannot construct IAS destination name.",
             ENV_UMS_URL,
         )
         return None
@@ -446,8 +427,7 @@ class UmsTransport:
     **Destination name** is resolved in order:
 
     1. ``config.destination_name`` (explicit config override).
-    2. ``APPFND_UMS_DESTINATION_NAME`` environment variable.
-    3. Landscape-based construction:
+    2. Landscape-based construction:
 
        * ``sap-managed-runtime-ias-{APPFND_CONHOS_LANDSCAPE}`` (requires
          ``APPFND_CONHOS_UMS_URL`` to be set; logs a warning and returns
@@ -554,8 +534,7 @@ class UmsTransport:
         if self._destination_name is None:
             raise TransportError(
                 "UMS destination name could not be resolved. "
-                "Either set APPFND_UMS_DESTINATION_NAME directly, "
-                "or set both APPFND_CONHOS_LANDSCAPE and APPFND_CONHOS_UMS_URL "
+                "Set both APPFND_CONHOS_LANDSCAPE and APPFND_CONHOS_UMS_URL "
                 "to construct the IAS destination name, "
                 "or provide a destination_name in ExtensibilityConfig."
             )

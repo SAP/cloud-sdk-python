@@ -21,8 +21,7 @@ class ExtensibilityConfig:
     Attributes:
         destination_name: Optional override for the UMS destination name.
             When set, it is used directly, bypassing automatic resolution.
-            When ``None`` (the default), the destination name is resolved via
-            ``APPFND_UMS_DESTINATION_NAME`` or constructed as
+            When ``None`` (the default), the destination name is constructed as
             ``sap-managed-runtime-ias-{APPFND_CONHOS_LANDSCAPE}`` (requires
             ``APPFND_CONHOS_UMS_URL`` to be set).
         destination_instance: Destination service instance name. When ``"default"``,

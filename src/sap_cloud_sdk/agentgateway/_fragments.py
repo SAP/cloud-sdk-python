@@ -9,7 +9,7 @@ Centralises all BTP Destination Service fragment operations:
 
 import logging
 from enum import Enum
-from typing import TypedDict
+from typing import Optional, TypedDict
 
 from sap_cloud_sdk.destination import (
     create_fragment_client,
@@ -132,7 +132,7 @@ class ActiveIntegration(TypedDict):
     """Metadata for a connected backend system integration."""
 
     global_tenant_id: str
-    system_type: str
+    system_type: Optional[str]
     integration_dependency: str
 
 
@@ -190,10 +190,9 @@ def _list_active_integrations(tenant_subdomain: str) -> list[ActiveIntegration]:
 
         if not system_type:
             logger.debug(
-                "Skipping fragment '%s': missing system_type label (gtid=%s, ord_id=%s)",
-                fragment.name, gtid, ord_id,
+                "Fragment '%s' is missing system_type label; system_type will be None in result",
+                fragment.name,
             )
-            continue
 
         result.append(
             ActiveIntegration(

@@ -78,7 +78,7 @@ class TestListActiveIntegrations:
         assert result == []
         mock_client.get_fragment_labels.assert_not_called()
 
-    def test_skips_fragment_missing_system_type(self):
+    def test_returns_none_system_type_when_label_absent(self):
         frag = _fragment("frag-no-systype")
         mock_client = MagicMock()
         mock_client.list_instance_fragments.return_value = [frag]
@@ -93,35 +93,21 @@ class TestListActiveIntegrations:
         ):
             result = _list_active_integrations("my-tenant")
 
-        assert result == []
-
-    def test_includes_fragment_missing_gtid(self):
-        """GTID and ORD ID are expected to always be present; missing system_type is the only skip condition."""
-        frag = _fragment("frag-no-gtid")
-        mock_client = MagicMock()
-        mock_client.list_instance_fragments.return_value = [frag]
-        mock_client.get_fragment_labels.return_value = [
-            _label("sap-managed-runtime-system-type", "sap.pce"),
-            _label("sap-managed-runtime-ordid", "sap-pce-apiResource-PA-v1"),
-        ]
-
-        with patch(
-            "sap_cloud_sdk.agentgateway._fragments.create_fragment_client",
-            return_value=mock_client,
-        ):
-            result = _list_active_integrations("my-tenant")
-
         assert len(result) == 1
-        assert result[0]["global_tenant_id"] is None
+        assert result[0] == {
+            "global_tenant_id": "gtid-1",
+            "system_type": None,
+            "integration_dependency": "sap-pce-apiResource-PA-v1",
+        }
 
-    def test_partial_failure_returns_valid_entries_only(self):
+    def test_fragment_with_missing_labels_gets_none_values(self):
         frag_ok = _fragment("frag-ok")
-        frag_bad = _fragment("frag-bad")
+        frag_partial = _fragment("frag-partial")
         mock_client = MagicMock()
-        mock_client.list_instance_fragments.return_value = [frag_ok, frag_bad]
+        mock_client.list_instance_fragments.return_value = [frag_ok, frag_partial]
         mock_client.get_fragment_labels.side_effect = [
             _full_labels("gtid-ok", "sap.pce", "sap-pce-apiResource-PA-v1"),
-            [_label("sap-managed-runtime-gtid", "gtid-bad")],  # missing system_type
+            [_label("sap-managed-runtime-gtid", "gtid-partial")],  # missing system_type and ord_id
         ]
 
         with patch(
@@ -130,8 +116,17 @@ class TestListActiveIntegrations:
         ):
             result = _list_active_integrations("my-tenant")
 
-        assert len(result) == 1
-        assert result[0]["global_tenant_id"] == "gtid-ok"
+        assert len(result) == 2
+        assert result[0] == {
+            "global_tenant_id": "gtid-ok",
+            "system_type": "sap.pce",
+            "integration_dependency": "sap-pce-apiResource-PA-v1",
+        }
+        assert result[1] == {
+            "global_tenant_id": "gtid-partial",
+            "system_type": None,
+            "integration_dependency": None,
+        }
 
     def test_passes_tenant_subdomain_to_list_and_get_labels(self):
         frag = _fragment("frag-abc")

@@ -39,7 +39,7 @@ from sap_cloud_sdk.core.auditlog_ng.exceptions import ValidationError
 from sap_cloud_sdk.core.telemetry import Module, Operation, record_metrics
 from sap_cloud_sdk.core.telemetry.config import ENV_OTLP_PROTOCOL
 from sap_cloud_sdk.core.runtime_context import get_context
-from sap_cloud_sdk.core.runtime_context.providers import TENANT_ID, USER_ID
+from sap_cloud_sdk.core.runtime_context.providers import APP_TENANT_ID, USER_ID
 from sap_cloud_sdk.ias._context import get_auth_context
 
 
@@ -61,7 +61,7 @@ def _fill_common_from_auth_context(event: Message) -> None:
     ctx = get_context()
     claims = get_auth_context()
 
-    tenant_id = ctx.get(TENANT_ID) or (claims and claims.app_tid)
+    tenant_id = ctx.get(APP_TENANT_ID) or (claims and claims.app_tid)
     user_id = ctx.get(USER_ID) or (claims and claims.user_uuid)
 
     if tenant_id and not common.tenant_id:

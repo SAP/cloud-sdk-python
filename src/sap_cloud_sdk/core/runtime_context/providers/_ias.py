@@ -10,7 +10,7 @@ from sap_cloud_sdk.ias import parse_token
 
 logger = logging.getLogger(__name__)
 
-TENANT_ID = ContextKey[str]("ias.app_tid")
+APP_TENANT_ID = ContextKey[str]("ias.app_tid")
 GLOBAL_TENANT_ID = ContextKey[str]("ias.sap_gtid")
 USER_ID = ContextKey[str]("ias.user_uuid")
 
@@ -23,7 +23,7 @@ class IASContextProvider(ContextProvider):
 
     Defines and populates the following context keys:
 
-      - :data:`TENANT_ID`        from ``app_tid`` claim
+      - :data:`APP_TENANT_ID`    from ``app_tid`` claim
       - :data:`GLOBAL_TENANT_ID` from ``sap_gtid`` claim
       - :data:`USER_ID`          from ``user_uuid`` claim
     """
@@ -41,7 +41,7 @@ class IASContextProvider(ContextProvider):
         values = {}
         if claims:
             if claims.app_tid:
-                values[TENANT_ID] = claims.app_tid
+                values[APP_TENANT_ID] = claims.app_tid
             if claims.sap_gtid:
                 values[GLOBAL_TENANT_ID] = claims.sap_gtid
             if claims.user_uuid:

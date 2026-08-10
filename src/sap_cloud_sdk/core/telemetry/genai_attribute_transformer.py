@@ -7,7 +7,7 @@ replacing the original attributes to ensure pure OpenTelemetry compliance.
 
 import json
 import logging
-from typing import Any, Dict, List, MutableMapping, Optional, Sequence, cast
+from typing import Any, Dict, List, Optional, Sequence
 
 from opentelemetry.sdk.trace import ReadableSpan
 from opentelemetry.sdk.trace.export import SpanExporter, SpanExportResult
@@ -63,15 +63,17 @@ class GenAIAttributeTransformer(SpanExporter):
         Returns:
             SpanExportResult from the wrapped exporter
         """
+        transformed = []
         for span in spans:
             try:
-                self._normalize_attributes(span)
+                transformed.append(self._normalize_attributes(span))
             except Exception as e:
                 logger.debug(
                     f"Error normalizing GenAI attributes for span {getattr(span, 'name', '<unknown>')}: {e}"
                 )
+                transformed.append(span)
 
-        return self.wrapped_exporter.export(spans)
+        return self.wrapped_exporter.export(transformed)
 
     def shutdown(self) -> None:
         """Shutdown the wrapped exporter."""
@@ -92,24 +94,17 @@ class GenAIAttributeTransformer(SpanExporter):
             return self.wrapped_exporter.force_flush()
         return self.wrapped_exporter.force_flush(timeout_millis)
 
-    def _normalize_attributes(self, span: ReadableSpan) -> None:
+    def _normalize_attributes(self, span: ReadableSpan) -> ReadableSpan:
         """
-        Perform minimal normalization on the span's attributes in-place.
+        Return a new ReadableSpan with normalized attributes.
         Only removes standard attributes that were transformed, preserving custom/proprietary ones.
-
-        Args:
-            span: The span to modify
         """
         if not span.attributes:
-            return
+            return span
 
-        # Access the internal mutable attributes dict
-        if not hasattr(span, "_attributes") or span._attributes is None:
-            return
+        attrs: Dict[str, Any] = dict(span.attributes)
 
-        attrs = cast(MutableMapping[str, Any], span._attributes)
-
-        # Only consider spans that have traceloop.* or llm.* or gen_ai.prompt.* or gen_ai.completion.* attributes
+        # Only process spans that have traceloop.* or llm.* or gen_ai.prompt.* or gen_ai.completion.* attributes
         if not any(
             k.startswith(
                 (
@@ -121,9 +116,8 @@ class GenAIAttributeTransformer(SpanExporter):
             )
             for k in attrs.keys()
         ):
-            return
+            return span
 
-        # Track which specific attributes to remove after transformation
         keys_to_remove = set()
 
         model_name = attrs.get(self._TL_MODEL_NAME)
@@ -139,18 +133,29 @@ class GenAIAttributeTransformer(SpanExporter):
             attrs["gen_ai.provider.name"] = provider
             keys_to_remove.add(self._TL_PROVIDER)
 
-        # Map usage attributes and track which ones were transformed
         keys_to_remove.update(self._map_llm_usage(attrs))
-
-        # Transform messages and collect keys to remove (all gen_ai.prompt.* and gen_ai.completion.*)
         keys_to_remove.update(self._get_message_keys_to_remove(attrs))
         self._transform_messages(attrs)
 
-        # Remove only the specific transformed attributes
         for key in keys_to_remove:
             attrs.pop(key, None)
 
-    def _map_llm_usage(self, attrs: MutableMapping[str, Any]) -> set:
+        return ReadableSpan(
+            name=span.name,
+            context=span.context,
+            parent=span.parent,
+            resource=span.resource,
+            attributes=attrs,
+            events=span.events,
+            links=span.links,
+            kind=span.kind,
+            instrumentation_scope=span.instrumentation_scope,
+            status=span.status,
+            start_time=span.start_time,
+            end_time=span.end_time,
+        )
+
+    def _map_llm_usage(self, attrs: Dict[str, Any]) -> set:
         """
         Map llm.usage.* keys into gen_ai.usage.* keys.
 
@@ -191,7 +196,7 @@ class GenAIAttributeTransformer(SpanExporter):
 
         return transformed_keys
 
-    def _get_message_keys_to_remove(self, attrs: MutableMapping[str, Any]) -> set:
+    def _get_message_keys_to_remove(self, attrs: Dict[str, Any]) -> set:
         """
         Get all gen_ai.prompt.* and gen_ai.completion.* keys that should be removed.
         These are always removed since they're transformed to new format.
@@ -207,7 +212,7 @@ class GenAIAttributeTransformer(SpanExporter):
                 keys_to_remove.add(key)
         return keys_to_remove
 
-    def _transform_messages(self, attrs: MutableMapping[str, Any]) -> None:
+    def _transform_messages(self, attrs: Dict[str, Any]) -> None:
         """
         Transform old-format gen_ai.prompt.* and gen_ai.completion.* attributes
         to new OTEL semconv 1.39.0 structured format.
@@ -239,7 +244,7 @@ class GenAIAttributeTransformer(SpanExporter):
                 logger.debug(f"Failed to serialize output messages: {e}")
 
     def _collect_indexed_attributes(
-        self, attrs: MutableMapping[str, Any], prefix: str
+        self, attrs: Dict[str, Any], prefix: str
     ) -> Dict[int, Dict[str, Any]]:
         """
         Collect indexed attributes like gen_ai.prompt.0.role, gen_ai.prompt.0.content

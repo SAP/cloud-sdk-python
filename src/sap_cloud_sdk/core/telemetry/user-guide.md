@@ -80,6 +80,64 @@ The SDK ships `opentelemetry-instrumentation-*` packages for all of the above as
 
 ---
 
+## Log-trace correlation and troubleshooting
+
+### How trace IDs propagate to downstream services
+
+When `auto_instrument()` is called, the SDK instruments `httpx` and `requests` with `HTTPXClientInstrumentor` and `RequestsInstrumentor`. These automatically inject the W3C [`traceparent`](https://www.w3.org/TR/trace-context/) header into every outbound HTTP request:
+
+```
+traceparent: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01
+```
+
+This includes all SDK-internal calls to Agent Gateway, Agent Memory, and other SAP services. Those services read `traceparent`, log under the same trace ID, and propagate it further. **No application code is needed** — propagation is handled automatically at the instrumentation layer.
+
+> **There is no separate "Correlation ID" concept in this SDK.** The W3C `traceparent` trace ID is the standard mechanism for log correlation across services. If you are looking for a correlation ID to hand off to another team for log lookup, use the trace ID — it is the same thing.
+
+### Finding the trace ID in logs
+
+When `logging` instrumentation is active (included in `auto_instrument()`), every log record is automatically annotated with `trace_id` and `span_id`:
+
+```
+ERROR sap_cloud_sdk.agentgateway._lob - Tool 'get_order' returned an error  trace_id=4bf92f3577b34da6a3ce929d0e0e4736 span_id=00f067aa0ba902b7
+```
+
+To retrieve the current trace ID programmatically:
+
+```python
+from opentelemetry import trace
+
+ctx = trace.get_current_span().get_span_context()
+if ctx.is_valid:
+    trace_id = format(ctx.trace_id, "032x")
+```
+
+### Searching correlated logs
+
+In deployed environments, use the trace ID to find all log entries across services for a single agent request. In the Cloud Logging Service (CLS), search:
+
+```
+trace_id: "4bf92f3577b34da6a3ce929d0e0e4736"
+```
+
+A typical agent request generates ~44 correlated log entries across the SDK and downstream services. To hand off to another team (e.g. Agent Gateway), share the trace ID — they can search their own logs using the same value.
+
+### Local development
+
+To see trace IDs locally without a tracing backend, print spans to the console:
+
+```bash
+export OTEL_TRACES_EXPORTER=console
+```
+
+Or in code:
+
+```python
+auto_instrument(disable_batch=True)
+```
+
+---
+
 ## Span functions
 
 For operations following [OpenTelemetry GenAI conventions](https://opentelemetry.io/docs/specs/semconv/gen-ai/gen-ai-agent-spans/):

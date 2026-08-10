@@ -70,9 +70,7 @@ def list_mcp_fragments(
         (and, if provided, matching one of the requested global tenant IDs).
     """
     logger.debug("Fetching MCP fragments for tenant '%s'", tenant_subdomain)
-    return _list_fragments_by_label(
-        FragmentLabel.MCP, tenant_subdomain, gtids
-    )
+    return _list_fragments_by_label(FragmentLabel.MCP, tenant_subdomain, gtids)
 
 
 def list_a2a_fragments(tenant_subdomain: str) -> list:
@@ -134,7 +132,6 @@ def get_ias_user_fragment_name(tenant_subdomain: str) -> str:
             f"for tenant '{tenant_subdomain}'"
         )
     return fragments[0].name
-
 
 
 def _list_active_integrations(tenant_subdomain: str) -> list[ConnectedSystem]:

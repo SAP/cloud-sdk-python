@@ -523,7 +523,9 @@ class AgentGatewayClient:
             logger.exception("Unexpected error during agent card discovery")
             raise AgentGatewaySDKError(f"Agent card discovery failed: {e}") from e
 
-    @record_metrics(Module.AGENTGATEWAY, Operation.AGENTGATEWAY_LIST_ACTIVE_INTEGRATIONS)
+    @record_metrics(
+        Module.AGENTGATEWAY, Operation.AGENTGATEWAY_LIST_ACTIVE_INTEGRATIONS
+    )
     def list_active_integrations(self) -> list[ConnectedSystem]:
         """List all active backend system integrations for the current tenant.
 

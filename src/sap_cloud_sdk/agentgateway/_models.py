@@ -14,6 +14,21 @@ class FragmentLabel(str, Enum):
     IAS_USER = "subscriber.ias.user"
 
 
+class ConnectedSystem(TypedDict):
+    """Metadata for a connected backend system integration.
+
+    Attributes:
+        global_tenant_id: GTID of the connected partner system.
+        system_type: Application namespace of the partner (e.g. ``"sap.pce"``).
+            May be ``None`` for older integrations missing the label.
+        integration_dependency: ORD ID of the integration dependency fulfilled.
+    """
+
+    global_tenant_id: Optional[str]
+    system_type: Optional[str]
+    integration_dependency: Optional[str]
+
+
 @dataclass
 class AuthResult:
     """Authentication result from Agent Gateway.

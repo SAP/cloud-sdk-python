@@ -453,10 +453,8 @@ class UmsTransport:
          ``APPFND_CONHOS_UMS_URL`` to be set; logs a warning and returns
          ``None`` otherwise).
 
-    **Base URL** is resolved as:
-
-    * ``APPFND_CONHOS_UMS_URL`` environment variable when set (new flow).
-    * The URL configured on the resolved destination otherwise (legacy flow).
+    **Base URL** is resolved from ``APPFND_CONHOS_UMS_URL``. A
+    :class:`TransportError` is raised if it is not set.
 
     In both cases the **mTLS certificate** is taken from the resolved
     destination.
@@ -579,25 +577,17 @@ class UmsTransport:
             )
 
         # 2. Resolve base URL --------------------------------------------
-        #    New flow: use APPFND_CONHOS_UMS_URL env var directly.
-        #    Legacy flow: use the URL from the destination itself.
         ums_url_override = os.environ.get(ENV_UMS_URL)
-        if ums_url_override:
-            base_url = ums_url_override
-            logger.debug(
-                "Using UMS URL from %s: %s", ENV_UMS_URL, base_url
+        if not ums_url_override:
+            logger.warning(
+                "%s is not set; cannot resolve UMS base URL.",
+                ENV_UMS_URL,
             )
-        else:
-            base_url = dest.url
-            if base_url is None:
-                raise TransportError(
-                    f"Destination '{self._destination_name}' has no URL configured."
-                )
-            logger.debug(
-                "Using UMS URL from destination '%s': %s",
-                self._destination_name,
-                base_url,
+            raise TransportError(
+                f"{ENV_UMS_URL} is not set; cannot resolve UMS base URL."
             )
+        base_url = ums_url_override
+        logger.debug("Using UMS URL from %s: %s", ENV_UMS_URL, base_url)
 
         # 3. Extract client certificate ----------------------------------
         if not dest.certificates:

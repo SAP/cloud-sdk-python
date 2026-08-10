@@ -286,12 +286,11 @@ class TestUmsTransportGetExtCapImpl:
         with pytest.raises(TransportError, match="Failed to resolve destination"):
             transport.get_extension_capability_implementation()
 
-    def test_destination_no_url(self, monkeypatch):
-        dest = _make_dest(url=None)
-        transport, dest_client = self._make_transport(dest=dest)
+    def test_raises_when_ums_url_not_set(self, monkeypatch):
+        transport, dest_client = self._make_transport()
         monkeypatch.delenv(ENV_UMS_URL, raising=False)
 
-        with pytest.raises(TransportError, match="has no URL configured"):
+        with pytest.raises(TransportError, match="APPFND_CONHOS_UMS_URL is not set"):
             transport.get_extension_capability_implementation()
 
     def test_http_request_failure(self):

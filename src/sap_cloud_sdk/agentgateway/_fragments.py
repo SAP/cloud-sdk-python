@@ -8,7 +8,6 @@ Centralises all BTP Destination Service fragment operations:
 """
 
 import logging
-from typing import Optional
 
 from sap_cloud_sdk.destination import (
     create_fragment_client,

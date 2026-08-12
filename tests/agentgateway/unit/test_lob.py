@@ -162,24 +162,6 @@ class TestFetchAuthToken:
             with pytest.raises(MCPServerNotFoundError, match="Empty auth header"):
                 _fetch_auth_token("dest-name", "tenant-sub")
 
-    def test_raises_with_error_field_from_destination(self):
-        """Raise MCPServerNotFoundError with the error message from the auth token."""
-        mock_dest = MagicMock()
-        mock_dest.auth_tokens = [MagicMock()]
-        mock_dest.auth_tokens[0].error = "No consumed apis matching provided resource parameter found."
-        mock_dest.auth_tokens[0].http_header = {"value": ""}
-
-        with patch(
-            "sap_cloud_sdk.agentgateway._lob.create_destination_client"
-        ) as mock_client:
-            mock_client.return_value.get_destination.return_value = mock_dest
-
-            with pytest.raises(
-                MCPServerNotFoundError,
-                match="No consumed apis matching provided resource parameter found.",
-            ):
-                _fetch_auth_token("dest-name", "tenant-sub")
-
     def test_passes_options_to_destination(self):
         """Pass consumption options to get_destination."""
         mock_dest = MagicMock()

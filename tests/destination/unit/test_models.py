@@ -308,15 +308,17 @@ class TestAuthTokenModel:
         assert token.error is None
 
     def test_from_dict_with_error_field(self):
-        """Parse an auth token dict that contains an error from the Destination Service."""
-        token = AuthToken.from_dict({
-            "type": "",
-            "value": "",
-            "error": "No consumed apis matching provided resource parameter found.",
-            "expires_in": "0",
-        })
-        assert token.error == "No consumed apis matching provided resource parameter found."
-        assert token.value == ""
+        """Raise DestinationOperationError with the Destination Service error message."""
+        with pytest.raises(
+            DestinationOperationError,
+            match="No consumed apis matching provided resource parameter found.",
+        ):
+            AuthToken.from_dict({
+                "type": "",
+                "value": "",
+                "error": "No consumed apis matching provided resource parameter found.",
+                "expires_in": "0",
+            })
 
     def test_from_dict_missing_fields_without_error_raises(self):
         """Raise DestinationOperationError when required fields are missing and no error is set."""

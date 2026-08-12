@@ -436,7 +436,8 @@ class AuthToken:
             AuthToken: Parsed auth token dataclass.
 
         Raises:
-            DestinationOperationError: If required fields are missing and no error is present.
+            DestinationOperationError: If required fields are missing, or if the token
+                carries an error from the Destination Service.
         """
         token_type = obj.get("type") or ""
         value = obj.get("value") or ""
@@ -448,6 +449,10 @@ class AuthToken:
         if not error and (not token_type or not value or not http_header):
             raise DestinationOperationError(
                 "auth token is missing required fields (type/value/http_header)"
+            )
+        if error and (not token_type or not value or not http_header):
+            raise DestinationOperationError(
+                f"auth token retrieval failed: {error}"
             )
 
         return cls(

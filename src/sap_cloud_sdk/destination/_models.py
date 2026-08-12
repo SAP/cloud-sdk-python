@@ -451,9 +451,7 @@ class AuthToken:
                 "auth token is missing required fields (type/value/http_header)"
             )
         if error and (not token_type or not value or not http_header):
-            raise DestinationOperationError(
-                f"auth token retrieval failed: {error}"
-            )
+            raise DestinationOperationError(f"auth token retrieval failed: {error}")
 
         return cls(
             type=token_type,

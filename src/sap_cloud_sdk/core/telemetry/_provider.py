@@ -19,7 +19,11 @@ from opentelemetry.exporter.otlp.proto.http.metric_exporter import (
     OTLPMetricExporter as HTTPMetricExporter,
 )
 from opentelemetry.instrumentation.logging.handler import LoggingHandler
-from opentelemetry.sdk._logs import LoggerProvider
+from opentelemetry.sdk._logs import (
+    LoggerProvider,
+    LogRecordProcessor,
+    ReadWriteLogRecord,
+)
 from opentelemetry.sdk._logs.export import BatchLogRecordProcessor
 from opentelemetry.sdk.metrics import (
     MeterProvider,
@@ -45,6 +49,35 @@ from sap_cloud_sdk.core._version import get_version
 from sap_cloud_sdk.core.telemetry.constants import SDK_PACKAGE_NAME
 
 logger = logging.getLogger(__name__)
+
+
+class _SdkResourceEnrichingProcessor(LogRecordProcessor):
+    """Merges sap.cloud_sdk.* resource attributes into every log record at emit time.
+
+    Used when the platform's auto-instrumentation has already installed a
+    LoggerProvider whose resource lacks SAP SDK attributes. Wraps a
+    BatchLogRecordProcessor and merges the SDK resource into each record
+    before forwarding, so sap.cloud_sdk.language/name/version always appear
+    in exported records regardless of which LoggerProvider is the global one.
+    """
+
+    def __init__(self, inner: LogRecordProcessor, sdk_resource: "Resource") -> None:
+        self._inner = inner
+        self._sdk_resource = sdk_resource
+
+    def on_emit(self, log_record: ReadWriteLogRecord) -> None:
+        if log_record.resource is not None:
+            log_record.resource = log_record.resource.merge(self._sdk_resource)
+        else:
+            log_record.resource = self._sdk_resource
+        self._inner.on_emit(log_record)
+
+    def shutdown(self) -> None:
+        self._inner.shutdown()
+
+    def force_flush(self, timeout_millis: int = 30000) -> bool:
+        return self._inner.force_flush(timeout_millis)
+
 
 # Global meter provider
 _meter_provider: Optional[MeterProvider] = None
@@ -117,9 +150,13 @@ def setup_log_provider() -> Optional[LoggerProvider]:
         if provider is not candidate:
             logger.warning(
                 "Global LoggerProvider was already set by another library. "
-                "Attaching SAP log processor to the existing provider."
+                "Attaching SAP log processor with resource enrichment to the existing provider."
             )
-            provider.add_log_record_processor(BatchLogRecordProcessor(exporter))
+            provider.add_log_record_processor(
+                _SdkResourceEnrichingProcessor(
+                    BatchLogRecordProcessor(exporter), resource
+                )
+            )
 
         handler = LoggingHandler(logger_provider=provider)
         logging.getLogger().addHandler(handler)

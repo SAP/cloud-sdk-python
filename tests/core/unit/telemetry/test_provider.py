@@ -14,6 +14,9 @@ from opentelemetry.sdk.metrics import (
 )
 from opentelemetry.sdk.metrics.export import AggregationTemporality
 
+from opentelemetry.sdk._logs import ReadWriteLogRecord
+from opentelemetry.sdk._logs._internal import LogRecord
+
 from sap_cloud_sdk.core.telemetry._provider import (
     get_meter,
     shutdown,
@@ -21,6 +24,7 @@ from sap_cloud_sdk.core.telemetry._provider import (
     _create_metric_exporter,
     setup_log_provider,
     _create_log_exporter,
+    _SdkResourceEnrichingProcessor,
 )
 from sap_cloud_sdk.core.telemetry.config import InstrumentationConfig
 
@@ -306,7 +310,7 @@ class TestSetupLogProvider:
                 with patch("sap_cloud_sdk.core.telemetry._provider._create_log_exporter", side_effect=Exception("boom")):
                     assert setup_log_provider() is None
 
-    def test_external_provider_gets_our_processor_attached(self):
+    def test_external_provider_gets_enriching_processor_attached(self):
         external_provider = MagicMock()
         candidate = MagicMock()
         with patch("sap_cloud_sdk.core.telemetry._provider.get_config", return_value=_ENABLED_CONFIG):
@@ -316,15 +320,84 @@ class TestSetupLogProvider:
                         with patch("sap_cloud_sdk.core.telemetry._provider.LoggerProvider", return_value=candidate):
                             with patch("sap_cloud_sdk.core.telemetry._provider.set_logger_provider"):
                                 with patch("sap_cloud_sdk.core.telemetry._provider.get_logger_provider", return_value=external_provider):
-                                    with patch(_LOGGING_HANDLER) as mock_handler_cls:
+                                    with patch(_LOGGING_HANDLER):
                                         with patch("logging.getLogger"):
                                             result = setup_log_provider()
 
-                                            # returns the external provider, not our candidate
                                             assert result is external_provider
-                                            # BatchLogRecordProcessor called twice: once for our candidate,
-                                            # once to attach our processor to the external provider
+                                            # BatchLogRecordProcessor constructed twice: once for our candidate,
+                                            # once wrapped inside the enriching processor
                                             assert mock_proc.call_count == 2
-                                            external_provider.add_log_record_processor.assert_called_once()
-                                            # handler wired to external provider
-                                            mock_handler_cls.assert_called_once_with(logger_provider=external_provider)
+                                            # The enriching processor (not a bare BatchLogRecordProcessor) is
+                                            # added to the external provider so SDK resource attrs are injected
+                                            call_args = external_provider.add_log_record_processor.call_args
+                                            assert call_args is not None
+                                            attached = call_args[0][0]
+                                            assert isinstance(attached, _SdkResourceEnrichingProcessor)
+
+
+class TestSdkResourceEnrichingProcessor:
+    def _make_log_record(self, resource_attrs: dict):
+        from opentelemetry.sdk.resources import Resource as _Resource
+        from opentelemetry.sdk._logs._internal import LogRecord, ReadWriteLogRecord as _RWR
+        from opentelemetry._logs import SeverityNumber
+        log_record = LogRecord(severity_number=SeverityNumber.INFO, body="test")
+        return _RWR(log_record=log_record, resource=_Resource(resource_attrs))
+
+    def test_on_emit_merges_sdk_attrs(self):
+        from opentelemetry.sdk.resources import Resource as _Resource
+
+        sdk_resource = _Resource({"sap.cloud_sdk.language": "python", "sap.cloud_sdk.name": "sap-cloud-sdk"})
+        inner = MagicMock()
+        proc = _SdkResourceEnrichingProcessor(inner, sdk_resource)
+
+        rw = self._make_log_record({"service.name": "my-service"})
+        proc.on_emit(rw)
+
+        inner.on_emit.assert_called_once_with(rw)
+        assert rw.resource.attributes["sap.cloud_sdk.language"] == "python"
+        assert rw.resource.attributes["sap.cloud_sdk.name"] == "sap-cloud-sdk"
+        # original attrs preserved
+        assert rw.resource.attributes["service.name"] == "my-service"
+
+    def test_on_emit_sdk_attrs_win_on_collision(self):
+        from opentelemetry.sdk.resources import Resource as _Resource
+
+        sdk_resource = _Resource({"service.name": "sdk-override", "sap.cloud_sdk.language": "python"})
+        inner = MagicMock()
+        proc = _SdkResourceEnrichingProcessor(inner, sdk_resource)
+
+        rw = self._make_log_record({"service.name": "platform-name"})
+        proc.on_emit(rw)
+
+        # SDK wins on collision
+        assert rw.resource.attributes["service.name"] == "sdk-override"
+
+    def test_on_emit_null_resource_replaced(self):
+        from opentelemetry.sdk.resources import Resource as _Resource
+        from opentelemetry.sdk._logs._internal import LogRecord, ReadWriteLogRecord as _RWR
+        from opentelemetry._logs import SeverityNumber
+
+        sdk_resource = _Resource({"sap.cloud_sdk.language": "python"})
+        inner = MagicMock()
+        proc = _SdkResourceEnrichingProcessor(inner, sdk_resource)
+
+        log_record = LogRecord(severity_number=SeverityNumber.INFO, body="test")
+        rw = _RWR(log_record=log_record, resource=None)
+        proc.on_emit(rw)
+
+        assert rw.resource is sdk_resource
+
+    def test_shutdown_delegates(self):
+        inner = MagicMock()
+        proc = _SdkResourceEnrichingProcessor(inner, MagicMock())
+        proc.shutdown()
+        inner.shutdown.assert_called_once()
+
+    def test_force_flush_delegates(self):
+        inner = MagicMock()
+        inner.force_flush.return_value = True
+        proc = _SdkResourceEnrichingProcessor(inner, MagicMock())
+        result = proc.force_flush(5000)
+        inner.force_flush.assert_called_once_with(5000)
+        assert result is True

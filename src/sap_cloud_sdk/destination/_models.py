@@ -413,6 +413,7 @@ class AuthToken:
         type: Token type (e.g., "Bearer", "Basic")
         value: Base64 encoded token binary content
         http_header: Dictionary with 'key' and 'value' for the prepared HTTP header
+        error: Error message returned by the Destination Service when token retrieval fails
         refresh_token: Optional base64 encoded refresh token
         scope: Optional token scopes as space-delimited string
     """
@@ -420,6 +421,7 @@ class AuthToken:
     type: str
     value: str
     http_header: Dict[str, str]
+    error: Optional[str] = None
     refresh_token: Optional[str] = None
     scope: Optional[str] = None
 
@@ -434,15 +436,16 @@ class AuthToken:
             AuthToken: Parsed auth token dataclass.
 
         Raises:
-            DestinationOperationError: If required fields are missing.
+            DestinationOperationError: If required fields are missing and no error is present.
         """
         token_type = obj.get("type") or ""
         value = obj.get("value") or ""
         http_header = obj.get("http_header") or {}
+        error = obj.get("error") or None
         refresh_token = obj.get("refresh_token")
         scope = obj.get("scope")
 
-        if not token_type or not value or not http_header:
+        if not error and (not token_type or not value or not http_header):
             raise DestinationOperationError(
                 "auth token is missing required fields (type/value/http_header)"
             )
@@ -451,6 +454,7 @@ class AuthToken:
             type=token_type,
             value=value,
             http_header=http_header,
+            error=error,
             refresh_token=refresh_token,
             scope=scope,
         )

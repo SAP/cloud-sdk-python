@@ -112,6 +112,10 @@ def _fetch_auth_token(
         )
 
     auth_token = dest.auth_tokens[0]
+    if auth_token.error:
+        raise MCPServerNotFoundError(
+            f"Auth token error for destination '{dest_name}': {auth_token.error}"
+        )
     header_value = auth_token.http_header.get("value") or ""
     if not header_value:
         raise MCPServerNotFoundError(f"Empty auth header for destination '{dest_name}'")

@@ -19,11 +19,7 @@ from opentelemetry.exporter.otlp.proto.http.metric_exporter import (
     OTLPMetricExporter as HTTPMetricExporter,
 )
 from opentelemetry.instrumentation.logging.handler import LoggingHandler
-from opentelemetry.sdk._logs import (
-    LoggerProvider,
-    LogRecordProcessor,
-    ReadWriteLogRecord,
-)
+from opentelemetry.sdk._logs import LoggerProvider
 from opentelemetry.sdk._logs.export import BatchLogRecordProcessor
 from opentelemetry.sdk.metrics import (
     MeterProvider,
@@ -51,32 +47,26 @@ from sap_cloud_sdk.core.telemetry.constants import SDK_PACKAGE_NAME
 logger = logging.getLogger(__name__)
 
 
-class _SdkResourceEnrichingProcessor(LogRecordProcessor):
-    """Merges sap.cloud_sdk.* resource attributes into every log record at emit time.
+def _merge_sdk_resource_into_log_provider(
+    provider: LoggerProvider, sdk_resource: Resource
+) -> None:
+    """Mutate provider._resource and update all active Logger instances.
 
-    Used when the platform's auto-instrumentation has already installed a
-    LoggerProvider whose resource lacks SAP SDK attributes. Wraps a
-    BatchLogRecordProcessor and merges the SDK resource into each record
-    before forwarding, so sap.cloud_sdk.language/name/version always appear
-    in exported records regardless of which LoggerProvider is the global one.
+    Mirrors the TracerProvider resource merge in auto_instrument.py —
+    OTel SDK exposes no public API to swap a LoggerProvider's Resource
+    post-construction.
     """
+    provider._resource = provider.resource.merge(sdk_resource)
+    with provider._active_loggers_lock:
+        for logger_instance in provider._active_loggers:
+            logger_instance._resource = provider._resource
+    logger.info(
+        "Merged sap-cloud-sdk resource attrs onto wrapper-installed LoggerProvider"
+    )
 
-    def __init__(self, inner: LogRecordProcessor, sdk_resource: "Resource") -> None:
-        self._inner = inner
-        self._sdk_resource = sdk_resource
 
-    def on_emit(self, log_record: ReadWriteLogRecord) -> None:
-        if log_record.resource is not None:
-            log_record.resource = log_record.resource.merge(self._sdk_resource)
-        else:
-            log_record.resource = self._sdk_resource
-        self._inner.on_emit(log_record)
-
-    def shutdown(self) -> None:
-        self._inner.shutdown()
-
-    def force_flush(self, timeout_millis: int = 30000) -> bool:
-        return self._inner.force_flush(timeout_millis)
+def _root_logger_has_otel_handler() -> bool:
+    return any(isinstance(h, LoggingHandler) for h in logging.getLogger().handlers)
 
 
 # Global meter provider
@@ -141,33 +131,36 @@ def setup_log_provider() -> Optional[LoggerProvider]:
     try:
         resource = Resource.create(create_resource_attributes_from_env())
         exporter = _create_log_exporter()
-        candidate = LoggerProvider(resource=resource)
-        candidate.add_log_record_processor(BatchLogRecordProcessor(exporter))
-        set_logger_provider(candidate)
 
-        provider = cast(LoggerProvider, get_logger_provider())
+        existing = cast(LoggerProvider, get_logger_provider())
 
-        if provider is not candidate:
+        if isinstance(existing, LoggerProvider):
+            # Platform's auto-instrumentation pre-installed a provider.
+            # Merge SDK resource attrs into it so all records carry sap.cloud_sdk.*.
+            # Do not add a second processor or handler — the platform already installed
+            # both, and adding duplicates causes multiple exports per log event.
             logger.warning(
                 "Global LoggerProvider was already set by another library. "
-                "Attaching SAP log processor with resource enrichment to the existing provider."
+                "Merging sap.cloud_sdk.* resource attributes into the existing provider."
             )
-            provider.add_log_record_processor(
-                _SdkResourceEnrichingProcessor(
-                    BatchLogRecordProcessor(exporter), resource
-                )
-            )
+            _merge_sdk_resource_into_log_provider(existing, resource)
+            if not _root_logger_has_otel_handler():
+                existing.add_log_record_processor(BatchLogRecordProcessor(exporter))
+                logging.getLogger().addHandler(LoggingHandler(logger_provider=existing))
+            _log_provider = existing
+        else:
+            provider = LoggerProvider(resource=resource)
+            provider.add_log_record_processor(BatchLogRecordProcessor(exporter))
+            set_logger_provider(provider)
+            logging.getLogger().addHandler(LoggingHandler(logger_provider=provider))
+            _log_provider = provider
 
-        handler = LoggingHandler(logger_provider=provider)
-        logging.getLogger().addHandler(handler)
-
-        _log_provider = provider
         logger.info(
             f"OpenTelemetry log provider initialized. "
             f"Service: {config.service_name}, "
             f"Endpoint: {config.otlp_endpoint}"
         )
-        return provider
+        return _log_provider
 
     except Exception as e:
         logger.error(f"Failed to initialize OpenTelemetry log provider: {e}")

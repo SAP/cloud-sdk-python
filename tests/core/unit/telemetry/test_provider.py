@@ -14,8 +14,7 @@ from opentelemetry.sdk.metrics import (
 )
 from opentelemetry.sdk.metrics.export import AggregationTemporality
 
-from opentelemetry.sdk._logs import ReadWriteLogRecord
-from opentelemetry.sdk._logs._internal import LogRecord
+from opentelemetry.sdk.resources import Resource
 
 from sap_cloud_sdk.core.telemetry._provider import (
     get_meter,
@@ -24,7 +23,8 @@ from sap_cloud_sdk.core.telemetry._provider import (
     _create_metric_exporter,
     setup_log_provider,
     _create_log_exporter,
-    _SdkResourceEnrichingProcessor,
+    _merge_sdk_resource_into_log_provider,
+    _root_logger_has_otel_handler,
 )
 from sap_cloud_sdk.core.telemetry.config import InstrumentationConfig
 
@@ -246,63 +246,49 @@ class TestSetupLogProvider:
         with patch("sap_cloud_sdk.core.telemetry._provider.get_config", return_value=config):
             assert setup_log_provider() is None
 
-    def test_returns_configured_provider(self):
-        mock_provider = MagicMock()
+    def test_normal_path_sets_our_provider(self):
+        """No pre-installed provider — we create ours, set it globally, add handler."""
         with patch("sap_cloud_sdk.core.telemetry._provider.get_config", return_value=_ENABLED_CONFIG):
             with patch("sap_cloud_sdk.core.telemetry._provider.Resource"):
                 with patch("sap_cloud_sdk.core.telemetry._provider._create_log_exporter"):
                     with patch("sap_cloud_sdk.core.telemetry._provider.BatchLogRecordProcessor"):
-                        with patch("sap_cloud_sdk.core.telemetry._provider.LoggerProvider", return_value=mock_provider):
-                            with patch("sap_cloud_sdk.core.telemetry._provider.set_logger_provider"):
-                                with patch("sap_cloud_sdk.core.telemetry._provider.get_logger_provider", return_value=mock_provider):
-                                    with patch(_LOGGING_HANDLER):
-                                        with patch("logging.getLogger"):
-                                            result = setup_log_provider()
-                                            assert result is mock_provider
+                        # plain MagicMock fails isinstance(x, LoggerProvider) → normal path
+                        with patch("sap_cloud_sdk.core.telemetry._provider.get_logger_provider", return_value=MagicMock()):
+                            with patch("sap_cloud_sdk.core.telemetry._provider.set_logger_provider") as mock_set:
+                                with patch(_LOGGING_HANDLER):
+                                    with patch("logging.getLogger"):
+                                        result = setup_log_provider()
+                                        assert result is not None
+                                        mock_set.assert_called_once_with(result)
 
-    def test_uses_shared_resource_attributes(self):
+    def test_normal_path_uses_sdk_resource(self):
         with patch("sap_cloud_sdk.core.telemetry._provider.get_config", return_value=_ENABLED_CONFIG):
             with patch("sap_cloud_sdk.core.telemetry._provider.create_resource_attributes_from_env", return_value={"service.name": "svc"}) as mock_attrs:
                 with patch("sap_cloud_sdk.core.telemetry._provider.Resource") as mock_resource:
                     with patch("sap_cloud_sdk.core.telemetry._provider._create_log_exporter"):
                         with patch("sap_cloud_sdk.core.telemetry._provider.BatchLogRecordProcessor"):
-                            with patch("sap_cloud_sdk.core.telemetry._provider.LoggerProvider"):
-                                with patch("sap_cloud_sdk.core.telemetry._provider.set_logger_provider"):
-                                    with patch(_LOGGING_HANDLER):
-                                        with patch("logging.getLogger"):
-                                            setup_log_provider()
-                                            mock_attrs.assert_called_once()
-                                            mock_resource.create.assert_called_once_with({"service.name": "svc"})
+                            with patch("sap_cloud_sdk.core.telemetry._provider.get_logger_provider", return_value=MagicMock()):
+                                with patch("sap_cloud_sdk.core.telemetry._provider.LoggerProvider"):
+                                    with patch("sap_cloud_sdk.core.telemetry._provider.set_logger_provider"):
+                                        with patch(_LOGGING_HANDLER):
+                                            with patch("logging.getLogger"):
+                                                setup_log_provider()
+                                                mock_attrs.assert_called_once()
+                                                mock_resource.create.assert_called_once_with({"service.name": "svc"})
 
-    def test_calls_set_logger_provider(self):
+    def test_normal_path_installs_handler_on_root_logger(self):
+        mock_handler = MagicMock()
+        mock_root = MagicMock()
         with patch("sap_cloud_sdk.core.telemetry._provider.get_config", return_value=_ENABLED_CONFIG):
             with patch("sap_cloud_sdk.core.telemetry._provider.Resource"):
                 with patch("sap_cloud_sdk.core.telemetry._provider._create_log_exporter"):
                     with patch("sap_cloud_sdk.core.telemetry._provider.BatchLogRecordProcessor"):
-                        mock_provider = MagicMock()
-                        with patch("sap_cloud_sdk.core.telemetry._provider.LoggerProvider", return_value=mock_provider):
-                            with patch("sap_cloud_sdk.core.telemetry._provider.set_logger_provider") as mock_set:
-                                with patch(_LOGGING_HANDLER):
-                                    with patch("logging.getLogger"):
-                                        setup_log_provider()
-                                        mock_set.assert_called_once_with(mock_provider)
-
-    def test_installs_handler_on_root_logger(self):
-        with patch("sap_cloud_sdk.core.telemetry._provider.get_config", return_value=_ENABLED_CONFIG):
-            with patch("sap_cloud_sdk.core.telemetry._provider.Resource"):
-                with patch("sap_cloud_sdk.core.telemetry._provider._create_log_exporter"):
-                    with patch("sap_cloud_sdk.core.telemetry._provider.BatchLogRecordProcessor"):
-                        mock_provider = MagicMock()
-                        with patch("sap_cloud_sdk.core.telemetry._provider.LoggerProvider", return_value=mock_provider):
+                        with patch("sap_cloud_sdk.core.telemetry._provider.get_logger_provider", return_value=MagicMock()):
                             with patch("sap_cloud_sdk.core.telemetry._provider.set_logger_provider"):
-                                with patch("sap_cloud_sdk.core.telemetry._provider.get_logger_provider", return_value=mock_provider):
-                                    mock_handler = MagicMock()
-                                    with patch(_LOGGING_HANDLER, return_value=mock_handler):
-                                        mock_root = MagicMock()
-                                        with patch("logging.getLogger", return_value=mock_root) as mock_get_logger:
-                                            setup_log_provider()
-                                            mock_get_logger.assert_called_once_with()
-                                            mock_root.addHandler.assert_called_once_with(mock_handler)
+                                with patch(_LOGGING_HANDLER, return_value=mock_handler):
+                                    with patch("logging.getLogger", return_value=mock_root):
+                                        setup_log_provider()
+                                        mock_root.addHandler.assert_called_once_with(mock_handler)
 
     def test_exception_returns_none(self):
         with patch("sap_cloud_sdk.core.telemetry._provider.get_config", return_value=_ENABLED_CONFIG):
@@ -310,94 +296,95 @@ class TestSetupLogProvider:
                 with patch("sap_cloud_sdk.core.telemetry._provider._create_log_exporter", side_effect=Exception("boom")):
                     assert setup_log_provider() is None
 
-    def test_external_provider_gets_enriching_processor_attached(self):
-        external_provider = MagicMock()
-        candidate = MagicMock()
+    def test_platform_path_merges_resource_no_extra_handler(self):
+        """Platform pre-installed provider with a handler — merge resource, add nothing."""
+        from opentelemetry.sdk._logs import LoggerProvider as _LP
+        external = MagicMock(spec=_LP)
         with patch("sap_cloud_sdk.core.telemetry._provider.get_config", return_value=_ENABLED_CONFIG):
             with patch("sap_cloud_sdk.core.telemetry._provider.Resource"):
                 with patch("sap_cloud_sdk.core.telemetry._provider._create_log_exporter"):
-                    with patch("sap_cloud_sdk.core.telemetry._provider.BatchLogRecordProcessor") as mock_proc:
-                        with patch("sap_cloud_sdk.core.telemetry._provider.LoggerProvider", return_value=candidate):
-                            with patch("sap_cloud_sdk.core.telemetry._provider.set_logger_provider"):
-                                with patch("sap_cloud_sdk.core.telemetry._provider.get_logger_provider", return_value=external_provider):
-                                    with patch(_LOGGING_HANDLER):
+                    with patch("sap_cloud_sdk.core.telemetry._provider.get_logger_provider", return_value=external):
+                        with patch("sap_cloud_sdk.core.telemetry._provider._merge_sdk_resource_into_log_provider") as mock_merge:
+                            with patch("sap_cloud_sdk.core.telemetry._provider._root_logger_has_otel_handler", return_value=True):
+                                result = setup_log_provider()
+                                assert result is external
+                                mock_merge.assert_called_once()
+                                external.add_log_record_processor.assert_not_called()
+
+    def test_platform_path_adds_handler_when_none_present(self):
+        """Platform set provider but no LoggingHandler — we add our own."""
+        from opentelemetry.sdk._logs import LoggerProvider as _LP
+        external = MagicMock(spec=_LP)
+        with patch("sap_cloud_sdk.core.telemetry._provider.get_config", return_value=_ENABLED_CONFIG):
+            with patch("sap_cloud_sdk.core.telemetry._provider.Resource"):
+                with patch("sap_cloud_sdk.core.telemetry._provider._create_log_exporter"):
+                    with patch("sap_cloud_sdk.core.telemetry._provider.BatchLogRecordProcessor"):
+                        with patch("sap_cloud_sdk.core.telemetry._provider.get_logger_provider", return_value=external):
+                            with patch("sap_cloud_sdk.core.telemetry._provider._merge_sdk_resource_into_log_provider"):
+                                with patch("sap_cloud_sdk.core.telemetry._provider._root_logger_has_otel_handler", return_value=False):
+                                    with patch(_LOGGING_HANDLER) as mock_handler_cls:
                                         with patch("logging.getLogger"):
-                                            result = setup_log_provider()
-
-                                            assert result is external_provider
-                                            # BatchLogRecordProcessor constructed twice: once for our candidate,
-                                            # once wrapped inside the enriching processor
-                                            assert mock_proc.call_count == 2
-                                            # The enriching processor (not a bare BatchLogRecordProcessor) is
-                                            # added to the external provider so SDK resource attrs are injected
-                                            call_args = external_provider.add_log_record_processor.call_args
-                                            assert call_args is not None
-                                            attached = call_args[0][0]
-                                            assert isinstance(attached, _SdkResourceEnrichingProcessor)
+                                            setup_log_provider()
+                                            external.add_log_record_processor.assert_called_once()
+                                            mock_handler_cls.assert_called_once_with(logger_provider=external)
 
 
-class TestSdkResourceEnrichingProcessor:
-    def _make_log_record(self, resource_attrs: dict):
-        from opentelemetry.sdk.resources import Resource as _Resource
-        from opentelemetry.sdk._logs._internal import LogRecord, ReadWriteLogRecord as _RWR
-        from opentelemetry._logs import SeverityNumber
-        log_record = LogRecord(severity_number=SeverityNumber.INFO, body="test")
-        return _RWR(log_record=log_record, resource=_Resource(resource_attrs))
+class TestMergeSdkResourceIntoLogProvider:
+    def test_updates_provider_resource(self):
+        from opentelemetry.sdk._logs import LoggerProvider as _LP
+        from opentelemetry.sdk.resources import Resource as _R
 
-    def test_on_emit_merges_sdk_attrs(self):
-        from opentelemetry.sdk.resources import Resource as _Resource
+        sdk_resource = _R({"sap.cloud_sdk.language": "python"})
+        provider = _LP(resource=_R({"service.name": "svc"}))
 
-        sdk_resource = _Resource({"sap.cloud_sdk.language": "python", "sap.cloud_sdk.name": "sap-cloud-sdk"})
-        inner = MagicMock()
-        proc = _SdkResourceEnrichingProcessor(inner, sdk_resource)
+        _merge_sdk_resource_into_log_provider(provider, sdk_resource)
 
-        rw = self._make_log_record({"service.name": "my-service"})
-        proc.on_emit(rw)
+        assert provider._resource.attributes["sap.cloud_sdk.language"] == "python"
+        assert provider._resource.attributes["service.name"] == "svc"
 
-        inner.on_emit.assert_called_once_with(rw)
-        assert rw.resource.attributes["sap.cloud_sdk.language"] == "python"
-        assert rw.resource.attributes["sap.cloud_sdk.name"] == "sap-cloud-sdk"
-        # original attrs preserved
-        assert rw.resource.attributes["service.name"] == "my-service"
+    def test_updates_active_logger_resources(self):
+        from opentelemetry.sdk._logs import LoggerProvider as _LP
+        from opentelemetry.sdk.resources import Resource as _R
 
-    def test_on_emit_sdk_attrs_win_on_collision(self):
-        from opentelemetry.sdk.resources import Resource as _Resource
+        sdk_resource = _R({"sap.cloud_sdk.language": "python"})
+        provider = _LP(resource=_R({"service.name": "svc"}))
+        logger_instance = provider.get_logger("test.module")
 
-        sdk_resource = _Resource({"service.name": "sdk-override", "sap.cloud_sdk.language": "python"})
-        inner = MagicMock()
-        proc = _SdkResourceEnrichingProcessor(inner, sdk_resource)
+        _merge_sdk_resource_into_log_provider(provider, sdk_resource)
 
-        rw = self._make_log_record({"service.name": "platform-name"})
-        proc.on_emit(rw)
+        # The logger already in the active set gets the updated resource
+        assert logger_instance._resource.attributes["sap.cloud_sdk.language"] == "python"  # ty: ignore[unresolved-attribute]
 
-        # SDK wins on collision
-        assert rw.resource.attributes["service.name"] == "sdk-override"
+    def test_sdk_attrs_win_on_collision(self):
+        from opentelemetry.sdk._logs import LoggerProvider as _LP
+        from opentelemetry.sdk.resources import Resource as _R
 
-    def test_on_emit_null_resource_replaced(self):
-        from opentelemetry.sdk.resources import Resource as _Resource
-        from opentelemetry.sdk._logs._internal import LogRecord, ReadWriteLogRecord as _RWR
-        from opentelemetry._logs import SeverityNumber
+        sdk_resource = _R({"service.name": "sdk-name"})
+        provider = _LP(resource=_R({"service.name": "platform-name"}))
 
-        sdk_resource = _Resource({"sap.cloud_sdk.language": "python"})
-        inner = MagicMock()
-        proc = _SdkResourceEnrichingProcessor(inner, sdk_resource)
+        _merge_sdk_resource_into_log_provider(provider, sdk_resource)
 
-        log_record = LogRecord(severity_number=SeverityNumber.INFO, body="test")
-        rw = _RWR(log_record=log_record, resource=None)
-        proc.on_emit(rw)
+        assert provider._resource.attributes["service.name"] == "sdk-name"
 
-        assert rw.resource is sdk_resource
 
-    def test_shutdown_delegates(self):
-        inner = MagicMock()
-        proc = _SdkResourceEnrichingProcessor(inner, MagicMock())
-        proc.shutdown()
-        inner.shutdown.assert_called_once()
+class TestRootLoggerHasOtelHandler:
+    def test_returns_false_when_no_handler(self):
+        root = logging.getLogger()
+        original = root.handlers[:]
+        root.handlers = []
+        try:
+            assert _root_logger_has_otel_handler() is False
+        finally:
+            root.handlers = original
 
-    def test_force_flush_delegates(self):
-        inner = MagicMock()
-        inner.force_flush.return_value = True
-        proc = _SdkResourceEnrichingProcessor(inner, MagicMock())
-        result = proc.force_flush(5000)
-        inner.force_flush.assert_called_once_with(5000)
-        assert result is True
+    def test_returns_true_when_handler_present(self):
+        from opentelemetry.instrumentation.logging.handler import LoggingHandler as OtelHandler
+        root = logging.getLogger()
+        original = root.handlers[:]
+        mock_provider = MagicMock()
+        handler = OtelHandler(logger_provider=mock_provider)
+        root.handlers = [handler]
+        try:
+            assert _root_logger_has_otel_handler() is True
+        finally:
+            root.handlers = original

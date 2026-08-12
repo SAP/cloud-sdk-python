@@ -135,7 +135,7 @@ def create_resource_attributes_from_env() -> dict:
         - service.instance.id (from HOSTNAME, defaults to "unknown")
         - deployment.environment.name (from APPFND_CONHOS_ENVIRONMENT, defaults to "unknown")
         - cloud.region (from APPFND_CONHOS_REGION, defaults to "unknown")
-        - sap.cld.subaccount_id (from APPFND_CONHOS_SUBACCOUNTID, defaults to "unknown")
+        - sap.cloud.provider.subaccount_id (from APPFND_CONHOS_SUBACCOUNTID, defaults to "unknown")
         - sap.cld.system_role (from APPFND_CONHOS_SYSTEM_ROLE, defaults to "ZAFT")
         - sap.cloud_sdk.name (constant: "SAP Cloud SDK for Python")
         - sap.cloud_sdk.language (constant: "python")

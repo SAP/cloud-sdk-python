@@ -293,8 +293,9 @@ class TestSetupLogProvider:
     def test_exception_returns_none(self):
         with patch("sap_cloud_sdk.core.telemetry._provider.get_config", return_value=_ENABLED_CONFIG):
             with patch("sap_cloud_sdk.core.telemetry._provider.Resource"):
-                with patch("sap_cloud_sdk.core.telemetry._provider._create_log_exporter", side_effect=Exception("boom")):
-                    assert setup_log_provider() is None
+                with patch("sap_cloud_sdk.core.telemetry._provider.get_logger_provider", return_value=MagicMock()):
+                    with patch("sap_cloud_sdk.core.telemetry._provider._create_log_exporter", side_effect=Exception("boom")):
+                        assert setup_log_provider() is None
 
     def test_platform_path_merges_resource_no_extra_handler(self):
         """Platform pre-installed provider with a handler — merge resource, add nothing."""
@@ -323,7 +324,6 @@ class TestSetupLogProvider:
                             with patch(_LOGGING_HANDLER) as mock_handler_cls:
                                 with patch("logging.getLogger"):
                                     setup_log_provider()
-                                    # No second processor — platform LP already has one
                                     external.add_log_record_processor.assert_not_called()
                                     mock_handler_cls.assert_called_once_with(logger_provider=external)
 
@@ -389,8 +389,6 @@ class TestRootLoggerHasOtelHandler:
             root.handlers = original
 
     def test_returns_true_when_sdk_level_handler_present(self):
-        """Platform sitecustomize.py uses opentelemetry.sdk._logs.LoggingHandler, not the
-        instrumentation-layer one. _root_logger_has_otel_handler must detect both."""
         from opentelemetry.sdk._logs import LoggingHandler as SDKHandler
         root = logging.getLogger()
         original = root.handlers[:]

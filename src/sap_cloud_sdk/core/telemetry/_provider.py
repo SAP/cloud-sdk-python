@@ -50,12 +50,7 @@ logger = logging.getLogger(__name__)
 def _merge_sdk_resource_into_log_provider(
     provider: LoggerProvider, sdk_resource: Resource
 ) -> None:
-    """Mutate provider._resource and update all active Logger instances.
-
-    Mirrors the TracerProvider resource merge in auto_instrument.py —
-    OTel SDK exposes no public API to swap a LoggerProvider's Resource
-    post-construction.
-    """
+    """OTel SDK has no public API to swap a LoggerProvider's Resource after construction."""
     provider._resource = provider.resource.merge(sdk_resource)
     with provider._active_loggers_lock:
         for logger_instance in provider._active_loggers:
@@ -66,9 +61,7 @@ def _merge_sdk_resource_into_log_provider(
 
 
 def _root_logger_has_otel_handler() -> bool:
-    # The platform's sitecustomize.py (OTEL_PYTHON_LOGGING_AUTO_INSTRUMENTATION_ENABLED)
-    # installs opentelemetry.sdk._logs.LoggingHandler, which is a different class from
-    # opentelemetry.instrumentation.logging.handler.LoggingHandler. Check both.
+    # sitecustomize.py installs sdk._logs.LoggingHandler, not the instrumentation-layer one — check both.
     try:
         from opentelemetry.sdk._logs import LoggingHandler as _SDKLoggingHandler
 
@@ -142,9 +135,7 @@ def setup_log_provider() -> Optional[LoggerProvider]:
         existing = cast(LoggerProvider, get_logger_provider())
 
         if isinstance(existing, LoggerProvider):
-            # Platform's auto-instrumentation pre-installed a provider.
-            # Merge SDK resource attrs into it so all records carry sap.cloud_sdk.*.
-            # Never add a second BatchLogRecordProcessor here — the platform's provider
+            # Never add a second BatchLogRecordProcessor — the platform's provider
             # already has one, and a second processor doubles every exported log record.
             logger.warning(
                 "Global LoggerProvider was already set by another library. "
@@ -152,8 +143,6 @@ def setup_log_provider() -> Optional[LoggerProvider]:
             )
             _merge_sdk_resource_into_log_provider(existing, resource)
             if not _root_logger_has_otel_handler():
-                # No stdlib bridge handler yet — add one so log records reach the
-                # platform's existing processor. No extra processor needed.
                 logging.getLogger().addHandler(LoggingHandler(logger_provider=existing))
             _log_provider = existing
         else:

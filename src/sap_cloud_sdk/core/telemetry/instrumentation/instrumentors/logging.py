@@ -12,7 +12,7 @@ _instrumentor = LoggingInstrumentor()
 
 
 def _has_otel_handler_on_root() -> bool:
-    """Return True if any OTel log bridge handler is already on the root logger."""
+    # sitecustomize.py installs sdk._logs.LoggingHandler, not the instrumentation-layer one — check both.
     try:
         from opentelemetry.sdk._logs import LoggingHandler as _SDKHandler
 
@@ -33,12 +33,9 @@ class LoggingInstrumentorWrapper(LibraryInstrumentor):
         return _instrumentor.is_instrumented_by_opentelemetry
 
     def _instrument(self, **kwargs) -> None:
+        kwargs.setdefault("set_logging_format", True)
         if _has_otel_handler_on_root():
-            # An OTel log bridge handler is already on root (from platform
-            # auto-instrumentation or setup_log_provider). Pass
-            # enable_log_auto_instrumentation=False so LoggingInstrumentor
-            # only injects trace context into stdlib log records — it must
-            # not add a second handler that would duplicate every log record.
+            # Already have a handler — adding another duplicates every log record.
             kwargs = {**kwargs, "enable_log_auto_instrumentation": False}
         _instrumentor.instrument(**kwargs)
 

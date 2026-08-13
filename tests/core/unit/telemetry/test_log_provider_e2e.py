@@ -118,7 +118,7 @@ class TestLogProviderEndToEnd:
         assert attrs.get("service.name") == "test-svc"
         assert attrs.get("sap.cloud_sdk.language") == "python"
         assert attrs.get("cloud.region") == "eu10"
-        assert attrs.get("sap.cld.subaccount_id") == "sub-123"
+        assert attrs.get("sap.cloud.provider.subaccount_id") == "sub-123"
 
     def test_extra_fields_become_log_attributes(self, log_exporter):
         logging.getLogger("test.extra").warning(
@@ -196,7 +196,7 @@ class TestLogProviderClashingProvider:
         root.setLevel(logging.DEBUG)
         logging.getLogger("test.clash").warning("hello from sdk")
 
-        our_records = our_exporter.get_finished_logs()
+        our_records = external_exporter.get_finished_logs()
         assert len(our_records) == 1
         assert our_records[0].log_record.body == "hello from sdk"
 

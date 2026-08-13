@@ -12,6 +12,10 @@ from typing import TYPE_CHECKING, Any, Optional, Union, cast
 import httpx
 from a2a.types import Message
 from opentelemetry.propagate import inject
+
+from google.protobuf.json_format import MessageToDict as _proto_message_to_dict
+from google.protobuf.json_format import ParseDict as _proto_parse_dict
+
 from pydantic_core import ValidationError
 
 from sap_cloud_sdk.core.telemetry import Module, Operation
@@ -199,6 +203,7 @@ class ExtensibilityClient:
                 tenant="1d2e1a41-a28b-431f-9e3f-42e9704bfa75",
             )
         """
+        logger.info("Fetching extension capabilities for tenant=%s", tenant)
         try:
             return self._transport.get_extension_capability_implementation(
                 capability_id=capability_id,
@@ -376,7 +381,7 @@ class ExtensibilityClient:
                         .get("main", [[{}]])[0][0]
                         .get("json", {})
                     )
-                    return Message(**response_json)
+                    return _proto_parse_dict(response_json, Message())
                 except (KeyError, IndexError, TypeError, ValidationError) as exc:
                     raise ExtensibilityError(
                         f"Failed to extract response from last executed node: {exc}"
@@ -400,6 +405,7 @@ class ExtensibilityClient:
         self, agw_client: Any, user_token: Optional[str]
     ) -> tuple[Any, Any]:
         tools = await agw_client.list_mcp_tools(user_token=user_token or None)
+        logger.info("Listed %d MCP tools from Agent Gateway", len(tools))
 
         execute_tool = next(
             (
@@ -415,6 +421,7 @@ class ExtensibilityClient:
                 f"MCP tool '{_EXECUTE_WORKFLOW_TOOL_NAME}' on server '{_N8N_MCP_SERVER_NAME}' "
                 "not found via Agent Gateway."
             )
+        logger.info("Fetched n8n execute_tool: %s", _EXECUTE_WORKFLOW_TOOL_NAME)
 
         get_exec_tool = next(
             (
@@ -430,6 +437,7 @@ class ExtensibilityClient:
                 f"MCP tool '{_GET_EXECUTION_TOOL_NAME}' on server '{_N8N_MCP_SERVER_NAME}' "
                 "not found via Agent Gateway."
             )
+        logger.info("Fetched n8n get_exec_tool: %s", _GET_EXECUTION_TOOL_NAME)
 
         return execute_tool, get_exec_tool
 
@@ -442,7 +450,10 @@ class ExtensibilityClient:
         message: Optional[Any],
         headers: Optional[dict],
     ) -> tuple[str, Any]:
-        message_body = message.model_dump(mode="json") if message is not None else {}
+        if message is None:
+            message_body: dict = {}
+        else:
+            message_body = _proto_message_to_dict(message, preserving_proto_field_name=True)
         execute_arguments = {
             "workflowId": hook.n8n_workflow_config.workflow_id,
             "inputs": {
@@ -455,6 +466,7 @@ class ExtensibilityClient:
                 },
             },
         }
+        logger.info("Executing workflow id=%s", hook.n8n_workflow_config.workflow_id)
         try:
             result_str = await agw_client.call_mcp_tool(
                 execute_tool,
@@ -480,6 +492,7 @@ class ExtensibilityClient:
             )
 
         execution_id = data.get("executionId")
+        logger.info("Workflow execution complete: execution_id=%s, status=%s", execution_id, status)
         return str(execution_id), status
 
     @staticmethod
@@ -494,7 +507,7 @@ class ExtensibilityClient:
                 .get("main", [[{}]])[0][0]
                 .get("json", {})
             )
-            return Message(**response_json)
+            return _proto_parse_dict(response_json, Message())
         except (KeyError, IndexError, TypeError, ValidationError) as exc:
             raise TransportError(
                 f"Failed to extract response from last executed node: {exc}"
@@ -511,6 +524,7 @@ class ExtensibilityClient:
     ) -> Optional[Message]:
         deadline = time.monotonic() + hook.timeout
         last_status = initial_status
+        logger.info("Polling for workflow %s execution result (timeout=%ss)", hook.n8n_workflow_config.workflow_id, hook.timeout)
 
         while time.monotonic() < deadline:
             await asyncio.sleep(_HOOK_POLL_INTERVAL)
@@ -541,6 +555,7 @@ class ExtensibilityClient:
             )
 
             if last_status == "success":
+                logger.info("Execution %s completed successfully", execution_id)
                 return self._extract_message(data)
 
             if last_status in _EXECUTION_TERMINAL_STATUSES:
@@ -615,12 +630,15 @@ class ExtensibilityClient:
         agw_client = create_agw_client(
             tenant_subdomain, _telemetry_source=Module.EXTENSIBILITY
         )
+        logger.info("AGW client created successfully for tenant_subdomain=%s", tenant_subdomain)
         execute_tool, get_exec_tool = await self._discover_n8n_tools(
             agw_client, user_token
         )
+        logger.info("Discovered n8n tools")
         execution_id, status = await self._execute_workflow_via_agw(
             agw_client, execute_tool, hook, user_token, message, headers
         )
+        logger.info("Workflow triggered: execution_id=%s, initial_status=%s", execution_id, status)
         return await self._poll_hook_execution(
             agw_client, get_exec_tool, hook, execution_id, user_token, status
         )

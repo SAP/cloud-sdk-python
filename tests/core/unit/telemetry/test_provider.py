@@ -312,21 +312,20 @@ class TestSetupLogProvider:
                                 external.add_log_record_processor.assert_not_called()
 
     def test_platform_path_adds_handler_when_none_present(self):
-        """Platform set provider but no LoggingHandler — we add our own."""
+        """Platform set provider but no LoggingHandler — we add handler, no extra processor."""
         from opentelemetry.sdk._logs import LoggerProvider as _LP
         external = MagicMock(spec=_LP)
         with patch("sap_cloud_sdk.core.telemetry._provider.get_config", return_value=_ENABLED_CONFIG):
             with patch("sap_cloud_sdk.core.telemetry._provider.Resource"):
-                with patch("sap_cloud_sdk.core.telemetry._provider._create_log_exporter"):
-                    with patch("sap_cloud_sdk.core.telemetry._provider.BatchLogRecordProcessor"):
-                        with patch("sap_cloud_sdk.core.telemetry._provider.get_logger_provider", return_value=external):
-                            with patch("sap_cloud_sdk.core.telemetry._provider._merge_sdk_resource_into_log_provider"):
-                                with patch("sap_cloud_sdk.core.telemetry._provider._root_logger_has_otel_handler", return_value=False):
-                                    with patch(_LOGGING_HANDLER) as mock_handler_cls:
-                                        with patch("logging.getLogger"):
-                                            setup_log_provider()
-                                            external.add_log_record_processor.assert_called_once()
-                                            mock_handler_cls.assert_called_once_with(logger_provider=external)
+                with patch("sap_cloud_sdk.core.telemetry._provider.get_logger_provider", return_value=external):
+                    with patch("sap_cloud_sdk.core.telemetry._provider._merge_sdk_resource_into_log_provider"):
+                        with patch("sap_cloud_sdk.core.telemetry._provider._root_logger_has_otel_handler", return_value=False):
+                            with patch(_LOGGING_HANDLER) as mock_handler_cls:
+                                with patch("logging.getLogger"):
+                                    setup_log_provider()
+                                    # No second processor — platform LP already has one
+                                    external.add_log_record_processor.assert_not_called()
+                                    mock_handler_cls.assert_called_once_with(logger_provider=external)
 
 
 class TestMergeSdkResourceIntoLogProvider:
@@ -383,6 +382,20 @@ class TestRootLoggerHasOtelHandler:
         original = root.handlers[:]
         mock_provider = MagicMock()
         handler = OtelHandler(logger_provider=mock_provider)
+        root.handlers = [handler]
+        try:
+            assert _root_logger_has_otel_handler() is True
+        finally:
+            root.handlers = original
+
+    def test_returns_true_when_sdk_level_handler_present(self):
+        """Platform sitecustomize.py uses opentelemetry.sdk._logs.LoggingHandler, not the
+        instrumentation-layer one. _root_logger_has_otel_handler must detect both."""
+        from opentelemetry.sdk._logs import LoggingHandler as SDKHandler
+        root = logging.getLogger()
+        original = root.handlers[:]
+        mock_provider = MagicMock()
+        handler = SDKHandler(logger_provider=mock_provider)
         root.handlers = [handler]
         try:
             assert _root_logger_has_otel_handler() is True

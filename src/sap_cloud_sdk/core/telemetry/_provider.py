@@ -66,7 +66,16 @@ def _merge_sdk_resource_into_log_provider(
 
 
 def _root_logger_has_otel_handler() -> bool:
-    return any(isinstance(h, LoggingHandler) for h in logging.getLogger().handlers)
+    # The platform's sitecustomize.py (OTEL_PYTHON_LOGGING_AUTO_INSTRUMENTATION_ENABLED)
+    # installs opentelemetry.sdk._logs.LoggingHandler, which is a different class from
+    # opentelemetry.instrumentation.logging.handler.LoggingHandler. Check both.
+    try:
+        from opentelemetry.sdk._logs import LoggingHandler as _SDKLoggingHandler
+
+        handler_types: tuple[type, ...] = (LoggingHandler, _SDKLoggingHandler)
+    except ImportError:
+        handler_types = (LoggingHandler,)
+    return any(isinstance(h, handler_types) for h in logging.getLogger().handlers)
 
 
 # Global meter provider
@@ -130,27 +139,28 @@ def setup_log_provider() -> Optional[LoggerProvider]:
 
     try:
         resource = Resource.create(create_resource_attributes_from_env())
-        exporter = _create_log_exporter()
-
         existing = cast(LoggerProvider, get_logger_provider())
 
         if isinstance(existing, LoggerProvider):
             # Platform's auto-instrumentation pre-installed a provider.
             # Merge SDK resource attrs into it so all records carry sap.cloud_sdk.*.
-            # Do not add a second processor or handler — the platform already installed
-            # both, and adding duplicates causes multiple exports per log event.
+            # Never add a second BatchLogRecordProcessor here — the platform's provider
+            # already has one, and a second processor doubles every exported log record.
             logger.warning(
                 "Global LoggerProvider was already set by another library. "
                 "Merging sap.cloud_sdk.* resource attributes into the existing provider."
             )
             _merge_sdk_resource_into_log_provider(existing, resource)
             if not _root_logger_has_otel_handler():
-                existing.add_log_record_processor(BatchLogRecordProcessor(exporter))
+                # No stdlib bridge handler yet — add one so log records reach the
+                # platform's existing processor. No extra processor needed.
                 logging.getLogger().addHandler(LoggingHandler(logger_provider=existing))
             _log_provider = existing
         else:
             provider = LoggerProvider(resource=resource)
-            provider.add_log_record_processor(BatchLogRecordProcessor(exporter))
+            provider.add_log_record_processor(
+                BatchLogRecordProcessor(_create_log_exporter())
+            )
             set_logger_provider(provider)
             logging.getLogger().addHandler(LoggingHandler(logger_provider=provider))
             _log_provider = provider

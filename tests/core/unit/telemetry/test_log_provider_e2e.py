@@ -148,36 +148,29 @@ class TestLogProviderEndToEnd:
 
 
 class TestLogProviderClashingProvider:
-    """When another library claims the global LoggerProvider first, our processor
-    must still be attached so logs reach the SAP OTLP endpoint."""
+    """When the platform pre-claims the global LoggerProvider, we merge our resource
+    attributes into it and leave its processor chain intact."""
 
-    def test_logs_reach_our_exporter_when_provider_already_set(self, monkeypatch):
+    def test_logs_flow_through_existing_provider_with_sdk_resource(self, monkeypatch):
         from opentelemetry._logs import _internal as _logs_internal
         from opentelemetry.sdk._logs.export import InMemoryLogRecordExporter, SimpleLogRecordProcessor
         import sap_cloud_sdk.core.telemetry._provider as provider_module
 
-        # Reset OTel singleton
         _logs_internal._LOGGER_PROVIDER_SET_ONCE._done = False
         _logs_internal._LOGGER_PROVIDER = None
         provider_module._log_provider = None
 
-        # Remove stale LoggingHandlers
         root = logging.getLogger()
         for h in list(root.handlers):
             if isinstance(h, LoggingHandler):
                 root.removeHandler(h)
 
-        # Simulate another library claiming the provider first
         external_exporter = InMemoryLogRecordExporter()
         external_provider = LoggerProvider()
         external_provider.add_log_record_processor(SimpleLogRecordProcessor(external_exporter))
         from opentelemetry._logs import set_logger_provider
         set_logger_provider(external_provider)
 
-        # Now our SDK runs setup_log_provider
-        our_exporter = InMemoryLogRecordExporter()
-        monkeypatch.setattr("sap_cloud_sdk.core.telemetry._provider._create_log_exporter", lambda: our_exporter)
-        monkeypatch.setattr("sap_cloud_sdk.core.telemetry._provider.BatchLogRecordProcessor", SimpleLogRecordProcessor)
         monkeypatch.setattr(
             "sap_cloud_sdk.core.telemetry._provider.get_config",
             lambda: __import__(
@@ -196,11 +189,12 @@ class TestLogProviderClashingProvider:
         root.setLevel(logging.DEBUG)
         logging.getLogger("test.clash").warning("hello from sdk")
 
-        our_records = external_exporter.get_finished_logs()
-        assert len(our_records) == 1
-        assert our_records[0].log_record.body == "hello from sdk"
+        records = external_exporter.get_finished_logs()
+        assert len(records) == 1
+        assert records[0].log_record.body == "hello from sdk"
+        # Resource merge must have happened — sap.cloud_sdk.* attrs prove it
+        assert records[0].resource.attributes.get("sap.cloud_sdk.language") == "python"
 
-        # Cleanup
         for h in list(root.handlers):
             if isinstance(h, LoggingHandler):
                 root.removeHandler(h)

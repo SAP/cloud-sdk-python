@@ -12,10 +12,6 @@ from typing import TYPE_CHECKING, Any, Optional, Union, cast
 import httpx
 from a2a.types import Message
 from opentelemetry.propagate import inject
-
-from google.protobuf.json_format import MessageToDict as _proto_message_to_dict
-from google.protobuf.json_format import ParseDict as _proto_parse_dict
-
 from pydantic_core import ValidationError
 
 from sap_cloud_sdk.core.telemetry import Module, Operation
@@ -381,7 +377,7 @@ class ExtensibilityClient:
                         .get("main", [[{}]])[0][0]
                         .get("json", {})
                     )
-                    return _proto_parse_dict(response_json, Message())
+                    return Message(**response_json)
                 except (KeyError, IndexError, TypeError, ValidationError) as exc:
                     raise ExtensibilityError(
                         f"Failed to extract response from last executed node: {exc}"
@@ -450,10 +446,7 @@ class ExtensibilityClient:
         message: Optional[Any],
         headers: Optional[dict],
     ) -> tuple[str, Any]:
-        if message is None:
-            message_body: dict = {}
-        else:
-            message_body = _proto_message_to_dict(message, preserving_proto_field_name=True)
+        message_body = message.model_dump(mode="json") if message is not None else {}
         execute_arguments = {
             "workflowId": hook.n8n_workflow_config.workflow_id,
             "inputs": {
@@ -507,7 +500,7 @@ class ExtensibilityClient:
                 .get("main", [[{}]])[0][0]
                 .get("json", {})
             )
-            return _proto_parse_dict(response_json, Message())
+            return Message(**response_json)
         except (KeyError, IndexError, TypeError, ValidationError) as exc:
             raise TransportError(
                 f"Failed to extract response from last executed node: {exc}"

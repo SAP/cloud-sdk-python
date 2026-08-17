@@ -485,7 +485,11 @@ class ExtensibilityClient:
             )
 
         execution_id = data.get("executionId")
-        logger.info("Workflow execution complete: execution_id=%s, status=%s", execution_id, status)
+        logger.info(
+            "Workflow execution complete: execution_id=%s, status=%s",
+            execution_id,
+            status,
+        )
         return str(execution_id), status
 
     @staticmethod
@@ -517,7 +521,11 @@ class ExtensibilityClient:
     ) -> Optional[Message]:
         deadline = time.monotonic() + hook.timeout
         last_status = initial_status
-        logger.info("Polling for workflow %s execution result (timeout=%ss)", hook.n8n_workflow_config.workflow_id, hook.timeout)
+        logger.info(
+            "Polling for workflow %s execution result (timeout=%ss)",
+            hook.n8n_workflow_config.workflow_id,
+            hook.timeout,
+        )
 
         while time.monotonic() < deadline:
             await asyncio.sleep(_HOOK_POLL_INTERVAL)
@@ -623,7 +631,9 @@ class ExtensibilityClient:
         agw_client = create_agw_client(
             tenant_subdomain, _telemetry_source=Module.EXTENSIBILITY
         )
-        logger.info("AGW client created successfully for tenant_subdomain=%s", tenant_subdomain)
+        logger.info(
+            "AGW client created successfully for tenant_subdomain=%s", tenant_subdomain
+        )
         execute_tool, get_exec_tool = await self._discover_n8n_tools(
             agw_client, user_token
         )
@@ -631,7 +641,11 @@ class ExtensibilityClient:
         execution_id, status = await self._execute_workflow_via_agw(
             agw_client, execute_tool, hook, user_token, message, headers
         )
-        logger.info("Workflow triggered: execution_id=%s, initial_status=%s", execution_id, status)
+        logger.info(
+            "Workflow triggered: execution_id=%s, initial_status=%s",
+            execution_id,
+            status,
+        )
         return await self._poll_hook_execution(
             agw_client, get_exec_tool, hook, execution_id, user_token, status
         )

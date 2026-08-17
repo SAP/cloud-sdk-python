@@ -443,3 +443,137 @@ class TestACompletionReactiveReload:
         ):
             with pytest.raises(litellm.AuthenticationError):
                 asyncio.run(acompletion(model="sap/x", messages=[]))
+
+
+# ---------------------------------------------------------------------------
+# Proxy mode — model aliasing in completion() / acompletion()
+# ---------------------------------------------------------------------------
+
+
+class TestCompletionProxyModeAliasing:
+    """completion() rewrites sap/<model> → litellm_proxy/<model> when proxy is active."""
+
+    def setup_method(self):
+        from sap_cloud_sdk.aicore.completion import _set_proxy_active
+        _set_proxy_active(False)
+
+    def teardown_method(self):
+        from sap_cloud_sdk.aicore.completion import _set_proxy_active
+        _set_proxy_active(False)
+
+    def test_sap_model_rewritten_when_proxy_active(self):
+        from sap_cloud_sdk.aicore.completion import _set_proxy_active
+        _set_proxy_active(True)
+        sentinel = object()
+        captured = {}
+
+        with patch(
+            "sap_cloud_sdk.aicore.completion.litellm.completion",
+            side_effect=lambda *a, **kw: captured.update(kw) or sentinel,
+        ):
+            result = completion(model="sap/gpt-4o", messages=[])
+
+        assert result is sentinel
+        assert captured["model"] == "litellm_proxy/gpt-4o"
+
+    def test_model_unchanged_when_proxy_not_active(self):
+        sentinel = object()
+        captured = {}
+
+        with patch(
+            "sap_cloud_sdk.aicore.completion.litellm.completion",
+            side_effect=lambda *a, **kw: captured.update(kw) or sentinel,
+        ):
+            result = completion(model="sap/gpt-4o", messages=[])
+
+        assert result is sentinel
+        assert captured["model"] == "sap/gpt-4o"
+
+    def test_non_sap_model_unchanged_even_when_proxy_active(self):
+        from sap_cloud_sdk.aicore.completion import _set_proxy_active
+        _set_proxy_active(True)
+        sentinel = object()
+        captured = {}
+
+        with patch(
+            "sap_cloud_sdk.aicore.completion.litellm.completion",
+            side_effect=lambda *a, **kw: captured.update(kw) or sentinel,
+        ):
+            result = completion(model="openai/gpt-4o", messages=[])
+
+        assert result is sentinel
+        assert captured["model"] == "openai/gpt-4o"
+
+    def test_proxy_rewrite_on_auth_error_retry(self):
+        """Model aliasing is applied on both the initial call and the retry."""
+        from sap_cloud_sdk.aicore.completion import _set_proxy_active
+        _set_proxy_active(True)
+
+        sentinel = object()
+        auth_err = litellm.AuthenticationError(
+            message="401", llm_provider="sap", model="sap/x"
+        )
+        call_models = []
+
+        def fake_completion(*args, **kwargs):
+            call_models.append(kwargs.get("model"))
+            if len(call_models) == 1:
+                raise auth_err
+            return sentinel
+
+        with (
+            patch("sap_cloud_sdk.aicore.completion.litellm.completion", side_effect=fake_completion),
+            patch("sap_cloud_sdk.aicore.set_aicore_config"),
+        ):
+            result = completion(model="sap/gpt-4o", messages=[])
+
+        assert result is sentinel
+        assert call_models == ["litellm_proxy/gpt-4o", "litellm_proxy/gpt-4o"]
+
+
+class TestACompletionProxyModeAliasing:
+    """acompletion() proxy aliasing — async path."""
+
+    def setup_method(self):
+        from sap_cloud_sdk.aicore.completion import _set_proxy_active
+        _set_proxy_active(False)
+
+    def teardown_method(self):
+        from sap_cloud_sdk.aicore.completion import _set_proxy_active
+        _set_proxy_active(False)
+
+    def test_sap_model_rewritten_when_proxy_active(self):
+        from sap_cloud_sdk.aicore.completion import _set_proxy_active
+        _set_proxy_active(True)
+        sentinel = object()
+        captured = {}
+
+        async def fake_acompletion(*args, **kwargs):
+            captured.update(kwargs)
+            return sentinel
+
+        with patch(
+            "sap_cloud_sdk.aicore.completion.litellm.acompletion",
+            side_effect=fake_acompletion,
+        ):
+            result = asyncio.run(acompletion(model="sap/gpt-4o", messages=[]))
+
+        assert result is sentinel
+        assert captured["model"] == "litellm_proxy/gpt-4o"
+
+    def test_model_unchanged_when_proxy_not_active(self):
+        sentinel = object()
+        captured = {}
+
+        async def fake_acompletion(*args, **kwargs):
+            captured.update(kwargs)
+            return sentinel
+
+        with patch(
+            "sap_cloud_sdk.aicore.completion.litellm.acompletion",
+            side_effect=fake_acompletion,
+        ):
+            result = asyncio.run(acompletion(model="sap/gpt-4o", messages=[]))
+
+        assert result is sentinel
+        assert captured["model"] == "sap/gpt-4o"

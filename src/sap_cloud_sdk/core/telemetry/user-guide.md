@@ -295,6 +295,7 @@ from litellm import completion
 
 logger = logging.getLogger(__name__)
 
+
 async def handle_request(query: str, user_id: str):
     set_tenant_id("bh7sjh...")
 

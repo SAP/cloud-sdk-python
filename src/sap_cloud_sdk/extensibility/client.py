@@ -401,7 +401,6 @@ class ExtensibilityClient:
         self, agw_client: Any, user_token: Optional[str]
     ) -> tuple[Any, Any]:
         tools = await agw_client.list_mcp_tools(user_token=user_token or None)
-        logger.info("Listed %d MCP tools from Agent Gateway", len(tools))
 
         execute_tool = next(
             (

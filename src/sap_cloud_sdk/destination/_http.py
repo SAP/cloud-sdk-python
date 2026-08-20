@@ -68,11 +68,7 @@ class TokenProvider:
         _validate_tenant_subdomain(tenant_subdomain)
 
         if tenant_subdomain:
-            try:
-                token_url = token_url.replace(str(identityzone), tenant_subdomain)
-            except Exception:
-                # Fallback to base token_url if replacement fails
-                token_url = self._config.token_url
+            token_url = token_url.replace(str(identityzone), tenant_subdomain)
 
         token: Dict[str, Any] = self._session.fetch_token(
             token_url=token_url,

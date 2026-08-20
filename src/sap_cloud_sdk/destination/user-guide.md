@@ -435,26 +435,21 @@ response = http.request("GET", "/api/resource")
 
 ### Client-Certificate (mTLS) Authentication
 
-When a destination's `Authentication` is `ClientCertificateAuthentication`, `DestinationHttpClient` automatically configures the underlying session for mutual TLS — no extra code needed.
+When a destination's `Authentication` is `ClientCertificateAuthentication`, `DestinationHttpClient` automatically configures the underlying session for mutual TLS.
 
 ```python
 from sap_cloud_sdk.destination import create_client, DestinationHttpClient
 
 client = create_client(instance="default")
-dest = client.get_destination("my-mtls-target")  # must be v2 get_destination
+dest = client.get_destination("my-mtls-target")
 
-http = DestinationHttpClient(dest)  # mTLS is wired automatically
-response = http.request("GET", "/api/resource")
+with DestinationHttpClient(dest) as http:  # mTLS is wired automatically
+    response = http.request("GET", "/api/resource")
 ```
-
-The certificate material is taken from `dest.certificates`, which is only populated by the v2 `get_destination()` API.
 
 - **`KeyStoreLocation`** destination property: selects a specific certificate by name when multiple are present.
 - **`KeyStorePassword`** destination property: used to decrypt an encrypted private key.
-- **Supported formats**: PEM (`.pem`) and PKCS12 (`.p12` / `.pfx`). JKS is not supported (Java-specific format).
-- **Server verification**: remains enabled (`CERT_REQUIRED`, `check_hostname=True`).
-
-> **Note:** A `DestinationCertificateError` is raised if the certificate cannot be loaded — for example, wrong or missing `KeyStorePassword`, unsupported format, malformed content, or a cert/key mismatch.
+- **Supported formats**: PEM (`.pem`) and PKCS12 (`.p12` / `.pfx`).
 
 ### What headers are pre-baked
 

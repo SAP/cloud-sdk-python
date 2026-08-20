@@ -65,7 +65,6 @@ dev = [
     "pytest-bdd>=7.2.0",
     "python-dotenv>=1.0.0",
     "ty==0.0.64",
-    "cryptography>=46.0.3",
     "ruff==0.16.0",
     "starlette>=0.40.0",
     "anyio>=3.6.2",

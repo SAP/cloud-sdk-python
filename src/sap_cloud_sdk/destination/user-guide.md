@@ -433,6 +433,29 @@ http = DestinationHttpClient(dest)
 response = http.request("GET", "/api/resource")
 ```
 
+### Client-Certificate (mTLS) Authentication
+
+When a destination's `Authentication` is `ClientCertificateAuthentication`, `DestinationHttpClient` automatically configures the underlying session for mutual TLS — no extra code needed.
+
+```python
+from sap_cloud_sdk.destination import create_client, DestinationHttpClient
+
+client = create_client(instance="default")
+dest = client.get_destination("my-mtls-target")  # must be v2 get_destination
+
+http = DestinationHttpClient(dest)  # mTLS is wired automatically
+response = http.request("GET", "/api/resource")
+```
+
+The certificate material is taken from `dest.certificates`, which is only populated by the v2 `get_destination()` API.
+
+- **`KeyStoreLocation`** destination property: selects a specific certificate by name when multiple are present.
+- **`KeyStorePassword`** destination property: used to decrypt an encrypted private key.
+- **Supported formats**: PEM (`.pem`) and PKCS12 (`.p12` / `.pfx`). JKS is not supported (Java-specific format).
+- **Server verification**: remains enabled (`CERT_REQUIRED`, `check_hostname=True`).
+
+> **Note:** A `DestinationCertificateError` is raised if the certificate cannot be loaded — for example, wrong or missing `KeyStorePassword`, unsupported format, malformed content, or a cert/key mismatch.
+
 ### What headers are pre-baked
 
 When `DestinationHttpClient` is constructed, it reads the destination and pre-bakes the following headers into every request:
@@ -905,6 +928,7 @@ Entries with a `"tenant"` field are treated as subscriber-specific. Entries with
 - `DestinationNotFoundError`: mapped from HTTP 404 where applicable
 - `DestinationOperationError`: general operation failures
 - `HttpError`: HTTP-related or local store read/write errors with `status_code` and `response_text` when applicable
+- `DestinationCertificateError`: raised when a client certificate cannot be loaded or wired into the HTTP session (unsupported format, wrong/missing KeyStorePassword, malformed content, cert/key mismatch)
 
 ## Configuration
 

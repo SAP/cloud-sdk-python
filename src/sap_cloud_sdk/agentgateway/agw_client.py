@@ -156,12 +156,12 @@ class AgentGatewayClient:
 
     def _resolve_tenant_subdomain(self) -> str:
         """Resolve tenant subdomain from string or callable."""
-        resolved = self._resolve_value(
+        resolved_tenant_subdomain = self._resolve_value(
             self._tenant_subdomain,
             "tenant_subdomain is required for LoB agent flow.",
         )
-        _validate_tenant_subdomain(resolved)
-        return resolved
+        _validate_tenant_subdomain(resolved_tenant_subdomain)
+        return resolved_tenant_subdomain
 
     @record_metrics(Module.AGENTGATEWAY, Operation.AGENTGATEWAY_GET_SYSTEM_AUTH)
     async def get_system_auth(self) -> AuthResult:

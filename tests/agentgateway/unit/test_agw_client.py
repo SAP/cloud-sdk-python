@@ -123,6 +123,50 @@ class TestResolveValue:
 
 
 # ============================================================
+# Test: AgentGatewayClient._resolve_tenant_subdomain
+# ============================================================
+
+
+class TestResolveTenantSubdomain:
+    """Tests for AgentGatewayClient._resolve_tenant_subdomain."""
+
+    def test_valid_string_subdomain_returns_value(self):
+        client = AgentGatewayClient(tenant_subdomain="tenant-123")
+        assert client._resolve_tenant_subdomain() == "tenant-123"
+
+    def test_callable_subdomain_is_resolved_then_validated(self):
+        client = AgentGatewayClient(tenant_subdomain=lambda: "dynamic-tenant")
+        assert client._resolve_tenant_subdomain() == "dynamic-tenant"
+
+    def test_invalid_subdomain_raises_value_error(self):
+        client = AgentGatewayClient(tenant_subdomain="-bad-subdomain")
+        with pytest.raises(ValueError, match="Invalid tenant_subdomain"):
+            client._resolve_tenant_subdomain()
+
+    def test_invalid_subdomain_from_callable_raises_value_error(self):
+        client = AgentGatewayClient(tenant_subdomain=lambda: "has.dot")
+        with pytest.raises(ValueError, match="Invalid tenant_subdomain"):
+            client._resolve_tenant_subdomain()
+
+    def test_none_subdomain_raises_sdk_error(self):
+        client = AgentGatewayClient(tenant_subdomain=None)
+        with pytest.raises(AgentGatewaySDKError, match="tenant_subdomain is required"):
+            client._resolve_tenant_subdomain()
+
+    @patch("sap_cloud_sdk.agentgateway.agw_client._validate_tenant_subdomain")
+    def test_validator_is_called_with_resolved_value(self, mock_validate):
+        client = AgentGatewayClient(tenant_subdomain="tenant-abc")
+        client._resolve_tenant_subdomain()
+        mock_validate.assert_called_once_with("tenant-abc")
+
+    @patch("sap_cloud_sdk.agentgateway.agw_client._validate_tenant_subdomain")
+    def test_validator_called_with_result_of_callable(self, mock_validate):
+        client = AgentGatewayClient(tenant_subdomain=lambda: "from-callable")
+        client._resolve_tenant_subdomain()
+        mock_validate.assert_called_once_with("from-callable")
+
+
+# ============================================================
 # Test: get_system_auth
 # ============================================================
 

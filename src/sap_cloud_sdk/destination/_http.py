@@ -18,7 +18,7 @@ from requests_oauthlib import OAuth2Session
 
 from sap_cloud_sdk.destination.config import DestinationConfig
 from sap_cloud_sdk.destination.exceptions import HttpError
-from sap_cloud_sdk.core.url_utils import _validate_tenant_subdomain
+from sap_cloud_sdk.core._tenant import _validate_tenant_subdomain
 
 # API version constants
 API_V1 = "v1"

@@ -10,7 +10,7 @@ from sap_cloud_sdk.dms.exceptions import (
     DMSPermissionDeniedException,
 )
 from sap_cloud_sdk.dms.model import DMSCredentials
-from sap_cloud_sdk.core.url_utils import _validate_tenant_subdomain
+from sap_cloud_sdk.core._tenant import _validate_tenant_subdomain
 
 logger = logging.getLogger(__name__)
 

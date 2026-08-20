@@ -37,7 +37,7 @@ from sap_cloud_sdk.agentgateway._models import (
     MCPTool,
     MCPToolFilter,
 )
-from sap_cloud_sdk.core.url_utils import _validate_tenant_subdomain
+from sap_cloud_sdk.core._tenant import _validate_tenant_subdomain
 from sap_cloud_sdk.agentgateway._token_cache import _GatewayUrlCache, _TokenCache
 from sap_cloud_sdk.agentgateway.exceptions import AgentGatewaySDKError
 from sap_cloud_sdk.core.telemetry import Module, Operation, record_metrics

@@ -2,7 +2,7 @@
 
 import pytest
 
-from sap_cloud_sdk.core.url_utils import _validate_tenant_subdomain
+from sap_cloud_sdk.core._tenant import _validate_tenant_subdomain
 
 
 class TestValidateTenantSubdomain:

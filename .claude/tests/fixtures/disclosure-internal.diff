@@ -1,0 +1,7 @@
+diff --git a/src/config.py b/src/config.py
+index 111..222 100644
+--- a/src/config.py
++++ b/src/config.py
+@@ -1,3 +1,4 @@
++API = "https://internal.tools.sap/api"
+ x = 1

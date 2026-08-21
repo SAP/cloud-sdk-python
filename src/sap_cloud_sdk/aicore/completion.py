@@ -14,6 +14,16 @@ wrappers fix it by catching the wrapped exception inside the SDK and
 re-raising as :class:`ContentFilteredError` so callers can rely on a
 single exception type for "filter blocked you."
 
+Credential rotation handling
+----------------------------
+When a credential (client_secret or mTLS certificate) is rotated while the
+pod is running, LiteLLM's cached token becomes invalid and the next token
+refresh attempt raises ``litellm.AuthenticationError``. The wrappers
+intercept this error, reload credentials from the mounted secret volume via
+:func:`reload_aicore_credentials`, and retry the call once. The caller is
+unaffected — rotation is transparent. If the retry also fails, the
+``AuthenticationError`` propagates normally.
+
 Usage::
 
     from sap_cloud_sdk.aicore import completion, ContentFilteredError
@@ -39,11 +49,30 @@ adoption of the SDK.
 
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 import litellm
 
 from .filtering.filters import _parse_input_filter_error
+
+logger = logging.getLogger(__name__)
+
+
+def reload_aicore_credentials() -> None:
+    """Re-read AI Core credentials from the mounted secret volume.
+
+    Called automatically by :func:`completion` and :func:`acompletion` when
+    LiteLLM raises ``AuthenticationError`` — covers credential rotation
+    (client_secret or mTLS certificate) without requiring a pod restart.
+
+    Safe to call manually if the application needs to force a reload, e.g.
+    after a deliberate secret rotation triggered by the operator.
+    """
+    # Import here to avoid a circular import: completion ← __init__ ← completion
+    from sap_cloud_sdk.aicore import set_aicore_config
+    logger.info("AI Core credentials reloading after authentication failure")
+    set_aicore_config()
 
 
 def _maybe_translate_filter_error(exc: BaseException) -> BaseException:
@@ -60,18 +89,17 @@ def _maybe_translate_filter_error(exc: BaseException) -> BaseException:
 
 
 def completion(*args: Any, **kwargs: Any) -> Any:
-    """Wrapper around :func:`litellm.completion` that normalises filter errors.
+    """Wrapper around :func:`litellm.completion` that normalises filter errors
+    and handles credential rotation transparently.
 
-    Forwards every argument unchanged. The only difference from calling
-    ``litellm.completion`` directly is that an input-filter rejection
-    (which litellm wraps in ``APIConnectionError``) is re-raised as
-    :class:`ContentFilteredError`. Output-filter rejections already
-    surface as :class:`ContentFilteredError` via the SDK's transport patch
-    and pass through unchanged.
-
-    All other exceptions surface verbatim.
+    On ``AuthenticationError`` (e.g. rotated client_secret or mTLS cert),
+    reloads credentials from the mounted secret volume and retries once.
+    All other exceptions surface verbatim after the filter-error translation.
     """
     try:
+        return litellm.completion(*args, **kwargs)
+    except litellm.AuthenticationError:
+        reload_aicore_credentials()
         return litellm.completion(*args, **kwargs)
     except Exception as exc:
         translated = _maybe_translate_filter_error(exc)
@@ -83,9 +111,12 @@ def completion(*args: Any, **kwargs: Any) -> Any:
 async def acompletion(*args: Any, **kwargs: Any) -> Any:
     """Async wrapper around :func:`litellm.acompletion`.
 
-    Same translation semantics as :func:`completion`.
+    Same translation and credential-rotation semantics as :func:`completion`.
     """
     try:
+        return await litellm.acompletion(*args, **kwargs)
+    except litellm.AuthenticationError:
+        reload_aicore_credentials()
         return await litellm.acompletion(*args, **kwargs)
     except Exception as exc:
         translated = _maybe_translate_filter_error(exc)
@@ -94,4 +125,4 @@ async def acompletion(*args: Any, **kwargs: Any) -> Any:
         raise translated from exc
 
 
-__all__ = ["completion", "acompletion"]
+__all__ = ["completion", "acompletion", "reload_aicore_credentials"]

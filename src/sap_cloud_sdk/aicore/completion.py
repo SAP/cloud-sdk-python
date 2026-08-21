@@ -136,6 +136,10 @@ def completion(*args: Any, **kwargs: Any) -> Any:
 
     On ``AuthenticationError`` (e.g. rotated client_secret or mTLS cert),
     reloads credentials from the mounted secret volume and retries once.
+
+    Model strings (e.g. ``sap/<model>``) are passed verbatim to LiteLLM in all
+    routing modes — proxy routing is handled by ``litellm.api_base`` configured
+    in :func:`set_aicore_config`, not by rewriting the model name.
     """
     try:
         result = litellm.completion(*args, **kwargs)
@@ -157,6 +161,7 @@ async def acompletion(*args: Any, **kwargs: Any) -> Any:
     """Async wrapper around :func:`litellm.acompletion`.
 
     Same credential-minimisation and rotation semantics as :func:`completion`.
+    Model strings are passed verbatim to LiteLLM in all routing modes.
     """
     try:
         result = await litellm.acompletion(*args, **kwargs)

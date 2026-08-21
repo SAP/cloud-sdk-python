@@ -35,6 +35,12 @@ logger = logging.getLogger(__name__)
 # No client_secret or certificate material is required in the service binding.
 TRANSPARENT_TLS_ENV_VAR = "AICORE_TRANSPARENT_TLS"
 
+# Option 3 — transparent proxy routing.
+# Deployer injects these; agent code is identical in all environments.
+_PROXY_URL_ENV = "AICORE_PROXY_URL"
+_PROXY_VIRTUAL_KEY_ENV = "AICORE_PROXY_VIRTUAL_KEY"
+_DESTINATION_NAME_ENV = "AICORE_DESTINATION_NAME"
+
 
 def _is_transparent_tls() -> bool:
     """Return True when transparent TLS proxy mode is active."""
@@ -128,19 +134,27 @@ def _get_aicore_base_url(instance_name: str = "aicore-instance") -> str:
 def set_aicore_config(instance_name: str = "aicore-instance") -> None:
     """Load AI Core credentials and activate content filtering.
 
-    Loads secrets from files or environment variables and sets them as
-    process env vars so ``litellm`` picks them up.
+    Detects which routing mode is active based on environment variables:
 
-    File mappings based on the Kubernetes secret structure:
-        clientid → AICORE_CLIENT_ID
-        clientsecret → AICORE_CLIENT_SECRET  (skipped in transparent TLS mode)
-        url → AICORE_AUTH_URL
-        serviceurls (JSON with AI_API_URL) → AICORE_BASE_URL
+    - ``AICORE_PROXY_URL`` set → **proxy mode**: routes all LiteLLM calls
+      through a LiteLLM proxy; ``sap/<model>`` is aliased to
+      ``litellm_proxy/<model>`` transparently. No AI Core credentials
+      are written to the process environment.
 
-    When ``AICORE_TRANSPARENT_TLS=true`` is set, the infrastructure sidecar
-    adds the mTLS certificate on the SDK's behalf. In this mode the SDK omits
-    ``AICORE_CLIENT_SECRET`` from the environment — LiteLLM will use plain
-    HTTPS to the token endpoint and the sidecar will attach the certificate.
+    - ``AICORE_DESTINATION_NAME`` set → **destination mode**: loads AI Core
+      credentials from a BTP Destination Service destination at startup.
+      The deployer only needs to inject Destination Service binding credentials;
+      the AI Core ``client_secret`` never needs to be in the K8s Secret.
+      Combined with the ``_clear_client_secret()`` mechanism (PR #257),
+      the secret is removed from env after the first LiteLLM call.
+
+    - Neither set → **direct mode** (existing behaviour): credentials are
+      loaded from a mounted K8s secret volume or environment variables.
+      ``AICORE_TRANSPARENT_TLS=true`` suppresses ``client_secret`` and
+      relies on an mTLS sidecar.
+
+    Agent code is identical in all three modes — the deployer controls
+    routing by choosing which env vars to inject.
 
     After credentials are loaded, content filtering is activated on every
     ``sap/*`` LiteLLM call at the configured thresholds (default: severity
@@ -150,9 +164,99 @@ def set_aicore_config(instance_name: str = "aicore-instance") -> None:
     to turn filtering off at runtime, or set ``AICORE_FILTER_ENABLED=false``
     to keep it off entirely.
     """
+    proxy_url = os.environ.get(_PROXY_URL_ENV, "")
+    destination_name = os.environ.get(_DESTINATION_NAME_ENV, "")
+
+    if proxy_url:
+        _configure_proxy_mode(proxy_url)
+    elif destination_name:
+        _configure_destination_mode(destination_name)
+    else:
+        _configure_direct_mode(instance_name)
+
+    set_filtering()
+
+
+def _configure_proxy_mode(proxy_url: str) -> None:
+    """Configure LiteLLM to route calls through an external proxy.
+
+    Sets ``litellm.api_base`` / ``litellm.api_key`` globally.
+    Model strings (e.g. ``sap/<model>``) are passed verbatim — no rewrite.
+    No AI Core credentials are written to env.
+    """
+    import litellm as _litellm
+
+    virtual_key = os.environ.get(_PROXY_VIRTUAL_KEY_ENV, "")
+    _litellm.api_base = proxy_url
+    if virtual_key:
+        _litellm.api_key = virtual_key
+    logger.info("AI Core proxy mode active — routing via %s", proxy_url)
+
+
+def _configure_destination_mode(name: str) -> None:
+    """Load AI Core credentials from a BTP Destination Service destination.
+
+    Calls the Destination Service at startup to resolve the named destination
+    and extracts ``clientId``, ``clientSecret``, ``tokenServiceURL``, and the
+    AI Core ``URL`` from the destination configuration properties. These are
+    written to the standard ``AICORE_*`` env vars so that LiteLLM can fetch
+    an OAuth token from XSUAA as usual.
+
+    Security: The deployer does NOT need to inject ``AICORE_CLIENT_SECRET``
+    directly — only Destination Service binding credentials are required in
+    the agent environment. The AI Core ``client_secret`` is fetched here
+    and removed from env after the first successful LiteLLM call
+    (PR #257 ``_clear_client_secret()`` mechanism).
+
+    Raises ``RuntimeError`` if the destination is not found or does not
+    return ``clientId`` / ``clientSecret``.
+    """
+    from sap_cloud_sdk.destination import create_client  # lazy import
+
+    client = create_client()
+    dest = client.get_destination(name)
+
+    if dest is None:
+        raise RuntimeError(
+            f"AI Core destination '{name}' not found in Destination Service. "
+            "Check that the destination exists and the binding has access."
+        )
+
+    base_url = dest.url or ""
+    if base_url and not base_url.endswith("/v2"):
+        base_url = base_url.rstrip("/") + "/v2"
+    if base_url:
+        os.environ["AICORE_BASE_URL"] = base_url
+
+    resource_group = dest.properties.get("resource_group", "default")
+    os.environ["AICORE_RESOURCE_GROUP"] = resource_group
+
+    client_id = dest.properties.get("clientId", "")
+    client_secret = dest.properties.get("clientSecret", "")
+    token_service_url = dest.properties.get("tokenServiceURL", "")
+
+    if not client_id or not client_secret:
+        raise RuntimeError(
+            f"Destination '{name}' did not return clientId/clientSecret. "
+            "Ensure the destination uses OAuth2ClientCredentials authentication "
+            "and the calling app has the Destination Service technical-user scope."
+        )
+
+    os.environ["AICORE_CLIENT_ID"] = client_id
+    os.environ["AICORE_CLIENT_SECRET"] = client_secret  # cleared after first LiteLLM call
+
+    if token_service_url:
+        if not token_service_url.endswith("/oauth/token"):
+            token_service_url = token_service_url.rstrip("/") + "/oauth/token"
+        os.environ["AICORE_AUTH_URL"] = token_service_url
+
+    logger.info("AI Core destination mode active — credentials loaded from '%s'", name)
+
+
+def _configure_direct_mode(instance_name: str) -> None:
+    """Load AI Core credentials directly from mounted secrets or env vars."""
     transparent_tls = _is_transparent_tls()
 
-    # Load secrets
     client_id = _get_secret("AICORE_CLIENT_ID", "clientid", instance_name=instance_name)
     auth_url = _get_secret("AICORE_AUTH_URL", "url", instance_name=instance_name)
     base_url = _get_aicore_base_url(instance_name)
@@ -160,14 +264,12 @@ def set_aicore_config(instance_name: str = "aicore-instance") -> None:
         "AICORE_RESOURCE_GROUP", default="default", instance_name=instance_name
     )
 
-    # Ensure AICORE_AUTH_URL has /oauth/token suffix
     if auth_url and not auth_url.endswith("/oauth/token"):
         auth_url = auth_url.rstrip("/") + "/oauth/token"
 
     if base_url and not base_url.endswith("/v2"):
         base_url = base_url.rstrip("/") + "/v2"
 
-    # Set environment variables for LiteLLM
     if client_id:
         os.environ["AICORE_CLIENT_ID"] = client_id
     if auth_url:
@@ -178,7 +280,6 @@ def set_aicore_config(instance_name: str = "aicore-instance") -> None:
         os.environ["AICORE_RESOURCE_GROUP"] = resource_group
 
     if transparent_tls:
-        # Remove any stale client_secret — the sidecar provides the mTLS cert.
         os.environ.pop("AICORE_CLIENT_SECRET", None)
         logger.info("AI Core transparent TLS mode active — client_secret not required")
     else:
@@ -188,14 +289,7 @@ def set_aicore_config(instance_name: str = "aicore-instance") -> None:
         if client_secret:
             os.environ["AICORE_CLIENT_SECRET"] = client_secret
 
-    # Log configuration completion (excluding sensitive information)
     logger.info("AI Core configuration has been set successfully")
-
-    # Activate content filtering for all sap/* LiteLLM model calls.
-    # AICORE_FILTER_ENABLED=false disables; AICORE_FILTER_* tune thresholds.
-    # Errors propagate — filtering misconfiguration should surface at startup
-    # rather than be swallowed silently.
-    set_filtering()
 
 
 __all__ = [

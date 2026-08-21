@@ -852,7 +852,6 @@ class TestSetAICoreConfigProxyMode:
         import litellm
         with (
             patch("sap_cloud_sdk.aicore.set_filtering"),
-            patch("sap_cloud_sdk.aicore._set_proxy_active"),
             patch.dict("os.environ", self._base_proxy_env(), clear=True),
         ):
             set_aicore_config()
@@ -863,7 +862,6 @@ class TestSetAICoreConfigProxyMode:
         import litellm
         with (
             patch("sap_cloud_sdk.aicore.set_filtering"),
-            patch("sap_cloud_sdk.aicore._set_proxy_active"),
             patch.dict(
                 "os.environ",
                 self._base_proxy_env(AICORE_PROXY_VIRTUAL_KEY="sk-virt-123"),
@@ -874,19 +872,9 @@ class TestSetAICoreConfigProxyMode:
         assert litellm.api_key == "sk-virt-123"
         litellm.api_key = None  # cleanup
 
-    def test_proxy_mode_activates_proxy_flag(self):
-        with (
-            patch("sap_cloud_sdk.aicore.set_filtering"),
-            patch("sap_cloud_sdk.aicore._set_proxy_active") as mock_set_proxy,
-            patch.dict("os.environ", self._base_proxy_env(), clear=True),
-        ):
-            set_aicore_config()
-        mock_set_proxy.assert_called_once_with(True)
-
     def test_proxy_mode_does_not_write_aicore_credentials(self):
         with (
             patch("sap_cloud_sdk.aicore.set_filtering"),
-            patch("sap_cloud_sdk.aicore._set_proxy_active"),
             patch.dict("os.environ", self._base_proxy_env(), clear=True),
         ):
             set_aicore_config()
@@ -896,7 +884,6 @@ class TestSetAICoreConfigProxyMode:
     def test_proxy_mode_takes_precedence_over_destination(self):
         with (
             patch("sap_cloud_sdk.aicore.set_filtering"),
-            patch("sap_cloud_sdk.aicore._set_proxy_active") as mock_set_proxy,
             patch("sap_cloud_sdk.aicore._configure_destination_mode") as mock_dest,
             patch.dict(
                 "os.environ",
@@ -905,13 +892,11 @@ class TestSetAICoreConfigProxyMode:
             ),
         ):
             set_aicore_config()
-        mock_set_proxy.assert_called_once_with(True)
         mock_dest.assert_not_called()
 
     def test_proxy_mode_still_calls_set_filtering(self):
         with (
             patch("sap_cloud_sdk.aicore.set_filtering") as mock_filter,
-            patch("sap_cloud_sdk.aicore._set_proxy_active"),
             patch.dict("os.environ", self._base_proxy_env(), clear=True),
         ):
             set_aicore_config()

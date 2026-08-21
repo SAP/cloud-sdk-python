@@ -50,7 +50,6 @@ adoption of the SDK.
 from __future__ import annotations
 
 import logging
-import threading
 from typing import Any
 
 import litellm
@@ -61,26 +60,6 @@ from sap_cloud_sdk.core.telemetry.operation import Operation
 from .filtering.filters import _parse_input_filter_error
 
 logger = logging.getLogger(__name__)
-
-# Proxy mode state — set by _configure_proxy_mode() in __init__.py.
-# When active, completion() rewrites sap/<model> → litellm_proxy/<model>.
-_proxy_lock = threading.Lock()
-_proxy_active: bool = False
-
-
-def _set_proxy_active(value: bool) -> None:
-    """Activate or deactivate proxy model aliasing (called by set_aicore_config)."""
-    global _proxy_active
-    with _proxy_lock:
-        _proxy_active = value
-
-
-def _rewrite_model_for_proxy(kwargs: dict) -> dict:
-    """Rewrite sap/<model> to litellm_proxy/<model> when proxy mode is active."""
-    model = kwargs.get("model", "")
-    if isinstance(model, str) and model.startswith("sap/"):
-        return {**kwargs, "model": "litellm_proxy/" + model[4:]}
-    return kwargs
 
 
 @record_metrics(Module.AICORE, Operation.AICORE_REACTIVE_RELOAD)
@@ -112,13 +91,10 @@ def completion(*args: Any, **kwargs: Any) -> Any:
     On ``AuthenticationError`` (e.g. rotated client_secret or mTLS cert),
     reloads credentials from the mounted secret volume and retries once.
 
-    When proxy mode is active (``AICORE_PROXY_URL`` set), rewrites
-    ``sap/<model>`` to ``litellm_proxy/<model>`` transparently.
+    Model strings (e.g. ``sap/<model>``) are passed verbatim to LiteLLM in all
+    routing modes — proxy routing is handled by ``litellm.api_base`` configured
+    in :func:`set_aicore_config`, not by rewriting the model name.
     """
-    with _proxy_lock:
-        proxy = _proxy_active
-    if proxy:
-        kwargs = _rewrite_model_for_proxy(kwargs)
     try:
         return litellm.completion(*args, **kwargs)
     except litellm.AuthenticationError:
@@ -134,12 +110,9 @@ def completion(*args: Any, **kwargs: Any) -> Any:
 async def acompletion(*args: Any, **kwargs: Any) -> Any:
     """Async wrapper around :func:`litellm.acompletion`.
 
-    Same credential-rotation and proxy aliasing semantics as :func:`completion`.
+    Same credential-rotation semantics as :func:`completion`.
+    Model strings are passed verbatim to LiteLLM in all routing modes.
     """
-    with _proxy_lock:
-        proxy = _proxy_active
-    if proxy:
-        kwargs = _rewrite_model_for_proxy(kwargs)
     try:
         return await litellm.acompletion(*args, **kwargs)
     except litellm.AuthenticationError:

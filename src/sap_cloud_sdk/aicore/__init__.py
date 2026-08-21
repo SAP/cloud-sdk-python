@@ -14,7 +14,7 @@ from sap_cloud_sdk.core.secret_resolver import resolve_base_mount
 from sap_cloud_sdk.core.telemetry.metrics_decorator import record_metrics
 from sap_cloud_sdk.core.telemetry.module import Module
 from sap_cloud_sdk.core.telemetry.operation import Operation
-from .completion import acompletion, completion, _set_proxy_active
+from .completion import acompletion, completion
 from .filtering import (
     AzureContentFilter,
     ContentFilter,
@@ -179,9 +179,9 @@ def set_aicore_config(instance_name: str = "aicore-instance") -> None:
 def _configure_proxy_mode(proxy_url: str) -> None:
     """Configure LiteLLM to route calls through an external proxy.
 
-    Sets ``litellm.api_base`` / ``litellm.api_key`` globally and activates
-    the ``sap/`` → ``litellm_proxy/`` model alias rewrite in the
-    completion wrappers. No AI Core credentials are written to env.
+    Sets ``litellm.api_base`` / ``litellm.api_key`` globally.
+    Model strings (e.g. ``sap/<model>``) are passed verbatim — no rewrite.
+    No AI Core credentials are written to env.
     """
     import litellm as _litellm
 
@@ -189,7 +189,6 @@ def _configure_proxy_mode(proxy_url: str) -> None:
     _litellm.api_base = proxy_url
     if virtual_key:
         _litellm.api_key = virtual_key
-    _set_proxy_active(True)
     logger.info("AI Core proxy mode active — routing via %s", proxy_url)
 
 

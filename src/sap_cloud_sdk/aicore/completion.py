@@ -71,26 +71,6 @@ logger = logging.getLogger(__name__)
 _secret_lock = threading.Lock()
 _secret_cleared = False
 
-# Proxy mode state — set by _configure_proxy_mode() in __init__.py.
-# When active, completion() rewrites sap/<model> → litellm_proxy/<model>.
-_proxy_lock = threading.Lock()
-_proxy_active: bool = False
-
-
-def _set_proxy_active(value: bool) -> None:
-    """Activate or deactivate proxy model aliasing (called by set_aicore_config)."""
-    global _proxy_active
-    with _proxy_lock:
-        _proxy_active = value
-
-
-def _rewrite_model_for_proxy(kwargs: dict) -> dict:
-    """Rewrite sap/<model> to litellm_proxy/<model> when proxy mode is active."""
-    model = kwargs.get("model", "")
-    if isinstance(model, str) and model.startswith("sap/"):
-        return {**kwargs, "model": "litellm_proxy/" + model[4:]}
-    return kwargs
-
 
 def _clear_client_secret() -> None:
     """Remove AICORE_CLIENT_SECRET from env after LiteLLM has cached the token.
@@ -157,23 +137,16 @@ def completion(*args: Any, **kwargs: Any) -> Any:
     On ``AuthenticationError`` (e.g. rotated client_secret or mTLS cert),
     reloads credentials from the mounted secret volume and retries once.
 
-    When proxy mode is active (``AICORE_PROXY_URL`` set), rewrites
-    ``sap/<model>`` to ``litellm_proxy/<model>`` transparently.
+    Model strings (e.g. ``sap/<model>``) are passed verbatim to LiteLLM in all
+    routing modes — proxy routing is handled by ``litellm.api_base`` configured
+    in :func:`set_aicore_config`, not by rewriting the model name.
     """
-    with _proxy_lock:
-        proxy = _proxy_active
-    if proxy:
-        kwargs = _rewrite_model_for_proxy(kwargs)
     try:
         result = litellm.completion(*args, **kwargs)
         _clear_client_secret()
         return result
     except litellm.AuthenticationError:
         reload_aicore_credentials()
-        with _proxy_lock:
-            proxy = _proxy_active
-        if proxy:
-            kwargs = _rewrite_model_for_proxy(kwargs)
         result = litellm.completion(*args, **kwargs)
         _clear_client_secret()
         return result
@@ -187,23 +160,15 @@ def completion(*args: Any, **kwargs: Any) -> Any:
 async def acompletion(*args: Any, **kwargs: Any) -> Any:
     """Async wrapper around :func:`litellm.acompletion`.
 
-    Same credential-minimisation, rotation, and proxy aliasing semantics as
-    :func:`completion`.
+    Same credential-minimisation and rotation semantics as :func:`completion`.
+    Model strings are passed verbatim to LiteLLM in all routing modes.
     """
-    with _proxy_lock:
-        proxy = _proxy_active
-    if proxy:
-        kwargs = _rewrite_model_for_proxy(kwargs)
     try:
         result = await litellm.acompletion(*args, **kwargs)
         _clear_client_secret()
         return result
     except litellm.AuthenticationError:
         reload_aicore_credentials()
-        with _proxy_lock:
-            proxy = _proxy_active
-        if proxy:
-            kwargs = _rewrite_model_for_proxy(kwargs)
         result = await litellm.acompletion(*args, **kwargs)
         _clear_client_secret()
         return result

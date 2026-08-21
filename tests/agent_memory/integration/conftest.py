@@ -22,7 +22,9 @@ Subscriber tenant name:
         Required for SUBSCRIBER tests. When absent those tests are skipped.
 """
 
+from collections.abc import Generator
 import os
+import uuid
 from pathlib import Path
 
 import pytest
@@ -84,3 +86,23 @@ def subscriber_tenant() -> str:
         )
 
     return tenant
+
+
+def _delete_all_memories(client: AgentMemoryClient, agent_id: str) -> None:
+    offset = 0
+    limit = 50
+    while True:
+        memories = client.list_memories(agent_id=agent_id, limit=limit, offset=offset)
+        for memory in memories:
+            client.delete_memory(memory.id)
+        if len(memories) < limit:
+            break
+        offset += limit
+
+
+@pytest.fixture(scope="session")
+def run_agent_id(agent_memory_client: AgentMemoryClient) -> Generator[str, None, None]:
+    """Return a unique agent ID for this test run and clean up all its data afterwards."""
+    agent_id = f"test-agent-{uuid.uuid4().hex[:8]}"
+    yield agent_id
+    _delete_all_memories(agent_memory_client, agent_id)

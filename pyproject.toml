@@ -1,6 +1,6 @@
 [project]
 name = "sap-cloud-sdk"
-version = "0.45.1"
+version = "0.46.0"
 description = "SAP Cloud SDK for Python"
 readme = "README.md"
 license = "Apache-2.0"
@@ -37,6 +37,7 @@ dependencies = [
     "opentelemetry-instrumentation-django~=0.64b0",
     "opentelemetry-instrumentation-flask~=0.64b0",
     "mcp>=1.1.0",
+    "python-odata>=0.7.0",
     "cryptography>=46.0.3",
 ]
 
@@ -81,6 +82,7 @@ dev = [
     "langchain-community>=0.3.0",
     "litellm>=1.40.0",
     "langchain-litellm>=0.6.6",
+    "responses>=0.25",
 ]
 
 [tool.pytest.ini_options]

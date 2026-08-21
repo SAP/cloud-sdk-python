@@ -141,6 +141,42 @@ CLOUD_SDK_CFG_SDM_DEFAULT_UAA='{"url":"https://your-auth-url","clientid":"your-c
 
 **Note**: The test fixture automatically onboards test repositories (standard and version-enabled) at session start and cleans them up on teardown. No pre-existing repositories are required.
 
+### DPI NG Consent Integration Tests
+
+For DPI NG Consent integration tests, configure the following variables in `.env_integration_tests`:
+
+```bash
+# DPI NG Consent Configuration - use the shared base URL (applies to all DPI NG sub-services)
+CLOUD_SDK_CFG_DPI_NG_DEFAULT_BASE_URL=https://your-dpi-ng-service-host
+```
+
+Authentication is configurable via one of three methods:
+
+**Option A - Static Bearer Token**
+
+```bash
+CLOUD_SDK_CFG_DPI_NG_CONSENT_DEFAULT_BEARER_TOKEN=your-bearer-token-here
+```
+
+**Option B - OAuth 2.0 Client Credentials**
+
+```bash
+CLOUD_SDK_CFG_DPI_NG_CONSENT_DEFAULT_TOKEN_URL=https://your-auth-host/oauth/token
+CLOUD_SDK_CFG_DPI_NG_CONSENT_DEFAULT_CLIENT_ID=your-client-id
+CLOUD_SDK_CFG_DPI_NG_CONSENT_DEFAULT_CLIENT_SECRET=your-client-secret
+```
+
+**Option C - Mutual TLS (mTLS)**
+
+```bash
+CLOUD_SDK_CFG_DPI_NG_CONSENT_DEFAULT_CERT_FILE=/path/to/client.crt
+CLOUD_SDK_CFG_DPI_NG_CONSENT_DEFAULT_KEY_FILE=/path/to/client.key
+CLOUD_SDK_CFG_DPI_NG_CONSENT_DEFAULT_CA_FILE=/path/to/ca.crt   # optional
+CLOUD_SDK_CFG_DPI_NG_CONSENT_DEFAULT_TENANT_ID=your-tenant-id-here
+```
+
+Tests are skipped automatically when `CLOUD_SDK_CFG_DPI_NG_DEFAULT_BASE_URL` or all auth variables are missing.
+
 ### ObjectStore Integration Tests
 
 For ObjectStore integration tests, configure the following variables in `.env_integration_tests`:
@@ -168,6 +204,7 @@ uv run pytest tests/core/integration/auditlog -v
 uv run pytest tests/core/integration/data_anonymization -v
 uv run pytest tests/destination/integration/ -v
 uv run pytest tests/dms/integration/ -v
+uv run pytest tests/core/integration/dpi_ng/consent/ -v
 uv run pytest tests/objectstore/integration/ -v
 ```
 

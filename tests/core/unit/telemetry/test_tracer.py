@@ -981,3 +981,39 @@ class TestPropagate:
 
         child_attrs = captures[1]["attributes"]
         assert "custom" not in child_attrs
+
+
+class TestResolveConversationId:
+    """Test suite for _resolve_conversation_id function."""
+
+    def test_resolve_conversation_id_explicit_param(self):
+        """Test that explicit conversation_id parameter takes highest priority."""
+        from sap_cloud_sdk.core.telemetry.tracer import _resolve_conversation_id
+
+        with patch('opentelemetry.baggage.get_baggage', return_value='baggage_id'):
+            result = _resolve_conversation_id('explicit_id')
+            assert result == 'explicit_id'
+
+    def test_resolve_conversation_id_from_baggage(self):
+        """Test that baggage value is used when no explicit param provided."""
+        from sap_cloud_sdk.core.telemetry.tracer import _resolve_conversation_id
+
+        with patch('opentelemetry.baggage.get_baggage', return_value='baggage_id'):
+            result = _resolve_conversation_id(None)
+            assert result == 'baggage_id'
+
+    def test_resolve_conversation_id_no_baggage(self):
+        """Test that None is returned when no explicit param and no baggage."""
+        from sap_cloud_sdk.core.telemetry.tracer import _resolve_conversation_id
+
+        with patch('opentelemetry.baggage.get_baggage', return_value=None):
+            result = _resolve_conversation_id(None)
+            assert result is None
+
+    def test_resolve_conversation_id_empty_baggage(self):
+        """Test that empty baggage string is treated as no value."""
+        from sap_cloud_sdk.core.telemetry.tracer import _resolve_conversation_id
+
+        with patch('opentelemetry.baggage.get_baggage', return_value=''):
+            result = _resolve_conversation_id(None)
+            assert result is None

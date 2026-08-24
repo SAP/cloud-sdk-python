@@ -1,6 +1,8 @@
 """SAP Cloud SDK for Python - Object Store module
 
-The create_client() uses secret resolver to load credentials from mounts/env vars
+``create_client()`` auto-detects the cloud provider from the service binding and
+returns a client implementing the ``ObjectStoreClient`` protocol. Supported
+providers: S3/MinIO, Azure Blob Storage, Google Cloud Storage.
 
 Usage:
     from sap_cloud_sdk.objectstore import create_client
@@ -8,65 +10,31 @@ Usage:
     client = create_client("object-store-1")
 """
 
-from typing import Optional
-
-from sap_cloud_sdk.objectstore.exceptions import (
-    ObjectStoreError,
-    ClientCreationError,
-    ObjectOperationError,
-    ObjectNotFoundError,
-    ListObjectsError,
+from sap_cloud_sdk.objectstore._factory import create_client
+from sap_cloud_sdk.objectstore._models import (
+    AzureBindingData,
+    GcsBindingData,
+    ObjectMetadata,
+    S3BindingData,
 )
-from sap_cloud_sdk.objectstore._models import ObjectStoreBindingData, ObjectMetadata
-from sap_cloud_sdk.objectstore._s3 import ObjectStoreClient
-from sap_cloud_sdk.core.secret_resolver import read_from_mount_and_fallback_to_env_var
-
-
-def create_client(
-    instance: str,
-    *,
-    config: Optional[ObjectStoreBindingData] = None,
-    disable_ssl: bool = False,
-) -> ObjectStoreClient:
-    """Creates an ObjectStoreClient with automatic local/cloud detection.
-    Uses secret resolver to load credentials from mounted secrets or environment variables
-
-    Args:
-        instance: Instance name for cloud mode secret resolution. Must be a non-empty string.
-        config: Optional explicit configuration. If provided, auto-detection is skipped
-                and this configuration is used directly.
-        disable_ssl: Whether to disable SSL/TLS connections. Defaults to False.
-
-    Returns:
-        ObjectStoreClient: Configured client ready for object storage operations.
-
-    Raises:
-        ValueError: If instance parameter is empty or None.
-        ClientCreationError: If client creation fails due to configuration or connection issues.
-    """
-    if not instance or not instance.strip():
-        raise ValueError("instance parameter must be a non-empty string")
-
-    # Cloud mode: with explicit configuration
-    if config is not None:
-        return ObjectStoreClient(config, disable_ssl=disable_ssl)
-
-    # Cloud mode: use secret resolver to load configuration
-    config = ObjectStoreBindingData()
-    read_from_mount_and_fallback_to_env_var(
-        base_volume_mount="/etc/secrets/appfnd",
-        base_var_name="CLOUD_SDK_CFG",
-        module="objectstore",
-        instance=instance,
-        target=config,
-    )
-    return ObjectStoreClient(config, disable_ssl=disable_ssl)
-
+from sap_cloud_sdk.objectstore._protocol import ObjectStoreClient
+from sap_cloud_sdk.objectstore.exceptions import (
+    ClientCreationError,
+    ListObjectsError,
+    ObjectNotFoundError,
+    ObjectOperationError,
+    ObjectStoreError,
+)
 
 __all__ = [
-    # Public user-facing types
+    # Protocol (usable as a type annotation)
+    "ObjectStoreClient",
+    # Binding data types (for explicit config= usage)
+    "S3BindingData",
+    "AzureBindingData",
+    "GcsBindingData",
+    # Metadata model
     "ObjectMetadata",
-    "ObjectStoreBindingData",
     # Factory function
     "create_client",
     # Exceptions

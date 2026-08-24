@@ -1,0 +1,176 @@
+"""Tests for provider auto-detection logic."""
+
+import os
+from unittest.mock import patch
+
+import pytest
+
+from sap_cloud_sdk.objectstore._detect import detect_provider, read_binding_keys
+
+
+class TestDetectProvider:
+
+    def test_s3_keys_detected_as_s3(self):
+        keys = {"access_key_id", "secret_access_key", "host", "bucket", "region"}
+        assert detect_provider(keys) == "s3"
+
+    def test_azure_keys_detected_as_azure(self):
+        keys = {"container_uri", "sas_token", "container_name", "account_name"}
+        assert detect_provider(keys) == "azure"
+
+    def test_gcs_keys_detected_as_gcs(self):
+        keys = {"base64encodedprivatekeydata", "projectid", "bucket", "region"}
+        assert detect_provider(keys) == "gcs"
+
+    def test_gcs_wins_over_s3_when_gcs_discriminators_present(self):
+        # GCS and S3 share 'bucket'/'region'; if GCS discriminators are present
+        # it must be detected as GCS, not S3.
+        keys = {
+            "base64encodedprivatekeydata",
+            "projectid",
+            "bucket",
+            "region",
+        }
+        assert detect_provider(keys) == "gcs"
+
+    def test_empty_keys_raises_value_error(self):
+        with pytest.raises(ValueError, match="Cannot detect objectstore provider"):
+            detect_provider(set())
+
+    def test_unrecognised_keys_raises_value_error(self):
+        with pytest.raises(ValueError, match="Cannot detect objectstore provider"):
+            detect_provider({"garbage", "unknown_key"})
+
+    def test_mixed_non_matching_keys_raises_value_error(self):
+        # Partial overlap with S3 but missing 'host'
+        with pytest.raises(ValueError):
+            detect_provider({"access_key_id", "secret_access_key"})
+
+    def test_uppercase_keys_still_detected_as_s3(self):
+        """detect_provider must lowercase before matching."""
+        keys = {"ACCESS_KEY_ID", "SECRET_ACCESS_KEY", "HOST"}
+        assert detect_provider(keys) == "s3"
+
+    def test_uppercase_azure_keys_still_detected(self):
+        keys = {"CONTAINER_URI", "SAS_TOKEN", "CONTAINER_NAME"}
+        assert detect_provider(keys) == "azure"
+
+    def test_uppercase_gcs_keys_still_detected(self):
+        keys = {"BASE64ENCODEDPRIVATEKEYDATA", "PROJECTID"}
+        assert detect_provider(keys) == "gcs"
+
+    def test_azure_wins_before_gcs_and_s3(self):
+        """The azure discriminator set must be checked first."""
+        # Artificially include both azure + gcs discriminators to verify ordering.
+        keys = {
+            "container_uri",
+            "sas_token",
+            "container_name",
+            "base64encodedprivatekeydata",
+            "projectid",
+        }
+        assert detect_provider(keys) == "azure"
+
+
+class TestReadBindingKeysLegacyLayout:
+
+    def test_legacy_layout_returns_lowercased_file_names(self, tmp_path, monkeypatch):
+        """Files under {base}/objectstore/{instance}/ are returned as lowercased keys."""
+        instance = "default"
+        legacy_dir = tmp_path / "objectstore" / instance
+        legacy_dir.mkdir(parents=True)
+        (legacy_dir / "access_key_id").touch()
+        (legacy_dir / "SECRET_ACCESS_KEY").touch()
+        (legacy_dir / "HOST").touch()
+
+        # Patch resolve_base_mount to return our tmp dir as the base.
+        monkeypatch.delenv("SERVICE_BINDING_ROOT", raising=False)
+        monkeypatch.setattr(
+            "sap_cloud_sdk.objectstore._detect.resolve_base_mount",
+            lambda *a, **kw: str(tmp_path),
+        )
+
+        keys = read_binding_keys(instance)
+
+        assert "access_key_id" in keys
+        assert "secret_access_key" in keys
+        assert "host" in keys
+
+    def test_legacy_layout_missing_dir_returns_empty(self, tmp_path, monkeypatch):
+        monkeypatch.delenv("SERVICE_BINDING_ROOT", raising=False)
+        monkeypatch.setattr(
+            "sap_cloud_sdk.objectstore._detect.resolve_base_mount",
+            lambda *a, **kw: str(tmp_path),
+        )
+        keys = read_binding_keys("nonexistent-instance")
+        assert keys == set()
+
+
+class TestReadBindingKeysFlatLayout:
+
+    def test_flat_layout_returns_file_names(self, tmp_path, monkeypatch):
+        """Files under $SERVICE_BINDING_ROOT/objectstore/ are returned as keys."""
+        flat_dir = tmp_path / "objectstore"
+        flat_dir.mkdir(parents=True)
+        (flat_dir / "container_uri").touch()
+        (flat_dir / "sas_token").touch()
+        (flat_dir / "container_name").touch()
+
+        monkeypatch.setenv("SERVICE_BINDING_ROOT", str(tmp_path))
+        monkeypatch.setattr(
+            "sap_cloud_sdk.objectstore._detect.resolve_base_mount",
+            lambda *a, **kw: str(tmp_path),
+        )
+
+        keys = read_binding_keys("any-instance")
+
+        assert "container_uri" in keys
+        assert "sas_token" in keys
+        assert "container_name" in keys
+
+
+class TestReadBindingKeysEnvLayout:
+
+    def test_env_vars_stripped_and_lowercased(self, monkeypatch, tmp_path):
+        """CLOUD_SDK_CFG_OBJECTSTORE_{INSTANCE}_* env vars are picked up."""
+        monkeypatch.delenv("SERVICE_BINDING_ROOT", raising=False)
+        monkeypatch.setattr(
+            "sap_cloud_sdk.objectstore._detect.resolve_base_mount",
+            lambda *a, **kw: str(tmp_path),
+        )
+        monkeypatch.setenv("CLOUD_SDK_CFG_OBJECTSTORE_DEFAULT_ACCESS_KEY_ID", "k")
+        monkeypatch.setenv("CLOUD_SDK_CFG_OBJECTSTORE_DEFAULT_SECRET_ACCESS_KEY", "s")
+        monkeypatch.setenv("CLOUD_SDK_CFG_OBJECTSTORE_DEFAULT_HOST", "h")
+
+        keys = read_binding_keys("default")
+
+        assert "access_key_id" in keys
+        assert "secret_access_key" in keys
+        assert "host" in keys
+
+    def test_env_vars_with_hyphens_in_instance_name(self, monkeypatch, tmp_path):
+        """Hyphens in instance names become underscores in the env prefix."""
+        monkeypatch.delenv("SERVICE_BINDING_ROOT", raising=False)
+        monkeypatch.setattr(
+            "sap_cloud_sdk.objectstore._detect.resolve_base_mount",
+            lambda *a, **kw: str(tmp_path),
+        )
+        monkeypatch.setenv(
+            "CLOUD_SDK_CFG_OBJECTSTORE_MY_INSTANCE_ACCESS_KEY_ID", "val"
+        )
+
+        keys = read_binding_keys("my-instance")
+
+        assert "access_key_id" in keys
+
+    def test_env_vars_different_instance_not_picked_up(self, monkeypatch, tmp_path):
+        monkeypatch.delenv("SERVICE_BINDING_ROOT", raising=False)
+        monkeypatch.setattr(
+            "sap_cloud_sdk.objectstore._detect.resolve_base_mount",
+            lambda *a, **kw: str(tmp_path),
+        )
+        monkeypatch.setenv("CLOUD_SDK_CFG_OBJECTSTORE_OTHER_HOST", "h")
+
+        keys = read_binding_keys("default")
+
+        assert "host" not in keys

@@ -3,34 +3,33 @@
 import io
 import os
 from datetime import datetime
-from http.client import HTTPResponse
-from typing import BinaryIO, List, cast
+from typing import IO, BinaryIO, List, cast
 
 import minio.datatypes
 from minio import Minio
 from minio.error import S3Error
 
 from sap_cloud_sdk.core.telemetry import Module, Operation, record_metrics
+from sap_cloud_sdk.objectstore._models import S3BindingData, ObjectMetadata
+from sap_cloud_sdk.objectstore._validation import (
+    EMPTY_CONTENT_TYPE_ERROR,
+    EMPTY_FILE_PATH_ERROR,
+    EMPTY_NAME_ERROR,
+    INVALID_DATA_TYPE_ERROR,
+    INVALID_PREFIX_TYPE_ERROR,
+    INVALID_STREAM_ERROR,
+    NEGATIVE_SIZE_ERROR,
+)
 from sap_cloud_sdk.objectstore.exceptions import (
     ClientCreationError,
-    ObjectOperationError,
-    ObjectNotFoundError,
     ListObjectsError,
+    ObjectNotFoundError,
+    ObjectOperationError,
 )
-from sap_cloud_sdk.objectstore._models import ObjectStoreBindingData, ObjectMetadata
 from sap_cloud_sdk.objectstore.utils import _normalize_host
 
-# Validation error message constants
-EMPTY_NAME_ERROR = "name must be a non-empty string"
-EMPTY_CONTENT_TYPE_ERROR = "content_type must be a non-empty string"
-EMPTY_FILE_PATH_ERROR = "file_path must be a non-empty string"
-INVALID_DATA_TYPE_ERROR = "data must be bytes"
-INVALID_STREAM_ERROR = "stream must be a readable binary stream"
-NEGATIVE_SIZE_ERROR = "size must be non-negative"
-INVALID_PREFIX_TYPE_ERROR = "prefix must be a string"
 
-
-class ObjectStoreClient:
+class S3Client:
     """S3-compatible object storage client.
 
     Provides a unified interface for object storage operations using the MinIO client library.
@@ -38,7 +37,7 @@ class ObjectStoreClient:
     """
 
     def __init__(
-        self, creds_config: ObjectStoreBindingData, *, disable_ssl: bool = False
+        self, creds_config: S3BindingData, *, disable_ssl: bool = False
     ) -> None:
         """Initialize the object storage client.
 
@@ -187,14 +186,14 @@ class ObjectStoreClient:
             raise ObjectOperationError(f"Failed to upload object '{name}': {e}") from e
 
     @record_metrics(Module.OBJECTSTORE, Operation.OBJECTSTORE_GET_OBJECT)
-    def get_object(self, name: str) -> HTTPResponse:
+    def get_object(self, name: str) -> IO[bytes]:
         """Download an object as a stream.
 
         Args:
             name: Name/key of the object to download
 
         Returns:
-            HTTPResponse stream of the object data
+            IO[bytes] stream of the object data
 
         Raises:
             ValueError: If name is invalid
@@ -206,7 +205,7 @@ class ObjectStoreClient:
 
         try:
             response = cast(
-                HTTPResponse,
+                IO[bytes],
                 self._minio_client.get_object(
                     bucket_name=self._creds_config.bucket, object_name=name
                 ),

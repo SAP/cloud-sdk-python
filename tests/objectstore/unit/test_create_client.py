@@ -1,55 +1,158 @@
 """Tests for create_client factory function."""
 
-from unittest.mock import Mock, patch
+from unittest.mock import MagicMock, patch
 import pytest
 
 from sap_cloud_sdk.objectstore import create_client
-from sap_cloud_sdk.objectstore._models import ObjectStoreBindingData
+from sap_cloud_sdk.objectstore._models import (
+    AzureBindingData,
+    GcsBindingData,
+    S3BindingData,
+)
+from sap_cloud_sdk.objectstore.exceptions import ClientCreationError
 
 
-class TestCreateClient:
+class TestCreateClientValidation:
 
-    @patch('sap_cloud_sdk.objectstore.read_from_mount_and_fallback_to_env_var')
-    @patch('sap_cloud_sdk.objectstore.ObjectStoreClient')
-    def test_create_client_cloud_mode(self, mock_client_class, mock_resolver):
-        mock_client = Mock()
-        mock_client_class.return_value = mock_client
-
-        result = create_client("production", disable_ssl=True)
-
-        mock_resolver.assert_called_once()
-        call_args = mock_resolver.call_args
-        assert call_args[1]["module"] == "objectstore"
-        assert call_args[1]["instance"] == "production"
-        assert isinstance(call_args[1]["target"], ObjectStoreBindingData)
-        mock_client_class.assert_called_once_with(call_args[1]["target"], disable_ssl=True)
-        assert result == mock_client
-
-    def test_create_client_empty_instance_raises_error(self):
-        """Test that create_client raises ValueError for empty instance."""
+    def test_create_client_empty_instance_raises_value_error(self):
         with pytest.raises(ValueError, match="instance parameter must be a non-empty string"):
             create_client("")
 
+    def test_create_client_whitespace_only_instance_raises_value_error(self):
         with pytest.raises(ValueError, match="instance parameter must be a non-empty string"):
-            create_client("   ")  # whitespace only
+            create_client("   ")
 
+    def test_create_client_none_instance_raises_value_error(self):
         with pytest.raises(ValueError, match="instance parameter must be a non-empty string"):
             create_client(None)  # type: ignore
 
 
-    @patch('sap_cloud_sdk.objectstore.ObjectStoreClient')
-    def test_create_client_with_explicit_config(self, mock_client_class):
-        """Test that create_client uses explicit config when provided."""
-        mock_config = ObjectStoreBindingData(
-            access_key_id="explicit_key",
-            secret_access_key="explicit_secret",
-            bucket="explicit-bucket",
-            host="explicit.host.com"
+class TestCreateClientExplicitConfig:
+
+    @patch("sap_cloud_sdk.objectstore._factory.S3Client")
+    def test_create_client_with_s3_config_returns_s3_client(self, mock_s3_class):
+        mock_instance = MagicMock()
+        mock_s3_class.return_value = mock_instance
+        config = S3BindingData(
+            access_key_id="key",
+            secret_access_key="secret",
+            bucket="bucket",
+            host="s3.example.com",
         )
-        mock_client = Mock()
-        mock_client_class.return_value = mock_client
 
-        result = create_client("ignored-instance", config=mock_config, disable_ssl=True)
+        result = create_client("any-instance", config=config)
 
-        mock_client_class.assert_called_once_with(mock_config, disable_ssl=True)
-        assert result == mock_client
+        mock_s3_class.assert_called_once_with(config)
+        assert result is mock_instance
+
+    @patch("sap_cloud_sdk.objectstore._factory.AzureClient")
+    def test_create_client_with_azure_config_returns_azure_client(self, mock_azure_class):
+        mock_instance = MagicMock()
+        mock_azure_class.return_value = mock_instance
+        config = AzureBindingData(
+            account_name="account",
+            container_name="container",
+            container_uri="https://account.blob.core.windows.net/container",
+            region="westus",
+            sas_token="sv=...",
+        )
+
+        result = create_client("any-instance", config=config)
+
+        mock_azure_class.assert_called_once_with(config)
+        assert result is mock_instance
+
+    @patch("sap_cloud_sdk.objectstore._factory.GcsClient")
+    def test_create_client_with_gcs_config_returns_gcs_client(self, mock_gcs_class):
+        mock_instance = MagicMock()
+        mock_gcs_class.return_value = mock_instance
+        config = GcsBindingData(
+            base64_encoded_private_key_data="dGVzdA==",
+            project_id="my-project",
+            bucket="my-bucket",
+        )
+
+        result = create_client("any-instance", config=config)
+
+        mock_gcs_class.assert_called_once_with(config)
+        assert result is mock_instance
+
+    def test_create_client_with_unknown_config_type_raises_client_creation_error(self):
+        with pytest.raises(ClientCreationError, match="Unsupported config type"):
+            create_client("any-instance", config=object())  # type: ignore
+
+
+class TestCreateClientAutoDetection:
+
+    @patch("sap_cloud_sdk.objectstore._factory.S3Client")
+    @patch("sap_cloud_sdk.objectstore._factory.load_from_env_or_mount")
+    @patch("sap_cloud_sdk.objectstore._factory.read_binding_keys")
+    def test_create_client_autodetects_s3(
+        self, mock_read_keys, mock_load, mock_s3_class
+    ):
+        s3_keys = {"access_key_id", "secret_access_key", "host", "bucket"}
+        mock_read_keys.return_value = s3_keys
+        mock_binding = S3BindingData()
+        mock_load.return_value = mock_binding
+        mock_instance = MagicMock()
+        mock_s3_class.return_value = mock_instance
+
+        import sap_cloud_sdk.objectstore._factory as factory
+        with patch.dict(factory._CLIENTS, {"s3": mock_s3_class}):
+            result = create_client("default")
+
+        mock_read_keys.assert_called_once_with("default")
+        mock_load.assert_called_once_with("s3", "default")
+        mock_s3_class.assert_called_once_with(mock_binding)
+        assert result is mock_instance
+
+    @patch("sap_cloud_sdk.objectstore._factory.AzureClient")
+    @patch("sap_cloud_sdk.objectstore._factory.load_from_env_or_mount")
+    @patch("sap_cloud_sdk.objectstore._factory.read_binding_keys")
+    def test_create_client_autodetects_azure(
+        self, mock_read_keys, mock_load, mock_azure_class
+    ):
+        azure_keys = {"container_uri", "sas_token", "container_name", "account_name"}
+        mock_read_keys.return_value = azure_keys
+        mock_binding = AzureBindingData()
+        mock_load.return_value = mock_binding
+        mock_instance = MagicMock()
+        mock_azure_class.return_value = mock_instance
+
+        import sap_cloud_sdk.objectstore._factory as factory
+        with patch.dict(factory._CLIENTS, {"azure": mock_azure_class}):
+            result = create_client("my-azure-instance")
+
+        mock_load.assert_called_once_with("azure", "my-azure-instance")
+        mock_azure_class.assert_called_once_with(mock_binding)
+        assert result is mock_instance
+
+    @patch("sap_cloud_sdk.objectstore._factory.GcsClient")
+    @patch("sap_cloud_sdk.objectstore._factory.load_from_env_or_mount")
+    @patch("sap_cloud_sdk.objectstore._factory.read_binding_keys")
+    def test_create_client_autodetects_gcs(
+        self, mock_read_keys, mock_load, mock_gcs_class
+    ):
+        gcs_keys = {"base64encodedprivatekeydata", "projectid", "bucket", "region"}
+        mock_read_keys.return_value = gcs_keys
+        mock_binding = GcsBindingData()
+        mock_load.return_value = mock_binding
+        mock_instance = MagicMock()
+        mock_gcs_class.return_value = mock_instance
+
+        import sap_cloud_sdk.objectstore._factory as factory
+        with patch.dict(factory._CLIENTS, {"gcs": mock_gcs_class}):
+            result = create_client("my-gcs-instance")
+
+        mock_load.assert_called_once_with("gcs", "my-gcs-instance")
+        mock_gcs_class.assert_called_once_with(mock_binding)
+        assert result is mock_instance
+
+    @patch("sap_cloud_sdk.objectstore._factory.read_binding_keys")
+    def test_create_client_no_matching_provider_raises_client_creation_error(
+        self, mock_read_keys
+    ):
+        mock_read_keys.return_value = {"garbage", "unknown_key"}
+
+        with pytest.raises(ClientCreationError):
+            create_client("unknown-instance")

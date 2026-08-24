@@ -20,7 +20,7 @@ See further information about installation in the [main documentation](/README.m
 
 ```python
 from sap_cloud_sdk.objectstore import create_client, ObjectStoreClient
-from sap_cloud_sdk.objectstore import ObjectStoreBindingData
+from sap_cloud_sdk.objectstore import S3BindingData
 ```
 
 ---
@@ -36,15 +36,24 @@ from sap_cloud_sdk.objectstore import create_client
 client = create_client("my-instance")
 ```
 
-You can also specify additional parameters if needed:
+### Local / MinIO endpoints (plain HTTP)
+
+`create_client()` always connects over TLS. For a local or MinIO endpoint
+served over plain HTTP, construct the S3 backend directly and pass
+`disable_ssl=True`:
 
 ```python
-from sap_cloud_sdk.objectstore import create_client
+from sap_cloud_sdk.objectstore import S3BindingData
+from sap_cloud_sdk.objectstore._s3 import S3Client
 
-# Custom configuration with SSL disabled
-client = create_client(
-    "my-instance",
-    disable_ssl=True,  # Disable SSL (default is False)
+client = S3Client(
+    S3BindingData(
+        access_key_id="...",
+        secret_access_key="...",
+        bucket="my-bucket",
+        host="localhost:9000",
+    ),
+    disable_ssl=True,  # plain HTTP; only for local/MinIO
 )
 ```
 
@@ -114,14 +123,14 @@ response = client.get_object("hello.txt")
 # Read the content
 content = response.read()  # Returns bytes
 text_content = content.decode("utf-8")  # Convert to string if needed
-
-# Don't forget to close the response
-response.close()
-
-# Or use as context manager (automatically closes)
-with client.get_object("hello.txt") as response:
-    content = response.read()
 ```
+
+> **Provider note:** `read()` works uniformly across all backends and is the
+> portable way to consume the stream. On S3 and GCS the returned object also
+> supports `close()` and use as a context manager (`with client.get_object(...)
+> as response:`). The Azure backend returns a streaming downloader that exposes
+> `read()`/`readall()` but not `close()` or the context-manager protocol — so
+> prefer `read()` if your code must work across all three providers.
 
 ### Check Object Existence
 

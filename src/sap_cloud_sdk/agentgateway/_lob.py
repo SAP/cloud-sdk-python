@@ -151,7 +151,12 @@ def get_ias_client_id_lob() -> str:
     )
     if not dest:
         raise AgentGatewaySDKError(f"IAS destination '{dest_name}' not found")
-    return dest.properties.get("clientId", "")
+    client_id = dest.properties.get("clientId", "")
+    if not client_id:
+        raise AgentGatewaySDKError(
+            f"IAS destination '{dest_name}' does not contain a 'clientId' property"
+        )
+    return client_id
 
 
 async def fetch_system_auth(

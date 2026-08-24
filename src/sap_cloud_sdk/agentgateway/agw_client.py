@@ -347,6 +347,10 @@ class AgentGatewayClient:
                     "Customer agent credentials detected at '%s'", credentials_path
                 )
                 credentials = load_customer_credentials(credentials_path)
+                if not credentials.client_id:
+                    raise AgentGatewaySDKError(
+                        "Customer agent credentials file does not contain a 'client_id'"
+                    )
                 return credentials.client_id
 
             # LoB flow — read clientId from the IAS destination properties

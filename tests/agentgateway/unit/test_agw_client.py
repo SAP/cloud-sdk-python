@@ -1209,6 +1209,17 @@ class TestGetIasClientId:
             with pytest.raises(AgentGatewaySDKError, match="Could not resolve IAS client ID"):
                 create_client().get_ias_client_id()
 
+    def test_customer_raises_when_client_id_empty(self):
+        mock_creds = MagicMock()
+        mock_creds.client_id = ""
+
+        with (
+            patch(_DETECT_CREDS_PATCH, return_value="/etc/ums/credentials/credentials"),
+            patch(_LOAD_CREDS_PATCH, return_value=mock_creds),
+        ):
+            with pytest.raises(AgentGatewaySDKError, match="client_id"):
+                create_client().get_ias_client_id()
+
     # --- LoB flow ---
 
     @_NO_CUSTOMER_CREDS
@@ -1225,11 +1236,10 @@ class TestGetIasClientId:
                 create_client(tenant_subdomain="my-tenant").get_ias_client_id()
 
     @_NO_CUSTOMER_CREDS
-    def test_lob_returns_empty_string_when_property_absent(self, _mock_detect):
-        with patch(_GET_IAS_CLIENT_ID_LOB_PATCH, return_value=""):
-            result = create_client(tenant_subdomain="my-tenant").get_ias_client_id()
-
-        assert result == ""
+    def test_lob_raises_when_client_id_property_absent(self, _mock_detect):
+        with patch(_GET_IAS_CLIENT_ID_LOB_PATCH, side_effect=AgentGatewaySDKError("does not contain a 'clientId' property")):
+            with pytest.raises(AgentGatewaySDKError, match="clientId"):
+                create_client(tenant_subdomain="my-tenant").get_ias_client_id()
 
     @_NO_CUSTOMER_CREDS
     def test_lob_raises_on_exception(self, _mock_detect):

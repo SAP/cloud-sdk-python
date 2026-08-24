@@ -1252,7 +1252,7 @@ class TestGetIasClientIdLob:
             with pytest.raises(AgentGatewaySDKError, match="sap-managed-runtime-ias-eu10"):
                 get_ias_client_id_lob()
 
-    def test_returns_empty_string_when_property_absent(self):
+    def test_raises_when_client_id_property_absent(self):
         mock_dest = MagicMock()
         mock_dest.properties = {}
         mock_dest_client = MagicMock()
@@ -1262,9 +1262,8 @@ class TestGetIasClientIdLob:
             patch("sap_cloud_sdk.agentgateway._lob._ias_dest_name", return_value="sap-managed-runtime-ias-eu10"),
             patch("sap_cloud_sdk.agentgateway._lob.create_destination_client", return_value=mock_dest_client),
         ):
-            result = get_ias_client_id_lob()
-
-        assert result == ""
+            with pytest.raises(AgentGatewaySDKError, match="clientId"):
+                get_ias_client_id_lob()
 
     def test_raises_when_landscape_env_not_set(self):
         with patch("sap_cloud_sdk.agentgateway._lob._ias_dest_name", side_effect=EnvironmentError("APPFND_CONHOS_LANDSCAPE not set")):

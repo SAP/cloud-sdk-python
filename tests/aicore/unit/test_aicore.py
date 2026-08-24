@@ -864,7 +864,7 @@ class TestSetAICoreConfigProxyMode:
             patch("sap_cloud_sdk.aicore.set_filtering"),
             patch.dict(
                 "os.environ",
-                self._base_proxy_env(AICORE_PROXY_VIRTUAL_KEY="sk-virt-123"),
+                self._base_proxy_env(AICORE_PROXY_API_KEY="sk-virt-123"),
                 clear=True,
             ),
         ):

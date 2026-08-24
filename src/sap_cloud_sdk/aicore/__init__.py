@@ -39,7 +39,7 @@ TRANSPARENT_TLS_ENV_VAR = "AICORE_TRANSPARENT_TLS"
 # Option 3 — transparent proxy routing.
 # Deployer injects these; agent code is identical in all environments.
 _PROXY_URL_ENV = "AICORE_PROXY_URL"
-_PROXY_VIRTUAL_KEY_ENV = "AICORE_PROXY_VIRTUAL_KEY"
+_PROXY_API_KEY_ENV = "AICORE_PROXY_API_KEY"
 _DESTINATION_NAME_ENV = "AICORE_DESTINATION_NAME"
 
 
@@ -138,9 +138,9 @@ def set_aicore_config(instance_name: str = "aicore-instance") -> None:
     Detects which routing mode is active based on environment variables:
 
     - ``AICORE_PROXY_URL`` set → **proxy mode**: routes all LiteLLM calls
-      through a LiteLLM proxy; ``sap/<model>`` is aliased to
-      ``litellm_proxy/<model>`` transparently. No AI Core credentials
-      are written to the process environment.
+      through a LiteLLM proxy via ``litellm.api_base``; model strings are
+      passed verbatim. No AI Core credentials are written to the process
+      environment.
 
     - ``AICORE_DESTINATION_NAME`` set → **destination mode**: loads AI Core
       credentials from a BTP Destination Service destination at startup.
@@ -185,10 +185,10 @@ def _configure_proxy_mode(proxy_url: str) -> None:
     """
     import litellm as _litellm
 
-    virtual_key = os.environ.get(_PROXY_VIRTUAL_KEY_ENV, "")
+    api_key = os.environ.get(_PROXY_API_KEY_ENV, "")
     _litellm.api_base = proxy_url
-    if virtual_key:
-        _litellm.api_key = virtual_key
+    if api_key:
+        _litellm.api_key = api_key
     logger.info("AI Core proxy mode active — routing via %s", proxy_url)
 
 

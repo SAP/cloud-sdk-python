@@ -29,6 +29,7 @@ from sap_cloud_sdk.agentgateway._fragments import (
     list_a2a_fragments,
 )
 from sap_cloud_sdk.agentgateway._models import (
+    AGWJsonRpcError,
     Agent,
     AgentCard,
     AgentCardFilter,
@@ -302,14 +303,30 @@ def _log_mcp_server_error(fragment_name: str, exc: BaseException) -> None:
             _log_mcp_server_error(fragment_name, inner)
         return
     if isinstance(exc, httpx.HTTPStatusError):
-        logger.error(
-            "Failed to load tools from fragment '%s' (HTTP %d): %s",
-            fragment_name,
-            exc.response.status_code,
-            exc.response.text[:500],
-        )
+        try:
+            body = exc.response.text
+        except httpx.ResponseNotRead:
+            body = None
+        rpc_error = AGWJsonRpcError.parse(body) if body else None
+        if rpc_error:
+            logger.error(
+                "Failed to load tools from fragment '%s' — %s returned HTTP %d [JSON-RPC %d]: %s",
+                fragment_name,
+                exc.request.url,
+                exc.response.status_code,
+                rpc_error.code,
+                rpc_error.message,
+            )
+        else:
+            logger.error(
+                "Failed to load tools from fragment '%s' — %s returned HTTP %d: %s",
+                fragment_name,
+                exc.request.url,
+                exc.response.status_code,
+                body[:500] if body else "(response body not available)",
+            )
     else:
-        logger.exception(
+        logger.error(
             "Failed to load tools from fragment '%s' — skipping",
             fragment_name,
             exc_info=exc,
@@ -477,13 +494,20 @@ async def call_mcp_tool_lob(
                 await session.initialize()
                 result = await session.call_tool(tool.name, kwargs)
                 if not result.content:
-                    logger.warning("Tool '%s' returned empty content", tool.name)
+                    logger.warning(
+                        "Tool '%s' on '%s' returned empty content", tool.name, tool.url
+                    )
                     return ""
                 first = result.content[0]
                 text = str(getattr(first, "text", ""))
 
                 if result.isError:
-                    logger.error("Tool '%s' returned an error: %s", tool.name, text)
+                    logger.error(
+                        "Tool '%s' on '%s' returned an error: %s",
+                        tool.name,
+                        tool.url,
+                        text,
+                    )
 
                 return text
 

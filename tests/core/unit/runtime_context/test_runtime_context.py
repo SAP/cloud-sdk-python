@@ -9,12 +9,14 @@ from sap_cloud_sdk.core.runtime_context import (
     DWC_SUBDOMAIN,
     DWC_TENANT,
     DWCContextProvider,
+    FEATURE_TOGGLES,
     IASContextProvider,
     RuntimeContext,
     RequestEnvelope,
     SAPTriggerContextProvider,
     TRIGGER_TYPE,
     get_context,
+    is_feature_enabled,
 )
 from sap_cloud_sdk.core.runtime_context._context import (
     async_sdk_context,
@@ -331,6 +333,51 @@ class TestDWCContextProvider:
 
     def test_satisfies_context_provider_protocol(self):
         assert isinstance(DWCContextProvider(), ContextProvider)
+
+    def test_extracts_feature_toggles(self):
+        envelope = _make_envelope({"dwc-feature-toggles": "toggle-a,toggle-b"})
+        ctx = DWCContextProvider().extract(envelope)
+        assert ctx.get(FEATURE_TOGGLES) == ["toggle-a", "toggle-b"]
+
+    def test_feature_toggles_strips_whitespace(self):
+        envelope = _make_envelope({"dwc-feature-toggles": " toggle-a , toggle-b "})
+        ctx = DWCContextProvider().extract(envelope)
+        assert ctx.get(FEATURE_TOGGLES) == ["toggle-a", "toggle-b"]
+
+    def test_feature_toggles_empty_when_header_absent(self):
+        envelope = _make_envelope({})
+        ctx = DWCContextProvider().extract(envelope)
+        assert ctx.get(FEATURE_TOGGLES) is None
+
+
+# ---------------------------------------------------------------------------
+# is_feature_enabled
+# ---------------------------------------------------------------------------
+
+
+class TestIsFeatureEnabled:
+    def test_returns_true_when_toggle_is_active(self):
+        ctx = RuntimeContext({FEATURE_TOGGLES: ["my-feature", "other"]})
+        with sdk_context(ctx):
+            assert is_feature_enabled("my-feature") is True
+
+    def test_returns_false_when_toggle_is_not_in_list(self):
+        ctx = RuntimeContext({FEATURE_TOGGLES: ["other-feature"]})
+        with sdk_context(ctx):
+            assert is_feature_enabled("my-feature") is False
+
+    def test_returns_false_when_toggle_list_is_empty(self):
+        ctx = RuntimeContext({FEATURE_TOGGLES: []})
+        with sdk_context(ctx):
+            assert is_feature_enabled("my-feature") is False
+
+    def test_returns_false_when_no_toggles_header(self):
+        ctx = RuntimeContext()
+        with sdk_context(ctx):
+            assert is_feature_enabled("my-feature") is False
+
+    def teardown_method(self):
+        set_context(RuntimeContext())
 
 
 # ---------------------------------------------------------------------------

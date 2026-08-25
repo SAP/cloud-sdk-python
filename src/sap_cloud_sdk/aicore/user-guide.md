@@ -57,8 +57,8 @@ The `set_aicore_config()` function:
 4. **Sets resource group** (defaults to "default" if not specified)
 5. **Activates content filtering** — Azure Content Safety + prompt shield enabled by default *(new in 0.32.0)*
 
-Model fallback is **not** auto-activated — it is opt-in via
-[`set_fallbacks()`](#model-fallback-opt-in).
+Model fallback is **not** auto-activated — it is opt-in via the `fallback=`
+parameter of [`set_aicore_config()`](#model-fallback-opt-in).
 
 ---
 
@@ -282,20 +282,24 @@ fails (unsupported in region, 429 Too Many Requests, 408 Request Timeout, or
 any 5xx — and only unsupported-in-region for streaming requests), the server
 automatically retries with the next preference in your list.
 
-Unlike content filtering, **fallback is opt-in**. `set_aicore_config()` does
-not enable it. The developer must call `set_fallbacks()` (or set the
-`AICORE_FALLBACK_*` env vars and call `set_fallbacks()` with no args).
+Unlike content filtering, **fallback is opt-in**. It is not enabled by
+default; activate it by passing a `FallbackConfig` to `set_aicore_config()`
+via the `fallback=` parameter (or set the `AICORE_FALLBACK_*` env vars before
+calling `set_aicore_config()`).
+
+Each fallback preference is fully configurable through `FallbackModel` — the
+`model` name, per-model `params` (e.g. `temperature`, `max_tokens`), and an
+optional `model_version`.
 
 ### Programmatic configuration
 
 ```python
 from sap_cloud_sdk.aicore import (
-    FallbackConfig, FallbackModel, set_aicore_config, set_fallbacks,
+    FallbackConfig, FallbackModel, set_aicore_config,
 )
 from litellm import completion
 
-set_aicore_config()
-set_fallbacks(FallbackConfig([
+set_aicore_config(fallback=FallbackConfig([
     FallbackModel(
         model="sap/mistralai--mistral-small-instruct",
         params={"temperature": 0.7, "max_tokens": 300},
@@ -329,7 +333,7 @@ This field is currently surfaced for non-streaming responses only.
 
 ### Configure via environment
 
-Set these **before** calling `set_fallbacks()`:
+Set these **before** calling `set_aicore_config()`:
 
 | Variable | Default | Description |
 |---|---|---|
@@ -343,8 +347,8 @@ AICORE_FALLBACK_MODELS=sap/mistralai--mistral-small-instruct,sap/anthropic--clau
 ```
 
 ```python
-from sap_cloud_sdk.aicore import set_fallbacks
-set_fallbacks()   # reads the env vars
+from sap_cloud_sdk.aicore import set_aicore_config
+set_aicore_config()   # reads the AICORE_FALLBACK_* env vars
 ```
 
 ### Filtering composes with fallback
@@ -357,10 +361,15 @@ after `set_aicore_config()`).
 
 ### Clearing at runtime
 
-There is no `disable_fallbacks()` function. To clear a previously-installed
-fallback configuration at runtime, call `set_fallbacks(None)` after clearing
-the `AICORE_FALLBACK_*` env vars (or with them unset). Most applications enable
-fallback once at startup and leave it on.
+To clear a previously-installed fallback configuration at runtime, call
+`disable_fallbacks()`. It restores the non-fallback transport (filtering stays
+untouched) and is idempotent. Most applications enable fallback once at startup
+and leave it on.
+
+```python
+from sap_cloud_sdk.aicore import disable_fallbacks
+disable_fallbacks()
+```
 
 ### Error responses
 

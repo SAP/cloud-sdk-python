@@ -29,9 +29,10 @@ from sap_cloud_sdk.aicore import (
     FallbackConfig,
     FallbackModel,
     completion,
-    set_fallbacks,
+    disable_fallbacks,
     set_filtering,
 )
+from sap_cloud_sdk.aicore.fallback.fallback import _apply_fallback
 
 scenarios("fallback.feature")
 
@@ -73,13 +74,15 @@ def models_configured(fallback_models: tuple[str, str]):
 
 @given("fallback is disabled")
 def fallback_off():
-    set_fallbacks(None)
+    disable_fallbacks()
 
 
 @given("fallback is configured with the test fallback model")
 def fallback_on(fallback_models: tuple[str, str]):
     _primary, fallback = fallback_models
-    set_fallbacks(FallbackConfig([FallbackModel(model=fallback)]))
+    # Credentials are already loaded by the session fixture; use the internal
+    # installer to toggle fallback without re-running set_aicore_config.
+    _apply_fallback(FallbackConfig([FallbackModel(model=fallback)]))
 
 
 @given("filtering is enabled with default thresholds")

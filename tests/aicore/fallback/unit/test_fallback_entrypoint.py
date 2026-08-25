@@ -1,4 +1,11 @@
-"""Unit tests for :func:`set_fallbacks` lifecycle and env-driven activation."""
+"""Unit tests for fallback activation (``_apply_fallback``) and
+``disable_fallbacks`` lifecycle, including env-driven activation.
+
+Activation is wired into ``set_aicore_config(fallback=...)`` in production; the
+underlying installer is ``_apply_fallback`` and the public clear is
+``disable_fallbacks``. These tests drive those directly to avoid mocking
+credential loading.
+"""
 
 from __future__ import annotations
 
@@ -15,7 +22,8 @@ from sap_cloud_sdk.aicore.fallback._patch import (
 from sap_cloud_sdk.aicore.fallback.fallback import (
     FallbackConfig,
     FallbackModel,
-    set_fallbacks,
+    _apply_fallback,
+    disable_fallbacks,
 )
 from sap_cloud_sdk.aicore.filtering._patch import (
     _ORIGINAL_CONFIG,
@@ -36,22 +44,16 @@ def clean_state(monkeypatch):
     _install_fallback(None)
 
 
-class TestSetFallbacks:
+class TestApplyFallback:
     def test_with_explicit_config_installs_patch(self):
-        set_fallbacks(FallbackConfig([FallbackModel(model="sap/x")]))
+        _apply_fallback(FallbackConfig([FallbackModel(model="sap/x")]))
         assert litellm.GenAIHubOrchestrationConfig is OrchestrationPatchConfig
         assert _fallback_patch._active_fallback_cfg is not None
-
-    def test_with_none_no_env_clears(self):
-        set_fallbacks(FallbackConfig([FallbackModel(model="sap/x")]))
-        set_fallbacks(None)
-        assert _fallback_patch._active_fallback_cfg is None
-        assert litellm.GenAIHubOrchestrationConfig is _ORIGINAL_CONFIG
 
     def test_with_none_reads_env_when_enabled(self, monkeypatch):
         monkeypatch.setenv("AICORE_FALLBACK_ENABLED", "true")
         monkeypatch.setenv("AICORE_FALLBACK_MODELS", "sap/a,sap/b")
-        set_fallbacks(None)
+        _apply_fallback(None)
         assert _fallback_patch._active_fallback_cfg is not None
         assert [m.model for m in _fallback_patch._active_fallback_cfg.models] == [
             "sap/a",
@@ -61,12 +63,26 @@ class TestSetFallbacks:
 
     def test_with_none_env_disabled_keeps_inactive(self):
         # AICORE_FALLBACK_ENABLED unset → from_env returns None → install None.
-        set_fallbacks(None)
+        _apply_fallback(None)
         assert _fallback_patch._active_fallback_cfg is None
         assert litellm.GenAIHubOrchestrationConfig is _ORIGINAL_CONFIG
 
     def test_idempotent(self):
         cfg = FallbackConfig([FallbackModel(model="sap/x")])
-        set_fallbacks(cfg)
-        set_fallbacks(cfg)
+        _apply_fallback(cfg)
+        _apply_fallback(cfg)
         assert litellm.GenAIHubOrchestrationConfig is OrchestrationPatchConfig
+
+
+class TestDisableFallbacks:
+    def test_clears_installed_config(self):
+        _apply_fallback(FallbackConfig([FallbackModel(model="sap/x")]))
+        disable_fallbacks()
+        assert _fallback_patch._active_fallback_cfg is None
+        assert litellm.GenAIHubOrchestrationConfig is _ORIGINAL_CONFIG
+
+    def test_idempotent_when_already_disabled(self):
+        disable_fallbacks()
+        disable_fallbacks()
+        assert _fallback_patch._active_fallback_cfg is None
+        assert litellm.GenAIHubOrchestrationConfig is _ORIGINAL_CONFIG

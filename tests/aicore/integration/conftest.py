@@ -9,7 +9,7 @@ from pathlib import Path
 import pytest
 from dotenv import load_dotenv
 
-from sap_cloud_sdk.aicore import disable_filtering, set_aicore_config, set_fallbacks
+from sap_cloud_sdk.aicore import disable_fallbacks, disable_filtering, set_aicore_config
 
 
 # Filtering integration vars — required for the filtering.feature scenarios.
@@ -54,7 +54,7 @@ def aicore_configured():
     set_aicore_config()
     yield
     disable_filtering()
-    set_fallbacks(None)
+    disable_fallbacks()
 
 
 @pytest.fixture(scope="session")
@@ -86,10 +86,10 @@ def fallback_models() -> tuple[str, str]:
 def reset_aicore_state_between_tests():
     """Each scenario opts in/out via its Given step."""
     disable_filtering()
-    set_fallbacks(None)
+    disable_fallbacks()
     yield
     disable_filtering()
-    set_fallbacks(None)
+    disable_fallbacks()
 
 
 def pytest_configure(config):

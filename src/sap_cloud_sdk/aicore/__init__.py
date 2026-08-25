@@ -14,7 +14,12 @@ from sap_cloud_sdk.core.telemetry.metrics_decorator import record_metrics
 from sap_cloud_sdk.core.telemetry.module import Module
 from sap_cloud_sdk.core.telemetry.operation import Operation
 from .completion import acompletion, completion
-from .fallback import FallbackConfig, FallbackModel, set_fallbacks
+from .fallback import (
+    FallbackConfig,
+    FallbackModel,
+    _apply_fallback,
+    disable_fallbacks,
+)
 from .filtering import (
     AzureContentFilter,
     ContentFilter,
@@ -116,7 +121,10 @@ def _get_aicore_base_url(instance_name: str = "aicore-instance") -> str:
 
 
 @record_metrics(Module.AICORE, Operation.AICORE_SET_CONFIG)
-def set_aicore_config(instance_name: str = "aicore-instance") -> None:
+def set_aicore_config(
+    instance_name: str = "aicore-instance",
+    fallback: Optional[FallbackConfig] = None,
+) -> None:
     """Load AI Core credentials and activate content filtering.
 
     Loads secrets from files or environment variables and sets them as
@@ -136,10 +144,21 @@ def set_aicore_config(instance_name: str = "aicore-instance") -> None:
     to turn filtering off at runtime, or set ``AICORE_FILTER_ENABLED=false``
     to keep it off entirely.
 
-    Model fallback is **opt-in** and is NOT activated by this function. To
-    enable it, call :func:`set_fallbacks` programmatically (or set
-    ``AICORE_FALLBACK_ENABLED=true`` and any of ``AICORE_FALLBACK_MODELS`` /
-    ``AICORE_FALLBACK_CONFIG`` and call ``set_fallbacks()`` with no args).
+    Model fallback is **opt-in**. Pass a :class:`FallbackConfig` via
+    ``fallback=`` to activate preference-ordered model fallback for
+    Orchestration v2, or set ``AICORE_FALLBACK_ENABLED=true`` (with
+    ``AICORE_FALLBACK_MODELS`` / ``AICORE_FALLBACK_CONFIG``) *before* calling
+    this function to activate it from the environment. When neither is set,
+    fallback stays inactive. Use :func:`disable_fallbacks` to turn it off at
+    runtime.
+
+    Args:
+        instance_name: Name of the AI Core service instance whose secrets to
+            load. Defaults to ``"aicore-instance"``.
+        fallback: Optional :class:`FallbackConfig` declaring preference-ordered
+            fallback models. When ``None`` (the default), fallback is activated
+            only if the ``AICORE_FALLBACK_*`` env vars opt in; otherwise it
+            stays inactive.
     """
     # Load secrets
     client_id = _get_secret("AICORE_CLIENT_ID", "clientid", instance_name=instance_name)
@@ -180,6 +199,11 @@ def set_aicore_config(instance_name: str = "aicore-instance") -> None:
     # rather than be swallowed silently.
     set_filtering()
 
+    # Activate model fallback when opted in. An explicit ``fallback`` config
+    # installs it directly; otherwise ``_apply_fallback(None)`` consults the
+    # AICORE_FALLBACK_* env vars and stays inactive unless they opt in.
+    _apply_fallback(fallback)
+
 
 __all__ = [
     "set_aicore_config",
@@ -196,7 +220,7 @@ __all__ = [
     "Severity",
     "ContentFilteredError",
     "OrchestrationError",
-    "set_fallbacks",
+    "disable_fallbacks",
     "FallbackConfig",
     "FallbackModel",
 ]

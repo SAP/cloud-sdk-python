@@ -48,6 +48,31 @@ from ..filtering._patch import FilteringOrchestrationConfig
 logger = logging.getLogger(__name__)
 
 
+# Wire-format keys for the orchestration ``config.modules[]`` entries, as built
+# by litellm's ``GenAIHubOrchestrationConfig``. Named here so the nested
+# ``prompt_templating.prompt.template`` walk and the filtering/fallback
+# injection points share a single source of truth.
+_KEY_FALLBACK_SAP_MODULES = "fallback_sap_modules"
+_KEY_PROMPT_TEMPLATING = "prompt_templating"
+_KEY_PROMPT = "prompt"
+_KEY_TEMPLATE = "template"
+_KEY_FILTERING = "filtering"
+
+
+def _get_prompt_template(module: dict) -> Any:
+    """Read ``module["prompt_templating"]["prompt"]["template"]`` safely."""
+    return (
+        module.get(_KEY_PROMPT_TEMPLATING, {}).get(_KEY_PROMPT, {}).get(_KEY_TEMPLATE)
+    )
+
+
+def _set_prompt_template(module: dict, template: Any) -> None:
+    """Write ``module["prompt_templating"]["prompt"]["template"] = template``."""
+    module.setdefault(_KEY_PROMPT_TEMPLATING, {}).setdefault(_KEY_PROMPT, {})[
+        _KEY_TEMPLATE
+    ] = template
+
+
 # Module-level fallback state. ``None`` means fallback is inactive; the
 # filtering module is the source of truth for the installed class in that
 # case (see :func:`_install_fallback`).
@@ -80,7 +105,7 @@ class OrchestrationPatchConfig(FilteringOrchestrationConfig):
         # LiteLLM's transform_request copies optional_params and pops
         # ``"fallback_sap_modules"`` to build the modules list.
         if _active_fallback_cfg is not None:
-            optional_params["fallback_sap_modules"] = (
+            optional_params[_KEY_FALLBACK_SAP_MODULES] = (
                 _active_fallback_cfg.to_litellm_kwarg()
             )
 
@@ -105,14 +130,10 @@ class OrchestrationPatchConfig(FilteringOrchestrationConfig):
         # server rejects with
         # "config.modules[N].prompt_templating.prompt.template should be
         # non-empty".
-        primary_template = (
-            modules[0].get("prompt_templating", {}).get("prompt", {}).get("template")
-        )
+        primary_template = _get_prompt_template(modules[0])
         if primary_template:
             for entry in modules[1:]:
-                entry.setdefault("prompt_templating", {}).setdefault("prompt", {})[
-                    "template"
-                ] = primary_template
+                _set_prompt_template(entry, primary_template)
 
         # Broadcast filtering across every module entry. The filtering parent
         # installed it on ``modules[0]`` only; broadcasting keeps the same
@@ -123,7 +144,7 @@ class OrchestrationPatchConfig(FilteringOrchestrationConfig):
             filtering_dict = _filter_patch._active_cfg.to_dict()
             if filtering_dict:
                 for entry in modules[1:]:
-                    entry["filtering"] = filtering_dict
+                    entry[_KEY_FILTERING] = filtering_dict
 
         return body
 

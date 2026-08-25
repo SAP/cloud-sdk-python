@@ -9,12 +9,14 @@ The litellm SAP provider already supports this: passing ``fallback_sap_modules``
 through ``optional_params`` builds ``body["config"]["modules"]`` as a list.
 This module is the SDK-side ergonomic layer: typed ``FallbackModel`` /
 ``FallbackConfig`` dataclasses, an env-driven ``from_env()`` builder, and the
-``set_fallbacks()`` entry point that installs them into the shared
+``_apply_fallback()`` helper that installs them into the shared
 ``OrchestrationPatchConfig`` patch (alongside any active filtering config).
 
-Fallback is **opt-in**: ``set_aicore_config()`` does not enable it. Developers
-must either call ``set_fallbacks(...)`` programmatically or set
-``AICORE_FALLBACK_ENABLED=true`` and call ``set_fallbacks()`` (with no args).
+Fallback is **opt-in**: it is activated by passing a :class:`FallbackConfig`
+to :func:`sap_cloud_sdk.aicore.set_aicore_config` (``fallback=...``), or by
+setting ``AICORE_FALLBACK_ENABLED=true`` (with ``AICORE_FALLBACK_MODELS`` or
+``AICORE_FALLBACK_CONFIG``) before calling ``set_aicore_config()``. Use
+:func:`disable_fallbacks` to turn it off at runtime.
 
 The companion ``intermediate_failures`` field from the orchestration response
 is surfaced as an attribute on the returned ``ModelResponse``. Non-streaming
@@ -175,48 +177,23 @@ class FallbackConfig:
 
 
 # ---------------------------------------------------------------------------
-# Entry point
+# Entry points
 # ---------------------------------------------------------------------------
 
 
-@record_metrics(Module.AICORE, Operation.AICORE_SET_FALLBACKS)
-def set_fallbacks(config: FallbackConfig | None = None) -> None:
-    """Install a model-fallback configuration.
+def _apply_fallback(config: FallbackConfig | None = None) -> None:
+    """Install a model-fallback configuration (internal).
 
-    Fallback is **opt-in**. ``set_aicore_config()`` does NOT activate it;
-    the developer must call this function (or set the
-    ``AICORE_FALLBACK_*`` env vars and call this function with no args).
+    Called by :func:`sap_cloud_sdk.aicore.set_aicore_config` and by the
+    env-var opt-in path. Not part of the public API — callers activate
+    fallback through ``set_aicore_config(fallback=...)`` and clear it with
+    :func:`disable_fallbacks`.
 
     Args:
         config: A :class:`FallbackConfig` to install. If ``None`` (the
             default), reads ``AICORE_FALLBACK_*`` env vars via
-            :meth:`FallbackConfig.from_env`. Pass ``None`` after an earlier
-            call to clear an installed fallback at runtime.
-
-    Examples:
-        Programmatic::
-
-            from sap_cloud_sdk.aicore import (
-                FallbackConfig, FallbackModel, set_fallbacks,
-            )
-
-            set_fallbacks(FallbackConfig([
-                FallbackModel(
-                    model="sap/mistralai--mistral-small-instruct",
-                    params={"temperature": 0.7, "max_tokens": 300},
-                ),
-            ]))
-
-        From environment::
-
-            import os
-            from sap_cloud_sdk.aicore import set_fallbacks
-
-            os.environ["AICORE_FALLBACK_ENABLED"] = "true"
-            os.environ["AICORE_FALLBACK_MODELS"] = (
-                "sap/mistralai--mistral-small-instruct"
-            )
-            set_fallbacks()
+            :meth:`FallbackConfig.from_env` — which returns ``None`` (leaving
+            fallback inactive) unless ``AICORE_FALLBACK_ENABLED`` is truthy.
     """
     if config is None:
         _install_fallback(FallbackConfig.from_env())
@@ -224,4 +201,28 @@ def set_fallbacks(config: FallbackConfig | None = None) -> None:
     _install_fallback(config)
 
 
-__all__ = ["FallbackModel", "FallbackConfig", "set_fallbacks"]
+@record_metrics(Module.AICORE, Operation.AICORE_DISABLE_FALLBACKS)
+def disable_fallbacks() -> None:
+    """Disable model fallback for SAP AI Core model calls.
+
+    Restores the filtering-only patch (or the original
+    ``litellm.GenAIHubOrchestrationConfig`` when filtering is also off).
+    Idempotent — safe to call when fallback is already disabled.
+
+    Examples:
+        Activate fallback, then turn it off at runtime::
+
+            from sap_cloud_sdk.aicore import (
+                FallbackConfig, FallbackModel, disable_fallbacks, set_aicore_config,
+            )
+
+            set_aicore_config(fallback=FallbackConfig([
+                FallbackModel(model="sap/mistralai--mistral-small-instruct"),
+            ]))
+            ...
+            disable_fallbacks()
+    """
+    _install_fallback(None)
+
+
+__all__ = ["FallbackModel", "FallbackConfig", "disable_fallbacks"]

@@ -147,7 +147,7 @@ class Operation(str, Enum):
     AICORE_AUTO_INSTRUMENT = "auto_instrument"
     AICORE_SET_FILTERING = "set_filtering"
     AICORE_DISABLE_FILTERING = "disable_filtering"
-    AICORE_SET_FALLBACKS = "set_fallbacks"
+    AICORE_DISABLE_FALLBACKS = "disable_fallbacks"
 
     # Print Operations
     PRINT_LIST_QUEUES = "list_queues"

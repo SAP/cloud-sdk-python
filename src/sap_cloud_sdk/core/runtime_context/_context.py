@@ -67,7 +67,7 @@ def get_context() -> RuntimeContext:
 def is_feature_enabled(name: str) -> bool:
     """Return ``True`` if *name* is in the active feature toggles for the current request.
 
-    Feature toggles are populated from the ``dwc-feature-toggles`` DWC request
+    Feature toggles are populated from the ``dwc-product-configuration`` DWC request
     header by :class:`~sap_cloud_sdk.core.runtime_context.DWCContextProvider`.
     Returns ``False`` when no toggles header was present or the toggle is absent.
     """

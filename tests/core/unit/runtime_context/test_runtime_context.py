@@ -335,12 +335,12 @@ class TestDWCContextProvider:
         assert isinstance(DWCContextProvider(), ContextProvider)
 
     def test_extracts_feature_toggles(self):
-        envelope = _make_envelope({"dwc-feature-toggles": "toggle-a,toggle-b"})
+        envelope = _make_envelope({"dwc-product-configuration": "toggle-a,toggle-b"})
         ctx = DWCContextProvider().extract(envelope)
         assert ctx.get(FEATURE_TOGGLES) == ["toggle-a", "toggle-b"]
 
     def test_feature_toggles_strips_whitespace(self):
-        envelope = _make_envelope({"dwc-feature-toggles": " toggle-a , toggle-b "})
+        envelope = _make_envelope({"dwc-product-configuration": " toggle-a , toggle-b "})
         ctx = DWCContextProvider().extract(envelope)
         assert ctx.get(FEATURE_TOGGLES) == ["toggle-a", "toggle-b"]
 

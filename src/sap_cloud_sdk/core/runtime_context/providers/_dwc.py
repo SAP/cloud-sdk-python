@@ -5,7 +5,7 @@ from sap_cloud_sdk.core.runtime_context._envelope import RequestEnvelope
 from sap_cloud_sdk.core.runtime_context._keys import DWC_SUBDOMAIN, DWC_TENANT, FEATURE_TOGGLES
 from sap_cloud_sdk.core.runtime_context._protocol import ContextProvider
 
-_FEATURE_TOGGLES_HEADER = "dwc-feature-toggles"
+_FEATURE_TOGGLES_HEADER = "dwc-product-configuration"
 
 
 class DWCContextProvider(ContextProvider):
@@ -15,7 +15,7 @@ class DWCContextProvider(ContextProvider):
 
       - :data:`~sap_cloud_sdk.core.runtime_context.DWC_SUBDOMAIN` from ``dwc-subdomain``
       - :data:`~sap_cloud_sdk.core.runtime_context.DWC_TENANT` from ``dwc-tenant``
-      - :data:`~sap_cloud_sdk.core.runtime_context.FEATURE_TOGGLES` from ``dwc-feature-toggles``
+      - :data:`~sap_cloud_sdk.core.runtime_context.FEATURE_TOGGLES` from ``dwc-product-configuration``
     """
 
     def extract(self, envelope: RequestEnvelope) -> RuntimeContext:

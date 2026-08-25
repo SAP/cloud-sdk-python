@@ -14,7 +14,6 @@ from google.cloud.exceptions import NotFound  # noqa: E402
 
 from sap_cloud_sdk.objectstore._gcs import GcsClient  # noqa: E402
 from sap_cloud_sdk.objectstore._models import GcsBindingData  # noqa: E402
-from sap_cloud_sdk.objectstore.config import build_gcs_client  # noqa: E402
 from sap_cloud_sdk.objectstore.exceptions import (  # noqa: E402
     ListObjectsError,
     ObjectNotFoundError,
@@ -33,10 +32,7 @@ def _make_client():
     mock_gcs = MagicMock()
     mock_bucket = MagicMock()
     mock_gcs.bucket.return_value = mock_bucket
-    with patch(
-        "sap_cloud_sdk.objectstore._gcs.build_gcs_client",
-        return_value=mock_gcs,
-    ):
+    with patch.object(GcsClient, "_create_storage_client", return_value=mock_gcs):
         client = GcsClient(_CREDS)
     return client, mock_gcs, mock_bucket
 
@@ -265,8 +261,8 @@ class TestGcsClientObjectExists:
             client.object_exists("")
 
 
-class TestBuildGcsClient:
-    """Test the build_gcs_client credential transform in isolation."""
+class TestCreateStorageClient:
+    """Test the GcsClient._create_storage_client credential transform in isolation."""
 
     def test_build_gcs_client_decodes_base64_and_passes_to_credentials(self):
         service_account_info = {
@@ -293,7 +289,8 @@ class TestBuildGcsClient:
             "google.cloud.storage.Client",
             return_value=mock_storage_client,
         ) as mock_client_class:
-            result = build_gcs_client(cfg)
+            instance = object.__new__(GcsClient)
+            result = instance._create_storage_client(cfg)
 
         mock_from_info.assert_called_once_with(service_account_info)
         mock_client_class.assert_called_once_with(

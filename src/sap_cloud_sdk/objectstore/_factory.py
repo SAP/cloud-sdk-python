@@ -1,6 +1,6 @@
 """Object store client factory — provider detection and dispatch."""
 
-from typing import Any, Union
+from typing import Union
 
 from sap_cloud_sdk.objectstore._azure import AzureClient
 from sap_cloud_sdk.objectstore._detect import detect_provider, read_binding_keys
@@ -16,12 +16,6 @@ from sap_cloud_sdk.objectstore._s3 import S3Client
 from sap_cloud_sdk.objectstore.config import load_from_env_or_mount
 from sap_cloud_sdk.objectstore.exceptions import ClientCreationError
 
-_CLIENTS: dict[ObjectStoreProvider, Any] = {
-    ObjectStoreProvider.S3: S3Client,
-    ObjectStoreProvider.AZURE: AzureClient,
-    ObjectStoreProvider.GCS: GcsClient,
-}
-
 
 def create_client(
     instance: str,
@@ -34,14 +28,10 @@ def create_client(
     ``instance`` from the secret mount or environment variables, infers the
     cloud provider, and returns the matching concrete client.
 
-    When ``config`` is supplied, provider detection is skipped and the matching
-    client is constructed directly from the given credentials.
-
     Args:
         instance: Instance name used for secret resolution. Must be non-empty.
-        config: Optional explicit credentials. If provided, auto-detection is
-            skipped.  Pass an ``S3BindingData`` for S3, an
-            ``AzureBindingData`` for Azure, or a ``GcsBindingData`` for GCS.
+        config: Optional explicit credentials. If provided, auto-detection is skipped
+        and this configuration is used directly.
 
     Returns:
         A client satisfying the ``ObjectStoreClient`` protocol.
@@ -49,7 +39,7 @@ def create_client(
     Raises:
         ValueError: If ``instance`` is empty or None.
         ClientCreationError: If no provider can be detected or client creation
-            fails.
+        fails.
     """
     if not instance or not instance.strip():
         raise ValueError("instance parameter must be a non-empty string")
@@ -66,7 +56,6 @@ def create_client(
             f"{type(config).__name__}"
         )
 
-    # Auto-detection path.
     keys = read_binding_keys(instance)
     try:
         provider = detect_provider(keys)
@@ -76,4 +65,13 @@ def create_client(
         ) from e
 
     binding = load_from_env_or_mount(provider, instance)
-    return _CLIENTS[provider](binding)
+    if provider is ObjectStoreProvider.S3:
+        assert isinstance(binding, S3BindingData)
+        return S3Client(binding)
+    if provider is ObjectStoreProvider.AZURE:
+        assert isinstance(binding, AzureBindingData)
+        return AzureClient(binding)
+    if provider is ObjectStoreProvider.GCS:
+        assert isinstance(binding, GcsBindingData)
+        return GcsClient(binding)
+    raise ClientCreationError(f"Unsupported provider: {provider}")

@@ -30,10 +30,7 @@ _CREDS = AzureBindingData(
 
 def _make_client(mock_container):
     """Construct AzureClient with a patched container."""
-    with patch(
-        "sap_cloud_sdk.objectstore._azure.build_azure_container_client",
-        return_value=mock_container,
-    ):
+    with patch.object(AzureClient, "_create_container_client", return_value=mock_container):
         return AzureClient(_CREDS)
 
 

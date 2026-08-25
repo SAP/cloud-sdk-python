@@ -6,15 +6,12 @@ from typing import IO, BinaryIO, List, NoReturn
 from sap_cloud_sdk.core.telemetry import Module, Operation, record_metrics
 from sap_cloud_sdk.objectstore._models import AzureBindingData, ObjectMetadata
 from sap_cloud_sdk.objectstore._validation import (
-    EMPTY_CONTENT_TYPE_ERROR,
-    EMPTY_FILE_PATH_ERROR,
-    EMPTY_NAME_ERROR,
-    INVALID_DATA_TYPE_ERROR,
-    INVALID_PREFIX_TYPE_ERROR,
-    INVALID_STREAM_ERROR,
-    NEGATIVE_SIZE_ERROR,
+    validate_object_name,
+    validate_prefix,
+    validate_put_from_bytes,
+    validate_put_from_file,
+    validate_put_object,
 )
-from sap_cloud_sdk.objectstore.config import build_azure_container_client
 from sap_cloud_sdk.objectstore.exceptions import (
     ClientCreationError,
     ListObjectsError,
@@ -40,11 +37,33 @@ class AzureClient:
             ClientCreationError: If client initialisation fails.
         """
         try:
-            self._container = build_azure_container_client(creds_config)
+            self._container = self._create_container_client(creds_config)
         except ClientCreationError:
             raise
         except Exception as e:
             raise ClientCreationError(f"Failed to initialise AzureClient: {e}") from e
+
+    def _create_container_client(self, cfg: AzureBindingData):
+        """Build an Azure ContainerClient from binding data.
+
+        Uses the container URI directly (which already includes the container name)
+        to construct a ContainerClient — avoids double-appending the container path.
+        """
+        try:
+            from azure.storage.blob import ContainerClient  # lazy: optional extra
+
+            return ContainerClient.from_container_url(
+                cfg.container_uri, credential=cfg.sas_token
+            )
+        except ImportError as e:
+            raise ClientCreationError(
+                "azure-storage-blob is required for Azure Object Store support. "
+                "Install it with: pip install 'sap-cloud-sdk[azure]'"
+            ) from e
+        except Exception as e:
+            raise ClientCreationError(
+                f"Failed to create Azure ContainerClient: {e}"
+            ) from e
 
     def _blob_client(self, name: str):
         """Return a BlobClient for the named blob in this container."""
@@ -63,12 +82,7 @@ class AzureClient:
             ValueError: If any parameter is invalid.
             ObjectOperationError: If the upload fails.
         """
-        if not name:
-            raise ValueError(EMPTY_NAME_ERROR)
-        if not isinstance(data, bytes):
-            raise ValueError(INVALID_DATA_TYPE_ERROR)
-        if not content_type:
-            raise ValueError(EMPTY_CONTENT_TYPE_ERROR)
+        validate_put_from_bytes(name, data, content_type)
 
         try:
             from azure.storage.blob import ContentSettings  # lazy
@@ -97,14 +111,7 @@ class AzureClient:
             ValueError: If any parameter is invalid.
             ObjectOperationError: If the upload fails.
         """
-        if not name:
-            raise ValueError(EMPTY_NAME_ERROR)
-        if not hasattr(stream, "read"):
-            raise ValueError(INVALID_STREAM_ERROR)
-        if size < 0:
-            raise ValueError(NEGATIVE_SIZE_ERROR)
-        if not content_type:
-            raise ValueError(EMPTY_CONTENT_TYPE_ERROR)
+        validate_put_object(name, stream, size, content_type)
 
         try:
             from azure.storage.blob import ContentSettings  # lazy
@@ -133,12 +140,7 @@ class AzureClient:
             ValueError: If any parameter is invalid.
             ObjectOperationError: If the upload fails.
         """
-        if not name:
-            raise ValueError(EMPTY_NAME_ERROR)
-        if not file_path:
-            raise ValueError(EMPTY_FILE_PATH_ERROR)
-        if not content_type:
-            raise ValueError(EMPTY_CONTENT_TYPE_ERROR)
+        validate_put_from_file(name, file_path, content_type)
 
         try:
             from azure.storage.blob import ContentSettings  # lazy
@@ -172,8 +174,7 @@ class AzureClient:
             ObjectNotFoundError: If the object does not exist.
             ObjectOperationError: If the download fails.
         """
-        if not name:
-            raise ValueError(EMPTY_NAME_ERROR)
+        validate_object_name(name)
 
         try:
             return self._blob_client(name).download_blob()
@@ -191,8 +192,7 @@ class AzureClient:
             ValueError: If name is invalid.
             ObjectOperationError: If the deletion fails.
         """
-        if not name:
-            raise ValueError(EMPTY_NAME_ERROR)
+        validate_object_name(name)
 
         try:
             self._blob_client(name).delete_blob()
@@ -220,8 +220,7 @@ class AzureClient:
             ValueError: If prefix is invalid.
             ListObjectsError: If listing fails.
         """
-        if not isinstance(prefix, str):
-            raise ValueError(INVALID_PREFIX_TYPE_ERROR)
+        validate_prefix(prefix)
 
         try:
             result = []
@@ -257,8 +256,7 @@ class AzureClient:
             ObjectNotFoundError: If the object does not exist.
             ObjectOperationError: If the operation fails.
         """
-        if not name:
-            raise ValueError(EMPTY_NAME_ERROR)
+        validate_object_name(name)
 
         try:
             props = self._blob_client(name).get_blob_properties()
@@ -287,8 +285,7 @@ class AzureClient:
             ValueError: If name is invalid.
             ObjectOperationError: If the check fails.
         """
-        if not name:
-            raise ValueError(EMPTY_NAME_ERROR)
+        validate_object_name(name)
 
         try:
             self.head_object(name)

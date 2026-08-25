@@ -1,11 +1,8 @@
-"""Provider auto-detection for the objectstore module (Design 1).
+"""Provider auto-detection for the objectstore module.
 
 Enumerates the binding keys present in the configured secret mount or
 environment variables to determine which cloud provider is backing a given
-objectstore instance — without loading any values.
-
-This logic lives in the objectstore module (not core) because it duplicates the
-mount-path enumeration logic rather than extending it, keeping ``core`` unchanged.
+objectstore instance.
 """
 
 import os
@@ -13,14 +10,12 @@ import os
 from sap_cloud_sdk.core.secret_resolver import resolve_base_mount
 from sap_cloud_sdk.objectstore._models import ObjectStoreProvider
 
-# Discriminators (order matters: azure/gcs checked before s3 so the shared
-# "bucket"/"region" keys in s3 and gcs are never used as discriminators).
 _DISCRIMINATORS: dict[ObjectStoreProvider, set[str]] = {
     ObjectStoreProvider.AZURE: {"container_uri", "sas_token", "container_name"},
     ObjectStoreProvider.GCS: {
-        "base64encodedprivatekeydata",
-        "projectid",
-    },  # lowercased for case-insensitive match
+        "base64EncodedPrivateKeyData",
+        "projectId",
+    },
     ObjectStoreProvider.S3: {"access_key_id", "secret_access_key", "host"},
 }
 
@@ -38,28 +33,28 @@ def read_binding_keys(instance: str) -> set[str]:
        from the flat attempt if SERVICE_BINDING_ROOT is set).
     3. Env-var prefix
        ``CLOUD_SDK_CFG_OBJECTSTORE_{instance_upper}_`` → strip the prefix,
-       lowercase the remaining key.
+       return the remaining key as-is.
 
     Returns:
-        Set of key names (always lowercased) present in any of the above sources.
+        Set of key names present in any of the above sources.
     """
     keys: set[str] = set()
     resolved_base = resolve_base_mount(_DEFAULT_BASE_MOUNT)
 
-    # Strategy 1: servicebinding.io flat path ($ROOT/objectstore/)
+    # servicebinding.io flat path ($ROOT/objectstore/)
     if os.environ.get("SERVICE_BINDING_ROOT") is not None:
         flat_dir = os.path.join(resolved_base, "objectstore")
         keys.update(_scan_dir(flat_dir))
 
-    # Strategy 2: legacy three-level path ($ROOT/objectstore/{instance}/)
+    # Three-level path ($ROOT/objectstore/{instance}/)
     legacy_dir = os.path.join(resolved_base, "objectstore", instance)
     keys.update(_scan_dir(legacy_dir))
 
-    # Strategy 3: environment variables
+    # Environment variables
     prefix = f"CLOUD_SDK_CFG_OBJECTSTORE_{instance.upper().replace('-', '_')}_"
     for var in os.environ:
         if var.upper().startswith(prefix):
-            key = var[len(prefix) :].lower()
+            key = var[len(prefix) :]
             if key:
                 keys.add(key)
 
@@ -67,11 +62,9 @@ def read_binding_keys(instance: str) -> set[str]:
 
 
 def _scan_dir(directory: str) -> set[str]:
-    """Return lowercased file names in ``directory``, or an empty set if absent."""
+    """Return file names in ``directory``, or an empty set if absent."""
     try:
-        return {
-            entry.name.lower() for entry in os.scandir(directory) if entry.is_file()
-        }
+        return {entry.name for entry in os.scandir(directory) if entry.is_file()}
     except (FileNotFoundError, NotADirectoryError, OSError):
         return set()
 
@@ -79,12 +72,8 @@ def _scan_dir(directory: str) -> set[str]:
 def detect_provider(keys: set[str]) -> ObjectStoreProvider:
     """Infer the cloud provider from a set of present binding keys.
 
-    Checks azure, gcs, then s3 (in that order) to avoid misidentifying a GCS
-    binding as S3 on the shared ``bucket``/``region`` keys.  All comparisons
-    are case-insensitive (keys are expected to already be lowercased).
-
     Args:
-        keys: Lowercased set of keys returned by ``read_binding_keys``.
+        keys: Set of keys returned by ``read_binding_keys``.
 
     Returns:
         Detected object store provider.

@@ -1,4 +1,4 @@
-"""Credential transforms and client builders for object store backends."""
+"""Credential loading for object store backends."""
 
 from typing import Union
 
@@ -39,67 +39,3 @@ def load_from_env_or_mount(
             f"failed to load objectstore configuration for instance='{instance}': {e}"
         ) from e
     return binding
-
-
-def build_azure_container_client(cfg: AzureBindingData):
-    """Build an Azure ContainerClient from binding data.
-
-    Uses the container URI directly (which already includes the container name)
-    to construct a ContainerClient — avoids double-appending the container path.
-
-    Args:
-        cfg: Azure binding credentials.
-
-    Returns:
-        Configured ContainerClient instance.
-
-    Raises:
-        ClientCreationError: If client initialisation fails.
-    """
-    try:
-        from azure.storage.blob import ContainerClient  # lazy: optional extra
-
-        return ContainerClient.from_container_url(
-            cfg.container_uri, credential=cfg.sas_token
-        )
-    except ImportError as e:
-        raise ClientCreationError(
-            "azure-storage-blob is required for Azure Object Store support. "
-            "Install it with: pip install 'sap-cloud-sdk[azure]'"
-        ) from e
-    except Exception as e:
-        raise ClientCreationError(f"Failed to create Azure ContainerClient: {e}") from e
-
-
-def build_gcs_client(cfg: GcsBindingData):
-    """Build a Google Cloud Storage Client from binding data.
-
-    Decodes the base64-encoded service-account JSON and creates a
-    storage.Client using the embedded credentials.
-
-    Args:
-        cfg: GCS binding credentials.
-
-    Returns:
-        Configured google.cloud.storage.Client instance.
-
-    Raises:
-        ClientCreationError: If client initialisation fails.
-    """
-    try:
-        import base64
-        import json
-
-        from google.cloud import storage  # lazy: optional extra
-        from google.oauth2 import service_account  # lazy: optional extra
-
-        info = json.loads(base64.b64decode(cfg.base64_encoded_private_key_data))
-        creds = service_account.Credentials.from_service_account_info(info)
-        return storage.Client(project=cfg.project_id, credentials=creds)
-    except ImportError as e:
-        raise ClientCreationError(
-            "google-cloud-storage is required for GCS Object Store support. "
-            "Install it with: pip install 'sap-cloud-sdk[gcs]'"
-        ) from e
-    except Exception as e:
-        raise ClientCreationError(f"Failed to create GCS storage client: {e}") from e

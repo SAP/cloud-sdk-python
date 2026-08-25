@@ -12,13 +12,11 @@ from minio.error import S3Error
 from sap_cloud_sdk.core.telemetry import Module, Operation, record_metrics
 from sap_cloud_sdk.objectstore._models import S3BindingData, ObjectMetadata
 from sap_cloud_sdk.objectstore._validation import (
-    EMPTY_CONTENT_TYPE_ERROR,
-    EMPTY_FILE_PATH_ERROR,
-    EMPTY_NAME_ERROR,
-    INVALID_DATA_TYPE_ERROR,
-    INVALID_PREFIX_TYPE_ERROR,
-    INVALID_STREAM_ERROR,
-    NEGATIVE_SIZE_ERROR,
+    validate_object_name,
+    validate_prefix,
+    validate_put_from_bytes,
+    validate_put_from_file,
+    validate_put_object,
 )
 from sap_cloud_sdk.objectstore.exceptions import (
     ClientCreationError,
@@ -48,7 +46,6 @@ class S3Client:
         Raises:
             ClientCreationError: If client initialization fails.
         """
-
         self._creds_config = creds_config
         self._disable_ssl = disable_ssl
         self._minio_client = self._create_minio_client()
@@ -79,12 +76,7 @@ class S3Client:
             ValueError: If any parameter is invalid
             ObjectOperationError: If the upload fails
         """
-        if not name:
-            raise ValueError(EMPTY_NAME_ERROR)
-        if not isinstance(data, bytes):
-            raise ValueError(INVALID_DATA_TYPE_ERROR)
-        if not content_type:
-            raise ValueError(EMPTY_CONTENT_TYPE_ERROR)
+        validate_put_from_bytes(name, data, content_type)
 
         try:
             self._minio_client.put_object(
@@ -117,14 +109,7 @@ class S3Client:
             ValueError: If any parameter is invalid
             ObjectOperationError: If the upload fails
         """
-        if not name:
-            raise ValueError(EMPTY_NAME_ERROR)
-        if not hasattr(stream, "read"):
-            raise ValueError(INVALID_STREAM_ERROR)
-        if size < 0:
-            raise ValueError(NEGATIVE_SIZE_ERROR)
-        if not content_type:
-            raise ValueError(EMPTY_CONTENT_TYPE_ERROR)
+        validate_put_object(name, stream, size, content_type)
 
         try:
             self._minio_client.put_object(
@@ -156,12 +141,7 @@ class S3Client:
             ValueError: If any parameter is invalid
             ObjectOperationError: If the upload fails
         """
-        if not name:
-            raise ValueError(EMPTY_NAME_ERROR)
-        if not file_path:
-            raise ValueError(EMPTY_FILE_PATH_ERROR)
-        if not content_type:
-            raise ValueError(EMPTY_CONTENT_TYPE_ERROR)
+        validate_put_from_file(name, file_path, content_type)
 
         try:
             # Check if file exists and get size
@@ -200,8 +180,7 @@ class S3Client:
             ObjectNotFoundError: If the object doesn't exist
             ObjectOperationError: If the download fails
         """
-        if not name:
-            raise ValueError(EMPTY_NAME_ERROR)
+        validate_object_name(name)
 
         try:
             response = cast(
@@ -233,8 +212,7 @@ class S3Client:
             ValueError: If name is invalid
             ObjectOperationError: If the deletion fails
         """
-        if not name:
-            raise ValueError(EMPTY_NAME_ERROR)
+        validate_object_name(name)
 
         try:
             self._minio_client.remove_object(
@@ -263,8 +241,7 @@ class S3Client:
             ValueError: If prefix is invalid
             ListObjectsError: If listing fails
         """
-        if not isinstance(prefix, str):
-            raise ValueError(INVALID_PREFIX_TYPE_ERROR)
+        validate_prefix(prefix)
 
         result = []
         try:
@@ -308,8 +285,7 @@ class S3Client:
             ObjectNotFoundError: If the object doesn't exist
             ObjectOperationError: If the operation fails
         """
-        if not name:
-            raise ValueError(EMPTY_NAME_ERROR)
+        validate_object_name(name)
 
         try:
             stat: minio.datatypes.Object = self._minio_client.stat_object(
@@ -349,8 +325,7 @@ class S3Client:
             ValueError: If name is invalid
             ObjectOperationError: If the check fails
         """
-        if not name:
-            raise ValueError(EMPTY_NAME_ERROR)
+        validate_object_name(name)
 
         try:
             self.head_object(name)

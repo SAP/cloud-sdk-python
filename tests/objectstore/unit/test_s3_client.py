@@ -45,7 +45,7 @@ class TestS3Client:
         mock_minio = Mock()
         mock_minio_class.return_value = mock_minio
 
-        client = S3Client(self.creds, disable_ssl=True)
+        S3Client(self.creds, disable_ssl=True)
 
         mock_minio_class.assert_called_once_with(
             endpoint="s3.amazonaws.com",

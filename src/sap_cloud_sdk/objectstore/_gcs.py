@@ -6,15 +6,12 @@ from typing import IO, BinaryIO, List, NoReturn
 from sap_cloud_sdk.core.telemetry import Module, Operation, record_metrics
 from sap_cloud_sdk.objectstore._models import GcsBindingData, ObjectMetadata
 from sap_cloud_sdk.objectstore._validation import (
-    EMPTY_CONTENT_TYPE_ERROR,
-    EMPTY_FILE_PATH_ERROR,
-    EMPTY_NAME_ERROR,
-    INVALID_DATA_TYPE_ERROR,
-    INVALID_PREFIX_TYPE_ERROR,
-    INVALID_STREAM_ERROR,
-    NEGATIVE_SIZE_ERROR,
+    validate_object_name,
+    validate_prefix,
+    validate_put_from_bytes,
+    validate_put_from_file,
+    validate_put_object,
 )
-from sap_cloud_sdk.objectstore.config import build_gcs_client
 from sap_cloud_sdk.objectstore.exceptions import (
     ClientCreationError,
     ListObjectsError,
@@ -40,12 +37,38 @@ class GcsClient:
             ClientCreationError: If client initialisation fails.
         """
         try:
-            self._client = build_gcs_client(creds_config)
+            self._client = self._create_storage_client(creds_config)
             self._bucket = self._client.bucket(creds_config.bucket)
         except ClientCreationError:
             raise
         except Exception as e:
             raise ClientCreationError(f"Failed to initialise GcsClient: {e}") from e
+
+    def _create_storage_client(self, cfg: GcsBindingData):
+        """Build a Google Cloud Storage Client from binding data.
+
+        Decodes the base64-encoded service-account JSON and creates a
+        storage.Client using the embedded credentials.
+        """
+        try:
+            import base64
+            import json
+
+            from google.cloud import storage  # lazy: optional extra
+            from google.oauth2 import service_account  # lazy: optional extra
+
+            info = json.loads(base64.b64decode(cfg.base64_encoded_private_key_data))
+            creds = service_account.Credentials.from_service_account_info(info)
+            return storage.Client(project=cfg.project_id, credentials=creds)
+        except ImportError as e:
+            raise ClientCreationError(
+                "google-cloud-storage is required for GCS Object Store support. "
+                "Install it with: pip install 'sap-cloud-sdk[gcs]'"
+            ) from e
+        except Exception as e:
+            raise ClientCreationError(
+                f"Failed to create GCS storage client: {e}"
+            ) from e
 
     @record_metrics(Module.OBJECTSTORE, Operation.OBJECTSTORE_PUT_OBJECT_FROM_BYTES)
     def put_object_from_bytes(self, name: str, data: bytes, content_type: str) -> None:
@@ -60,12 +83,7 @@ class GcsClient:
             ValueError: If any parameter is invalid.
             ObjectOperationError: If the upload fails.
         """
-        if not name:
-            raise ValueError(EMPTY_NAME_ERROR)
-        if not isinstance(data, bytes):
-            raise ValueError(INVALID_DATA_TYPE_ERROR)
-        if not content_type:
-            raise ValueError(EMPTY_CONTENT_TYPE_ERROR)
+        validate_put_from_bytes(name, data, content_type)
 
         try:
             blob = self._bucket.blob(name)
@@ -89,14 +107,7 @@ class GcsClient:
             ValueError: If any parameter is invalid.
             ObjectOperationError: If the upload fails.
         """
-        if not name:
-            raise ValueError(EMPTY_NAME_ERROR)
-        if not hasattr(stream, "read"):
-            raise ValueError(INVALID_STREAM_ERROR)
-        if size < 0:
-            raise ValueError(NEGATIVE_SIZE_ERROR)
-        if not content_type:
-            raise ValueError(EMPTY_CONTENT_TYPE_ERROR)
+        validate_put_object(name, stream, size, content_type)
 
         try:
             blob = self._bucket.blob(name)
@@ -119,12 +130,7 @@ class GcsClient:
             ValueError: If any parameter is invalid.
             ObjectOperationError: If the upload fails.
         """
-        if not name:
-            raise ValueError(EMPTY_NAME_ERROR)
-        if not file_path:
-            raise ValueError(EMPTY_FILE_PATH_ERROR)
-        if not content_type:
-            raise ValueError(EMPTY_CONTENT_TYPE_ERROR)
+        validate_put_from_file(name, file_path, content_type)
 
         try:
             if not os.path.isfile(file_path):
@@ -152,8 +158,7 @@ class GcsClient:
             ObjectNotFoundError: If the object does not exist.
             ObjectOperationError: If the download fails.
         """
-        if not name:
-            raise ValueError(EMPTY_NAME_ERROR)
+        validate_object_name(name)
 
         try:
             blob = self._bucket.blob(name)
@@ -173,8 +178,7 @@ class GcsClient:
             ValueError: If name is invalid.
             ObjectOperationError: If the deletion fails.
         """
-        if not name:
-            raise ValueError(EMPTY_NAME_ERROR)
+        validate_object_name(name)
 
         try:
             blob = self._bucket.blob(name)
@@ -203,8 +207,7 @@ class GcsClient:
             ValueError: If prefix is invalid.
             ListObjectsError: If listing fails.
         """
-        if not isinstance(prefix, str):
-            raise ValueError(INVALID_PREFIX_TYPE_ERROR)
+        validate_prefix(prefix)
 
         try:
             result = []
@@ -240,8 +243,7 @@ class GcsClient:
             ObjectNotFoundError: If the object does not exist.
             ObjectOperationError: If the operation fails.
         """
-        if not name:
-            raise ValueError(EMPTY_NAME_ERROR)
+        validate_object_name(name)
 
         try:
             blob = self._bucket.get_blob(name)
@@ -276,8 +278,7 @@ class GcsClient:
             ValueError: If name is invalid.
             ObjectOperationError: If the check fails.
         """
-        if not name:
-            raise ValueError(EMPTY_NAME_ERROR)
+        validate_object_name(name)
 
         try:
             self.head_object(name)

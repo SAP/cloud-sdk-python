@@ -97,9 +97,7 @@ class TestCreateClientAutoDetection:
         mock_instance = MagicMock()
         mock_s3_class.return_value = mock_instance
 
-        import sap_cloud_sdk.objectstore._factory as factory
-        with patch.dict(factory._CLIENTS, {"s3": mock_s3_class}):
-            result = create_client("default")
+        result = create_client("default")
 
         mock_read_keys.assert_called_once_with("default")
         mock_load.assert_called_once_with("s3", "default")
@@ -119,9 +117,7 @@ class TestCreateClientAutoDetection:
         mock_instance = MagicMock()
         mock_azure_class.return_value = mock_instance
 
-        import sap_cloud_sdk.objectstore._factory as factory
-        with patch.dict(factory._CLIENTS, {"azure": mock_azure_class}):
-            result = create_client("my-azure-instance")
+        result = create_client("my-azure-instance")
 
         mock_load.assert_called_once_with("azure", "my-azure-instance")
         mock_azure_class.assert_called_once_with(mock_binding)
@@ -140,9 +136,7 @@ class TestCreateClientAutoDetection:
         mock_instance = MagicMock()
         mock_gcs_class.return_value = mock_instance
 
-        import sap_cloud_sdk.objectstore._factory as factory
-        with patch.dict(factory._CLIENTS, {"gcs": mock_gcs_class}):
-            result = create_client("my-gcs-instance")
+        result = create_client("my-gcs-instance")
 
         mock_load.assert_called_once_with("gcs", "my-gcs-instance")
         mock_gcs_class.assert_called_once_with(mock_binding)

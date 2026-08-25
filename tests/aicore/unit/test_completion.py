@@ -29,7 +29,6 @@ import litellm
 import pytest
 
 from sap_cloud_sdk.aicore import acompletion, completion
-from sap_cloud_sdk.aicore.completion import reload_aicore_credentials
 from sap_cloud_sdk.aicore.filtering.exceptions import ContentFilteredError
 
 
@@ -201,18 +200,6 @@ class TestACompletionWrapper:
             with pytest.raises(_FakeAPIConnectionError) as ei:
                 asyncio.run(acompletion(model="sap/x", messages=[]))
         assert ei.value is raised
-
-
-# ---------------------------------------------------------------------------
-# reload_aicore_credentials()
-# ---------------------------------------------------------------------------
-
-
-class TestReloadAICoreCredentials:
-    def test_calls_set_aicore_config(self):
-        with patch("sap_cloud_sdk.aicore.set_aicore_config") as mock_config:
-            reload_aicore_credentials()
-        mock_config.assert_called_once_with()
 
 
 # ---------------------------------------------------------------------------

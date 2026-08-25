@@ -3925,7 +3925,7 @@ wheels = [
 
 [[package]]
 name = "sap-cloud-sdk"
-version = "0.45.0"
+version = "0.45.3"
 source = { editable = "." }
 dependencies = [
     { name = "cryptography" },
@@ -4042,8 +4042,8 @@ requires-dist = [
     { name = "opentelemetry-instrumentation-sqlalchemy", specifier = "~=0.64b0" },
     { name = "opentelemetry-instrumentation-starlette", specifier = "~=0.64b0" },
     { name = "opentelemetry-sdk", specifier = ">=1.43.0" },
-    { name = "protobuf", specifier = ">=7.0.0" },
-    { name = "protovalidate", specifier = ">=0.13.0" },
+    { name = "protobuf", specifier = ">=5.29.5" },
+    { name = "protovalidate", specifier = ">=0.14.1" },
     { name = "pydantic", specifier = "~=2.12.3" },
     { name = "pyjwt", specifier = ">=2.13.0" },
     { name = "requests", specifier = ">=2.33.0" },

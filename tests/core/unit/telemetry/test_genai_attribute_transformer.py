@@ -44,12 +44,13 @@ class TestNormalizeAttributes:
             'traceloop.association.properties.ls_provider': 'openai',
         })
 
-        transformer._normalize_attributes(span)
+        result = transformer._normalize_attributes(span)
 
-        assert span._attributes['gen_ai.request.model'] == 'gpt-4'
-        assert span._attributes['gen_ai.provider.name'] == 'openai'
+        assert result.attributes is not None
+        assert result.attributes['gen_ai.request.model'] == 'gpt-4'
+        assert result.attributes['gen_ai.provider.name'] == 'openai'
         # Fallback: response.model should be set from request.model
-        assert span._attributes['gen_ai.response.model'] == 'gpt-4'
+        assert result.attributes['gen_ai.response.model'] == 'gpt-4'
 
     def test_normalize_attributes_preserves_existing_response_model(self):
         """Test normalization preserves existing gen_ai.response.model if present."""
@@ -61,11 +62,12 @@ class TestNormalizeAttributes:
             'gen_ai.response.model': 'gpt-4-turbo',  # Already present, should not be overwritten
         })
 
-        transformer._normalize_attributes(span)
+        result = transformer._normalize_attributes(span)
 
-        assert span._attributes['gen_ai.request.model'] == 'gpt-4'
+        assert result.attributes is not None
+        assert result.attributes['gen_ai.request.model'] == 'gpt-4'
         # Should preserve the existing response.model
-        assert span._attributes['gen_ai.response.model'] == 'gpt-4-turbo'
+        assert result.attributes['gen_ai.response.model'] == 'gpt-4-turbo'
 
     def test_normalize_attributes_replaces_unknown_response_model(self):
         """Test normalization replaces 'unknown' gen_ai.response.model with request model."""
@@ -77,11 +79,12 @@ class TestNormalizeAttributes:
             'gen_ai.response.model': 'unknown',  # Should be replaced with actual model
         })
 
-        transformer._normalize_attributes(span)
+        result = transformer._normalize_attributes(span)
 
-        assert span._attributes['gen_ai.request.model'] == 'gpt-4'
+        assert result.attributes is not None
+        assert result.attributes['gen_ai.request.model'] == 'gpt-4'
         # Should replace "unknown" with actual model name
-        assert span._attributes['gen_ai.response.model'] == 'gpt-4'
+        assert result.attributes['gen_ai.response.model'] == 'gpt-4'
 
     def test_normalize_attributes_with_llm_usage(self):
         """Test normalization maps llm.usage.* to gen_ai.usage.*."""
@@ -95,11 +98,12 @@ class TestNormalizeAttributes:
             'llm.usage.output_tokens': 50,
         })
 
-        transformer._normalize_attributes(span)
+        result = transformer._normalize_attributes(span)
 
-        assert span._attributes['gen_ai.usage.total_tokens'] == 150
-        assert span._attributes['gen_ai.usage.input_tokens'] == 100
-        assert span._attributes['gen_ai.usage.output_tokens'] == 50
+        assert result.attributes is not None
+        assert result.attributes['gen_ai.usage.total_tokens'] == 150
+        assert result.attributes['gen_ai.usage.input_tokens'] == 100
+        assert result.attributes['gen_ai.usage.output_tokens'] == 50
 
     def test_normalize_attributes_with_prompt_tokens_fallback(self):
         """Test normalization uses prompt_tokens as fallback for input_tokens."""
@@ -112,10 +116,11 @@ class TestNormalizeAttributes:
             'llm.usage.completion_tokens': 50,
         })
 
-        transformer._normalize_attributes(span)
+        result = transformer._normalize_attributes(span)
 
-        assert span._attributes['gen_ai.usage.input_tokens'] == 100
-        assert span._attributes['gen_ai.usage.output_tokens'] == 50
+        assert result.attributes is not None
+        assert result.attributes['gen_ai.usage.input_tokens'] == 100
+        assert result.attributes['gen_ai.usage.output_tokens'] == 50
 
     def test_normalize_attributes_with_cache_read_tokens(self):
         """Test normalization includes cache read input tokens."""
@@ -127,9 +132,10 @@ class TestNormalizeAttributes:
             'llm.usage.cache_read_input_tokens': 25,
         })
 
-        transformer._normalize_attributes(span)
+        result = transformer._normalize_attributes(span)
 
-        assert span._attributes['gen_ai.usage.cache_read_input_tokens'] == 25
+        assert result.attributes is not None
+        assert result.attributes['gen_ai.usage.cache_read_input_tokens'] == 25
 
     def test_normalize_attributes_removes_standard_traceloop_attributes(self):
         """Test normalization removes only standard traceloop.* attributes, preserving custom ones."""
@@ -144,18 +150,19 @@ class TestNormalizeAttributes:
             'gen_ai.request.model': 'should-remain',
         })
 
-        transformer._normalize_attributes(span)
+        result = transformer._normalize_attributes(span)
 
+        assert result.attributes is not None
         # Standard traceloop.* attributes should be removed
-        assert 'traceloop.association.properties.ls_model_name' not in span._attributes
-        assert 'traceloop.association.properties.ls_provider' not in span._attributes
+        assert 'traceloop.association.properties.ls_model_name' not in result.attributes
+        assert 'traceloop.association.properties.ls_provider' not in result.attributes
 
         # Custom/proprietary traceloop.* attributes should be preserved
-        assert span._attributes.get('traceloop.custom.attribute') == 'custom_value'
-        assert span._attributes.get('traceloop.proprietary.data') == 'proprietary_value'
+        assert result.attributes.get('traceloop.custom.attribute') == 'custom_value'
+        assert result.attributes.get('traceloop.proprietary.data') == 'proprietary_value'
 
         # gen_ai attributes should remain
-        assert 'gen_ai.request.model' in span._attributes
+        assert 'gen_ai.request.model' in result.attributes
 
     def test_normalize_attributes_removes_standard_llm_attributes(self):
         """Test normalization removes only standard llm.usage.* attributes, preserving custom ones."""
@@ -170,19 +177,20 @@ class TestNormalizeAttributes:
             'llm.proprietary.business_unit': 'finance',
         })
 
-        transformer._normalize_attributes(span)
+        result = transformer._normalize_attributes(span)
 
+        assert result.attributes is not None
         # Standard llm.usage.* attributes should be removed after transformation
-        assert 'llm.usage.total_tokens' not in span._attributes
-        assert 'llm.usage.input_tokens' not in span._attributes
+        assert 'llm.usage.total_tokens' not in result.attributes
+        assert 'llm.usage.input_tokens' not in result.attributes
 
         # Custom/proprietary llm.* attributes should be preserved
-        assert span._attributes.get('llm.custom_cost_tracking') == 0.0023
-        assert span._attributes.get('llm.proprietary.business_unit') == 'finance'
+        assert result.attributes.get('llm.custom_cost_tracking') == 0.0023
+        assert result.attributes.get('llm.proprietary.business_unit') == 'finance'
 
         # gen_ai attributes should be present
-        assert 'gen_ai.usage.total_tokens' in span._attributes
-        assert 'gen_ai.usage.input_tokens' in span._attributes
+        assert 'gen_ai.usage.total_tokens' in result.attributes
+        assert 'gen_ai.usage.input_tokens' in result.attributes
 
     def test_normalize_attributes_skips_non_genai_spans(self):
         """Test normalization skips spans without traceloop or llm attributes."""
@@ -195,10 +203,10 @@ class TestNormalizeAttributes:
         }
         span = create_mock_span(original_attrs.copy())
 
-        transformer._normalize_attributes(span)
+        result = transformer._normalize_attributes(span)
 
-        # Attributes should remain unchanged
-        assert span._attributes == original_attrs
+        # Original span returned unchanged for non-GenAI spans
+        assert result is span
 
     def test_normalize_attributes_with_no_attributes(self):
         """Test normalization handles span with no attributes."""
@@ -208,8 +216,8 @@ class TestNormalizeAttributes:
         span = MagicMock()
         span.attributes = None
 
-        # Should not raise an error
-        transformer._normalize_attributes(span)
+        result = transformer._normalize_attributes(span)
+        assert result is span
 
     def test_normalize_attributes_with_no_internal_attributes(self):
         """Test normalization handles span without _attributes."""
@@ -220,8 +228,8 @@ class TestNormalizeAttributes:
         span.attributes = {'test': 'value'}
         span._attributes = None
 
-        # Should not raise an error
-        transformer._normalize_attributes(span)
+        result = transformer._normalize_attributes(span)
+        assert result is span
 
     def test_normalize_attributes_handles_non_string_values(self):
         """Test normalization handles non-string model name and provider values."""
@@ -233,11 +241,12 @@ class TestNormalizeAttributes:
             'traceloop.association.properties.ls_provider': None,
         })
 
-        transformer._normalize_attributes(span)
+        result = transformer._normalize_attributes(span)
 
+        assert result.attributes is not None
         # Should not add gen_ai attributes for non-string values
-        assert 'gen_ai.request.model' not in span._attributes
-        assert 'gen_ai.provider.name' not in span._attributes
+        assert 'gen_ai.request.model' not in result.attributes
+        assert 'gen_ai.provider.name' not in result.attributes
 
     def test_normalize_attributes_handles_empty_string_values(self):
         """Test normalization handles empty string model name and provider."""
@@ -249,11 +258,12 @@ class TestNormalizeAttributes:
             'traceloop.association.properties.ls_provider': '',
         })
 
-        transformer._normalize_attributes(span)
+        result = transformer._normalize_attributes(span)
 
+        assert result.attributes is not None
         # Should not add gen_ai attributes for empty strings
-        assert 'gen_ai.request.model' not in span._attributes
-        assert 'gen_ai.provider.name' not in span._attributes
+        assert 'gen_ai.request.model' not in result.attributes
+        assert 'gen_ai.provider.name' not in result.attributes
 
 
 class TestMapLLMUsage:
@@ -339,15 +349,17 @@ class TestExport:
 
         result = transformer.export(spans)
 
-        # Verify transformation occurred
-        assert 'gen_ai.request.model' in span._attributes
-        assert 'gen_ai.usage.total_tokens' in span._attributes
-        assert not any(k.startswith('llm.') for k in span._attributes.keys())
-        assert not any(k.startswith('traceloop.') for k in span._attributes.keys())
+        # Verify transformation occurred on the span passed to the wrapped exporter
+        exported = mock_exporter.export.call_args[0][0]
+        exported_attrs = exported[0].attributes
+        assert 'gen_ai.request.model' in exported_attrs
+        assert 'gen_ai.usage.total_tokens' in exported_attrs
+        assert not any(k.startswith('llm.') for k in exported_attrs.keys())
+        assert not any(k.startswith('traceloop.') for k in exported_attrs.keys())
         assert result == SpanExportResult.SUCCESS
 
     def test_export_non_genai_spans_unchanged(self):
-        """Test that non-GenAI spans are not transformed."""
+        """Test that non-GenAI spans are passed through unchanged."""
         mock_exporter = MagicMock()
         mock_exporter.export.return_value = SpanExportResult.SUCCESS
         transformer = GenAIAttributeTransformer(mock_exporter)
@@ -361,8 +373,9 @@ class TestExport:
 
         result = transformer.export(spans)
 
-        # Verify no transformation occurred
-        assert span._attributes == original_attrs
+        # Non-GenAI span is returned as-is (same object)
+        exported = mock_exporter.export.call_args[0][0]
+        assert exported[0] is span
         assert result == SpanExportResult.SUCCESS
 
     def test_export_handles_transformation_error(self):
@@ -396,7 +409,7 @@ class TestExport:
 
         result = transformer.export(spans)
 
-        mock_exporter.export.assert_called_once_with(spans)
+        mock_exporter.export.assert_called_once()
         assert result == SpanExportResult.SUCCESS
 
 
@@ -461,13 +474,14 @@ class TestTransformMessages:
             'gen_ai.prompt.1.content': 'You are a helpful assistant',
         })
 
-        transformer._normalize_attributes(span)
+        result = transformer._normalize_attributes(span)
 
+        assert result.attributes is not None
         # Check that gen_ai.input.messages was created
-        assert 'gen_ai.input.messages' in span._attributes
+        assert 'gen_ai.input.messages' in result.attributes
 
         # Parse and verify the JSON structure
-        messages = json.loads(span._attributes['gen_ai.input.messages'])
+        messages = json.loads(str(result.attributes['gen_ai.input.messages']))
         assert len(messages) == 2
 
         assert messages[0]['role'] == 'user'
@@ -479,7 +493,7 @@ class TestTransformMessages:
         assert messages[1]['parts'][0]['content'] == 'You are a helpful assistant'
 
         # Verify old attributes were removed
-        assert not any(k.startswith('gen_ai.prompt.') for k in span._attributes.keys())
+        assert not any(k.startswith('gen_ai.prompt.') for k in result.attributes.keys())
 
     def test_transform_output_messages(self):
         """Test transforming gen_ai.completion.* to gen_ai.output.messages."""
@@ -493,13 +507,14 @@ class TestTransformMessages:
             'gen_ai.completion.0.finish_reason': 'stop',
         })
 
-        transformer._normalize_attributes(span)
+        result = transformer._normalize_attributes(span)
 
+        assert result.attributes is not None
         # Check that gen_ai.output.messages was created
-        assert 'gen_ai.output.messages' in span._attributes
+        assert 'gen_ai.output.messages' in result.attributes
 
         # Parse and verify the JSON structure
-        messages = json.loads(span._attributes['gen_ai.output.messages'])
+        messages = json.loads(str(result.attributes['gen_ai.output.messages']))
         assert len(messages) == 1
 
         assert messages[0]['role'] == 'assistant'
@@ -508,7 +523,7 @@ class TestTransformMessages:
         assert messages[0]['finish_reason'] == 'stop'
 
         # Verify old attributes were removed
-        assert not any(k.startswith('gen_ai.completion.') for k in span._attributes.keys())
+        assert not any(k.startswith('gen_ai.completion.') for k in result.attributes.keys())
 
     def test_transform_multiple_output_messages(self):
         """Test transforming multiple completion messages."""
@@ -523,9 +538,10 @@ class TestTransformMessages:
             'gen_ai.completion.1.content': 'Second response',
         })
 
-        transformer._normalize_attributes(span)
+        result = transformer._normalize_attributes(span)
 
-        messages = json.loads(span._attributes['gen_ai.output.messages'])
+        assert result.attributes is not None
+        messages = json.loads(str(result.attributes['gen_ai.output.messages']))
         assert len(messages) == 2
         assert messages[0]['parts'][0]['content'] == 'First response'
         assert messages[1]['parts'][0]['content'] == 'Second response'
@@ -540,11 +556,12 @@ class TestTransformMessages:
             'llm.usage.total_tokens': 150,
         })
 
-        transformer._normalize_attributes(span)
+        result = transformer._normalize_attributes(span)
 
+        assert result.attributes is not None
         # Should not create message attributes
-        assert 'gen_ai.input.messages' not in span._attributes
-        assert 'gen_ai.output.messages' not in span._attributes
+        assert 'gen_ai.input.messages' not in result.attributes
+        assert 'gen_ai.output.messages' not in result.attributes
 
     def test_transform_messages_with_extra_fields(self):
         """Test that extra fields in messages are preserved."""
@@ -558,9 +575,10 @@ class TestTransformMessages:
             'gen_ai.prompt.0.custom_field': 'custom_value',
         })
 
-        transformer._normalize_attributes(span)
+        result = transformer._normalize_attributes(span)
 
-        messages = json.loads(span._attributes['gen_ai.input.messages'])
+        assert result.attributes is not None
+        messages = json.loads(str(result.attributes['gen_ai.input.messages']))
         assert messages[0]['custom_field'] == 'custom_value'
 
 
@@ -716,8 +734,9 @@ class TestIntegrationScenarios:
 
         transformer.export([span])
 
-        # Verify all transformations
-        attrs = span._attributes
+        # Verify all transformations on the exported span
+        exported = mock_exporter.export.call_args[0][0]
+        attrs = exported[0].attributes
         assert attrs['gen_ai.request.model'] == 'gpt-4'
         assert attrs['gen_ai.provider.name'] == 'openai'
         assert attrs['gen_ai.usage.total_tokens'] == 150
@@ -753,7 +772,8 @@ class TestIntegrationScenarios:
 
         transformer.export([span])
 
-        attrs = span._attributes
+        exported = mock_exporter.export.call_args[0][0]
+        attrs = exported[0].attributes
 
         # Verify basic transformations
         assert attrs['gen_ai.request.model'] == 'gpt-4'
@@ -795,10 +815,15 @@ class TestIntegrationScenarios:
 
         transformer.export([genai_span, http_span])
 
-        # GenAI span should be transformed
-        assert 'gen_ai.request.model' in genai_span._attributes
-        assert not any(k.startswith('llm.') for k in genai_span._attributes.keys())
+        exported = mock_exporter.export.call_args[0][0]
+        exported_genai = exported[0].attributes
+        exported_http = exported[1]  # returned as-is (same object)
 
-        # HTTP span should be unchanged
-        assert 'http.method' in http_span._attributes
-        assert 'gen_ai.request.model' not in http_span._attributes
+        # GenAI span should be transformed
+        assert 'gen_ai.request.model' in exported_genai
+        assert not any(k.startswith('llm.') for k in exported_genai.keys())
+
+        # HTTP span should be unchanged (same object returned)
+        assert exported_http is http_span
+        assert 'http.method' in exported_http.attributes
+        assert 'gen_ai.request.model' not in exported_http.attributes

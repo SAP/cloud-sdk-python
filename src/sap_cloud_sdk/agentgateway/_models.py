@@ -72,26 +72,28 @@ class IntegrationDependency:
 
 @dataclass
 class CustomerCredentials:
-    """Credentials for customer agent mTLS authentication.
+    """Credentials for customer agent authentication.
 
-    Loaded from the credentials file mounted on the pod filesystem.
+    Loaded from the credentials file mounted on the pod filesystem (STANDARD mode)
+    or from environment variables (TRANSPARENT mode).
     Used internally by the customer agent flow.
 
     Attributes:
         token_service_url: IAS token service endpoint URL
         client_id: IAS client ID
-        certificate: PEM-encoded client certificate
-        private_key: PEM-encoded private key
+        certificate: PEM-encoded client certificate (required for STANDARD mode, None for TRANSPARENT)
+        private_key: PEM-encoded private key (required for STANDARD mode, None for TRANSPARENT)
         gateway_url: Agent Gateway base URL
         integration_dependencies: List of MCP servers with their ord_id and global_tenant_id.
+        tls_mode: TLS authentication mode (STANDARD or TRANSPARENT)
     """
 
     token_service_url: str
     client_id: str
-    certificate: str
-    private_key: str
     gateway_url: str
     integration_dependencies: list[IntegrationDependency]
+    certificate: str | None = None
+    private_key: str | None = None
 
 
 @dataclass
@@ -149,4 +151,37 @@ class AgentCardFilter:
     """
 
     agent_names: list[str] = field(default_factory=list)
+    ord_ids: list[str] = field(default_factory=list)
+
+
+@dataclass
+class MCPToolFilter:
+    """Filter options for list_mcp_tools.
+
+    All fields are optional. When multiple fields are set they are applied
+    together (AND semantics). Empty lists are treated the same as None (no
+    filtering on that field).
+
+    Attributes:
+        names: Tool names to include (matched against MCPTool.name).
+            Applied after fetching.
+        ord_ids: ORD IDs to include (extracted from the fragment URL for LoB
+            agents, or matched against IntegrationDependency.ord_id for
+            customer agents). Applied before fetching, skipping non-matching
+            fragments.
+
+    Example:
+        ```python
+        from sap_cloud_sdk.agentgateway import MCPToolFilter
+
+        tools = await agw_client.list_mcp_tools(
+            filter=MCPToolFilter(
+                names=["get-sales-order"],
+                ord_ids=["sap.s4:apiAccess:salesOrder:v1"],
+            )
+        )
+        ```
+    """
+
+    names: list[str] = field(default_factory=list)
     ord_ids: list[str] = field(default_factory=list)

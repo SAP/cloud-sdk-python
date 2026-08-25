@@ -45,7 +45,7 @@ result = await agw_client.call_mcp_tool(
 LoB agents use BTP Destination Service for credential management. Tools and A2A agents are auto-discovered from destination fragments.
 
 ```python
-from sap_cloud_sdk.agentgateway import ClientConfig, create_client
+from sap_cloud_sdk.agentgateway import ClientConfig, MCPToolFilter, create_client
 
 config = ClientConfig(timeout=30.0)
 agw_client = create_client(tenant_subdomain="my-tenant", config=config)
@@ -53,6 +53,14 @@ agw_client = create_client(tenant_subdomain="my-tenant", config=config)
 # Discover MCP tools (auto-discovered from destination fragments)
 # Pass user_token to use principal propagation when listing tools
 tools = await agw_client.list_mcp_tools(user_token="user-jwt")
+
+# Filter by tool name (post-fetch) or ORD ID (pre-fetch)
+tools = await agw_client.list_mcp_tools(
+    filter=MCPToolFilter(
+        names=["get-sales-order"],
+        ord_ids=["sap.s4:apiAccess:salesOrder:v1"],
+    )
+)
 
 # Invoke a tool (user_token required for principal propagation)
 result = await agw_client.call_mcp_tool(
@@ -122,6 +130,20 @@ mcp_tool_to_langchain(
 )
 ```
 
+The converter maps each property's JSON Schema `"type"` to the corresponding Python type so Pydantic validates and forwards the correct native type to the MCP server:
+
+| JSON Schema type | Python type |
+| ---------------- | ----------- |
+| `"string"`       | `str`       |
+| `"integer"`      | `int`       |
+| `"number"`       | `float`     |
+| `"boolean"`      | `bool`      |
+| `"array"`        | `list`      |
+| `"object"`       | `dict`      |
+| missing / other  | `Any`       |
+
+Optional fields (not listed in `"required"`) are typed as `T | None` with a `None` default.
+
 ## Concepts
 
 ### Agent Types
@@ -135,12 +157,21 @@ The SDK automatically detects the agent type based on the presence of a credenti
 
 The SDK discovers resources via BTP Destination Service fragments filtered by the `sap-managed-runtime-type` label:
 
-| Label value | Resource |
-|---|---|
-| `agw.mcp.server` | MCP tool server — `URL` property points to the MCP endpoint |
-| `agw.a2a.server` | A2A agent — `URL` property is the agent base URL; ORD ID is extracted from the second-to-last URL path segment |
-| `subscriber.ias` | IAS credential fragment for system-scoped token acquisition |
-| `subscriber.ias.user` | IAS credential fragment for user-scoped token exchange |
+| Label value           | Resource                                                                                                       |
+| --------------------- | -------------------------------------------------------------------------------------------------------------- |
+| `agw.mcp.server`      | MCP tool server — `URL` property points to the MCP endpoint                                                    |
+| `agw.a2a.server`      | A2A agent — `URL` property is the agent base URL; ORD ID is extracted from the second-to-last URL path segment |
+| `subscriber.ias`      | IAS credential fragment for system-scoped token acquisition                                                    |
+| `subscriber.ias.user` | IAS credential fragment for user-scoped token exchange                                                         |
+
+## Multi-tenancy
+
+- **Supported:** Yes (LoB flow); N/A (Customer flow)
+- **Authentication:** IAS (IAS via Destination Service for LoB flow; mTLS for Customer flow)
+- **How to use:**
+  - **LoB flow:** Pass `tenant_subdomain` to `create_client()`. All subsequent calls on that client instance use the subscriber tenant context.
+  - **Customer flow:** N/A
+- **Further reading:** N/A
 
 ## API
 
@@ -189,14 +220,13 @@ class AgentGatewayClient:
     async def list_mcp_tools(
         self,
         user_token: str | Callable[[], str] | None = None,
-        app_tid: str | None = None,
+        filter: MCPToolFilter | None = None,
     ) -> list[MCPTool]
 
     async def call_mcp_tool(
         self,
         tool: MCPTool,
         user_token: str | Callable[[], str] | None = None,
-        app_tid: str | None = None,
         **kwargs,
     ) -> str
 
@@ -204,6 +234,22 @@ class AgentGatewayClient:
         self,
         filter: AgentCardFilter | None = None,
     ) -> list[Agent]
+
+    def get_ias_client_id(self) -> str
+```
+
+#### `get_ias_client_id()`
+
+Returns the IAS client ID. Automatically detects agent type:
+
+- **Customer agents**: reads `client_id` directly from the mounted credentials file.
+- **LoB agents**: fetches the IAS destination (`sap-managed-runtime-ias-{landscape}`) at provider subaccount level and returns the `clientId` destination property.
+
+Raises `AgentGatewaySDKError` if the value cannot be resolved.
+
+```python
+agw_client = create_client(tenant_subdomain="my-tenant")
+client_id = agw_client.get_ias_client_id()
 ```
 
 ### AgentCardFilter
@@ -213,23 +259,41 @@ from sap_cloud_sdk.agentgateway import AgentCardFilter
 
 AgentCardFilter(
     agent_names=[],  # agent card names to include (matched against card JSON `name`); empty = no filter
-    ord_ids=[],      # ORD IDs to include (extracted from fragment URL); empty = no filter
+    ord_ids=[],  # ORD IDs to include (extracted from fragment URL); empty = no filter
 )
 ```
 
-Both fields default to empty lists. Filters are applied with AND semantics: if both are set, an agent must match both to be included. `agent_names` is applied after fetching (requires reading the card); `ord_ids` is applied before fetching (extracted from the fragment URL, no card request needed).
+Both fields default to empty lists. `agent_names` is applied after fetching; `ord_ids` is applied before fetching (extracted from the fragment URL, no card request needed).
+
+### MCPToolFilter
+
+```python
+from sap_cloud_sdk.agentgateway import MCPToolFilter
+
+MCPToolFilter(
+    names=[],  # tool names to include (matched against MCPTool.name); empty = no filter
+    ord_ids=[],  # ORD IDs to include (extracted from fragment URL for LoB, or matched
+    # against IntegrationDependency.ord_id for customer agents); empty = no filter
+)
+```
+
+Both fields default to empty lists. `names` is applied after fetching; `ord_ids` is applied before fetching, skipping non-matching fragments.
+
+> Both filter classes use AND semantics: if both fields are set, a result must match all of them to be included.
 
 ### Data Models
 
 ```python
 @dataclass
 class Agent:
-    ord_id: str       # ORD ID from fragment ordId property
+    ord_id: str  # ORD ID from fragment ordId property
     agent_card: AgentCard
+
 
 @dataclass
 class AgentCard:
-    raw: dict         # full parsed JSON from /.well-known/agent-card.json
+    raw: dict  # full parsed JSON from /.well-known/agent-card.json
+
 
 @dataclass
 class MCPTool:

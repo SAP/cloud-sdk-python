@@ -262,12 +262,12 @@ class TestHttpTransport:
         monkeypatch.setattr(
             destination_module,
             "create_client",
-            lambda: destination_client,
+            lambda **_: destination_client,
         )
         monkeypatch.setattr(
             destination_module,
             "create_certificate_client",
-            lambda: cert_client,
+            lambda **_: cert_client,
         )
 
         transport = object.__new__(HttpTransport)
@@ -280,6 +280,7 @@ class TestHttpTransport:
 
         cert_path = transport._resolve_cert()
 
+        assert isinstance(cert_path, str)
         assert Path(cert_path).exists()
         assert "BEGIN RSA PRIVATE KEY" in Path(cert_path).read_text(encoding="utf-8")
         transport._session = MagicMock()
@@ -312,11 +313,11 @@ class TestHttpTransport:
         cert_client = types.SimpleNamespace(
             get_instance_certificate=lambda name: certificate
         )
-        monkeypatch.setattr(destination_module, "create_client", lambda: destination_client)
+        monkeypatch.setattr(destination_module, "create_client", lambda **_: destination_client)
         monkeypatch.setattr(
             destination_module,
             "create_certificate_client",
-            lambda: cert_client,
+            lambda **_: cert_client,
         )
 
         transport = object.__new__(HttpTransport)
@@ -329,6 +330,7 @@ class TestHttpTransport:
 
         cert_path = transport._resolve_cert()
 
+        assert isinstance(cert_path, str)
         assert Path(cert_path).exists()
         assert "BEGIN CERTIFICATE" in Path(cert_path).read_text(encoding="utf-8")
         transport._session = MagicMock()
@@ -373,7 +375,7 @@ class TestHttpTransport:
 
     def test_resolve_cert_without_config_raises(self) -> None:
         transport = object.__new__(HttpTransport)
-        transport._config = types.SimpleNamespace(
+        transport._config = types.SimpleNamespace(  # ty: ignore[invalid-assignment]
             cert=None,
             key=None,
             cert_path=None,

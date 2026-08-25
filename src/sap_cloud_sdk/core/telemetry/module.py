@@ -12,11 +12,13 @@ class Module(str, Enum):
     AICORE = "aicore"
     AUDITLOG = "auditlog"
     AUDITLOG_NG = "auditlog_ng"
+    BOOTSTRAP = "bootstrap"
     DATA_ANONYMIZATION = "data_anonymization"
     DESTINATION = "destination"
     DMS = "dms"
     EXTENSIBILITY = "extensibility"
     OBJECTSTORE = "objectstore"
+    OUTPUT_MANAGEMENT = "outputmanagement"
     PRINT = "print"
     TELEMETRY = "telemetry"
 

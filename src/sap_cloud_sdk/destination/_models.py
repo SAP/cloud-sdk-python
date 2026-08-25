@@ -413,6 +413,7 @@ class AuthToken:
         type: Token type (e.g., "Bearer", "Basic")
         value: Base64 encoded token binary content
         http_header: Dictionary with 'key' and 'value' for the prepared HTTP header
+        error: Error message returned by the Destination Service when token retrieval fails
         refresh_token: Optional base64 encoded refresh token
         scope: Optional token scopes as space-delimited string
     """
@@ -420,6 +421,7 @@ class AuthToken:
     type: str
     value: str
     http_header: Dict[str, str]
+    error: Optional[str] = None
     refresh_token: Optional[str] = None
     scope: Optional[str] = None
 
@@ -434,23 +436,28 @@ class AuthToken:
             AuthToken: Parsed auth token dataclass.
 
         Raises:
-            DestinationOperationError: If required fields are missing.
+            DestinationOperationError: If required fields are missing, or if the token
+                carries an error from the Destination Service.
         """
         token_type = obj.get("type") or ""
         value = obj.get("value") or ""
         http_header = obj.get("http_header") or {}
+        error = obj.get("error") or None
         refresh_token = obj.get("refresh_token")
         scope = obj.get("scope")
 
-        if not token_type or not value or not http_header:
+        if not error and (not token_type or not value or not http_header):
             raise DestinationOperationError(
                 "auth token is missing required fields (type/value/http_header)"
             )
+        if error and (not token_type or not value or not http_header):
+            raise DestinationOperationError(f"auth token retrieval failed: {error}")
 
         return cls(
             type=token_type,
             value=value,
             http_header=http_header,
+            error=error,
             refresh_token=refresh_token,
             scope=scope,
         )
@@ -510,6 +517,10 @@ class ConsumptionOptions:
         chain_vars: Key-value pairs for destination chain variables (X-chain-var-<name>).
             Each entry is sent as a separate "X-chain-var-<key>" header. Only applicable
             when chain_name is provided.
+        skip_token_retrieval: When True, instructs the Destination Service to skip the
+            OAuth2 token exchange and return only the destination configuration properties
+            ($skipTokenRetrieval query parameter). Useful when only destination metadata
+            is needed and token retrieval would be wasteful or cause unnecessary errors.
 
     Example:
         ```python
@@ -560,6 +571,7 @@ class ConsumptionOptions:
     code_verifier: Optional[str] = None
     chain_name: Optional[str] = None
     chain_vars: Optional[dict] = None
+    skip_token_retrieval: bool = False
 
 
 @dataclass
@@ -1000,3 +1012,8 @@ class TransparentProxyDestination:
             ```
         """
         self.headers[header.value] = value
+
+
+@dataclass
+class _DestinationInstanceConfig:
+    instanceid: str = ""

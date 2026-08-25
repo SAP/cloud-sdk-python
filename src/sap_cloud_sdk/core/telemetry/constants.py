@@ -17,7 +17,7 @@ ATTR_CLOUD_REGION = "cloud.region"
 ATTR_USER_ID = "user.id"
 
 # Attribute keys - SAP standard
-ATTR_SAP_SUBACCOUNT_ID = "sap.cld.subaccount_id"
+ATTR_SAP_SUBACCOUNT_ID = "sap.cloud.provider.subaccount_id"
 ATTR_SAP_TENANT_ID = "sap.tenancy.tenant_id"
 ATTR_SAP_SYSTEM_ROLE = "sap.cld.system_role"
 ATTR_SAP_TRIGGER_TYPE = "sap.ai.agent.trigger.type"
@@ -31,6 +31,9 @@ ATTR_MLFLOW_EXPERIMENT_ID = "mlflow.experiment_id"
 
 # Attribute keys - ORD
 ATTR_SAP_ORD_ID = "sap.ord.id"
+
+# Attribute keys - Service display name
+ATTR_SAP_SERVICE_DISPLAY_NAME = "sap.service.display_name"
 
 # Attribute keys - SAP App Foundation specific
 ATTR_CAPABILITY = "sap.cloud_sdk.capability"

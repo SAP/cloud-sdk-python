@@ -36,7 +36,9 @@ Wrap your LLM calls to add the context autoinstrumentation can't provide:
 ```python
 from sap_cloud_sdk.core.telemetry import invoke_agent_span
 
-with invoke_agent_span(provider="openai", agent_name="SupportBot", conversation_id="conv-123"):
+with invoke_agent_span(
+    provider="openai", agent_name="SupportBot", conversation_id="conv-123"
+):
     # autoinstrumented LLM call is a child of this span
     response = client.chat.completions.create(...)
 ```
@@ -46,9 +48,35 @@ with invoke_agent_span(provider="openai", agent_name="SupportBot", conversation_
 ```python
 from sap_cloud_sdk.core.telemetry import set_tenant_id
 
+
 def handle_request(request):
     set_tenant_id(extract_tenant_from_jwt(request))
 ```
+
+---
+
+## Library instrumentation
+
+`auto_instrument()` automatically instruments any supported library that is already installed in the service — no extra configuration needed. If a library is not installed, it is silently skipped.
+
+**Supported libraries:**
+
+| Library      | What is traced                           |
+|--------------|------------------------------------------|
+| `httpx`      | Outbound HTTP requests (sync and async)  |
+| `requests`   | Outbound HTTP requests                   |
+| `grpcio`     | gRPC client and server calls             |
+| `starlette`  | Inbound HTTP requests                    |
+| `fastapi`    | Inbound HTTP requests with route details |
+| `aiohttp`    | Outbound async HTTP requests             |
+| `django`     | Inbound HTTP requests                    |
+| `flask`      | Inbound HTTP requests                    |
+| `sqlalchemy` | Database queries                         |
+| `logging`    | Injects `trace_id` and `span_id` into every log record for log-trace correlation |
+
+Instrumentation activates based on what is installed in the service, not on what extras were used to install the SDK. If your service has `django` in its own requirements, the SDK will instrument it automatically.
+
+The SDK ships `opentelemetry-instrumentation-*` packages for all of the above as hard dependencies. The target frameworks themselves are optional — install them via your service's own requirements or via the SDK's convenience extras (e.g. `sap-cloud-sdk[django]`).
 
 ---
 
@@ -60,7 +88,9 @@ For operations following [OpenTelemetry GenAI conventions](https://opentelemetry
 from sap_cloud_sdk.core.telemetry import chat_span, execute_tool_span, invoke_agent_span
 
 # Agent invocation — top-level parent span for an agent turn
-with invoke_agent_span(provider="openai", agent_name="SupportBot", conversation_id="cid"):
+with invoke_agent_span(
+    provider="openai", agent_name="SupportBot", conversation_id="cid"
+):
     response = client.beta.threads.runs.create(...)
 
 # LLM chat call — use when autoinstrumentation is not available
@@ -68,7 +98,9 @@ with chat_span(model="gpt-4", provider="openai", conversation_id="cid") as span:
     response = client.chat.completions.create(...)
 
 # Tool execution
-with execute_tool_span(tool_name="get_weather", tool_type="mcp", tool_description="weather mcp server"):
+with execute_tool_span(
+    tool_name="get_weather", tool_type="mcp", tool_description="weather mcp server"
+):
     result = call_weather_api(location)
 ```
 
@@ -108,8 +140,8 @@ with extension_context(
 Available extension types:
 
 ```python
-ExtensionType.TOOL          # MCP tool call (default)
-ExtensionType.INSTRUCTION   # Instruction/prompt injection
+ExtensionType.TOOL  # MCP tool call (default)
+ExtensionType.INSTRUCTION  # Instruction/prompt injection
 ```
 
 In downstream services, read the propagated context:
@@ -119,16 +151,15 @@ from sap_cloud_sdk.core.telemetry import get_extension_context
 
 ext_ctx = get_extension_context()
 if ext_ctx:
-    print(ext_ctx["capability_id"])       # "default"
-    print(ext_ctx["extension_name"])      # "ServiceNow Extension"
-    print(ext_ctx["extension_type"])      # "tool"
+    print(ext_ctx["capability_id"])  # "default"
+    print(ext_ctx["extension_name"])  # "ServiceNow Extension"
+    print(ext_ctx["extension_type"])  # "tool"
 ```
 
 The extension baggage span processor (registered automatically by `auto_instrument()`)
 stamps `sap.extension.*` attributes on all spans created inside an
 `extension_context()` block, including spans from third-party instrumentation.
-It uses the official `BaggageSpanProcessor` from `opentelemetry-processor-baggage`
-under the hood, filtering to only propagate `sap.extension.*` baggage keys.
+It uses a built-in `BaggageSpanProcessor` under the hood to stamp baggage keys.
 
 ### Available operations
 
@@ -142,6 +173,54 @@ GenAIOperation.EXECUTE_TOOL
 GenAIOperation.CREATE_AGENT
 GenAIOperation.INVOKE_AGENT
 ```
+
+---
+
+## Logging
+
+`auto_instrument()` sets up OTel logs alongside traces and metrics. It installs a handler on the root stdlib logger so all existing `logging.getLogger(...)` calls in your app automatically ship log records to the OTel backend with the same resource attributes (service name, region, subaccount, etc.).
+
+No changes to your logging code are needed:
+
+```python
+import logging
+
+logger = logging.getLogger(__name__)
+
+logger.info("Destination fetched")
+logger.warning("Retrying request, attempt %d", attempt)
+logger.error("Failed to connect", exc_info=True)
+```
+
+### Structured fields
+
+Use `extra={}` to attach structured attributes to a log record:
+
+```python
+logger.info("Request completed", extra={"tenant_id": tid, "duration_ms": 120})
+```
+
+### Log level filtering
+
+By default all levels (`DEBUG` and above) flow through OTel. To restrict what gets exported, set the level on the root logger or any specific logger:
+
+```python
+# Only WARNING and above to OTel
+logging.getLogger().setLevel(logging.WARNING)
+
+# Or scope it to your app's logger tree
+logging.getLogger("my_app").setLevel(logging.INFO)
+```
+
+### Correlation with traces
+
+OTel logs emitted inside an active span are automatically correlated — the `trace_id` and `span_id` are injected into the log record. No extra work needed.
+
+### Third-party logging libraries
+
+The OTel handler is installed on the root stdlib `logging` logger. Any library that propagates to stdlib works automatically.
+
+Libraries that bypass stdlib entirely need a custom sink that forwards records to `logging.getLogger(...).log(...)`. The OTel handler then picks them up from there.
 
 ---
 
@@ -178,7 +257,7 @@ with invoke_agent_span(
     provider="openai",
     agent_name="SupportBot",
     attributes={"user.id": "u-456"},
-    propagate=True
+    propagate=True,
 ):
     # child spans automatically receive user.id
     with execute_tool_span("search"):
@@ -201,6 +280,7 @@ Propagation is scoped: once the parent span exits, its attributes stop propagati
 ## Complete example
 
 ```python
+import logging
 from sap_cloud_sdk.core.telemetry import (
     auto_instrument,
     invoke_agent_span,
@@ -213,25 +293,29 @@ auto_instrument()
 
 from litellm import completion
 
+logger = logging.getLogger(__name__)
+
+
 async def handle_request(query: str, user_id: str):
     set_tenant_id("bh7sjh...")
+
+    logger.info("Handling request", extra={"user_id": user_id})
 
     # Parent span carries business context for the whole agent turn.
     # Autoinstrumentation creates the child LLM span automatically.
     with invoke_agent_span(
-        provider="openai",
-        agent_name="SupportBot",
-        attributes={"user.id": user_id}
+        provider="openai", agent_name="SupportBot", attributes={"user.id": user_id}
     ):
         documents = await retrieve_knowledge_base(query)
         add_span_attribute("documents.retrieved", len(documents))
+        logger.debug("Retrieved %d documents", len(documents))
 
         response = completion(
             model="gpt-4",
             messages=[
                 {"role": "system", "content": f"Context: {documents}"},
-                {"role": "user", "content": query}
-            ]
+                {"role": "user", "content": query},
+            ],
         )
 
         return response
@@ -249,6 +333,7 @@ You can write your own by subclassing `TelemetryMiddleware`:
 
 ```python
 from sap_cloud_sdk.core.telemetry.middleware.base import TelemetryMiddleware
+
 
 class MyMiddleware(TelemetryMiddleware):
     def register(self) -> None:
@@ -285,6 +370,13 @@ auto_instrument(middlewares=[StarletteIASTelemetryMiddleware(app=app)])
 
 ---
 
+## Multi-tenancy
+
+- **Supported:** N/A
+- **Authentication:** N/A
+- **How to use:** This is an infrastructure module. `set_tenant_id()` and `StarletteIASTelemetryMiddleware` allow attaching a tenant identifier to OpenTelemetry spans as metadata, but this is observability context.
+- **Further reading:** N/A
+
 ## Configuration
 
 ### Production
@@ -307,7 +399,7 @@ export OTEL_EXPORTER_OTLP_ENDPOINT="https://otel-collector.example.com"
 
 ### Transport protocol
 
-Both traces and metrics use gRPC by default. Switch to HTTP/protobuf by setting:
+Traces, metrics, and logs all use gRPC by default. Switch to HTTP/protobuf by setting:
 
 ```bash
 export OTEL_EXPORTER_OTLP_PROTOCOL="http/protobuf"
@@ -335,7 +427,64 @@ export APPFND_CONHOS_SYSTEM_ROLE="S4HC"
 export SAP_SOLUTION_AREA="AFND"
 ```
 
-### ORD document ID
+---
+
+## Instrumenting SDK modules with `record_metrics`
+
+The `record_metrics` decorator records request and error counters for any SDK module operation. It is the standard way to add usage telemetry to a client method.
+
+```python
+from sap_cloud_sdk.core.telemetry import record_metrics
+
+
+class MyClient:
+    @record_metrics("my_module", "my_operation")
+    def my_method(self): ...
+```
+
+Each call to the decorated method increments `sap.cloud_sdk.capability.requests`. On exception it increments `sap.cloud_sdk.capability.errors` and re-raises. Metrics are emitted only when `OTEL_EXPORTER_OTLP_ENDPOINT` is set — no-op otherwise.
+
+### Using the built-in enums
+
+For modules that live inside this package, use the `Module` and `Operation` enums:
+
+```python
+from sap_cloud_sdk.core.telemetry import record_metrics, Module, Operation
+
+
+class DestinationClient:
+    @record_metrics(Module.DESTINATION, Operation.DESTINATION_GET_DESTINATION)
+    def get_destination(self, name: str): ...
+```
+
+### Using plain strings (external packages)
+
+External packages that depend on `sap-cloud-sdk` can pass plain strings directly without contributing to the enums in this repo:
+
+```python
+from sap_cloud_sdk.core.telemetry import record_metrics
+
+
+class MyExternalClient:
+    @record_metrics("my_module", "my_operation")
+    def my_method(self): ...
+```
+
+The `Module` enum values are still the canonical form for OSS modules. Plain strings are the extension point for packages that have their own release lifecycle.
+
+### Source attribution
+
+When one SDK module creates a client from another internally, set `_telemetry_source` so the metric reflects the originating module:
+
+```python
+auditlog_client = AuditLogClient(_telemetry_source=Module.OBJECTSTORE)
+```
+
+The decorator reads `_telemetry_source` from `self` (or from `__init__` kwargs) and passes it as the `source` attribute on the metric.
+
+---
+
+## ORD document ID
 
 ```bash
 export ORD_DOCUMENT_ID="sap.foo:ord-doc:v1"

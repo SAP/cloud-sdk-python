@@ -8,6 +8,7 @@ from sap_cloud_sdk.extensibility._ums_transport import (
     UmsTransport,
     _MAX_PAGES,
     ENV_CONHOS_LANDSCAPE,
+    ENV_UMS_URL,
 )
 from sap_cloud_sdk.extensibility.exceptions import TransportError
 
@@ -27,6 +28,7 @@ class TestUmsTransportPagination:
     @pytest.fixture(autouse=True)
     def _set_landscape_env(self, monkeypatch):
         monkeypatch.setenv(ENV_CONHOS_LANDSCAPE, "exttest-dev-eu12")
+        monkeypatch.setenv(ENV_UMS_URL, "https://ums.example.com")
 
     @patch("sap_cloud_sdk.extensibility._ums_transport.create_destination_client")
     def _make_transport(self, mock_dest_client, dest=None):

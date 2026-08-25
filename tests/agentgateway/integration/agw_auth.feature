@@ -55,3 +55,7 @@ Feature: Agent Gateway Auth Integration
     When I call list_mcp_tools
     And I call call_mcp_tool with the sample MCP tool and the user token
     Then the tool result should be a non-empty string
+
+  Scenario: Get IAS client ID returns a non-empty string
+    When I call get_ias_client_id
+    Then the ias_client_id should be a non-empty string

@@ -61,6 +61,7 @@ class ScenarioContext:
         self.retrieved_labels: List[Label] = []
         self.http_client: Optional[DestinationHttpClient] = None
         self.http_response = None
+        self.service_instance_id: Optional[str] = None
 
 
 @pytest.fixture
@@ -1611,7 +1612,18 @@ def create_http_client(context):
 
 @when(parsers.parse('I send a GET request to "{path}"'))
 def send_get_request(context, path):
-    context.http_response = context.http_client.request("GET", path)
+    import requests
+    try:
+        context.http_response = context.http_client.request("GET", path)
+    except (requests.exceptions.ConnectionError, requests.exceptions.Timeout) as e:
+        pytest.skip(f"External endpoint unreachable — skipping: {e}")
+
+    # skip if the echo service itself returned an error
+    if not context.http_response.ok:
+        pytest.skip(
+            f"External endpoint returned {context.http_response.status_code}: "
+            f"{context.http_response.text[:200]}"
+        )
 
 
 @then("the response contains an Authorization header")
@@ -1621,3 +1633,19 @@ def assert_authorization_header_present(context):
         f"Expected Authorization header in response, got: {list(echoed.keys())}. "
         "Check that BTP returned an auth token for the destination."
     )
+
+
+@when("I call get_service_instance_id")
+def call_get_service_instance_id(context, destination_client):
+    """Call get_service_instance_id and store the result."""
+    if not os.environ.get("CLOUD_SDK_CFG_DESTINATION_DEFAULT_INSTANCEID"):
+        pytest.skip("CLOUD_SDK_CFG_DESTINATION_DEFAULT_INSTANCEID is not set — skipping service instance ID test")
+    context.service_instance_id = destination_client.get_service_instance_id()
+
+
+@then("the service instance ID should be a non-empty string")
+def assert_service_instance_id_non_empty(context):
+    """Verify the service instance ID is a non-empty string."""
+    assert context.service_instance_id is not None
+    assert isinstance(context.service_instance_id, str)
+    assert context.service_instance_id.strip(), "Expected a non-empty service instance ID"

@@ -55,6 +55,7 @@ Usage (Customer agent):
 from sap_cloud_sdk.agentgateway._models import (
     AuthResult,
     MCPTool,
+    MCPToolFilter,
     Agent,
     AgentCard,
     AgentCardFilter,
@@ -63,6 +64,7 @@ from sap_cloud_sdk.agentgateway.config import ClientConfig
 from sap_cloud_sdk.agentgateway.agw_client import create_client, AgentGatewayClient
 from sap_cloud_sdk.agentgateway.exceptions import (
     AgentGatewaySDKError,
+    AgentGatewayServerError,
     MCPServerNotFoundError,
 )
 
@@ -77,10 +79,12 @@ __all__ = [
     # Data models
     "AuthResult",
     "MCPTool",
+    "MCPToolFilter",
     "Agent",
     "AgentCard",
     "AgentCardFilter",
     # Exceptions
     "AgentGatewaySDKError",
+    "AgentGatewayServerError",
     "MCPServerNotFoundError",
 ]

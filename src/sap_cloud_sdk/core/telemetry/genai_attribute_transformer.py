@@ -53,6 +53,8 @@ class GenAIAttributeTransformer(SpanExporter):
             "GenAI attribute transformer initialized (minimal normalization enabled)"
         )
 
+    _SUPPRESS_ATTR = "sap.cloud_sdk.suppress"
+
     def export(self, spans: Sequence[ReadableSpan]) -> SpanExportResult:
         """
         Export spans after transforming attributes.
@@ -65,6 +67,8 @@ class GenAIAttributeTransformer(SpanExporter):
         """
         transformed = []
         for span in spans:
+            if span.attributes and span.attributes.get(self._SUPPRESS_ATTR):
+                continue
             try:
                 transformed.append(self._normalize_attributes(span))
             except Exception as e:

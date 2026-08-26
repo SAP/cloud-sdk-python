@@ -7,7 +7,9 @@ from typing import MutableMapping, Any
 
 from opentelemetry.sdk.trace.export import SpanExportResult
 
-from sap_cloud_sdk.core.telemetry.genai_attribute_transformer import GenAIAttributeTransformer
+from sap_cloud_sdk.core.telemetry.genai_attribute_transformer import (
+    GenAIAttributeTransformer,
+)
 
 
 def create_mock_span(attributes: dict, name: str = "test_span") -> MagicMock:
@@ -39,158 +41,176 @@ class TestNormalizeAttributes:
         mock_exporter = MagicMock()
         transformer = GenAIAttributeTransformer(mock_exporter)
 
-        span = create_mock_span({
-            'traceloop.association.properties.ls_model_name': 'gpt-4',
-            'traceloop.association.properties.ls_provider': 'openai',
-        })
+        span = create_mock_span(
+            {
+                "traceloop.association.properties.ls_model_name": "gpt-4",
+                "traceloop.association.properties.ls_provider": "openai",
+            }
+        )
 
         result = transformer._normalize_attributes(span)
 
         assert result.attributes is not None
-        assert result.attributes['gen_ai.request.model'] == 'gpt-4'
-        assert result.attributes['gen_ai.provider.name'] == 'openai'
+        assert result.attributes["gen_ai.request.model"] == "gpt-4"
+        assert result.attributes["gen_ai.provider.name"] == "openai"
         # Fallback: response.model should be set from request.model
-        assert result.attributes['gen_ai.response.model'] == 'gpt-4'
+        assert result.attributes["gen_ai.response.model"] == "gpt-4"
 
     def test_normalize_attributes_preserves_existing_response_model(self):
         """Test normalization preserves existing gen_ai.response.model if present."""
         mock_exporter = MagicMock()
         transformer = GenAIAttributeTransformer(mock_exporter)
 
-        span = create_mock_span({
-            'traceloop.association.properties.ls_model_name': 'gpt-4',
-            'gen_ai.response.model': 'gpt-4-turbo',  # Already present, should not be overwritten
-        })
+        span = create_mock_span(
+            {
+                "traceloop.association.properties.ls_model_name": "gpt-4",
+                "gen_ai.response.model": "gpt-4-turbo",  # Already present, should not be overwritten
+            }
+        )
 
         result = transformer._normalize_attributes(span)
 
         assert result.attributes is not None
-        assert result.attributes['gen_ai.request.model'] == 'gpt-4'
+        assert result.attributes["gen_ai.request.model"] == "gpt-4"
         # Should preserve the existing response.model
-        assert result.attributes['gen_ai.response.model'] == 'gpt-4-turbo'
+        assert result.attributes["gen_ai.response.model"] == "gpt-4-turbo"
 
     def test_normalize_attributes_replaces_unknown_response_model(self):
         """Test normalization replaces 'unknown' gen_ai.response.model with request model."""
         mock_exporter = MagicMock()
         transformer = GenAIAttributeTransformer(mock_exporter)
 
-        span = create_mock_span({
-            'traceloop.association.properties.ls_model_name': 'gpt-4',
-            'gen_ai.response.model': 'unknown',  # Should be replaced with actual model
-        })
+        span = create_mock_span(
+            {
+                "traceloop.association.properties.ls_model_name": "gpt-4",
+                "gen_ai.response.model": "unknown",  # Should be replaced with actual model
+            }
+        )
 
         result = transformer._normalize_attributes(span)
 
         assert result.attributes is not None
-        assert result.attributes['gen_ai.request.model'] == 'gpt-4'
+        assert result.attributes["gen_ai.request.model"] == "gpt-4"
         # Should replace "unknown" with actual model name
-        assert result.attributes['gen_ai.response.model'] == 'gpt-4'
+        assert result.attributes["gen_ai.response.model"] == "gpt-4"
 
     def test_normalize_attributes_with_llm_usage(self):
         """Test normalization maps llm.usage.* to gen_ai.usage.*."""
         mock_exporter = MagicMock()
         transformer = GenAIAttributeTransformer(mock_exporter)
 
-        span = create_mock_span({
-            'traceloop.association.properties.ls_model_name': 'gpt-4',
-            'llm.usage.total_tokens': 150,
-            'llm.usage.input_tokens': 100,
-            'llm.usage.output_tokens': 50,
-        })
+        span = create_mock_span(
+            {
+                "traceloop.association.properties.ls_model_name": "gpt-4",
+                "llm.usage.total_tokens": 150,
+                "llm.usage.input_tokens": 100,
+                "llm.usage.output_tokens": 50,
+            }
+        )
 
         result = transformer._normalize_attributes(span)
 
         assert result.attributes is not None
-        assert result.attributes['gen_ai.usage.total_tokens'] == 150
-        assert result.attributes['gen_ai.usage.input_tokens'] == 100
-        assert result.attributes['gen_ai.usage.output_tokens'] == 50
+        assert result.attributes["gen_ai.usage.total_tokens"] == 150
+        assert result.attributes["gen_ai.usage.input_tokens"] == 100
+        assert result.attributes["gen_ai.usage.output_tokens"] == 50
 
     def test_normalize_attributes_with_prompt_tokens_fallback(self):
         """Test normalization uses prompt_tokens as fallback for input_tokens."""
         mock_exporter = MagicMock()
         transformer = GenAIAttributeTransformer(mock_exporter)
 
-        span = create_mock_span({
-            'traceloop.association.properties.ls_model_name': 'gpt-4',
-            'llm.usage.prompt_tokens': 100,
-            'llm.usage.completion_tokens': 50,
-        })
+        span = create_mock_span(
+            {
+                "traceloop.association.properties.ls_model_name": "gpt-4",
+                "llm.usage.prompt_tokens": 100,
+                "llm.usage.completion_tokens": 50,
+            }
+        )
 
         result = transformer._normalize_attributes(span)
 
         assert result.attributes is not None
-        assert result.attributes['gen_ai.usage.input_tokens'] == 100
-        assert result.attributes['gen_ai.usage.output_tokens'] == 50
+        assert result.attributes["gen_ai.usage.input_tokens"] == 100
+        assert result.attributes["gen_ai.usage.output_tokens"] == 50
 
     def test_normalize_attributes_with_cache_read_tokens(self):
         """Test normalization includes cache read input tokens."""
         mock_exporter = MagicMock()
         transformer = GenAIAttributeTransformer(mock_exporter)
 
-        span = create_mock_span({
-            'traceloop.association.properties.ls_model_name': 'gpt-4',
-            'llm.usage.cache_read_input_tokens': 25,
-        })
+        span = create_mock_span(
+            {
+                "traceloop.association.properties.ls_model_name": "gpt-4",
+                "llm.usage.cache_read_input_tokens": 25,
+            }
+        )
 
         result = transformer._normalize_attributes(span)
 
         assert result.attributes is not None
-        assert result.attributes['gen_ai.usage.cache_read_input_tokens'] == 25
+        assert result.attributes["gen_ai.usage.cache_read_input_tokens"] == 25
 
     def test_normalize_attributes_removes_standard_traceloop_attributes(self):
         """Test normalization removes only standard traceloop.* attributes, preserving custom ones."""
         mock_exporter = MagicMock()
         transformer = GenAIAttributeTransformer(mock_exporter)
 
-        span = create_mock_span({
-            'traceloop.association.properties.ls_model_name': 'gpt-4',
-            'traceloop.association.properties.ls_provider': 'openai',
-            'traceloop.custom.attribute': 'custom_value',
-            'traceloop.proprietary.data': 'proprietary_value',
-            'gen_ai.request.model': 'should-remain',
-        })
+        span = create_mock_span(
+            {
+                "traceloop.association.properties.ls_model_name": "gpt-4",
+                "traceloop.association.properties.ls_provider": "openai",
+                "traceloop.custom.attribute": "custom_value",
+                "traceloop.proprietary.data": "proprietary_value",
+                "gen_ai.request.model": "should-remain",
+            }
+        )
 
         result = transformer._normalize_attributes(span)
 
         assert result.attributes is not None
         # Standard traceloop.* attributes should be removed
-        assert 'traceloop.association.properties.ls_model_name' not in result.attributes
-        assert 'traceloop.association.properties.ls_provider' not in result.attributes
+        assert "traceloop.association.properties.ls_model_name" not in result.attributes
+        assert "traceloop.association.properties.ls_provider" not in result.attributes
 
         # Custom/proprietary traceloop.* attributes should be preserved
-        assert result.attributes.get('traceloop.custom.attribute') == 'custom_value'
-        assert result.attributes.get('traceloop.proprietary.data') == 'proprietary_value'
+        assert result.attributes.get("traceloop.custom.attribute") == "custom_value"
+        assert (
+            result.attributes.get("traceloop.proprietary.data") == "proprietary_value"
+        )
 
         # gen_ai attributes should remain
-        assert 'gen_ai.request.model' in result.attributes
+        assert "gen_ai.request.model" in result.attributes
 
     def test_normalize_attributes_removes_standard_llm_attributes(self):
         """Test normalization removes only standard llm.usage.* attributes, preserving custom ones."""
         mock_exporter = MagicMock()
         transformer = GenAIAttributeTransformer(mock_exporter)
 
-        span = create_mock_span({
-            'traceloop.association.properties.ls_model_name': 'gpt-4',
-            'llm.usage.total_tokens': 150,
-            'llm.usage.input_tokens': 100,
-            'llm.custom_cost_tracking': 0.0023,
-            'llm.proprietary.business_unit': 'finance',
-        })
+        span = create_mock_span(
+            {
+                "traceloop.association.properties.ls_model_name": "gpt-4",
+                "llm.usage.total_tokens": 150,
+                "llm.usage.input_tokens": 100,
+                "llm.custom_cost_tracking": 0.0023,
+                "llm.proprietary.business_unit": "finance",
+            }
+        )
 
         result = transformer._normalize_attributes(span)
 
         assert result.attributes is not None
         # Standard llm.usage.* attributes should be removed after transformation
-        assert 'llm.usage.total_tokens' not in result.attributes
-        assert 'llm.usage.input_tokens' not in result.attributes
+        assert "llm.usage.total_tokens" not in result.attributes
+        assert "llm.usage.input_tokens" not in result.attributes
 
         # Custom/proprietary llm.* attributes should be preserved
-        assert result.attributes.get('llm.custom_cost_tracking') == 0.0023
-        assert result.attributes.get('llm.proprietary.business_unit') == 'finance'
+        assert result.attributes.get("llm.custom_cost_tracking") == 0.0023
+        assert result.attributes.get("llm.proprietary.business_unit") == "finance"
 
         # gen_ai attributes should be present
-        assert 'gen_ai.usage.total_tokens' in result.attributes
-        assert 'gen_ai.usage.input_tokens' in result.attributes
+        assert "gen_ai.usage.total_tokens" in result.attributes
+        assert "gen_ai.usage.input_tokens" in result.attributes
 
     def test_normalize_attributes_skips_non_genai_spans(self):
         """Test normalization skips spans without traceloop or llm attributes."""
@@ -198,8 +218,8 @@ class TestNormalizeAttributes:
         transformer = GenAIAttributeTransformer(mock_exporter)
 
         original_attrs = {
-            'http.method': 'GET',
-            'http.url': 'http://example.com',
+            "http.method": "GET",
+            "http.url": "http://example.com",
         }
         span = create_mock_span(original_attrs.copy())
 
@@ -225,7 +245,7 @@ class TestNormalizeAttributes:
         transformer = GenAIAttributeTransformer(mock_exporter)
 
         span = MagicMock()
-        span.attributes = {'test': 'value'}
+        span.attributes = {"test": "value"}
         span._attributes = None
 
         result = transformer._normalize_attributes(span)
@@ -236,34 +256,38 @@ class TestNormalizeAttributes:
         mock_exporter = MagicMock()
         transformer = GenAIAttributeTransformer(mock_exporter)
 
-        span = create_mock_span({
-            'traceloop.association.properties.ls_model_name': 123,  # non-string
-            'traceloop.association.properties.ls_provider': None,
-        })
+        span = create_mock_span(
+            {
+                "traceloop.association.properties.ls_model_name": 123,  # non-string
+                "traceloop.association.properties.ls_provider": None,
+            }
+        )
 
         result = transformer._normalize_attributes(span)
 
         assert result.attributes is not None
         # Should not add gen_ai attributes for non-string values
-        assert 'gen_ai.request.model' not in result.attributes
-        assert 'gen_ai.provider.name' not in result.attributes
+        assert "gen_ai.request.model" not in result.attributes
+        assert "gen_ai.provider.name" not in result.attributes
 
     def test_normalize_attributes_handles_empty_string_values(self):
         """Test normalization handles empty string model name and provider."""
         mock_exporter = MagicMock()
         transformer = GenAIAttributeTransformer(mock_exporter)
 
-        span = create_mock_span({
-            'traceloop.association.properties.ls_model_name': '',
-            'traceloop.association.properties.ls_provider': '',
-        })
+        span = create_mock_span(
+            {
+                "traceloop.association.properties.ls_model_name": "",
+                "traceloop.association.properties.ls_provider": "",
+            }
+        )
 
         result = transformer._normalize_attributes(span)
 
         assert result.attributes is not None
         # Should not add gen_ai attributes for empty strings
-        assert 'gen_ai.request.model' not in result.attributes
-        assert 'gen_ai.provider.name' not in result.attributes
+        assert "gen_ai.request.model" not in result.attributes
+        assert "gen_ai.provider.name" not in result.attributes
 
 
 class TestMapLLMUsage:
@@ -275,18 +299,18 @@ class TestMapLLMUsage:
         transformer = GenAIAttributeTransformer(mock_exporter)
 
         attrs = {
-            'llm.usage.total_tokens': 150,
-            'llm.usage.input_tokens': 100,
-            'llm.usage.output_tokens': 50,
-            'llm.usage.cache_read_input_tokens': 25,
+            "llm.usage.total_tokens": 150,
+            "llm.usage.input_tokens": 100,
+            "llm.usage.output_tokens": 50,
+            "llm.usage.cache_read_input_tokens": 25,
         }
 
         transformer._map_llm_usage(attrs)
 
-        assert attrs['gen_ai.usage.total_tokens'] == 150
-        assert attrs['gen_ai.usage.input_tokens'] == 100
-        assert attrs['gen_ai.usage.output_tokens'] == 50
-        assert attrs['gen_ai.usage.cache_read_input_tokens'] == 25
+        assert attrs["gen_ai.usage.total_tokens"] == 150
+        assert attrs["gen_ai.usage.input_tokens"] == 100
+        assert attrs["gen_ai.usage.output_tokens"] == 50
+        assert attrs["gen_ai.usage.cache_read_input_tokens"] == 25
 
     def test_map_llm_usage_prefers_input_tokens(self):
         """Test that input_tokens is preferred over prompt_tokens."""
@@ -294,13 +318,13 @@ class TestMapLLMUsage:
         transformer = GenAIAttributeTransformer(mock_exporter)
 
         attrs = {
-            'llm.usage.input_tokens': 100,
-            'llm.usage.prompt_tokens': 200,  # should be ignored
+            "llm.usage.input_tokens": 100,
+            "llm.usage.prompt_tokens": 200,  # should be ignored
         }
 
         transformer._map_llm_usage(attrs)
 
-        assert attrs['gen_ai.usage.input_tokens'] == 100
+        assert attrs["gen_ai.usage.input_tokens"] == 100
 
     def test_map_llm_usage_prefers_output_tokens(self):
         """Test that output_tokens is preferred over completion_tokens."""
@@ -308,13 +332,13 @@ class TestMapLLMUsage:
         transformer = GenAIAttributeTransformer(mock_exporter)
 
         attrs = {
-            'llm.usage.output_tokens': 50,
-            'llm.usage.completion_tokens': 100,  # should be ignored
+            "llm.usage.output_tokens": 50,
+            "llm.usage.completion_tokens": 100,  # should be ignored
         }
 
         transformer._map_llm_usage(attrs)
 
-        assert attrs['gen_ai.usage.output_tokens'] == 50
+        assert attrs["gen_ai.usage.output_tokens"] == 50
 
     def test_map_llm_usage_partial_fields(self):
         """Test mapping with only some fields present."""
@@ -322,14 +346,14 @@ class TestMapLLMUsage:
         transformer = GenAIAttributeTransformer(mock_exporter)
 
         attrs = {
-            'llm.usage.total_tokens': 150,
+            "llm.usage.total_tokens": 150,
         }
 
         transformer._map_llm_usage(attrs)
 
-        assert attrs['gen_ai.usage.total_tokens'] == 150
-        assert 'gen_ai.usage.input_tokens' not in attrs
-        assert 'gen_ai.usage.output_tokens' not in attrs
+        assert attrs["gen_ai.usage.total_tokens"] == 150
+        assert "gen_ai.usage.input_tokens" not in attrs
+        assert "gen_ai.usage.output_tokens" not in attrs
 
 
 class TestExport:
@@ -341,10 +365,13 @@ class TestExport:
         mock_exporter.export.return_value = SpanExportResult.SUCCESS
         transformer = GenAIAttributeTransformer(mock_exporter)
 
-        span = create_mock_span({
-            'traceloop.association.properties.ls_model_name': 'gpt-4',
-            'llm.usage.total_tokens': 150,
-        }, name='chat')
+        span = create_mock_span(
+            {
+                "traceloop.association.properties.ls_model_name": "gpt-4",
+                "llm.usage.total_tokens": 150,
+            },
+            name="chat",
+        )
         spans = [span]
 
         result = transformer.export(spans)
@@ -352,10 +379,10 @@ class TestExport:
         # Verify transformation occurred on the span passed to the wrapped exporter
         exported = mock_exporter.export.call_args[0][0]
         exported_attrs = exported[0].attributes
-        assert 'gen_ai.request.model' in exported_attrs
-        assert 'gen_ai.usage.total_tokens' in exported_attrs
-        assert not any(k.startswith('llm.') for k in exported_attrs.keys())
-        assert not any(k.startswith('traceloop.') for k in exported_attrs.keys())
+        assert "gen_ai.request.model" in exported_attrs
+        assert "gen_ai.usage.total_tokens" in exported_attrs
+        assert not any(k.startswith("llm.") for k in exported_attrs.keys())
+        assert not any(k.startswith("traceloop.") for k in exported_attrs.keys())
         assert result == SpanExportResult.SUCCESS
 
     def test_export_non_genai_spans_unchanged(self):
@@ -365,8 +392,8 @@ class TestExport:
         transformer = GenAIAttributeTransformer(mock_exporter)
 
         original_attrs = {
-            'http.method': 'GET',
-            'http.url': 'http://example.com',
+            "http.method": "GET",
+            "http.url": "http://example.com",
         }
         span = create_mock_span(original_attrs.copy())
         spans = [span]
@@ -386,10 +413,10 @@ class TestExport:
 
         # Create span that will cause error during transformation
         span = MagicMock()
-        span.attributes = {'traceloop.association.properties.ls_model_name': 'gpt-4'}
-        span.name = 'chat'
+        span.attributes = {"traceloop.association.properties.ls_model_name": "gpt-4"}
+        span.name = "chat"
         # Missing _attributes will cause error
-        delattr(span, '_attributes')
+        delattr(span, "_attributes")
 
         spans = [span]
 
@@ -404,13 +431,41 @@ class TestExport:
         mock_exporter.export.return_value = SpanExportResult.SUCCESS
         transformer = GenAIAttributeTransformer(mock_exporter)
 
-        span = create_mock_span({'http.method': 'GET'})
+        span = create_mock_span({"http.method": "GET"})
         spans = [span]
 
         result = transformer.export(spans)
 
         mock_exporter.export.assert_called_once()
         assert result == SpanExportResult.SUCCESS
+
+    def test_export_suppresses_marked_spans(self):
+        """Spans with sap.cloud_sdk.suppress=True are not forwarded to the wrapped exporter."""
+        mock_exporter = MagicMock()
+        mock_exporter.export.return_value = SpanExportResult.SUCCESS
+        transformer = GenAIAttributeTransformer(mock_exporter)
+
+        suppressed = create_mock_span(
+            {"sap.cloud_sdk.suppress": True, "http.url": "https://gw/v1/mcp/call"}
+        )
+        normal = create_mock_span({"http.method": "GET"})
+
+        transformer.export([suppressed, normal])
+
+        exported = mock_exporter.export.call_args[0][0]
+        assert suppressed not in exported
+        assert normal in exported
+
+    def test_export_suppressed_only_returns_success_with_empty_list(self):
+        """When all spans are suppressed, the wrapped exporter still receives an empty list."""
+        mock_exporter = MagicMock()
+        mock_exporter.export.return_value = SpanExportResult.SUCCESS
+        transformer = GenAIAttributeTransformer(mock_exporter)
+
+        suppressed = create_mock_span({"sap.cloud_sdk.suppress": True})
+        transformer.export([suppressed])
+
+        mock_exporter.export.assert_called_once_with([])
 
 
 class TestShutdownAndForceFlush:
@@ -466,120 +521,132 @@ class TestTransformMessages:
         mock_exporter = MagicMock()
         transformer = GenAIAttributeTransformer(mock_exporter)
 
-        span = create_mock_span({
-            'traceloop.association.properties.ls_model_name': 'gpt-4',
-            'gen_ai.prompt.0.role': 'user',
-            'gen_ai.prompt.0.content': 'What is Application Foundation?',
-            'gen_ai.prompt.1.role': 'system',
-            'gen_ai.prompt.1.content': 'You are a helpful assistant',
-        })
+        span = create_mock_span(
+            {
+                "traceloop.association.properties.ls_model_name": "gpt-4",
+                "gen_ai.prompt.0.role": "user",
+                "gen_ai.prompt.0.content": "What is Application Foundation?",
+                "gen_ai.prompt.1.role": "system",
+                "gen_ai.prompt.1.content": "You are a helpful assistant",
+            }
+        )
 
         result = transformer._normalize_attributes(span)
 
         assert result.attributes is not None
         # Check that gen_ai.input.messages was created
-        assert 'gen_ai.input.messages' in result.attributes
+        assert "gen_ai.input.messages" in result.attributes
 
         # Parse and verify the JSON structure
-        messages = json.loads(str(result.attributes['gen_ai.input.messages']))
+        messages = json.loads(str(result.attributes["gen_ai.input.messages"]))
         assert len(messages) == 2
 
-        assert messages[0]['role'] == 'user'
-        assert messages[0]['parts'][0]['type'] == 'text'
-        assert messages[0]['parts'][0]['content'] == 'What is Application Foundation?'
+        assert messages[0]["role"] == "user"
+        assert messages[0]["parts"][0]["type"] == "text"
+        assert messages[0]["parts"][0]["content"] == "What is Application Foundation?"
 
-        assert messages[1]['role'] == 'system'
-        assert messages[1]['parts'][0]['type'] == 'text'
-        assert messages[1]['parts'][0]['content'] == 'You are a helpful assistant'
+        assert messages[1]["role"] == "system"
+        assert messages[1]["parts"][0]["type"] == "text"
+        assert messages[1]["parts"][0]["content"] == "You are a helpful assistant"
 
         # Verify old attributes were removed
-        assert not any(k.startswith('gen_ai.prompt.') for k in result.attributes.keys())
+        assert not any(k.startswith("gen_ai.prompt.") for k in result.attributes.keys())
 
     def test_transform_output_messages(self):
         """Test transforming gen_ai.completion.* to gen_ai.output.messages."""
         mock_exporter = MagicMock()
         transformer = GenAIAttributeTransformer(mock_exporter)
 
-        span = create_mock_span({
-            'traceloop.association.properties.ls_model_name': 'gpt-4',
-            'gen_ai.completion.0.role': 'assistant',
-            'gen_ai.completion.0.content': 'Application Foundation is...',
-            'gen_ai.completion.0.finish_reason': 'stop',
-        })
+        span = create_mock_span(
+            {
+                "traceloop.association.properties.ls_model_name": "gpt-4",
+                "gen_ai.completion.0.role": "assistant",
+                "gen_ai.completion.0.content": "Application Foundation is...",
+                "gen_ai.completion.0.finish_reason": "stop",
+            }
+        )
 
         result = transformer._normalize_attributes(span)
 
         assert result.attributes is not None
         # Check that gen_ai.output.messages was created
-        assert 'gen_ai.output.messages' in result.attributes
+        assert "gen_ai.output.messages" in result.attributes
 
         # Parse and verify the JSON structure
-        messages = json.loads(str(result.attributes['gen_ai.output.messages']))
+        messages = json.loads(str(result.attributes["gen_ai.output.messages"]))
         assert len(messages) == 1
 
-        assert messages[0]['role'] == 'assistant'
-        assert messages[0]['parts'][0]['type'] == 'text'
-        assert messages[0]['parts'][0]['content'] == 'Application Foundation is...'
-        assert messages[0]['finish_reason'] == 'stop'
+        assert messages[0]["role"] == "assistant"
+        assert messages[0]["parts"][0]["type"] == "text"
+        assert messages[0]["parts"][0]["content"] == "Application Foundation is..."
+        assert messages[0]["finish_reason"] == "stop"
 
         # Verify old attributes were removed
-        assert not any(k.startswith('gen_ai.completion.') for k in result.attributes.keys())
+        assert not any(
+            k.startswith("gen_ai.completion.") for k in result.attributes.keys()
+        )
 
     def test_transform_multiple_output_messages(self):
         """Test transforming multiple completion messages."""
         mock_exporter = MagicMock()
         transformer = GenAIAttributeTransformer(mock_exporter)
 
-        span = create_mock_span({
-            'traceloop.association.properties.ls_model_name': 'gpt-4',
-            'gen_ai.completion.0.role': 'assistant',
-            'gen_ai.completion.0.content': 'First response',
-            'gen_ai.completion.1.role': 'assistant',
-            'gen_ai.completion.1.content': 'Second response',
-        })
+        span = create_mock_span(
+            {
+                "traceloop.association.properties.ls_model_name": "gpt-4",
+                "gen_ai.completion.0.role": "assistant",
+                "gen_ai.completion.0.content": "First response",
+                "gen_ai.completion.1.role": "assistant",
+                "gen_ai.completion.1.content": "Second response",
+            }
+        )
 
         result = transformer._normalize_attributes(span)
 
         assert result.attributes is not None
-        messages = json.loads(str(result.attributes['gen_ai.output.messages']))
+        messages = json.loads(str(result.attributes["gen_ai.output.messages"]))
         assert len(messages) == 2
-        assert messages[0]['parts'][0]['content'] == 'First response'
-        assert messages[1]['parts'][0]['content'] == 'Second response'
+        assert messages[0]["parts"][0]["content"] == "First response"
+        assert messages[1]["parts"][0]["content"] == "Second response"
 
     def test_transform_no_messages(self):
         """Test that transformation works when no message attributes present."""
         mock_exporter = MagicMock()
         transformer = GenAIAttributeTransformer(mock_exporter)
 
-        span = create_mock_span({
-            'traceloop.association.properties.ls_model_name': 'gpt-4',
-            'llm.usage.total_tokens': 150,
-        })
+        span = create_mock_span(
+            {
+                "traceloop.association.properties.ls_model_name": "gpt-4",
+                "llm.usage.total_tokens": 150,
+            }
+        )
 
         result = transformer._normalize_attributes(span)
 
         assert result.attributes is not None
         # Should not create message attributes
-        assert 'gen_ai.input.messages' not in result.attributes
-        assert 'gen_ai.output.messages' not in result.attributes
+        assert "gen_ai.input.messages" not in result.attributes
+        assert "gen_ai.output.messages" not in result.attributes
 
     def test_transform_messages_with_extra_fields(self):
         """Test that extra fields in messages are preserved."""
         mock_exporter = MagicMock()
         transformer = GenAIAttributeTransformer(mock_exporter)
 
-        span = create_mock_span({
-            'traceloop.association.properties.ls_model_name': 'gpt-4',
-            'gen_ai.prompt.0.role': 'user',
-            'gen_ai.prompt.0.content': 'Hello',
-            'gen_ai.prompt.0.custom_field': 'custom_value',
-        })
+        span = create_mock_span(
+            {
+                "traceloop.association.properties.ls_model_name": "gpt-4",
+                "gen_ai.prompt.0.role": "user",
+                "gen_ai.prompt.0.content": "Hello",
+                "gen_ai.prompt.0.custom_field": "custom_value",
+            }
+        )
 
         result = transformer._normalize_attributes(span)
 
         assert result.attributes is not None
-        messages = json.loads(str(result.attributes['gen_ai.input.messages']))
-        assert messages[0]['custom_field'] == 'custom_value'
+        messages = json.loads(str(result.attributes["gen_ai.input.messages"]))
+        assert messages[0]["custom_field"] == "custom_value"
 
 
 class TestCollectIndexedAttributes:
@@ -591,17 +658,17 @@ class TestCollectIndexedAttributes:
         transformer = GenAIAttributeTransformer(mock_exporter)
 
         attrs = {
-            'gen_ai.prompt.0.role': 'user',
-            'gen_ai.prompt.0.content': 'Hello',
-            'gen_ai.prompt.1.role': 'assistant',
-            'gen_ai.prompt.1.content': 'Hi',
+            "gen_ai.prompt.0.role": "user",
+            "gen_ai.prompt.0.content": "Hello",
+            "gen_ai.prompt.1.role": "assistant",
+            "gen_ai.prompt.1.content": "Hi",
         }
 
-        result = transformer._collect_indexed_attributes(attrs, 'gen_ai.prompt.')
+        result = transformer._collect_indexed_attributes(attrs, "gen_ai.prompt.")
 
         assert len(result) == 2
-        assert result[0] == {'role': 'user', 'content': 'Hello'}
-        assert result[1] == {'role': 'assistant', 'content': 'Hi'}
+        assert result[0] == {"role": "user", "content": "Hello"}
+        assert result[1] == {"role": "assistant", "content": "Hi"}
 
     def test_collect_indexed_attributes_empty(self):
         """Test collection with no matching attributes."""
@@ -609,11 +676,11 @@ class TestCollectIndexedAttributes:
         transformer = GenAIAttributeTransformer(mock_exporter)
 
         attrs = {
-            'http.method': 'GET',
-            'http.url': 'http://example.com',
+            "http.method": "GET",
+            "http.url": "http://example.com",
         }
 
-        result = transformer._collect_indexed_attributes(attrs, 'gen_ai.prompt.')
+        result = transformer._collect_indexed_attributes(attrs, "gen_ai.prompt.")
 
         assert len(result) == 0
 
@@ -623,12 +690,12 @@ class TestCollectIndexedAttributes:
         transformer = GenAIAttributeTransformer(mock_exporter)
 
         attrs = {
-            'gen_ai.prompt.notanumber.role': 'user',
-            'gen_ai.prompt.0': 'missing_field',
-            'gen_ai.prompt.': 'no_index',
+            "gen_ai.prompt.notanumber.role": "user",
+            "gen_ai.prompt.0": "missing_field",
+            "gen_ai.prompt.": "no_index",
         }
 
-        result = transformer._collect_indexed_attributes(attrs, 'gen_ai.prompt.')
+        result = transformer._collect_indexed_attributes(attrs, "gen_ai.prompt.")
 
         # Should skip invalid formats
         assert len(result) == 0
@@ -643,16 +710,16 @@ class TestStructureMessages:
         transformer = GenAIAttributeTransformer(mock_exporter)
 
         indexed_messages = {
-            0: {'role': 'user', 'content': 'Hello'},
-            1: {'role': 'assistant', 'content': 'Hi'},
+            0: {"role": "user", "content": "Hello"},
+            1: {"role": "assistant", "content": "Hi"},
         }
 
         result = transformer._structure_messages(indexed_messages)
 
         assert len(result) == 2
-        assert result[0]['role'] == 'user'
-        assert result[0]['parts'][0]['type'] == 'text'
-        assert result[0]['parts'][0]['content'] == 'Hello'
+        assert result[0]["role"] == "user"
+        assert result[0]["parts"][0]["type"] == "text"
+        assert result[0]["parts"][0]["content"] == "Hello"
 
     def test_structure_messages_with_finish_reason(self):
         """Test structuring messages with finish_reason."""
@@ -660,12 +727,12 @@ class TestStructureMessages:
         transformer = GenAIAttributeTransformer(mock_exporter)
 
         indexed_messages = {
-            0: {'role': 'assistant', 'content': 'Response', 'finish_reason': 'stop'},
+            0: {"role": "assistant", "content": "Response", "finish_reason": "stop"},
         }
 
         result = transformer._structure_messages(indexed_messages)
 
-        assert result[0]['finish_reason'] == 'stop'
+        assert result[0]["finish_reason"] == "stop"
 
     def test_structure_messages_missing_content(self):
         """Test structuring messages without content field."""
@@ -673,13 +740,13 @@ class TestStructureMessages:
         transformer = GenAIAttributeTransformer(mock_exporter)
 
         indexed_messages = {
-            0: {'role': 'user'},
+            0: {"role": "user"},
         }
 
         result = transformer._structure_messages(indexed_messages)
 
-        assert result[0]['role'] == 'user'
-        assert len(result[0]['parts']) == 0
+        assert result[0]["role"] == "user"
+        assert len(result[0]["parts"]) == 0
 
     def test_structure_messages_default_role(self):
         """Test structuring messages without role uses default."""
@@ -687,12 +754,12 @@ class TestStructureMessages:
         transformer = GenAIAttributeTransformer(mock_exporter)
 
         indexed_messages = {
-            0: {'content': 'Hello'},
+            0: {"content": "Hello"},
         }
 
         result = transformer._structure_messages(indexed_messages)
 
-        assert result[0]['role'] == 'user'
+        assert result[0]["role"] == "user"
 
     def test_structure_messages_preserves_order(self):
         """Test that messages are ordered by index."""
@@ -700,17 +767,17 @@ class TestStructureMessages:
         transformer = GenAIAttributeTransformer(mock_exporter)
 
         indexed_messages = {
-            2: {'role': 'system', 'content': 'Third'},
-            0: {'role': 'user', 'content': 'First'},
-            1: {'role': 'assistant', 'content': 'Second'},
+            2: {"role": "system", "content": "Third"},
+            0: {"role": "user", "content": "First"},
+            1: {"role": "assistant", "content": "Second"},
         }
 
         result = transformer._structure_messages(indexed_messages)
 
         assert len(result) == 3
-        assert result[0]['parts'][0]['content'] == 'First'
-        assert result[1]['parts'][0]['content'] == 'Second'
-        assert result[2]['parts'][0]['content'] == 'Third'
+        assert result[0]["parts"][0]["content"] == "First"
+        assert result[1]["parts"][0]["content"] == "Second"
+        assert result[2]["parts"][0]["content"] == "Third"
 
 
 class TestIntegrationScenarios:
@@ -722,36 +789,39 @@ class TestIntegrationScenarios:
         mock_exporter.export.return_value = SpanExportResult.SUCCESS
         transformer = GenAIAttributeTransformer(mock_exporter)
 
-        span = create_mock_span({
-            'traceloop.association.properties.ls_model_name': 'gpt-4',
-            'traceloop.association.properties.ls_provider': 'openai',
-            'llm.usage.total_tokens': 150,
-            'llm.usage.input_tokens': 100,
-            'llm.usage.output_tokens': 50,
-            'llm.custom_cost_tracking': 0.0023,
-            'traceloop.custom_session_id': 'session-123',
-        }, name='ChatCompletion')
+        span = create_mock_span(
+            {
+                "traceloop.association.properties.ls_model_name": "gpt-4",
+                "traceloop.association.properties.ls_provider": "openai",
+                "llm.usage.total_tokens": 150,
+                "llm.usage.input_tokens": 100,
+                "llm.usage.output_tokens": 50,
+                "llm.custom_cost_tracking": 0.0023,
+                "traceloop.custom_session_id": "session-123",
+            },
+            name="ChatCompletion",
+        )
 
         transformer.export([span])
 
         # Verify all transformations on the exported span
         exported = mock_exporter.export.call_args[0][0]
         attrs = exported[0].attributes
-        assert attrs['gen_ai.request.model'] == 'gpt-4'
-        assert attrs['gen_ai.provider.name'] == 'openai'
-        assert attrs['gen_ai.usage.total_tokens'] == 150
-        assert attrs['gen_ai.usage.input_tokens'] == 100
-        assert attrs['gen_ai.usage.output_tokens'] == 50
+        assert attrs["gen_ai.request.model"] == "gpt-4"
+        assert attrs["gen_ai.provider.name"] == "openai"
+        assert attrs["gen_ai.usage.total_tokens"] == 150
+        assert attrs["gen_ai.usage.input_tokens"] == 100
+        assert attrs["gen_ai.usage.output_tokens"] == 50
 
         # Verify standard llm.usage.* and traceloop.association.* attributes were removed
-        assert 'llm.usage.total_tokens' not in attrs
-        assert 'llm.usage.input_tokens' not in attrs
-        assert 'traceloop.association.properties.ls_model_name' not in attrs
-        assert 'traceloop.association.properties.ls_provider' not in attrs
+        assert "llm.usage.total_tokens" not in attrs
+        assert "llm.usage.input_tokens" not in attrs
+        assert "traceloop.association.properties.ls_model_name" not in attrs
+        assert "traceloop.association.properties.ls_provider" not in attrs
 
         # Verify custom attributes were preserved
-        assert attrs.get('llm.custom_cost_tracking') == 0.0023
-        assert attrs.get('traceloop.custom_session_id') == 'session-123'
+        assert attrs.get("llm.custom_cost_tracking") == 0.0023
+        assert attrs.get("traceloop.custom_session_id") == "session-123"
 
     def test_full_transformation_with_messages(self):
         """Test complete transformation including message conversion."""
@@ -759,16 +829,19 @@ class TestIntegrationScenarios:
         mock_exporter.export.return_value = SpanExportResult.SUCCESS
         transformer = GenAIAttributeTransformer(mock_exporter)
 
-        span = create_mock_span({
-            'traceloop.association.properties.ls_model_name': 'gpt-4',
-            'traceloop.association.properties.ls_provider': 'openai',
-            'gen_ai.prompt.0.role': 'user',
-            'gen_ai.prompt.0.content': 'What is AI?',
-            'gen_ai.completion.0.role': 'assistant',
-            'gen_ai.completion.0.content': 'AI is...',
-            'gen_ai.completion.0.finish_reason': 'stop',
-            'llm.usage.total_tokens': 150,
-        }, name='ChatCompletion')
+        span = create_mock_span(
+            {
+                "traceloop.association.properties.ls_model_name": "gpt-4",
+                "traceloop.association.properties.ls_provider": "openai",
+                "gen_ai.prompt.0.role": "user",
+                "gen_ai.prompt.0.content": "What is AI?",
+                "gen_ai.completion.0.role": "assistant",
+                "gen_ai.completion.0.content": "AI is...",
+                "gen_ai.completion.0.finish_reason": "stop",
+                "llm.usage.total_tokens": 150,
+            },
+            name="ChatCompletion",
+        )
 
         transformer.export([span])
 
@@ -776,27 +849,27 @@ class TestIntegrationScenarios:
         attrs = exported[0].attributes
 
         # Verify basic transformations
-        assert attrs['gen_ai.request.model'] == 'gpt-4'
-        assert attrs['gen_ai.provider.name'] == 'openai'
+        assert attrs["gen_ai.request.model"] == "gpt-4"
+        assert attrs["gen_ai.provider.name"] == "openai"
 
         # Verify message transformations
-        assert 'gen_ai.input.messages' in attrs
-        assert 'gen_ai.output.messages' in attrs
+        assert "gen_ai.input.messages" in attrs
+        assert "gen_ai.output.messages" in attrs
 
-        input_messages = json.loads(attrs['gen_ai.input.messages'])
+        input_messages = json.loads(attrs["gen_ai.input.messages"])
         assert len(input_messages) == 1
-        assert input_messages[0]['role'] == 'user'
+        assert input_messages[0]["role"] == "user"
 
-        output_messages = json.loads(attrs['gen_ai.output.messages'])
+        output_messages = json.loads(attrs["gen_ai.output.messages"])
         assert len(output_messages) == 1
-        assert output_messages[0]['role'] == 'assistant'
-        assert output_messages[0]['finish_reason'] == 'stop'
+        assert output_messages[0]["role"] == "assistant"
+        assert output_messages[0]["finish_reason"] == "stop"
 
         # Verify all old attributes were removed
-        assert not any(key.startswith('llm.') for key in attrs.keys())
-        assert not any(key.startswith('traceloop.') for key in attrs.keys())
-        assert not any(key.startswith('gen_ai.prompt.') for key in attrs.keys())
-        assert not any(key.startswith('gen_ai.completion.') for key in attrs.keys())
+        assert not any(key.startswith("llm.") for key in attrs.keys())
+        assert not any(key.startswith("traceloop.") for key in attrs.keys())
+        assert not any(key.startswith("gen_ai.prompt.") for key in attrs.keys())
+        assert not any(key.startswith("gen_ai.completion.") for key in attrs.keys())
 
     def test_mixed_genai_and_non_genai_spans(self):
         """Test exporting mix of GenAI and non-GenAI spans."""
@@ -804,14 +877,20 @@ class TestIntegrationScenarios:
         mock_exporter.export.return_value = SpanExportResult.SUCCESS
         transformer = GenAIAttributeTransformer(mock_exporter)
 
-        genai_span = create_mock_span({
-            'traceloop.association.properties.ls_model_name': 'gpt-4',
-            'llm.usage.total_tokens': 150,
-        }, name='chat')
+        genai_span = create_mock_span(
+            {
+                "traceloop.association.properties.ls_model_name": "gpt-4",
+                "llm.usage.total_tokens": 150,
+            },
+            name="chat",
+        )
 
-        http_span = create_mock_span({
-            'http.method': 'GET',
-        }, name='http_request')
+        http_span = create_mock_span(
+            {
+                "http.method": "GET",
+            },
+            name="http_request",
+        )
 
         transformer.export([genai_span, http_span])
 
@@ -820,10 +899,10 @@ class TestIntegrationScenarios:
         exported_http = exported[1]  # returned as-is (same object)
 
         # GenAI span should be transformed
-        assert 'gen_ai.request.model' in exported_genai
-        assert not any(k.startswith('llm.') for k in exported_genai.keys())
+        assert "gen_ai.request.model" in exported_genai
+        assert not any(k.startswith("llm.") for k in exported_genai.keys())
 
         # HTTP span should be unchanged (same object returned)
         assert exported_http is http_span
-        assert 'http.method' in exported_http.attributes
-        assert 'gen_ai.request.model' not in exported_http.attributes
+        assert "http.method" in exported_http.attributes
+        assert "gen_ai.request.model" not in exported_http.attributes

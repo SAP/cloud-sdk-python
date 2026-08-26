@@ -22,6 +22,20 @@ from sap_cloud_sdk.core.telemetry.constants import (
     SDK_NAME,
 )
 
+# Registry of extra resource attributes contributed by companion SDKs.
+# Populated via register_sdk_resource_attributes() at import time of those SDKs.
+_extra_sdk_attributes: dict = {}
+
+
+def register_sdk_resource_attributes(attributes: dict) -> None:
+    """Register additional OTel resource attributes to be included in every provider.
+
+    Companion SDKs (e.g. sap-internal-sdk) call this once at import time so their
+    version appears on every span and metric without any change to agent startup code.
+    """
+    _extra_sdk_attributes.update(attributes)
+
+
 # Default attribute values
 DEFAULT_UNKNOWN = "unknown"
 
@@ -171,6 +185,8 @@ def create_resource_attributes_from_env() -> dict:
     service_display_name = _get_service_display_name()
     if service_display_name is not None:
         attributes[ATTR_SAP_SERVICE_DISPLAY_NAME] = service_display_name
+
+    attributes.update(_extra_sdk_attributes)
 
     return attributes
 

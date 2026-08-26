@@ -16,6 +16,7 @@ from sap_cloud_sdk.core.telemetry.operation import Operation
 from sap_cloud_sdk.core.telemetry.genai_operation import GenAIOperation
 from sap_cloud_sdk.core.telemetry.metrics_decorator import record_metrics
 from sap_cloud_sdk.core.telemetry.auto_instrument import auto_instrument
+from sap_cloud_sdk.core.telemetry.config import register_sdk_resource_attributes
 from sap_cloud_sdk.core.telemetry.tracer import (
     context_overlay,
     get_current_span,
@@ -67,6 +68,7 @@ __all__ = [
     "set_tenant_id",
     "get_tenant_id",
     "auto_instrument",
+    "register_sdk_resource_attributes",
     "context_overlay",
     "get_current_span",
     "add_span_attribute",

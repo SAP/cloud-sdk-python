@@ -7,6 +7,8 @@ from sap_cloud_sdk.core.telemetry.config import (
     create_resource_attributes_from_env,
     get_config,
     set_config,
+    register_sdk_resource_attributes,
+    _extra_sdk_attributes,
 )
 from sap_cloud_sdk.core.telemetry.constants import (
     ATTR_MLFLOW_EXPERIMENT_ID,
@@ -299,3 +301,40 @@ class TestCreateResourceAttributesFromEnv:
 
             assert attrs[ATTR_SAP_SERVICE_DISPLAY_NAME] == "My Service"
             assert attrs[ATTR_SAP_ORD_ID] == "my-ord-id"
+
+
+class TestRegisterSdkResourceAttributes:
+    """Tests for the companion-SDK resource attribute registry."""
+
+    def setup_method(self):
+        _extra_sdk_attributes.clear()
+
+    def teardown_method(self):
+        _extra_sdk_attributes.clear()
+
+    def test_registered_attributes_appear_in_resource(self):
+        register_sdk_resource_attributes({"sap.internal_sdk.version": "1.0.0"})
+        attrs = create_resource_attributes_from_env()
+        assert attrs["sap.internal_sdk.version"] == "1.0.0"
+
+    def test_multiple_registrations_are_merged(self):
+        register_sdk_resource_attributes({"sap.foo.version": "1.0"})
+        register_sdk_resource_attributes({"sap.bar.version": "2.0"})
+        attrs = create_resource_attributes_from_env()
+        assert attrs["sap.foo.version"] == "1.0"
+        assert attrs["sap.bar.version"] == "2.0"
+
+    def test_registered_attributes_do_not_override_cloud_sdk_keys(self):
+        from sap_cloud_sdk.core.telemetry.constants import ATTR_SAP_SDK_VERSION
+        original = create_resource_attributes_from_env()[ATTR_SAP_SDK_VERSION]
+        register_sdk_resource_attributes({ATTR_SAP_SDK_VERSION: "999"})
+        attrs = create_resource_attributes_from_env()
+        assert attrs[ATTR_SAP_SDK_VERSION] == "999"
+        _extra_sdk_attributes.clear()
+        assert create_resource_attributes_from_env()[ATTR_SAP_SDK_VERSION] == original
+
+    def test_empty_registry_does_not_affect_output(self):
+        attrs_without = create_resource_attributes_from_env()
+        register_sdk_resource_attributes({})
+        attrs_with = create_resource_attributes_from_env()
+        assert attrs_without == attrs_with

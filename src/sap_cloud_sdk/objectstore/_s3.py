@@ -10,7 +10,8 @@ from minio import Minio
 from minio.error import S3Error
 
 from sap_cloud_sdk.core.telemetry import Module, Operation, record_metrics
-from sap_cloud_sdk.objectstore._models import S3BindingData, ObjectMetadata
+from sap_cloud_sdk.objectstore.config import S3Config
+from sap_cloud_sdk.objectstore._models import ObjectMetadata
 from sap_cloud_sdk.objectstore._validation import (
     validate_object_name,
     validate_prefix,
@@ -34,30 +35,26 @@ class S3Client:
     Supports upload, download, delete, list, and metadata operations on S3-compatible storage.
     """
 
-    def __init__(
-        self, creds_config: S3BindingData, *, disable_ssl: bool = False
-    ) -> None:
+    def __init__(self, config: S3Config) -> None:
         """Initialize the object storage client.
 
         Args:
-            creds_config: Connection credentials and endpoint configuration.
-            disable_ssl: Whether to disable SSL/TLS connections. Defaults to False.
+            config: S3 client configuration including credentials and runtime options.
 
         Raises:
             ClientCreationError: If client initialization fails.
         """
-        self._creds_config = creds_config
-        self._disable_ssl = disable_ssl
+        self._config = config
         self._minio_client = self._create_minio_client()
 
     def _create_minio_client(self) -> Minio:
         """Create MinIO client with proper configuration."""
         try:
             return Minio(
-                endpoint=_normalize_host(self._creds_config.host),
-                access_key=self._creds_config.access_key_id,
-                secret_key=self._creds_config.secret_access_key,
-                secure=not self._disable_ssl,
+                endpoint=_normalize_host(self._config.host),
+                access_key=self._config.access_key_id,
+                secret_key=self._config.secret_access_key,
+                secure=not self._config.disable_ssl,
             )
 
         except Exception as e:
@@ -80,7 +77,7 @@ class S3Client:
 
         try:
             self._minio_client.put_object(
-                bucket_name=self._creds_config.bucket,
+                bucket_name=self._config.bucket,
                 object_name=name,
                 data=io.BytesIO(data),
                 length=len(data),
@@ -113,7 +110,7 @@ class S3Client:
 
         try:
             self._minio_client.put_object(
-                bucket_name=self._creds_config.bucket,
+                bucket_name=self._config.bucket,
                 object_name=name,
                 data=stream,
                 length=size,
@@ -152,7 +149,7 @@ class S3Client:
 
             with open(file_path, "rb") as file_stream:
                 self._minio_client.put_object(
-                    bucket_name=self._creds_config.bucket,
+                    bucket_name=self._config.bucket,
                     object_name=name,
                     data=file_stream,
                     length=file_size,
@@ -186,7 +183,7 @@ class S3Client:
             response = cast(
                 IO[bytes],
                 self._minio_client.get_object(
-                    bucket_name=self._creds_config.bucket, object_name=name
+                    bucket_name=self._config.bucket, object_name=name
                 ),
             )
             return response
@@ -216,7 +213,7 @@ class S3Client:
 
         try:
             self._minio_client.remove_object(
-                bucket_name=self._creds_config.bucket, object_name=name
+                bucket_name=self._config.bucket, object_name=name
             )
         except S3Error as e:
             if e.code != "NoSuchKey":
@@ -246,7 +243,7 @@ class S3Client:
         result = []
         try:
             objects = self._minio_client.list_objects(
-                bucket_name=self._creds_config.bucket, prefix=prefix
+                bucket_name=self._config.bucket, prefix=prefix
             )
 
             for obj in objects:
@@ -289,7 +286,7 @@ class S3Client:
 
         try:
             stat: minio.datatypes.Object = self._minio_client.stat_object(
-                bucket_name=self._creds_config.bucket, object_name=name
+                bucket_name=self._config.bucket, object_name=name
             )
 
             return ObjectMetadata(

@@ -4,10 +4,13 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from sap_cloud_sdk.objectstore import create_client
-from sap_cloud_sdk.objectstore._models import (
+from sap_cloud_sdk.objectstore.config import (
     AzureBindingData,
+    AzureConfig,
     GcsBindingData,
+    GcsConfig,
     S3BindingData,
+    S3Config,
 )
 from sap_cloud_sdk.objectstore.exceptions import ClientCreationError
 
@@ -33,7 +36,7 @@ class TestCreateClientExplicitConfig:
     def test_create_client_with_s3_config_returns_s3_client(self, mock_s3_class):
         mock_instance = MagicMock()
         mock_s3_class.return_value = mock_instance
-        config = S3BindingData(
+        config = S3Config(
             access_key_id="key",
             secret_access_key="secret",
             bucket="bucket",
@@ -49,7 +52,7 @@ class TestCreateClientExplicitConfig:
     def test_create_client_with_azure_config_returns_azure_client(self, mock_azure_class):
         mock_instance = MagicMock()
         mock_azure_class.return_value = mock_instance
-        config = AzureBindingData(
+        config = AzureConfig(
             account_name="account",
             container_name="container",
             container_uri="https://account.blob.core.windows.net/container",
@@ -66,7 +69,7 @@ class TestCreateClientExplicitConfig:
     def test_create_client_with_gcs_config_returns_gcs_client(self, mock_gcs_class):
         mock_instance = MagicMock()
         mock_gcs_class.return_value = mock_instance
-        config = GcsBindingData(
+        config = GcsConfig(
             base64_encoded_private_key_data="dGVzdA==",
             project_id="my-project",
             bucket="my-bucket",
@@ -92,8 +95,10 @@ class TestCreateClientAutoDetection:
     ):
         s3_keys = {"access_key_id", "secret_access_key", "host", "bucket"}
         mock_read_keys.return_value = s3_keys
-        mock_binding = S3BindingData()
-        mock_load.return_value = mock_binding
+        mock_config = S3Config(
+            access_key_id="", secret_access_key="", bucket="", host=""
+        )
+        mock_load.return_value = mock_config
         mock_instance = MagicMock()
         mock_s3_class.return_value = mock_instance
 
@@ -101,7 +106,7 @@ class TestCreateClientAutoDetection:
 
         mock_read_keys.assert_called_once_with("default")
         mock_load.assert_called_once_with("s3", "default")
-        mock_s3_class.assert_called_once_with(mock_binding)
+        mock_s3_class.assert_called_once_with(mock_config)
         assert result is mock_instance
 
     @patch("sap_cloud_sdk.objectstore._factory.AzureClient")
@@ -112,15 +117,17 @@ class TestCreateClientAutoDetection:
     ):
         azure_keys = {"container_uri", "sas_token", "container_name", "account_name"}
         mock_read_keys.return_value = azure_keys
-        mock_binding = AzureBindingData()
-        mock_load.return_value = mock_binding
+        mock_config = AzureConfig(
+            account_name="", container_name="", container_uri="", region="", sas_token=""
+        )
+        mock_load.return_value = mock_config
         mock_instance = MagicMock()
         mock_azure_class.return_value = mock_instance
 
         result = create_client("my-azure-instance")
 
         mock_load.assert_called_once_with("azure", "my-azure-instance")
-        mock_azure_class.assert_called_once_with(mock_binding)
+        mock_azure_class.assert_called_once_with(mock_config)
         assert result is mock_instance
 
     @patch("sap_cloud_sdk.objectstore._factory.GcsClient")
@@ -131,15 +138,17 @@ class TestCreateClientAutoDetection:
     ):
         gcs_keys = {"base64encodedprivatekeydata", "projectid", "bucket", "region"}
         mock_read_keys.return_value = gcs_keys
-        mock_binding = GcsBindingData()
-        mock_load.return_value = mock_binding
+        mock_config = GcsConfig(
+            base64_encoded_private_key_data="", project_id="", bucket=""
+        )
+        mock_load.return_value = mock_config
         mock_instance = MagicMock()
         mock_gcs_class.return_value = mock_instance
 
         result = create_client("my-gcs-instance")
 
         mock_load.assert_called_once_with("gcs", "my-gcs-instance")
-        mock_gcs_class.assert_called_once_with(mock_binding)
+        mock_gcs_class.assert_called_once_with(mock_config)
         assert result is mock_instance
 
     @patch("sap_cloud_sdk.objectstore._factory.read_binding_keys")

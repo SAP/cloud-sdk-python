@@ -9,8 +9,8 @@ from typing import Dict, Any
 import pytest
 from dotenv import load_dotenv
 
-from sap_cloud_sdk.objectstore._models import S3BindingData
 from sap_cloud_sdk.objectstore._s3 import S3Client
+from sap_cloud_sdk.objectstore.config import S3Config
 
 
 logger = logging.getLogger(__name__)
@@ -68,14 +68,15 @@ def integration_env() -> Dict[str, str]:
 def objectstore_client(integration_env):
     """Create an ObjectStore client for cloud testing using explicit configuration."""
     try:
-        config = S3BindingData(
+        disable_ssl = integration_env.get("CLOUD_SDK_CFG_OBJECTSTORE_DEFAULT_SSL_ENABLED", "true").lower() in ("false", "0")
+        config = S3Config(
             host=integration_env["CLOUD_SDK_CFG_OBJECTSTORE_DEFAULT_HOST"],
             access_key_id=integration_env["CLOUD_SDK_CFG_OBJECTSTORE_DEFAULT_ACCESS_KEY_ID"],
             secret_access_key=integration_env["CLOUD_SDK_CFG_OBJECTSTORE_DEFAULT_SECRET_ACCESS_KEY"],
             bucket=integration_env["CLOUD_SDK_CFG_OBJECTSTORE_DEFAULT_BUCKET"],
+            disable_ssl=disable_ssl,
         )
-        disable_ssl = integration_env.get("CLOUD_SDK_CFG_OBJECTSTORE_DEFAULT_SSL_ENABLED", "true").lower() in ("false", "0")
-        client = S3Client(config, disable_ssl=disable_ssl)
+        client = S3Client(config)
         return client
     except Exception as e:
         pytest.fail(f"Failed to create ObjectStore client for cloud integration tests: {e}")
@@ -180,7 +181,7 @@ def cleanup_objects(objectstore_client, test_prefix):
 @pytest.fixture
 def failure_simulation(integration_env):
     """Utilities for simulating various failure conditions using explicit configuration."""
-    base_config = S3BindingData(
+    base_config = S3Config(
         host=integration_env["CLOUD_SDK_CFG_OBJECTSTORE_DEFAULT_HOST"],
         access_key_id=integration_env["CLOUD_SDK_CFG_OBJECTSTORE_DEFAULT_ACCESS_KEY_ID"],
         secret_access_key=integration_env["CLOUD_SDK_CFG_OBJECTSTORE_DEFAULT_SECRET_ACCESS_KEY"],
@@ -191,23 +192,25 @@ def failure_simulation(integration_env):
     class FailureSimulator:
         def create_client_with_network_failure(self):
             """Create a client configured with an unreachable endpoint."""
-            cfg = S3BindingData(
+            cfg = S3Config(
                 host="unreachable-endpoint.invalid:9000",
                 access_key_id=base_config.access_key_id,
                 secret_access_key=base_config.secret_access_key,
                 bucket=base_config.bucket,
+                disable_ssl=disable_ssl,
             )
-            return S3Client(cfg, disable_ssl=disable_ssl)
+            return S3Client(cfg)
 
         def create_client_with_permission_denied(self):
             """Create a client configured with invalid credentials."""
-            cfg = S3BindingData(
+            cfg = S3Config(
                 host=base_config.host,
                 access_key_id="invalid-access-key",
                 secret_access_key="invalid-secret-key",
                 bucket=base_config.bucket,
+                disable_ssl=disable_ssl,
             )
-            return S3Client(cfg, disable_ssl=disable_ssl)
+            return S3Client(cfg)
 
         def setup_intermittent_failure(self):
             """Placeholder for intermittent failure setup."""

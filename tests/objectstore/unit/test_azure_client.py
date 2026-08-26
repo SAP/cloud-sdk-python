@@ -12,14 +12,15 @@ from azure.core.exceptions import HttpResponseError, ResourceNotFoundError  # no
 from azure.storage.blob import ContentSettings  # noqa: E402
 
 from sap_cloud_sdk.objectstore._azure import AzureClient  # noqa: E402
-from sap_cloud_sdk.objectstore._models import AzureBindingData, ObjectMetadata  # noqa: E402
+from sap_cloud_sdk.objectstore._models import ObjectMetadata  # noqa: E402
+from sap_cloud_sdk.objectstore.config import AzureConfig  # noqa: E402
 from sap_cloud_sdk.objectstore.exceptions import (  # noqa: E402
     ListObjectsError,
     ObjectNotFoundError,
     ObjectOperationError,
 )
 
-_CREDS = AzureBindingData(
+_CREDS = AzureConfig(
     account_name="account",
     container_name="container",
     container_uri="https://account.blob.core.windows.net/container",

@@ -4,7 +4,8 @@ import os
 from typing import IO, BinaryIO, List, NoReturn
 
 from sap_cloud_sdk.core.telemetry import Module, Operation, record_metrics
-from sap_cloud_sdk.objectstore._models import GcsBindingData, ObjectMetadata
+from sap_cloud_sdk.objectstore.config import GcsConfig
+from sap_cloud_sdk.objectstore._models import ObjectMetadata
 from sap_cloud_sdk.objectstore._validation import (
     validate_object_name,
     validate_prefix,
@@ -27,24 +28,24 @@ class GcsClient:
     Google Cloud Storage. Obtain an instance via ``create_client()``.
     """
 
-    def __init__(self, creds_config: GcsBindingData) -> None:
+    def __init__(self, config: GcsConfig) -> None:
         """Initialise the GCS object storage client.
 
         Args:
-            creds_config: GCS credentials.
+            config: GCS client configuration.
 
         Raises:
             ClientCreationError: If client initialisation fails.
         """
         try:
-            self._client = self._create_storage_client(creds_config)
-            self._bucket = self._client.bucket(creds_config.bucket)
+            self._client = self._create_storage_client(config)
+            self._bucket = self._client.bucket(config.bucket)
         except ClientCreationError:
             raise
         except Exception as e:
             raise ClientCreationError(f"Failed to initialise GcsClient: {e}") from e
 
-    def _create_storage_client(self, cfg: GcsBindingData):
+    def _create_storage_client(self, cfg: GcsConfig):
         """Build a Google Cloud Storage Client from binding data.
 
         Decodes the base64-encoded service-account JSON and creates a

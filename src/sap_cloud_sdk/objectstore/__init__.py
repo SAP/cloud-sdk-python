@@ -11,15 +11,16 @@ Usage:
 """
 
 from sap_cloud_sdk.objectstore._factory import create_client
-from sap_cloud_sdk.objectstore._models import (
-    AzureBindingData,
-    GcsBindingData,
-    ObjectMetadata,
-    S3BindingData,
-)
+from sap_cloud_sdk.objectstore._models import ObjectMetadata
 from sap_cloud_sdk.objectstore._protocol import ObjectStoreClient
+from sap_cloud_sdk.objectstore.config import (
+    AzureConfig,
+    GcsConfig,
+    S3Config,
+)
 from sap_cloud_sdk.objectstore.exceptions import (
     ClientCreationError,
+    ConfigError,
     ListObjectsError,
     ObjectNotFoundError,
     ObjectOperationError,
@@ -29,16 +30,17 @@ from sap_cloud_sdk.objectstore.exceptions import (
 __all__ = [
     # Protocol (usable as a type annotation)
     "ObjectStoreClient",
-    # Binding data types (for explicit config= usage)
-    "S3BindingData",
-    "AzureBindingData",
-    "GcsBindingData",
+    # Config types (pass to create_client() to bypass auto-detection)
+    "S3Config",
+    "AzureConfig",
+    "GcsConfig",
     # Metadata model
     "ObjectMetadata",
     # Factory function
     "create_client",
     # Exceptions
     "ObjectStoreError",
+    "ConfigError",
     "ClientCreationError",
     "ObjectOperationError",
     "ObjectNotFoundError",

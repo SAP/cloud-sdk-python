@@ -1,14 +1,14 @@
 """Tests for data models."""
 
-from dataclasses import fields, is_dataclass
+from dataclasses import is_dataclass
 from datetime import datetime
 
 import pytest
 
-from sap_cloud_sdk.objectstore._models import (
+from sap_cloud_sdk.objectstore._models import ObjectMetadata
+from sap_cloud_sdk.objectstore.config import (
     AzureBindingData,
     GcsBindingData,
-    ObjectMetadata,
     S3BindingData,
 )
 
@@ -76,44 +76,28 @@ class TestGcsBindingData:
 
     def test_empty_initialization(self):
         config = GcsBindingData()
-        assert config.base64_encoded_private_key_data == ""
-        assert config.project_id == ""
+        assert config.base64EncodedPrivateKeyData == ""
+        assert config.projectId == ""
+        assert config.bucket == ""
         assert config.key_algo == ""
         assert config.region == ""
-        assert config.bucket == ""
 
     def test_field_assignment(self):
         config = GcsBindingData(
-            base64_encoded_private_key_data="dGVzdA==",
-            project_id="my-gcp-project",
+            base64EncodedPrivateKeyData="dGVzdA==",
+            projectId="my-gcp-project",
+            bucket="my-gcs-bucket",
             key_algo="RSA_2048",
             region="us-central1",
-            bucket="my-gcs-bucket",
         )
-        assert config.base64_encoded_private_key_data == "dGVzdA=="
-        assert config.project_id == "my-gcp-project"
+        assert config.base64EncodedPrivateKeyData == "dGVzdA=="
+        assert config.projectId == "my-gcp-project"
         assert config.bucket == "my-gcs-bucket"
+        assert config.key_algo == "RSA_2048"
+        assert config.region == "us-central1"
 
     def test_is_dataclass(self):
         assert is_dataclass(GcsBindingData)
-
-    def test_base64_private_key_field_has_secret_metadata(self):
-        """base64_encoded_private_key_data must carry the camelCase alias."""
-        matching = [
-            f for f in fields(GcsBindingData)
-            if f.metadata.get("secret") == "base64EncodedPrivateKeyData"
-        ]
-        assert len(matching) == 1
-        assert matching[0].name == "base64_encoded_private_key_data"
-
-    def test_project_id_field_has_secret_metadata(self):
-        """project_id must carry the camelCase alias 'projectId'."""
-        matching = [
-            f for f in fields(GcsBindingData)
-            if f.metadata.get("secret") == "projectId"
-        ]
-        assert len(matching) == 1
-        assert matching[0].name == "project_id"
 
 
 class TestObjectMetadata:

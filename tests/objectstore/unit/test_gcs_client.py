@@ -13,14 +13,14 @@ pytest.importorskip("google.cloud.storage")
 from google.cloud.exceptions import NotFound  # noqa: E402
 
 from sap_cloud_sdk.objectstore._gcs import GcsClient  # noqa: E402
-from sap_cloud_sdk.objectstore._models import GcsBindingData  # noqa: E402
+from sap_cloud_sdk.objectstore.config import GcsConfig  # noqa: E402
 from sap_cloud_sdk.objectstore.exceptions import (  # noqa: E402
     ListObjectsError,
     ObjectNotFoundError,
     ObjectOperationError,
 )
 
-_CREDS = GcsBindingData(
+_CREDS = GcsConfig(
     base64_encoded_private_key_data="dGVzdA==",
     project_id="my-project",
     bucket="my-bucket",
@@ -273,7 +273,7 @@ class TestCreateStorageClient:
         encoded = base64.b64encode(
             json.dumps(service_account_info).encode()
         ).decode()
-        cfg = GcsBindingData(
+        cfg = GcsConfig(
             base64_encoded_private_key_data=encoded,
             project_id="my-project",
             bucket="my-bucket",

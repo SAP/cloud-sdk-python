@@ -13,8 +13,8 @@ from sap_cloud_sdk.objectstore._models import ObjectStoreProvider
 _DISCRIMINATORS: dict[ObjectStoreProvider, set[str]] = {
     ObjectStoreProvider.AZURE: {"container_uri", "sas_token", "container_name"},
     ObjectStoreProvider.GCS: {
-        "base64EncodedPrivateKeyData",
-        "projectId",
+        "base64encodedprivatekeydata",
+        "projectid",
     },
     ObjectStoreProvider.S3: {"access_key_id", "secret_access_key", "host"},
 }
@@ -93,5 +93,5 @@ def detect_provider(keys: set[str]) -> ObjectStoreProvider:
         f"Cannot detect objectstore provider from keys: {sorted(lowered)}. "
         "Expected one of: s3 (access_key_id, secret_access_key, host), "
         "azure (container_uri, sas_token, container_name), "
-        "gcs (base64EncodedPrivateKeyData, projectId)."
+        "gcs (base64encodedprivatekeydata, projectid)."
     )

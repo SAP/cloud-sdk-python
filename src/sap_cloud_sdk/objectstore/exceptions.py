@@ -7,6 +7,12 @@ class ObjectStoreError(Exception):
     pass
 
 
+class ConfigError(ObjectStoreError):
+    """Raised when loading or validating object store configuration fails."""
+
+    pass
+
+
 class ClientCreationError(ObjectStoreError):
     """Raised when object store client creation fails."""
 

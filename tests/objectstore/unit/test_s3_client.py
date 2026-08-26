@@ -9,7 +9,8 @@ import pytest
 from minio.error import S3Error
 
 from sap_cloud_sdk.objectstore._s3 import S3Client
-from sap_cloud_sdk.objectstore._models import S3BindingData, ObjectMetadata
+from sap_cloud_sdk.objectstore._models import ObjectMetadata
+from sap_cloud_sdk.objectstore.config import S3Config
 from sap_cloud_sdk.objectstore.exceptions import (
     ClientCreationError, ObjectOperationError, ObjectNotFoundError, ListObjectsError
 )
@@ -18,11 +19,11 @@ from sap_cloud_sdk.objectstore.exceptions import (
 class TestS3Client:
 
     def setup_method(self):
-        self.creds = S3BindingData(
+        self.config = S3Config(
             access_key_id="test_key",
             secret_access_key="test_secret",
             bucket="test-bucket",
-            host="s3.amazonaws.com"
+            host="s3.amazonaws.com",
         )
 
     @patch('sap_cloud_sdk.objectstore._s3.Minio')
@@ -30,7 +31,7 @@ class TestS3Client:
         mock_minio = Mock()
         mock_minio_class.return_value = mock_minio
 
-        client = S3Client(self.creds, disable_ssl=False)
+        client = S3Client(self.config)
 
         mock_minio_class.assert_called_once_with(
             endpoint="s3.amazonaws.com",
@@ -45,7 +46,13 @@ class TestS3Client:
         mock_minio = Mock()
         mock_minio_class.return_value = mock_minio
 
-        S3Client(self.creds, disable_ssl=True)
+        S3Client(S3Config(
+            access_key_id="test_key",
+            secret_access_key="test_secret",
+            bucket="test-bucket",
+            host="s3.amazonaws.com",
+            disable_ssl=True,
+        ))
 
         mock_minio_class.assert_called_once_with(
             endpoint="s3.amazonaws.com",
@@ -59,14 +66,14 @@ class TestS3Client:
         mock_minio_class.side_effect = Exception("Connection failed")
 
         with pytest.raises(ClientCreationError, match="Failed to create MinIO client"):
-            S3Client(self.creds)
+            S3Client(self.config)
 
     @patch('sap_cloud_sdk.objectstore._s3.Minio')
     def test_put_object_from_bytes_success(self, mock_minio_class):
         mock_minio = Mock()
         mock_minio_class.return_value = mock_minio
 
-        client = S3Client(self.creds)
+        client = S3Client(self.config)
         test_data = b"Hello, World!"
 
         client.put_object_from_bytes("test.txt", test_data, "text/plain")
@@ -82,7 +89,7 @@ class TestS3Client:
     @patch('sap_cloud_sdk.objectstore._s3.Minio')
     def test_put_object_from_bytes_validation(self, mock_minio_class):
         mock_minio_class.return_value = Mock()
-        client = S3Client(self.creds)
+        client = S3Client(self.config)
 
         with pytest.raises(ValueError, match="name must be a non-empty string"):
             client.put_object_from_bytes("", b"data", "text/plain")
@@ -100,7 +107,7 @@ class TestS3Client:
         mock_minio.put_object.side_effect = s3_error
         mock_minio_class.return_value = mock_minio
 
-        client = S3Client(self.creds)
+        client = S3Client(self.config)
 
         with pytest.raises(ObjectOperationError, match="Failed to upload object"):
             client.put_object_from_bytes("test.txt", b"data", "text/plain")
@@ -110,7 +117,7 @@ class TestS3Client:
         mock_minio = Mock()
         mock_minio_class.return_value = mock_minio
 
-        client = S3Client(self.creds)
+        client = S3Client(self.config)
         stream = io.BytesIO(b"stream data")
 
         client.put_object("test.txt", stream, 11, "text/plain")
@@ -126,7 +133,7 @@ class TestS3Client:
     @patch('sap_cloud_sdk.objectstore._s3.Minio')
     def test_put_object_validation(self, mock_minio_class):
         mock_minio_class.return_value = Mock()
-        client = S3Client(self.creds)
+        client = S3Client(self.config)
 
         with pytest.raises(ValueError, match="size must be non-negative"):
             client.put_object("test.txt", io.BytesIO(b"data"), -1, "text/plain")
@@ -139,7 +146,7 @@ class TestS3Client:
         mock_minio = Mock()
         mock_minio_class.return_value = mock_minio
 
-        client = S3Client(self.creds)
+        client = S3Client(self.config)
         client.put_object_from_file("test.txt", "/path/to/file.txt", "text/plain")
 
         mock_isfile.assert_called_once_with("/path/to/file.txt")
@@ -151,7 +158,7 @@ class TestS3Client:
     @patch('os.path.isfile', return_value=False)
     def test_put_object_from_file_not_found(self, mock_isfile, mock_file, mock_minio_class):
         mock_minio_class.return_value = Mock()
-        client = S3Client(self.creds)
+        client = S3Client(self.config)
 
         with pytest.raises(ObjectOperationError, match="File not found"):
             client.put_object_from_file("test.txt", "/nonexistent.txt", "text/plain")
@@ -163,7 +170,7 @@ class TestS3Client:
         mock_minio.get_object.return_value = mock_response
         mock_minio_class.return_value = mock_minio
 
-        client = S3Client(self.creds)
+        client = S3Client(self.config)
         result = client.get_object("test.txt")
 
         mock_minio.get_object.assert_called_once_with(
@@ -179,7 +186,7 @@ class TestS3Client:
         mock_minio.get_object.side_effect = s3_error
         mock_minio_class.return_value = mock_minio
 
-        client = S3Client(self.creds)
+        client = S3Client(self.config)
 
         with pytest.raises(ObjectNotFoundError, match="Object 'test.txt' not found"):
             client.get_object("test.txt")
@@ -189,7 +196,7 @@ class TestS3Client:
         mock_minio = Mock()
         mock_minio_class.return_value = mock_minio
 
-        client = S3Client(self.creds)
+        client = S3Client(self.config)
         client.delete_object("test.txt")
 
         mock_minio.remove_object.assert_called_once_with(
@@ -204,7 +211,7 @@ class TestS3Client:
         mock_minio.remove_object.side_effect = s3_error
         mock_minio_class.return_value = mock_minio
 
-        client = S3Client(self.creds)
+        client = S3Client(self.config)
         client.delete_object("test.txt")
 
     @patch('sap_cloud_sdk.objectstore._s3.Minio')
@@ -222,7 +229,7 @@ class TestS3Client:
         mock_minio.list_objects.return_value = [mock_obj1]
         mock_minio_class.return_value = mock_minio
 
-        client = S3Client(self.creds)
+        client = S3Client(self.config)
         result = client.list_objects("prefix/")
 
         mock_minio.list_objects.assert_called_once_with(
@@ -241,7 +248,7 @@ class TestS3Client:
         mock_minio.list_objects.side_effect = s3_error
         mock_minio_class.return_value = mock_minio
 
-        client = S3Client(self.creds)
+        client = S3Client(self.config)
 
         with pytest.raises(ListObjectsError, match="Failed to list objects"):
             client.list_objects("prefix/")
@@ -258,7 +265,7 @@ class TestS3Client:
         mock_minio.stat_object.return_value = mock_stat
         mock_minio_class.return_value = mock_minio
 
-        client = S3Client(self.creds)
+        client = S3Client(self.config)
         result = client.head_object("test.txt")
 
         mock_minio.stat_object.assert_called_once_with(
@@ -277,7 +284,7 @@ class TestS3Client:
         mock_minio.stat_object.side_effect = s3_error
         mock_minio_class.return_value = mock_minio
 
-        client = S3Client(self.creds)
+        client = S3Client(self.config)
 
         with pytest.raises(ObjectNotFoundError, match="Object 'test.txt' not found"):
             client.head_object("test.txt")
@@ -288,7 +295,7 @@ class TestS3Client:
         mock_minio.stat_object.return_value = Mock()
         mock_minio_class.return_value = mock_minio
 
-        client = S3Client(self.creds)
+        client = S3Client(self.config)
         result = client.object_exists("test.txt")
 
         assert result is True
@@ -300,7 +307,7 @@ class TestS3Client:
         mock_minio.stat_object.side_effect = s3_error
         mock_minio_class.return_value = mock_minio
 
-        client = S3Client(self.creds)
+        client = S3Client(self.config)
         result = client.object_exists("test.txt")
 
         assert result is False
@@ -308,7 +315,7 @@ class TestS3Client:
     @patch('sap_cloud_sdk.objectstore._s3.Minio')
     def test_get_object_empty_name_validation(self, mock_minio_class):
         mock_minio_class.return_value = Mock()
-        client = S3Client(self.creds)
+        client = S3Client(self.config)
 
         with pytest.raises(ValueError, match="name must be a non-empty string"):
             client.get_object("")
@@ -316,7 +323,7 @@ class TestS3Client:
     @patch('sap_cloud_sdk.objectstore._s3.Minio')
     def test_delete_object_empty_name_validation(self, mock_minio_class):
         mock_minio_class.return_value = Mock()
-        client = S3Client(self.creds)
+        client = S3Client(self.config)
 
         with pytest.raises(ValueError, match="name must be a non-empty string"):
             client.delete_object("")
@@ -324,7 +331,7 @@ class TestS3Client:
     @patch('sap_cloud_sdk.objectstore._s3.Minio')
     def test_head_object_empty_name_validation(self, mock_minio_class):
         mock_minio_class.return_value = Mock()
-        client = S3Client(self.creds)
+        client = S3Client(self.config)
 
         with pytest.raises(ValueError, match="name must be a non-empty string"):
             client.head_object("")
@@ -332,7 +339,7 @@ class TestS3Client:
     @patch('sap_cloud_sdk.objectstore._s3.Minio')
     def test_object_exists_empty_name_validation(self, mock_minio_class):
         mock_minio_class.return_value = Mock()
-        client = S3Client(self.creds)
+        client = S3Client(self.config)
 
         with pytest.raises(ValueError, match="name must be a non-empty string"):
             client.object_exists("")
@@ -340,7 +347,7 @@ class TestS3Client:
     @patch('sap_cloud_sdk.objectstore._s3.Minio')
     def test_list_objects_prefix_validation(self, mock_minio_class):
         mock_minio_class.return_value = Mock()
-        client = S3Client(self.creds)
+        client = S3Client(self.config)
 
         with pytest.raises(ValueError, match="prefix must be a string"):
             client.list_objects(123)  # ty: ignore[invalid-argument-type]

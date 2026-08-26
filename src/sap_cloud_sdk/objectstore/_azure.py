@@ -4,7 +4,8 @@ import os
 from typing import IO, BinaryIO, List, NoReturn
 
 from sap_cloud_sdk.core.telemetry import Module, Operation, record_metrics
-from sap_cloud_sdk.objectstore._models import AzureBindingData, ObjectMetadata
+from sap_cloud_sdk.objectstore.config import AzureConfig
+from sap_cloud_sdk.objectstore._models import ObjectMetadata
 from sap_cloud_sdk.objectstore._validation import (
     validate_object_name,
     validate_prefix,
@@ -27,23 +28,23 @@ class AzureClient:
     Azure Blob Storage. Obtain an instance via ``create_client()``.
     """
 
-    def __init__(self, creds_config: AzureBindingData) -> None:
+    def __init__(self, config: AzureConfig) -> None:
         """Initialise the Azure object storage client.
 
         Args:
-            creds_config: Azure Blob Storage credentials.
+            config: Azure Blob Storage client configuration.
 
         Raises:
             ClientCreationError: If client initialisation fails.
         """
         try:
-            self._container = self._create_container_client(creds_config)
+            self._container = self._create_container_client(config)
         except ClientCreationError:
             raise
         except Exception as e:
             raise ClientCreationError(f"Failed to initialise AzureClient: {e}") from e
 
-    def _create_container_client(self, cfg: AzureBindingData):
+    def _create_container_client(self, cfg: AzureConfig):
         """Build an Azure ContainerClient from binding data.
 
         Uses the container URI directly (which already includes the container name)

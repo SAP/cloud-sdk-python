@@ -140,6 +140,7 @@ class TestReactive401UpdatesEnv:
         with (
             patch("sap_cloud_sdk.aicore.completion.litellm.completion", side_effect=_fake_completion),
             patch("sap_cloud_sdk.aicore.set_filtering"),
+            patch("sap_cloud_sdk.aicore.completion._clear_client_secret"),
         ):
             result = completion(model="sap/x", messages=[])
 

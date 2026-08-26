@@ -1,5 +1,7 @@
 """Tests for sap_cloud_sdk.core.runtime_context."""
 
+import base64
+import json
 import pytest
 from unittest.mock import MagicMock, patch
 
@@ -314,6 +316,10 @@ class TestSAPTriggerContextProvider:
 # ---------------------------------------------------------------------------
 
 
+def _make_stage_config(features: list[dict]) -> str:
+    return base64.b64encode(json.dumps({"features": features}).encode()).decode()
+
+
 class TestDWCContextProvider:
     def test_extracts_dwc_subdomain(self):
         envelope = _make_envelope({"dwc-subdomain": "my-subdomain"})
@@ -334,19 +340,33 @@ class TestDWCContextProvider:
     def test_satisfies_context_provider_protocol(self):
         assert isinstance(DWCContextProvider(), ContextProvider)
 
-    def test_extracts_feature_toggles(self):
-        envelope = _make_envelope({"dwc-product-configuration": "toggle-a,toggle-b"})
-        ctx = DWCContextProvider().extract(envelope)
-        assert ctx.get(FEATURE_TOGGLES) == ["toggle-a", "toggle-b"]
+    def test_extracts_enabled_feature_toggles(self):
+        header = _make_stage_config([
+            {"name": "FEATURE_A", "enabled": True},
+            {"name": "FEATURE_B", "enabled": True},
+        ])
+        ctx = DWCContextProvider().extract(_make_envelope({"dwc-stage-configuration": header}))
+        assert ctx.get(FEATURE_TOGGLES) == ["FEATURE_A", "FEATURE_B"]
 
-    def test_feature_toggles_strips_whitespace(self):
-        envelope = _make_envelope({"dwc-product-configuration": " toggle-a , toggle-b "})
-        ctx = DWCContextProvider().extract(envelope)
-        assert ctx.get(FEATURE_TOGGLES) == ["toggle-a", "toggle-b"]
+    def test_excludes_disabled_feature_toggles(self):
+        header = _make_stage_config([
+            {"name": "FEATURE_A", "enabled": True},
+            {"name": "FEATURE_B", "enabled": False},
+        ])
+        ctx = DWCContextProvider().extract(_make_envelope({"dwc-stage-configuration": header}))
+        assert ctx.get(FEATURE_TOGGLES) == ["FEATURE_A"]
 
-    def test_feature_toggles_empty_when_header_absent(self):
-        envelope = _make_envelope({})
-        ctx = DWCContextProvider().extract(envelope)
+    def test_feature_toggles_none_when_header_absent(self):
+        ctx = DWCContextProvider().extract(_make_envelope({}))
+        assert ctx.get(FEATURE_TOGGLES) is None
+
+    def test_feature_toggles_none_on_invalid_base64(self):
+        ctx = DWCContextProvider().extract(_make_envelope({"dwc-stage-configuration": "!!!"}))
+        assert ctx.get(FEATURE_TOGGLES) is None
+
+    def test_feature_toggles_none_on_invalid_json(self):
+        bad = base64.b64encode(b"not-json").decode()
+        ctx = DWCContextProvider().extract(_make_envelope({"dwc-stage-configuration": bad}))
         assert ctx.get(FEATURE_TOGGLES) is None
 
 

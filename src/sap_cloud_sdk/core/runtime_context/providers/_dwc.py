@@ -1,11 +1,17 @@
 """DWC context provider."""
 
+import base64
+import json
+import logging
+
 from sap_cloud_sdk.core.runtime_context._context import RuntimeContext
 from sap_cloud_sdk.core.runtime_context._envelope import RequestEnvelope
 from sap_cloud_sdk.core.runtime_context._keys import DWC_SUBDOMAIN, DWC_TENANT, FEATURE_TOGGLES
 from sap_cloud_sdk.core.runtime_context._protocol import ContextProvider
 
-_FEATURE_TOGGLES_HEADER = "dwc-product-configuration"
+logger = logging.getLogger(__name__)
+
+_FEATURE_TOGGLES_HEADER = "dwc-stage-configuration"
 
 
 class DWCContextProvider(ContextProvider):
@@ -15,7 +21,7 @@ class DWCContextProvider(ContextProvider):
 
       - :data:`~sap_cloud_sdk.core.runtime_context.DWC_SUBDOMAIN` from ``dwc-subdomain``
       - :data:`~sap_cloud_sdk.core.runtime_context.DWC_TENANT` from ``dwc-tenant``
-      - :data:`~sap_cloud_sdk.core.runtime_context.FEATURE_TOGGLES` from ``dwc-product-configuration``
+      - :data:`~sap_cloud_sdk.core.runtime_context.FEATURE_TOGGLES` from ``dwc-stage-configuration``
     """
 
     def extract(self, envelope: RequestEnvelope) -> RuntimeContext:
@@ -25,5 +31,17 @@ class DWCContextProvider(ContextProvider):
         if tenant := envelope.headers.get("dwc-tenant"):
             values[DWC_TENANT] = tenant
         if raw := envelope.headers.get(_FEATURE_TOGGLES_HEADER):
-            values[FEATURE_TOGGLES] = [t.strip() for t in raw.split(",") if t.strip()]
+            toggles = _parse_feature_toggles(raw)
+            if toggles is not None:
+                values[FEATURE_TOGGLES] = toggles
         return RuntimeContext(values)
+
+
+def _parse_feature_toggles(raw: str) -> list[str] | None:
+    try:
+        decoded = base64.b64decode(raw).decode()
+        data = json.loads(decoded)
+        return [f["name"] for f in data.get("features", []) if f.get("enabled")]
+    except Exception as e:
+        logger.debug("Failed to parse dwc-stage-configuration header: %s", e)
+        return None

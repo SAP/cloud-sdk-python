@@ -90,15 +90,7 @@ class TestWatcherUpdatesEnvProactively:
         stop = threading.Event()
         reloaded = threading.Event()
 
-        original_set_config = set_aicore_config
-
         def _tracking_set_config(**kwargs):
-            with patch("sap_cloud_sdk.aicore.set_filtering"):
-                # Call the real function so env actually updates
-                import sap_cloud_sdk.aicore as _mod
-                _mod.set_aicore_config.__wrapped__(**kwargs) if hasattr(
-                    _mod.set_aicore_config, "__wrapped__"
-                ) else None
             reloaded.set()
 
         with patch("sap_cloud_sdk.aicore.set_aicore_config", side_effect=_tracking_set_config):

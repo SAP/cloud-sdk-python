@@ -166,6 +166,17 @@ class TestAccessStrategy:
         client, _ = _make_client()
         assert client._tenant is None
 
+    def test_subscriber_with_invalid_tenant_raises_value_error(self):
+        """SUBSCRIBER with a malformed tenant subdomain raises ValueError at construction."""
+        transport = MagicMock(spec=HttpTransport)
+        for bad in ("-leading", "has.dot", "trailing-"):
+            with pytest.raises(ValueError, match="Invalid tenant_subdomain"):
+                AgentMemoryClient(
+                    transport,
+                    access_strategy=AccessStrategy.SUBSCRIBER,
+                    tenant=bad,
+                )
+
     # ── Transport routing ─────────────────────────────────────────────────────
 
     def test_subscriber_passes_tenant_to_transport(self):

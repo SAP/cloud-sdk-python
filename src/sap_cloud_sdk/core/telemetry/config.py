@@ -30,8 +30,22 @@ _extra_sdk_attributes: dict = {}
 def register_sdk_resource_attributes(attributes: dict) -> None:
     """Register additional OTel resource attributes to be included in every provider.
 
-    Companion SDKs (e.g. sap-internal-sdk) call this once at import time so their
-    version appears on every span and metric without any change to agent startup code.
+    Companion SDKs call this once at import time so their version appears on every
+    span and metric without any change to agent startup code. Read the version from
+    ``importlib.metadata`` rather than hardcoding it::
+
+        from importlib.metadata import version, PackageNotFoundError
+        from sap_cloud_sdk.core.telemetry.config import register_sdk_resource_attributes
+
+        try:
+            sdk_version = version("my-sdk-package")
+        except PackageNotFoundError:
+            sdk_version = "unknown"
+
+        register_sdk_resource_attributes({
+            "sap.my_sdk.version": sdk_version,
+            "sap.my_sdk.language": "python",
+        })
     """
     _extra_sdk_attributes.update(attributes)
 

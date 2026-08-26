@@ -13,14 +13,10 @@ from sap_cloud_sdk.core.telemetry.config import ENV_HIGH_CARDINALITY_URLS
 # into the outgoing request, preserving distributed trace context.
 _SUPPRESS_ATTR = "sap.cloud_sdk.suppress"
 
-_DEFAULT_HIGH_CARDINALITY_PATTERNS = ["/v1/mcp/"]
-
 
 def _compile_patterns() -> list[re.Pattern]:
     raw = os.getenv(ENV_HIGH_CARDINALITY_URLS, "")
     patterns = [p.strip() for p in raw.split(",") if p.strip()]
-    if not patterns:
-        patterns = _DEFAULT_HIGH_CARDINALITY_PATTERNS
     return [re.compile(re.escape(p)) for p in patterns]
 
 
@@ -47,9 +43,9 @@ _instrumentor = HTTPXClientInstrumentor()
 class HttpxInstrumentor(LibraryInstrumentor):
     """Instruments httpx sync and async clients with OTel spans and W3C header propagation.
 
-    Spans for URLs matching SAP_CLOUD_SDK_HIGH_CARDINALITY_URLS (default: /v1/mcp/) are
-    marked for suppression at export time. The span is still created so that W3C traceparent
-    headers propagate to the downstream service.
+    Spans for URLs matching SAP_CLOUD_SDK_HIGH_CARDINALITY_URLS (comma-separated substrings,
+    unset by default) are marked for suppression at export time. The span is still created so
+    that W3C traceparent headers propagate to the downstream service.
     """
 
     library_name = "httpx"

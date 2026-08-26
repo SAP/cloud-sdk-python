@@ -1,11 +1,16 @@
 """Tests for provider auto-detection logic."""
 
 import os
+from itertools import combinations
 from unittest.mock import patch
 
 import pytest
 
-from sap_cloud_sdk.objectstore._detect import detect_provider, read_binding_keys
+from sap_cloud_sdk.objectstore._detect import (
+    _DISCRIMINATORS,
+    detect_provider,
+    read_binding_keys,
+)
 
 
 class TestDetectProvider:
@@ -19,15 +24,16 @@ class TestDetectProvider:
         assert detect_provider(keys) == "azure"
 
     def test_gcs_keys_detected_as_gcs(self):
-        keys = {"base64encodedprivatekeydata", "projectid", "bucket", "region"}
+        # Real binding key names are camelCase (as they appear in the mount).
+        keys = {"base64EncodedPrivateKeyData", "projectId", "bucket", "region"}
         assert detect_provider(keys) == "gcs"
 
     def test_gcs_wins_over_s3_when_gcs_discriminators_present(self):
         # GCS and S3 share 'bucket'/'region'; if GCS discriminators are present
         # it must be detected as GCS, not S3.
         keys = {
-            "base64encodedprivatekeydata",
-            "projectid",
+            "base64EncodedPrivateKeyData",
+            "projectId",
             "bucket",
             "region",
         }
@@ -56,7 +62,13 @@ class TestDetectProvider:
         assert detect_provider(keys) == "azure"
 
     def test_uppercase_gcs_keys_still_detected(self):
+        # Env-var form: keys arrive fully uppercased.
         keys = {"BASE64ENCODEDPRIVATEKEYDATA", "PROJECTID"}
+        assert detect_provider(keys) == "gcs"
+
+    def test_camelcase_gcs_keys_detected(self):
+        # Mount form: keys arrive verbatim in their binding camelCase.
+        keys = {"base64EncodedPrivateKeyData", "projectId"}
         assert detect_provider(keys) == "gcs"
 
     def test_azure_wins_before_gcs_and_s3(self):
@@ -66,10 +78,29 @@ class TestDetectProvider:
             "container_uri",
             "sas_token",
             "container_name",
-            "base64encodedprivatekeydata",
-            "projectid",
+            "base64EncodedPrivateKeyData",
+            "projectId",
         }
         assert detect_provider(keys) == "azure"
+
+    def test_discriminator_sets_are_pairwise_disjoint(self):
+        """Each provider must own at least one key no other provider shares.
+
+        Detection is first-match-wins; it is only unambiguous while the
+        discriminator sets don't overlap. If a new provider is added with a
+        discriminator that intersects an existing one, first-match ordering
+        would silently pick the wrong provider — this test fails loudly instead.
+        """
+        lowered = {
+            provider: {d.lower() for d in discriminators}
+            for provider, discriminators in _DISCRIMINATORS.items()
+        }
+        for (p_a, set_a), (p_b, set_b) in combinations(lowered.items(), 2):
+            overlap = set_a & set_b
+            assert not overlap, (
+                f"discriminators for {p_a} and {p_b} overlap on {sorted(overlap)}; "
+                "detection can no longer distinguish these providers"
+            )
 
 
 class TestReadBindingKeysLegacyLayout:

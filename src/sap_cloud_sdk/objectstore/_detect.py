@@ -13,8 +13,8 @@ from sap_cloud_sdk.objectstore._models import ObjectStoreProvider
 _DISCRIMINATORS: dict[ObjectStoreProvider, set[str]] = {
     ObjectStoreProvider.AZURE: {"container_uri", "sas_token", "container_name"},
     ObjectStoreProvider.GCS: {
-        "base64encodedprivatekeydata",
-        "projectid",
+        "base64EncodedPrivateKeyData",
+        "projectId",
     },
     ObjectStoreProvider.S3: {"access_key_id", "secret_access_key", "host"},
 }
@@ -82,16 +82,20 @@ def detect_provider(keys: set[str]) -> ObjectStoreProvider:
         ValueError: If no provider can be identified from the available keys.
     """
     lowered = {k.lower() for k in keys}
-    if _DISCRIMINATORS[ObjectStoreProvider.AZURE].issubset(lowered):
+
+    def matches(provider: ObjectStoreProvider) -> bool:
+        return {d.lower() for d in _DISCRIMINATORS[provider]}.issubset(lowered)
+
+    if matches(ObjectStoreProvider.AZURE):
         return ObjectStoreProvider.AZURE
-    if _DISCRIMINATORS[ObjectStoreProvider.GCS].issubset(lowered):
+    if matches(ObjectStoreProvider.GCS):
         return ObjectStoreProvider.GCS
-    if _DISCRIMINATORS[ObjectStoreProvider.S3].issubset(lowered):
+    if matches(ObjectStoreProvider.S3):
         return ObjectStoreProvider.S3
 
     raise ValueError(
         f"Cannot detect objectstore provider from keys: {sorted(lowered)}. "
         "Expected one of: s3 (access_key_id, secret_access_key, host), "
         "azure (container_uri, sas_token, container_name), "
-        "gcs (base64encodedprivatekeydata, projectid)."
+        "gcs (base64EncodedPrivateKeyData, projectId)."
     )

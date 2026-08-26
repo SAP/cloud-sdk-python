@@ -6,7 +6,11 @@ import logging
 
 from sap_cloud_sdk.core.runtime_context._context import RuntimeContext
 from sap_cloud_sdk.core.runtime_context._envelope import RequestEnvelope
-from sap_cloud_sdk.core.runtime_context._keys import DWC_SUBDOMAIN, DWC_TENANT, FEATURE_TOGGLES
+from sap_cloud_sdk.core.runtime_context._keys import (
+    DWC_SUBDOMAIN,
+    DWC_TENANT,
+    FEATURE_TOGGLES,
+)
 from sap_cloud_sdk.core.runtime_context._protocol import ContextProvider
 
 logger = logging.getLogger(__name__)

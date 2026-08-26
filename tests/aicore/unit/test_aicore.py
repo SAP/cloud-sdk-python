@@ -710,5 +710,3 @@ class TestSetAICoreConfig:
 
             # Function should complete without errors even with decorator
             # The actual telemetry recording is tested in telemetry tests
-
-

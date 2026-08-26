@@ -20,6 +20,7 @@ from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import ConsoleSpanExporter, SpanExporter
 from traceloop.sdk import Traceloop
 
+from sap_cloud_sdk.core.telemetry._provider import setup_log_provider
 from sap_cloud_sdk.core.telemetry.module import Module
 from sap_cloud_sdk.core.telemetry.operation import Operation
 from sap_cloud_sdk.core.telemetry.config import (
@@ -35,6 +36,9 @@ from sap_cloud_sdk.core.telemetry.genai_attribute_transformer import (
 from sap_cloud_sdk.core.telemetry.metrics_decorator import record_metrics
 from sap_cloud_sdk.core.telemetry.span_processors.propagated_attributes_processor import (
     PropagatedAttributesSpanProcessor,
+)
+from sap_cloud_sdk.core.telemetry.span_processors.runtime_context_processor import (
+    RuntimeContextSpanProcessor,
 )
 from sap_cloud_sdk.core.telemetry.instrumentation import get_registry
 
@@ -92,6 +96,9 @@ def auto_instrument(
 
     _set_baggage_processor()
     _set_propagated_attributes_processor()
+    _set_runtime_context_processor()
+
+    setup_log_provider()
 
     if middlewares:
         _register_middleware_processors(middlewares)
@@ -143,6 +150,20 @@ def _set_propagated_attributes_processor():
     provider.add_span_processor(PropagatedAttributesSpanProcessor())
     logger.info(
         "Registered PropagatedAttributesSpanProcessor for ContextVar attribute propagation"
+    )
+
+
+def _set_runtime_context_processor():
+    provider = trace.get_tracer_provider()
+    if not isinstance(provider, TracerProvider):
+        logger.warning(
+            "Unknown TracerProvider type. Skipping RuntimeContextSpanProcessor"
+        )
+        return
+
+    provider.add_span_processor(RuntimeContextSpanProcessor())
+    logger.info(
+        "Registered RuntimeContextSpanProcessor for runtime context identity propagation"
     )
 
 

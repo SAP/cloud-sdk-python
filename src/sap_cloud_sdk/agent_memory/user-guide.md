@@ -713,6 +713,7 @@ elif total <= PAGE_SIZE:
         agent_id="my-agent", invoker_id="user-123", limit=total
     )
 else:
+
     def iter_all_memories(client, agent_id, invoker_id, page_size=PAGE_SIZE):
         offset = 0
         while True:
@@ -780,7 +781,8 @@ The default `threshold` of `0.6` may be too strict for your data. Try a lower va
 
 ```python
 results = client.search_memories(
-    agent_id="my-agent", invoker_id="user-123",
+    agent_id="my-agent",
+    invoker_id="user-123",
     query="user display preferences",
     threshold=0.3,
 )
@@ -932,10 +934,10 @@ from sap_cloud_sdk.agent_memory.factory.langgraph_checkpoint import create_check
     key="config.checkpointer.ttl_seconds",
     label="Thread TTL (seconds)",
     description="Evict inactive conversation threads after this period of "
-                "inactivity. Set to 0 to disable eviction.",
+    "inactivity. Set to 0 to disable eviction.",
 )
 def thread_ttl_seconds() -> int:
-    return 3600 # 1 hour
+    return 3600  # 1 hour
 
 
 class MyAgent:

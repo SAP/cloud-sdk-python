@@ -35,7 +35,9 @@ from sap_cloud_sdk.agentgateway._models import (
     AgentCardFilter,
     AuthResult,
     MCPTool,
+    MCPToolFilter,
 )
+from sap_cloud_sdk.core._tenant import _validate_tenant_subdomain
 from sap_cloud_sdk.agentgateway._token_cache import _GatewayUrlCache, _TokenCache
 from sap_cloud_sdk.agentgateway.exceptions import AgentGatewaySDKError
 from sap_cloud_sdk.core.telemetry import Module, Operation, record_metrics
@@ -154,10 +156,12 @@ class AgentGatewayClient:
 
     def _resolve_tenant_subdomain(self) -> str:
         """Resolve tenant subdomain from string or callable."""
-        return self._resolve_value(
+        resolved_tenant_subdomain = self._resolve_value(
             self._tenant_subdomain,
             "tenant_subdomain is required for LoB agent flow.",
         )
+        _validate_tenant_subdomain(resolved_tenant_subdomain)
+        return resolved_tenant_subdomain
 
     @record_metrics(Module.AGENTGATEWAY, Operation.AGENTGATEWAY_GET_SYSTEM_AUTH)
     async def get_system_auth(self) -> AuthResult:
@@ -343,6 +347,10 @@ class AgentGatewayClient:
                     "Customer agent credentials detected at '%s'", credentials_path
                 )
                 credentials = load_customer_credentials(credentials_path)
+                if not credentials.client_id:
+                    raise AgentGatewaySDKError(
+                        "Customer agent credentials file does not contain a 'client_id'"
+                    )
                 return credentials.client_id
 
             # LoB flow — read clientId from the IAS destination properties
@@ -354,7 +362,9 @@ class AgentGatewayClient:
 
     @record_metrics(Module.AGENTGATEWAY, Operation.AGENTGATEWAY_LIST_MCP_TOOLS)
     async def list_mcp_tools(
-        self, user_token: str | Callable[[], str] | None = None
+        self,
+        user_token: str | Callable[[], str] | None = None,
+        filter: MCPToolFilter | None = None,
     ) -> list[MCPTool]:
         """List all MCP tools from MCP servers.
 
@@ -373,6 +383,8 @@ class AgentGatewayClient:
             user_token: User's JWT for principal propagation.
                 Can be a string or a callable returning a string.
                 If provided, uses user-scoped auth instead of system auth.
+            filter: Optional filter to narrow results by tool name or ORD ID.
+                If None or empty, all tools are included.
 
         Returns:
             List of MCPTool objects from all MCP servers.
@@ -388,6 +400,15 @@ class AgentGatewayClient:
 
             # With user token for principal propagation:
             tools = await agw_client.list_mcp_tools(user_token="user-jwt")
+
+            # With filters
+            from sap_cloud_sdk.agentgateway import MCPToolFilter
+            tools = await agw_client.list_mcp_tools(
+                filter=MCPToolFilter(
+                    names=["get-sales-order"],
+                    ord_ids=["sap.s4:apiAccess:salesOrder:v1"],
+                )
+            )
             ```
         """
         try:
@@ -404,7 +425,10 @@ class AgentGatewayClient:
                 )
                 credentials = load_customer_credentials(credentials_path)
                 return await get_mcp_tools_customer(
-                    credentials, auth.access_token, self._config.timeout
+                    credentials,
+                    auth.access_token,
+                    self._config.timeout,
+                    filter=filter,
                 )
 
             # Check for transparent mode
@@ -412,7 +436,10 @@ class AgentGatewayClient:
                 logger.info(_LOG_TRANSPARENT_MODE)
                 credentials = load_customer_credentials_from_env()
                 return await get_mcp_tools_customer(
-                    credentials, auth.access_token, self._config.timeout
+                    credentials,
+                    auth.access_token,
+                    self._config.timeout,
+                    filter=filter,
                 )
 
             # LoB flow - requires tenant_subdomain
@@ -422,7 +449,10 @@ class AgentGatewayClient:
             else:
                 auth = await self.get_system_auth()
             return await get_mcp_tools_lob(
-                tenant, auth.access_token, self._config.timeout
+                tenant,
+                auth.access_token,
+                self._config.timeout,
+                filter=filter,
             )
 
         except AgentGatewaySDKError:
@@ -484,13 +514,11 @@ class AgentGatewayClient:
 
             tenant = self._resolve_tenant_subdomain()
             auth = await self.get_system_auth()
-            f = filter or AgentCardFilter()
             return await get_agent_cards_lob(
                 tenant,
                 auth.access_token,
                 self._config.timeout,
-                agent_names=f.agent_names or None,
-                ord_ids=f.ord_ids or None,
+                filter=filter,
             )
         except AgentGatewaySDKError:
             raise

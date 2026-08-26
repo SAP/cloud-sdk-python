@@ -10,6 +10,7 @@ from sap_cloud_sdk.dms.exceptions import (
     DMSPermissionDeniedException,
 )
 from sap_cloud_sdk.dms.model import DMSCredentials
+from sap_cloud_sdk.core._tenant import _validate_tenant_subdomain
 
 logger = logging.getLogger(__name__)
 
@@ -65,6 +66,8 @@ class Auth:
     def _resolve_token_url(self, tenant_subdomain: Optional[str]) -> str:
         if not tenant_subdomain:
             return self._credentials.token_url
+        _validate_tenant_subdomain(tenant_subdomain)
+
         logger.debug("Resolving token URL for tenant '%s'", tenant_subdomain)
         return self._credentials.token_url.replace(
             self._credentials.identityzone,

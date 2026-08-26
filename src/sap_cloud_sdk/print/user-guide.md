@@ -16,10 +16,17 @@ See further information about installation in the [main documentation](/README.m
 ```python
 from sap_cloud_sdk.print import create_client
 from sap_cloud_sdk.print import (
-    PrintQueue, PrintProfile, PrintContent, PrintTask, PrintTaskMetadata,
+    PrintQueue,
+    PrintProfile,
+    PrintContent,
+    PrintTask,
+    PrintTaskMetadata,
 )
 from sap_cloud_sdk.print.exceptions import (
-    ClientCreationError, ConfigError, PrintOperationError, HttpError,
+    ClientCreationError,
+    ConfigError,
+    PrintOperationError,
+    HttpError,
 )
 ```
 

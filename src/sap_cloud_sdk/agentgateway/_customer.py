@@ -32,6 +32,7 @@ from sap_cloud_sdk.agentgateway._models import (
     CustomerCredentials,
     IntegrationDependency,
     MCPTool,
+    MCPToolFilter,
 )
 from sap_cloud_sdk.agentgateway._token_cache import _TokenCache
 from sap_cloud_sdk.agentgateway.exceptions import AgentGatewaySDKError
@@ -642,7 +643,7 @@ async def _list_server_tools(
         async with streamable_http_client(url, http_client=http_client) as (
             read,
             write,
-            _,
+            *_,
         ):
             async with ClientSession(read, write) as session:
                 init_result = await session.initialize()
@@ -672,10 +673,30 @@ async def _list_server_tools(
                 ]
 
 
+def _log_mcp_server_error(ord_id: str, exc: BaseException) -> None:
+    # Unwrap ExceptionGroup from anyio to surface the real HTTP error body
+    if isinstance(exc, BaseExceptionGroup):
+        for inner in exc.exceptions:
+            _log_mcp_server_error(ord_id, inner)
+        return
+    if isinstance(exc, httpx.HTTPStatusError):
+        logger.error(
+            "Failed to load tools from %s (HTTP %d): %s",
+            ord_id,
+            exc.response.status_code,
+            exc.response.text[:500],
+        )
+    else:
+        logger.exception(
+            "Failed to load tools from %s — skipping", ord_id, exc_info=exc
+        )
+
+
 async def get_mcp_tools_customer(
     credentials: CustomerCredentials,
     system_token: str,
     timeout: float,
+    filter: MCPToolFilter | None = None,
 ) -> list[MCPTool]:
     """List all MCP tools from servers defined in credentials.
 
@@ -686,19 +707,24 @@ async def get_mcp_tools_customer(
         credentials: Customer credentials with integrationDependencies.
         system_token: Pre-fetched raw system token for authentication.
         timeout: HTTP timeout in seconds for MCP server calls.
+        filter: Optional MCPToolFilter narrowing results by tool name or ORD ID.
+            If None or empty, all tools are included.
 
     Returns:
         List of MCPTool objects from all servers.
-
-    Raises:
-        AgentGatewaySDKError: If integrationDependencies is empty.
     """
+    f = filter or MCPToolFilter()
     dependencies = credentials.integration_dependencies
 
     if not dependencies:
-        raise AgentGatewaySDKError(
+        logger.warning(
             "integrationDependencies is empty in credentials — no MCP servers configured."
         )
+        return []
+
+    if f.ord_ids:
+        ord_ids_set = set(f.ord_ids)
+        dependencies = [d for d in dependencies if d.ord_id in ord_ids_set]
 
     logger.info("Discovering tools from %d MCP server(s)", len(dependencies))
 
@@ -717,8 +743,13 @@ async def get_mcp_tools_customer(
             server_tools = await _list_server_tools(url, system_token, timeout)
             tools.extend(server_tools)
             logger.debug("Loaded %d tool(s) from %s", len(server_tools), dep.ord_id)
-        except Exception:
-            logger.exception("Failed to load tools from %s — skipping", dep.ord_id)
+        except Exception as exc:
+            _log_mcp_server_error(dep.ord_id, exc)
+
+    # Post-fetch filter: tool names are only known after fetching
+    if f.names:
+        names_set = set(f.names)
+        tools = [t for t in tools if t.name in names_set]
 
     logger.info(
         "Loaded %d MCP tool(s) from %d server(s)", len(tools), len(dependencies)
@@ -758,7 +789,7 @@ async def call_mcp_tool_customer(
         async with streamable_http_client(tool.url, http_client=http_client) as (
             read,
             write,
-            _,
+            *_,
         ):
             async with ClientSession(read, write) as session:
                 await session.initialize()
@@ -769,4 +800,9 @@ async def call_mcp_tool_customer(
                     return ""
 
                 first = result.content[0]
-                return str(getattr(first, "text", ""))
+                text = str(getattr(first, "text", ""))
+
+                if result.isError:
+                    logger.error("Tool '%s' returned an error: %s", tool.name, text)
+
+                return text

@@ -22,8 +22,8 @@ from sap_cloud_sdk.core.runtime_context._context import (
     set_context,
 )
 from sap_cloud_sdk.core.runtime_context.providers._ias import (
+    APP_TENANT_ID,
     GLOBAL_TENANT_ID,
-    TENANT_ID,
     USER_ID,
 )
 from sap_cloud_sdk.core.runtime_context.starlette import _merge
@@ -242,7 +242,7 @@ class TestIASContextProvider:
         envelope = _make_envelope({"authorization": "Bearer tok"})
         with patch(_PATCH_PARSE, return_value=claims):
             ctx = IASContextProvider().extract(envelope)
-        assert ctx.get(TENANT_ID) == "t-1"
+        assert ctx.get(APP_TENANT_ID) == "t-1"
         assert ctx.get(USER_ID) == "u-1"
 
     def test_does_not_set_trigger_type(self):
@@ -264,7 +264,7 @@ class TestIASContextProvider:
     def test_returns_empty_context_when_no_auth_header(self):
         envelope = _make_envelope({})
         ctx = IASContextProvider().extract(envelope)
-        assert ctx.get(TENANT_ID) is None
+        assert ctx.get(APP_TENANT_ID) is None
         assert ctx.get(USER_ID) is None
         assert ctx.get(GLOBAL_TENANT_ID) is None
 
@@ -272,7 +272,7 @@ class TestIASContextProvider:
         envelope = _make_envelope({"authorization": "Bearer bad"})
         with patch(_PATCH_PARSE, side_effect=ValueError("bad")):
             ctx = IASContextProvider().extract(envelope)
-        assert ctx.get(TENANT_ID) is None
+        assert ctx.get(APP_TENANT_ID) is None
         assert ctx.get(USER_ID) is None
 
     def test_tenant_id_none_when_claim_absent(self):
@@ -280,7 +280,7 @@ class TestIASContextProvider:
         envelope = _make_envelope({"authorization": "Bearer tok"})
         with patch(_PATCH_PARSE, return_value=claims):
             ctx = IASContextProvider().extract(envelope)
-        assert ctx.get(TENANT_ID) is None
+        assert ctx.get(APP_TENANT_ID) is None
         assert ctx.get(USER_ID) == "u-1"
 
     def test_satisfies_context_provider_protocol(self):

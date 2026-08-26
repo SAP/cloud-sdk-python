@@ -7,6 +7,7 @@ variables and configure them for use with LiteLLM.
 import json
 import logging
 import os
+import threading
 from typing import Optional
 
 from sap_cloud_sdk.core.secret_resolver import resolve_base_mount
@@ -175,8 +176,73 @@ def set_aicore_config(instance_name: str = "aicore-instance") -> None:
     set_filtering()
 
 
+def _get_secret_dir_mtime(instance_name: str = "aicore-instance") -> float:
+    """Return the mtime of the AI Core secret directory, or 0.0 if it does not exist."""
+    secret_dir = os.path.join(resolve_base_mount(), "aicore", instance_name)
+    try:
+        return os.stat(secret_dir).st_mtime
+    except OSError:
+        return 0.0
+
+
+def watch_aicore_config(
+    instance_name: str = "aicore-instance",
+    interval: float = 30.0,
+    stop_event: threading.Event | None = None,
+) -> threading.Thread:
+    """Start a daemon thread that proactively reloads AI Core credentials
+    when the mounted secret volume changes.
+
+    Polls the secret directory mtime every ``interval`` seconds. On change,
+    calls :func:`set_aicore_config` before LiteLLM's cached OAuth token
+    expires — avoiding 401 errors entirely rather than recovering from them.
+
+    Kubernetes projected volumes perform an atomic symlink swap on rotation,
+    which changes the directory mtime. Both ``secret`` and ``projected``
+    volume types are covered.
+
+    Returns the daemon thread. Stop it cleanly via ``stop_event.set()``.
+
+    Each call starts a new daemon thread — avoid calling more than once per process.
+
+    Typical usage::
+
+        import threading
+        from sap_cloud_sdk.aicore import set_aicore_config, watch_aicore_config
+
+        set_aicore_config()
+
+        _stop = threading.Event()
+        watch_aicore_config(stop_event=_stop)
+        # at shutdown: _stop.set()
+    """
+    if stop_event is None:
+        stop_event = threading.Event()
+
+    last_mtime = _get_secret_dir_mtime(instance_name)
+
+    def _watch() -> None:
+        nonlocal last_mtime
+        while not stop_event.wait(timeout=interval):
+            try:
+                current_mtime = _get_secret_dir_mtime(instance_name)
+                if current_mtime != last_mtime:
+                    logger.info(
+                        "AI Core secret volume changed — proactively reloading credentials"
+                    )
+                    set_aicore_config(instance_name=instance_name)
+                    last_mtime = current_mtime
+            except Exception:
+                logger.exception("Error during proactive AI Core credential reload")
+
+    thread = threading.Thread(target=_watch, daemon=True, name="aicore-secret-watcher")
+    thread.start()
+    return thread
+
+
 __all__ = [
     "set_aicore_config",
+    "watch_aicore_config",
     "set_filtering",
     "disable_filtering",
     "completion",

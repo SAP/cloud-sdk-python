@@ -85,6 +85,7 @@ def completion(*args: Any, **kwargs: Any) -> Any:
     except litellm.AuthenticationError:
         # Local import avoids circular dep: completion ← __init__ ← completion
         from sap_cloud_sdk.aicore import set_aicore_config
+
         logger.info("AI Core credentials reloading after authentication failure")
         set_aicore_config()
         return litellm.completion(*args, **kwargs)
@@ -104,6 +105,7 @@ async def acompletion(*args: Any, **kwargs: Any) -> Any:
         return await litellm.acompletion(*args, **kwargs)
     except litellm.AuthenticationError:
         from sap_cloud_sdk.aicore import set_aicore_config
+
         logger.info("AI Core credentials reloading after authentication failure")
         set_aicore_config()
         return await litellm.acompletion(*args, **kwargs)

@@ -138,13 +138,13 @@ def set_aicore_config(instance_name: str = "aicore-instance") -> None:
     """
     # Load secrets
     client_id = _get_secret("AICORE_CLIENT_ID", "clientid", instance_name=instance_name)
+    client_secret = _get_secret(
+        "AICORE_CLIENT_SECRET", "clientsecret", instance_name=instance_name
+    )
     auth_url = _get_secret("AICORE_AUTH_URL", "url", instance_name=instance_name)
     base_url = _get_aicore_base_url(instance_name)
     resource_group = _get_secret(
         "AICORE_RESOURCE_GROUP", default="default", instance_name=instance_name
-    )
-    client_secret = _get_secret(
-        "AICORE_CLIENT_SECRET", "clientsecret", instance_name=instance_name
     )
 
     # Ensure AICORE_AUTH_URL has /oauth/token suffix
@@ -157,14 +157,14 @@ def set_aicore_config(instance_name: str = "aicore-instance") -> None:
     # Set environment variables for LiteLLM
     if client_id:
         os.environ["AICORE_CLIENT_ID"] = client_id
+    if client_secret:
+        os.environ["AICORE_CLIENT_SECRET"] = client_secret
     if auth_url:
         os.environ["AICORE_AUTH_URL"] = auth_url
     if base_url:
         os.environ["AICORE_BASE_URL"] = base_url
     if resource_group:
         os.environ["AICORE_RESOURCE_GROUP"] = resource_group
-    if client_secret:
-        os.environ["AICORE_CLIENT_SECRET"] = client_secret
 
     # Log configuration completion (excluding sensitive information)
     logger.info("AI Core configuration has been set successfully")

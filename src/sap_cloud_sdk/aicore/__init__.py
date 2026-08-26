@@ -187,7 +187,7 @@ def _get_secret_dir_mtime(instance_name: str = "aicore-instance") -> float:
 
 def watch_aicore_config(
     instance_name: str = "aicore-instance",
-    interval: float = 30.0,
+    interval: float = 60.0,
     stop_event: threading.Event | None = None,
 ) -> threading.Thread:
     """Start a daemon thread that proactively reloads AI Core credentials

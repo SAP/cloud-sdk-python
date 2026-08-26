@@ -268,6 +268,54 @@ class TestAzureClientHeadObject:
             client.head_object("")
 
 
+class TestCreateContainerClient:
+    """Test AzureClient._create_container_client in isolation (mirrors TestCreateStorageClient in GCS)."""
+
+    def test_build_container_client_calls_from_container_url_with_correct_args(self):
+        from unittest.mock import sentinel
+
+        cfg = AzureConfig(
+            account_name="account",
+            container_name="container",
+            container_uri="https://account.blob.core.windows.net/container",
+            region="westus",
+            sas_token="sv=2020",
+        )
+
+        with patch(
+            "azure.storage.blob.ContainerClient.from_container_url",
+            return_value=sentinel.container_client,
+        ) as mock_from_url:
+            instance = object.__new__(AzureClient)
+            result = instance._create_container_client(cfg)
+
+        mock_from_url.assert_called_once_with(
+            cfg.container_uri, credential=cfg.sas_token
+        )
+        assert result is sentinel.container_client
+
+    def test_import_error_raises_client_creation_error(self):
+        from sap_cloud_sdk.objectstore.exceptions import ClientCreationError
+
+        cfg = AzureConfig(
+            account_name="account",
+            container_name="container",
+            container_uri="https://account.blob.core.windows.net/container",
+            region="westus",
+            sas_token="sv=2020",
+        )
+
+        # Simulate the ImportError branch by patching ContainerClient.from_container_url
+        # to raise ImportError (which the method catches and re-wraps).
+        with patch(
+            "azure.storage.blob.ContainerClient.from_container_url",
+            side_effect=ImportError("azure-storage-blob not installed"),
+        ):
+            instance = object.__new__(AzureClient)
+            with pytest.raises(ClientCreationError, match="sap-cloud-sdk\\[azure\\]"):
+                instance._create_container_client(cfg)
+
+
 class TestAzureClientObjectExists:
 
     def test_object_exists_returns_true_when_present(self):

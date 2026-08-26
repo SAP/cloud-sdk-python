@@ -74,8 +74,8 @@ class TestDetectProvider:
 
 class TestReadBindingKeysLegacyLayout:
 
-    def test_legacy_layout_returns_lowercased_file_names(self, tmp_path, monkeypatch):
-        """Files under {base}/objectstore/{instance}/ are returned as lowercased keys."""
+    def test_legacy_layout_returns_verbatim_file_names(self, tmp_path, monkeypatch):
+        """Files under {base}/objectstore/{instance}/ are returned verbatim (no case-folding)."""
         instance = "default"
         legacy_dir = tmp_path / "objectstore" / instance
         legacy_dir.mkdir(parents=True)
@@ -92,9 +92,10 @@ class TestReadBindingKeysLegacyLayout:
 
         keys = read_binding_keys(instance)
 
+        # Keys are returned as-is (verbatim filenames); no lowercasing here.
         assert "access_key_id" in keys
-        assert "secret_access_key" in keys
-        assert "host" in keys
+        assert "SECRET_ACCESS_KEY" in keys
+        assert "HOST" in keys
 
     def test_legacy_layout_missing_dir_returns_empty(self, tmp_path, monkeypatch):
         monkeypatch.delenv("SERVICE_BINDING_ROOT", raising=False)
@@ -131,8 +132,8 @@ class TestReadBindingKeysFlatLayout:
 
 class TestReadBindingKeysEnvLayout:
 
-    def test_env_vars_stripped_and_lowercased(self, monkeypatch, tmp_path):
-        """CLOUD_SDK_CFG_OBJECTSTORE_{INSTANCE}_* env vars are picked up."""
+    def test_env_vars_stripped_verbatim(self, monkeypatch, tmp_path):
+        """CLOUD_SDK_CFG_OBJECTSTORE_{INSTANCE}_* env vars are picked up; suffix is returned as-is (uppercase)."""
         monkeypatch.delenv("SERVICE_BINDING_ROOT", raising=False)
         monkeypatch.setattr(
             "sap_cloud_sdk.objectstore._detect.resolve_base_mount",
@@ -144,9 +145,10 @@ class TestReadBindingKeysEnvLayout:
 
         keys = read_binding_keys("default")
 
-        assert "access_key_id" in keys
-        assert "secret_access_key" in keys
-        assert "host" in keys
+        # The prefix is stripped; the remaining suffix is returned as-is (uppercase).
+        assert "ACCESS_KEY_ID" in keys
+        assert "SECRET_ACCESS_KEY" in keys
+        assert "HOST" in keys
 
     def test_env_vars_with_hyphens_in_instance_name(self, monkeypatch, tmp_path):
         """Hyphens in instance names become underscores in the env prefix."""
@@ -161,7 +163,8 @@ class TestReadBindingKeysEnvLayout:
 
         keys = read_binding_keys("my-instance")
 
-        assert "access_key_id" in keys
+        # The suffix after the prefix is returned verbatim (uppercase).
+        assert "ACCESS_KEY_ID" in keys
 
     def test_env_vars_different_instance_not_picked_up(self, monkeypatch, tmp_path):
         monkeypatch.delenv("SERVICE_BINDING_ROOT", raising=False)

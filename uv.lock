@@ -4037,7 +4037,9 @@ name = "sap-cloud-sdk"
 version = "0.45.1"
 source = { editable = "." }
 dependencies = [
+    { name = "azure-storage-blob" },
     { name = "cryptography" },
+    { name = "google-cloud-storage" },
     { name = "grpcio" },
     { name = "hatchling" },
     { name = "httpx" },
@@ -4072,9 +4074,6 @@ dependencies = [
 aiohttp = [
     { name = "aiohttp" },
 ]
-azure = [
-    { name = "azure-storage-blob" },
-]
 django = [
     { name = "django", version = "5.2.16", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12'" },
     { name = "django", version = "6.0.7", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12'" },
@@ -4087,9 +4086,6 @@ fastapi = [
 ]
 flask = [
     { name = "flask" },
-]
-gcs = [
-    { name = "google-cloud-storage" },
 ]
 langgraph = [
     { name = "langgraph" },
@@ -4134,12 +4130,12 @@ dev = [
 requires-dist = [
     { name = "a2a-sdk", marker = "extra == 'extensibility'", specifier = ">=0.2.0" },
     { name = "aiohttp", marker = "extra == 'aiohttp'", specifier = ">=3.9.0" },
-    { name = "azure-storage-blob", marker = "extra == 'azure'", specifier = ">=12.20.0" },
+    { name = "azure-storage-blob", specifier = ">=12.20.0" },
     { name = "cryptography", specifier = ">=46.0.3" },
     { name = "django", marker = "extra == 'django'", specifier = ">=4.0" },
     { name = "fastapi", marker = "extra == 'fastapi'", specifier = ">=0.100.0" },
     { name = "flask", marker = "extra == 'flask'", specifier = ">=3.0" },
-    { name = "google-cloud-storage", marker = "extra == 'gcs'", specifier = ">=2.18.0" },
+    { name = "google-cloud-storage", specifier = ">=2.18.0" },
     { name = "grpcio", specifier = ">=1.60.0" },
     { name = "hatchling", specifier = "~=1.27.0" },
     { name = "httpx", specifier = ">=0.27.0" },
@@ -4172,7 +4168,7 @@ requires-dist = [
     { name = "starlette", marker = "extra == 'starlette'", specifier = ">=0.40.0" },
     { name = "traceloop-sdk", specifier = "~=0.61.0" },
 ]
-provides-extras = ["extensibility", "azure", "gcs", "starlette", "fastapi", "aiohttp", "sqlalchemy", "django", "flask", "langgraph"]
+provides-extras = ["extensibility", "starlette", "fastapi", "aiohttp", "sqlalchemy", "django", "flask", "langgraph"]
 
 [package.metadata.requires-dev]
 dev = [

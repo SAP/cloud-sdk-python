@@ -89,7 +89,7 @@ class AzureClient:
         to construct a ContainerClient — avoids double-appending the container path.
         """
         try:
-            from azure.storage.blob import ContainerClient  # lazy: optional extra
+            from azure.storage.blob import ContainerClient
 
             return ContainerClient.from_container_url(
                 cfg.container_uri, credential=cfg.sas_token
@@ -124,7 +124,7 @@ class AzureClient:
         validate_put_from_bytes(name, data, content_type)
 
         try:
-            from azure.storage.blob import ContentSettings  # lazy
+            from azure.storage.blob import ContentSettings
 
             self._blob_client(name).upload_blob(
                 data,
@@ -153,7 +153,7 @@ class AzureClient:
         validate_put_object(name, stream, size, content_type)
 
         try:
-            from azure.storage.blob import ContentSettings  # lazy
+            from azure.storage.blob import ContentSettings
 
             self._blob_client(name).upload_blob(
                 stream,
@@ -182,7 +182,7 @@ class AzureClient:
         validate_put_from_file(name, file_path, content_type)
 
         try:
-            from azure.storage.blob import ContentSettings  # lazy
+            from azure.storage.blob import ContentSettings
 
             if not os.path.isfile(file_path):
                 raise ObjectOperationError(f"File not found: {file_path}")
@@ -238,7 +238,7 @@ class AzureClient:
             self._blob_client(name).delete_blob()
         except Exception as e:
             try:
-                from azure.core.exceptions import ResourceNotFoundError  # lazy
+                from azure.core.exceptions import ResourceNotFoundError
 
                 if isinstance(e, ResourceNotFoundError):
                     return  # idempotent
@@ -343,7 +343,7 @@ class AzureClient:
             from azure.core.exceptions import (
                 HttpResponseError,
                 ResourceNotFoundError,
-            )  # lazy
+            )
 
             if isinstance(exc, ResourceNotFoundError) or (
                 isinstance(exc, HttpResponseError) and exc.status_code == 404

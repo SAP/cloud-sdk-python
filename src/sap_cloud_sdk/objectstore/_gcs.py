@@ -56,8 +56,8 @@ class GcsClient:
             import base64
             import json
 
-            from google.cloud import storage  # lazy: optional extra
-            from google.oauth2 import service_account  # lazy: optional extra
+            from google.cloud import storage
+            from google.oauth2 import service_account
 
             info = json.loads(base64.b64decode(cfg.base64_encoded_private_key_data))
             creds = service_account.Credentials.from_service_account_info(info)
@@ -187,7 +187,7 @@ class GcsClient:
             blob.delete()
         except Exception as e:
             try:
-                from google.cloud.exceptions import NotFound  # lazy
+                from google.cloud.exceptions import NotFound
 
                 if isinstance(e, NotFound):
                     return  # idempotent
@@ -295,7 +295,7 @@ class GcsClient:
     def _map_gcs_error(self, exc: Exception, name: str, operation: str) -> NoReturn:
         """Map GCS SDK exceptions to objectstore exceptions and re-raise."""
         try:
-            from google.cloud.exceptions import NotFound  # lazy
+            from google.cloud.exceptions import NotFound
 
             if isinstance(exc, NotFound):
                 raise ObjectNotFoundError(f"Object '{name}' not found") from exc

@@ -10,6 +10,8 @@ authors = [
 requires-python = ">=3.11"
 dependencies = [
     "minio~=7.2.16",
+    "azure-storage-blob>=12.20.0",
+    "google-cloud-storage>=2.18.0",
     "setuptools>=83.0",
     "requests>=2.33.0",
     "requests-oauthlib~=2.0.0",
@@ -42,8 +44,6 @@ dependencies = [
 
 [project.optional-dependencies]
 extensibility = ["a2a-sdk>=0.2.0"]
-azure = ["azure-storage-blob>=12.20.0"]
-gcs = ["google-cloud-storage>=2.18.0"]
 starlette = ["starlette>=0.40.0"]
 fastapi = ["fastapi>=0.100.0"]
 aiohttp = ["aiohttp>=3.9.0"]

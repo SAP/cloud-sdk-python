@@ -98,16 +98,16 @@ class CustomerCredentials:
 
 
 @dataclass
-class AGWJsonRpcError:
+class JsonRpcError:
     """Parsed JSON-RPC error from an Agent Gateway response.
 
     AGW returns HTTP 200 with a JSON-RPC error body when the request is
-    structurally valid but the server encountered an error, e.g.:
-
-        {"jsonrpc": "2.0", "error": {"code": -32603, "message": "Internal Server Error"}}
+    structurally valid but the server encountered an error.
+    
+    Example: {"jsonrpc": "2.0", "error": {"code": -32603, "message": "Internal Server Error"}}
 
     Attributes:
-        code: JSON-RPC error code (e.g. -32603 for internal error).
+        code: JSON-RPC error code.
         message: Human-readable error message from AGW.
     """
 
@@ -115,7 +115,7 @@ class AGWJsonRpcError:
     message: str
 
     @classmethod
-    def parse(cls, text: str) -> "AGWJsonRpcError | None":
+    def parse(cls, text: str) -> "JsonRpcError | None":
         try:
             data = json.loads(text)
             error = data.get("error", {})

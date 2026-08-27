@@ -262,6 +262,28 @@ class TestLoadFromEnvOrMountAzure:
 
 
 class TestLoadFromEnvOrMountGcs:
+    def test_loads_camel_case_keys_from_service_binding_mount(
+        self, tmp_path, monkeypatch
+    ):
+        binding_dir = tmp_path / "objectstore"
+        binding_dir.mkdir()
+        secrets = {
+            "base64EncodedPrivateKeyData": "dGVzdA==",
+            "projectId": "my-project",
+            "bucket": "my-bucket",
+            "key_algo": "RSA",
+            "region": "us-central1",
+        }
+        for name, value in secrets.items():
+            (binding_dir / name).write_text(value, encoding="utf-8")
+        monkeypatch.setenv("SERVICE_BINDING_ROOT", str(tmp_path))
+
+        cfg = load_from_env_or_mount(ObjectStoreProvider.GCS, "default")
+
+        assert isinstance(cfg, GcsConfig)
+        assert cfg.base64_encoded_private_key_data == "dGVzdA=="
+        assert cfg.project_id == "my-project"
+        assert cfg.bucket == "my-bucket"
 
     def test_returns_gcs_config_for_gcs_provider(self):
         def populate_binding(

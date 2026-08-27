@@ -1,6 +1,6 @@
 """Binding data and client configuration for object store backends."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Union
 
 from sap_cloud_sdk.core.secret_resolver import read_from_mount_and_fallback_to_env_var
@@ -148,8 +148,10 @@ class GcsBindingData:
     Filled by the secret resolver; all fields are plain strings.
     """
 
-    base64EncodedPrivateKeyData: str = ""
-    projectId: str = ""
+    base64EncodedPrivateKeyData: str = field(
+        default="", metadata={"secret": "base64EncodedPrivateKeyData"}
+    )
+    projectId: str = field(default="", metadata={"secret": "projectId"})
     bucket: str = ""
     key_algo: str = ""
     region: str = ""

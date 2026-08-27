@@ -124,7 +124,14 @@ async def handler(request):
 ```
 
 `is_feature_enabled` returns `False` when the header is absent or the toggle
-name is not in the active list. For direct access to the full list:
+name is not in the active list.
+
+> **Common pitfall:** `is_feature_enabled` always returns `False` if `bootstrap(app)` was never
+> called. Without it, no middleware is registered, the `dwc-stage-configuration` header is never
+> parsed, and `get_context()` returns an empty context for every request. Make sure `bootstrap` is
+> called once at app startup before the server starts accepting requests.
+
+For direct access to the full list:
 
 ```python
 from sap_cloud_sdk.core.runtime_context import FEATURE_TOGGLES, get_context

@@ -26,7 +26,7 @@ from sap_cloud_sdk.agent_memory.exceptions import (
     AgentMemoryConfigError,
     AgentMemoryValidationError,
 )
-from sap_cloud_sdk.core._http_client import HttpClient
+from sap_cloud_sdk.core._http_client import HttpClient, HttpMethod
 
 
 def _parse_call_params(call_args) -> dict:
@@ -188,7 +188,7 @@ class TestMemoryCRUD:
         assert isinstance(memory, Memory)
         assert memory.id == "mem-1"
         call = mock_http.request.call_args
-        assert call[0][0] == "POST"
+        assert call[0][0] == HttpMethod.POST
         assert call[1]["json"]["agentID"] == "agent-a"
         assert call[1]["json"]["invokerID"] == "user-b"
         assert call[1]["json"]["content"] == "some memory"
@@ -226,7 +226,7 @@ class TestMemoryCRUD:
 
         client.add_memory("a", "u", "x")
 
-        assert mock_http.request.call_args[0][0] == "POST"
+        assert mock_http.request.call_args[0][0] == HttpMethod.POST
         assert mock_http.request.call_args[0][1] == MEMORIES
 
     def test_get_memory_calls_get_with_memory_id(self):
@@ -239,7 +239,7 @@ class TestMemoryCRUD:
         memory = client.get_memory("mem-1")
 
         assert memory.id == "mem-1"
-        assert mock_http.request.call_args[0][0] == "GET"
+        assert mock_http.request.call_args[0][0] == HttpMethod.GET
         assert mock_http.request.call_args[0][1] == f"{MEMORIES}(mem-1)"
 
     def test_update_memory_calls_patch(self):
@@ -249,7 +249,7 @@ class TestMemoryCRUD:
 
         client.update_memory("mem-1", content="updated")
 
-        assert mock_http.request.call_args[0][0] == "PATCH"
+        assert mock_http.request.call_args[0][0] == HttpMethod.PATCH
         assert mock_http.request.call_args[1]["json"]["content"] == "updated"
 
     def test_update_memory_excludes_none_fields(self):
@@ -279,7 +279,7 @@ class TestMemoryCRUD:
 
         client.delete_memory("mem-1")
 
-        assert mock_http.request.call_args[0][0] == "DELETE"
+        assert mock_http.request.call_args[0][0] == HttpMethod.DELETE
         assert mock_http.request.call_args[0][1] == f"{MEMORIES}(mem-1)"
 
 
@@ -504,7 +504,7 @@ class TestSearchMemories:
 
         client.search_memories("agent-a", "user-b", "my query", threshold=0.7, limit=5)
 
-        assert mock_http.request.call_args[0][0] == "POST"
+        assert mock_http.request.call_args[0][0] == HttpMethod.POST
         assert mock_http.request.call_args[0][1] == MEMORY_SEARCH
         payload = mock_http.request.call_args[1]["json"]
         assert payload["agentID"] == "agent-a"
@@ -576,7 +576,7 @@ class TestMessageCRUD:
 
         client.add_message("a", "u", "g", MessageRole.USER, "hi")
 
-        assert mock_http.request.call_args[0][0] == "POST"
+        assert mock_http.request.call_args[0][0] == HttpMethod.POST
         assert mock_http.request.call_args[0][1] == MESSAGES
 
     def test_add_message_with_metadata(self):
@@ -615,7 +615,7 @@ class TestMessageCRUD:
         message = client.get_message("msg-1")
 
         assert message.id == "msg-1"
-        assert mock_http.request.call_args[0][0] == "GET"
+        assert mock_http.request.call_args[0][0] == HttpMethod.GET
         assert mock_http.request.call_args[0][1] == f"{MESSAGES}(msg-1)"
 
     def test_delete_message_calls_delete(self):
@@ -625,7 +625,7 @@ class TestMessageCRUD:
 
         client.delete_message("msg-1")
 
-        assert mock_http.request.call_args[0][0] == "DELETE"
+        assert mock_http.request.call_args[0][0] == HttpMethod.DELETE
         assert mock_http.request.call_args[0][1] == f"{MESSAGES}(msg-1)"
 
 
@@ -813,7 +813,7 @@ class TestRetentionConfig:
         assert rc.message_days == 30
         assert rc.memory_days == 90
         assert rc.usage_log_days == 180
-        assert mock_http.request.call_args[0][0] == "GET"
+        assert mock_http.request.call_args[0][0] == HttpMethod.GET
         assert mock_http.request.call_args[0][1] == RETENTION_CONFIG
 
     def test_update_retention_config(self):
@@ -823,7 +823,7 @@ class TestRetentionConfig:
 
         client.update_retention_config(message_days=60)
 
-        assert mock_http.request.call_args[0][0] == "PATCH"
+        assert mock_http.request.call_args[0][0] == HttpMethod.PATCH
         assert mock_http.request.call_args[0][1] == RETENTION_CONFIG
         payload = mock_http.request.call_args[1]["json"]
         assert payload["messageDays"] == 60

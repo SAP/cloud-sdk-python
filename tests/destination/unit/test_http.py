@@ -28,7 +28,7 @@ class TestRequest:
 
         assert result is resp
         http.request.assert_called_once_with(
-            "GET",
+            HttpMethod.GET,
             "/v1/instanceDestinations/my-dest",
             tenant_subdomain="tenant-1",
             params=None,
@@ -43,14 +43,6 @@ class TestRequest:
 
         call_args = http.request.call_args
         assert call_args[0][1] == "/v1/subaccountDestinations"
-
-    def test_string_method_accepted(self):
-        http, _ = _mock_http(200)
-
-        _request(http, "get", "v1/foo")
-
-        call_args = http.request.call_args
-        assert call_args[0][0] == "GET"
 
     def test_post_passes_json_body(self):
         http, _ = _mock_http(201)

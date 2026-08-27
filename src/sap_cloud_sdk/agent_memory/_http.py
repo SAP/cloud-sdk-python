@@ -12,14 +12,14 @@ from sap_cloud_sdk.agent_memory.exceptions import (
     AgentMemoryHttpError,
     AgentMemoryNotFoundError,
 )
-from sap_cloud_sdk.core._http_client import HttpClient
+from sap_cloud_sdk.core._http_client import HttpClient, HttpMethod
 
 logger = logging.getLogger(__name__)
 
 
 def _request(
     http: HttpClient,
-    method: str,
+    method: HttpMethod,
     path: str,
     *,
     params: Optional[dict[str, Any]] = None,
@@ -27,7 +27,7 @@ def _request(
     **kwargs: Any,
 ) -> dict[str, Any]:
     """Execute an Agent Memory HTTP request and map errors to domain exceptions."""
-    logger.debug("%s %s (tenant=%r)", method, path, tenant_subdomain)
+    logger.debug("%s %s (tenant=%r)", method.value, path, tenant_subdomain)
 
     if params:
         path = f"{path}?{urlencode(params, quote_via=quote)}"
@@ -41,9 +41,9 @@ def _request(
             **kwargs,
         )
     except Timeout as exc:
-        raise AgentMemoryHttpError(f"Request timed out: {method} {path}") from exc
+        raise AgentMemoryHttpError(f"Request timed out: {method.value} {path}") from exc
     except RequestException as exc:
-        raise AgentMemoryHttpError(f"Request failed: {method} {path} — {exc}") from exc
+        raise AgentMemoryHttpError(f"Request failed: {method.value} {path} — {exc}") from exc
     except Exception as exc:
         raise AgentMemoryHttpError(str(exc)) from exc
 
@@ -52,7 +52,7 @@ def _request(
 
     if response.status_code == 404:
         raise AgentMemoryNotFoundError(
-            f"Resource not found: {method} {path}",
+            f"Resource not found: {method.value} {path}",
             status_code=404,
             response_text=response.text,
         )
@@ -60,7 +60,7 @@ def _request(
     if not response.ok:
         raise AgentMemoryHttpError(
             f"Agent Memory service request failed. "
-            f"Method: {method}, Path: {path}, "
+            f"Method: {method.value}, Path: {path}, "
             f"Status: {response.status_code}, Response: {response.text}",
             status_code=response.status_code,
             response_text=response.text,

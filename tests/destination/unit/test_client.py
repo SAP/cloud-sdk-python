@@ -5,6 +5,7 @@ from unittest.mock import Mock, patch
 from requests import Response
 
 from sap_cloud_sdk.destination.client import DestinationClient
+from sap_cloud_sdk.core._http_client import HttpMethod
 from sap_cloud_sdk.destination._models import (
     Destination,
     Label,
@@ -1233,7 +1234,7 @@ class TestDestinationClientLabels:
         labels = [Label(key="env", values=["prod"])]
         destination_client.update_destination_labels("destA", labels, Level.SERVICE_INSTANCE)
         args, kwargs = mock_http.request.call_args
-        assert args[0] == "PUT"
+        assert args[0] == HttpMethod.PUT
         assert args[1] == "/v1/instanceDestinations/destA/labels"
         assert kwargs["json"] == [{"key": "env", "values": ["prod"]}]
         assert kwargs["tenant_subdomain"] is None
@@ -1242,7 +1243,7 @@ class TestDestinationClientLabels:
         labels = [Label(key="env", values=["staging"])]
         destination_client.update_destination_labels("destA", labels, Level.SUB_ACCOUNT)
         args, kwargs = mock_http.request.call_args
-        assert args[0] == "PUT"
+        assert args[0] == HttpMethod.PUT
         assert args[1] == "/v1/subaccountDestinations/destA/labels"
         assert kwargs["json"] == [{"key": "env", "values": ["staging"]}]
         assert kwargs["tenant_subdomain"] is None
@@ -1256,7 +1257,7 @@ class TestDestinationClientLabels:
         patch_obj = PatchLabels(action="ADD", labels=[Label(key="env", values=["prod"])])
         destination_client.patch_destination_labels("destA", patch_obj, Level.SERVICE_INSTANCE)
         args, kwargs = mock_http.request.call_args
-        assert args[0] == "PATCH"
+        assert args[0] == HttpMethod.PATCH
         assert args[1] == "/v1/instanceDestinations/destA/labels"
         assert kwargs["json"] == {"action": "ADD", "labels": [{"key": "env", "values": ["prod"]}]}
         assert kwargs["tenant_subdomain"] is None
@@ -1265,7 +1266,7 @@ class TestDestinationClientLabels:
         patch_obj = PatchLabels(action="DELETE", labels=[Label(key="env", values=[])])
         destination_client.patch_destination_labels("destA", patch_obj, Level.SUB_ACCOUNT)
         args, kwargs = mock_http.request.call_args
-        assert args[0] == "PATCH"
+        assert args[0] == HttpMethod.PATCH
         assert args[1] == "/v1/subaccountDestinations/destA/labels"
         assert kwargs["json"] == {"action": "DELETE", "labels": [{"key": "env", "values": []}]}
         assert kwargs["tenant_subdomain"] is None

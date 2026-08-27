@@ -5,6 +5,7 @@ from unittest.mock import Mock
 from requests import Response
 
 from sap_cloud_sdk.destination.fragment_client import FragmentClient
+from sap_cloud_sdk.core._http_client import HttpMethod
 from sap_cloud_sdk.destination._models import AccessStrategy, Fragment, Label, Level, PatchLabels
 from sap_cloud_sdk.destination.exceptions import (
     DestinationOperationError,
@@ -54,7 +55,7 @@ class TestFragmentClientRead:
         assert fragment.name == "test-fragment"
         assert fragment.properties["URL"] == "https://api.example.com"
         args, kwargs = mock_http.request.call_args
-        assert args[0] == "GET"
+        assert args[0] == HttpMethod.GET
         assert args[1] == "/v1/instanceDestinationFragments/test-fragment"
         assert kwargs["tenant_subdomain"] is None
 
@@ -139,7 +140,7 @@ class TestFragmentClientWrite:
         fragment = Fragment(name="new-fragment", properties={"URL": "https://api.example.com"})
         fragment_client.create_fragment(fragment, level=Level.SUB_ACCOUNT)
         args, kwargs = mock_http.request.call_args
-        assert args[0] == "POST"
+        assert args[0] == HttpMethod.POST
         assert args[1] == "/v1/subaccountDestinationFragments"
         assert kwargs["json"]["FragmentName"] == "new-fragment"
         assert kwargs["json"]["URL"] == "https://api.example.com"
@@ -172,7 +173,7 @@ class TestFragmentClientWrite:
         fragment = Fragment(name="existing-fragment", properties={"URL": "https://updated.example.com"})
         fragment_client.update_fragment(fragment, level=Level.SUB_ACCOUNT)
         args, kwargs = mock_http.request.call_args
-        assert args[0] == "PUT"
+        assert args[0] == HttpMethod.PUT
         assert args[1] == "/v1/subaccountDestinationFragments"
         assert kwargs["json"]["FragmentName"] == "existing-fragment"
 
@@ -197,7 +198,7 @@ class TestFragmentClientWrite:
     def test_delete_fragment_with_tenant(self, fragment_client, mock_http):
         fragment_client.delete_fragment("test-fragment", level=Level.SUB_ACCOUNT, tenant="test-tenant")
         args, kwargs = mock_http.request.call_args
-        assert args[0] == "DELETE"
+        assert args[0] == HttpMethod.DELETE
         assert args[1] == "/v1/subaccountDestinationFragments/test-fragment"
         assert kwargs["tenant_subdomain"] == "test-tenant"
 
@@ -479,7 +480,7 @@ class TestFragmentClientLabels:
         labels = [Label(key="env", values=["prod"])]
         fragment_client.update_fragment_labels("fragA", labels, Level.SERVICE_INSTANCE)
         args, kwargs = mock_http.request.call_args
-        assert args[0] == "PUT"
+        assert args[0] == HttpMethod.PUT
         assert args[1] == "/v1/instanceDestinationFragments/fragA/labels"
         assert kwargs["json"] == [{"key": "env", "values": ["prod"]}]
         assert kwargs["tenant_subdomain"] is None
@@ -500,7 +501,7 @@ class TestFragmentClientLabels:
         patch = PatchLabels(action="ADD", labels=[Label(key="env", values=["prod"])])
         fragment_client.patch_fragment_labels("fragA", patch, Level.SERVICE_INSTANCE)
         args, kwargs = mock_http.request.call_args
-        assert args[0] == "PATCH"
+        assert args[0] == HttpMethod.PATCH
         assert args[1] == "/v1/instanceDestinationFragments/fragA/labels"
         assert kwargs["json"]["action"] == "ADD"
         assert kwargs["tenant_subdomain"] is None

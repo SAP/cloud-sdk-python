@@ -37,7 +37,7 @@ from sap_cloud_sdk.agent_memory.utils._odata import (
 from sap_cloud_sdk.agent_memory.exceptions import (
     AgentMemoryValidationError,
 )
-from sap_cloud_sdk.core._http_client import HttpClient
+from sap_cloud_sdk.core._http_client import HttpClient, HttpMethod
 from sap_cloud_sdk.core.telemetry import Module, Operation, record_metrics
 
 logger = logging.getLogger(__name__)
@@ -147,7 +147,7 @@ class AgentMemoryClient:
         }
         if metadata is not None:
             payload["metadata"] = metadata
-        data = _request(self._http, "POST", MEMORIES, json=payload)
+        data = _request(self._http, HttpMethod.POST, MEMORIES, json=payload)
         return Memory.from_dict(data)
 
     @record_metrics(Module.AGENT_MEMORY, Operation.AGENT_MEMORY_GET_MEMORY)
@@ -166,7 +166,7 @@ class AgentMemoryClient:
             AgentMemoryHttpError: If the request fails.
         """
         _require_non_empty(memory_id=memory_id)
-        data = _request(self._http, "GET", f"{MEMORIES}({memory_id})")
+        data = _request(self._http, HttpMethod.GET, f"{MEMORIES}({memory_id})")
         return Memory.from_dict(data)
 
     @record_metrics(Module.AGENT_MEMORY, Operation.AGENT_MEMORY_UPDATE_MEMORY)
@@ -200,7 +200,7 @@ class AgentMemoryClient:
             payload["content"] = content
         if metadata is not None:
             payload["metadata"] = metadata
-        _request(self._http, "PATCH", f"{MEMORIES}({memory_id})", json=payload)
+        _request(self._http, HttpMethod.PATCH, f"{MEMORIES}({memory_id})", json=payload)
 
     @record_metrics(Module.AGENT_MEMORY, Operation.AGENT_MEMORY_DELETE_MEMORY)
     def delete_memory(self, memory_id: str) -> None:
@@ -215,7 +215,7 @@ class AgentMemoryClient:
             AgentMemoryHttpError: If the request fails.
         """
         _require_non_empty(memory_id=memory_id)
-        _request(self._http, "DELETE", f"{MEMORIES}({memory_id})")
+        _request(self._http, HttpMethod.DELETE, f"{MEMORIES}({memory_id})")
 
     @record_metrics(Module.AGENT_MEMORY, Operation.AGENT_MEMORY_LIST_MEMORIES)
     def list_memories(
@@ -263,7 +263,7 @@ class AgentMemoryClient:
             top=limit,
             skip=offset if offset else None,
         )
-        response = _request(self._http, "GET", MEMORIES, params=params)
+        response = _request(self._http, HttpMethod.GET, MEMORIES, params=params)
         items, _ = extract_value_and_count(response)
         return [Memory.from_dict(item) for item in items]
 
@@ -288,7 +288,7 @@ class AgentMemoryClient:
             top=0,
             count=True,
         )
-        response = _request(self._http, "GET", MEMORIES, params=params)
+        response = _request(self._http, HttpMethod.GET, MEMORIES, params=params)
         _, total = extract_value_and_count(response)
         return total or 0
 
@@ -335,7 +335,7 @@ class AgentMemoryClient:
             "threshold": threshold,
             "top": limit,
         }
-        response = _request(self._http, "POST", MEMORY_SEARCH, json=payload)
+        response = _request(self._http, HttpMethod.POST, MEMORY_SEARCH, json=payload)
         items = response.get("value", [])
         return [SearchResult.from_dict(item) for item in items]
 
@@ -387,7 +387,7 @@ class AgentMemoryClient:
         }
         if metadata is not None:
             payload["metadata"] = metadata
-        data = _request(self._http, "POST", MESSAGES, json=payload)
+        data = _request(self._http, HttpMethod.POST, MESSAGES, json=payload)
         return Message.from_dict(data)
 
     @record_metrics(Module.AGENT_MEMORY, Operation.AGENT_MEMORY_GET_MESSAGE)
@@ -406,7 +406,7 @@ class AgentMemoryClient:
             AgentMemoryHttpError: If the request fails.
         """
         _require_non_empty(message_id=message_id)
-        data = _request(self._http, "GET", f"{MESSAGES}({message_id})")
+        data = _request(self._http, HttpMethod.GET, f"{MESSAGES}({message_id})")
         return Message.from_dict(data)
 
     @record_metrics(Module.AGENT_MEMORY, Operation.AGENT_MEMORY_DELETE_MESSAGE)
@@ -422,7 +422,7 @@ class AgentMemoryClient:
             AgentMemoryHttpError: If the request fails.
         """
         _require_non_empty(message_id=message_id)
-        _request(self._http, "DELETE", f"{MESSAGES}({message_id})")
+        _request(self._http, HttpMethod.DELETE, f"{MESSAGES}({message_id})")
 
     @record_metrics(Module.AGENT_MEMORY, Operation.AGENT_MEMORY_LIST_MESSAGES)
     def list_messages(
@@ -476,7 +476,7 @@ class AgentMemoryClient:
             top=limit,
             skip=offset if offset else None,
         )
-        response = _request(self._http, "GET", MESSAGES, params=params)
+        response = _request(self._http, HttpMethod.GET, MESSAGES, params=params)
         items, _ = extract_value_and_count(response)
         return [Message.from_dict(item) for item in items]
 
@@ -494,7 +494,7 @@ class AgentMemoryClient:
         Raises:
             AgentMemoryHttpError: If the request fails.
         """
-        data = _request(self._http, "GET", RETENTION_CONFIG)
+        data = _request(self._http, HttpMethod.GET, RETENTION_CONFIG)
         return RetentionConfig.from_dict(data)
 
     @record_metrics(Module.AGENT_MEMORY, Operation.AGENT_MEMORY_UPDATE_RETENTION_CONFIG)
@@ -533,6 +533,7 @@ class AgentMemoryClient:
         ):
             if value is not None and value < 0:
                 raise AgentMemoryValidationError(f"'{name}' must be >= 0")
+        
         payload: dict[str, Any] = {}
         if message_days is not None:
             payload["messageDays"] = message_days
@@ -540,4 +541,5 @@ class AgentMemoryClient:
             payload["memoryDays"] = memory_days
         if usage_log_days is not None:
             payload["usageLogDays"] = usage_log_days
-        _request(self._http, "PATCH", RETENTION_CONFIG, json=payload)
+
+        _request(self._http, HttpMethod.PATCH, RETENTION_CONFIG, json=payload)

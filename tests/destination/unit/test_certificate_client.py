@@ -5,6 +5,7 @@ from unittest.mock import Mock, call
 from requests import Response
 
 from sap_cloud_sdk.destination.certificate_client import CertificateClient
+from sap_cloud_sdk.core._http_client import HttpMethod
 from sap_cloud_sdk.destination._models import AccessStrategy, Certificate, Label, Level, ListOptions, PatchLabels
 from sap_cloud_sdk.destination.utils._pagination import PagedResult
 from sap_cloud_sdk.destination.exceptions import (
@@ -56,7 +57,7 @@ class TestCertificateClientRead:
         assert certificate.content == "base64-encoded-content"
         assert certificate.type == "PEM"
         args, kwargs = mock_http.request.call_args
-        assert args[0] == "GET"
+        assert args[0] == HttpMethod.GET
         assert args[1] == "/v1/instanceCertificates/test-cert.pem"
         assert kwargs["tenant_subdomain"] is None
 
@@ -150,7 +151,7 @@ class TestCertificateClientWrite:
         certificate = Certificate(name="new-cert.pem", content="base64-encoded-content", type="PEM")
         certificate_client.create_certificate(certificate, level=Level.SUB_ACCOUNT)
         args, kwargs = mock_http.request.call_args
-        assert args[0] == "POST"
+        assert args[0] == HttpMethod.POST
         assert args[1] == "/v1/subaccountCertificates"
         assert kwargs["json"]["Name"] == "new-cert.pem"
         assert kwargs["json"]["Content"] == "base64-encoded-content"
@@ -184,7 +185,7 @@ class TestCertificateClientWrite:
         certificate = Certificate(name="existing-cert.pem", content="updated-base64-content", type="PEM")
         certificate_client.update_certificate(certificate, level=Level.SUB_ACCOUNT)
         args, kwargs = mock_http.request.call_args
-        assert args[0] == "PUT"
+        assert args[0] == HttpMethod.PUT
         assert args[1] == "/v1/subaccountCertificates"
         assert kwargs["json"]["Name"] == "existing-cert.pem"
 
@@ -209,7 +210,7 @@ class TestCertificateClientWrite:
     def test_delete_certificate_with_tenant(self, certificate_client, mock_http):
         certificate_client.delete_certificate("test-cert.pem", level=Level.SUB_ACCOUNT, tenant="test-tenant")
         args, kwargs = mock_http.request.call_args
-        assert args[0] == "DELETE"
+        assert args[0] == HttpMethod.DELETE
         assert args[1] == "/v1/subaccountCertificates/test-cert.pem"
         assert kwargs["tenant_subdomain"] == "test-tenant"
 
@@ -507,7 +508,7 @@ class TestCertificateClientLabels:
         labels = [Label(key="env", values=["prod"])]
         certificate_client.update_certificate_labels("cert1", labels, Level.SERVICE_INSTANCE)
         args, kwargs = mock_http.request.call_args
-        assert args[0] == "PUT"
+        assert args[0] == HttpMethod.PUT
         assert args[1] == "/v1/instanceCertificates/cert1/labels"
         assert kwargs["json"] == [{"key": "env", "values": ["prod"]}]
         assert kwargs["tenant_subdomain"] is None
@@ -528,7 +529,7 @@ class TestCertificateClientLabels:
         patch = PatchLabels(action="ADD", labels=[Label(key="env", values=["prod"])])
         certificate_client.patch_certificate_labels("cert1", patch, Level.SERVICE_INSTANCE)
         args, kwargs = mock_http.request.call_args
-        assert args[0] == "PATCH"
+        assert args[0] == HttpMethod.PATCH
         assert args[1] == "/v1/instanceCertificates/cert1/labels"
         assert kwargs["json"]["action"] == "ADD"
         assert kwargs["tenant_subdomain"] is None

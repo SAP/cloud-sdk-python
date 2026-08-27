@@ -14,7 +14,7 @@ API_V2 = "v2"
 
 def _request(
     http: HttpClient,
-    method: HttpMethod | str,
+    method: HttpMethod,
     path: str,
     *,
     params=None,
@@ -22,14 +22,15 @@ def _request(
     headers=None,
     tenant_subdomain=None,
 ) -> Response:
-    method_str = method.value if isinstance(method, HttpMethod) else str(method).upper()
+
     all_headers: dict = {"Accept": "application/json"}
     if headers:
         all_headers.update(headers)
+
     normalized_path = f"/{path.lstrip('/')}"
     try:
         resp = http.request(
-            method_str,
+            method,
             normalized_path,
             tenant_subdomain=tenant_subdomain,
             params=params,
@@ -46,7 +47,7 @@ def _request(
     except Exception:
         text = "<failed to read response body>"
     raise HttpError(
-        f"HTTP {resp.status_code} for {method_str} {normalized_path}",
+        f"HTTP {resp.status_code} for {method.value} {normalized_path}",
         status_code=resp.status_code,
         response_text=text,
     )

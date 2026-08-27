@@ -45,7 +45,9 @@ def _parse_feature_toggles(raw: str) -> list[str] | None:
     try:
         decoded = base64.b64decode(raw).decode()
         data = json.loads(decoded)
-        return [f["name"] for f in data.get("features", []) if f.get("enabled")]
+        toggles = [f["name"] for f in data.get("features", []) if f.get("enabled")]
+        logger.debug("Feature toggles from dwc-stage-configuration: %s", toggles)
+        return toggles
     except Exception as e:
         logger.debug("Failed to parse dwc-stage-configuration header: %s", e)
         return None

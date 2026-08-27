@@ -533,7 +533,7 @@ class AgentMemoryClient:
         ):
             if value is not None and value < 0:
                 raise AgentMemoryValidationError(f"'{name}' must be >= 0")
-        
+
         payload: dict[str, Any] = {}
         if message_days is not None:
             payload["messageDays"] = message_days

@@ -43,7 +43,9 @@ def _request(
     except Timeout as exc:
         raise AgentMemoryHttpError(f"Request timed out: {method.value} {path}") from exc
     except RequestException as exc:
-        raise AgentMemoryHttpError(f"Request failed: {method.value} {path} — {exc}") from exc
+        raise AgentMemoryHttpError(
+            f"Request failed: {method.value} {path} — {exc}"
+        ) from exc
     except Exception as exc:
         raise AgentMemoryHttpError(str(exc)) from exc
 

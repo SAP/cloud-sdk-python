@@ -47,8 +47,11 @@ from sap_cloud_sdk.destination.utils._pagination import (
     PaginationInfo,
     PagedResult,
 )
-from sap_cloud_sdk.destination.config import load_from_env_or_mount, DestinationConfig
-from sap_cloud_sdk.destination._http import TokenProvider, DestinationHttp
+from sap_cloud_sdk.destination.config import (
+    DestinationConfig,
+    _make_destination_factory,
+)
+from sap_cloud_sdk.core._http_client import HttpClient, XsuaaAuthProvider
 from sap_cloud_sdk.destination._destination_http_client import DestinationHttpClient
 from sap_cloud_sdk.destination.client import DestinationClient
 from sap_cloud_sdk.destination.fragment_client import FragmentClient
@@ -72,6 +75,20 @@ from sap_cloud_sdk.destination.exceptions import (
 
 
 logger = logging.getLogger(__name__)
+
+
+def _build_destination_http(
+    instance: Optional[str], config: Optional[DestinationConfig]
+) -> HttpClient:
+    if config is not None:
+        auth = XsuaaAuthProvider(lambda: config)
+        binding = config
+    else:
+        factory = _make_destination_factory(instance or "default")
+        binding = factory()
+        auth = XsuaaAuthProvider(factory)
+    base_url = f"{binding.url.rstrip('/')}/destination-configuration"
+    return HttpClient(base_url, auth)
 
 
 def _mock_file(name: str) -> str:
@@ -117,9 +134,7 @@ def create_client(
             return LocalDevDestinationClient()
 
         # Cloud mode via secret resolver or explicit config
-        binding = config or load_from_env_or_mount(instance)
-        tp = TokenProvider(binding)
-        http = DestinationHttp(config=binding, token_provider=tp)
+        http = _build_destination_http(instance, config)
 
         return DestinationClient(
             http, use_default_proxy, _telemetry_source=_telemetry_source
@@ -162,9 +177,7 @@ def create_fragment_client(
             return LocalDevFragmentClient()
 
         # Use provided config or load from environment/mount (cloud mode)
-        binding = config or load_from_env_or_mount(instance)
-        tp = TokenProvider(binding)
-        http = DestinationHttp(config=binding, token_provider=tp)
+        http = _build_destination_http(instance, config)
 
         return FragmentClient(http, _telemetry_source=_telemetry_source)
 
@@ -205,9 +218,7 @@ def create_certificate_client(
             return LocalDevCertificateClient()
 
         # Use provided config or load from environment/mount (cloud mode)
-        binding = config or load_from_env_or_mount(instance)
-        tp = TokenProvider(binding)
-        http = DestinationHttp(config=binding, token_provider=tp)
+        http = _build_destination_http(instance, config)
 
         return CertificateClient(http, _telemetry_source=_telemetry_source)
 

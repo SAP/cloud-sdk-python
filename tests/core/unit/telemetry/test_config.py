@@ -7,8 +7,6 @@ from sap_cloud_sdk.core.telemetry.config import (
     create_resource_attributes_from_env,
     get_config,
     set_config,
-    register_sdk_resource_attributes,
-    _extra_sdk_attributes,
 )
 from sap_cloud_sdk.core.telemetry.constants import (
     ATTR_MLFLOW_EXPERIMENT_ID,
@@ -303,38 +301,47 @@ class TestCreateResourceAttributesFromEnv:
             assert attrs[ATTR_SAP_ORD_ID] == "my-ord-id"
 
 
-class TestRegisterSdkResourceAttributes:
-    """Tests for the companion-SDK resource attribute registry."""
+def _make_ep(name: str, attrs: dict, raises: Exception | None = None):
+    """Build a mock entry point that returns *attrs* (or raises *raises*)."""
+    from unittest.mock import MagicMock
+    ep = MagicMock()
+    ep.name = name
+    if raises is not None:
+        ep.load.return_value = MagicMock(side_effect=raises)
+    else:
+        ep.load.return_value = lambda: attrs
+    return ep
 
-    def setup_method(self):
-        _extra_sdk_attributes.clear()
 
-    def teardown_method(self):
-        _extra_sdk_attributes.clear()
+class TestSdkResourceProviderEntryPoints:
+    """Tests for companion-SDK resource attribute discovery via entry points."""
 
-    def test_registered_attributes_appear_in_resource(self):
-        register_sdk_resource_attributes({"sap.internal_sdk.version": "1.0.0"})
-        attrs = create_resource_attributes_from_env()
-        assert attrs["sap.internal_sdk.version"] == "1.0.0"
+    def test_provider_attributes_appear_in_resource(self):
+        mock_ep = _make_ep("test_sdk", {"sap.test_sdk.version": "1.0.0"})
+        with patch("sap_cloud_sdk.core.telemetry.config._entry_points", return_value=[mock_ep]):
+            attrs = create_resource_attributes_from_env()
+        assert attrs["sap.test_sdk.version"] == "1.0.0"
 
-    def test_multiple_registrations_are_merged(self):
-        register_sdk_resource_attributes({"sap.foo.version": "1.0"})
-        register_sdk_resource_attributes({"sap.bar.version": "2.0"})
-        attrs = create_resource_attributes_from_env()
-        assert attrs["sap.foo.version"] == "1.0"
-        assert attrs["sap.bar.version"] == "2.0"
+    def test_multiple_providers_are_merged(self):
+        eps = [
+            _make_ep("sdk_a", {"sap.sdk_a.version": "1.0"}),
+            _make_ep("sdk_b", {"sap.sdk_b.version": "2.0"}),
+        ]
+        with patch("sap_cloud_sdk.core.telemetry.config._entry_points", return_value=eps):
+            attrs = create_resource_attributes_from_env()
+        assert attrs["sap.sdk_a.version"] == "1.0"
+        assert attrs["sap.sdk_b.version"] == "2.0"
 
-    def test_registered_attributes_do_not_override_cloud_sdk_keys(self):
+    def test_failing_provider_is_skipped_silently(self):
+        bad_ep = _make_ep("broken", {}, raises=RuntimeError("boom"))
+        good_ep = _make_ep("good", {"sap.good.version": "3.0"})
+        with patch("sap_cloud_sdk.core.telemetry.config._entry_points", return_value=[bad_ep, good_ep]):
+            attrs = create_resource_attributes_from_env()
+        assert attrs["sap.good.version"] == "3.0"
+        assert "sap.broken.version" not in attrs
+
+    def test_no_providers_does_not_affect_cloud_sdk_keys(self):
+        with patch("sap_cloud_sdk.core.telemetry.config._entry_points", return_value=[]):
+            attrs = create_resource_attributes_from_env()
         from sap_cloud_sdk.core.telemetry.constants import ATTR_SAP_SDK_VERSION
-        original = create_resource_attributes_from_env()[ATTR_SAP_SDK_VERSION]
-        register_sdk_resource_attributes({ATTR_SAP_SDK_VERSION: "999"})
-        attrs = create_resource_attributes_from_env()
-        assert attrs[ATTR_SAP_SDK_VERSION] == "999"
-        _extra_sdk_attributes.clear()
-        assert create_resource_attributes_from_env()[ATTR_SAP_SDK_VERSION] == original
-
-    def test_empty_registry_does_not_affect_output(self):
-        attrs_without = create_resource_attributes_from_env()
-        register_sdk_resource_attributes({})
-        attrs_with = create_resource_attributes_from_env()
-        assert attrs_without == attrs_with
+        assert ATTR_SAP_SDK_VERSION in attrs

@@ -1,7 +1,9 @@
 """Configuration for OpenTelemetry telemetry."""
 
+import logging
 import os
 from dataclasses import dataclass
+from importlib.metadata import entry_points as _entry_points
 from typing import Optional
 from opentelemetry.sdk.resources import SERVICE_NAME
 from sap_cloud_sdk.core._version import get_version
@@ -22,33 +24,7 @@ from sap_cloud_sdk.core.telemetry.constants import (
     SDK_NAME,
 )
 
-# Registry of extra resource attributes contributed by companion SDKs.
-# Populated via register_sdk_resource_attributes() at import time of those SDKs.
-_extra_sdk_attributes: dict = {}
-
-
-def register_sdk_resource_attributes(attributes: dict) -> None:
-    """Register additional OTel resource attributes to be included in every provider.
-
-    Companion SDKs call this once at import time so their version appears on every
-    span and metric without any change to agent startup code. Read the version from
-    ``importlib.metadata`` rather than hardcoding it::
-
-        from importlib.metadata import version, PackageNotFoundError
-        from sap_cloud_sdk.core.telemetry.config import register_sdk_resource_attributes
-
-        try:
-            sdk_version = version("my-sdk-package")
-        except PackageNotFoundError:
-            sdk_version = "unknown"
-
-        register_sdk_resource_attributes({
-            "sap.my_sdk.version": sdk_version,
-            "sap.my_sdk.language": "python",
-        })
-    """
-    _extra_sdk_attributes.update(attributes)
-
+logger = logging.getLogger(__name__)
 
 # Default attribute values
 DEFAULT_UNKNOWN = "unknown"
@@ -200,7 +176,12 @@ def create_resource_attributes_from_env() -> dict:
     if service_display_name is not None:
         attributes[ATTR_SAP_SERVICE_DISPLAY_NAME] = service_display_name
 
-    attributes.update(_extra_sdk_attributes)
+    for _ep in _entry_points(group="sap_cloud_sdk.resource_providers"):
+        try:
+            _provider = _ep.load()
+            attributes.update(_provider())
+        except Exception:
+            logger.debug("Failed to load resource provider %s", _ep.name, exc_info=True)
 
     return attributes
 

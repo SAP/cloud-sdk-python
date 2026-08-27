@@ -123,14 +123,17 @@ response = client.get_object("hello.txt")
 # Read the content
 content = response.read()  # Returns bytes
 text_content = content.decode("utf-8")  # Convert to string if needed
+response.close()
+
+# Prefer a context manager so the reader is always closed
+with client.get_object("hello.txt") as response:
+    content = response.read()
 ```
 
-> **Provider note:** `read()` works uniformly across all backends and is the
-> portable way to consume the stream. On S3 and GCS the returned object also
-> supports `close()` and use as a context manager (`with client.get_object(...)
-> as response:`). The Azure backend returns a streaming downloader that exposes
-> `read()`/`readall()` but not `close()` or the context-manager protocol — so
-> prefer `read()` if your code must work across all three providers.
+> **Provider note:** `get_object()` returns an `ObjectReader`. Calling `read()`
+> or `read(size)`, calling `close()`, and using the reader as a context manager
+> are portable across all backends. Other operations exposed by a provider's
+> concrete reader are not part of the shared interface.
 
 ### Check Object Existence
 

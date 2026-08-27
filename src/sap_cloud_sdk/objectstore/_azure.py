@@ -1,11 +1,13 @@
 """Azure Blob Storage backend implementation for object store operations."""
 
 import os
-from typing import IO, BinaryIO, List, NoReturn
+from types import TracebackType
+from typing import TYPE_CHECKING, BinaryIO, List, NoReturn, Self
 
 from sap_cloud_sdk.core.telemetry import Module, Operation, record_metrics
 from sap_cloud_sdk.objectstore.config import AzureConfig
 from sap_cloud_sdk.objectstore._models import ObjectMetadata
+from sap_cloud_sdk.objectstore._protocol import ObjectReader
 from sap_cloud_sdk.objectstore._validation import (
     validate_object_name,
     validate_prefix,
@@ -19,6 +21,42 @@ from sap_cloud_sdk.objectstore.exceptions import (
     ObjectNotFoundError,
     ObjectOperationError,
 )
+
+if TYPE_CHECKING:
+    from azure.storage.blob import StorageStreamDownloader
+
+
+class _AzureObjectReader:
+    """Add a managed-reader lifecycle to an Azure blob downloader."""
+
+    def __init__(self, downloader: "StorageStreamDownloader[bytes]") -> None:
+        self._downloader: StorageStreamDownloader[bytes] | None = downloader
+
+    def _require_open(self) -> "StorageStreamDownloader[bytes]":
+        if self._downloader is None:
+            raise ValueError("I/O operation on closed object reader")
+        return self._downloader
+
+    def read(self, size: int = -1, /) -> bytes:
+        return self._require_open().read(size)
+
+    def close(self) -> None:
+        # StorageStreamDownloader has no close operation. Dropping the reference
+        # ends the adapter's logical lifetime and releases its buffered state.
+        self._downloader = None
+
+    def __enter__(self) -> Self:
+        self._require_open()
+        return self
+
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_value: BaseException | None,
+        traceback: TracebackType | None,
+        /,
+    ) -> None:
+        self.close()
 
 
 class AzureClient:
@@ -161,14 +199,14 @@ class AzureClient:
             raise ObjectOperationError(f"Failed to upload object '{name}': {e}") from e
 
     @record_metrics(Module.OBJECTSTORE, Operation.OBJECTSTORE_GET_OBJECT)
-    def get_object(self, name: str) -> IO[bytes]:
+    def get_object(self, name: str) -> ObjectReader:
         """Download an object as a stream.
 
         Args:
             name: Name/key of the object to download.
 
         Returns:
-            IO[bytes] stream of the object data.
+            A readable binary stream of the object data.
 
         Raises:
             ValueError: If name is invalid.
@@ -178,7 +216,8 @@ class AzureClient:
         validate_object_name(name)
 
         try:
-            return self._blob_client(name).download_blob()
+            downloader = self._blob_client(name).download_blob()
+            return _AzureObjectReader(downloader)
         except Exception as e:
             self._map_azure_error(e, name, "download")
 

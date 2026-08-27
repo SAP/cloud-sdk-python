@@ -12,10 +12,8 @@ from azure.core.exceptions import HttpResponseError, ResourceNotFoundError  # no
 from azure.storage.blob import ContentSettings  # noqa: E402
 
 from sap_cloud_sdk.objectstore._azure import AzureClient  # noqa: E402
-from sap_cloud_sdk.objectstore._models import ObjectMetadata  # noqa: E402
 from sap_cloud_sdk.objectstore.config import AzureConfig  # noqa: E402
 from sap_cloud_sdk.objectstore.exceptions import (  # noqa: E402
-    ListObjectsError,
     ObjectNotFoundError,
     ObjectOperationError,
 )
@@ -121,6 +119,7 @@ class TestAzureClientGetObject:
         container = MagicMock()
         blob_client = MagicMock()
         mock_stream = MagicMock()
+        mock_stream.read.return_value = b"test"
         blob_client.download_blob.return_value = mock_stream
         container.get_blob_client.return_value = blob_client
         client = _make_client(container)
@@ -128,7 +127,42 @@ class TestAzureClientGetObject:
         result = client.get_object("test.txt")
 
         blob_client.download_blob.assert_called_once()
-        assert result is mock_stream
+        assert result.read(4) == b"test"
+        mock_stream.read.assert_called_once_with(4)
+
+    def test_get_object_reader_close_is_idempotent(self):
+        container = MagicMock()
+        blob_client = MagicMock()
+        mock_stream = MagicMock()
+        blob_client.download_blob.return_value = mock_stream
+        container.get_blob_client.return_value = blob_client
+        reader = _make_client(container).get_object("test.txt")
+
+        reader.close()
+        reader.close()
+
+        mock_stream.close.assert_not_called()
+        with pytest.raises(ValueError, match="closed object reader"):
+            reader.read()
+        with pytest.raises(ValueError, match="closed object reader"):
+            with reader:
+                pass
+
+    def test_get_object_reader_context_manager_closes_on_error(self):
+        container = MagicMock()
+        blob_client = MagicMock()
+        mock_stream = MagicMock()
+        blob_client.download_blob.return_value = mock_stream
+        container.get_blob_client.return_value = blob_client
+        reader = _make_client(container).get_object("test.txt")
+
+        with pytest.raises(RuntimeError, match="boom"):
+            with reader as entered:
+                assert entered is reader
+                raise RuntimeError("boom")
+
+        with pytest.raises(ValueError, match="closed object reader"):
+            reader.read()
 
     def test_get_object_not_found_via_resource_not_found_error(self):
         container = MagicMock()

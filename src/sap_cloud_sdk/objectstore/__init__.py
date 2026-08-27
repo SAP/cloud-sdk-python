@@ -12,7 +12,7 @@ Usage:
 
 from sap_cloud_sdk.objectstore._factory import create_client
 from sap_cloud_sdk.objectstore._models import ObjectMetadata
-from sap_cloud_sdk.objectstore._protocol import ObjectStoreClient
+from sap_cloud_sdk.objectstore._protocol import ObjectReader, ObjectStoreClient
 from sap_cloud_sdk.objectstore.config import (
     AzureConfig,
     GcsConfig,
@@ -30,6 +30,7 @@ from sap_cloud_sdk.objectstore.exceptions import (
 __all__ = [
     # Protocol (usable as a type annotation)
     "ObjectStoreClient",
+    "ObjectReader",
     # Config types (pass to create_client() to bypass auto-detection)
     "S3Config",
     "AzureConfig",

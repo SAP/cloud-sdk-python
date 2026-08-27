@@ -278,8 +278,8 @@ def upload_with_specific_timeout(context):
 @when("I download the object")
 def download_object(context):
     try:
-        content_stream = context.client.get_object(context.object_name)
-        context.downloaded_content = content_stream.read()
+        with context.client.get_object(context.object_name) as content_stream:
+            context.downloaded_content = content_stream.read()
         context.last_error = None
     except Exception as e:
         context.last_error = e

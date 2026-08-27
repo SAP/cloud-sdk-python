@@ -1,11 +1,12 @@
 """Google Cloud Storage backend implementation for object store operations."""
 
 import os
-from typing import IO, BinaryIO, List, NoReturn
+from typing import BinaryIO, List, NoReturn
 
 from sap_cloud_sdk.core.telemetry import Module, Operation, record_metrics
 from sap_cloud_sdk.objectstore.config import GcsConfig
 from sap_cloud_sdk.objectstore._models import ObjectMetadata
+from sap_cloud_sdk.objectstore._protocol import ObjectReader
 from sap_cloud_sdk.objectstore._validation import (
     validate_object_name,
     validate_prefix,
@@ -145,14 +146,14 @@ class GcsClient:
             raise ObjectOperationError(f"Failed to upload object '{name}': {e}") from e
 
     @record_metrics(Module.OBJECTSTORE, Operation.OBJECTSTORE_GET_OBJECT)
-    def get_object(self, name: str) -> IO[bytes]:
+    def get_object(self, name: str) -> ObjectReader:
         """Download an object as a stream.
 
         Args:
             name: Name/key of the object to download.
 
         Returns:
-            IO[bytes] stream of the object data.
+            A readable binary stream of the object data.
 
         Raises:
             ValueError: If name is invalid.

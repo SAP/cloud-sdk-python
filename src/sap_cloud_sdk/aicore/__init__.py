@@ -185,6 +185,7 @@ def _get_secret_dir_mtime(instance_name: str = "aicore-instance") -> float:
         return 0.0
 
 
+@record_metrics(Module.AICORE, Operation.AICORE_WATCH_CONFIG)
 def watch_aicore_config(
     instance_name: str = "aicore-instance",
     interval: float = 60.0,
@@ -240,6 +241,7 @@ def watch_aicore_config(
     return thread
 
 
+@record_metrics(Module.AICORE, Operation.AICORE_PATCH_LITELLM)
 def patch_litellm_for_credential_rotation() -> None:
     """Patch ``litellm.completion`` / ``litellm.acompletion`` globally so ALL callers
     get transparent credential reload on ``AuthenticationError``.

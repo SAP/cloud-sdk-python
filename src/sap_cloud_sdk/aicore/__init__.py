@@ -45,7 +45,11 @@ _DESTINATION_NAME_ENV = "AICORE_DESTINATION_NAME"
 
 def _is_transparent_tls() -> bool:
     """Return True when transparent TLS proxy mode is active."""
-    return os.environ.get(TRANSPARENT_TLS_ENV_VAR, "").strip().lower() in ("1", "true", "yes")
+    return os.environ.get(TRANSPARENT_TLS_ENV_VAR, "").strip().lower() in (
+        "1",
+        "true",
+        "yes",
+    )
 
 
 def _get_secret(

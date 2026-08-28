@@ -9,6 +9,7 @@ import pytest
 from sap_cloud_sdk.aicore import (
     _get_aicore_base_url,
     _get_secret,
+    _is_transparent_tls,
     set_aicore_config,
 )
 

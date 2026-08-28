@@ -240,9 +240,68 @@ def watch_aicore_config(
     return thread
 
 
+def patch_litellm_for_credential_rotation() -> None:
+    """Patch ``litellm.completion`` / ``litellm.acompletion`` globally so ALL callers
+    get transparent credential reload on ``AuthenticationError``.
+
+    LangGraph agents typically call ``litellm.completion`` through ``ChatLiteLLM``
+    (LangChain), bypassing the SDK's own ``completion()`` wrapper and its built-in
+    401-reload handler. Call this function once at agent startup to extend the same
+    reactive reload behaviour to **every** litellm caller in the process.
+
+    Idempotent — calling more than once has no additional effect.
+
+    Recommended startup pattern for LangGraph / ChatLiteLLM agents::
+
+        from sap_cloud_sdk.aicore import (
+            set_aicore_config,
+            patch_litellm_for_credential_rotation,
+            watch_aicore_config,
+        )
+
+        set_aicore_config()                       # load credentials
+        patch_litellm_for_credential_rotation()   # reactive reload for ChatLiteLLM
+        watch_aicore_config()                     # proactive reload on secret rotation
+
+    Agents that already use the SDK's ``completion()`` / ``acompletion()`` wrappers
+    do not need this — those wrappers already handle 401s transparently.
+    """
+    import litellm as _litellm
+
+    if getattr(_litellm, "_sap_aicore_patched", False):
+        return
+
+    _orig_completion = _litellm.completion
+    _orig_acompletion = _litellm.acompletion
+
+    def _completion(*args, **kwargs):
+        try:
+            return _orig_completion(*args, **kwargs)
+        except _litellm.AuthenticationError:
+            logger.info("AI Core credentials reloading after authentication failure")
+            set_aicore_config()
+            return _orig_completion(*args, **kwargs)
+
+    async def _acompletion(*args, **kwargs):
+        try:
+            return await _orig_acompletion(*args, **kwargs)
+        except _litellm.AuthenticationError:
+            logger.info("AI Core credentials reloading after authentication failure")
+            set_aicore_config()
+            return await _orig_acompletion(*args, **kwargs)
+
+    _litellm.completion = _completion
+    _litellm.acompletion = _acompletion
+    _litellm._sap_aicore_patched = True
+    logger.info(
+        "litellm patched for AI Core credential rotation — applies to all callers"
+    )
+
+
 __all__ = [
     "set_aicore_config",
     "watch_aicore_config",
+    "patch_litellm_for_credential_rotation",
     "set_filtering",
     "disable_filtering",
     "completion",

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 from typing import Any, Callable, Generic, Optional, Type, TypeVar
+from sap_cloud_sdk.core.secret_resolver.resolver import resolve_base_mount
 
 C = TypeVar("C")
 
@@ -44,7 +45,9 @@ class ConfigFactory(Generic[C]):
         self._extract = extract
         self._base_volume_mount = base_volume_mount
         self._base_var_name = base_var_name
-        self._watch_path = os.path.join(base_volume_mount, module, instance)
+        self._watch_path = os.path.join(
+            resolve_base_mount(base_volume_mount), module, instance
+        )
         self._last_mtime: Optional[float] = None
 
     def __call__(self) -> C:

@@ -112,6 +112,11 @@ class TestConfigFactoryWatchPath:
         factory = _make_factory(module="svc", instance="inst", base_volume_mount="/custom/mount")
         assert factory._watch_path == "/custom/mount/svc/inst"
 
+    def test_service_binding_root_env_var_overrides_watch_path(self, monkeypatch):
+        monkeypatch.setenv("SERVICE_BINDING_ROOT", "/run/bindings")
+        factory = _make_factory(module="svc", instance="inst", base_volume_mount="/etc/secrets/appfnd")
+        assert factory._watch_path == "/run/bindings/svc/inst"
+
 
 class TestConfigFactoryHasChanged:
     def test_first_call_records_baseline_and_returns_false(self):

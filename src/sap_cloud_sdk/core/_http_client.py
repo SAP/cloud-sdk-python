@@ -150,13 +150,28 @@ class XsuaaAuthProvider(AuthProvider):
             self._cache.pop(tenant_subdomain, None)
 
     def invalidate_all(self) -> None:
+        with self._lock:
+            self._invalidate_all_unsafe()
+
+    def _invalidate_all_unsafe(self) -> None:
+        """Invalidate all cached sessions. Caller must hold ``self._lock``."""
         for oauth, _ in self._cache.values():
             oauth.close()
         self._cache.clear()
 
     def close(self) -> None:
         with self._lock:
-            self.invalidate_all()
+            self._invalidate_all_unsafe()
+
+    @property
+    def base_url(self) -> Optional[str]:
+        """Current base URL from the most recently read config.
+
+        Updated on every token refresh so callers always get a fresh URL after
+        secret rotation.  Returns ``None`` when the underlying config does not
+        expose a ``base_url`` attribute (e.g. the destination module uses ``url``).
+        """
+        return getattr(self._config, "base_url", None)
 
 
 class HttpClient:

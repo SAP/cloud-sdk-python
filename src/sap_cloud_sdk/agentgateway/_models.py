@@ -65,7 +65,7 @@ class MCPTool:
 
     Attributes:
         name: Tool name on MCP server (used when calling the tool)
-        server_name: MCP server name from serverInfo.name
+        server_name: MCP server name from server_info.name
         description: Tool description
         input_schema: JSON schema for tool input parameters
         url: MCP endpoint URL

@@ -344,10 +344,10 @@ async def list_server_tools(
             async with ClientSession(read, write) as session:
                 init_result = await session.initialize()
                 server_name = (
-                    init_result.serverInfo.name
+                    init_result.server_info.name
                     if init_result
-                    and init_result.serverInfo
-                    and init_result.serverInfo.name
+                    and init_result.server_info
+                    and init_result.server_info.name
                     else fragment_name
                 )
                 result = await session.list_tools()

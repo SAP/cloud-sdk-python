@@ -317,5 +317,3 @@ class TestACompletionReactiveReload:
         ):
             with pytest.raises(litellm.AuthenticationError):
                 asyncio.run(acompletion(model="sap/x", messages=[]))
-
-

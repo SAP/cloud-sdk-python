@@ -37,6 +37,7 @@ from sap_cloud_sdk.agentgateway._models import (
     MCPTool,
     MCPToolFilter,
 )
+from sap_cloud_sdk.core._tenant import _validate_tenant_subdomain
 from sap_cloud_sdk.agentgateway._token_cache import _GatewayUrlCache, _TokenCache
 from sap_cloud_sdk.agentgateway.exceptions import AgentGatewaySDKError
 from sap_cloud_sdk.core.telemetry import Module, Operation, record_metrics
@@ -155,10 +156,12 @@ class AgentGatewayClient:
 
     def _resolve_tenant_subdomain(self) -> str:
         """Resolve tenant subdomain from string or callable."""
-        return self._resolve_value(
+        resolved_tenant_subdomain = self._resolve_value(
             self._tenant_subdomain,
             "tenant_subdomain is required for LoB agent flow.",
         )
+        _validate_tenant_subdomain(resolved_tenant_subdomain)
+        return resolved_tenant_subdomain
 
     @record_metrics(Module.AGENTGATEWAY, Operation.AGENTGATEWAY_GET_SYSTEM_AUTH)
     async def get_system_auth(self) -> AuthResult:
@@ -354,6 +357,10 @@ class AgentGatewayClient:
                     "Customer agent credentials detected at '%s'", credentials_path
                 )
                 credentials = load_customer_credentials(credentials_path)
+                if not credentials.client_id:
+                    raise AgentGatewaySDKError(
+                        "Customer agent credentials file does not contain a 'client_id'"
+                    )
                 return credentials.client_id
 
             # LoB flow — read clientId from the IAS destination properties

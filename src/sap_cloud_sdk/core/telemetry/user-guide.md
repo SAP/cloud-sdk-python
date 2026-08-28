@@ -295,6 +295,7 @@ from litellm import completion
 
 logger = logging.getLogger(__name__)
 
+
 async def handle_request(query: str, user_id: str):
     set_tenant_id("bh7sjh...")
 
@@ -435,10 +436,10 @@ The `record_metrics` decorator records request and error counters for any SDK mo
 ```python
 from sap_cloud_sdk.core.telemetry import record_metrics
 
+
 class MyClient:
     @record_metrics("my_module", "my_operation")
-    def my_method(self):
-        ...
+    def my_method(self): ...
 ```
 
 Each call to the decorated method increments `sap.cloud_sdk.capability.requests`. On exception it increments `sap.cloud_sdk.capability.errors` and re-raises. Metrics are emitted only when `OTEL_EXPORTER_OTLP_ENDPOINT` is set — no-op otherwise.
@@ -450,10 +451,10 @@ For modules that live inside this package, use the `Module` and `Operation` enum
 ```python
 from sap_cloud_sdk.core.telemetry import record_metrics, Module, Operation
 
+
 class DestinationClient:
     @record_metrics(Module.DESTINATION, Operation.DESTINATION_GET_DESTINATION)
-    def get_destination(self, name: str):
-        ...
+    def get_destination(self, name: str): ...
 ```
 
 ### Using plain strings (external packages)
@@ -463,10 +464,10 @@ External packages that depend on `sap-cloud-sdk` can pass plain strings directly
 ```python
 from sap_cloud_sdk.core.telemetry import record_metrics
 
+
 class MyExternalClient:
     @record_metrics("my_module", "my_operation")
-    def my_method(self):
-        ...
+    def my_method(self): ...
 ```
 
 The `Module` enum values are still the canonical form for OSS modules. Plain strings are the extension point for packages that have their own release lifecycle.

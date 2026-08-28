@@ -676,6 +676,22 @@ BODY
   rm -rf "$tmpd"
 }
 
+@test "FP-COM-01: multi-scope with spaces passes COM-01 (e.g. feat(a, b, c): msg)" {
+  [ -f "$SCRIPT_DIR/check-commits.sh" ] || skip "check-commits.sh not present"
+  result=$(PR_TITLE="feat(destination, agent-memory, core): support binding rotation" \
+    LANGUAGE=python bash "$SCRIPT_DIR/check-commits.sh" < /dev/null 2>/dev/null)
+  count=$(echo "$result" | jq -r '[.findings[] | select(.rule=="COM-01")] | length')
+  [ "$count" = "0" ]
+}
+
+@test "COM-01 still fires for invalid prefix" {
+  [ -f "$SCRIPT_DIR/check-commits.sh" ] || skip "check-commits.sh not present"
+  result=$(PR_TITLE="update some stuff without prefix" \
+    LANGUAGE=python bash "$SCRIPT_DIR/check-commits.sh" < /dev/null 2>/dev/null)
+  count=$(echo "$result" | jq -r '[.findings[] | select(.rule=="COM-01")] | length')
+  [ "$count" = "1" ]
+}
+
 @test "DIS-07 is BLOCK for PR that changes src/" {
   [ -f "$SCRIPT_DIR/check-disclosure.sh" ] || skip "check-disclosure.sh not present"
   tmpd=$(mktemp -d)

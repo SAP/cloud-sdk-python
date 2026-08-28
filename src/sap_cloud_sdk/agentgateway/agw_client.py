@@ -285,7 +285,9 @@ class AgentGatewayClient:
                     access_token=token,
                     gateway_url=credentials.gateway_url,
                 )
-                logger.info("User auth token obtained — gateway: '%s'", result.gateway_url)
+                logger.info(
+                    "User auth token obtained — gateway: '%s'", result.gateway_url
+                )
                 return result
 
             # Check for transparent mode
@@ -305,7 +307,9 @@ class AgentGatewayClient:
                     access_token=token,
                     gateway_url=credentials.gateway_url,
                 )
-                logger.info("User auth token obtained — gateway: '%s'", result.gateway_url)
+                logger.info(
+                    "User auth token obtained — gateway: '%s'", result.gateway_url
+                )
                 return result
 
             tenant = self._resolve_tenant_subdomain()

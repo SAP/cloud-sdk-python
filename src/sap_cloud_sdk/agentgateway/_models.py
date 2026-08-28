@@ -103,7 +103,7 @@ class JsonRpcError:
 
     AGW returns HTTP 200 with a JSON-RPC error body when the request is
     structurally valid but the server encountered an error.
-    
+
     Example: {"jsonrpc": "2.0", "error": {"code": -32603, "message": "Internal Server Error"}}
 
     Attributes:

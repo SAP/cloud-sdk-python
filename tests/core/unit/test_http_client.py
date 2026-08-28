@@ -14,11 +14,24 @@ def _make_response(status_code: int) -> MagicMock:
     return resp
 
 
+def _make_mock_auth(base_url: str | None = None) -> MagicMock:
+    """Return a mock AuthProvider with base_url set to None by default.
+
+    Without an explicit assignment, MagicMock(spec=...) returns a truthy
+    MagicMock for the base_url attribute, which would override the constructor
+    URL in HttpClient._execute.  Setting it to None lets the fallback logic
+    use the URL passed to the HttpClient constructor.
+    """
+    auth = MagicMock(spec=XsuaaAuthProvider)
+    auth.base_url = base_url
+    return auth
+
+
 def _make_client_with_mock_session(
     base_url: str = "https://example.com",
     status_code: int = 200,
 ) -> tuple[HttpClient, MagicMock, MagicMock]:
-    auth = MagicMock(spec=XsuaaAuthProvider)
+    auth = _make_mock_auth()
     session = MagicMock()
     session.request.return_value = _make_response(status_code)
     auth.get_session.return_value = session
@@ -29,7 +42,7 @@ class TestHttpClient:
     # ── 401 retry ──────────────────────────────────────────────────────────────
 
     def test_401_triggers_invalidate_and_retry(self):
-        auth = MagicMock(spec=XsuaaAuthProvider)
+        auth = _make_mock_auth()
         session = MagicMock()
         auth.get_session.return_value = session
 
@@ -59,7 +72,7 @@ class TestHttpClient:
         assert session.request.call_count == 1
 
     def test_retry_uses_fresh_session_after_invalidate(self):
-        auth = MagicMock(spec=XsuaaAuthProvider)
+        auth = _make_mock_auth()
         stale_session = MagicMock()
         fresh_session = MagicMock()
 
@@ -116,6 +129,24 @@ class TestHttpClient:
         client.request(HttpMethod.GET, "/items")
         assert session.request.call_args[0][1] == "https://svc.example.com/items"
 
+    def test_rotated_base_url_used_after_token_refresh(self):
+        """Requests use auth_provider.base_url (updated on token refresh) not the stale constructor URL."""
+        auth = _make_mock_auth(base_url="https://new-svc.example.com")
+        session = MagicMock()
+        session.request.return_value = _make_response(200)
+        auth.get_session.return_value = session
+
+        client = HttpClient("https://old-svc.example.com", auth)
+        client.request(HttpMethod.GET, "/v1/memories")
+
+        assert session.request.call_args[0][1] == "https://new-svc.example.com/v1/memories"
+
+    def test_falls_back_to_constructor_url_when_provider_base_url_is_none(self):
+        """When auth_provider.base_url is None, the constructor URL is used."""
+        client, _, session = _make_client_with_mock_session("https://svc.example.com")
+        client.request(HttpMethod.GET, "/items")
+        assert session.request.call_args[0][1] == "https://svc.example.com/items"
+
     # ── kwargs forwarding ──────────────────────────────────────────────────────
 
     def test_json_body_forwarded(self):
@@ -141,7 +172,7 @@ class TestHttpClient:
         assert session.request.call_args[1]["timeout"] == 30.0
 
     def test_custom_timeout_passed_to_session(self):
-        auth = MagicMock(spec=XsuaaAuthProvider)
+        auth = _make_mock_auth()
         session = MagicMock()
         session.request.return_value = _make_response(200)
         auth.get_session.return_value = session

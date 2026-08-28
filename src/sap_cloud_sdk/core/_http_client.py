@@ -91,7 +91,7 @@ class XsuaaAuthProvider(AuthProvider):
         has_changed = getattr(self._config_factory, "has_changed", None)
         if callable(has_changed) and has_changed():
             with self._lock:
-                self.invalidate_all()
+                self._invalidate_all_unsafe()
 
         with self._lock:
             cached = self._cache.get(tenant_subdomain)
@@ -160,8 +160,7 @@ class XsuaaAuthProvider(AuthProvider):
         self._cache.clear()
 
     def close(self) -> None:
-        with self._lock:
-            self._invalidate_all_unsafe()
+        self.invalidate_all()
 
     @property
     def base_url(self) -> Optional[str]:
@@ -243,13 +242,17 @@ class HttpClient:
             session: requests.Session = self._auth_provider.get_session(
                 tenant_subdomain
             )
+            # Use the auth provider's current base_url (updated on every token
+            # refresh) so requests go to the correct URL after secret rotation.
+            base_url = getattr(self._auth_provider, "base_url", None) or self._base_url
         else:
             if self._plain_session is None:
                 self._plain_session = requests.Session()
             session = self._plain_session
+            base_url = self._base_url
         return session.request(
             method_str,
-            f"{self._base_url}{path}",
+            f"{base_url}{path}",
             timeout=self._timeout,
             **kwargs,
         )

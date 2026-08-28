@@ -49,7 +49,7 @@ from sap_cloud_sdk.destination.utils._pagination import (
 )
 from sap_cloud_sdk.destination.config import (
     DestinationConfig,
-    _make_destination_factory,
+    _make_config_factory,
 )
 from sap_cloud_sdk.core._http_client import HttpClient, XsuaaAuthProvider
 from sap_cloud_sdk.destination._destination_http_client import DestinationHttpClient
@@ -76,6 +76,8 @@ from sap_cloud_sdk.destination.exceptions import (
 
 logger = logging.getLogger(__name__)
 
+_DEFAULT_INSTANCE = "default"
+
 
 def _build_destination_http(
     instance: Optional[str], config: Optional[DestinationConfig]
@@ -84,7 +86,7 @@ def _build_destination_http(
         auth = XsuaaAuthProvider(lambda: config)
         binding = config
     else:
-        factory = _make_destination_factory(instance or "default")
+        factory = _make_config_factory(instance or _DEFAULT_INSTANCE)
         binding = factory()
         auth = XsuaaAuthProvider(factory)
     base_url = f"{binding.url.rstrip('/')}/destination-configuration"

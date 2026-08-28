@@ -152,7 +152,7 @@ def load_from_env_or_mount(instance: Optional[str] = None) -> DestinationConfig:
         )
 
 
-def _make_destination_factory(instance: str) -> "ConfigFactory[DestinationConfig]":
+def _make_config_factory(instance: str) -> "ConfigFactory[DestinationConfig]":
     """Return a :class:`~sap_cloud_sdk.core.secret_resolver.ConfigFactory` for the given instance."""
     from sap_cloud_sdk.core.secret_resolver import ConfigFactory
 

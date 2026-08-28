@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any, Optional
+
 from requests import Response
 from requests.exceptions import RequestException
 
@@ -17,10 +19,10 @@ def _request(
     method: HttpMethod,
     path: str,
     *,
-    params=None,
-    json=None,
-    headers=None,
-    tenant_subdomain=None,
+    params: Optional[dict[str, Any]] = None,
+    json: Optional[Any] = None,
+    headers: Optional[dict[str, str]] = None,
+    tenant_subdomain: Optional[str] = None,
 ) -> Response:
 
     all_headers: dict = {"Accept": "application/json"}

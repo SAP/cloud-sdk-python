@@ -11,6 +11,9 @@ from __future__ import annotations
 
 import logging
 from typing import Any, Optional
+from urllib.parse import quote, urlencode
+
+from requests.exceptions import RequestException, Timeout
 
 from sap_cloud_sdk.agent_memory._endpoints import (
     MEMORIES,
@@ -18,7 +21,6 @@ from sap_cloud_sdk.agent_memory._endpoints import (
     MESSAGES,
     RETENTION_CONFIG,
 )
-from sap_cloud_sdk.agent_memory._http import _request
 from sap_cloud_sdk.agent_memory._models import (
     AccessStrategy,
     Memory,
@@ -35,6 +37,8 @@ from sap_cloud_sdk.agent_memory.utils._odata import (
     extract_value_and_count,
 )
 from sap_cloud_sdk.agent_memory.exceptions import (
+    AgentMemoryHttpError,
+    AgentMemoryNotFoundError,
     AgentMemoryValidationError,
 )
 from sap_cloud_sdk.core._http_client import HttpClient, HttpMethod
@@ -113,6 +117,54 @@ class AgentMemoryClient:
     def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
         self.close()
 
+    def _request(
+        self,
+        method: HttpMethod,
+        path: str,
+        *,
+        params: Optional[dict[str, Any]] = None,
+        tenant_subdomain: Optional[str] = None,
+        **kwargs: Any,
+    ) -> dict[str, Any]:
+        logger.debug("%s %s (tenant=%r)", method.value, path, tenant_subdomain)
+        if params:
+            path = f"{path}?{urlencode(params, quote_via=quote)}"
+        try:
+            response = self._http.request(
+                method,
+                path,
+                tenant_subdomain=tenant_subdomain,
+                headers={"Content-Type": "application/json"},
+                **kwargs,
+            )
+        except Timeout as exc:
+            raise AgentMemoryHttpError(
+                f"Request timed out: {method.value} {path}"
+            ) from exc
+        except RequestException as exc:
+            raise AgentMemoryHttpError(
+                f"Request failed: {method.value} {path} — {exc}"
+            ) from exc
+        except Exception as exc:
+            raise AgentMemoryHttpError(str(exc)) from exc
+        if response.status_code == 204 or not response.content:
+            return {}
+        if response.status_code == 404:
+            raise AgentMemoryNotFoundError(
+                f"Resource not found: {method.value} {path}",
+                status_code=404,
+                response_text=response.text,
+            )
+        if not response.ok:
+            raise AgentMemoryHttpError(
+                f"Agent Memory service request failed. "
+                f"Method: {method.value}, Path: {path}, "
+                f"Status: {response.status_code}, Response: {response.text}",
+                status_code=response.status_code,
+                response_text=response.text,
+            )
+        return response.json()
+
     # ── Memory operations ──────────────────────────────────────────────────────
 
     @record_metrics(Module.AGENT_MEMORY, Operation.AGENT_MEMORY_ADD_MEMORY)
@@ -147,7 +199,7 @@ class AgentMemoryClient:
         }
         if metadata is not None:
             payload["metadata"] = metadata
-        data = _request(self._http, HttpMethod.POST, MEMORIES, json=payload)
+        data = self._request(HttpMethod.POST, MEMORIES, json=payload)
         return Memory.from_dict(data)
 
     @record_metrics(Module.AGENT_MEMORY, Operation.AGENT_MEMORY_GET_MEMORY)
@@ -166,7 +218,7 @@ class AgentMemoryClient:
             AgentMemoryHttpError: If the request fails.
         """
         _require_non_empty(memory_id=memory_id)
-        data = _request(self._http, HttpMethod.GET, f"{MEMORIES}({memory_id})")
+        data = self._request(HttpMethod.GET, f"{MEMORIES}({memory_id})")
         return Memory.from_dict(data)
 
     @record_metrics(Module.AGENT_MEMORY, Operation.AGENT_MEMORY_UPDATE_MEMORY)
@@ -200,7 +252,7 @@ class AgentMemoryClient:
             payload["content"] = content
         if metadata is not None:
             payload["metadata"] = metadata
-        _request(self._http, HttpMethod.PATCH, f"{MEMORIES}({memory_id})", json=payload)
+        self._request(HttpMethod.PATCH, f"{MEMORIES}({memory_id})", json=payload)
 
     @record_metrics(Module.AGENT_MEMORY, Operation.AGENT_MEMORY_DELETE_MEMORY)
     def delete_memory(self, memory_id: str) -> None:
@@ -215,7 +267,7 @@ class AgentMemoryClient:
             AgentMemoryHttpError: If the request fails.
         """
         _require_non_empty(memory_id=memory_id)
-        _request(self._http, HttpMethod.DELETE, f"{MEMORIES}({memory_id})")
+        self._request(HttpMethod.DELETE, f"{MEMORIES}({memory_id})")
 
     @record_metrics(Module.AGENT_MEMORY, Operation.AGENT_MEMORY_LIST_MEMORIES)
     def list_memories(
@@ -263,7 +315,7 @@ class AgentMemoryClient:
             top=limit,
             skip=offset if offset else None,
         )
-        response = _request(self._http, HttpMethod.GET, MEMORIES, params=params)
+        response = self._request(HttpMethod.GET, MEMORIES, params=params)
         items, _ = extract_value_and_count(response)
         return [Memory.from_dict(item) for item in items]
 
@@ -288,7 +340,7 @@ class AgentMemoryClient:
             top=0,
             count=True,
         )
-        response = _request(self._http, HttpMethod.GET, MEMORIES, params=params)
+        response = self._request(HttpMethod.GET, MEMORIES, params=params)
         _, total = extract_value_and_count(response)
         return total or 0
 
@@ -335,7 +387,7 @@ class AgentMemoryClient:
             "threshold": threshold,
             "top": limit,
         }
-        response = _request(self._http, HttpMethod.POST, MEMORY_SEARCH, json=payload)
+        response = self._request(HttpMethod.POST, MEMORY_SEARCH, json=payload)
         items = response.get("value", [])
         return [SearchResult.from_dict(item) for item in items]
 
@@ -387,7 +439,7 @@ class AgentMemoryClient:
         }
         if metadata is not None:
             payload["metadata"] = metadata
-        data = _request(self._http, HttpMethod.POST, MESSAGES, json=payload)
+        data = self._request(HttpMethod.POST, MESSAGES, json=payload)
         return Message.from_dict(data)
 
     @record_metrics(Module.AGENT_MEMORY, Operation.AGENT_MEMORY_GET_MESSAGE)
@@ -406,7 +458,7 @@ class AgentMemoryClient:
             AgentMemoryHttpError: If the request fails.
         """
         _require_non_empty(message_id=message_id)
-        data = _request(self._http, HttpMethod.GET, f"{MESSAGES}({message_id})")
+        data = self._request(HttpMethod.GET, f"{MESSAGES}({message_id})")
         return Message.from_dict(data)
 
     @record_metrics(Module.AGENT_MEMORY, Operation.AGENT_MEMORY_DELETE_MESSAGE)
@@ -422,7 +474,7 @@ class AgentMemoryClient:
             AgentMemoryHttpError: If the request fails.
         """
         _require_non_empty(message_id=message_id)
-        _request(self._http, HttpMethod.DELETE, f"{MESSAGES}({message_id})")
+        self._request(HttpMethod.DELETE, f"{MESSAGES}({message_id})")
 
     @record_metrics(Module.AGENT_MEMORY, Operation.AGENT_MEMORY_LIST_MESSAGES)
     def list_messages(
@@ -476,7 +528,7 @@ class AgentMemoryClient:
             top=limit,
             skip=offset if offset else None,
         )
-        response = _request(self._http, HttpMethod.GET, MESSAGES, params=params)
+        response = self._request(HttpMethod.GET, MESSAGES, params=params)
         items, _ = extract_value_and_count(response)
         return [Message.from_dict(item) for item in items]
 
@@ -494,7 +546,7 @@ class AgentMemoryClient:
         Raises:
             AgentMemoryHttpError: If the request fails.
         """
-        data = _request(self._http, HttpMethod.GET, RETENTION_CONFIG)
+        data = self._request(HttpMethod.GET, RETENTION_CONFIG)
         return RetentionConfig.from_dict(data)
 
     @record_metrics(Module.AGENT_MEMORY, Operation.AGENT_MEMORY_UPDATE_RETENTION_CONFIG)
@@ -542,4 +594,4 @@ class AgentMemoryClient:
         if usage_log_days is not None:
             payload["usageLogDays"] = usage_log_days
 
-        _request(self._http, HttpMethod.PATCH, RETENTION_CONFIG, json=payload)
+        self._request(HttpMethod.PATCH, RETENTION_CONFIG, json=payload)

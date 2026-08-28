@@ -13,6 +13,7 @@ Provides three building blocks used by all service modules:
 from __future__ import annotations
 
 import logging
+import threading
 from abc import ABC, abstractmethod
 from datetime import datetime, timedelta
 from typing import Any, Callable, Optional
@@ -84,17 +85,20 @@ class XsuaaAuthProvider(AuthProvider):
         self._config = config_factory()
         self._timeout = timeout
         self._cache: dict[Optional[str], tuple[OAuth2Session, datetime]] = {}
+        self._lock = threading.Lock()
 
     def get_session(self, tenant_subdomain: Optional[str] = None) -> OAuth2Session:
         has_changed = getattr(self._config_factory, "has_changed", None)
         if callable(has_changed) and has_changed():
-            self.invalidate_all()
+            with self._lock:
+                self.invalidate_all()
 
-        cached = self._cache.get(tenant_subdomain)
-        if cached is not None:
-            oauth, expires_at = cached
-            if datetime.now() < expires_at:
-                return oauth
+        with self._lock:
+            cached = self._cache.get(tenant_subdomain)
+            if cached is not None:
+                oauth, expires_at = cached
+                if datetime.now() < expires_at:
+                    return oauth
 
         return self._fetch_token(tenant_subdomain)
 
@@ -128,11 +132,11 @@ class XsuaaAuthProvider(AuthProvider):
             seconds=expires_in - _TOKEN_EXPIRY_BUFFER_SECONDS
         )
 
-        existing = self._cache.get(tenant_subdomain)
-        if existing is not None:
-            existing[0].close()
-
-        self._cache[tenant_subdomain] = (oauth, expires_at)
+        with self._lock:
+            existing = self._cache.get(tenant_subdomain)
+            if existing is not None:
+                existing[0].close()
+            self._cache[tenant_subdomain] = (oauth, expires_at)
 
         logger.debug(
             "Obtained OAuth2 token for tenant=%r (expires in %ds)",
@@ -142,7 +146,8 @@ class XsuaaAuthProvider(AuthProvider):
         return oauth
 
     def invalidate(self, tenant_subdomain: Optional[str] = None) -> None:
-        self._cache.pop(tenant_subdomain, None)
+        with self._lock:
+            self._cache.pop(tenant_subdomain, None)
 
     def invalidate_all(self) -> None:
         for oauth, _ in self._cache.values():
@@ -150,7 +155,8 @@ class XsuaaAuthProvider(AuthProvider):
         self._cache.clear()
 
     def close(self) -> None:
-        self.invalidate_all()
+        with self._lock:
+            self.invalidate_all()
 
 
 class HttpClient:

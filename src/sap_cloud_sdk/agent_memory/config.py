@@ -28,6 +28,8 @@ from typing import Optional, TYPE_CHECKING
 
 from sap_cloud_sdk.agent_memory.exceptions import AgentMemoryConfigError
 
+_SERVICE_NAME = "hana-agent-memory"
+
 if TYPE_CHECKING:
     from sap_cloud_sdk.core.secret_resolver import ConfigFactory
 
@@ -167,7 +169,7 @@ def _load_config_for_instance(instance: str) -> AgentMemoryConfig:
         AgentMemoryConfigError: If configuration cannot be loaded or is incomplete.
     """
     try:
-        return _make_agent_memory_factory(instance)()
+        return _make_config_factory(instance)()
     except AgentMemoryConfigError:
         raise
     except Exception as exc:
@@ -176,7 +178,7 @@ def _load_config_for_instance(instance: str) -> AgentMemoryConfig:
         ) from exc
 
 
-def _make_agent_memory_factory(instance: str) -> "ConfigFactory[AgentMemoryConfig]":
+def _make_config_factory(instance: str) -> "ConfigFactory[AgentMemoryConfig]":
     """Return a :class:`~sap_cloud_sdk.core.secret_resolver.ConfigFactory` for the given instance.
 
     The factory re-reads the binding on every call and tracks the secret
@@ -201,7 +203,7 @@ def _make_agent_memory_factory(instance: str) -> "ConfigFactory[AgentMemoryConfi
             ) from exc
 
     return ConfigFactory(
-        module="hana-agent-memory",
+        module=_SERVICE_NAME,
         instance=instance,
         binding_cls=BindingData,
         extract=_extract,

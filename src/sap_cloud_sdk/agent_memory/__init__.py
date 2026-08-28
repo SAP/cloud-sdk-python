@@ -20,7 +20,7 @@ from typing import Optional
 from sap_cloud_sdk.agent_memory.client import AgentMemoryClient
 from sap_cloud_sdk.agent_memory.config import (
     AgentMemoryConfig,
-    _make_agent_memory_factory,
+    _make_config_factory,
 )
 from sap_cloud_sdk.agent_memory.exceptions import (
     AgentMemoryConfigError,
@@ -47,7 +47,7 @@ def _build_agent_memory_http(
     if config is not None:
         auth = XsuaaAuthProvider(lambda: config) if config.token_url else None
         return HttpClient(config.base_url, auth, timeout=config.timeout)
-    factory = _make_agent_memory_factory(instance)
+    factory = _make_config_factory(instance)
     cfg = factory()
     auth = XsuaaAuthProvider(factory) if cfg.token_url else None
     return HttpClient(cfg.base_url, auth, timeout=cfg.timeout)

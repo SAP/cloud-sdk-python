@@ -17,9 +17,11 @@ SDK_REVIEW_MARKER_PREFIX="${SDK_REVIEW_MARKER_PREFIX:-<!-- sdk-review:v1}"
 SUMMARY_MARKER="${SUMMARY_MARKER:-<!-- sdk-review:v1 kind=summary -->}"
 
 # check_gh_auth <hostname> → exit 0 if authed, exit 2 with message otherwise
+# Uses `gh auth token` (not `gh auth status`) because `status` fails on macOS
+# keyring lock even when the token itself is valid and usable.
 check_gh_auth() {
   local hostname="${1:-github.com}"
-  if ! gh auth status --hostname "$hostname" > /dev/null 2>&1; then
+  if ! gh auth token --hostname "$hostname" > /dev/null 2>&1; then
     echo "ERROR: gh CLI not authenticated for $hostname. Run: gh auth login --hostname $hostname" >&2
     exit 2
   fi

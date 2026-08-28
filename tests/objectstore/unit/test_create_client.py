@@ -53,10 +53,8 @@ class TestCreateClientExplicitConfig:
         mock_instance = MagicMock()
         mock_azure_class.return_value = mock_instance
         config = AzureConfig(
-            account_name="account",
             container_name="container",
             container_uri="https://account.blob.core.windows.net/container",
-            region="westus",
             sas_token="sv=...",
         )
 
@@ -115,10 +113,10 @@ class TestCreateClientAutoDetection:
     def test_create_client_autodetects_azure(
         self, mock_read_keys, mock_load, mock_azure_class
     ):
-        azure_keys = {"container_uri", "sas_token", "container_name", "account_name"}
+        azure_keys = {"container_uri", "sas_token", "container_name"}
         mock_read_keys.return_value = azure_keys
         mock_config = AzureConfig(
-            account_name="", container_name="", container_uri="", region="", sas_token=""
+            container_name="", container_uri="", sas_token=""
         )
         mock_load.return_value = mock_config
         mock_instance = MagicMock()

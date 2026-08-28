@@ -20,7 +20,7 @@ class TestDetectProvider:
         assert detect_provider(keys) == "s3"
 
     def test_azure_keys_detected_as_azure(self):
-        keys = {"container_uri", "sas_token", "container_name", "account_name"}
+        keys = {"container_uri", "sas_token", "container_name"}
         assert detect_provider(keys) == "azure"
 
     def test_gcs_keys_detected_as_gcs(self):

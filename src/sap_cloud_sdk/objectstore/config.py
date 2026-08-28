@@ -33,17 +33,13 @@ class AzureConfig:
     """Client configuration for Azure Blob Storage.
 
     Args:
-        account_name: Azure storage account name.
         container_name: Container name.
         container_uri: Full container URI.
-        region: Azure region.
         sas_token: Shared access signature token.
     """
 
-    account_name: str
     container_name: str
     container_uri: str
-    region: str
     sas_token: str
 
 
@@ -109,10 +105,8 @@ class AzureBindingData:
     Filled by the secret resolver; all fields are plain strings.
     """
 
-    account_name: str = ""
     container_name: str = ""
     container_uri: str = ""
-    region: str = ""
     sas_token: str = ""
 
     def validate(self) -> None:
@@ -120,6 +114,7 @@ class AzureBindingData:
         missing = [
             name
             for name, value in [
+                ("container_name", self.container_name),
                 ("container_uri", self.container_uri),
                 ("sas_token", self.sas_token),
             ]
@@ -133,10 +128,8 @@ class AzureBindingData:
     def to_config(self) -> AzureConfig:
         """Return an AzureConfig with credentials from this binding."""
         return AzureConfig(
-            account_name=self.account_name,
             container_name=self.container_name,
             container_uri=self.container_uri,
-            region=self.region,
             sas_token=self.sas_token,
         )
 
@@ -153,8 +146,6 @@ class GcsBindingData:
     )
     projectId: str = field(default="", metadata={"secret": "projectId"})
     bucket: str = ""
-    key_algo: str = ""
-    region: str = ""
 
     def validate(self) -> None:
         """Raise ConfigError if any runtime-required field is empty."""

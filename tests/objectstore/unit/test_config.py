@@ -95,15 +95,20 @@ class TestAzureBindingDataValidate:
             binding.validate()
 
     def test_validate_raises_and_names_each_missing_field(self):
-        binding = AzureBindingData(container_uri="", sas_token="")
+        binding = AzureBindingData(container_name="", container_uri="", sas_token="")
         with pytest.raises(ConfigError) as exc_info:
             binding.validate()
         msg = str(exc_info.value)
+        assert "container_name" in msg
         assert "container_uri" in msg
         assert "sas_token" in msg
 
     def test_validate_raises_naming_only_the_missing_field(self):
-        binding = AzureBindingData(container_uri="https://example.com/c", sas_token="")
+        binding = AzureBindingData(
+            container_name="container",
+            container_uri="https://example.com/c",
+            sas_token="",
+        )
         with pytest.raises(ConfigError) as exc_info:
             binding.validate()
         msg = str(exc_info.value)
@@ -112,6 +117,7 @@ class TestAzureBindingDataValidate:
 
     def test_validate_does_not_raise_when_required_fields_populated(self):
         binding = AzureBindingData(
+            container_name="container",
             container_uri="https://account.blob.core.windows.net/container",
             sas_token="sv=2020",
         )
@@ -122,18 +128,14 @@ class TestAzureBindingDataToConfig:
 
     def test_to_config_maps_fields_onto_azure_config(self):
         binding = AzureBindingData(
-            account_name="account",
             container_name="container",
             container_uri="https://account.blob.core.windows.net/container",
-            region="westus",
             sas_token="sv=2020",
         )
         cfg = binding.to_config()
         assert isinstance(cfg, AzureConfig)
-        assert cfg.account_name == "account"
         assert cfg.container_name == "container"
         assert cfg.container_uri == "https://account.blob.core.windows.net/container"
-        assert cfg.region == "westus"
         assert cfg.sas_token == "sv=2020"
 
 
@@ -241,12 +243,30 @@ class TestLoadFromEnvOrMountS3:
 
 
 class TestLoadFromEnvOrMountAzure:
+    def test_loads_binding_without_unused_optional_fields(self, tmp_path, monkeypatch):
+        binding_dir = tmp_path / "objectstore"
+        binding_dir.mkdir()
+        (binding_dir / "container_uri").write_text(
+            "https://example.com/container", encoding="utf-8"
+        )
+        (binding_dir / "container_name").write_text("container", encoding="utf-8")
+        (binding_dir / "sas_token").write_text("sv=2020", encoding="utf-8")
+        monkeypatch.setenv("SERVICE_BINDING_ROOT", str(tmp_path))
+
+        cfg = load_from_env_or_mount(ObjectStoreProvider.AZURE, "default")
+
+        assert cfg == AzureConfig(
+            container_name="container",
+            container_uri="https://example.com/container",
+            sas_token="sv=2020",
+        )
 
     def test_returns_azure_config_for_azure_provider(self):
         def populate_binding(
             base_volume_mount, base_var_name, module, instance, target
         ):
             target.container_uri = "https://example.com/c"
+            target.container_name = "container"
             target.sas_token = "sv=2020"
 
         with patch(_RESOLVER_PATH, side_effect=populate_binding):
@@ -271,8 +291,6 @@ class TestLoadFromEnvOrMountGcs:
             "base64EncodedPrivateKeyData": "dGVzdA==",
             "projectId": "my-project",
             "bucket": "my-bucket",
-            "key_algo": "RSA",
-            "region": "us-central1",
         }
         for name, value in secrets.items():
             (binding_dir / name).write_text(value, encoding="utf-8")

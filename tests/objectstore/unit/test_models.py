@@ -49,23 +49,20 @@ class TestAzureBindingData:
 
     def test_empty_initialization(self):
         config = AzureBindingData()
-        assert config.account_name == ""
         assert config.container_name == ""
         assert config.container_uri == ""
-        assert config.region == ""
         assert config.sas_token == ""
 
     def test_field_assignment(self):
         config = AzureBindingData(
-            account_name="myaccount",
             container_name="mycontainer",
             container_uri="https://myaccount.blob.core.windows.net/mycontainer",
-            region="westus",
             sas_token="sv=2020-08-04&ss=b",
         )
-        assert config.account_name == "myaccount"
         assert config.container_name == "mycontainer"
-        assert config.region == "westus"
+        assert config.container_uri == (
+            "https://myaccount.blob.core.windows.net/mycontainer"
+        )
         assert config.sas_token == "sv=2020-08-04&ss=b"
 
     def test_is_dataclass(self):
@@ -79,22 +76,16 @@ class TestGcsBindingData:
         assert config.base64EncodedPrivateKeyData == ""
         assert config.projectId == ""
         assert config.bucket == ""
-        assert config.key_algo == ""
-        assert config.region == ""
 
     def test_field_assignment(self):
         config = GcsBindingData(
             base64EncodedPrivateKeyData="dGVzdA==",
             projectId="my-gcp-project",
             bucket="my-gcs-bucket",
-            key_algo="RSA_2048",
-            region="us-central1",
         )
         assert config.base64EncodedPrivateKeyData == "dGVzdA=="
         assert config.projectId == "my-gcp-project"
         assert config.bucket == "my-gcs-bucket"
-        assert config.key_algo == "RSA_2048"
-        assert config.region == "us-central1"
 
     def test_is_dataclass(self):
         assert is_dataclass(GcsBindingData)

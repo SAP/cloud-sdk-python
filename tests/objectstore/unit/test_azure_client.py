@@ -19,10 +19,8 @@ from sap_cloud_sdk.objectstore.exceptions import (  # noqa: E402
 )
 
 _CREDS = AzureConfig(
-    account_name="account",
     container_name="container",
     container_uri="https://account.blob.core.windows.net/container",
-    region="westus",
     sas_token="sv=2020",
 )
 
@@ -309,10 +307,8 @@ class TestCreateContainerClient:
         from unittest.mock import sentinel
 
         cfg = AzureConfig(
-            account_name="account",
             container_name="container",
             container_uri="https://account.blob.core.windows.net/container",
-            region="westus",
             sas_token="sv=2020",
         )
 
@@ -332,10 +328,8 @@ class TestCreateContainerClient:
         from sap_cloud_sdk.objectstore.exceptions import ClientCreationError
 
         cfg = AzureConfig(
-            account_name="account",
             container_name="container",
             container_uri="https://account.blob.core.windows.net/container",
-            region="westus",
             sas_token="sv=2020",
         )
 

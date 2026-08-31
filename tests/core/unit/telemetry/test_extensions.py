@@ -19,6 +19,7 @@ from sap_cloud_sdk.core.telemetry.extensions import (
     ATTR_EXTENSION_ITEM_NAME,
     ATTR_EXTENSION_URL,
     ATTR_SOLUTION_ID,
+    ATTR_JOULE_STUDIO_GSID,
     ATTR_SUMMARY_TOTAL_OPERATION_COUNT,
     ATTR_SUMMARY_TOTAL_DURATION_MS,
     ATTR_SUMMARY_TOOL_CALL_COUNT,
@@ -100,7 +101,7 @@ class TestExtensionContext:
     """Test suite for extension_context function."""
 
     def test_extension_context_sets_all_baggage(self):
-        """Test extension_context sets all baggage values including url and solution_id."""
+        """Test extension_context sets all baggage values including url, solution_id, and joule_studio_gsid."""
         captured_baggage = {}
 
         def mock_set_baggage(key, value, context=None):
@@ -128,6 +129,7 @@ class TestExtensionContext:
                             item_name="create_ticket",
                             extension_url="https://ext.example.com",
                             solution_id="sol-789",
+                            joule_studio_gsid="gsid-test-123",
                         ):
                             pass
 
@@ -140,6 +142,7 @@ class TestExtensionContext:
         assert captured_baggage[ATTR_EXTENSION_ITEM_NAME] == "create_ticket"
         assert captured_baggage[ATTR_EXTENSION_URL] == "https://ext.example.com"
         assert captured_baggage[ATTR_SOLUTION_ID] == "sol-789"
+        assert captured_baggage[ATTR_JOULE_STUDIO_GSID] == "gsid-test-123"
 
     def test_extension_context_defaults_for_new_params(self):
         """Test extension_context uses defaults when new params are omitted."""
@@ -177,6 +180,7 @@ class TestExtensionContext:
         assert captured_baggage[ATTR_EXTENSION_ITEM_NAME] == ""
         assert ATTR_EXTENSION_URL not in captured_baggage
         assert ATTR_SOLUTION_ID not in captured_baggage
+        assert ATTR_JOULE_STUDIO_GSID not in captured_baggage
 
     def test_extension_context_hook_type(self):
         """Test extension_context with hook extension type."""
@@ -434,6 +438,7 @@ class TestGetExtensionContext:
                 ATTR_EXTENSION_ITEM_NAME: "create_ticket",
                 ATTR_EXTENSION_URL: "https://ext.example.com",
                 ATTR_SOLUTION_ID: "sol-789",
+                ATTR_JOULE_STUDIO_GSID: "gsid-789",
             }
             return values.get(key)
 
@@ -451,6 +456,7 @@ class TestGetExtensionContext:
             assert result["item_name"] == "create_ticket"
             assert result["extension_url"] == "https://ext.example.com"
             assert result["solution_id"] == "sol-789"
+            assert result["joule_studio_gsid"] == "gsid-789"
 
     def test_with_different_extension_types(self):
         """Test get_extension_context with different extension types."""
@@ -565,6 +571,7 @@ class TestExtensionContextIntegration:
             item_name="create_ticket",
             extension_url="https://ext.example.com",
             solution_id="sol-789",
+            joule_studio_gsid="gsid-789",
         ):
             result_during = get_extension_context()
             assert result_during is not None
@@ -577,6 +584,7 @@ class TestExtensionContextIntegration:
             assert result_during["item_name"] == "create_ticket"
             assert result_during["extension_url"] == "https://ext.example.com"
             assert result_during["solution_id"] == "sol-789"
+            assert result_during["joule_studio_gsid"] == "gsid-789"
 
         result_after = get_extension_context()
         assert result_after is None
@@ -640,6 +648,7 @@ class TestExtensionContextIntegration:
             assert result["item_name"] == ""
             assert result["extension_url"] == ""
             assert result["solution_id"] == ""
+            assert result["joule_studio_gsid"] == ""
 
 
 # ---------------------------------------------------------------------------
@@ -794,9 +803,11 @@ class TestBuildExtensionSpanAttributes:
             "tool",
             extension_url="https://url",
             solution_id="sol-123",
+            joule_studio_gsid="gsid-123",
         )
         assert attrs["sap.extension.solution_id"] == "sol-123"
         assert attrs["sap.extension.extensionUrl"] == "https://url"
+        assert attrs["sap.extension.joule_studio_gsid"] == "gsid-123"
 
     def test_omits_solution_id_when_empty(self):
         attrs = build_extension_span_attributes(
@@ -809,6 +820,7 @@ class TestBuildExtensionSpanAttributes:
         )
         assert "sap.extension.solution_id" not in attrs
         assert "sap.extension.extensionUrl" not in attrs
+        assert "sap.extension.joule_studio_gsid" not in attrs
 
 
 # ---------------------------------------------------------------------------
@@ -1084,6 +1096,7 @@ class TestExtensionContextLogFilter:
             item_name="tool1",
             extension_url="https://ext.example.com",
             solution_id="sol-42",
+            joule_studio_gsid="gsid-42",
         ):
             result = filt.filter(record)
 
@@ -1097,6 +1110,7 @@ class TestExtensionContextLogFilter:
         assert getattr(record, "ext_item_name") == "tool1"
         assert getattr(record, "ext_extension_url") == "https://ext.example.com"
         assert getattr(record, "ext_solution_id") == "sol-42"
+        assert getattr(record, "ext_joule_studio_gsid") == "gsid-42"
 
     def test_no_attributes_outside_context(self):
         filt = ExtensionContextLogFilter()
@@ -1132,3 +1146,4 @@ class TestExtensionContextLogFilter:
         assert getattr(record, "ext_item_name") == ""
         assert getattr(record, "ext_extension_url") == ""
         assert getattr(record, "ext_solution_id") == ""
+        assert getattr(record, "ext_joule_studio_gsid") == ""

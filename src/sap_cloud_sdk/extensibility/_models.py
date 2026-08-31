@@ -411,6 +411,8 @@ class ExtensionSourceInfo:
         extension_url: Build extension URL, or empty string if not provided.
         solution_id: Build solution ID extracted from extension_url, or empty
             string if not available.
+        joule_studio_gsid: Global solution ID of Joule Studio, or empty string
+            if not available.
     """
 
     extension_name: str
@@ -418,6 +420,7 @@ class ExtensionSourceInfo:
     extension_id: str
     extension_url: str = ""
     solution_id: str = ""
+    joule_studio_gsid: str = ""
 
     @classmethod
     def from_dict(cls, obj: Dict[str, Any]) -> ExtensionSourceInfo:
@@ -445,6 +448,7 @@ class ExtensionSourceInfo:
             extension_id=obj.get("extensionId", ""),
             extension_url=obj.get("extensionUrl") or "",
             solution_id=obj.get("solutionId") or "",
+            joule_studio_gsid=obj.get("jouleStudioGsid") or "",
         )
 
     @classmethod
@@ -469,6 +473,7 @@ class ExtensionSourceInfo:
                 extension_id="",
                 extension_url="",
                 solution_id="",
+                joule_studio_gsid="",
             )
         if isinstance(value, dict):
             return cls.from_dict(value)
@@ -478,6 +483,7 @@ class ExtensionSourceInfo:
             extension_id="",
             extension_url="",
             solution_id="",
+            joule_studio_gsid="",
         )
 
 

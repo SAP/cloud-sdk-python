@@ -636,7 +636,8 @@ async def _list_server_tools(
         List of MCPTool objects from this server.
 
     Raises:
-        AgentGatewaySDKError: If server does not provide serverInfo.name.
+        AgentGatewaySDKError: If server does not provide a server name
+            (serverInfo/server_info).
     """
     async with httpx.AsyncClient(
         headers={
@@ -656,8 +657,8 @@ async def _list_server_tools(
                 server_name = mcp_server_name(init_result)
                 if not server_name:
                     raise AgentGatewaySDKError(
-                        f"MCP server at '{url}' did not provide serverInfo.name. "
-                        "This is required by the MCP protocol."
+                        f"MCP server at '{url}' did not provide its server name "
+                        "(serverInfo/server_info). This is required by the MCP protocol."
                     )
 
                 result = await session.list_tools()

@@ -40,6 +40,7 @@ class LibraryInstrumentor(ABC):
         from sap_cloud_sdk.core.telemetry.instrumentation._registry import (
             record_instrumented,
         )
+
         record_instrumented(self.library_name)
         logger.debug("Instrumented %s", self.library_name)
 

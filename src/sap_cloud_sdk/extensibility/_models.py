@@ -433,7 +433,8 @@ class ExtensionSourceInfo:
                 "extensionVersion": "1",
                 "extensionId": "a1b2c3d4-...",
                 "extensionUrl": "https://...",
-                "solutionId": "f9cbd5c1-..."
+                "solutionId": "f9cbd5c1-...",
+                "jouleStudioGsid": "gsid-value-..."
             }
 
         Args:

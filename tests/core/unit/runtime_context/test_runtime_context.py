@@ -25,6 +25,10 @@ from sap_cloud_sdk.core.runtime_context._context import (
     sdk_context,
     set_context,
 )
+from sap_cloud_sdk.core.runtime_context._registry import (
+    get_framework_adapters,
+    record_attached,
+)
 from sap_cloud_sdk.core.runtime_context.providers._ias import (
     APP_TENANT_ID,
     GLOBAL_TENANT_ID,
@@ -432,3 +436,39 @@ class TestMerge:
         ctx = RuntimeContext({key: "v"})
         merged = _merge([ctx])
         assert merged.get(key) == "v"
+
+
+# ---------------------------------------------------------------------------
+# get_framework_adapters
+# ---------------------------------------------------------------------------
+
+
+class TestGetFrameworkAdapters:
+    def setup_method(self):
+        from sap_cloud_sdk.core.runtime_context import _registry as registry_mod
+        self._original = list(registry_mod._attached)
+        registry_mod._attached.clear()
+
+    def teardown_method(self):
+        from sap_cloud_sdk.core.runtime_context import _registry as registry_mod
+        registry_mod._attached.clear()
+        registry_mod._attached.extend(self._original)
+
+    def test_empty_before_bootstrap(self):
+        assert get_framework_adapters() == []
+
+    def test_records_name_after_record_attached(self):
+        record_attached("starlette")
+        assert get_framework_adapters() == ["starlette"]
+
+    def test_multiple_calls_accumulate(self):
+        record_attached("starlette")
+        record_attached("flask")
+        assert get_framework_adapters() == ["starlette", "flask"]
+
+    def test_returns_copy(self):
+        record_attached("starlette")
+        snapshot = get_framework_adapters()
+        snapshot.clear()
+        assert get_framework_adapters() == ["starlette"]
+

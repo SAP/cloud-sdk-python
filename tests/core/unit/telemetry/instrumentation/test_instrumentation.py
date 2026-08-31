@@ -7,6 +7,8 @@ from sap_cloud_sdk.core.telemetry.instrumentation.base import LibraryInstrumento
 from sap_cloud_sdk.core.telemetry.instrumentation._registry import (
     _registry,
     get_registry,
+    get_instrumented_libraries,
+    record_instrumented,
     register,
 )
 
@@ -258,3 +260,44 @@ class TestAutoInstrumentCallsRegistry:
         with patch.object(registry_mod, "_registry", [mock_inst]):
             _instrument_libraries()
         mock_inst.instrument.assert_called_once()
+
+
+# ---------------------------------------------------------------------------
+# get_instrumented_libraries
+# ---------------------------------------------------------------------------
+
+class TestGetInstrumentedLibraries:
+    def setup_method(self):
+        from sap_cloud_sdk.core.telemetry.instrumentation import _registry as registry_mod
+        self._original = list(registry_mod._instrumented)
+        registry_mod._instrumented.clear()
+
+    def teardown_method(self):
+        from sap_cloud_sdk.core.telemetry.instrumentation import _registry as registry_mod
+        registry_mod._instrumented.clear()
+        registry_mod._instrumented.extend(self._original)
+
+    def test_empty_before_any_instrumentation(self):
+        assert get_instrumented_libraries() == []
+
+    def test_records_library_after_successful_instrument(self):
+        inst = _ConcreteInstrumentor()
+        inst.instrument()
+        assert "sys" in get_instrumented_libraries()
+
+    def test_skipped_library_not_recorded(self):
+        inst = _MissingLibraryInstrumentor()
+        inst.instrument()
+        assert "_nonexistent_library_xyz" not in get_instrumented_libraries()
+
+    def test_idempotent_instrument_records_only_once(self):
+        inst = _ConcreteInstrumentor()
+        inst.instrument()
+        inst.instrument()  # is_instrumented() returns True, so _instrument() is skipped
+        assert get_instrumented_libraries().count("sys") == 1
+
+    def test_returns_copy(self):
+        record_instrumented("httpx")
+        snapshot = get_instrumented_libraries()
+        snapshot.clear()
+        assert "httpx" in get_instrumented_libraries()

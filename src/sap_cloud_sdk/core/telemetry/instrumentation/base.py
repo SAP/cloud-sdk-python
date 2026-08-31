@@ -37,6 +37,10 @@ class LibraryInstrumentor(ABC):
                 "%s instrumentation skipped — library not importable", self.library_name
             )
             return
+        from sap_cloud_sdk.core.telemetry.instrumentation._registry import (
+            record_instrumented,
+        )
+        record_instrumented(self.library_name)
         logger.debug("Instrumented %s", self.library_name)
 
     def uninstrument(self) -> None:

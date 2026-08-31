@@ -7,6 +7,8 @@ from sap_cloud_sdk.core.runtime_context._registry import FrameworkAdapter, regis
 
 
 class _StarletteContextAdapter(FrameworkAdapter):
+    name = "starlette"
+
     def _matches(self, app) -> bool:
         from starlette.applications import Starlette
 

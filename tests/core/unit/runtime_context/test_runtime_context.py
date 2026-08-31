@@ -471,4 +471,3 @@ class TestGetFrameworkAdapters:
         snapshot = get_framework_adapters()
         snapshot.clear()
         assert get_framework_adapters() == ["starlette"]
-

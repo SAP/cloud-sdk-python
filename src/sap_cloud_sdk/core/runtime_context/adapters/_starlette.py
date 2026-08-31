@@ -3,7 +3,11 @@
 from typing import List
 
 from sap_cloud_sdk.core.runtime_context._protocol import ContextProvider
-from sap_cloud_sdk.core.runtime_context._registry import Adapter, FrameworkAdapter, register
+from sap_cloud_sdk.core.runtime_context._registry import (
+    Adapter,
+    FrameworkAdapter,
+    register,
+)
 
 
 class _StarletteContextAdapter(FrameworkAdapter):

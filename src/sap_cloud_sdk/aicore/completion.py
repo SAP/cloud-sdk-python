@@ -54,17 +54,18 @@ from typing import Any
 
 import litellm
 
-from .filtering.filters import _parse_input_filter_error
 from sap_cloud_sdk.core.telemetry.metrics_decorator import record_metrics
 from sap_cloud_sdk.core.telemetry.module import Module
 from sap_cloud_sdk.core.telemetry.operation import Operation
+from .filtering.filters import _parse_input_filter_error
 
 logger = logging.getLogger(__name__)
 
 
 @record_metrics(Module.AICORE, Operation.AICORE_REACTIVE_RELOAD)
 def _reload_reactive() -> None:
-    from sap_cloud_sdk.aicore import set_aicore_config  # local import: avoids circular dep
+    # Local import avoids circular dep: completion ← __init__ ← completion
+    from sap_cloud_sdk.aicore import set_aicore_config
 
     logger.info("AI Core credentials reloading after authentication failure")
     set_aicore_config()

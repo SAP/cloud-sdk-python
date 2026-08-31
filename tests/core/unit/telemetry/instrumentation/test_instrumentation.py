@@ -19,7 +19,7 @@ from sap_cloud_sdk.core.telemetry.instrumentation._registry import (
 # ---------------------------------------------------------------------------
 
 class _ConcreteInstrumentor(LibraryInstrumentor):
-    library_name = "sys"  # always installed
+    library_name = Library.HTTPX  # always installed (hard SDK dependency)
 
     def __init__(self):
         self._instrumented = False
@@ -284,7 +284,7 @@ class TestGetInstrumentedLibraries:
     def test_records_library_after_successful_instrument(self):
         inst = _ConcreteInstrumentor()
         inst.instrument()
-        assert "sys" in get_instrumented_libraries()
+        assert Library.HTTPX in get_instrumented_libraries()
 
     def test_skipped_library_not_recorded(self):
         inst = _MissingLibraryInstrumentor()
@@ -295,7 +295,7 @@ class TestGetInstrumentedLibraries:
         inst = _ConcreteInstrumentor()
         inst.instrument()
         inst.instrument()  # is_instrumented() returns True, so _instrument() is skipped
-        assert get_instrumented_libraries().count("sys") == 1
+        assert get_instrumented_libraries().count(Library.HTTPX) == 1
 
     def test_returns_copy(self):
         record_instrumented(Library.HTTPX)

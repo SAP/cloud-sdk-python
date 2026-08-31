@@ -202,6 +202,7 @@ editing `bootstrap`.
 ### Adding a new framework or invocation source
 
 ```python
+from sap_cloud_sdk import Adapter
 from sap_cloud_sdk.core.runtime_context import (
     ContextProvider,
     FrameworkAdapter,
@@ -211,7 +212,7 @@ from sap_cloud_sdk.core.runtime_context import (
 
 class FlaskContextAdapter(FrameworkAdapter):
     @property
-    def name(self) -> str:
+    def name(self) -> Adapter:
         return "flask"
 
     def _matches(self, app) -> bool:

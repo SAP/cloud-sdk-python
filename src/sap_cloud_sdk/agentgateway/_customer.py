@@ -23,12 +23,14 @@ import uuid
 import httpx
 from mcp import ClientSession
 from mcp.client.streamable_http import streamable_http_client
+from mcp.shared.exceptions import McpError
 
 from sap_cloud_sdk.agentgateway._dependencies_resolver import (
     EnvironmentDependenciesResolver,
     IntegrationDependenciesResolver,
 )
 from sap_cloud_sdk.agentgateway._models import (
+    JsonRpcError,
     CustomerCredentials,
     IntegrationDependency,
     MCPTool,
@@ -680,15 +682,42 @@ def _log_mcp_server_error(ord_id: str, exc: BaseException) -> None:
             _log_mcp_server_error(ord_id, inner)
         return
     if isinstance(exc, httpx.HTTPStatusError):
+        try:
+            body = exc.response.text
+        except httpx.ResponseNotRead:
+            body = None
+        rpc_error = JsonRpcError.parse(body) if body else None
+        if rpc_error:
+            logger.error(
+                "Failed to load tools from %s — %s returned HTTP %d [JSON-RPC %d]: %s",
+                ord_id,
+                exc.request.url,
+                exc.response.status_code,
+                rpc_error.code,
+                rpc_error.message,
+            )
+        else:
+            logger.error(
+                "Failed to load tools from %s — %s returned HTTP %d: %s",
+                ord_id,
+                exc.request.url,
+                exc.response.status_code,
+                body[:500] if body else "(response body not available)",
+            )
+    elif isinstance(exc, McpError):
         logger.error(
-            "Failed to load tools from %s (HTTP %d): %s",
+            "Failed to load tools from %s — JSON-RPC %d: %s",
             ord_id,
-            exc.response.status_code,
-            exc.response.text[:500],
+            exc.error.code,
+            exc.error.message,
         )
     else:
-        logger.exception(
-            "Failed to load tools from %s — skipping", ord_id, exc_info=exc
+        logger.error(
+            "Failed to load tools from %s — %s: %s",
+            ord_id,
+            type(exc).__name__,
+            exc,
+            exc_info=exc,
         )
 
 
@@ -796,13 +825,20 @@ async def call_mcp_tool_customer(
                 result = await session.call_tool(tool.name, kwargs)
 
                 if not result.content:
-                    logger.warning("Tool '%s' returned empty content", tool.name)
+                    logger.warning(
+                        "Tool '%s' on '%s' returned empty content", tool.name, tool.url
+                    )
                     return ""
 
                 first = result.content[0]
                 text = str(getattr(first, "text", ""))
 
                 if result.isError:
-                    logger.error("Tool '%s' returned an error: %s", tool.name, text)
+                    logger.error(
+                        "Tool '%s' on '%s' returned an error: %s",
+                        tool.name,
+                        tool.url,
+                        text,
+                    )
 
                 return text

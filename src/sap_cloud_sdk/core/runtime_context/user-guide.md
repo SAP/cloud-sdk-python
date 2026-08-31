@@ -33,7 +33,7 @@ bootstrap(app)
 
 By default `bootstrap` registers `IASContextProvider` (reads IAS JWT),
 `SAPTriggerContextProvider` (reads `x-sap-origin`), and `DWCContextProvider`
-(reads `dwc-subdomain` and `dwc-tenant`).
+(reads `dwc-subdomain`, `dwc-tenant`, and `dwc-stage-configuration`).
 
 ### 2. Read context anywhere
 
@@ -95,7 +95,49 @@ metadata or a message queue envelope — as long as the adapter populates
 |---|---|---|
 | `IASContextProvider` | `Authorization: Bearer <JWT>` | `TENANT_ID`, `USER_ID`, `GLOBAL_TENANT_ID` |
 | `SAPTriggerContextProvider` | `x-sap-origin` | `TRIGGER_TYPE` |
-| `DWCContextProvider` | `dwc-subdomain`, `dwc-tenant` | `DWC_SUBDOMAIN`, `DWC_TENANT` |
+| `DWCContextProvider` | `dwc-subdomain`, `dwc-tenant`, `dwc-stage-configuration` | `DWC_SUBDOMAIN`, `DWC_TENANT`, `FEATURE_TOGGLES` |
+
+### Feature toggles
+
+`DWCContextProvider` reads the `dwc-stage-configuration` header. The value is
+base64-encoded JSON with the shape:
+
+```json
+{
+  "features": [
+    {"name": "MY_FEATURE", "enabled": true},
+    {"name": "OTHER_FEATURE", "enabled": false}
+  ]
+}
+```
+
+Only features with `"enabled": true` are included. Use `is_feature_enabled(name)`
+to check a toggle for the current request:
+
+```python
+from sap_cloud_sdk.core.runtime_context import is_feature_enabled
+
+@app.route("/")
+async def handler(request):
+    if is_feature_enabled("my-feature"):
+        ...
+```
+
+`is_feature_enabled` returns `False` when the header is absent or the toggle
+name is not in the active list.
+
+> **Common pitfall:** `is_feature_enabled` always returns `False` if `bootstrap(app)` was never
+> called. Without it, no middleware is registered, the `dwc-stage-configuration` header is never
+> parsed, and `get_context()` returns an empty context for every request. Make sure `bootstrap` is
+> called once at app startup before the server starts accepting requests.
+
+For direct access to the full list:
+
+```python
+from sap_cloud_sdk.core.runtime_context import FEATURE_TOGGLES, get_context
+
+toggles = get_context().get(FEATURE_TOGGLES)  # List[str] | None
+```
 
 ### Custom providers
 

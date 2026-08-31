@@ -1,5 +1,7 @@
 """Tests for sap_cloud_sdk.core.runtime_context."""
 
+import base64
+import json
 import pytest
 from unittest.mock import MagicMock, patch
 
@@ -9,12 +11,14 @@ from sap_cloud_sdk.core.runtime_context import (
     DWC_SUBDOMAIN,
     DWC_TENANT,
     DWCContextProvider,
+    FEATURE_TOGGLES,
     IASContextProvider,
     RuntimeContext,
     RequestEnvelope,
     SAPTriggerContextProvider,
     TRIGGER_TYPE,
     get_context,
+    is_feature_enabled,
 )
 from sap_cloud_sdk.core.runtime_context._context import (
     async_sdk_context,
@@ -312,6 +316,10 @@ class TestSAPTriggerContextProvider:
 # ---------------------------------------------------------------------------
 
 
+def _make_stage_config(features: list[dict]) -> str:
+    return base64.b64encode(json.dumps({"features": features}).encode()).decode()
+
+
 class TestDWCContextProvider:
     def test_extracts_dwc_subdomain(self):
         envelope = _make_envelope({"dwc-subdomain": "my-subdomain"})
@@ -331,6 +339,65 @@ class TestDWCContextProvider:
 
     def test_satisfies_context_provider_protocol(self):
         assert isinstance(DWCContextProvider(), ContextProvider)
+
+    def test_extracts_enabled_feature_toggles(self):
+        header = _make_stage_config([
+            {"name": "FEATURE_A", "enabled": True},
+            {"name": "FEATURE_B", "enabled": True},
+        ])
+        ctx = DWCContextProvider().extract(_make_envelope({"dwc-stage-configuration": header}))
+        assert ctx.get(FEATURE_TOGGLES) == ["FEATURE_A", "FEATURE_B"]
+
+    def test_excludes_disabled_feature_toggles(self):
+        header = _make_stage_config([
+            {"name": "FEATURE_A", "enabled": True},
+            {"name": "FEATURE_B", "enabled": False},
+        ])
+        ctx = DWCContextProvider().extract(_make_envelope({"dwc-stage-configuration": header}))
+        assert ctx.get(FEATURE_TOGGLES) == ["FEATURE_A"]
+
+    def test_feature_toggles_none_when_header_absent(self):
+        ctx = DWCContextProvider().extract(_make_envelope({}))
+        assert ctx.get(FEATURE_TOGGLES) is None
+
+    def test_feature_toggles_none_on_invalid_base64(self):
+        ctx = DWCContextProvider().extract(_make_envelope({"dwc-stage-configuration": "!!!"}))
+        assert ctx.get(FEATURE_TOGGLES) is None
+
+    def test_feature_toggles_none_on_invalid_json(self):
+        bad = base64.b64encode(b"not-json").decode()
+        ctx = DWCContextProvider().extract(_make_envelope({"dwc-stage-configuration": bad}))
+        assert ctx.get(FEATURE_TOGGLES) is None
+
+
+# ---------------------------------------------------------------------------
+# is_feature_enabled
+# ---------------------------------------------------------------------------
+
+
+class TestIsFeatureEnabled:
+    def test_returns_true_when_toggle_is_active(self):
+        ctx = RuntimeContext({FEATURE_TOGGLES: ["my-feature", "other"]})
+        with sdk_context(ctx):
+            assert is_feature_enabled("my-feature") is True
+
+    def test_returns_false_when_toggle_is_not_in_list(self):
+        ctx = RuntimeContext({FEATURE_TOGGLES: ["other-feature"]})
+        with sdk_context(ctx):
+            assert is_feature_enabled("my-feature") is False
+
+    def test_returns_false_when_toggle_list_is_empty(self):
+        ctx = RuntimeContext({FEATURE_TOGGLES: []})
+        with sdk_context(ctx):
+            assert is_feature_enabled("my-feature") is False
+
+    def test_returns_false_when_no_toggles_header(self):
+        ctx = RuntimeContext()
+        with sdk_context(ctx):
+            assert is_feature_enabled("my-feature") is False
+
+    def teardown_method(self):
+        set_context(RuntimeContext())
 
 
 # ---------------------------------------------------------------------------

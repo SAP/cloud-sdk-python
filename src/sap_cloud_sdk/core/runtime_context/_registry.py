@@ -37,7 +37,7 @@ def record_attached(name: Adapter) -> None:
         _attached.append(name)
 
 
-def get_framework_adapters() -> List[Adapter]:
+def get_attached_adapters() -> List[Adapter]:
     """Return the adapters attached via bootstrap().
 
     Each entry corresponds to one :func:`~sap_cloud_sdk.bootstrap` call that

@@ -202,8 +202,8 @@ editing `bootstrap`.
 ### Adding a new framework or invocation source
 
 ```python
-from sap_cloud_sdk import Adapter
 from sap_cloud_sdk.core.runtime_context import (
+    Adapter,
     ContextProvider,
     FrameworkAdapter,
     register,
@@ -233,18 +233,18 @@ register(FlaskContextAdapter())
 
 ## Introspection
 
-Use `get_framework_adapters()` to check which framework adapters have been attached at runtime:
+Use `get_attached_adapters()` to check which framework adapters have been attached at runtime:
 
 ```python
-from sap_cloud_sdk import Adapter, get_framework_adapters
+from sap_cloud_sdk.core.runtime_context import Adapter, get_attached_adapters
 
-get_framework_adapters()  # -> [Adapter.STARLETTE] after bootstrap(app), [] before
+get_attached_adapters()  # -> [Adapter.STARLETTE] after bootstrap(app), [] before
 ```
 
 This is useful for modules that need to fail fast if their required framework was never bootstrapped:
 
 ```python
-if Adapter.STARLETTE not in get_framework_adapters():
+if Adapter.STARLETTE not in get_attached_adapters():
     raise RuntimeError(
         "This client requires Starlette to be bootstrapped. "
         "Call bootstrap(app) with your Starlette/FastAPI app."

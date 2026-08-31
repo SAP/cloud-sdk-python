@@ -27,7 +27,7 @@ from sap_cloud_sdk.core.runtime_context._context import (
 )
 from sap_cloud_sdk.core.runtime_context._registry import (
     Adapter,
-    get_framework_adapters,
+    get_attached_adapters,
     record_attached,
 )
 from sap_cloud_sdk.core.runtime_context.providers._ias import (
@@ -440,7 +440,7 @@ class TestMerge:
 
 
 # ---------------------------------------------------------------------------
-# get_framework_adapters
+# get_attached_adapters
 # ---------------------------------------------------------------------------
 
 
@@ -456,19 +456,19 @@ class TestGetFrameworkAdapters:
         registry_mod._attached.extend(self._original)
 
     def test_empty_before_bootstrap(self):
-        assert get_framework_adapters() == []
+        assert get_attached_adapters() == []
 
     def test_records_name_after_record_attached(self):
         record_attached(Adapter.STARLETTE)
-        assert get_framework_adapters() == [Adapter.STARLETTE]
+        assert get_attached_adapters() == [Adapter.STARLETTE]
 
     def test_multiple_calls_accumulate(self):
         record_attached(Adapter.STARLETTE)
         record_attached(Adapter.STARLETTE)  # idempotent
-        assert get_framework_adapters() == [Adapter.STARLETTE]
+        assert get_attached_adapters() == [Adapter.STARLETTE]
 
     def test_returns_copy(self):
         record_attached(Adapter.STARLETTE)
-        snapshot = get_framework_adapters()
+        snapshot = get_attached_adapters()
         snapshot.clear()
-        assert get_framework_adapters() == [Adapter.STARLETTE]
+        assert get_attached_adapters() == [Adapter.STARLETTE]

@@ -83,7 +83,7 @@ The SDK ships `opentelemetry-instrumentation-*` packages for all of the above as
 Use `get_instrumented_libraries()` to query which libraries were actually patched at runtime:
 
 ```python
-from sap_cloud_sdk import Library, get_instrumented_libraries
+from sap_cloud_sdk.core.telemetry import Library, get_instrumented_libraries
 
 get_instrumented_libraries()  # -> [Library.HTTPX, Library.SQLALCHEMY, ...] after auto_instrument(), [] before
 ```

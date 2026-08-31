@@ -4,14 +4,22 @@ from __future__ import annotations
 
 import logging
 from abc import ABC, abstractmethod
+from enum import StrEnum
 from typing import List
 
 from sap_cloud_sdk.core.runtime_context._protocol import ContextProvider
 
 logger = logging.getLogger(__name__)
 
+
+class Adapter(StrEnum):
+    """Known framework adapters that can be attached via :func:`~sap_cloud_sdk.bootstrap`."""
+
+    STARLETTE = "starlette"
+
+
 _registry: List[FrameworkAdapter] = []
-_attached: List[str] = []
+_attached: List[Adapter] = []
 
 
 def register(adapter: FrameworkAdapter) -> None:
@@ -23,16 +31,17 @@ def get_registry() -> List[FrameworkAdapter]:
     return list(_registry)
 
 
-def record_attached(name: str) -> None:
+def record_attached(name: Adapter) -> None:
     """Record a framework adapter as attached. Called by bootstrap()."""
-    _attached.append(name)
+    if name not in _attached:
+        _attached.append(name)
 
 
-def get_framework_adapters() -> List[str]:
-    """Return the names of framework adapters attached via bootstrap().
+def get_framework_adapters() -> List[Adapter]:
+    """Return the adapters attached via bootstrap().
 
     Each entry corresponds to one :func:`~sap_cloud_sdk.bootstrap` call that
-    successfully matched and attached an adapter (e.g. ``"starlette"``).
+    successfully matched and attached an adapter (e.g. :attr:`Adapter.STARLETTE`).
     Returns an empty list if bootstrap() has not been called yet.
     """
     return list(_attached)
@@ -49,7 +58,9 @@ class FrameworkAdapter(ABC):
     Example::
 
         class FlaskContextAdapter(FrameworkAdapter):
-            name = "flask"
+            @property
+            def name(self) -> str:
+                return "flask"
 
             def _matches(self, app) -> bool:
                 from flask import Flask
@@ -61,8 +72,9 @@ class FrameworkAdapter(ABC):
         register(FlaskContextAdapter())
     """
 
-    #: Human-readable identifier for this adapter (e.g. ``"starlette"``).
-    name: str
+    @property
+    @abstractmethod
+    def name(self) -> Adapter: ...
 
     def matches(self, app) -> bool:
         """Return True if this adapter handles *app*'s framework type."""

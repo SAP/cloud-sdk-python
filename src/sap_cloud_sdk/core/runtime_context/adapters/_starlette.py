@@ -3,11 +3,13 @@
 from typing import List
 
 from sap_cloud_sdk.core.runtime_context._protocol import ContextProvider
-from sap_cloud_sdk.core.runtime_context._registry import FrameworkAdapter, register
+from sap_cloud_sdk.core.runtime_context._registry import Adapter, FrameworkAdapter, register
 
 
 class _StarletteContextAdapter(FrameworkAdapter):
-    name = "starlette"
+    @property
+    def name(self) -> Adapter:
+        return Adapter.STARLETTE
 
     def _matches(self, app) -> bool:
         from starlette.applications import Starlette

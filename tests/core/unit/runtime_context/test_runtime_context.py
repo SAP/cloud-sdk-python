@@ -26,6 +26,7 @@ from sap_cloud_sdk.core.runtime_context._context import (
     set_context,
 )
 from sap_cloud_sdk.core.runtime_context._registry import (
+    Adapter,
     get_framework_adapters,
     record_attached,
 )
@@ -458,16 +459,16 @@ class TestGetFrameworkAdapters:
         assert get_framework_adapters() == []
 
     def test_records_name_after_record_attached(self):
-        record_attached("starlette")
-        assert get_framework_adapters() == ["starlette"]
+        record_attached(Adapter.STARLETTE)
+        assert get_framework_adapters() == [Adapter.STARLETTE]
 
     def test_multiple_calls_accumulate(self):
-        record_attached("starlette")
-        record_attached("flask")
-        assert get_framework_adapters() == ["starlette", "flask"]
+        record_attached(Adapter.STARLETTE)
+        record_attached(Adapter.STARLETTE)  # idempotent
+        assert get_framework_adapters() == [Adapter.STARLETTE]
 
     def test_returns_copy(self):
-        record_attached("starlette")
+        record_attached(Adapter.STARLETTE)
         snapshot = get_framework_adapters()
         snapshot.clear()
-        assert get_framework_adapters() == ["starlette"]
+        assert get_framework_adapters() == [Adapter.STARLETTE]

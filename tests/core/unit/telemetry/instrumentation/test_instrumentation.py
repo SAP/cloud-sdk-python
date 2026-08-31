@@ -5,6 +5,7 @@ import pytest
 
 from sap_cloud_sdk.core.telemetry.instrumentation.base import LibraryInstrumentor
 from sap_cloud_sdk.core.telemetry.instrumentation._registry import (
+    Library,
     _registry,
     get_registry,
     get_instrumented_libraries,
@@ -297,7 +298,7 @@ class TestGetInstrumentedLibraries:
         assert get_instrumented_libraries().count("sys") == 1
 
     def test_returns_copy(self):
-        record_instrumented("httpx")
+        record_instrumented(Library.HTTPX)
         snapshot = get_instrumented_libraries()
         snapshot.clear()
-        assert "httpx" in get_instrumented_libraries()
+        assert Library.HTTPX in get_instrumented_libraries()

@@ -9,8 +9,8 @@ detect_language() {
     exit 3
   fi
   if [ -f "$root/pyproject.toml" ]; then
-    # Require the SDK package layout for a positive Python result
-    if [ -d "$root/src/sap_cloud_sdk" ]; then
+    # Accept any src/sap_* package layout (sap_cloud_sdk, sap_internal_sdk, etc.)
+    if ls -d "$root/src/sap_"* >/dev/null 2>&1; then
       echo "python"; return
     fi
   fi

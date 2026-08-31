@@ -24,6 +24,11 @@ import httpx
 from mcp import ClientSession
 from mcp.client.streamable_http import streamable_http_client
 
+from sap_cloud_sdk.agentgateway._compat import (
+    mcp_input_schema,
+    mcp_is_error,
+    mcp_server_name,
+)
 from sap_cloud_sdk.agentgateway._dependencies_resolver import (
     EnvironmentDependenciesResolver,
     IntegrationDependenciesResolver,
@@ -648,17 +653,13 @@ async def _list_server_tools(
             async with ClientSession(read, write) as session:
                 init_result = await session.initialize()
 
-                if not (
-                    init_result
-                    and init_result.serverInfo
-                    and init_result.serverInfo.name
-                ):
+                server_name = mcp_server_name(init_result)
+                if not server_name:
                     raise AgentGatewaySDKError(
                         f"MCP server at '{url}' did not provide serverInfo.name. "
                         "This is required by the MCP protocol."
                     )
 
-                server_name = init_result.serverInfo.name
                 result = await session.list_tools()
 
                 return [
@@ -666,7 +667,7 @@ async def _list_server_tools(
                         name=t.name,
                         server_name=server_name,
                         description=t.description or "",
-                        input_schema=t.inputSchema or {},
+                        input_schema=mcp_input_schema(t),
                         url=url,
                     )
                     for t in result.tools
@@ -802,7 +803,7 @@ async def call_mcp_tool_customer(
                 first = result.content[0]
                 text = str(getattr(first, "text", ""))
 
-                if result.isError:
+                if mcp_is_error(result):
                     logger.error("Tool '%s' returned an error: %s", tool.name, text)
 
                 return text

@@ -75,14 +75,20 @@ performs an atomic symlink swap on rotation), it calls `set_aicore_config()`
 before the cached OAuth token expires — so agents never see a 401 at all.
 
 ```python
+from sap_cloud_sdk.aicore import set_aicore_config, watch_aicore_config
+
+set_aicore_config()    # load credentials at startup
+watch_aicore_config()  # proactive reload on secret rotation
+```
+
+To stop the watcher cleanly at shutdown, pass a `stop_event` (alternative form — pick one):
+
+```python
 import threading
 from sap_cloud_sdk.aicore import set_aicore_config, watch_aicore_config
 
-set_aicore_config()          # load credentials at startup
-watch_aicore_config()        # proactive reload on secret rotation
-
-# Optional: stop cleanly at shutdown
 _stop = threading.Event()
+set_aicore_config()
 watch_aicore_config(stop_event=_stop)
 # at shutdown: _stop.set()
 ```

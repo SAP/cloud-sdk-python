@@ -144,7 +144,8 @@ class Operation(str, Enum):
 
     # AI Core Operations
     AICORE_SET_CONFIG = "set_aicore_config"
-    AICORE_WATCH_CONFIG = "watch_aicore_config"
+    AICORE_PROACTIVE_RELOAD = "aicore_proactive_reload"
+    AICORE_REACTIVE_RELOAD = "aicore_reactive_reload"
     AICORE_PATCH_LITELLM = "patch_litellm_for_credential_rotation"
     AICORE_AUTO_INSTRUMENT = "auto_instrument"
     AICORE_SET_FILTERING = "set_filtering"

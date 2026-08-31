@@ -185,7 +185,16 @@ def _get_secret_dir_mtime(instance_name: str = "aicore-instance") -> float:
         return 0.0
 
 
-@record_metrics(Module.AICORE, Operation.AICORE_WATCH_CONFIG)
+@record_metrics(Module.AICORE, Operation.AICORE_PROACTIVE_RELOAD)
+def _reload_proactive(instance_name: str = "aicore-instance") -> None:
+    set_aicore_config(instance_name=instance_name)
+
+
+@record_metrics(Module.AICORE, Operation.AICORE_REACTIVE_RELOAD)
+def _reload_reactive() -> None:
+    set_aicore_config()
+
+
 def watch_aicore_config(
     instance_name: str = "aicore-instance",
     interval: float = 60.0,
@@ -231,7 +240,7 @@ def watch_aicore_config(
                     logger.info(
                         "AI Core secret volume changed — proactively reloading credentials"
                     )
-                    set_aicore_config(instance_name=instance_name)
+                    _reload_proactive(instance_name=instance_name)
                     last_mtime = current_mtime
             except Exception:
                 logger.exception("Error during proactive AI Core credential reload")
@@ -280,16 +289,14 @@ def patch_litellm_for_credential_rotation() -> None:
         try:
             return _orig_completion(*args, **kwargs)
         except _litellm.AuthenticationError:
-            logger.info("AI Core credentials reloading after authentication failure")
-            set_aicore_config()
+            _reload_reactive()
             return _orig_completion(*args, **kwargs)
 
     async def _acompletion(*args, **kwargs):
         try:
             return await _orig_acompletion(*args, **kwargs)
         except _litellm.AuthenticationError:
-            logger.info("AI Core credentials reloading after authentication failure")
-            set_aicore_config()
+            _reload_reactive()
             return await _orig_acompletion(*args, **kwargs)
 
     _litellm.completion = _completion

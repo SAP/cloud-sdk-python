@@ -55,8 +55,19 @@ from typing import Any
 import litellm
 
 from .filtering.filters import _parse_input_filter_error
+from sap_cloud_sdk.core.telemetry.metrics_decorator import record_metrics
+from sap_cloud_sdk.core.telemetry.module import Module
+from sap_cloud_sdk.core.telemetry.operation import Operation
 
 logger = logging.getLogger(__name__)
+
+
+@record_metrics(Module.AICORE, Operation.AICORE_REACTIVE_RELOAD)
+def _reload_reactive() -> None:
+    from sap_cloud_sdk.aicore import set_aicore_config  # local import: avoids circular dep
+
+    logger.info("AI Core credentials reloading after authentication failure")
+    set_aicore_config()
 
 
 def _maybe_translate_filter_error(exc: BaseException) -> BaseException:
@@ -83,11 +94,7 @@ def completion(*args: Any, **kwargs: Any) -> Any:
     try:
         return litellm.completion(*args, **kwargs)
     except litellm.AuthenticationError:
-        # Local import avoids circular dep: completion ← __init__ ← completion
-        from sap_cloud_sdk.aicore import set_aicore_config
-
-        logger.info("AI Core credentials reloading after authentication failure")
-        set_aicore_config()
+        _reload_reactive()
         return litellm.completion(*args, **kwargs)
     except Exception as exc:
         translated = _maybe_translate_filter_error(exc)
@@ -104,10 +111,7 @@ async def acompletion(*args: Any, **kwargs: Any) -> Any:
     try:
         return await litellm.acompletion(*args, **kwargs)
     except litellm.AuthenticationError:
-        from sap_cloud_sdk.aicore import set_aicore_config
-
-        logger.info("AI Core credentials reloading after authentication failure")
-        set_aicore_config()
+        _reload_reactive()
         return await litellm.acompletion(*args, **kwargs)
     except Exception as exc:
         translated = _maybe_translate_filter_error(exc)

@@ -33,6 +33,11 @@ from sap_cloud_sdk.agentgateway._fragments import (
     list_a2a_fragments,
     list_mcp_fragments,
 )
+from sap_cloud_sdk.agentgateway._compat import (
+    mcp_input_schema,
+    mcp_is_error,
+    mcp_server_name,
+)
 from sap_cloud_sdk.agentgateway._models import (
     Agent,
     AgentCard,
@@ -379,13 +384,7 @@ async def list_server_tools(
         ):
             async with ClientSession(read, write) as session:
                 init_result = await session.initialize()
-                server_name = (
-                    init_result.serverInfo.name
-                    if init_result
-                    and init_result.serverInfo
-                    and init_result.serverInfo.name
-                    else fragment_name
-                )
+                server_name = mcp_server_name(init_result) or fragment_name
                 result = await session.list_tools()
                 tools = result.tools or []
                 if not tools:
@@ -397,7 +396,7 @@ async def list_server_tools(
                         name=t.name,
                         server_name=server_name,
                         description=t.description or "",
-                        input_schema=t.inputSchema or {},
+                        input_schema=mcp_input_schema(t),
                         url=dest_url,
                         fragment_name=fragment_name,
                     )
@@ -525,7 +524,7 @@ async def call_mcp_tool_lob(
                 first = result.content[0]
                 text = str(getattr(first, "text", ""))
 
-                if result.isError:
+                if mcp_is_error(result):
                     logger.error(
                         "Tool '%s' on '%s' returned an error: %s",
                         tool.name,

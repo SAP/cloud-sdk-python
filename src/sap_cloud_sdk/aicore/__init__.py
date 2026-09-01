@@ -7,6 +7,7 @@ variables and configure them for use with LiteLLM.
 import json
 import logging
 import os
+import threading
 from typing import Optional
 
 from sap_cloud_sdk.core.secret_resolver import resolve_base_mount
@@ -175,8 +176,141 @@ def set_aicore_config(instance_name: str = "aicore-instance") -> None:
     set_filtering()
 
 
+def _get_secret_dir_mtime(instance_name: str = "aicore-instance") -> float:
+    """Return the mtime of the AI Core secret directory, or 0.0 if it does not exist."""
+    secret_dir = os.path.join(resolve_base_mount(), "aicore", instance_name)
+    try:
+        return os.stat(secret_dir).st_mtime
+    except OSError:
+        return 0.0
+
+
+@record_metrics(Module.AICORE, Operation.AICORE_PROACTIVE_RELOAD)
+def _reload_proactive(instance_name: str = "aicore-instance") -> None:
+    set_aicore_config(instance_name=instance_name)
+
+
+@record_metrics(Module.AICORE, Operation.AICORE_REACTIVE_RELOAD)
+def _reload_reactive() -> None:
+    set_aicore_config()
+
+
+def watch_aicore_config(
+    instance_name: str = "aicore-instance",
+    interval: float = 60.0,
+    stop_event: threading.Event | None = None,
+) -> threading.Thread:
+    """Start a daemon thread that proactively reloads AI Core credentials
+    when the mounted secret volume changes.
+
+    Polls the secret directory mtime every ``interval`` seconds. On change,
+    calls :func:`set_aicore_config` before LiteLLM's cached OAuth token
+    expires — avoiding 401 errors entirely rather than recovering from them.
+
+    Kubernetes projected volumes perform an atomic symlink swap on rotation,
+    which changes the directory mtime. Both ``secret`` and ``projected``
+    volume types are covered.
+
+    Returns the daemon thread. Stop it cleanly via ``stop_event.set()``.
+
+    Each call starts a new daemon thread — avoid calling more than once per process.
+
+    Typical usage::
+
+        import threading
+        from sap_cloud_sdk.aicore import set_aicore_config, watch_aicore_config
+
+        set_aicore_config()
+
+        _stop = threading.Event()
+        watch_aicore_config(stop_event=_stop)
+        # at shutdown: _stop.set()
+    """
+    if stop_event is None:
+        stop_event = threading.Event()
+
+    last_mtime = _get_secret_dir_mtime(instance_name)
+
+    def _watch() -> None:
+        nonlocal last_mtime
+        while not stop_event.wait(timeout=interval):
+            try:
+                current_mtime = _get_secret_dir_mtime(instance_name)
+                if current_mtime != last_mtime:
+                    logger.info(
+                        "AI Core secret volume changed — proactively reloading credentials"
+                    )
+                    _reload_proactive(instance_name=instance_name)
+                    last_mtime = current_mtime
+            except Exception:
+                logger.exception("Error during proactive AI Core credential reload")
+
+    thread = threading.Thread(target=_watch, daemon=True, name="aicore-secret-watcher")
+    thread.start()
+    return thread
+
+
+@record_metrics(Module.AICORE, Operation.AICORE_PATCH_LITELLM)
+def patch_litellm_for_credential_rotation() -> None:
+    """Patch ``litellm.completion`` / ``litellm.acompletion`` globally so ALL callers
+    get transparent credential reload on ``AuthenticationError``.
+
+    LangGraph agents typically call ``litellm.completion`` through ``ChatLiteLLM``
+    (LangChain), bypassing the SDK's own ``completion()`` wrapper and its built-in
+    401-reload handler. Call this function once at agent startup to extend the same
+    reactive reload behaviour to **every** litellm caller in the process.
+
+    Idempotent — calling more than once has no additional effect.
+
+    Recommended startup pattern for LangGraph / ChatLiteLLM agents::
+
+        from sap_cloud_sdk.aicore import (
+            set_aicore_config,
+            patch_litellm_for_credential_rotation,
+            watch_aicore_config,
+        )
+
+        set_aicore_config()                       # load credentials
+        patch_litellm_for_credential_rotation()   # reactive reload for ChatLiteLLM
+        watch_aicore_config()                     # proactive reload on secret rotation
+
+    Agents that already use the SDK's ``completion()`` / ``acompletion()`` wrappers
+    do not need this — those wrappers already handle 401s transparently.
+    """
+    import litellm as _litellm
+
+    if getattr(_litellm, "_sap_aicore_patched", False):
+        return
+
+    _orig_completion = _litellm.completion
+    _orig_acompletion = _litellm.acompletion
+
+    def _completion(*args, **kwargs):
+        try:
+            return _orig_completion(*args, **kwargs)
+        except _litellm.AuthenticationError:
+            _reload_reactive()
+            return _orig_completion(*args, **kwargs)
+
+    async def _acompletion(*args, **kwargs):
+        try:
+            return await _orig_acompletion(*args, **kwargs)
+        except _litellm.AuthenticationError:
+            _reload_reactive()
+            return await _orig_acompletion(*args, **kwargs)
+
+    _litellm.completion = _completion
+    _litellm.acompletion = _acompletion
+    _litellm._sap_aicore_patched = True
+    logger.info(
+        "litellm patched for AI Core credential rotation — applies to all callers"
+    )
+
+
 __all__ = [
     "set_aicore_config",
+    "watch_aicore_config",
+    "patch_litellm_for_credential_rotation",
     "set_filtering",
     "disable_filtering",
     "completion",

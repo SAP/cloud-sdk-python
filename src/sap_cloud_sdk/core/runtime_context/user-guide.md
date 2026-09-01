@@ -203,6 +203,7 @@ editing `bootstrap`.
 
 ```python
 from sap_cloud_sdk.core.runtime_context import (
+    Adapter,
     ContextProvider,
     FrameworkAdapter,
     register,
@@ -210,6 +211,10 @@ from sap_cloud_sdk.core.runtime_context import (
 
 
 class FlaskContextAdapter(FrameworkAdapter):
+    @property
+    def name(self) -> Adapter:
+        return "flask"
+
     def _matches(self, app) -> bool:
         from flask import Flask
 
@@ -223,6 +228,30 @@ class FlaskContextAdapter(FrameworkAdapter):
 
 register(FlaskContextAdapter())
 ```
+
+---
+
+## Introspection
+
+Use `get_attached_adapters()` to check which framework adapters have been attached at runtime:
+
+```python
+from sap_cloud_sdk.core.runtime_context import Adapter, get_attached_adapters
+
+get_attached_adapters()  # -> [Adapter.STARLETTE] after bootstrap(app), [] before
+```
+
+This is useful for modules that need to fail fast if their required framework was never bootstrapped:
+
+```python
+if Adapter.STARLETTE not in get_attached_adapters():
+    raise RuntimeError(
+        "This client requires Starlette to be bootstrapped. "
+        "Call bootstrap(app) with your Starlette/FastAPI app."
+    )
+```
+
+Returns an empty list if `bootstrap()` has not been called yet. Each entry corresponds to one successful `bootstrap(app)` call.
 
 ---
 

@@ -23,7 +23,11 @@ import uuid
 import httpx
 from mcp import ClientSession
 from mcp.client.streamable_http import streamable_http_client
-from mcp.shared.exceptions import McpError
+
+try:
+    from mcp.shared.exceptions import McpError
+except ImportError:
+    from mcp.shared.exceptions import MCPError as McpError  # type: ignore[no-redef]  # ty: ignore[unresolved-import]
 
 from sap_cloud_sdk.agentgateway._dependencies_resolver import (
     EnvironmentDependenciesResolver,

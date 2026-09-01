@@ -36,7 +36,7 @@ dependencies = [
     "opentelemetry-instrumentation-sqlalchemy~=0.64b0",
     "opentelemetry-instrumentation-django~=0.64b0",
     "opentelemetry-instrumentation-flask~=0.64b0",
-    "mcp>=1.1.0",
+    "mcp>=1.1.0,<1.24",
     "cryptography>=46.0.3",
 ]
 

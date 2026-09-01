@@ -147,7 +147,9 @@ def extension_context(
     if solution_id:
         ctx = baggage.set_baggage(ATTR_SOLUTION_ID, solution_id, context=ctx)
     if joule_studio_gsid:
-        ctx = baggage.set_baggage(ATTR_JOULE_STUDIO_GSID, joule_studio_gsid, context=ctx)
+        ctx = baggage.set_baggage(
+            ATTR_JOULE_STUDIO_GSID, joule_studio_gsid, context=ctx
+        )
 
     token = attach(ctx)
     try:
@@ -463,9 +465,14 @@ async def call_extension_tool(
     See Also:
         :func:`call_extension_hook` for hook-based extensions.
     """
-    resolved_name, resolved_id, resolved_version, resolved_url, resolved_solution_id, resolved_joule_studio_gsid = (
-        resolve_source_info(tool_name, source_mapping, "unknown")
-    )
+    (
+        resolved_name,
+        resolved_id,
+        resolved_version,
+        resolved_url,
+        resolved_solution_id,
+        resolved_joule_studio_gsid,
+    ) = resolve_source_info(tool_name, source_mapping, "unknown")
 
     attrs = build_extension_span_attributes(
         resolved_name,
@@ -544,9 +551,14 @@ async def call_extension_hook(
     Returns:
         The hook's response.
     """
-    resolved_name, resolved_id, resolved_version, resolved_url, resolved_solution_id, resolved_joule_studio_gsid = (
-        resolve_source_info(hook_id, source_mapping, extension_name)
-    )
+    (
+        resolved_name,
+        resolved_id,
+        resolved_version,
+        resolved_url,
+        resolved_solution_id,
+        resolved_joule_studio_gsid,
+    ) = resolve_source_info(hook_id, source_mapping, extension_name)
 
     item_name = getattr(hook, "name", None) or hook_id
 

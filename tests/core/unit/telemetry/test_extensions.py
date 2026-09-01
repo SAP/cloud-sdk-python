@@ -660,7 +660,7 @@ class TestResolveSourceInfo:
     """Tests for resolve_source_info."""
 
     def test_none_mapping_returns_fallback(self):
-        name, ext_id, ver, url, sid = resolve_source_info("key", None, "fallback")
+        name, ext_id, ver, url, sid, _ = resolve_source_info("key", None, "fallback")
         assert name == "fallback"
         assert ext_id == ""
         assert ver == ""
@@ -668,13 +668,13 @@ class TestResolveSourceInfo:
         assert sid == ""
 
     def test_missing_key_returns_fallback(self):
-        name, ext_id, ver, url, sid = resolve_source_info(
+        name, ext_id, ver, url, sid, _ = resolve_source_info(
             "missing", {"other": {}}, "fb"
         )
         assert name == "fb"
 
     def test_empty_fallback_returns_unknown(self):
-        name, _, _, _, _ = resolve_source_info("missing", None, "")
+        name, _, _, _, _, _ = resolve_source_info("missing", None, "")
         assert name == "unknown"
 
     def test_dataclass_source_info(self):
@@ -685,7 +685,7 @@ class TestResolveSourceInfo:
             extension_version: str
 
         info = FakeSourceInfo("My Ext", "uuid-1", "3")
-        name, ext_id, ver, url, sid = resolve_source_info("k", {"k": info}, "fb")
+        name, ext_id, ver, url, sid, _ = resolve_source_info("k", {"k": info}, "fb")
         assert name == "My Ext"
         assert ext_id == "uuid-1"
         assert ver == "3"
@@ -700,7 +700,7 @@ class TestResolveSourceInfo:
             extension_version: str
 
         info = FakeSourceInfo("", "uuid-1", "3")
-        name, _, _, _, _ = resolve_source_info("k", {"k": info}, "fb")
+        name, _, _, _, _, _ = resolve_source_info("k", {"k": info}, "fb")
         assert name == "fb"
 
     def test_dict_source_info(self):
@@ -709,7 +709,7 @@ class TestResolveSourceInfo:
             "extensionId": "uuid-2",
             "extensionVersion": "5",
         }
-        name, ext_id, ver, url, sid = resolve_source_info("k", {"k": info}, "fb")
+        name, ext_id, ver, url, sid, _ = resolve_source_info("k", {"k": info}, "fb")
         assert name == "Dict Ext"
         assert ext_id == "uuid-2"
         assert ver == "5"
@@ -718,11 +718,11 @@ class TestResolveSourceInfo:
 
     def test_dict_empty_name_uses_fallback(self):
         info = {"extensionName": "", "extensionId": "x", "extensionVersion": "1"}
-        name, _, _, _, _ = resolve_source_info("k", {"k": info}, "fb")
+        name, _, _, _, _, _ = resolve_source_info("k", {"k": info}, "fb")
         assert name == "fb"
 
     def test_unknown_type_returns_fallback(self):
-        name, ext_id, ver, url, sid = resolve_source_info("k", {"k": 42}, "fb")
+        name, ext_id, ver, url, sid, _ = resolve_source_info("k", {"k": 42}, "fb")
         assert name == "fb"
         assert ext_id == ""
         assert ver == ""
@@ -737,7 +737,7 @@ class TestResolveSourceInfo:
             extension_version: str | None
 
         info = FakeSourceInfo("Ext", "id", None)
-        _, _, ver, _, _ = resolve_source_info("k", {"k": info}, "fb")
+        _, _, ver, _, _, _ = resolve_source_info("k", {"k": info}, "fb")
         assert ver == ""
 
     def test_dataclass_with_url_and_solution_id(self):
@@ -750,7 +750,7 @@ class TestResolveSourceInfo:
             solution_id: str
 
         info = FakeSourceInfo("Ext", "id", "1", "https://url", "sol-123")
-        _, _, _, url, sid = resolve_source_info("k", {"k": info}, "fb")
+        _, _, _, url, sid, _ = resolve_source_info("k", {"k": info}, "fb")
         assert url == "https://url"
         assert sid == "sol-123"
 
@@ -762,7 +762,7 @@ class TestResolveSourceInfo:
             "extensionUrl": "https://url",
             "solutionId": "sol-456",
         }
-        _, _, _, url, sid = resolve_source_info("k", {"k": info}, "fb")
+        _, _, _, url, sid, _ = resolve_source_info("k", {"k": info}, "fb")
         assert url == "https://url"
         assert sid == "sol-456"
 

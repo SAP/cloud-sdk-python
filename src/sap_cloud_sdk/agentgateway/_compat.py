@@ -11,7 +11,7 @@ def mcp_server_name(init_result: Any) -> str | None:
     return getattr(info, "name", None) if info is not None else None
 
 
-def mcp_input_schema(tool: Any) -> dict:
+def mcp_input_schema(tool: Any) -> dict[str, Any]:
     """Return the tool's input schema across mcp 1.x/2.x, defaulting to {}."""
     schema = getattr(tool, "input_schema", None)
     if schema is None:

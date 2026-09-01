@@ -215,6 +215,6 @@ class TestOperation:
         """Test that we have the expected number of operations."""
         all_operations = list(Operation)
         # 3 auditlog + 12 destination + 10 certificate + 10 fragment + 8 objectstore
-        # + 2 extensibility + 4 aicore + 23 dms + 6 agentgateway + 13 agent_memory
-        # + 5 data_anonymization + 52 adms + 6 print + 1 bootstrap + 3 output_management = 158
-        assert len(all_operations) == 158
+        # + 2 extensibility + 7 aicore + 23 dms + 6 agentgateway + 13 agent_memory
+        # + 5 data_anonymization + 52 adms + 6 print + 1 bootstrap + 3 output_management = 161
+        assert len(all_operations) == 161

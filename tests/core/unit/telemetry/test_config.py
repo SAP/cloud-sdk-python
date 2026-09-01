@@ -299,3 +299,49 @@ class TestCreateResourceAttributesFromEnv:
 
             assert attrs[ATTR_SAP_SERVICE_DISPLAY_NAME] == "My Service"
             assert attrs[ATTR_SAP_ORD_ID] == "my-ord-id"
+
+
+def _make_ep(name: str, attrs: dict, raises: Exception | None = None):
+    """Build a mock entry point that returns *attrs* (or raises *raises*)."""
+    from unittest.mock import MagicMock
+    ep = MagicMock()
+    ep.name = name
+    if raises is not None:
+        ep.load.return_value = MagicMock(side_effect=raises)
+    else:
+        ep.load.return_value = lambda: attrs
+    return ep
+
+
+class TestSdkResourceProviderEntryPoints:
+    """Tests for companion-SDK resource attribute discovery via entry points."""
+
+    def test_provider_attributes_appear_in_resource(self):
+        mock_ep = _make_ep("test_sdk", {"sap.test_sdk.version": "1.0.0"})
+        with patch("sap_cloud_sdk.core.telemetry.config._entry_points", return_value=[mock_ep]):
+            attrs = create_resource_attributes_from_env()
+        assert attrs["sap.test_sdk.version"] == "1.0.0"
+
+    def test_multiple_providers_are_merged(self):
+        eps = [
+            _make_ep("sdk_a", {"sap.sdk_a.version": "1.0"}),
+            _make_ep("sdk_b", {"sap.sdk_b.version": "2.0"}),
+        ]
+        with patch("sap_cloud_sdk.core.telemetry.config._entry_points", return_value=eps):
+            attrs = create_resource_attributes_from_env()
+        assert attrs["sap.sdk_a.version"] == "1.0"
+        assert attrs["sap.sdk_b.version"] == "2.0"
+
+    def test_failing_provider_is_skipped_silently(self):
+        bad_ep = _make_ep("broken", {}, raises=RuntimeError("boom"))
+        good_ep = _make_ep("good", {"sap.good.version": "3.0"})
+        with patch("sap_cloud_sdk.core.telemetry.config._entry_points", return_value=[bad_ep, good_ep]):
+            attrs = create_resource_attributes_from_env()
+        assert attrs["sap.good.version"] == "3.0"
+        assert "sap.broken.version" not in attrs
+
+    def test_no_providers_does_not_affect_cloud_sdk_keys(self):
+        with patch("sap_cloud_sdk.core.telemetry.config._entry_points", return_value=[]):
+            attrs = create_resource_attributes_from_env()
+        from sap_cloud_sdk.core.telemetry.constants import ATTR_SAP_SDK_VERSION
+        assert ATTR_SAP_SDK_VERSION in attrs

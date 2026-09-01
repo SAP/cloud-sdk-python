@@ -607,7 +607,7 @@ class TestListMcpTools:
 
             await agw_client.list_mcp_tools(user_token="user-jwt")
 
-            assert mock_user_auth.call_count == 2
+            assert mock_user_auth.call_count == 1
             mock_lob.assert_called_once_with(
                 "my-tenant", "user-token-xyz", 60.0, filter=None
             )

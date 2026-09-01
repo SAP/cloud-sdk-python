@@ -9,7 +9,6 @@ from typing import Dict, List, Any, Optional
 import pytest
 from pytest_bdd import scenarios, given, when, then, parsers
 
-from sap_cloud_sdk.objectstore import create_client
 from sap_cloud_sdk.objectstore.exceptions import (
     ObjectNotFoundError,
     ObjectOperationError,
@@ -197,10 +196,10 @@ def permission_denied_delete(context, failure_simulation):
 
 
 @given("the object store service has intermittent connectivity issues")
-def intermittent_connectivity(context, failure_simulation):
+def intermittent_connectivity(context, failure_simulation, objectstore_client):
     failure_simulation.setup_intermittent_failure()
     try:
-        context.client = create_client("default")
+        context.client = objectstore_client
     except Exception as e:
         context.last_error = e
 
@@ -527,8 +526,10 @@ def download_not_found_error(context):
 def download_permission_error(context):
     assert context.last_error is not None, "Expected permission denied error but download succeeded"
     error_msg = str(context.last_error).lower()
-    assert any(term in error_msg for term in ["permission", "access denied", "unauthorized", "forbidden"]), \
-        f"Expected permission error but got: {context.last_error}"
+    assert any(term in error_msg for term in [
+        "permission", "access denied", "unauthorized", "forbidden", "401",
+        "invalid_grant", "invalid jwt"
+    ]), f"Expected permission error but got: {context.last_error}"
 
 
 @then("the metadata retrieval should fail with an object not found error")
@@ -543,8 +544,9 @@ def metadata_permission_error(context):
     assert context.last_error is not None, "Expected permission denied error but metadata retrieval succeeded"
     error_msg = str(context.last_error).lower()
     permission_patterns = [
-        "permission", "access denied", "unauthorized", "forbidden", "403",
-        "invalidaccesskeyid", "invalidaccesskey", "accessdenied", "signaturedoesnotmatch"
+        "permission", "access denied", "unauthorized", "forbidden", "401", "403",
+        "invalid_grant", "invalid jwt", "invalidaccesskeyid", "invalidaccesskey",
+        "accessdenied", "signaturedoesnotmatch"
     ]
     assert any(term in error_msg for term in permission_patterns), \
         f"Expected permission error but got: {context.last_error}"
@@ -555,8 +557,9 @@ def list_permission_error(context):
     assert context.last_error is not None, "Expected permission denied error but list operation succeeded"
     error_msg = str(context.last_error).lower()
     permission_patterns = [
-        "permission", "access denied", "unauthorized", "forbidden", "403",
-        "invalidaccesskeyid", "invalidaccesskey", "accessdenied", "signaturedoesnotmatch"
+        "permission", "access denied", "unauthorized", "forbidden", "401", "403",
+        "invalid_grant", "invalid jwt", "invalidaccesskeyid", "invalidaccesskey",
+        "accessdenied", "signaturedoesnotmatch"
     ]
     assert any(term in error_msg for term in permission_patterns), \
         f"Expected permission error but got: {context.last_error}"
@@ -583,8 +586,9 @@ def deletion_permission_error(context):
     assert context.last_error is not None, "Expected permission denied error but deletion succeeded"
     error_msg = str(context.last_error).lower()
     permission_patterns = [
-        "permission", "access denied", "unauthorized", "forbidden", "403",
-        "invalidaccesskeyid", "invalidaccesskey", "accessdenied", "signaturedoesnotmatch"
+        "permission", "access denied", "unauthorized", "forbidden", "401", "403",
+        "invalid_grant", "invalid jwt", "invalidaccesskeyid", "invalidaccesskey",
+        "accessdenied", "signaturedoesnotmatch"
     ]
     assert any(term in error_msg for term in permission_patterns), \
         f"Expected permission error but got: {context.last_error}"

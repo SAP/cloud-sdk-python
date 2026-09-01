@@ -66,6 +66,15 @@ class TestGcsClientPutObjectFromBytes:
         with pytest.raises(ValueError, match="content_type must be a non-empty string"):
             client.put_object_from_bytes("key", b"data", "")
 
+    def test_put_object_from_bytes_network_failure_is_wrapped(self):
+        client, _, bucket = _make_client()
+        bucket.blob.return_value.upload_from_string.side_effect = ConnectionError(
+            "network unavailable"
+        )
+
+        with pytest.raises(ObjectOperationError, match="network unavailable"):
+            client.put_object_from_bytes("key", b"data", "text/plain")
+
 
 class TestGcsClientPutObject:
 
@@ -200,6 +209,13 @@ class TestGcsClientListObjects:
         with pytest.raises(ValueError, match="prefix must be a string"):
             client.list_objects(42)
 
+    def test_list_objects_network_failure_is_wrapped(self):
+        client, gcs_client, _ = _make_client()
+        gcs_client.list_blobs.side_effect = ConnectionError("network unavailable")
+
+        with pytest.raises(ListObjectsError, match="network unavailable"):
+            client.list_objects("prefix/")
+
 
 class TestGcsClientHeadObject:
 
@@ -259,6 +275,13 @@ class TestGcsClientObjectExists:
         client, _, _ = _make_client()
         with pytest.raises(ValueError, match="name must be a non-empty string"):
             client.object_exists("")
+
+    def test_object_exists_network_failure_is_wrapped(self):
+        client, _, bucket = _make_client()
+        bucket.get_blob.side_effect = ConnectionError("network unavailable")
+
+        with pytest.raises(ObjectOperationError, match="network unavailable"):
+            client.object_exists("key")
 
 
 class TestCreateStorageClient:

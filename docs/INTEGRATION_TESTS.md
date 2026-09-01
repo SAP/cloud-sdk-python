@@ -143,15 +143,28 @@ CLOUD_SDK_CFG_SDM_DEFAULT_UAA='{"url":"https://your-auth-url","clientid":"your-c
 
 ### ObjectStore Integration Tests
 
-For ObjectStore integration tests, configure the following variables in `.env_integration_tests`:
+ObjectStore scenarios run once for each fully configured provider. Providers
+with incomplete credentials are skipped independently. Configure one or more
+of the following groups in `.env_integration_tests`:
+Provider auto-detection is also verified for each configured group.
 
 ```bash
-# ObjectStore Configuration
+# S3 / S3-compatible ObjectStore
 CLOUD_SDK_CFG_OBJECTSTORE_DEFAULT_HOST=your-host-here
 CLOUD_SDK_CFG_OBJECTSTORE_DEFAULT_ACCESS_KEY_ID=your-access-key-id-here
 CLOUD_SDK_CFG_OBJECTSTORE_DEFAULT_SECRET_ACCESS_KEY=your-secret-access-key-kere
 CLOUD_SDK_CFG_OBJECTSTORE_DEFAULT_BUCKET=your-bucket-here
 CLOUD_SDK_CFG_OBJECTSTORE_DEFAULT_SSL_ENABLED=false
+
+# Azure Blob Storage
+CLOUD_SDK_CFG_OBJECTSTORE_AZURE_CONTAINER_NAME=your-container-name-here
+CLOUD_SDK_CFG_OBJECTSTORE_AZURE_CONTAINER_URI=https://your-account.blob.core.windows.net/your-container
+CLOUD_SDK_CFG_OBJECTSTORE_AZURE_SAS_TOKEN=your-sas-token-here
+
+# Google Cloud Storage
+CLOUD_SDK_CFG_OBJECTSTORE_GCS_BASE64ENCODEDPRIVATEKEYDATA=your-base64-encoded-service-account-json
+CLOUD_SDK_CFG_OBJECTSTORE_GCS_PROJECTID=your-gcp-project-id
+CLOUD_SDK_CFG_OBJECTSTORE_GCS_BUCKET=your-bucket-here
 ```
 
 ## Running Integration Tests

@@ -825,3 +825,74 @@ DIFF
   [ "$count" = "0" ]
   rm -rf "$tmpd"
 }
+
+# ------------------------------------------------------------
+# FP-EL — PY-EL-02 exception-handling checks
+# ------------------------------------------------------------
+
+@test "FP-EL-01: PY-EL-02 does NOT fire when except block ends with raise X(...) from e" {
+  tmpd=$(mktemp -d)
+  cat > "$tmpd/module.py" << 'PYEOF'
+class S3Client:
+    def put_object(self, name, data):
+        try:
+            pass
+        except Exception as e:
+            raise ObjectOperationError(f"Failed to upload '{name}': {e}") from e
+PYEOF
+  result=$(python3 "$SCRIPT_DIR/lib/ast_python_checks.py" el-02 "$tmpd/module.py" 2>/dev/null)
+  count=$(echo "$result" | grep -c '"PY-EL-02"' 2>/dev/null) || count=0
+  [ "$count" = "0" ]
+  rm -rf "$tmpd"
+}
+
+@test "FP-EL-02: PY-EL-02 fires when except block silently swallows (pass only, no logger)" {
+  tmpd=$(mktemp -d)
+  cat > "$tmpd/module.py" << 'PYEOF'
+class S3Client:
+    def put_object(self, name, data):
+        try:
+            pass
+        except Exception:
+            pass
+PYEOF
+  result=$(python3 "$SCRIPT_DIR/lib/ast_python_checks.py" el-02 "$tmpd/module.py" 2>/dev/null)
+  count=$(echo "$result" | grep -c '"PY-EL-02"' 2>/dev/null) || count=0
+  [ "$count" = "1" ]
+  rm -rf "$tmpd"
+}
+
+# ------------------------------------------------------------
+# FP-BREAK — breaking-detector additive-arg regression
+# ------------------------------------------------------------
+
+@test "FP-BREAK-01: breaking-detector does NOT flag adding new optional positional arg with default" {
+  [ -f "$SCRIPT_DIR/lib/breaking-detector.py" ] || skip "breaking-detector.py not present"
+  command -v git >/dev/null 2>&1 || skip "git not available"
+  tmpd=$(mktemp -d)
+  (
+    cd "$tmpd"
+    git init -q
+    git config user.email "test@test.test"
+    git config user.name "Test"
+    mkdir -p src/mymodule
+    cat > src/mymodule/client.py << 'PYEOF'
+class AgentGatewayClient:
+    async def list_mcp_tools(self, user_token=None, filter=None):
+        pass
+PYEOF
+    git add . && git commit -q -m "base"
+    BASE=$(git rev-parse HEAD)
+    cat > src/mymodule/client.py << 'PYEOF'
+class AgentGatewayClient:
+    async def list_mcp_tools(self, user_token=None, filter=None, cache=None):
+        pass
+PYEOF
+    git add . && git commit -q -m "head"
+    HEAD_SHA=$(git rev-parse HEAD)
+    result=$(python3 "$SCRIPT_DIR/lib/breaking-detector.py" "$BASE" "$HEAD_SHA" 2>/dev/null)
+    breaking=$(echo "$result" | python3 -c "import json,sys; print(json.loads(sys.stdin.read()).get('breaking_detected',''))" 2>/dev/null)
+    [ "$breaking" = "False" ]
+  )
+  rm -rf "$tmpd"
+}

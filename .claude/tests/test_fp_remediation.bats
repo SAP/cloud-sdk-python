@@ -710,3 +710,29 @@ BODY
   [ "$severity" = "BLOCK" ]
   rm -rf "$tmpd"
 }
+
+@test "FP-SEC-07-S: SEC-07 does not fire on PEM header used as string literal for type detection" {
+  [ -f "$SCRIPT_DIR/check-secrets.sh" ] || skip "check-secrets.sh not present"
+  tmpd=$(mktemp -d)
+  cat > "$tmpd/diff" <<'DIFF'
+diff --git a/src/sap_cloud_sdk/destination/_cert_loader.py b/src/sap_cloud_sdk/destination/_cert_loader.py
+--- a/src/sap_cloud_sdk/destination/_cert_loader.py
++++ b/src/sap_cloud_sdk/destination/_cert_loader.py
+@@ -1,2 +1,4 @@
++    PEM_HEADERS = [
++        b"-----BEGIN ENCRYPTED PRIVATE KEY-----",
++    ]
+DIFF
+  result=$(DIFF_FILE="$tmpd/diff" LANGUAGE=python bash "$SCRIPT_DIR/check-secrets.sh" 2>/dev/null)
+  count=$(echo "$result" | jq -r '[.findings[] | select(.rule=="SEC-07")] | length')
+  [ "$count" = "0" ]
+  rm -rf "$tmpd"
+}
+
+@test "FP-COM-02: feat!(scope): passes COM-01 (! before scope variant)" {
+  [ -f "$SCRIPT_DIR/check-commits.sh" ] || skip "check-commits.sh not present"
+  result=$(PR_TITLE="feat!(objectstore): add Azure and GCS backends" \
+    LANGUAGE=python bash "$SCRIPT_DIR/check-commits.sh" < /dev/null 2>/dev/null)
+  count=$(echo "$result" | jq -r '[.findings[] | select(.rule=="COM-01")] | length')
+  [ "$count" = "0" ]
+}

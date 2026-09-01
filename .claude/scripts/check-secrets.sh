@@ -86,16 +86,22 @@ echo "$diff_content" | awk '
     emit_finding "SEC-06" "BLOCK" "$file" "$line_num" "JWT token detected — remove and rotate" "" >> "$findings"
   fi
   # SEC-07: Private key header
-  # FP-P: test fixture PEM stubs (body is "test", "fake", "dummy", or < 40 chars
-  # of base64) must not fire. Real private keys have hundreds of chars of base64.
-  # We gate on file path AND body content within the diff hunk.
+  # FP-P: test fixture PEM stubs must not fire.
+  # FP-S: PEM header used as a string literal for type detection (e.g.
+  #   b"-----BEGIN ENCRYPTED PRIVATE KEY-----"  in a list of identifiers)
+  #   has no key material — the header string ends with the closing dashes.
   if echo "$content" | grep -qE 'BEGIN (RSA |EC |OPENSSH |DSA |ENCRYPTED )?PRIVATE KEY'; then
+    # Skip if it's just the PEM header string constant (ends with '-----' inside quotes)
+    _is_header_literal=false
+    if echo "$content" | grep -qE "([\"'])-----BEGIN (RSA |EC |OPENSSH |DSA |ENCRYPTED )?PRIVATE KEY-----([\"',)]|\$)"; then
+      _is_header_literal=true
+    fi
     # Skip if file is under a test directory (path heuristic)
     _is_test_path=false
     if echo "$file" | grep -qE '(^|/)(tests?|test_[^/]+|[^/]+_test)\.(py|java)$|/(tests?|fixtures?)/|\.env[^/]*\.example$'; then
       _is_test_path=true
     fi
-    if [ "$_is_test_path" = "false" ]; then
+    if [ "$_is_test_path" = "false" ] && [ "$_is_header_literal" = "false" ]; then
       emit_finding "SEC-07" "BLOCK" "$file" "$line_num" "Private key header detected — remove and rotate" "" >> "$findings"
     fi
     # Even in test files, fire if body looks like real key content (>= 40 base64 chars)

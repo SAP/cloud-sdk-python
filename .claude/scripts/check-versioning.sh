@@ -74,6 +74,7 @@ if [ "$breaking_detected" = "true" ]; then
   if [ "$has_bang" = "false" ] && [ -n "${PR_TITLE:-}" ]; then
     echo "$PR_TITLE" | grep -qE '^(feat|fix|refactor|chore|docs|test|ci|build|perf|style|revert)\([^)]*\)!:' && has_bang="true"
     echo "$PR_TITLE" | grep -qE '^(feat|fix|refactor|chore|docs|test|ci|build|perf|style|revert)!:' && has_bang="true"
+    echo "$PR_TITLE" | grep -qE '^(feat|fix|refactor|chore|docs|test|ci|build|perf|style|revert)!\\([^)]*\\):' && has_bang="true"
   fi
   has_bump=$([ -n "$version_bumped" ] && echo "true" || echo "false")
 

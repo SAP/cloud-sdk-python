@@ -736,3 +736,92 @@ DIFF
   count=$(echo "$result" | jq -r '[.findings[] | select(.rule=="COM-01")] | length')
   [ "$count" = "0" ]
 }
+
+@test "FP-TEL-01: PY-TEL-07 fires on module-level fn without @record_metrics when sibling is instrumented" {
+  tmpd=$(mktemp -d)
+  cat > "$tmpd/module.py" << 'PYEOF'
+@record_metrics
+def instrumented_fn():
+    pass
+
+def uninstrumented_fn():
+    pass
+PYEOF
+  result=$(python3 "$SCRIPT_DIR/lib/ast_python_checks.py" tel-07 "$tmpd/module.py" 2>/dev/null)
+  count=$(echo "$result" | grep -c '"PY-TEL-07"' 2>/dev/null) || count=0
+  [ "$count" = "1" ]
+  rm -rf "$tmpd"
+}
+
+@test "FP-TEL-02: PY-TEL-07 does not fire for private functions (prefixed _)" {
+  tmpd=$(mktemp -d)
+  cat > "$tmpd/module.py" << 'PYEOF'
+@record_metrics
+def public_fn():
+    pass
+
+def _private_fn():
+    pass
+PYEOF
+  result=$(python3 "$SCRIPT_DIR/lib/ast_python_checks.py" tel-07 "$tmpd/module.py" 2>/dev/null)
+  count=$(echo "$result" | grep -c '"PY-TEL-07"' 2>/dev/null) || count=0
+  [ "$count" = "0" ]
+  rm -rf "$tmpd"
+}
+
+@test "FP-TEL-03: PY-TEL-07 does not fire when no module functions are instrumented" {
+  tmpd=$(mktemp -d)
+  cat > "$tmpd/module.py" << 'PYEOF'
+def fn_a():
+    pass
+
+def fn_b():
+    pass
+PYEOF
+  result=$(python3 "$SCRIPT_DIR/lib/ast_python_checks.py" tel-07 "$tmpd/module.py" 2>/dev/null)
+  count=$(echo "$result" | grep -c '"PY-TEL-07"' 2>/dev/null) || count=0
+  [ "$count" = "0" ]
+  rm -rf "$tmpd"
+}
+
+@test "FP-TEL-04: PY-TEL-08 fires when new public fn added to SDK without operation.py changes" {
+  [ -f "$SCRIPT_DIR/check-telemetry.sh" ] || skip "check-telemetry.sh not present"
+  tmpd=$(mktemp -d)
+  mkdir -p "$tmpd/src/sap_cloud_sdk/aicore"
+  cat > "$tmpd/diff" << 'DIFF'
+diff --git a/src/sap_cloud_sdk/aicore/__init__.py b/src/sap_cloud_sdk/aicore/__init__.py
+--- a/src/sap_cloud_sdk/aicore/__init__.py
++++ b/src/sap_cloud_sdk/aicore/__init__.py
+@@ -1,0 +1,4 @@
++def watch_aicore_config(interval: float = 60.0) -> None:
++    """Proactive watcher."""
++    pass
+DIFF
+  result=$(DIFF_FILE="$tmpd/diff" LANGUAGE=python REPO_ROOT="$tmpd" bash "$SCRIPT_DIR/check-telemetry.sh" 2>/dev/null)
+  count=$(echo "$result" | python3 -c "import json,sys; d=json.loads(sys.stdin.read()); print(sum(1 for f in d.get('findings',[]) if f.get('rule')=='PY-TEL-08'))" 2>/dev/null || echo 0)
+  [ "$count" = "1" ]
+  rm -rf "$tmpd"
+}
+
+@test "FP-TEL-05: PY-TEL-08 does not fire when operation.py is also modified in the PR" {
+  [ -f "$SCRIPT_DIR/check-telemetry.sh" ] || skip "check-telemetry.sh not present"
+  tmpd=$(mktemp -d)
+  mkdir -p "$tmpd/src/sap_cloud_sdk/aicore" "$tmpd/src/sap_cloud_sdk/core/telemetry"
+  cat > "$tmpd/diff" << 'DIFF'
+diff --git a/src/sap_cloud_sdk/aicore/__init__.py b/src/sap_cloud_sdk/aicore/__init__.py
+--- /dev/null
++++ b/src/sap_cloud_sdk/aicore/__init__.py
+@@ -0,0 +1,3 @@
++def watch_aicore_config() -> None:
++    pass
+diff --git a/src/sap_cloud_sdk/core/telemetry/operation.py b/src/sap_cloud_sdk/core/telemetry/operation.py
+--- a/src/sap_cloud_sdk/core/telemetry/operation.py
++++ b/src/sap_cloud_sdk/core/telemetry/operation.py
+@@ -1,0 +1,1 @@
++    AICORE_PROACTIVE_RELOAD = "aicore_proactive_reload"
+DIFF
+  result=$(DIFF_FILE="$tmpd/diff" LANGUAGE=python REPO_ROOT="$tmpd" bash "$SCRIPT_DIR/check-telemetry.sh" 2>/dev/null)
+  count=$(echo "$result" | python3 -c "import json,sys; d=json.loads(sys.stdin.read()); print(sum(1 for f in d.get('findings',[]) if f.get('rule')=='PY-TEL-08'))" 2>/dev/null || echo 0)
+  [ "$count" = "0" ]
+  rm -rf "$tmpd"
+}

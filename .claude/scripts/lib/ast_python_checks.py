@@ -176,6 +176,51 @@ def check_tel_02(path: str, tree: ast.Module) -> None:
                 )
 
 
+
+# ---------- PY-TEL-07: module-level public functions have @record_metrics when siblings do ----------
+
+
+def check_tel_07(path: str, tree: ast.Module) -> None:
+    """FLAG when any module-level public fn lacks @record_metrics while a sibling has it.
+
+    Catches the pattern Betina identified on PR #256: new helper functions added
+    to aicore/__init__.py without @record_metrics while existing fns are instrumented.
+    """
+    module_funcs = [
+        node for node in tree.body
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+        and not node.name.startswith("_")
+    ]
+    if not module_funcs:
+        return
+
+    def has_record(func: "ast.FunctionDef | ast.AsyncFunctionDef") -> bool:
+        return any(
+            (
+                isinstance(d, ast.Call)
+                and isinstance(d.func, ast.Name)
+                and d.func.id == "record_metrics"
+            )
+            or (isinstance(d, ast.Name) and d.id == "record_metrics")
+            for d in func.decorator_list
+        )
+
+    if not any(has_record(f) for f in module_funcs):
+        return  # no instrumentation in this module at all — no expectation set
+
+    for func in module_funcs:
+        if not has_record(func):
+            emit(
+                "PY-TEL-07",
+                "FLAG",
+                path,
+                func.lineno,
+                f"Module-level function `{func.name}` missing @record_metrics "
+                f"(other public functions in this module are instrumented)",
+                "Add @record_metrics(Module.X, Operation.Y) — or add a new "
+                "Operation constant to operation.py first (see PR #256 feedback)",
+            )
+
 # ---------- PY-TEL-06: test files that assert record_request_metric calls ----------
 
 
@@ -509,6 +554,7 @@ CHECKS = {
     "el-01": check_el_01,
     "el-02": check_el_02,
     "tel-02": check_tel_02,
+    "tel-07": check_tel_07,
     "pt-08": check_pt_08,
     "con-01": check_con_01,
 }

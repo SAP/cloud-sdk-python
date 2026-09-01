@@ -51,6 +51,8 @@ if [ "$LANGUAGE" = "python" ]; then
   else
     new_decorators=0
   fi
+  # All SDK module-level Python files for PY-TEL-07 (wider than *Client.py)
+  module_files=$(echo "$diff_content" | { grep -oE '^\+\+\+ b/src/sap_cloud_sdk/[a-z_/]+/[a-z_]+\.py' 2>/dev/null || true; } | sed 's|^+++ b/||' | sort -u)
 else
   new_decorators=$(echo "$diff_content" | { grep -E '^\+.*Telemetry\.executeWithTelemetry' 2>/dev/null || true; } | wc -l | tr -d ' ')
 fi
@@ -72,6 +74,40 @@ if [ "$LANGUAGE" = "python" ] && [ -n "$client_files" ]; then
     fi
   done < "$raw_tel"
   rm -f "$raw_tel"
+fi
+
+
+# PY-TEL-07: module-level public fns should have @record_metrics when siblings do
+# Catches functions like watch_aicore_config / patch_litellm_for_credential_rotation
+# that were flagged by Betina on PR #256.
+if [ "$LANGUAGE" = "python" ] && [ -n "${module_files:-}" ]; then
+  raw_tel07=$(mktemp); trap 'rm -f "$raw_tel07"' EXIT
+  # shellcheck disable=SC2086
+  python3 "$SCRIPT_DIR/lib/ast_python_checks.py" tel-07 $module_files 2>/dev/null > "$raw_tel07" || true
+  while IFS= read -r finding; do
+    [ -z "$finding" ] && continue
+    f=$(echo "$finding" | python3 -c "import json,sys;o=json.loads(sys.stdin.read());print(o.get('file',''))")
+    ln=$(echo "$finding" | python3 -c "import json,sys;o=json.loads(sys.stdin.read());print(o.get('line',0))")
+    [ -z "$f" ] && continue
+    if is_line_touched "$f" "$ln"; then
+      echo "$finding" >> "$findings"
+    fi
+  done < "$raw_tel07"
+  rm -f "$raw_tel07"
+fi
+
+# PY-TEL-08: new public SDK functions without a new Operation constant — Jean's suggestion
+# When a PR adds new observable operations (non-private module-level fns), suggest adding
+# a named Operation constant to operation.py for richer telemetry granularity.
+if [ "$LANGUAGE" = "python" ] && [ -n "${module_files:-}" ]; then
+  new_pub_fns=$(echo "$diff_content" |     { grep -oE '^\+[[:space:]]*(async def|def) [a-z][a-z_]+[(]' 2>/dev/null || true; } |     { grep -vE 'def _' 2>/dev/null || true; } | wc -l | tr -d ' ')
+  op_changed=0
+  if echo "$diff_content" | grep -q '^+++ b/src/sap_cloud_sdk/core/telemetry/operation\.py' 2>/dev/null; then
+    op_changed=1
+  fi
+  if [ "${new_pub_fns:-0}" -gt 0 ] && [ "${op_changed:-0}" -eq 0 ]; then
+    emit_finding "PY-TEL-08" "FLAG" "src/sap_cloud_sdk/core/telemetry/operation.py" 1       "${new_pub_fns} new public SDK function(s) added without a new Operation constant"       "Consider adding Operation.MODULE_FUNCNAME = 'func_name' to operation.py for each new observable operation" >> "$findings"
+  fi
 fi
 
 # JV-TEL-02: For Java, grep-based check (executeWithTelemetry wrap around methods)

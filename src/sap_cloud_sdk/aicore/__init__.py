@@ -180,6 +180,7 @@ def set_aicore_config(instance_name: str = "aicore-instance") -> None:
     set_filtering()
 
 
+@record_metrics(Module.AICORE, Operation.AICORE_PROXY_MODE)
 def _configure_proxy_mode(proxy_url: str) -> None:
     """Configure LiteLLM to route calls through an external proxy.
 
@@ -196,6 +197,7 @@ def _configure_proxy_mode(proxy_url: str) -> None:
     logger.info("AI Core proxy mode active — routing via %s", proxy_url)
 
 
+@record_metrics(Module.AICORE, Operation.AICORE_DESTINATION_MODE)
 def _configure_destination_mode(name: str) -> None:
     """Load AI Core credentials from a BTP Destination Service destination.
 

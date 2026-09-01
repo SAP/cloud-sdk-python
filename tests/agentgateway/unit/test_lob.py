@@ -839,12 +839,13 @@ class TestListServerTools:
             None,
         )
 
-        mock_init = MagicMock()
-        if init_server_name is None:
-            mock_init.serverInfo = None
+        mock_init = MagicMock(spec=[])
+        if init_server_name is not None:
+            mock_server_info = MagicMock(spec=["name"])
+            mock_server_info.name = init_server_name
+            mock_init.server_info = mock_server_info
         else:
-            mock_init.serverInfo = MagicMock()
-            mock_init.serverInfo.name = init_server_name
+            mock_init.server_info = None
 
         mock_list = MagicMock()
         mock_list.tools = tools
@@ -878,11 +879,11 @@ class TestListServerTools:
 
     @pytest.mark.asyncio
     async def test_returns_tools_with_server_info_name(self):
-        """Use serverInfo.name from InitializeResult as server_name on returned tools."""
-        tool_mock = MagicMock()
+        """Use server_info.name from InitializeResult as server_name on returned tools."""
+        tool_mock = MagicMock(spec=["name", "description", "input_schema"])
         tool_mock.name = "do-something"
         tool_mock.description = "Does something"
-        tool_mock.inputSchema = {"type": "object"}
+        tool_mock.input_schema = {"type": "object"}
 
         with (
             patch("sap_cloud_sdk.agentgateway._lob.httpx.AsyncClient") as mock_http,
@@ -905,11 +906,11 @@ class TestListServerTools:
 
     @pytest.mark.asyncio
     async def test_falls_back_to_fragment_name_when_server_info_missing(self):
-        """Fall back to fragment_name when serverInfo or its name is absent."""
-        tool_mock = MagicMock()
+        """Fall back to fragment_name when server_info or its name is absent."""
+        tool_mock = MagicMock(spec=["name", "description", "input_schema"])
         tool_mock.name = "do-something"
         tool_mock.description = ""
-        tool_mock.inputSchema = {}
+        tool_mock.input_schema = {}
 
         with (
             patch("sap_cloud_sdk.agentgateway._lob.httpx.AsyncClient") as mock_http,

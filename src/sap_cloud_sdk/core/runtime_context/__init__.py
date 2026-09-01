@@ -32,7 +32,12 @@ from sap_cloud_sdk.core.runtime_context._keys import (
     TRIGGER_TYPE,
 )
 from sap_cloud_sdk.core.runtime_context._protocol import ContextProvider
-from sap_cloud_sdk.core.runtime_context._registry import FrameworkAdapter, register
+from sap_cloud_sdk.core.runtime_context._registry import (
+    Adapter,
+    FrameworkAdapter,
+    get_attached_adapters,
+    register,
+)
 from sap_cloud_sdk.core.runtime_context.providers import (
     DWCContextProvider,
     IASContextProvider,
@@ -46,6 +51,7 @@ from sap_cloud_sdk.core.runtime_context.providers import (
 import sap_cloud_sdk.core.runtime_context.adapters  # noqa: F401
 
 __all__ = [
+    "Adapter",
     "APP_TENANT_ID",
     "ContextKey",
     "ContextProvider",
@@ -54,6 +60,7 @@ __all__ = [
     "DWCContextProvider",
     "FEATURE_TOGGLES",
     "FrameworkAdapter",
+    "get_attached_adapters",
     "GLOBAL_TENANT_ID",
     "IASContextProvider",
     "RuntimeContext",

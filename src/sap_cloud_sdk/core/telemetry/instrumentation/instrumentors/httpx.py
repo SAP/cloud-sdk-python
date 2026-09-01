@@ -1,7 +1,7 @@
 from opentelemetry.instrumentation.httpx import HTTPXClientInstrumentor
 
 from sap_cloud_sdk.core.telemetry.instrumentation.base import LibraryInstrumentor
-from sap_cloud_sdk.core.telemetry.instrumentation._registry import register
+from sap_cloud_sdk.core.telemetry.instrumentation._registry import Library, register
 
 _instrumentor = HTTPXClientInstrumentor()
 
@@ -9,7 +9,7 @@ _instrumentor = HTTPXClientInstrumentor()
 class HttpxInstrumentor(LibraryInstrumentor):
     """Instruments httpx sync and async clients with OTel spans and W3C header propagation."""
 
-    library_name = "httpx"
+    library_name = Library.HTTPX
 
     def is_instrumented(self) -> bool:
         return _instrumentor.is_instrumented_by_opentelemetry

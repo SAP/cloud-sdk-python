@@ -57,6 +57,10 @@ from sap_cloud_sdk.core.telemetry.extensions import (
     ExtensionContextLogFilter,
 )
 from sap_cloud_sdk.core.telemetry.middleware import TelemetryMiddleware
+from sap_cloud_sdk.core.telemetry.instrumentation._registry import (
+    Library,
+    get_instrumented_libraries,
+)
 
 __all__ = [
     "Module",
@@ -105,6 +109,8 @@ __all__ = [
     "emit_extensions_summary_span",
     "ExtensionContextLogFilter",
     "TelemetryMiddleware",
+    "Library",
+    "get_instrumented_libraries",
 ]
 
 try:

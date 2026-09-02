@@ -244,6 +244,13 @@ activate_input = DraftActivateInput(
 active = client.relations.activate_draft(activate_input)
 ```
 
+## Multi-tenancy
+
+- **Supported:** No
+- **Authentication:** IAS
+- **How to use:** Multi-tenancy is not supported by this service.
+- **Further reading:** N/A
+
 ## Error Handling
 
 ```python

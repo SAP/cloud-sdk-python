@@ -15,6 +15,13 @@ from enum import Enum
 from typing import Any, Optional
 
 
+class AccessStrategy(str, Enum):
+    """Access strategy for tenant-scoped Agent Memory operations."""
+
+    SUBSCRIBER = "SUBSCRIBER"
+    PROVIDER = "PROVIDER"
+
+
 class MessageRole(str, Enum):
     """Role of the message author."""
 

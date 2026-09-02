@@ -125,7 +125,7 @@ mcp_tool_to_langchain(
 The converter maps each property's JSON Schema `"type"` to the corresponding Python type so Pydantic validates and forwards the correct native type to the MCP server:
 
 | JSON Schema type | Python type |
-|------------------|-------------|
+| ---------------- | ----------- |
 | `"string"`       | `str`       |
 | `"integer"`      | `int`       |
 | `"number"`       | `float`     |
@@ -149,12 +149,21 @@ The SDK automatically detects the agent type based on the presence of a credenti
 
 The SDK discovers resources via BTP Destination Service fragments filtered by the `sap-managed-runtime-type` label:
 
-| Label value | Resource |
-|---|---|
-| `agw.mcp.server` | MCP tool server — `URL` property points to the MCP endpoint |
-| `agw.a2a.server` | A2A agent — `URL` property is the agent base URL; ORD ID is extracted from the second-to-last URL path segment |
-| `subscriber.ias` | IAS credential fragment for system-scoped token acquisition |
-| `subscriber.ias.user` | IAS credential fragment for user-scoped token exchange |
+| Label value           | Resource                                                                                                       |
+| --------------------- | -------------------------------------------------------------------------------------------------------------- |
+| `agw.mcp.server`      | MCP tool server — `URL` property points to the MCP endpoint                                                    |
+| `agw.a2a.server`      | A2A agent — `URL` property is the agent base URL; ORD ID is extracted from the second-to-last URL path segment |
+| `subscriber.ias`      | IAS credential fragment for system-scoped token acquisition                                                    |
+| `subscriber.ias.user` | IAS credential fragment for user-scoped token exchange                                                         |
+
+## Multi-tenancy
+
+- **Supported:** Yes (LoB flow); N/A (Customer flow)
+- **Authentication:** IAS (IAS via Destination Service for LoB flow; mTLS for Customer flow)
+- **How to use:**
+  - **LoB flow:** Pass `tenant_subdomain` to `create_client()`. All subsequent calls on that client instance use the subscriber tenant context.
+  - **Customer flow:** N/A
+- **Further reading:** N/A
 
 ## API
 
@@ -203,14 +212,12 @@ class AgentGatewayClient:
     async def list_mcp_tools(
         self,
         user_token: str | Callable[[], str] | None = None,
-        app_tid: str | None = None,
     ) -> list[MCPTool]
 
     async def call_mcp_tool(
         self,
         tool: MCPTool,
         user_token: str | Callable[[], str] | None = None,
-        app_tid: str | None = None,
         **kwargs,
     ) -> str
 

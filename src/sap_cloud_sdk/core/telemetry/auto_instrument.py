@@ -11,7 +11,10 @@ from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import (
 from opentelemetry.exporter.otlp.proto.http.trace_exporter import (
     OTLPSpanExporter as HTTPSpanExporter,
 )
-from opentelemetry.processor.baggage import ALLOW_ALL_BAGGAGE_KEYS, BaggageSpanProcessor
+from sap_cloud_sdk.core.telemetry.span_processors.baggage_span_processor import (
+    ALLOW_ALL_BAGGAGE_KEYS,
+    BaggageSpanProcessor,
+)
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import ConsoleSpanExporter, SpanExporter
@@ -30,7 +33,7 @@ from sap_cloud_sdk.core.telemetry.genai_attribute_transformer import (
     GenAIAttributeTransformer,
 )
 from sap_cloud_sdk.core.telemetry.metrics_decorator import record_metrics
-from sap_cloud_sdk.core.telemetry.propagated_attributes_processor import (
+from sap_cloud_sdk.core.telemetry.span_processors.propagated_attributes_processor import (
     PropagatedAttributesSpanProcessor,
 )
 

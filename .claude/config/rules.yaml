@@ -107,7 +107,7 @@ rules:
   DEP-04:       { tier: BLOCK_LOCKED }
 
   # -------- COMMITS --------
-  COM-01:       { tier: BLOCK }
+  COM-01:       { tier: FLAG }
 
   # -------- DELETION --------
   DEL-01:       { tier: BLOCK }

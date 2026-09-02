@@ -464,3 +464,162 @@ class TestPatchLitellmForCredentialRotation:
 
         stop.set()
         t.join(timeout=1.0)
+
+
+# ---------------------------------------------------------------------------
+# 5. Proxy mode + LangGraph/A2A — credential rotation and routing invariants
+# ---------------------------------------------------------------------------
+
+
+class TestProxyModeWithLangGraph:
+    """Validates that proxy routing and credential rotation interact correctly.
+
+    AFSDK-4306 live validation (auto-doc-dev-eu12, 2026-08-20) confirmed:
+    - destination mode reactive reload works end-to-end.
+    - proxy mode never injects AICORE_CLIENT_SECRET into the env.
+
+    These tests cover the unit-level equivalents of those scenarios plus
+    the A2A/LangGraph path (direct litellm.completion with proxy active).
+    """
+
+    def test_patch_works_with_proxy_mode_active(self, monkeypatch, clean_litellm_patch):
+        """patch_litellm_for_credential_rotation + proxy mode: 401 triggers reload,
+        proxy URL env var stays set after reload.
+        """
+        monkeypatch.setenv("AICORE_PROXY_URL", "https://proxy.example.com")
+        monkeypatch.delenv("AICORE_CLIENT_SECRET", raising=False)
+
+        sentinel = object()
+        auth_err = litellm.AuthenticationError(
+            message="401", llm_provider="sap", model="sap/x"
+        )
+        call_results = [auth_err, sentinel]
+
+        def _fake(*args, **kwargs):
+            r = call_results.pop(0)
+            if isinstance(r, Exception):
+                raise r
+            return r
+
+        with (
+            patch("litellm.completion", side_effect=_fake),
+            patch("sap_cloud_sdk.aicore.set_aicore_config") as reload_mock,
+        ):
+            patch_litellm_for_credential_rotation()
+            result = litellm.completion(model="sap/x", messages=[])
+
+        assert result is sentinel
+        reload_mock.assert_called_once()
+        assert os.environ.get("AICORE_PROXY_URL") == "https://proxy.example.com"
+
+    def test_watcher_preserves_proxy_mode_after_rotation(self, tmp_path, monkeypatch):
+        """Watcher reload calls set_aicore_config(), which re-enters _configure_proxy_mode
+        when AICORE_PROXY_URL is present — litellm.api_base stays set.
+        """
+        import litellm as _litellm
+
+        monkeypatch.setenv("AICORE_PROXY_URL", "https://proxy.example.com")
+        monkeypatch.delenv("AICORE_CLIENT_SECRET", raising=False)
+        monkeypatch.setenv("SERVICE_BINDING_ROOT", str(tmp_path))
+        secret_dir = _write_secret_files(tmp_path, secret="unused-in-proxy-mode")
+
+        stop = threading.Event()
+
+        with patch("sap_cloud_sdk.aicore.set_filtering"):
+            set_aicore_config()
+            initial_api_base = _litellm.api_base
+            t = watch_aicore_config(interval=0.05, stop_event=stop)
+
+            new_time = time.time() + 10
+            os.utime(secret_dir, (new_time, new_time))
+            time.sleep(0.2)
+
+        assert _litellm.api_base == initial_api_base, (
+            "litellm.api_base must remain set after a watcher-triggered reload in proxy mode"
+        )
+        stop.set()
+        t.join(timeout=1.0)
+
+    def test_a2a_direct_litellm_routes_via_proxy_after_patch(
+        self, monkeypatch, clean_litellm_patch
+    ):
+        """A2A / ChatLiteLLM path: direct litellm.completion with proxy active
+        gets reactive reload on 401 after patch_litellm_for_credential_rotation().
+        """
+        import litellm as _litellm
+
+        monkeypatch.setenv("AICORE_PROXY_URL", "https://proxy.example.com")
+
+        with patch("sap_cloud_sdk.aicore.set_filtering"):
+            set_aicore_config()
+
+        assert _litellm.api_base == "https://proxy.example.com"
+
+        sentinel = object()
+        auth_err = litellm.AuthenticationError(
+            message="401", llm_provider="sap", model="sap/x"
+        )
+        calls = [auth_err, sentinel]
+
+        def _fake_completion(*args, **kwargs):
+            r = calls.pop(0)
+            if isinstance(r, Exception):
+                raise r
+            return r
+
+        with (
+            patch("litellm.completion", side_effect=_fake_completion),
+            patch("sap_cloud_sdk.aicore.set_aicore_config") as reload_mock,
+        ):
+            patch_litellm_for_credential_rotation()
+            result = litellm.completion(model="sap/x", messages=[])
+
+        assert result is sentinel
+        reload_mock.assert_called_once()
+
+    def test_destination_mode_credential_rotation_reload(self, monkeypatch):
+        """Destination mode: reload re-calls _configure_destination_mode() fetching
+        fresh credentials — mirrors AFSDK-4306 Val 3 (auto-doc-dev-eu12, 2026-08-20).
+        """
+        monkeypatch.setenv("AICORE_DESTINATION_NAME", "aicore-destination")
+        monkeypatch.delenv("AICORE_CLIENT_SECRET", raising=False)
+
+        call_count = [0]
+
+        def _fake_destination_mode(name):
+            call_count[0] += 1
+            os.environ["AICORE_CLIENT_SECRET"] = f"rotated-secret-v{call_count[0]}"
+
+        with (
+            patch(
+                "sap_cloud_sdk.aicore._configure_destination_mode",
+                side_effect=_fake_destination_mode,
+            ),
+            patch("sap_cloud_sdk.aicore.set_filtering"),
+        ):
+            set_aicore_config()
+            assert os.environ["AICORE_CLIENT_SECRET"] == "rotated-secret-v1"
+            assert call_count[0] == 1
+
+            set_aicore_config()  # simulates reload after 401
+            assert os.environ["AICORE_CLIENT_SECRET"] == "rotated-secret-v2"
+            assert call_count[0] == 2
+
+    def test_proxy_credential_snapshot_not_cleared_by_reload(self, monkeypatch):
+        """In proxy mode, AICORE_CLIENT_SECRET is never written to env by set_aicore_config().
+
+        A reload must not introduce a stale secret — proxy auth uses litellm.api_key,
+        not the AICORE_CLIENT_SECRET env var.
+        """
+        monkeypatch.setenv("AICORE_PROXY_URL", "https://proxy.example.com")
+        monkeypatch.delenv("AICORE_CLIENT_SECRET", raising=False)
+
+        with patch("sap_cloud_sdk.aicore.set_filtering"):
+            set_aicore_config()
+
+        assert "AICORE_CLIENT_SECRET" not in os.environ
+
+        with patch("sap_cloud_sdk.aicore.set_filtering"):
+            set_aicore_config()  # reload
+
+        assert "AICORE_CLIENT_SECRET" not in os.environ

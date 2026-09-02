@@ -150,8 +150,6 @@ class Operation(str, Enum):
     AICORE_AUTO_INSTRUMENT = "auto_instrument"
     AICORE_SET_FILTERING = "set_filtering"
     AICORE_DISABLE_FILTERING = "disable_filtering"
-    AICORE_PROXY_MODE = "aicore_proxy_mode"
-    AICORE_DESTINATION_MODE = "aicore_destination_mode"
 
     # Print Operations
     PRINT_LIST_QUEUES = "list_queues"

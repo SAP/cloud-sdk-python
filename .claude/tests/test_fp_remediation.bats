@@ -476,7 +476,7 @@ ADDED
   rm -rf "$tmpd"
 }
 
-@test "FP-K-01: PY-CON-01 fires when at least one occurrence is on an added line" {
+@test "FP-K-02: PY-CON-01 does NOT fire when only 1 of 3 total occurrences is on an added line" {
   [ -f "$SCRIPT_DIR/lib/ast_python_checks.py" ] || skip "ast_python_checks.py not present"
   tmpd=$(mktemp -d)
 
@@ -493,7 +493,7 @@ def c():
     logger.info("customer credentials at path")   # line 10
 PY
 
-  # PR touches line 4 (one of the occurrences)
+  # PR touches only line 4 (1 of the 3 occurrences) — pre-existing repetition
   cat > "$tmpd/added-lines.txt" <<ADDED
 $tmpd/module.py:4
 ADDED
@@ -502,10 +502,7 @@ ADDED
     python3 "$SCRIPT_DIR/lib/ast_python_checks.py" con-01 "$tmpd/module.py" > "$tmpd/out.jsonl"
 
   count=$(wc -l < "$tmpd/out.jsonl" | tr -d ' ')
-  [ "$count" = "1" ]
-  # Anchor line should be the added-line occurrence (4), not the first overall
-  anchor=$(jq -r '.line' "$tmpd/out.jsonl")
-  [ "$anchor" = "4" ]
+  [ "$count" = "0" ]
   rm -rf "$tmpd"
 }
 
@@ -895,4 +892,153 @@ PYEOF
     [ "$breaking" = "False" ]
   )
   rm -rf "$tmpd"
+}
+
+# ------------------------------------------------------------
+# FP-CON — PY-CON-01 pre-existing string FP
+# ------------------------------------------------------------
+
+@test "FP-CON-01: PY-CON-01 does NOT fire when string is pre-existing and only 1 added-line occurrence" {
+  tmpd=$(mktemp -d)
+  added_lines=$(mktemp)
+  # Pre-existing file with 'aicore-instance' in 3 places
+  cat > "$tmpd/aicore.py" << 'PYEOF'
+def get_url(instance_name: str = "aicore-instance") -> str:
+    pass
+
+def set_config(instance_name: str = "aicore-instance") -> None:
+    pass
+
+def get_mtime(instance_name: str = "aicore-instance") -> float:
+    return 0.0
+
+def new_fn(instance_name: str = "aicore-instance") -> None:
+    pass
+PYEOF
+  # Simulate: PR only adds line 10 (the new_fn line)
+  echo "$tmpd/aicore.py:10" > "$added_lines"
+  result=$(ADDED_LINES_FILE="$added_lines" python3 "$SCRIPT_DIR/lib/ast_python_checks.py" con-01 "$tmpd/aicore.py" 2>/dev/null)
+  count=$(echo "$result" | grep -c '"PY-CON-01"' 2>/dev/null) || count=0
+  [ "$count" = "0" ]
+  rm -rf "$tmpd" "$added_lines"
+}
+
+@test "FP-CON-02: PY-CON-01 DOES fire when PR introduces 3+ new occurrences of a string" {
+  tmpd=$(mktemp -d)
+  added_lines=$(mktemp)
+  cat > "$tmpd/client.py" << 'PYEOF'
+def fn_a(name: str = "my-service") -> None:
+    pass
+
+def fn_b(name: str = "my-service") -> None:
+    pass
+
+def fn_c(name: str = "my-service") -> None:
+    pass
+PYEOF
+  # All 3 occurrences are on added lines (new file)
+  echo "$tmpd/client.py:1" > "$added_lines"
+  echo "$tmpd/client.py:4" >> "$added_lines"
+  echo "$tmpd/client.py:7" >> "$added_lines"
+  result=$(ADDED_LINES_FILE="$added_lines" python3 "$SCRIPT_DIR/lib/ast_python_checks.py" con-01 "$tmpd/client.py" 2>/dev/null)
+  count=$(echo "$result" | grep -c '"PY-CON-01"' 2>/dev/null) || count=0
+  [ "$count" = "1" ]
+  rm -rf "$tmpd" "$added_lines"
+}
+
+# ------------------------------------------------------------
+# FP-BND — BND-02 endswith guard FP
+# ------------------------------------------------------------
+
+@test "FP-BND-01: BND-02 does NOT fire when rstrip+/oauth/token is preceded by endswith guard" {
+  tmpd=$(mktemp -d)
+  cat > "$tmpd/test.diff" << 'DIFFEOF'
+diff --git a/src/sap_cloud_sdk/aicore/__init__.py b/src/sap_cloud_sdk/aicore/__init__.py
+--- a/src/sap_cloud_sdk/aicore/__init__.py
++++ b/src/sap_cloud_sdk/aicore/__init__.py
+@@ -100,6 +100,8 @@ def _configure_direct_mode() -> None:
++        if not token_service_url.endswith("/oauth/token"):
++            token_service_url = token_service_url.rstrip("/") + "/oauth/token"
+DIFFEOF
+  result=$(DIFF_FILE="$tmpd/test.diff" LANGUAGE=python REPO_ROOT="$tmpd" \
+    bash "$SCRIPT_DIR/check-binding-shape.sh" 2>/dev/null)
+  count=$(echo "$result" | python3 -c "
+import json, sys
+d = json.loads(sys.stdin.read())
+print(sum(1 for f in d.get('findings', []) if f.get('rule') == 'BND-02'))
+" 2>/dev/null) || count=0
+  [ "$count" = "0" ]
+  rm -rf "$tmpd"
+}
+
+@test "FP-BND-02: BND-02 DOES fire when rstrip+/oauth/token has no endswith guard" {
+  tmpd=$(mktemp -d)
+  cat > "$tmpd/test.diff" << 'DIFFEOF'
+diff --git a/src/sap_cloud_sdk/aicore/__init__.py b/src/sap_cloud_sdk/aicore/__init__.py
+--- a/src/sap_cloud_sdk/aicore/__init__.py
++++ b/src/sap_cloud_sdk/aicore/__init__.py
+@@ -100,6 +100,7 @@ def configure() -> None:
++        token_url = base_url.rstrip("/") + "/oauth/token"
+DIFFEOF
+  result=$(DIFF_FILE="$tmpd/test.diff" LANGUAGE=python REPO_ROOT="$tmpd" \
+    bash "$SCRIPT_DIR/check-binding-shape.sh" 2>/dev/null)
+  count=$(echo "$result" | python3 -c "
+import json, sys
+d = json.loads(sys.stdin.read())
+print(sum(1 for f in d.get('findings', []) if f.get('rule') == 'BND-02'))
+" 2>/dev/null) || count=0
+  [ "$count" -gt "0" ]
+  rm -rf "$tmpd"
+}
+
+# ------------------------------------------------------------
+# FP-HC — HC-04 write-assignment FP
+# ------------------------------------------------------------
+
+@test "FP-HC-01: HC-04 does NOT fire when os.environ line is a write assignment" {
+  tmpd=$(mktemp -d)
+  added_lines=$(mktemp)
+  cat > "$tmpd/test.diff" << 'DIFFEOF'
+diff --git a/src/sap_cloud_sdk/aicore/__init__.py b/src/sap_cloud_sdk/aicore/__init__.py
+--- a/src/sap_cloud_sdk/aicore/__init__.py
++++ b/src/sap_cloud_sdk/aicore/__init__.py
+@@ -80,6 +80,9 @@ def _configure_direct_mode() -> None:
++    os.environ["AICORE_AUTH_URL"] = binding["uaa"]["url"]
++    os.environ["AICORE_CLIENT_ID"] = binding["uaa"]["clientid"]
++    os.environ["AICORE_CLIENT_SECRET"] = binding["uaa"]["clientsecret"]
+DIFFEOF
+  echo "src/sap_cloud_sdk/aicore/__init__.py:81" > "$added_lines"
+  echo "src/sap_cloud_sdk/aicore/__init__.py:82" >> "$added_lines"
+  echo "src/sap_cloud_sdk/aicore/__init__.py:83" >> "$added_lines"
+  result=$(DIFF_FILE="$tmpd/test.diff" LANGUAGE=python REPO_ROOT="$tmpd" \
+    ADDED_LINES_FILE="$added_lines" bash "$SCRIPT_DIR/check-hardcode.sh" 2>/dev/null)
+  count=$(echo "$result" | python3 -c "
+import json, sys
+d = json.loads(sys.stdin.read())
+print(sum(1 for f in d.get('findings', []) if f.get('rule') == 'HC-04'))
+" 2>/dev/null) || count=0
+  [ "$count" = "0" ]
+  rm -rf "$tmpd" "$added_lines"
+}
+
+@test "FP-HC-02: HC-04 DOES fire when os.environ line is a direct read (no assignment)" {
+  tmpd=$(mktemp -d)
+  added_lines=$(mktemp)
+  cat > "$tmpd/test.diff" << 'DIFFEOF'
+diff --git a/src/sap_cloud_sdk/aicore/__init__.py b/src/sap_cloud_sdk/aicore/__init__.py
+--- a/src/sap_cloud_sdk/aicore/__init__.py
++++ b/src/sap_cloud_sdk/aicore/__init__.py
+@@ -80,6 +80,7 @@ def configure() -> None:
++    secret = os.environ["AICORE_CLIENT_SECRET"]
+DIFFEOF
+  echo "src/sap_cloud_sdk/aicore/__init__.py:80" > "$added_lines"
+  result=$(DIFF_FILE="$tmpd/test.diff" LANGUAGE=python REPO_ROOT="$tmpd" \
+    ADDED_LINES_FILE="$added_lines" bash "$SCRIPT_DIR/check-hardcode.sh" 2>/dev/null)
+  count=$(echo "$result" | python3 -c "
+import json, sys
+d = json.loads(sys.stdin.read())
+print(sum(1 for f in d.get('findings', []) if f.get('rule') == 'HC-04'))
+" 2>/dev/null) || count=0
+  [ "$count" = "1" ]
+  rm -rf "$tmpd" "$added_lines"
 }

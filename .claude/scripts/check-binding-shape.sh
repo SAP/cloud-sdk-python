@@ -18,25 +18,31 @@ diff_content=$(cat "$DIFF_FILE" 2>/dev/null || echo "")
 # FP-N-01: pre-filter — only lines mentioning /oauth/token can match.
 # FP-O-01: skip test files (multi-module: <module>/src/test/…) — a hardcoded
 # token path in a test fixture is not production binding code.
+# FP-P-01: skip when the preceding added line contains an endswith("/oauth/token")
+# guard — this is the established SDK normalization pattern (also used by
+# _configure_direct_mode) and is intentional: append only when not already present.
 echo "$diff_content" | awk '
-  BEGIN { file=""; line=0; skip=0 }
+  BEGIN { file=""; line=0; skip=0; prev="" }
   /^diff --git a\// {
-    file=$4; sub(/^b\//, "", file); line=0
+    file=$4; sub(/^b\//, "", file); line=0; prev=""
     skip = (file ~ /(^|\/)src\/test\// || file ~ /(^|\/)(tests?|mocks?)\//) ? 1 : 0
     next
   }
   /^@@/ { if (match($0, /\+[0-9]+/)) line=substr($0, RSTART+1, RLENGTH-1)+0; next }
   /^\+/ && !/^\+\+\+/ {
     c = substr($0, 2)
-    if (!skip && c ~ /\/oauth\/token/) { print file "\t" line "\t" c }
+    if (!skip && c ~ /\/oauth\/token/) { print file "\t" line "\t" c "\t" prev }
+    prev = c
     line++
     next
   }
   /^ / { line++; next }
-' | while IFS=$'\t' read -r file line_num content; do
+' | while IFS=$'\t' read -r file line_num content prev_content; do
   [ -z "$file" ] && continue
   # Self-review protection: skip skill files
   if [ "$(is_skill_file "$file")" = "true" ]; then continue; fi
+  # FP-P-01: safe normalization guard — endswith check on preceding added line
+  if echo "$prev_content" | grep -qF 'endswith("/oauth/token")'; then continue; fi
   if echo "$content" | grep -qE 'rstrip\("/"\)[[:space:]]*\+[[:space:]]*"/oauth/token"|\.replaceAll\("/\+\$", ""\)[[:space:]]*\+[[:space:]]*"/oauth/token"'; then
     emit_finding "BND-02" "BLOCK" "$file" "$line_num" \
       "BTP token URL built via string concat — different services expose different fields" \

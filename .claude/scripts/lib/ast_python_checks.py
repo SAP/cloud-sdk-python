@@ -343,12 +343,13 @@ def check_con_01(
             break
         if len(lines) < threshold:
             continue
-        # FP-K-01: require at least one occurrence to live on a PR-added line.
-        # Without this, an unrelated edit is credited for the repetition that
-        # already existed. If we have no diff scope, allow the legacy path.
+        # FP-K-01: require 'threshold' occurrences on PR-added lines, not just ≥1.
+        # A pre-existing string with one new occurrence should not fire — the PR
+        # didn't introduce the repetition, it only touched a nearby line.
+        # If we have no diff scope, fall back to counting all occurrences.
         if added_lines_for_file is not None:
             added_occurrences = [ln for ln in lines if ln in added_lines_for_file]
-            if not added_occurrences:
+            if len(added_occurrences) < threshold:
                 continue
             anchor_line = added_occurrences[0]
         else:

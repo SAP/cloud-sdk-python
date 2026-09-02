@@ -121,9 +121,14 @@ echo "$diff_content" | awk -v ignore="$ignore_files" '
     emit_finding_if_touched "HC-02" "BLOCK" "$file" "$line_num" "Hardcoded Authorization header value" "" >> "$findings"
   fi
   # HC-04: direct os.environ / System.getenv
+  # FP-Q-01: skip os.environ["KEY"] = value (write/set) — SDK config-init functions
+  # like _configure_direct_mode intentionally write env vars from binding data.
+  # Only flag reads (os.environ["KEY"] not followed by assignment operator).
   if [ "$LANGUAGE" = "python" ]; then
     if echo "$content" | grep -qE 'os\.environ\["[A-Z]'; then
-      emit_finding_if_touched "HC-04" "FLAG" "$file" "$line_num" "Direct os.environ access — prefer secret_resolver / config layer" "" >> "$findings"
+      if ! echo "$content" | grep -qE 'os\.environ\["[A-Z][^"]*"\][[:space:]]*='; then
+        emit_finding_if_touched "HC-04" "FLAG" "$file" "$line_num" "Direct os.environ access — prefer secret_resolver / config layer" "" >> "$findings"
+      fi
     fi
   else
     if echo "$content" | grep -qE 'System\.getenv\('; then

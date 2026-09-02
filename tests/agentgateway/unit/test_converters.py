@@ -298,6 +298,7 @@ class TestMcpToolToLangchainInvocation:
         call_tool = AsyncMock(return_value="ok")
         lc_tool = mcp_tool_to_langchain(_make_tool(), call_tool, lambda: "token")
 
+        assert lc_tool.coroutine is not None
         await lc_tool.coroutine(eventid="E001", config={"configurable": {}})
 
         assert "config" not in call_tool.call_args.kwargs
@@ -308,6 +309,7 @@ class TestMcpToolToLangchainInvocation:
         call_tool = AsyncMock(return_value="ok")
         lc_tool = mcp_tool_to_langchain(_make_tool(), call_tool, lambda: "token")
 
+        assert lc_tool.coroutine is not None
         await lc_tool.coroutine(eventid="E001", run_manager=object())
 
         assert "run_manager" not in call_tool.call_args.kwargs
@@ -318,6 +320,7 @@ class TestMcpToolToLangchainInvocation:
         call_tool = AsyncMock(return_value="ok")
         lc_tool = mcp_tool_to_langchain(_make_tool(), call_tool, lambda: "token")
 
+        assert lc_tool.coroutine is not None
         await lc_tool.coroutine(
             eventid="E001",
             showdeclinedreason="true",

@@ -112,7 +112,9 @@ def mcp_tool_to_langchain(
     async def run(**kwargs) -> str:
         tool_kwargs = {k: v for k, v in kwargs.items() if k in allowed_keys}
         resolved = (
-            {k: v for k, v in tool_kwargs.items() if v is not None} if omit_none else tool_kwargs
+            {k: v for k, v in tool_kwargs.items() if v is not None}
+            if omit_none
+            else tool_kwargs
         )
         return await call_tool(
             mcp_tool,

@@ -16,6 +16,11 @@ from sap_cloud_sdk.adms._models import (
 from sap_cloud_sdk.adms.config import _ADMIN_SERVICE_PATH, _SERVICE_PATH
 from sap_cloud_sdk.core.telemetry import Module, Operation, record_metrics
 
+# Fully-qualified OData V4 unbound action / function paths.
+# Unbound action/function import names — no namespace prefix (per EDMX ActionImport/FunctionImport).
+_START_JOB_DOC_SERVICE = "StartJob"
+_START_JOB_ADMIN_SERVICE = "StartJob"
+
 
 class _JobApi:
     """Async job operations for the ADMS module.
@@ -42,7 +47,9 @@ class _JobApi:
                 "JobParameters": params.to_odata_dict(),
             }
         }
-        resp = self._http.post("StartJob", json=payload, service_base=_SERVICE_PATH)
+        resp = self._http.post(
+            _START_JOB_DOC_SERVICE, json=payload, service_base=_SERVICE_PATH
+        )
         return JobOutput.from_dict(resp.json())
 
     @record_metrics(Module.ADMS, Operation.ADMS_JOBS_START_DELETE_USER_DATA)
@@ -62,7 +69,9 @@ class _JobApi:
             }
         }
         resp = self._http.post(
-            "StartJob", json=payload, service_base=_ADMIN_SERVICE_PATH
+            _START_JOB_ADMIN_SERVICE,
+            json=payload,
+            service_base=_ADMIN_SERVICE_PATH,
         )
         return JobOutput.from_dict(resp.json())
 
@@ -108,7 +117,7 @@ class _AsyncJobApi:
             }
         }
         resp = await self._http.post(
-            "StartJob", json=payload, service_base=_SERVICE_PATH
+            _START_JOB_DOC_SERVICE, json=payload, service_base=_SERVICE_PATH
         )
         return JobOutput.from_dict(resp.json())
 
@@ -124,7 +133,9 @@ class _AsyncJobApi:
             }
         }
         resp = await self._http.post(
-            "StartJob", json=payload, service_base=_ADMIN_SERVICE_PATH
+            _START_JOB_ADMIN_SERVICE,
+            json=payload,
+            service_base=_ADMIN_SERVICE_PATH,
         )
         return JobOutput.from_dict(resp.json())
 

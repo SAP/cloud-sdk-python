@@ -956,6 +956,15 @@ wheels = [
 ]
 
 [[package]]
+name = "gherkin-official"
+version = "29.0.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/f3/d8/7a28537efd7638448f7512a0cce011d4e3bf1c7f4794ad4e9c87b3f1e98e/gherkin_official-29.0.0.tar.gz", hash = "sha256:dbea32561158f02280d7579d179b019160d072ce083197625e2f80a6776bb9eb", size = 32303, upload-time = "2024-08-12T09:41:09.595Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/f8/fc/b86c22ad3b18d8324a9d6fe5a3b55403291d2bf7572ba6a16efa5aa88059/gherkin_official-29.0.0-py3-none-any.whl", hash = "sha256:26967b0d537a302119066742669e0e8b663e632769330be675457ae993e1d1bc", size = 37085, upload-time = "2024-08-12T09:41:07.954Z" },
+]
+
+[[package]]
 name = "google-api-core"
 version = "2.34.0"
 source = { registry = "https://pypi.org/simple" }
@@ -3419,9 +3428,10 @@ wheels = [
 
 [[package]]
 name = "pytest-bdd"
-version = "7.3.0"
+version = "8.1.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
+    { name = "gherkin-official" },
     { name = "mako" },
     { name = "packaging" },
     { name = "parse" },
@@ -3429,9 +3439,9 @@ dependencies = [
     { name = "pytest" },
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/49/9a/45c2aa5241513eb3169d9aa600933104a59dc12e8754ad63cf16dd8b9dcb/pytest_bdd-7.3.0.tar.gz", hash = "sha256:9dfeb1d8565d9548907f36a5a9e2c8e1e0cbac3b2724e17331b87386a19fbc16", size = 47435, upload-time = "2024-09-21T09:52:28.744Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/2d/2f/14c2e55372a5718a93b56aea48cd6ccc15d2d245364e516cd7b19bbd07ad/pytest_bdd-8.1.0.tar.gz", hash = "sha256:ef0896c5cd58816dc49810e8ff1d632f4a12019fb3e49959b2d349ffc1c9bfb5", size = 56147, upload-time = "2024-12-05T21:45:58.83Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/7d/30/557b1cf7b951ad47d822f0495a248c0a18e6e12e4e3287bd63a85aeceb4b/pytest_bdd-7.3.0-py3-none-any.whl", hash = "sha256:168ede4a118e348feb70182590ee4a2f856e68dafe54a75a4e9203da37d4ade6", size = 42218, upload-time = "2024-09-21T09:52:26.404Z" },
+    { url = "https://files.pythonhosted.org/packages/9f/7d/1461076b0cc9a9e6fa8b51b9dea2677182ba8bc248d99d95ca321f2c666f/pytest_bdd-8.1.0-py3-none-any.whl", hash = "sha256:2124051e71a05ad7db15296e39013593f72ebf96796e1b023a40e5453c47e5fb", size = 49149, upload-time = "2024-12-05T21:45:56.184Z" },
 ]
 
 [[package]]
@@ -3989,7 +3999,7 @@ dev = [
     { name = "litellm", specifier = ">=1.40.0,<2" },
     { name = "pytest", specifier = ">=8.4.2,<9" },
     { name = "pytest-asyncio", specifier = ">=1.0.0,<2" },
-    { name = "pytest-bdd", specifier = ">=7.2.0,<8" },
+    { name = "pytest-bdd", specifier = ">=8.1.0,<9" },
     { name = "pytest-cov", specifier = ">=7.0.0,<8" },
     { name = "python-dotenv", specifier = ">=1.0.0,<2" },
     { name = "ruff", specifier = ">=0.8.0,<1" },

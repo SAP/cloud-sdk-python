@@ -70,5 +70,5 @@ def aicore_configured():
     skipped automatically.
     """
     if not os.environ.get("AICORE_BASE_URL"):
-        pytest.skip("AICORE_BASE_URL not set — skipping AI Core integration tests")  # ty: ignore[too-many-positional-arguments]
+        pytest.skip("AICORE_BASE_URL not set — skipping AI Core integration tests")
     set_aicore_config()

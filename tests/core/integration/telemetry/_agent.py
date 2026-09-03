@@ -21,7 +21,7 @@ def build_langgraph_agent():
         from langgraph.graph import END, StateGraph
         from langgraph.graph.message import add_messages
     except ImportError:
-        pytest.skip("langchain-litellm or langgraph not installed")  # ty: ignore[too-many-positional-arguments]
+        pytest.skip("langchain-litellm or langgraph not installed")
 
     @dataclass
     class State:

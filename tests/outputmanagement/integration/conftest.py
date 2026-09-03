@@ -135,7 +135,7 @@ def _create_cloud_client():
         return client
     except Exception as e:
         pytest.skip(
-            f"Output Management cloud integration tests require credentials: {e}"  # ty: ignore[too-many-positional-arguments]
+            f"Output Management cloud integration tests require credentials: {e}"
         )
 
 

@@ -42,7 +42,7 @@ def adms_config() -> AdmsConfig:
     try:
         return load_from_env_or_mount("default")
     except ConfigError as exc:
-        pytest.skip(f"ADMS integration tests skipped — missing config: {exc}")  # ty: ignore[too-many-positional-arguments]
+        pytest.skip(f"ADMS integration tests skipped — missing config: {exc}")
 
 
 # ---------------------------------------------------------------------------

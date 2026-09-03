@@ -28,7 +28,7 @@ This results in env var names: CLOUD_SDK_CFG_DESTINATION_{INSTANCE}_{FIELD_KEY}
 """
 
 from dataclasses import dataclass
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
 import os
 
 from sap_cloud_sdk.core.secret_resolver.resolver import (
@@ -36,6 +36,9 @@ from sap_cloud_sdk.core.secret_resolver.resolver import (
 )
 from sap_cloud_sdk.destination.exceptions import ConfigError
 from sap_cloud_sdk.destination._models import TransparentProxy
+
+if TYPE_CHECKING:
+    from sap_cloud_sdk.core.secret_resolver import ConfigFactory
 
 _TRANSPARENT_PROXY_ENV_VAR = "APPFND_CONHOS_TRANSP_PROXY"
 _TRANSPARENT_PROXY_ENV_VAR = "APPFND_CONHOS_TRANSP_PROXY"
@@ -147,6 +150,26 @@ def load_from_env_or_mount(instance: Optional[str] = None) -> DestinationConfig:
         raise ConfigError(
             f"failed to load destination configuration for instance='{inst}': {e}"
         )
+
+
+def _make_config_factory(instance: str) -> "ConfigFactory[DestinationConfig]":
+    """Return a :class:`~sap_cloud_sdk.core.secret_resolver.ConfigFactory` for the given instance."""
+    from sap_cloud_sdk.core.secret_resolver import ConfigFactory
+
+    def _extract(binding: BindingData) -> DestinationConfig:
+        try:
+            return binding.to_binding()
+        except Exception as exc:
+            raise ConfigError(
+                f"Failed to load Destination configuration for instance '{instance}': {exc}"
+            ) from exc
+
+    return ConfigFactory(
+        module="destination",
+        instance=instance,
+        binding_cls=BindingData,
+        extract=_extract,
+    )
 
 
 def load_transparent_proxy() -> Optional[TransparentProxy]:

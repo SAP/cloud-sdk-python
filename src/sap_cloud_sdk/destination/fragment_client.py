@@ -5,7 +5,8 @@ from __future__ import annotations
 from typing import Callable, List, Optional, TypeVar
 
 from sap_cloud_sdk.core.telemetry import Module, Operation, record_metrics
-from sap_cloud_sdk.destination._http import DestinationHttp, API_V1
+from sap_cloud_sdk.core._http_client import HttpClient
+from sap_cloud_sdk.destination._http import API_V1, HttpMethod, _request
 from sap_cloud_sdk.destination._models import (
     AccessStrategy,
     Fragment,
@@ -59,7 +60,7 @@ class FragmentClient:
 
     def __init__(
         self,
-        http: DestinationHttp,
+        http: HttpClient,
         _telemetry_source: Optional[Module] = None,
     ) -> None:
         """Initialize FragmentClient with dependency injection.
@@ -226,7 +227,13 @@ class FragmentClient:
         body = fragment.to_dict()
 
         try:
-            self._http.post(f"{API_V1}/{coll}", body=body, tenant_subdomain=tenant)
+            _request(
+                self._http,
+                HttpMethod.POST,
+                f"{API_V1}/{coll}",
+                json=body,
+                tenant_subdomain=tenant,
+            )
         except HttpError:
             raise
         except Exception as e:
@@ -261,7 +268,13 @@ class FragmentClient:
         body = fragment.to_dict()
 
         try:
-            self._http.put(f"{API_V1}/{coll}", body=body, tenant_subdomain=tenant)
+            _request(
+                self._http,
+                HttpMethod.PUT,
+                f"{API_V1}/{coll}",
+                json=body,
+                tenant_subdomain=tenant,
+            )
         except HttpError:
             raise
         except Exception as e:
@@ -291,7 +304,12 @@ class FragmentClient:
         coll = self._sub_path_for_level(level)
 
         try:
-            self._http.delete(f"{API_V1}/{coll}/{name}", tenant_subdomain=tenant)
+            _request(
+                self._http,
+                HttpMethod.DELETE,
+                f"{API_V1}/{coll}/{name}",
+                tenant_subdomain=tenant,
+            )
         except HttpError:
             raise
         except Exception as e:
@@ -321,8 +339,11 @@ class FragmentClient:
         """
         try:
             path = self._sub_path_for_level(level)
-            resp = self._http.get(
-                f"{API_V1}/{path}/{name}/labels", tenant_subdomain=tenant
+            resp = _request(
+                self._http,
+                HttpMethod.GET,
+                f"{API_V1}/{path}/{name}/labels",
+                tenant_subdomain=tenant,
             )
             data = resp.json()
             if not isinstance(data, list):
@@ -362,9 +383,11 @@ class FragmentClient:
         resolved_level = level or Level.SUB_ACCOUNT
         try:
             path = self._sub_path_for_level(resolved_level)
-            self._http.put(
+            _request(
+                self._http,
+                HttpMethod.PUT,
                 f"{API_V1}/{path}/{name}/labels",
-                body=[lbl.to_dict() for lbl in labels],
+                json=[lbl.to_dict() for lbl in labels],
                 tenant_subdomain=tenant,
             )
         except HttpError:
@@ -397,9 +420,11 @@ class FragmentClient:
         resolved_level = level or Level.SUB_ACCOUNT
         try:
             path = self._sub_path_for_level(resolved_level)
-            self._http.patch(
+            _request(
+                self._http,
+                HttpMethod.PATCH,
                 f"{API_V1}/{path}/{name}/labels",
-                body=patch.to_dict(),
+                json=patch.to_dict(),
                 tenant_subdomain=tenant,
             )
         except HttpError:
@@ -433,8 +458,11 @@ class FragmentClient:
         """
         try:
             path = self._sub_path_for_level(level)
-            resp = self._http.get(
-                f"{API_V1}/{path}/{name}", tenant_subdomain=tenant_subdomain
+            resp = _request(
+                self._http,
+                HttpMethod.GET,
+                f"{API_V1}/{path}/{name}",
+                tenant_subdomain=tenant_subdomain,
             )
             data = resp.json()
 
@@ -471,7 +499,9 @@ class FragmentClient:
         try:
             path = self._sub_path_for_level(level)
             query_params = filter.to_query_params() if filter else {}
-            resp = self._http.get(
+            resp = _request(
+                self._http,
+                HttpMethod.GET,
                 f"{API_V1}/{path}",
                 tenant_subdomain=tenant_subdomain,
                 params=query_params,

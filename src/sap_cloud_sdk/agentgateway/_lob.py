@@ -13,7 +13,11 @@ import uuid
 import httpx
 from mcp import ClientSession
 from mcp.client.streamable_http import streamable_http_client
-from mcp.shared.exceptions import McpError
+
+try:
+    from mcp.shared.exceptions import McpError
+except ImportError:
+    from mcp.shared.exceptions import MCPError as McpError  # type: ignore[no-redef]  # ty: ignore[unresolved-import]
 from sap_cloud_sdk.destination import (
     create_client as create_destination_client,
     ConsumptionLevel,
@@ -26,14 +30,19 @@ from sap_cloud_sdk.agentgateway._fragments import (
     FragmentLabel,
     get_ias_fragment_name,
     get_ias_user_fragment_name,
-    list_mcp_fragments,
     list_a2a_fragments,
+    list_mcp_fragments,
+)
+from sap_cloud_sdk.agentgateway._compat import (
+    mcp_input_schema,
+    mcp_is_error,
+    mcp_server_name,
 )
 from sap_cloud_sdk.agentgateway._models import (
-    JsonRpcError,
     Agent,
     AgentCard,
     AgentCardFilter,
+    JsonRpcError,
     MCPTool,
     MCPToolFilter,
 )
@@ -375,24 +384,23 @@ async def list_server_tools(
         ):
             async with ClientSession(read, write) as session:
                 init_result = await session.initialize()
-                server_name = (
-                    init_result.serverInfo.name
-                    if init_result
-                    and init_result.serverInfo
-                    and init_result.serverInfo.name
-                    else fragment_name
-                )
+                server_name = mcp_server_name(init_result) or fragment_name
                 result = await session.list_tools()
+                tools = result.tools or []
+                if not tools:
+                    logger.info(
+                        "No tools returned by AGW for fragment '%s'", fragment_name
+                    )
                 return [
                     MCPTool(
                         name=t.name,
                         server_name=server_name,
                         description=t.description or "",
-                        input_schema=t.inputSchema or {},
+                        input_schema=mcp_input_schema(t),
                         url=dest_url,
                         fragment_name=fragment_name,
                     )
-                    for t in result.tools
+                    for t in tools
                 ]
 
 
@@ -516,7 +524,7 @@ async def call_mcp_tool_lob(
                 first = result.content[0]
                 text = str(getattr(first, "text", ""))
 
-                if result.isError:
+                if mcp_is_error(result):
                     logger.error(
                         "Tool '%s' on '%s' returned an error: %s",
                         tool.name,

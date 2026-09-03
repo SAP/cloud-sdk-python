@@ -264,7 +264,7 @@ def use_configured_subscriber_tenant(context):
     """Set the tenant from the CLOUD_SDK_CFG_DESTINATION_DEFAULT_TENANT_SUBDOMAIN environment variable."""
     tenant = os.environ.get("CLOUD_SDK_CFG_DESTINATION_DEFAULT_TENANT_SUBDOMAIN")
     if not tenant:
-        pytest.skip("CLOUD_SDK_CFG_DESTINATION_DEFAULT_TENANT_SUBDOMAIN environment variable not set")
+        pytest.skip("CLOUD_SDK_CFG_DESTINATION_DEFAULT_TENANT_SUBDOMAIN environment variable not set")  # ty: ignore[too-many-positional-arguments]
     context.tenant = tenant
 
 
@@ -1616,13 +1616,13 @@ def send_get_request(context, path):
     try:
         context.http_response = context.http_client.request("GET", path)
     except (requests.exceptions.ConnectionError, requests.exceptions.Timeout) as e:
-        pytest.skip(f"External endpoint unreachable — skipping: {e}")
+        pytest.skip(f"External endpoint unreachable — skipping: {e}")  # ty: ignore[too-many-positional-arguments]
 
     # skip if the echo service itself returned an error
     if not context.http_response.ok:
         pytest.skip(
             f"External endpoint returned {context.http_response.status_code}: "
-            f"{context.http_response.text[:200]}"
+            f"{context.http_response.text[:200]}"  # ty: ignore[too-many-positional-arguments]
         )
 
 
@@ -1639,7 +1639,7 @@ def assert_authorization_header_present(context):
 def call_get_service_instance_id(context, destination_client):
     """Call get_service_instance_id and store the result."""
     if not os.environ.get("CLOUD_SDK_CFG_DESTINATION_DEFAULT_INSTANCEID"):
-        pytest.skip("CLOUD_SDK_CFG_DESTINATION_DEFAULT_INSTANCEID is not set — skipping service instance ID test")
+        pytest.skip("CLOUD_SDK_CFG_DESTINATION_DEFAULT_INSTANCEID is not set — skipping service instance ID test")  # ty: ignore[too-many-positional-arguments]
     context.service_instance_id = destination_client.get_service_instance_id()
 
 

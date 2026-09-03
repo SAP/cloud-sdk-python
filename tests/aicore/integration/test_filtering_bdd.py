@@ -155,7 +155,7 @@ def send_prompt(ctx: ScenarioContext, model: str, prompt: str) -> None:
             "AICORE_FILTER_TEST_SELF_HARM_PROMPT environment variable "
             "(GitHub secret in CI) to a prompt that triggers Azure Content "
             "Safety self-harm filtering. Kept out of source so harmful "
-            "content is not committed to the public repository."
+            "content is not committed to the public repository."  # ty: ignore[too-many-positional-arguments]
         )
     try:
         ctx.response = completion(

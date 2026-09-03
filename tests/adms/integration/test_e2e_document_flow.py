@@ -288,7 +288,7 @@ def scan_state_pending_or_clean(context: ScenarioContext) -> None:
 @then("the download should be blocked if not CLEAN")
 def download_blocked_if_not_clean(context: ScenarioContext) -> None:
     if context.download_blocked is False:
-        pytest.skip("Document already CLEAN — scan gate test not applicable")
+        pytest.skip("Document already CLEAN — scan gate test not applicable")  # ty: ignore[too-many-positional-arguments]
     assert context.download_blocked is True
 
 

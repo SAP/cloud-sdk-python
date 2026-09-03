@@ -21,7 +21,7 @@ def dms_client():
         client = create_client(instance="default")
         return client
     except Exception as e:
-        pytest.skip(f"DMS integration tests require credentials: {e}")
+        pytest.skip(f"DMS integration tests require credentials: {e}")  # ty: ignore[too-many-positional-arguments]
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -52,7 +52,7 @@ def _setup_test_repositories(dms_client):
         )
         created_repos.append(repo.id)
     except DMSError as e:
-        pytest.skip(f"DMS ECM repository connection not available — skipping DMS integration tests: {e}")
+        pytest.skip(f"DMS ECM repository connection not available — skipping DMS integration tests: {e}")  # ty: ignore[too-many-positional-arguments]
 
     yield
 

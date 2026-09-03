@@ -131,7 +131,7 @@ before the cached OAuth token expires — so agents never see a 401 at all.
 ```python
 from sap_cloud_sdk.aicore import set_aicore_config, watch_aicore_config
 
-set_aicore_config()    # load credentials at startup
+set_aicore_config()  # load credentials at startup
 watch_aicore_config()  # proactive reload on secret rotation
 ```
 
@@ -158,7 +158,7 @@ directly, bypassing the SDK's reactive handler. Two options:
 from sap_cloud_sdk.aicore import set_aicore_config, watch_aicore_config
 
 set_aicore_config()
-watch_aicore_config()   # ADD THIS — no other changes needed
+watch_aicore_config()  # ADD THIS — no other changes needed
 ```
 
 **Option B — also add reactive reload for ChatLiteLLM:**
@@ -171,7 +171,7 @@ from sap_cloud_sdk.aicore import (
 )
 
 set_aicore_config()
-patch_litellm_for_credential_rotation()   # patches litellm.completion globally
+patch_litellm_for_credential_rotation()  # patches litellm.completion globally
 watch_aicore_config()
 ```
 

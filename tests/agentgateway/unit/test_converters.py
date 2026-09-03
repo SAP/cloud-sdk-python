@@ -291,3 +291,45 @@ class TestMcpToolToLangchainInvocation:
         kwargs = call_tool.call_args.kwargs
         assert "showdeclinedreason" in kwargs
         assert kwargs["showdeclinedreason"] is None
+
+    @pytest.mark.asyncio
+    async def test_langchain_config_kwarg_not_forwarded_to_call_tool(self):
+        """LangChain >= 0.3 injects 'config' into _arun; it must not reach call_tool."""
+        call_tool = AsyncMock(return_value="ok")
+        lc_tool = mcp_tool_to_langchain(_make_tool(), call_tool, lambda: "token")
+
+        assert lc_tool.coroutine is not None
+        await lc_tool.coroutine(eventid="E001", config={"configurable": {}})
+
+        assert "config" not in call_tool.call_args.kwargs
+
+    @pytest.mark.asyncio
+    async def test_langchain_run_manager_kwarg_not_forwarded_to_call_tool(self):
+        """LangChain injects 'run_manager' into _arun; it must not reach call_tool."""
+        call_tool = AsyncMock(return_value="ok")
+        lc_tool = mcp_tool_to_langchain(_make_tool(), call_tool, lambda: "token")
+
+        assert lc_tool.coroutine is not None
+        await lc_tool.coroutine(eventid="E001", run_manager=object())
+
+        assert "run_manager" not in call_tool.call_args.kwargs
+
+    @pytest.mark.asyncio
+    async def test_langchain_injected_kwargs_stripped_while_tool_params_pass_through(self):
+        """Both 'config' and 'run_manager' are stripped; real tool params still reach call_tool."""
+        call_tool = AsyncMock(return_value="ok")
+        lc_tool = mcp_tool_to_langchain(_make_tool(), call_tool, lambda: "token")
+
+        assert lc_tool.coroutine is not None
+        await lc_tool.coroutine(
+            eventid="E001",
+            showdeclinedreason="true",
+            config={"configurable": {}},
+            run_manager=object(),
+        )
+
+        kwargs = call_tool.call_args.kwargs
+        assert kwargs["eventid"] == "E001"
+        assert kwargs["showdeclinedreason"] == "true"
+        assert "config" not in kwargs
+        assert "run_manager" not in kwargs

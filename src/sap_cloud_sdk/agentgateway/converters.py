@@ -91,16 +91,6 @@ def mcp_tool_to_langchain(
             "Install it with: pip install sap-cloud-sdk[langchain]"
         ) from None
 
-    async def run(**kwargs) -> str:
-        resolved = (
-            {k: v for k, v in kwargs.items() if v is not None} if omit_none else kwargs
-        )
-        return await call_tool(
-            mcp_tool,
-            user_token=get_user_token,
-            **resolved,
-        )
-
     # Build args schema from input_schema
     properties = mcp_tool.input_schema.get("properties", {})
     required = set(mcp_tool.input_schema.get("required", []))
@@ -113,6 +103,24 @@ def mcp_tool_to_langchain(
         else:
             fields[k] = (py_type, ...)
     args_schema = create_model(f"{mcp_tool.name}_args", **fields) if fields else None
+
+    # Closed over at conversion time: only keys declared in the MCP schema are
+    # forwarded, so any kwargs LangChain injects (config, run_manager, …) are
+    # silently ignored without needing an explicit deny-list.
+    allowed_keys = frozenset(properties)
+
+    async def run(**kwargs) -> str:
+        tool_kwargs = {k: v for k, v in kwargs.items() if k in allowed_keys}
+        resolved = (
+            {k: v for k, v in tool_kwargs.items() if v is not None}
+            if omit_none
+            else tool_kwargs
+        )
+        return await call_tool(
+            mcp_tool,
+            user_token=get_user_token,
+            **resolved,
+        )
 
     return StructuredTool.from_function(
         coroutine=run,

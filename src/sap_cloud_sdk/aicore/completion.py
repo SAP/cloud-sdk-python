@@ -88,9 +88,12 @@ def completion(*args: Any, **kwargs: Any) -> Any:
     """Wrapper around :func:`litellm.completion` that normalises filter errors
     and handles credential rotation transparently.
 
-    On ``AuthenticationError`` (e.g. rotated client_secret), reloads
-    credentials from the mounted secret volume and retries once.
-    All other exceptions surface verbatim after the filter-error translation.
+    On ``AuthenticationError`` (e.g. rotated client_secret or mTLS cert),
+    reloads credentials from the mounted secret volume and retries once.
+
+    Model strings (e.g. ``sap/<model>``) are passed verbatim to LiteLLM in all
+    routing modes — proxy routing is handled by ``litellm.api_base`` configured
+    in :func:`set_aicore_config`, not by rewriting the model name.
     """
     try:
         return litellm.completion(*args, **kwargs)
@@ -107,7 +110,8 @@ def completion(*args: Any, **kwargs: Any) -> Any:
 async def acompletion(*args: Any, **kwargs: Any) -> Any:
     """Async wrapper around :func:`litellm.acompletion`.
 
-    Same translation and credential-rotation semantics as :func:`completion`.
+    Same credential-rotation semantics as :func:`completion`.
+    Model strings are passed verbatim to LiteLLM in all routing modes.
     """
     try:
         return await litellm.acompletion(*args, **kwargs)

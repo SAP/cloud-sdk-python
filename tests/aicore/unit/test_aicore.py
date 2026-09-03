@@ -4,10 +4,12 @@ import json
 import os
 from unittest.mock import mock_open, patch
 
+import pytest
 
 from sap_cloud_sdk.aicore import (
     _get_aicore_base_url,
     _get_secret,
+    _is_transparent_tls,
     set_aicore_config,
 )
 
@@ -710,3 +712,342 @@ class TestSetAICoreConfig:
 
             # Function should complete without errors even with decorator
             # The actual telemetry recording is tested in telemetry tests
+
+
+class TestIsTransparentTls:
+    """Test suite for _is_transparent_tls helper."""
+
+    def test_returns_true_for_value_true(self):
+        with patch.dict("os.environ", {"AICORE_TRANSPARENT_TLS": "true"}):
+            assert _is_transparent_tls() is True
+
+    def test_returns_true_for_value_1(self):
+        with patch.dict("os.environ", {"AICORE_TRANSPARENT_TLS": "1"}):
+            assert _is_transparent_tls() is True
+
+    def test_returns_true_for_value_yes(self):
+        with patch.dict("os.environ", {"AICORE_TRANSPARENT_TLS": "yes"}):
+            assert _is_transparent_tls() is True
+
+    def test_returns_true_case_insensitive(self):
+        with patch.dict("os.environ", {"AICORE_TRANSPARENT_TLS": "TRUE"}):
+            assert _is_transparent_tls() is True
+
+    def test_returns_false_when_absent(self):
+        with patch.dict("os.environ", {}, clear=True):
+            assert _is_transparent_tls() is False
+
+    def test_returns_false_for_value_false(self):
+        with patch.dict("os.environ", {"AICORE_TRANSPARENT_TLS": "false"}):
+            assert _is_transparent_tls() is False
+
+
+class TestSetAICoreConfigTransparentTls:
+    """Test suite for set_aicore_config in transparent TLS mode."""
+
+    def _base_secrets(self):
+        return {
+            "AICORE_CLIENT_ID": "test-client-id",
+            "AICORE_AUTH_URL": "https://auth.example.com",
+            "AICORE_RESOURCE_GROUP": "default",
+        }
+
+    def test_transparent_tls_does_not_set_client_secret(self):
+        """In transparent TLS mode, AICORE_CLIENT_SECRET must not be written to env."""
+        with (
+            patch("sap_cloud_sdk.aicore._get_secret") as mock_get_secret,
+            patch("sap_cloud_sdk.aicore._get_aicore_base_url", return_value="https://api.example.com"),
+            patch("sap_cloud_sdk.aicore.set_filtering"),
+            patch.dict("os.environ", {"AICORE_TRANSPARENT_TLS": "true"}, clear=True),
+        ):
+            mock_get_secret.side_effect = lambda name, file_name=None, default="", instance_name="aicore-instance": (
+                self._base_secrets().get(name, default)
+            )
+
+            set_aicore_config()
+
+            assert "AICORE_CLIENT_SECRET" not in os.environ
+
+    def test_transparent_tls_removes_stale_client_secret(self):
+        """Any pre-existing AICORE_CLIENT_SECRET is cleared in transparent TLS mode."""
+        with (
+            patch("sap_cloud_sdk.aicore._get_secret") as mock_get_secret,
+            patch("sap_cloud_sdk.aicore._get_aicore_base_url", return_value=""),
+            patch("sap_cloud_sdk.aicore.set_filtering"),
+            patch.dict(
+                "os.environ",
+                {"AICORE_TRANSPARENT_TLS": "true", "AICORE_CLIENT_SECRET": "stale-secret"},
+                clear=True,
+            ),
+        ):
+            mock_get_secret.side_effect = lambda name, file_name=None, default="", instance_name="aicore-instance": (
+                self._base_secrets().get(name, default)
+            )
+
+            set_aicore_config()
+
+            assert "AICORE_CLIENT_SECRET" not in os.environ
+
+    def test_transparent_tls_sets_other_credentials(self):
+        """Non-secret credentials are still set in transparent TLS mode."""
+        with (
+            patch("sap_cloud_sdk.aicore._get_secret") as mock_get_secret,
+            patch("sap_cloud_sdk.aicore._get_aicore_base_url", return_value="https://api.example.com"),
+            patch("sap_cloud_sdk.aicore.set_filtering"),
+            patch.dict("os.environ", {"AICORE_TRANSPARENT_TLS": "true"}, clear=True),
+        ):
+            mock_get_secret.side_effect = lambda name, file_name=None, default="", instance_name="aicore-instance": (
+                self._base_secrets().get(name, default)
+            )
+
+            set_aicore_config()
+
+            assert os.environ["AICORE_CLIENT_ID"] == "test-client-id"
+            assert os.environ["AICORE_AUTH_URL"] == "https://auth.example.com/oauth/token"
+            assert os.environ["AICORE_BASE_URL"] == "https://api.example.com/v2"
+
+    def test_standard_mode_still_sets_client_secret(self):
+        """Regression: without transparent TLS, client_secret is still written."""
+        with (
+            patch("sap_cloud_sdk.aicore._get_secret") as mock_get_secret,
+            patch("sap_cloud_sdk.aicore._get_aicore_base_url", return_value=""),
+            patch("sap_cloud_sdk.aicore.set_filtering"),
+            patch.dict("os.environ", {}, clear=True),
+        ):
+            mock_get_secret.side_effect = lambda name, file_name=None, default="", instance_name="aicore-instance": (
+                {**self._base_secrets(), "AICORE_CLIENT_SECRET": "my-secret"}.get(name, default)
+            )
+
+            set_aicore_config()
+
+            assert os.environ["AICORE_CLIENT_SECRET"] == "my-secret"
+
+    def test_transparent_tls_does_not_call_get_secret_for_client_secret(self):
+        """_get_secret should not be called for clientsecret in transparent TLS mode."""
+        with (
+            patch("sap_cloud_sdk.aicore._get_secret") as mock_get_secret,
+            patch("sap_cloud_sdk.aicore._get_aicore_base_url", return_value=""),
+            patch("sap_cloud_sdk.aicore.set_filtering"),
+            patch.dict("os.environ", {"AICORE_TRANSPARENT_TLS": "true"}, clear=True),
+        ):
+            mock_get_secret.return_value = ""
+
+            set_aicore_config()
+
+            called_names = [c.args[0] for c in mock_get_secret.call_args_list]
+            assert "AICORE_CLIENT_SECRET" not in called_names
+
+
+# ---------------------------------------------------------------------------
+# Proxy mode — set_aicore_config() with AICORE_PROXY_URL
+# ---------------------------------------------------------------------------
+
+
+class TestSetAICoreConfigProxyMode:
+    """set_aicore_config() routes via proxy when AICORE_PROXY_URL is present."""
+
+    def _base_proxy_env(self, **extra):
+        return {"AICORE_PROXY_URL": "https://proxy.example.com", **extra}
+
+    def test_proxy_mode_sets_litellm_api_base(self):
+        import litellm
+        with (
+            patch("sap_cloud_sdk.aicore.set_filtering"),
+            patch.dict("os.environ", self._base_proxy_env(), clear=True),
+        ):
+            set_aicore_config()
+        assert litellm.api_base == "https://proxy.example.com"
+        litellm.api_base = None  # cleanup
+
+    def test_proxy_mode_sets_litellm_api_key_when_virtual_key_present(self):
+        import litellm
+        with (
+            patch("sap_cloud_sdk.aicore.set_filtering"),
+            patch.dict(
+                "os.environ",
+                self._base_proxy_env(AICORE_PROXY_API_KEY="sk-virt-123"),
+                clear=True,
+            ),
+        ):
+            set_aicore_config()
+        assert litellm.api_key == "sk-virt-123"
+        litellm.api_key = None  # cleanup
+
+    def test_proxy_mode_does_not_write_aicore_credentials(self):
+        with (
+            patch("sap_cloud_sdk.aicore.set_filtering"),
+            patch.dict("os.environ", self._base_proxy_env(), clear=True),
+        ):
+            set_aicore_config()
+            for var in ("AICORE_CLIENT_ID", "AICORE_CLIENT_SECRET", "AICORE_AUTH_URL"):
+                assert var not in os.environ, f"{var} must not be written in proxy mode"
+
+    def test_proxy_mode_takes_precedence_over_destination(self):
+        with (
+            patch("sap_cloud_sdk.aicore.set_filtering"),
+            patch("sap_cloud_sdk.aicore._configure_destination_mode") as mock_dest,
+            patch.dict(
+                "os.environ",
+                self._base_proxy_env(AICORE_DESTINATION_NAME="aicore"),
+                clear=True,
+            ),
+        ):
+            set_aicore_config()
+        mock_dest.assert_not_called()
+
+    def test_proxy_mode_still_calls_set_filtering(self):
+        with (
+            patch("sap_cloud_sdk.aicore.set_filtering") as mock_filter,
+            patch.dict("os.environ", self._base_proxy_env(), clear=True),
+        ):
+            set_aicore_config()
+        mock_filter.assert_called_once()
+
+    def test_direct_mode_used_when_neither_proxy_nor_destination_set(self):
+        with (
+            patch("sap_cloud_sdk.aicore.set_filtering"),
+            patch("sap_cloud_sdk.aicore._configure_direct_mode") as mock_direct,
+            patch.dict("os.environ", {}, clear=True),
+        ):
+            set_aicore_config()
+        mock_direct.assert_called_once()
+
+
+# ---------------------------------------------------------------------------
+# Destination mode — set_aicore_config() with AICORE_DESTINATION_NAME
+# ---------------------------------------------------------------------------
+
+
+class TestSetAICoreConfigDestinationMode:
+    """set_aicore_config() loads credentials from BTP Destination Service."""
+
+    def _mock_destination(
+        self,
+        url="https://api.ai.prod.example.com",
+        properties=None,
+        auth_tokens=None,
+    ):
+        from unittest.mock import MagicMock
+        dest = MagicMock()
+        dest.url = url
+        dest.properties = properties or {
+            "clientId": "sb-client-id",
+            "clientSecret": "client-secret-value",
+            "tokenServiceURL": "https://auth.example.com/oauth/token",
+        }
+        dest.auth_tokens = auth_tokens or []
+        return dest
+
+    def test_destination_mode_sets_base_url_with_v2_suffix(self):
+        dest = self._mock_destination(url="https://api.ai.prod.example.com")
+        with (
+            patch("sap_cloud_sdk.aicore.set_filtering"),
+            patch(
+                "sap_cloud_sdk.destination.create_client"
+            ) as mock_create,
+            patch.dict("os.environ", {"AICORE_DESTINATION_NAME": "aicore"}, clear=True),
+        ):
+            mock_create.return_value.get_destination.return_value = dest
+            set_aicore_config()
+            assert os.environ["AICORE_BASE_URL"] == "https://api.ai.prod.example.com/v2"
+
+    def test_destination_mode_does_not_double_v2(self):
+        dest = self._mock_destination(url="https://api.ai.prod.example.com/v2")
+        with (
+            patch("sap_cloud_sdk.aicore.set_filtering"),
+            patch("sap_cloud_sdk.destination.create_client") as mock_create,
+            patch.dict("os.environ", {"AICORE_DESTINATION_NAME": "aicore"}, clear=True),
+        ):
+            mock_create.return_value.get_destination.return_value = dest
+            set_aicore_config()
+            assert os.environ["AICORE_BASE_URL"] == "https://api.ai.prod.example.com/v2"
+
+    def test_destination_mode_sets_resource_group_from_properties(self):
+        dest = self._mock_destination(
+            properties={
+                "clientId": "id",
+                "clientSecret": "sec",
+                "tokenServiceURL": "https://auth.example.com/oauth/token",
+                "resource_group": "production",
+            }
+        )
+        with (
+            patch("sap_cloud_sdk.aicore.set_filtering"),
+            patch("sap_cloud_sdk.destination.create_client") as mock_create,
+            patch.dict("os.environ", {"AICORE_DESTINATION_NAME": "aicore"}, clear=True),
+        ):
+            mock_create.return_value.get_destination.return_value = dest
+            set_aicore_config()
+            assert os.environ["AICORE_RESOURCE_GROUP"] == "production"
+
+    def test_destination_mode_defaults_resource_group_to_default(self):
+        dest = self._mock_destination()  # no resource_group in properties
+        with (
+            patch("sap_cloud_sdk.aicore.set_filtering"),
+            patch("sap_cloud_sdk.destination.create_client") as mock_create,
+            patch.dict("os.environ", {"AICORE_DESTINATION_NAME": "aicore"}, clear=True),
+        ):
+            mock_create.return_value.get_destination.return_value = dest
+            set_aicore_config()
+            assert os.environ["AICORE_RESOURCE_GROUP"] == "default"
+
+    def test_destination_mode_sets_client_credentials(self):
+        dest = self._mock_destination()
+        with (
+            patch("sap_cloud_sdk.aicore.set_filtering"),
+            patch("sap_cloud_sdk.destination.create_client") as mock_create,
+            patch.dict("os.environ", {"AICORE_DESTINATION_NAME": "aicore"}, clear=True),
+        ):
+            mock_create.return_value.get_destination.return_value = dest
+            set_aicore_config()
+            assert os.environ["AICORE_CLIENT_ID"] == "sb-client-id"
+            assert os.environ["AICORE_CLIENT_SECRET"] == "client-secret-value"
+
+    def test_destination_mode_appends_oauth_token_suffix(self):
+        dest = self._mock_destination(
+            properties={
+                "clientId": "id",
+                "clientSecret": "sec",
+                "tokenServiceURL": "https://auth.example.com",  # no /oauth/token
+            }
+        )
+        with (
+            patch("sap_cloud_sdk.aicore.set_filtering"),
+            patch("sap_cloud_sdk.destination.create_client") as mock_create,
+            patch.dict("os.environ", {"AICORE_DESTINATION_NAME": "aicore"}, clear=True),
+        ):
+            mock_create.return_value.get_destination.return_value = dest
+            set_aicore_config()
+            assert os.environ["AICORE_AUTH_URL"] == "https://auth.example.com/oauth/token"
+
+    def test_destination_mode_raises_when_destination_not_found(self):
+        with (
+            patch("sap_cloud_sdk.aicore.set_filtering"),
+            patch("sap_cloud_sdk.destination.create_client") as mock_create,
+            patch.dict("os.environ", {"AICORE_DESTINATION_NAME": "missing"}, clear=True),
+        ):
+            mock_create.return_value.get_destination.return_value = None
+            with pytest.raises(RuntimeError, match="not found"):
+                set_aicore_config()
+
+    def test_destination_mode_raises_when_no_client_credentials(self):
+        dest = self._mock_destination(properties={"resource_group": "default"})
+        with (
+            patch("sap_cloud_sdk.aicore.set_filtering"),
+            patch("sap_cloud_sdk.destination.create_client") as mock_create,
+            patch.dict("os.environ", {"AICORE_DESTINATION_NAME": "aicore"}, clear=True),
+        ):
+            mock_create.return_value.get_destination.return_value = dest
+            with pytest.raises(RuntimeError, match="clientId/clientSecret"):
+                set_aicore_config()
+
+    def test_destination_mode_still_calls_set_filtering(self):
+        dest = self._mock_destination()
+        with (
+            patch("sap_cloud_sdk.aicore.set_filtering") as mock_filter,
+            patch("sap_cloud_sdk.destination.create_client") as mock_create,
+            patch.dict("os.environ", {"AICORE_DESTINATION_NAME": "aicore"}, clear=True),
+        ):
+            mock_create.return_value.get_destination.return_value = dest
+            set_aicore_config()
+        mock_filter.assert_called_once()

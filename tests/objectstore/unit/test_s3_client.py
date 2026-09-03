@@ -175,7 +175,7 @@ class TestObjectStoreClient:
     @patch('sap_cloud_sdk.objectstore._s3.Minio')
     def test_get_object_not_found(self, mock_minio_class):
         mock_minio = Mock()
-        s3_error = S3Error("NoSuchKey", "Key not found", "test.txt", "123", "456", Mock())
+        s3_error = S3Error(Mock(), "NoSuchKey", "Key not found", "test.txt", "123", "456")
         mock_minio.get_object.side_effect = s3_error
         mock_minio_class.return_value = mock_minio
 
@@ -200,7 +200,7 @@ class TestObjectStoreClient:
     @patch('sap_cloud_sdk.objectstore._s3.Minio')
     def test_delete_object_not_found_ignored(self, mock_minio_class):
         mock_minio = Mock()
-        s3_error = S3Error("NoSuchKey", "Key not found", "test.txt", "123", "456", Mock())
+        s3_error = S3Error(Mock(), "NoSuchKey", "Key not found", "test.txt", "123", "456")
         mock_minio.remove_object.side_effect = s3_error
         mock_minio_class.return_value = mock_minio
 
@@ -273,7 +273,7 @@ class TestObjectStoreClient:
     @patch('sap_cloud_sdk.objectstore._s3.Minio')
     def test_head_object_not_found(self, mock_minio_class):
         mock_minio = Mock()
-        s3_error = S3Error("NoSuchKey", "Key not found", "test.txt", "123", "456", Mock())
+        s3_error = S3Error(Mock(), "NoSuchKey", "Key not found", "test.txt", "123", "456")
         mock_minio.stat_object.side_effect = s3_error
         mock_minio_class.return_value = mock_minio
 
@@ -296,7 +296,7 @@ class TestObjectStoreClient:
     @patch('sap_cloud_sdk.objectstore._s3.Minio')
     def test_object_exists_false(self, mock_minio_class):
         mock_minio = Mock()
-        s3_error = S3Error("NoSuchKey", "Key not found", "test.txt", "123", "456", Mock())
+        s3_error = S3Error(Mock(), "NoSuchKey", "Key not found", "test.txt", "123", "456")
         mock_minio.stat_object.side_effect = s3_error
         mock_minio_class.return_value = mock_minio
 

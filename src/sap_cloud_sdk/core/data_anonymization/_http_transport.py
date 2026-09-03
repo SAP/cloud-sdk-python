@@ -182,9 +182,8 @@ class HttpTransport(Transport):
         try:
             if request.file_path is not None:
                 file_handle = open(request.file_path, "rb")
-                file_value: BinaryIO | bytes = file_handle
+                file_value = file_handle
             else:
-                assert request.file_content is not None  # enforced by model validation
                 file_value = request.file_content
 
             files = {

@@ -66,6 +66,7 @@ _GRAPHQL_QUERY_FRAGMENT = """\
         title
         extensionVersion
         solutionId
+        jouleStudioGsid
         capabilityImplementations {
           capabilityId
           instruction { text }
@@ -327,6 +328,7 @@ def _build_source_mapping(
             extension_version=node.get("extensionVersion", ""),
             extension_id=node.get("id", ""),
             solution_id=node.get("solutionId") or "",
+            joule_studio_gsid=node.get("jouleStudioGsid") or "",
         )
 
         for cap_impl in node.get("capabilityImplementations", []):

@@ -78,6 +78,18 @@ Instrumentation activates based on what is installed in the service, not on what
 
 The SDK ships `opentelemetry-instrumentation-*` packages for all of the above as hard dependencies. The target frameworks themselves are optional — install them via your service's own requirements or via the SDK's convenience extras (e.g. `sap-cloud-sdk[django]`).
 
+### Introspection
+
+Use `get_instrumented_libraries()` to query which libraries were actually patched at runtime:
+
+```python
+from sap_cloud_sdk.core.telemetry import Library, get_instrumented_libraries
+
+get_instrumented_libraries()  # -> [Library.HTTPX, Library.SQLALCHEMY, ...] after auto_instrument(), [] before
+```
+
+Only libraries that were installed **and** successfully instrumented appear in the list. Libraries skipped because they are not installed do not appear. Returns an empty list if `auto_instrument()` has not been called yet.
+
 ---
 
 ## Span functions

@@ -284,10 +284,14 @@ class AgentGatewayClient:
                     self._config.timeout,
                     self._token_cache,
                 )
-                return AuthResult(
+                result = AuthResult(
                     access_token=token,
                     gateway_url=credentials.gateway_url,
                 )
+                logger.info(
+                    "User auth token obtained — gateway: '%s'", result.gateway_url
+                )
+                return result
 
             # Check for transparent mode
             if detect_transparent_credentials():
@@ -302,10 +306,14 @@ class AgentGatewayClient:
                     self._config.timeout,
                     self._token_cache,
                 )
-                return AuthResult(
+                result = AuthResult(
                     access_token=token,
                     gateway_url=credentials.gateway_url,
                 )
+                logger.info(
+                    "User auth token obtained — gateway: '%s'", result.gateway_url
+                )
+                return result
 
             tenant = self._resolve_tenant_subdomain()
             token, gateway_url = await fetch_user_auth(
@@ -314,7 +322,9 @@ class AgentGatewayClient:
                 token_cache=self._token_cache,
                 gateway_url_cache=self._gateway_url_cache,
             )
-            return AuthResult(access_token=token, gateway_url=gateway_url)
+            result = AuthResult(access_token=token, gateway_url=gateway_url)
+            logger.info("User auth token obtained — gateway: '%s'", result.gateway_url)
+            return result
 
         except AgentGatewaySDKError:
             raise
@@ -444,10 +454,6 @@ class AgentGatewayClient:
 
             # LoB flow - requires tenant_subdomain
             tenant = self._resolve_tenant_subdomain()
-            if user_token:
-                auth = await self.get_user_auth(user_token)
-            else:
-                auth = await self.get_system_auth()
             return await get_mcp_tools_lob(
                 tenant,
                 auth.access_token,
@@ -597,7 +603,10 @@ class AgentGatewayClient:
                     tool, auth.access_token, self._config.timeout, **kwargs
                 )
 
-            auth = await self.get_user_auth(user_token)
+            if not user_token:
+                raise AgentGatewaySDKError(
+                    "user_token is required for LoB tool invocation."
+                )
             return await call_mcp_tool_lob(
                 tool, auth.access_token, self._config.timeout, **kwargs
             )

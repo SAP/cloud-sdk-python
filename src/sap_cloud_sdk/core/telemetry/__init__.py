@@ -37,6 +37,7 @@ from sap_cloud_sdk.core.telemetry.extensions import (
     ATTR_EXTENSION_ITEM_NAME,
     ATTR_EXTENSION_URL,
     ATTR_SOLUTION_ID,
+    ATTR_JOULE_STUDIO_GSID,
     ATTR_SUMMARY_TOTAL_OPERATION_COUNT,
     ATTR_SUMMARY_TOTAL_DURATION_MS,
     ATTR_SUMMARY_TOOL_CALL_COUNT,
@@ -56,6 +57,10 @@ from sap_cloud_sdk.core.telemetry.extensions import (
     ExtensionContextLogFilter,
 )
 from sap_cloud_sdk.core.telemetry.middleware import TelemetryMiddleware
+from sap_cloud_sdk.core.telemetry.instrumentation._registry import (
+    Library,
+    get_instrumented_libraries,
+)
 
 __all__ = [
     "Module",
@@ -85,6 +90,7 @@ __all__ = [
     "ATTR_EXTENSION_ITEM_NAME",
     "ATTR_EXTENSION_URL",
     "ATTR_SOLUTION_ID",
+    "ATTR_JOULE_STUDIO_GSID",
     "ATTR_SUMMARY_TOTAL_OPERATION_COUNT",
     "ATTR_SUMMARY_TOTAL_DURATION_MS",
     "ATTR_SUMMARY_TOOL_CALL_COUNT",
@@ -103,6 +109,8 @@ __all__ = [
     "emit_extensions_summary_span",
     "ExtensionContextLogFilter",
     "TelemetryMiddleware",
+    "Library",
+    "get_instrumented_libraries",
 ]
 
 try:

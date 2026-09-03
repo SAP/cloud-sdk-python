@@ -15,14 +15,17 @@ transport patch as :class:`ContentFilteredError`). Test focus:
 - :class:`ContentFilteredError` already raised by the transport patch
   passes through unchanged (we don't double-wrap).
 - ``acompletion`` exhibits the same behaviour on the async path.
+- On ``AuthenticationError``, credentials are reloaded and the call is
+  retried once (credential rotation without pod restart).
 """
 
 from __future__ import annotations
 
 import asyncio
 import json
-from unittest.mock import patch
+from unittest.mock import MagicMock, call, patch
 
+import litellm
 import pytest
 
 from sap_cloud_sdk.aicore import acompletion, completion
@@ -187,13 +190,130 @@ class TestACompletionWrapper:
     def test_non_filter_exception_surfaces_verbatim(self):
         raised = _FakeAPIConnectionError("SapException - other transport error")
 
-        async def fake_acompletion(**kwargs):
+        async def fake_acompletion_non_filter(**kwargs):
             raise raised
 
         with patch(
             "sap_cloud_sdk.aicore.completion.litellm.acompletion",
-            side_effect=fake_acompletion,
+            side_effect=fake_acompletion_non_filter,
         ):
             with pytest.raises(_FakeAPIConnectionError) as ei:
                 asyncio.run(acompletion(model="sap/x", messages=[]))
         assert ei.value is raised
+
+
+# ---------------------------------------------------------------------------
+# Reactive reload on AuthenticationError — sync
+# ---------------------------------------------------------------------------
+
+
+class TestCompletionReactiveReload:
+    def test_auth_error_triggers_reload_and_retry_succeeds(self):
+        """On AuthenticationError, credentials reload and second call succeeds."""
+        sentinel = object()
+        auth_err = litellm.AuthenticationError(
+            message="401 Unauthorized", llm_provider="sap", model="sap/x"
+        )
+        call_returns = [auth_err, sentinel]
+
+        def fake_completion(*args, **kwargs):
+            result = call_returns.pop(0)
+            if isinstance(result, Exception):
+                raise result
+            return result
+
+        with (
+            patch("sap_cloud_sdk.aicore.completion.litellm.completion", side_effect=fake_completion),
+            patch("sap_cloud_sdk.aicore.set_aicore_config") as mock_reload,
+        ):
+            result = completion(model="sap/x", messages=[])
+
+        assert result is sentinel
+        mock_reload.assert_called_once_with()
+
+    def test_auth_error_retry_also_fails_propagates(self):
+        """If the retry also raises AuthenticationError, it propagates to the caller."""
+        auth_err = litellm.AuthenticationError(
+            message="401 Unauthorized", llm_provider="sap", model="sap/x"
+        )
+
+        with (
+            patch("sap_cloud_sdk.aicore.completion.litellm.completion", side_effect=auth_err),
+            patch("sap_cloud_sdk.aicore.set_aicore_config"),
+        ):
+            with pytest.raises(litellm.AuthenticationError):
+                completion(model="sap/x", messages=[])
+
+    def test_auth_error_reload_called_exactly_once(self):
+        """Reload is called exactly once — no infinite retry loop."""
+        auth_err = litellm.AuthenticationError(
+            message="401", llm_provider="sap", model="sap/x"
+        )
+        mock_litellm = MagicMock(side_effect=auth_err)
+
+        with (
+            patch("sap_cloud_sdk.aicore.completion.litellm.completion", mock_litellm),
+            patch("sap_cloud_sdk.aicore.set_aicore_config") as mock_reload,
+        ):
+            with pytest.raises(litellm.AuthenticationError):
+                completion(model="sap/x", messages=[])
+
+        mock_reload.assert_called_once()
+        assert mock_litellm.call_count == 2
+
+    def test_non_auth_error_does_not_trigger_reload(self):
+        """Non-authentication errors do not trigger a credential reload."""
+        raised = ValueError("some other error")
+
+        with (
+            patch("sap_cloud_sdk.aicore.completion.litellm.completion", side_effect=raised),
+            patch("sap_cloud_sdk.aicore.set_aicore_config") as mock_reload,
+        ):
+            with pytest.raises(ValueError):
+                completion(model="sap/x", messages=[])
+
+        mock_reload.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
+# Reactive reload on AuthenticationError — async
+# ---------------------------------------------------------------------------
+
+
+class TestACompletionReactiveReload:
+    def test_auth_error_triggers_reload_and_retry_succeeds(self):
+        sentinel = object()
+        auth_err = litellm.AuthenticationError(
+            message="401 Unauthorized", llm_provider="sap", model="sap/x"
+        )
+        call_returns = [auth_err, sentinel]
+
+        async def fake_acompletion(*args, **kwargs):
+            result = call_returns.pop(0)
+            if isinstance(result, Exception):
+                raise result
+            return result
+
+        with (
+            patch("sap_cloud_sdk.aicore.completion.litellm.acompletion", side_effect=fake_acompletion),
+            patch("sap_cloud_sdk.aicore.set_aicore_config") as mock_reload,
+        ):
+            result = asyncio.run(acompletion(model="sap/x", messages=[]))
+
+        assert result is sentinel
+        mock_reload.assert_called_once_with()
+
+    def test_auth_error_retry_also_fails_propagates(self):
+        auth_err = litellm.AuthenticationError(
+            message="401", llm_provider="sap", model="sap/x"
+        )
+
+        async def fake_acompletion(*args, **kwargs):
+            raise auth_err
+
+        with (
+            patch("sap_cloud_sdk.aicore.completion.litellm.acompletion", side_effect=fake_acompletion),
+            patch("sap_cloud_sdk.aicore.set_aicore_config"),
+        ):
+            with pytest.raises(litellm.AuthenticationError):
+                asyncio.run(acompletion(model="sap/x", messages=[]))

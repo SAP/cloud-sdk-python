@@ -13,6 +13,11 @@ import uuid
 import httpx
 from mcp import ClientSession
 from mcp.client.streamable_http import streamable_http_client
+
+try:
+    from mcp.shared.exceptions import McpError
+except ImportError:
+    from mcp.shared.exceptions import MCPError as McpError  # type: ignore[no-redef]  # ty: ignore[unresolved-import]
 from sap_cloud_sdk.destination import (
     create_client as create_destination_client,
     ConsumptionLevel,
@@ -25,13 +30,19 @@ from sap_cloud_sdk.agentgateway._fragments import (
     FragmentLabel,
     get_ias_fragment_name,
     get_ias_user_fragment_name,
-    list_mcp_fragments,
     list_a2a_fragments,
+    list_mcp_fragments,
+)
+from sap_cloud_sdk.agentgateway._compat import (
+    mcp_input_schema,
+    mcp_is_error,
+    mcp_server_name,
 )
 from sap_cloud_sdk.agentgateway._models import (
     Agent,
     AgentCard,
     AgentCardFilter,
+    JsonRpcError,
     MCPTool,
     MCPToolFilter,
 )
@@ -307,16 +318,41 @@ def _log_mcp_server_error(fragment_name: str, exc: BaseException) -> None:
             _log_mcp_server_error(fragment_name, inner)
         return
     if isinstance(exc, httpx.HTTPStatusError):
+        try:
+            body = exc.response.text
+        except httpx.ResponseNotRead:
+            body = None
+        rpc_error = JsonRpcError.parse(body) if body else None
+        if rpc_error:
+            logger.error(
+                "Failed to load tools from fragment '%s' — %s returned HTTP %d [JSON-RPC %d]: %s",
+                fragment_name,
+                exc.request.url,
+                exc.response.status_code,
+                rpc_error.code,
+                rpc_error.message,
+            )
+        else:
+            logger.error(
+                "Failed to load tools from fragment '%s' — %s returned HTTP %d: %s",
+                fragment_name,
+                exc.request.url,
+                exc.response.status_code,
+                body[:500] if body else "(response body not available)",
+            )
+    elif isinstance(exc, McpError):
         logger.error(
-            "Failed to load tools from fragment '%s' (HTTP %d): %s",
+            "Failed to load tools from fragment '%s' — JSON-RPC %d: %s",
             fragment_name,
-            exc.response.status_code,
-            exc.response.text[:500],
+            exc.error.code,
+            exc.error.message,
         )
     else:
-        logger.exception(
-            "Failed to load tools from fragment '%s' — skipping",
+        logger.error(
+            "Failed to load tools from fragment '%s' — %s: %s",
             fragment_name,
+            type(exc).__name__,
+            exc,
             exc_info=exc,
         )
 
@@ -348,24 +384,23 @@ async def list_server_tools(
         ):
             async with ClientSession(read, write) as session:
                 init_result = await session.initialize()
-                server_name = (
-                    init_result.serverInfo.name
-                    if init_result
-                    and init_result.serverInfo
-                    and init_result.serverInfo.name
-                    else fragment_name
-                )
+                server_name = mcp_server_name(init_result) or fragment_name
                 result = await session.list_tools()
+                tools = result.tools or []
+                if not tools:
+                    logger.info(
+                        "No tools returned by AGW for fragment '%s'", fragment_name
+                    )
                 return [
                     MCPTool(
                         name=t.name,
                         server_name=server_name,
                         description=t.description or "",
-                        input_schema=t.inputSchema or {},
+                        input_schema=mcp_input_schema(t),
                         url=dest_url,
                         fragment_name=fragment_name,
                     )
-                    for t in result.tools
+                    for t in tools
                 ]
 
 
@@ -482,13 +517,20 @@ async def call_mcp_tool_lob(
                 await session.initialize()
                 result = await session.call_tool(tool.name, kwargs)
                 if not result.content:
-                    logger.warning("Tool '%s' returned empty content", tool.name)
+                    logger.warning(
+                        "Tool '%s' on '%s' returned empty content", tool.name, tool.url
+                    )
                     return ""
                 first = result.content[0]
                 text = str(getattr(first, "text", ""))
 
-                if result.isError:
-                    logger.error("Tool '%s' returned an error: %s", tool.name, text)
+                if mcp_is_error(result):
+                    logger.error(
+                        "Tool '%s' on '%s' returned an error: %s",
+                        tool.name,
+                        tool.url,
+                        text,
+                    )
 
                 return text
 

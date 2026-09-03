@@ -46,6 +46,7 @@ ATTR_EXTENSION_VERSION = "sap.extension.extensionVersion"
 ATTR_EXTENSION_ITEM_NAME = "sap.extension.extension.item.name"
 ATTR_EXTENSION_URL = "sap.extension.extensionUrl"
 ATTR_SOLUTION_ID = "sap.extension.solution_id"
+ATTR_JOULE_STUDIO_GSID = "sap.extension.joule_studio_gsid"
 
 
 class ExtensionType(str, Enum):
@@ -72,6 +73,7 @@ def extension_context(
     item_name: str = "",
     extension_url: str = "",
     solution_id: str = "",
+    joule_studio_gsid: str = "",
 ) -> Generator[None, None, None]:
     """Set extension context in OTel baggage for propagation.
 
@@ -90,6 +92,7 @@ def extension_context(
     - ``sap.extension.extension.item.name``: The tool or hook name
     - ``sap.extension.extensionUrl``: The extension URL (when provided)
     - ``sap.extension.solution_id``: The solution ID (when provided)
+    - ``sap.extension.joule_studio_gsid``: The global solution ID of Joule Studio (when provided)
 
     Args:
         capability_id: The capability ID for the extension
@@ -101,7 +104,8 @@ def extension_context(
         extension_version: The version of the extension (e.g. ``"1"``).
         item_name: The name of the specific tool or hook being called.
         extension_url: The build extension URL (empty string if not available).
-        solution_id: The build solution ID (empty string if not available).
+        solution_id: The solution ID (empty string if not available).
+        joule_studio_gsid: The global solution ID of Joule Studio (empty string if not available).
 
     Yields:
         None. The context is active for the duration of the with block.
@@ -121,6 +125,7 @@ def extension_context(
             extension_version="1",
             item_name="create_ticket",
             solution_id="my-solution-42",
+            joule_studio_gsid="gsid-value",
         ):
             result = await mcp_client.call_tool("create_ticket", args)
         ```
@@ -141,6 +146,10 @@ def extension_context(
         ctx = baggage.set_baggage(ATTR_EXTENSION_URL, extension_url, context=ctx)
     if solution_id:
         ctx = baggage.set_baggage(ATTR_SOLUTION_ID, solution_id, context=ctx)
+    if joule_studio_gsid:
+        ctx = baggage.set_baggage(
+            ATTR_JOULE_STUDIO_GSID, joule_studio_gsid, context=ctx
+        )
 
     token = attach(ctx)
     try:
@@ -168,6 +177,7 @@ def get_extension_context() -> dict[str, Any] | None:
         - ``item_name``: The tool or hook name
         - ``extension_url``: The extension URL (empty string if not set)
         - ``solution_id``: The solution ID (empty string if not set)
+        - ``joule_studio_gsid``: The global solution ID of Joule Studio (empty string if not set)
 
         Returns ``None`` if not in an extension context.
 
@@ -194,6 +204,7 @@ def get_extension_context() -> dict[str, Any] | None:
         "item_name": baggage.get_baggage(ATTR_EXTENSION_ITEM_NAME),
         "extension_url": baggage.get_baggage(ATTR_EXTENSION_URL) or "",
         "solution_id": baggage.get_baggage(ATTR_SOLUTION_ID) or "",
+        "joule_studio_gsid": baggage.get_baggage(ATTR_JOULE_STUDIO_GSID) or "",
     }
 
 
@@ -227,6 +238,7 @@ _BAGGAGE_LOG_FIELDS = [
     (ATTR_EXTENSION_ITEM_NAME, "ext_item_name"),
     (ATTR_EXTENSION_URL, "ext_extension_url"),
     (ATTR_SOLUTION_ID, "ext_solution_id"),
+    (ATTR_JOULE_STUDIO_GSID, "ext_joule_studio_gsid"),
 ]
 
 
@@ -239,14 +251,14 @@ def resolve_source_info(
     key: str,
     source_mapping: dict[str, Any] | None,
     fallback_name: str,
-) -> tuple[str, str, str, str, str]:
-    """Resolve extension name, id, version, url, and solution_id from a source mapping.
+) -> tuple[str, str, str, str, str, str]:
+    """Resolve extension name, id, version, url, solution_id, and joule_studio_gsid from a source mapping.
 
     Source mapping values may be ``ExtensionSourceInfo`` dataclass instances
     (with attributes ``extension_name``, ``extension_id``,
-    ``extension_version``, ``extension_url``, ``solution_id``) or plain dicts
+    ``extension_version``, ``extension_url``, ``solution_id``, ``joule_studio_gsid``) or plain dicts
     with camelCase keys (``extensionName``, ``extensionId``,
-    ``extensionVersion``, ``extensionUrl``, ``solutionId``).
+    ``extensionVersion``, ``extensionUrl``, ``solutionId``, ``jouleStudioGsid``).
 
     Falls back to *fallback_name* for the name and empty strings for other
     fields when the key is not found in the mapping.
@@ -260,11 +272,11 @@ def resolve_source_info(
             name is empty.
 
     Returns:
-        Tuple of ``(extension_name, extension_id, extension_version, extension_url, solution_id)``.
+        Tuple of ``(extension_name, extension_id, extension_version, extension_url, solution_id, joule_studio_gsid)``.
     """
     info = (source_mapping or {}).get(key)
     if info is None:
-        return (fallback_name or "unknown", "", "", "", "")
+        return (fallback_name or "unknown", "", "", "", "", "")
     # SDK ExtensionSourceInfo dataclass (duck-typed to avoid circular import)
     if hasattr(info, "extension_name"):
         return (
@@ -273,6 +285,7 @@ def resolve_source_info(
             str(info.extension_version) if info.extension_version else "",
             getattr(info, "extension_url", "") or "",
             getattr(info, "solution_id", "") or "",
+            getattr(info, "joule_studio_gsid", "") or "",
         )
     # Plain dict with camelCase keys (older SDK or manual construction)
     if isinstance(info, dict):
@@ -282,8 +295,9 @@ def resolve_source_info(
             str(info.get("extensionVersion", "")) or "",
             info.get("extensionUrl") or "",
             info.get("solutionId") or "",
+            info.get("jouleStudioGsid") or "",
         )
-    return (fallback_name or "unknown", "", "", "", "")
+    return (fallback_name or "unknown", "", "", "", "", "")
 
 
 # ---------------------------------------------------------------------------
@@ -300,6 +314,7 @@ def build_extension_span_attributes(
     item_name: str,
     extension_url: str = "",
     solution_id: str = "",
+    joule_studio_gsid: str = "",
 ) -> dict[str, Any]:
     """Build the full set of ``sap.extension.*`` span attributes.
 
@@ -311,7 +326,8 @@ def build_extension_span_attributes(
         capability: Extension capability ID (e.g. ``"default"``).
         item_name: Name of the specific tool or hook being called.
         extension_url: Build extension URL (empty string if not available).
-        solution_id: Build solution ID (empty string if not available).
+        solution_id: Solution ID (empty string if not available).
+        joule_studio_gsid: Global solution ID (empty string if not available).
 
     Returns:
         Dict with all ``sap.extension.*`` attribute keys.
@@ -329,6 +345,8 @@ def build_extension_span_attributes(
         attrs[ATTR_EXTENSION_URL] = extension_url
     if solution_id:
         attrs[ATTR_SOLUTION_ID] = solution_id
+    if joule_studio_gsid:
+        attrs[ATTR_JOULE_STUDIO_GSID] = joule_studio_gsid
     return attrs
 
 
@@ -447,9 +465,14 @@ async def call_extension_tool(
     See Also:
         :func:`call_extension_hook` for hook-based extensions.
     """
-    resolved_name, resolved_id, resolved_version, resolved_url, resolved_solution_id = (
-        resolve_source_info(tool_name, source_mapping, "unknown")
-    )
+    (
+        resolved_name,
+        resolved_id,
+        resolved_version,
+        resolved_url,
+        resolved_solution_id,
+        resolved_joule_studio_gsid,
+    ) = resolve_source_info(tool_name, source_mapping, "unknown")
 
     attrs = build_extension_span_attributes(
         resolved_name,
@@ -460,6 +483,7 @@ async def call_extension_tool(
         tool_name,
         extension_url=resolved_url,
         solution_id=resolved_solution_id,
+        joule_studio_gsid=resolved_joule_studio_gsid,
     )
 
     t0 = time.monotonic()
@@ -474,6 +498,7 @@ async def call_extension_tool(
                 item_name=tool_name,
                 extension_url=resolved_url,
                 solution_id=resolved_solution_id,
+                joule_studio_gsid=resolved_joule_studio_gsid,
             ),
             _tracer.start_as_current_span(
                 f"extension_tool {tool_name}",
@@ -526,9 +551,14 @@ async def call_extension_hook(
     Returns:
         The hook's response.
     """
-    resolved_name, resolved_id, resolved_version, resolved_url, resolved_solution_id = (
-        resolve_source_info(hook_id, source_mapping, extension_name)
-    )
+    (
+        resolved_name,
+        resolved_id,
+        resolved_version,
+        resolved_url,
+        resolved_solution_id,
+        resolved_joule_studio_gsid,
+    ) = resolve_source_info(hook_id, source_mapping, extension_name)
 
     item_name = getattr(hook, "name", None) or hook_id
 
@@ -541,6 +571,7 @@ async def call_extension_hook(
         item_name,
         extension_url=resolved_url,
         solution_id=resolved_solution_id,
+        joule_studio_gsid=resolved_joule_studio_gsid,
     )
 
     t0 = time.monotonic()
@@ -555,6 +586,7 @@ async def call_extension_hook(
                 item_name=item_name,
                 extension_url=resolved_url,
                 solution_id=resolved_solution_id,
+                joule_studio_gsid=resolved_joule_studio_gsid,
             ),
             _tracer.start_as_current_span(
                 f"extension_hook {item_name}",

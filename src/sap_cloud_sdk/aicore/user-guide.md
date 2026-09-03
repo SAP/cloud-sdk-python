@@ -47,6 +47,141 @@ set_aicore_config(instance_name="aicore-production")
 
 ---
 
+## Routing Modes
+
+`set_aicore_config()` detects which routing mode to activate based on environment variables.
+**Agent code is identical in all three modes** — the deployer controls routing by choosing which
+env vars to inject.
+
+### Direct mode (default)
+
+No extra env vars required. Credentials are loaded from the mounted K8s secret volume
+(`/etc/secrets/appfnd/aicore/<instance>/`) or from `AICORE_*` environment variables.
+This is the standard mode for agents deployed on BTP managed runtime.
+
+```python
+set_aicore_config()  # reads mounted secret or AICORE_* env vars
+```
+
+### Proxy mode (`AICORE_PROXY_URL`)
+
+Set `AICORE_PROXY_URL` to route all LiteLLM calls through a LiteLLM-compatible proxy.
+No AI Core credentials are written to the process environment — the proxy handles
+authentication. Optionally set `AICORE_PROXY_API_KEY` for proxy-level auth.
+
+```bash
+# Injected by the deployer (e.g. K8s ConfigMap / Helm values)
+AICORE_PROXY_URL=https://your-litellm-proxy.example.com
+AICORE_PROXY_API_KEY=sk-...  # optional
+```
+
+```python
+set_aicore_config()  # detects AICORE_PROXY_URL, sets litellm.api_base
+# AICORE_CLIENT_SECRET is NOT written to env in this mode
+```
+
+Model strings (`sap/<model>`) are passed verbatim — no rewriting.
+
+### Destination mode (`AICORE_DESTINATION_NAME`)
+
+Set `AICORE_DESTINATION_NAME` to load AI Core credentials at startup from a BTP Destination
+Service destination. The deployer only needs to inject Destination Service binding credentials;
+the AI Core `client_secret` never needs to be in the K8s Secret directly.
+
+```bash
+AICORE_DESTINATION_NAME=aicore-destination  # name of the BTP destination
+```
+
+```python
+set_aicore_config()  # calls Destination Service, writes AICORE_* env vars
+```
+
+The destination must use **OAuth2ClientCredentials** authentication with `clientId`,
+`clientSecret`, and `tokenServiceURL` as destination configuration properties.
+
+---
+
+## Credential Rotation
+
+BTP rotates AI Core service binding credentials automatically. The SDK
+handles this transparently — no pod restart required.
+
+### Reactive reload (completion wrapper)
+
+`sap_cloud_sdk.aicore.completion` / `acompletion` catch `AuthenticationError`
+(HTTP 401), reload credentials via `set_aicore_config()`, and retry the call
+once. The caller never sees the error.
+
+```python
+from sap_cloud_sdk.aicore import completion, set_aicore_config
+
+set_aicore_config()
+
+# 401s are retried transparently — no extra code needed
+response = completion(model="sap/anthropic--claude-4.5-sonnet", messages=[...])
+```
+
+### Proactive reload (recommended for all agents)
+
+`watch_aicore_config()` starts a daemon thread that polls the mounted secret
+directory every 60 seconds. When the directory mtime changes (Kubernetes
+performs an atomic symlink swap on rotation), it calls `set_aicore_config()`
+before the cached OAuth token expires — so agents never see a 401 at all.
+
+```python
+from sap_cloud_sdk.aicore import set_aicore_config, watch_aicore_config
+
+set_aicore_config()    # load credentials at startup
+watch_aicore_config()  # proactive reload on secret rotation
+```
+
+To stop the watcher cleanly at shutdown, pass a `stop_event` (alternative form — pick one):
+
+```python
+import threading
+from sap_cloud_sdk.aicore import set_aicore_config, watch_aicore_config
+
+_stop = threading.Event()
+set_aicore_config()
+watch_aicore_config(stop_event=_stop)
+# at shutdown: _stop.set()
+```
+
+### LangGraph / ChatLiteLLM agents
+
+`ChatLiteLLM` (used in LangGraph agent templates) calls `litellm.completion`
+directly, bypassing the SDK's reactive handler. Two options:
+
+**Option A — proactive watcher only (recommended, one line):**
+
+```python
+from sap_cloud_sdk.aicore import set_aicore_config, watch_aicore_config
+
+set_aicore_config()
+watch_aicore_config()   # ADD THIS — no other changes needed
+```
+
+**Option B — also add reactive reload for ChatLiteLLM:**
+
+```python
+from sap_cloud_sdk.aicore import (
+    set_aicore_config,
+    patch_litellm_for_credential_rotation,
+    watch_aicore_config,
+)
+
+set_aicore_config()
+patch_litellm_for_credential_rotation()   # patches litellm.completion globally
+watch_aicore_config()
+```
+
+`patch_litellm_for_credential_rotation()` wraps `litellm.completion` /
+`litellm.acompletion` globally so every caller in the process — including
+`ChatLiteLLM` — gets transparent 401 reload. Idempotent; call it once at
+startup.
+
+---
+
 ## What It Does
 
 The `set_aicore_config()` function:

@@ -193,7 +193,7 @@ class HttpTransport(Transport):
                 )
             }
 
-            return self._session.post(
+            return self._session.post(  # ty: ignore[invalid-argument-type]
                 url,
                 data=request.to_form_fields(),
                 files=files,

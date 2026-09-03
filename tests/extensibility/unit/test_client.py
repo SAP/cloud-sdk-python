@@ -277,7 +277,8 @@ def _success_payload(workflow_id: str = "wf-001") -> str:
                                             "json": {
                                                 "message_id": "msg-1",
                                                 "context_id": "ctx-1",
-                                                "role": 2,
+                                                "role": "agent",
+                                                "parts": [{"kind": "text", "text": ""}],
                                             }
                                         }
                                     ]
@@ -311,7 +312,8 @@ def _poll_success_payload() -> str:
                                             "json": {
                                                 "message_id": "msg-2",
                                                 "context_id": "ctx-1",
-                                                "role": 2,
+                                                "role": "agent",
+                                                "parts": [{"kind": "text", "text": ""}],
                                             }
                                         }
                                     ]

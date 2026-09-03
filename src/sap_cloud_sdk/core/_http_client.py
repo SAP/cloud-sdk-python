@@ -91,6 +91,7 @@ class XsuaaAuthProvider(AuthProvider):
         has_changed = getattr(self._config_factory, "has_changed", None)
         if callable(has_changed) and has_changed():
             with self._lock:
+                logger.info("Invalidating token cache due to secret rotation")
                 self._invalidate_all_unsafe()
 
         with self._lock:
@@ -104,6 +105,12 @@ class XsuaaAuthProvider(AuthProvider):
 
     def _fetch_token(self, tenant_subdomain: Optional[str]) -> OAuth2Session:
         self._config = self._config_factory()
+        logger.debug(
+            "Fetching new OAuth2 token from %s (tenant=%r, base_url=%r)",
+            self._config.token_url,
+            tenant_subdomain,
+            getattr(self._config, "base_url", None),
+        )
 
         token_url = self._config.token_url
         identityzone = self._config.identityzone

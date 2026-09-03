@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+import logging
 import os
 from typing import Any, Callable, Generic, Optional, Type, TypeVar
 from sap_cloud_sdk.core.secret_resolver.resolver import resolve_base_mount
+
+logger = logging.getLogger(__name__)
 
 C = TypeVar("C")
 
@@ -80,4 +83,11 @@ class ConfigFactory(Generic[C]):
             return False
         changed = self._last_mtime is not None and mtime != self._last_mtime
         self._last_mtime = mtime
+        if changed:
+            logger.info(
+                "Secret rotation detected for %s/%s (mtime changed to %.3f)",
+                self._module,
+                self._instance,
+                mtime,
+            )
         return changed

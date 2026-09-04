@@ -29,12 +29,29 @@ jobs:
       - name: Read package name and version from pyproject.toml
         id: metadata
         run: |
-          pip install toml
+          python -m pip install toml packaging
           PKG_NAME=$(python -c "import toml; print(toml.load('pyproject.toml')['project']['name'])")
           VERSION=$(python -c "import toml; print(toml.load('pyproject.toml')['project']['version'])")
           echo "Publishing $PKG_NAME version $VERSION to PyPI"
           echo "name=$PKG_NAME" >> $GITHUB_OUTPUT
           echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Validate release version, tag, and pre-release status
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PACKAGE_VERSION: ${{ steps.metadata.outputs.version }}
+          RELEASE_ID: ${{ github.event.release.id }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          # Read the current release state so corrected settings are picked up on rerun
+          CURRENT_PRERELEASE=$(
+            gh api "repos/$GITHUB_REPOSITORY/releases/$RELEASE_ID" \
+              --jq '.prerelease'
+          )
+          export CURRENT_PRERELEASE
+
+          python .github/scripts/validate_release.py \
+            "$PACKAGE_VERSION" "$RELEASE_TAG" "$CURRENT_PRERELEASE"
 
       - name: Check if version already exists on PyPI
         run: |

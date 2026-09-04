@@ -25,7 +25,9 @@ from sap_cloud_sdk.core.telemetry._provider import (
     _create_log_exporter,
     _merge_sdk_resource_into_log_provider,
     _root_logger_has_otel_handler,
+    _make_logging_handler,
 )
+from sap_cloud_sdk.core.telemetry.log_filters.identity import IdentityLogFilter
 from sap_cloud_sdk.core.telemetry.config import InstrumentationConfig
 
 _DELTA_TEMPORALITY = {
@@ -399,3 +401,74 @@ class TestRootLoggerHasOtelHandler:
             assert _root_logger_has_otel_handler() is True
         finally:
             root.handlers = original
+
+
+class TestMakeLoggingHandler:
+    def test_returns_logging_handler(self):
+        from opentelemetry.instrumentation.logging.handler import LoggingHandler
+
+        mock_provider = MagicMock()
+        handler = _make_logging_handler(mock_provider)
+        assert isinstance(handler, LoggingHandler)
+
+    def test_installs_identity_filter(self):
+        mock_provider = MagicMock()
+        handler = _make_logging_handler(mock_provider)
+        assert any(isinstance(f, IdentityLogFilter) for f in handler.filters)
+
+
+class TestSetupLogProviderInstallsFilter:
+    @pytest.fixture(autouse=True)
+    def reset_log_provider(self):
+        import sap_cloud_sdk.core.telemetry._provider as provider_module
+        provider_module._log_provider = None
+        yield
+        provider_module._log_provider = None
+
+    def test_normal_path_installs_tenant_id_filter(self):
+        from opentelemetry.instrumentation.logging.handler import LoggingHandler
+
+        installed_handlers = []
+
+        def capture_add_handler(handler):
+            installed_handlers.append(handler)
+
+        mock_root = MagicMock()
+        mock_root.addHandler.side_effect = capture_add_handler
+
+        with patch("sap_cloud_sdk.core.telemetry._provider.get_config", return_value=_ENABLED_CONFIG):
+            with patch("sap_cloud_sdk.core.telemetry._provider.Resource"):
+                with patch("sap_cloud_sdk.core.telemetry._provider._create_log_exporter"):
+                    with patch("sap_cloud_sdk.core.telemetry._provider.BatchLogRecordProcessor"):
+                        with patch("sap_cloud_sdk.core.telemetry._provider.get_logger_provider", return_value=MagicMock()):
+                            with patch("sap_cloud_sdk.core.telemetry._provider.set_logger_provider"):
+                                with patch("logging.getLogger", return_value=mock_root):
+                                    setup_log_provider()
+
+        assert len(installed_handlers) == 1
+        handler = installed_handlers[0]
+        assert isinstance(handler, LoggingHandler)
+        assert any(isinstance(f, IdentityLogFilter) for f in handler.filters)
+
+    def test_merge_path_installs_tenant_id_filter(self):
+        from opentelemetry.sdk._logs import LoggerProvider as _LP
+        from opentelemetry.instrumentation.logging.handler import LoggingHandler
+
+        external = MagicMock(spec=_LP)
+        installed_handlers = []
+
+        mock_root = MagicMock()
+        mock_root.addHandler.side_effect = lambda h: installed_handlers.append(h)
+
+        with patch("sap_cloud_sdk.core.telemetry._provider.get_config", return_value=_ENABLED_CONFIG):
+            with patch("sap_cloud_sdk.core.telemetry._provider.Resource"):
+                with patch("sap_cloud_sdk.core.telemetry._provider.get_logger_provider", return_value=external):
+                    with patch("sap_cloud_sdk.core.telemetry._provider._merge_sdk_resource_into_log_provider"):
+                        with patch("sap_cloud_sdk.core.telemetry._provider._root_logger_has_otel_handler", return_value=False):
+                            with patch("logging.getLogger", return_value=mock_root):
+                                setup_log_provider()
+
+        assert len(installed_handlers) == 1
+        handler = installed_handlers[0]
+        assert isinstance(handler, LoggingHandler)
+        assert any(isinstance(f, IdentityLogFilter) for f in handler.filters)

@@ -43,6 +43,7 @@ from sap_cloud_sdk.core.telemetry.config import (
 )
 from sap_cloud_sdk.core._version import get_version
 from sap_cloud_sdk.core.telemetry.constants import SDK_PACKAGE_NAME
+from sap_cloud_sdk.core.telemetry.log_filters.identity import IdentityLogFilter
 
 logger = logging.getLogger(__name__)
 
@@ -114,6 +115,12 @@ def shutdown() -> None:
         _meter_provider = None
 
 
+def _make_logging_handler(provider: LoggerProvider) -> LoggingHandler:
+    handler = LoggingHandler(logger_provider=provider)
+    handler.addFilter(IdentityLogFilter())
+    return handler
+
+
 def setup_log_provider() -> Optional[LoggerProvider]:
     """Set up the global OTel LoggerProvider using the shared resource attributes.
 
@@ -143,7 +150,7 @@ def setup_log_provider() -> Optional[LoggerProvider]:
             )
             _merge_sdk_resource_into_log_provider(existing, resource)
             if not _root_logger_has_otel_handler():
-                logging.getLogger().addHandler(LoggingHandler(logger_provider=existing))
+                logging.getLogger().addHandler(_make_logging_handler(existing))
             _log_provider = existing
         else:
             provider = LoggerProvider(resource=resource)
@@ -151,7 +158,7 @@ def setup_log_provider() -> Optional[LoggerProvider]:
                 BatchLogRecordProcessor(_create_log_exporter())
             )
             set_logger_provider(provider)
-            logging.getLogger().addHandler(LoggingHandler(logger_provider=provider))
+            logging.getLogger().addHandler(_make_logging_handler(provider))
             _log_provider = provider
 
         logger.info(

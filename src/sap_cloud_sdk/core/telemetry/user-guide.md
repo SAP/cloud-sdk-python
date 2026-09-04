@@ -380,31 +380,6 @@ auto_instrument(middlewares=[StarletteIASTelemetryMiddleware(app=app)])
 
 ---
 
-## Multi-tenancy
-
-`sap.tenancy.tenant_id` and `user.id` are automatically propagated to all three OTel signal types — traces, metrics, and logs — when a request context is active. No manual attribute setting is required.
-
-**For apps using `bootstrap()`** (recommended):
-
-`IASContextProvider` extracts the tenant and user from the `Authorization: Bearer` header and populates the runtime context. The SDK reads from this context automatically.
-
-**For Starlette/FastAPI apps using `StarletteIASTelemetryMiddleware`:**
-
-The middleware parses the IAS JWT on each request and makes the identity available as a fallback when the runtime context is not populated.
-
-**For other frameworks:**
-
-Call `set_tenant_id()` manually at the request boundary. Note: this only affects SDK-recorded metrics and spans that explicitly read it — use `bootstrap()` or a middleware for full coverage across all signal types.
-
-```python
-from sap_cloud_sdk.core.telemetry import set_tenant_id
-
-def handle_request(request):
-    set_tenant_id(extract_tenant_from_jwt(request))
-```
-
-Identity attributes are omitted on signals emitted outside a request context (e.g. at startup) — no empty-string values are injected.
-
 ## Configuration
 
 ### Production

@@ -6,9 +6,7 @@ then normalises into an ``AgentMemoryConfig``.
 Mount path convention::
 
     /etc/secrets/appfnd/hana-agent-memory/default/application_url     (provider)
-    /etc/secrets/appfnd/hana-agent-memory/<tenant>/application_url     (subscriber)
     /etc/secrets/appfnd/hana-agent-memory/default/uaa
-    /etc/secrets/appfnd/hana-agent-memory/<tenant>/uaa
 
 ``application_url`` is the Agent Memory service base URL (plain string).
 ``uaa`` is a JSON string with OAuth2 credentials containing at minimum:
@@ -18,8 +16,6 @@ Env fallback convention::
 
     CLOUD_SDK_CFG_HANA_AGENT_MEMORY_DEFAULT_APPLICATION_URL
     CLOUD_SDK_CFG_HANA_AGENT_MEMORY_DEFAULT_UAA
-    CLOUD_SDK_CFG_HANA_AGENT_MEMORY_<TENANT>_APPLICATION_URL
-    CLOUD_SDK_CFG_HANA_AGENT_MEMORY_<TENANT>_UAA
 """
 
 import json

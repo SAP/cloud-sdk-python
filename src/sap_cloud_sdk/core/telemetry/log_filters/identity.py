@@ -7,14 +7,20 @@ from sap_cloud_sdk.core.telemetry.constants import ATTR_SAP_TENANT_ID, ATTR_USER
 
 def _resolve_log_attributes() -> dict:
     try:
-        from sap_cloud_sdk.core.runtime_context import get_context, GLOBAL_TENANT_ID, USER_ID
+        from sap_cloud_sdk.core.runtime_context import (
+            get_context,
+            GLOBAL_TENANT_ID,
+            USER_ID,
+        )
         from sap_cloud_sdk.ias import get_auth_context
 
         ctx = get_context()
         claims = get_auth_context()
         candidates = {
-            ATTR_SAP_TENANT_ID: ctx.get(GLOBAL_TENANT_ID) or (claims and claims.sap_gtid),
-            ATTR_USER_ID: ctx.get(USER_ID) or (claims and claims.user_uuid),
+            ATTR_SAP_TENANT_ID: ctx.get(GLOBAL_TENANT_ID)
+            or (claims and claims.sap_gtid),
+            ATTR_USER_ID: ctx.get(USER_ID)
+            or (claims and claims.user_uuid),
         }
         return {k: v for k, v in candidates.items() if v}
     except Exception:

@@ -13,6 +13,7 @@ class Module(str, Enum):
     AUDITLOG = "auditlog"
     AUDITLOG_NG = "auditlog_ng"
     BOOTSTRAP = "bootstrap"
+    CACHE = "cache"
     DATA_ANONYMIZATION = "data_anonymization"
     DESTINATION = "destination"
     DMS = "dms"

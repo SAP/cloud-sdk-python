@@ -38,6 +38,7 @@ dependencies = [
     "opentelemetry-instrumentation-flask~=0.64b0",
     "mcp>=1.1.0",
     "cryptography>=46.0.3",
+    "cachetools~=5.5.2",
 ]
 
 [project.optional-dependencies]

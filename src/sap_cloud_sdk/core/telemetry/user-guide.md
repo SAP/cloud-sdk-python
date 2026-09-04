@@ -42,21 +42,6 @@ with invoke_agent_span(
     # autoinstrumented LLM call is a child of this span
     response = client.chat.completions.create(...)
 ```
-
-### 3. Tenant and user identity propagates automatically
-
-For Starlette/FastAPI apps, wire `StarletteIASTelemetryMiddleware` once and `sap.tenancy.tenant_id` / `user.id` appear on all traces and logs automatically:
-
-```python
-from sap_cloud_sdk.core.telemetry import auto_instrument
-from sap_cloud_sdk.core.telemetry.middleware import StarletteIASTelemetryMiddleware
-
-app = Starlette(...)
-auto_instrument(middlewares=[StarletteIASTelemetryMiddleware(app=app)])
-```
-
-Or use `bootstrap()` with `IASContextProvider` for framework-agnostic identity extraction.
-
 ---
 
 ## Library instrumentation

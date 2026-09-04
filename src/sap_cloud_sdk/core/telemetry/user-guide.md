@@ -55,7 +55,7 @@ app = Starlette(...)
 auto_instrument(middlewares=[StarletteIASTelemetryMiddleware(app=app)])
 ```
 
-Or use `bootstrap()` with `IASContextProvider` for framework-agnostic identity extraction. See [Multi-tenancy](#multi-tenancy) for details.
+Or use `bootstrap()` with `IASContextProvider` for framework-agnostic identity extraction.
 
 ---
 

@@ -279,6 +279,7 @@ class TestHttpTransport:
         transport._tmp_key_file = None
 
         cert_path = transport._resolve_cert()
+        assert isinstance(cert_path, str)
 
         assert isinstance(cert_path, str)
         assert Path(cert_path).exists()
@@ -329,6 +330,7 @@ class TestHttpTransport:
         transport._tmp_key_file = None
 
         cert_path = transport._resolve_cert()
+        assert isinstance(cert_path, str)
 
         assert isinstance(cert_path, str)
         assert Path(cert_path).exists()

@@ -19,8 +19,7 @@ def _resolve_log_attributes() -> dict:
         candidates = {
             ATTR_SAP_TENANT_ID: ctx.get(GLOBAL_TENANT_ID)
             or (claims and claims.sap_gtid),
-            ATTR_USER_ID: ctx.get(USER_ID)
-            or (claims and claims.user_uuid),
+            ATTR_USER_ID: ctx.get(USER_ID) or (claims and claims.user_uuid),
         }
         return {k: v for k, v in candidates.items() if v}
     except Exception:

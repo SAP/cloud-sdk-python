@@ -85,16 +85,17 @@ class TestCreateClient:
         assert isinstance(client, AgentMemoryClient)
         assert client._http is not None
 
-    def test_subscriber_strategy_loads_tenant_binding(self, monkeypatch):
-        """Factory with SUBSCRIBER loads the tenant binding."""
+    def test_subscriber_strategy_loads_default_binding(self, monkeypatch):
+        """Factory with SUBSCRIBER loads the default binding (native implementation)."""
         import json
         monkeypatch.setenv(
-            "CLOUD_SDK_CFG_HANA_AGENT_MEMORY_ACME_CORP_APPLICATION_URL",
-            "http://acme.memory.example.com",
+            "CLOUD_SDK_CFG_HANA_AGENT_MEMORY_DEFAULT_APPLICATION_URL",
+            "http://memory.example.com",
         )
         monkeypatch.setenv(
-            "CLOUD_SDK_CFG_HANA_AGENT_MEMORY_ACME_CORP_UAA",
-            json.dumps({"url": "http://acme.auth.example.com", "clientid": "c", "clientsecret": "s"}),
+            "CLOUD_SDK_CFG_HANA_AGENT_MEMORY_DEFAULT_UAA",
+            json.dumps({"url": "http://auth.example.com", "clientid": "c", "clientsecret": "s",
+                        "identityzone": "provider-zone"}),
         )
         with patch("sap_cloud_sdk.agent_memory._build_agent_memory_http") as mock_build:
             mock_build.return_value = Mock(spec=HttpClient)
@@ -103,7 +104,7 @@ class TestCreateClient:
                 tenant="acme-corp",
             )
         assert isinstance(client, AgentMemoryClient)
-        assert client._http is not None
+        assert client._tenant == "acme-corp"
 
     def test_provider_strategy_loads_default_binding(self, monkeypatch):
         """Factory with PROVIDER loads the default binding."""
@@ -167,11 +168,77 @@ class TestAccessStrategy:
         mock_http.request.assert_called_once()
 
 
+# ── Access strategy ───────────────────────────────────────────────────────────
+
+
+class TestAccessStrategy:
+    # ── Init-time validation ──────────────────────────────────────────────────
+
+    def test_subscriber_without_tenant_raises_at_init(self):
+        """SUBSCRIBER without tenant raises AgentMemoryValidationError at construction."""
+        http = Mock(spec=HttpClient)
+        with pytest.raises(AgentMemoryValidationError, match="tenant"):
+            AgentMemoryClient(http, access_strategy=AccessStrategy.SUBSCRIBER)
+
+    def test_subscriber_with_tenant_constructs_successfully(self):
+        """SUBSCRIBER with tenant constructs without error and stores tenant."""
+        client, _ = _make_subscriber_client("acme")
+        assert client._tenant == "acme"
+
+    def test_provider_constructs_without_tenant(self):
+        """PROVIDER constructs without tenant and stores None."""
+        client, _ = _make_client()
+        assert client._tenant is None
+
+    def test_subscriber_with_invalid_tenant_raises_value_error(self):
+        """SUBSCRIBER with a malformed tenant subdomain raises ValueError at construction."""
+        http = Mock(spec=HttpClient)
+        for bad in ("-leading", "has.dot", "trailing-"):
+            with pytest.raises(ValueError, match="Invalid tenant_subdomain"):
+                AgentMemoryClient(
+                    http,
+                    access_strategy=AccessStrategy.SUBSCRIBER,
+                    tenant=bad,
+                )
+
+    # ── Transport routing ─────────────────────────────────────────────────────
+
+    def test_subscriber_passes_tenant_to_transport(self):
+        """SUBSCRIBER client passes tenant_subdomain to the HTTP layer on every call."""
+        client, mock_http = _make_subscriber_client("acme")
+        mock_http.request.return_value = _make_response(200, json_data={
+            "id": "m1", "agentID": "a", "invokerID": "u", "content": "x",
+        })
+
+        client.add_memory("a", "u", "x")
+
+        assert mock_http.request.call_args[1]["tenant_subdomain"] == "acme"
+
+    def test_provider_passes_none_tenant_to_transport(self):
+        """PROVIDER client passes tenant_subdomain=None to the HTTP layer."""
+        client, mock_http = _make_client()
+        mock_http.request.return_value = _make_response(200, json_data={
+            "id": "m1", "agentID": "a", "invokerID": "u", "content": "x",
+        })
+
+        client.add_memory("a", "u", "x")
+
+        assert mock_http.request.call_args[1]["tenant_subdomain"] is None
+
+    def test_list_memories_passes_tenant_to_transport(self):
+        """list_memories passes tenant_subdomain from client config."""
+        client, mock_http = _make_subscriber_client("sub")
+        mock_http.request.return_value = _make_response(200, json_data={"value": []})
+
+        client.list_memories(agent_id="a")
+
+        assert mock_http.request.call_args[1]["tenant_subdomain"] == "sub"
+
+
 # ── Memory CRUD operations ────────────────────────────────────────────────────
 
 
 class TestMemoryCRUD:
-
     def test_add_memory_posts_correct_payload(self):
         """add_memory sends required and optional fields in the POST body."""
         client, mock_http = _make_client()
@@ -287,7 +354,6 @@ class TestMemoryCRUD:
 
 
 class TestListMemories:
-
     def test_returns_list_of_memories(self):
         """list_memories returns a list of Memory objects."""
         client, mock_http = _make_client()
@@ -433,7 +499,6 @@ class TestListMemories:
 
 
 class TestCountMemories:
-
     def test_returns_count_from_response(self):
         """count_memories returns the @odata.count value."""
         client, mock_http = _make_client()
@@ -479,14 +544,25 @@ class TestCountMemories:
 
 
 class TestSearchMemories:
-
     def test_returns_results_in_api_order(self):
         """search_memories returns results in the order returned by the API."""
         client, mock_http = _make_client()
         mock_http.request.return_value = _make_response(200, json_data={
             "value": [
-                {"id": "m1", "agentID": "a", "invokerID": "u", "content": "first", "similarity": 0.5},
-                {"id": "m2", "agentID": "a", "invokerID": "u", "content": "second", "similarity": 0.9},
+                {
+                    "id": "m1",
+                    "agentID": "a",
+                    "invokerID": "u",
+                    "content": "first",
+                    "similarity": 0.5,
+                },
+                {
+                    "id": "m2",
+                    "agentID": "a",
+                    "invokerID": "u",
+                    "content": "second",
+                    "similarity": 0.9,
+                },
             ]
         })
 
@@ -539,7 +615,6 @@ class TestSearchMemories:
 
 
 class TestMessageCRUD:
-
     def test_add_message_posts_correct_payload(self):
         """add_message sends required fields in the POST body."""
         client, mock_http = _make_client()
@@ -553,7 +628,11 @@ class TestMessageCRUD:
         })
 
         message = client.add_message(
-            "agent-a", "user-b", "conv-1", MessageRole.USER, "Hello!",
+            "agent-a",
+            "user-b",
+            "conv-1",
+            MessageRole.USER,
+            "Hello!",
         )
 
         assert isinstance(message, Message)
@@ -588,7 +667,9 @@ class TestMessageCRUD:
             "metadata": {"key": "val"},
         })
 
-        client.add_message("a", "u", "g", MessageRole.USER, "hi", metadata={"key": "val"})
+        client.add_message(
+            "a", "u", "g", MessageRole.USER, "hi", metadata={"key": "val"}
+        )
 
         assert mock_http.request.call_args[1]["json"]["metadata"] == {"key": "val"}
 
@@ -633,15 +714,18 @@ class TestMessageCRUD:
 
 
 class TestListMessages:
-
     def test_returns_list_of_messages(self):
         """list_messages returns a list of Message objects."""
         client, mock_http = _make_client()
         mock_http.request.return_value = _make_response(200, json_data={
             "value": [
                 {
-                    "id": "msg-1", "agentID": "a", "invokerID": "u",
-                    "messageGroup": "g", "role": "USER", "content": "hi",
+                    "id": "msg-1",
+                    "agentID": "a",
+                    "invokerID": "u",
+                    "messageGroup": "g",
+                    "role": "USER",
+                    "content": "hi",
                 },
             ],
         })
@@ -657,8 +741,10 @@ class TestListMessages:
         mock_http.request.return_value = _make_response(200, json_data={"value": []})
 
         client.list_messages(
-            agent_id="a", invoker_id="u",
-            message_group="conv-1", role="USER",
+            agent_id="a",
+            invoker_id="u",
+            message_group="conv-1",
+            role="USER",
         )
 
         params = _parse_call_params(mock_http.request.call_args)
@@ -795,7 +881,6 @@ class TestListMessages:
 
 
 class TestRetentionConfig:
-
     def test_get_retention_config(self):
         """get_retention_config sends GET to the retentionConfig endpoint."""
         client, mock_http = _make_client()
@@ -871,7 +956,6 @@ class TestContextManager:
 
 
 class TestMemoryValidation:
-
     def test_add_memory_raises_for_empty_agent_id(self):
         client, _ = _make_client()
         with pytest.raises(AgentMemoryValidationError, match="agent_id"):
@@ -919,7 +1003,6 @@ class TestMemoryValidation:
 
 
 class TestSearchMemoriesValidation:
-
     def test_raises_for_empty_agent_id(self):
         client, _ = _make_client()
         with pytest.raises(AgentMemoryValidationError, match="agent_id"):
@@ -972,7 +1055,6 @@ class TestSearchMemoriesValidation:
 
 
 class TestMessageValidation:
-
     def test_add_message_raises_for_empty_agent_id(self):
         client, _ = _make_client()
         with pytest.raises(AgentMemoryValidationError, match="agent_id"):
@@ -1015,7 +1097,6 @@ class TestMessageValidation:
 
 
 class TestRetentionConfigValidation:
-
     def test_update_raises_when_no_fields_provided(self):
         client, _ = _make_client()
         with pytest.raises(AgentMemoryValidationError, match="At least one"):
@@ -1050,7 +1131,6 @@ class TestRetentionConfigValidation:
 
 
 class TestFilterDefinitionValidation:
-
     def test_list_memories_raises_for_unsupported_target(self):
         client, _ = _make_client()
         with pytest.raises(AgentMemoryValidationError, match="target"):

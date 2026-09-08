@@ -42,6 +42,7 @@ from sap_cloud_sdk.agent_memory.exceptions import (
     AgentMemoryValidationError,
 )
 from sap_cloud_sdk.core._http_client import HttpClient, HttpMethod
+from sap_cloud_sdk.core._tenant import _validate_tenant_subdomain
 from sap_cloud_sdk.core.telemetry import Module, Operation, record_metrics
 
 logger = logging.getLogger(__name__)
@@ -82,11 +83,14 @@ class AgentMemoryClient:
     Do not instantiate directly — use :func:`sap_cloud_sdk.agent_memory.create_client`.
 
     Args:
-        http: Configured HttpClient for the Agent Memory service.
+        transport: HTTP transport loaded from the default service binding
+            (resolved once at construction time by
+            :func:`sap_cloud_sdk.agent_memory.create_client`).
         access_strategy: Tenant access strategy for all operations.
             Defaults to ``SUBSCRIBER``.
         tenant: Subscriber tenant subdomain. Required when
-            ``access_strategy=SUBSCRIBER``.
+            ``access_strategy=SUBSCRIBER``. The subscriber token URL is
+            derived from the provider binding's ``identityzone`` field.
     """
 
     def __init__(
@@ -100,12 +104,14 @@ class AgentMemoryClient:
             raise AgentMemoryValidationError(
                 "tenant is required when access_strategy=SUBSCRIBER"
             )
+        _validate_tenant_subdomain(tenant)
         if access_strategy is AccessStrategy.PROVIDER:
             logger.warning(
                 "AccessStrategy.PROVIDER is active: no tenant isolation will be applied. "
                 "Only use this strategy for provider-owned operations."
             )
         self._http = http
+        self._tenant = tenant if access_strategy is AccessStrategy.SUBSCRIBER else None
 
     def close(self) -> None:
         """Close the underlying HTTP session and release resources."""
@@ -199,7 +205,9 @@ class AgentMemoryClient:
         }
         if metadata is not None:
             payload["metadata"] = metadata
-        data = self._request(HttpMethod.POST, MEMORIES, json=payload)
+        data = self._request(
+            HttpMethod.POST, MEMORIES, json=payload, tenant_subdomain=self._tenant
+        )
         return Memory.from_dict(data)
 
     @record_metrics(Module.AGENT_MEMORY, Operation.AGENT_MEMORY_GET_MEMORY)
@@ -218,7 +226,9 @@ class AgentMemoryClient:
             AgentMemoryHttpError: If the request fails.
         """
         _require_non_empty(memory_id=memory_id)
-        data = self._request(HttpMethod.GET, f"{MEMORIES}({memory_id})")
+        data = self._request(
+            HttpMethod.GET, f"{MEMORIES}({memory_id})", tenant_subdomain=self._tenant
+        )
         return Memory.from_dict(data)
 
     @record_metrics(Module.AGENT_MEMORY, Operation.AGENT_MEMORY_UPDATE_MEMORY)
@@ -252,7 +262,12 @@ class AgentMemoryClient:
             payload["content"] = content
         if metadata is not None:
             payload["metadata"] = metadata
-        self._request(HttpMethod.PATCH, f"{MEMORIES}({memory_id})", json=payload)
+        self._request(
+            HttpMethod.PATCH,
+            f"{MEMORIES}({memory_id})",
+            json=payload,
+            tenant_subdomain=self._tenant,
+        )
 
     @record_metrics(Module.AGENT_MEMORY, Operation.AGENT_MEMORY_DELETE_MEMORY)
     def delete_memory(self, memory_id: str) -> None:
@@ -267,7 +282,9 @@ class AgentMemoryClient:
             AgentMemoryHttpError: If the request fails.
         """
         _require_non_empty(memory_id=memory_id)
-        self._request(HttpMethod.DELETE, f"{MEMORIES}({memory_id})")
+        self._request(
+            HttpMethod.DELETE, f"{MEMORIES}({memory_id})", tenant_subdomain=self._tenant
+        )
 
     @record_metrics(Module.AGENT_MEMORY, Operation.AGENT_MEMORY_LIST_MEMORIES)
     def list_memories(
@@ -315,7 +332,9 @@ class AgentMemoryClient:
             top=limit,
             skip=offset if offset else None,
         )
-        response = self._request(HttpMethod.GET, MEMORIES, params=params)
+        response = self._request(
+            HttpMethod.GET, MEMORIES, params=params, tenant_subdomain=self._tenant
+        )
         items, _ = extract_value_and_count(response)
         return [Memory.from_dict(item) for item in items]
 
@@ -340,7 +359,9 @@ class AgentMemoryClient:
             top=0,
             count=True,
         )
-        response = self._request(HttpMethod.GET, MEMORIES, params=params)
+        response = self._request(
+            HttpMethod.GET, MEMORIES, params=params, tenant_subdomain=self._tenant
+        )
         _, total = extract_value_and_count(response)
         return total or 0
 
@@ -387,7 +408,9 @@ class AgentMemoryClient:
             "threshold": threshold,
             "top": limit,
         }
-        response = self._request(HttpMethod.POST, MEMORY_SEARCH, json=payload)
+        response = self._request(
+            HttpMethod.POST, MEMORY_SEARCH, json=payload, tenant_subdomain=self._tenant
+        )
         items = response.get("value", [])
         return [SearchResult.from_dict(item) for item in items]
 
@@ -439,7 +462,9 @@ class AgentMemoryClient:
         }
         if metadata is not None:
             payload["metadata"] = metadata
-        data = self._request(HttpMethod.POST, MESSAGES, json=payload)
+        data = self._request(
+            HttpMethod.POST, MESSAGES, json=payload, tenant_subdomain=self._tenant
+        )
         return Message.from_dict(data)
 
     @record_metrics(Module.AGENT_MEMORY, Operation.AGENT_MEMORY_GET_MESSAGE)
@@ -458,7 +483,9 @@ class AgentMemoryClient:
             AgentMemoryHttpError: If the request fails.
         """
         _require_non_empty(message_id=message_id)
-        data = self._request(HttpMethod.GET, f"{MESSAGES}({message_id})")
+        data = self._request(
+            HttpMethod.GET, f"{MESSAGES}({message_id})", tenant_subdomain=self._tenant
+        )
         return Message.from_dict(data)
 
     @record_metrics(Module.AGENT_MEMORY, Operation.AGENT_MEMORY_DELETE_MESSAGE)
@@ -474,7 +501,11 @@ class AgentMemoryClient:
             AgentMemoryHttpError: If the request fails.
         """
         _require_non_empty(message_id=message_id)
-        self._request(HttpMethod.DELETE, f"{MESSAGES}({message_id})")
+        self._request(
+            HttpMethod.DELETE,
+            f"{MESSAGES}({message_id})",
+            tenant_subdomain=self._tenant,
+        )
 
     @record_metrics(Module.AGENT_MEMORY, Operation.AGENT_MEMORY_LIST_MESSAGES)
     def list_messages(
@@ -528,7 +559,9 @@ class AgentMemoryClient:
             top=limit,
             skip=offset if offset else None,
         )
-        response = self._request(HttpMethod.GET, MESSAGES, params=params)
+        response = self._request(
+            HttpMethod.GET, MESSAGES, params=params, tenant_subdomain=self._tenant
+        )
         items, _ = extract_value_and_count(response)
         return [Message.from_dict(item) for item in items]
 
@@ -544,9 +577,12 @@ class AgentMemoryClient:
             The current :class:`RetentionConfig`.
 
         Raises:
+            AgentMemoryValidationError: If tenant is missing for ``SUBSCRIBER``.
             AgentMemoryHttpError: If the request fails.
         """
-        data = self._request(HttpMethod.GET, RETENTION_CONFIG)
+        data = self._request(
+            HttpMethod.GET, RETENTION_CONFIG, tenant_subdomain=self._tenant
+        )
         return RetentionConfig.from_dict(data)
 
     @record_metrics(Module.AGENT_MEMORY, Operation.AGENT_MEMORY_UPDATE_RETENTION_CONFIG)
@@ -594,4 +630,9 @@ class AgentMemoryClient:
         if usage_log_days is not None:
             payload["usageLogDays"] = usage_log_days
 
-        self._request(HttpMethod.PATCH, RETENTION_CONFIG, json=payload)
+        self._request(
+            HttpMethod.PATCH,
+            RETENTION_CONFIG,
+            json=payload,
+            tenant_subdomain=self._tenant,
+        )

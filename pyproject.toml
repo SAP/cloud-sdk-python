@@ -81,6 +81,7 @@ dev = [
     "langchain-community>=0.3.0",
     "litellm>=1.40.0",
     "langchain-litellm>=0.6.6",
+    "pre-commit>=4.6.2",
 ]
 
 [tool.pytest.ini_options]

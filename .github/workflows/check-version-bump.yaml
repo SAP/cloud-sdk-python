@@ -18,6 +18,14 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+
+      - name: Install version comparison dependency
+        run: python -m pip install packaging
+
       - name: Check that version was bumped if src/ was modified
         run: |
           BASE_SHA="${{ github.event.pull_request.base.sha }}"
@@ -29,18 +37,10 @@ jobs:
             BASE_VERSION=$(git show "$BASE_SHA:pyproject.toml" | grep "^version = " | cut -d'"' -f2)
             HEAD_VERSION=$(git show "$HEAD_SHA:pyproject.toml" | grep "^version = " | cut -d'"' -f2)
 
-            if [ "$BASE_VERSION" = "$HEAD_VERSION" ]; then
-              echo "ERROR: Source files under src/ were modified but the version in pyproject.toml was not bumped (still $HEAD_VERSION)."
-              exit 1
-            fi
+            # Use PEP 440 ordering because sort -V ranks RCs above final releases
+            python .github/scripts/check_version_bump.py \
+              "$BASE_VERSION" "$HEAD_VERSION"
 
-            HIGHER=$(printf '%s\n' "$BASE_VERSION" "$HEAD_VERSION" | sort -V | tail -1)
-            if [ "$HIGHER" != "$HEAD_VERSION" ]; then
-              echo "ERROR: Version regression detected. Base is $BASE_VERSION but PR has $HEAD_VERSION."
-              exit 1
-            fi
-
-            echo "Version bump OK: $BASE_VERSION → $HEAD_VERSION"
           else
             echo "No source file changes under src/. Version bump not required."
           fi

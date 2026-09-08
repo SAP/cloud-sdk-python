@@ -182,10 +182,10 @@ class HttpTransport(Transport):
         try:
             if request.file_path is not None:
                 file_handle = open(request.file_path, "rb")
-                file_value = file_handle
-            else:
-                file_value = request.file_content
 
+            file_value: BinaryIO | bytes = (
+                file_handle if file_handle is not None else request.file_content or b""
+            )
             files = {
                 "file": (
                     request.resolved_file_name(),

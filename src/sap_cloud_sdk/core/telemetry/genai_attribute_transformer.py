@@ -107,6 +107,11 @@ class GenAIAttributeTransformer(SpanExporter):
         if not hasattr(span, "_attributes") or span._attributes is None:
             return
 
+        # BoundedAttributes (the default OTEL type) is immutable; copy to a plain dict
+        # so mutations below don't silently fail with TypeError.
+        if not isinstance(span._attributes, dict):
+            span._attributes = dict(span._attributes)
+
         attrs = cast(MutableMapping[str, Any], span._attributes)
 
         # Only consider spans that have traceloop.* or llm.* or gen_ai.prompt.* or gen_ai.completion.* attributes

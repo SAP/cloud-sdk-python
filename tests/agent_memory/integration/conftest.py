@@ -47,9 +47,9 @@ def agent_memory_client() -> AgentMemoryClient:
     try:
         return create_client(access_strategy=AccessStrategy.PROVIDER)
     except AgentMemoryConfigError as e:
-        pytest.skip(f"Agent Memory credentials not configured — skipping integration tests: {e}")
+        pytest.skip(f"Agent Memory credentials not configured — skipping integration tests: {e}")  # ty: ignore[too-many-positional-arguments]
     except Exception as e:
-        pytest.fail(f"Failed to create Agent Memory client for integration tests: {e}")
+        pytest.fail(f"Failed to create Agent Memory client for integration tests: {e}")  # ty: ignore[invalid-argument-type]
 
 
 @pytest.fixture(scope="session")
@@ -71,7 +71,7 @@ def subscriber_tenant() -> str:
     tenant = os.environ.get("CLOUD_SDK_CFG_HANA_AGENT_MEMORY_DEFAULT_SUBSCRIBER_TENANT", "")
     if not tenant:
         pytest.skip(
-            "CLOUD_SDK_CFG_HANA_AGENT_MEMORY_DEFAULT_SUBSCRIBER_TENANT not set — "
+            "CLOUD_SDK_CFG_HANA_AGENT_MEMORY_DEFAULT_SUBSCRIBER_TENANT not set — "  # ty: ignore[too-many-positional-arguments]
             "skipping subscriber tenant tests"
         )
 
@@ -79,7 +79,7 @@ def subscriber_tenant() -> str:
         _load_config_for_instance(tenant)
     except AgentMemoryConfigError:
         pytest.skip(
-            f"Subscriber binding for tenant '{tenant}' not configured — "
+            f"Subscriber binding for tenant '{tenant}' not configured — "  # ty: ignore[too-many-positional-arguments]
             f"skipping subscriber tenant tests"
         )
 

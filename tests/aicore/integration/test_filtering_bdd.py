@@ -151,7 +151,7 @@ def send_prompt(ctx: ScenarioContext, model: str, prompt: str) -> None:
     """
     if not prompt:
         pytest.skip(
-            "Self-harm test prompt is empty — set the "
+            "Self-harm test prompt is empty — set the "  # ty: ignore[too-many-positional-arguments]
             "AICORE_FILTER_TEST_SELF_HARM_PROMPT environment variable "
             "(GitHub secret in CI) to a prompt that triggers Azure Content "
             "Safety self-harm filtering. Kept out of source so harmful "

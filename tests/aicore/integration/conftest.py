@@ -32,7 +32,7 @@ def aicore_configured():
     _load_env()
     missing = [k for k in _REQUIRED_VARS if not os.environ.get(k)]
     if missing:
-        pytest.skip(f"Missing env vars for filtering integration tests: {missing}")
+        pytest.skip(f"Missing env vars for filtering integration tests: {missing}")  # ty: ignore[too-many-positional-arguments]
     set_aicore_config()
     yield
     disable_filtering()

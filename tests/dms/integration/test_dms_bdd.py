@@ -128,7 +128,7 @@ def select_version_repo(context: DMSTestContext, dms_client: DMSClient):
             version_repo = r
             break
     if version_repo is None:
-        pytest.skip("No version-enabled repository available")
+        pytest.skip("No version-enabled repository available")  # ty: ignore[too-many-positional-arguments]
     context.repo = version_repo
     context.repo_id = version_repo.id
 

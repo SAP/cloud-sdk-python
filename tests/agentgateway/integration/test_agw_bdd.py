@@ -77,7 +77,7 @@ def have_valid_user_token(context: ScenarioContext):
     """Load user token from environment variable."""
     token = os.environ.get("CLOUD_SDK_CFG_AGW_DEFAULT_USER_TOKEN", "")
     if not token:
-        pytest.skip("CLOUD_SDK_CFG_AGW_DEFAULT_USER_TOKEN is not set — skipping user auth scenario")
+        pytest.skip("CLOUD_SDK_CFG_AGW_DEFAULT_USER_TOKEN is not set — skipping user auth scenario")  # ty: ignore[too-many-positional-arguments]
     context.user_token = token
 
 
@@ -86,7 +86,7 @@ def have_sample_mcp_tool_name(context: ScenarioContext):
     """Load sample MCP tool name from environment variable."""
     tool_name = os.environ.get("CLOUD_SDK_CFG_AGW_DEFAULT_SAMPLE_MCP_TOOL", "")
     if not tool_name:
-        pytest.skip("CLOUD_SDK_CFG_AGW_DEFAULT_SAMPLE_MCP_TOOL is not set — skipping tool scenario")
+        pytest.skip("CLOUD_SDK_CFG_AGW_DEFAULT_SAMPLE_MCP_TOOL is not set — skipping tool scenario")  # ty: ignore[too-many-positional-arguments]
     context.sample_mcp_tool_name = tool_name
 
 
@@ -141,7 +141,7 @@ def call_call_mcp_tool_sample(context: ScenarioContext, agw_client: AgentGateway
     assert context.sample_mcp_tool_name is not None
     tool = next((t for t in context.tools if t.name == context.sample_mcp_tool_name), None)
     if tool is None:
-        pytest.fail(f"Tool '{context.sample_mcp_tool_name}' not found in list_mcp_tools result")
+        pytest.fail(f"Tool '{context.sample_mcp_tool_name}' not found in list_mcp_tools result")  # ty: ignore[invalid-argument-type]
     context.tool_result = run(
         agw_client.call_mcp_tool(tool, user_token=context.user_token)
     )

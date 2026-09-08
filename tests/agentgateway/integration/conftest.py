@@ -24,7 +24,7 @@ def agw_client() -> AgentGatewayClient:
 
     tenant_subdomain = os.environ.get("CLOUD_SDK_CFG_AGW_DEFAULT_TENANT_SUBDOMAIN")
     if not tenant_subdomain:
-        pytest.skip("CLOUD_SDK_CFG_AGW_DEFAULT_TENANT_SUBDOMAIN is not set — skipping AGW integration tests")
+        pytest.skip("CLOUD_SDK_CFG_AGW_DEFAULT_TENANT_SUBDOMAIN is not set — skipping AGW integration tests")  # ty: ignore[too-many-positional-arguments]
 
     landscape = os.environ.get("CLOUD_SDK_CFG_AGW_DEFAULT_LANDSCAPE")
     if landscape:
@@ -33,9 +33,9 @@ def agw_client() -> AgentGatewayClient:
     try:
         return create_client(tenant_subdomain=tenant_subdomain)
     except MCPServerNotFoundError as e:
-        pytest.skip(f"AGW not subscribed for this tenant — skipping AGW integration tests: {e}")
+        pytest.skip(f"AGW not subscribed for this tenant — skipping AGW integration tests: {e}")  # ty: ignore[too-many-positional-arguments]
     except Exception as e:
-        pytest.fail(f"Failed to create Agent Gateway client for integration tests: {e}")
+        pytest.fail(f"Failed to create Agent Gateway client for integration tests: {e}")  # ty: ignore[invalid-argument-type]
 
 
 # Configure pytest markers for integration tests
@@ -59,4 +59,4 @@ def pytest_runtest_call(item):
     try:
         item.runtest()
     except MCPServerNotFoundError as e:
-        pytest.skip(f"AGW not subscribed for this tenant — skipping: {e}")
+        pytest.skip(f"AGW not subscribed for this tenant — skipping: {e}")  # ty: ignore[too-many-positional-arguments]

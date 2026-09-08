@@ -253,7 +253,7 @@ def async_scan_state_pending_or_clean(context: AsyncScenarioContext) -> None:
 @then("the async download should be blocked if not CLEAN")
 def async_download_blocked_if_not_clean(context: AsyncScenarioContext) -> None:
     if context.download_blocked is False:
-        pytest.skip("Document already CLEAN — scan gate test not applicable")
+        pytest.skip("Document already CLEAN — scan gate test not applicable")  # ty: ignore[too-many-positional-arguments]
     assert context.download_blocked is True
 
 

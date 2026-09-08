@@ -1,5 +1,3 @@
-import datetime
-
 from buf.validate import validate_pb2 as _validate_pb2
 from google.protobuf import struct_pb2 as _struct_pb2
 from google.protobuf import timestamp_pb2 as _timestamp_pb2
@@ -7,8 +5,7 @@ from google.protobuf.internal import containers as _containers
 from google.protobuf.internal import enum_type_wrapper as _enum_type_wrapper
 from google.protobuf import descriptor as _descriptor
 from google.protobuf import message as _message
-from collections.abc import Iterable as _Iterable, Mapping as _Mapping
-from typing import ClassVar as _ClassVar, Optional as _Optional, Union as _Union
+from typing import ClassVar as _ClassVar, Iterable as _Iterable, Mapping as _Mapping, Optional as _Optional, Union as _Union
 
 DESCRIPTOR: _descriptor.FileDescriptor
 
@@ -270,7 +267,7 @@ class Common(_message.Message):
     tenant_id: str
     user_session_context_id: str
     app_context: _containers.ScalarMap[str, str]
-    def __init__(self, timestamp: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., source_ip: _Optional[_Iterable[str]] = ..., user_impersonated_id: _Optional[str] = ..., user_initiator_id: _Optional[str] = ..., app_id: _Optional[str] = ..., tenant_id: _Optional[str] = ..., user_session_context_id: _Optional[str] = ..., app_context: _Optional[_Mapping[str, str]] = ...) -> None: ...
+    def __init__(self, timestamp: _Optional[_Union[_timestamp_pb2.Timestamp, _Mapping]] = ..., source_ip: _Optional[_Iterable[str]] = ..., user_impersonated_id: _Optional[str] = ..., user_initiator_id: _Optional[str] = ..., app_id: _Optional[str] = ..., tenant_id: _Optional[str] = ..., user_session_context_id: _Optional[str] = ..., app_context: _Optional[_Mapping[str, str]] = ...) -> None: ...
 
 class AuditlogClear(_message.Message):
     __slots__ = ("common", "number_of_events")
@@ -522,7 +519,7 @@ class CredentialExpiration(_message.Message):
     credential_id: str
     credential_type: CredentialType
     expiration_date: _timestamp_pb2.Timestamp
-    def __init__(self, common: _Optional[_Union[Common, _Mapping]] = ..., credential_id: _Optional[str] = ..., credential_type: _Optional[_Union[CredentialType, str]] = ..., expiration_date: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...
+    def __init__(self, common: _Optional[_Union[Common, _Mapping]] = ..., credential_id: _Optional[str] = ..., credential_type: _Optional[_Union[CredentialType, str]] = ..., expiration_date: _Optional[_Union[_timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...
 
 class CredentialRevokation(_message.Message):
     __slots__ = ("common", "credential_id", "credential_type", "revokation_date")
@@ -534,7 +531,7 @@ class CredentialRevokation(_message.Message):
     credential_id: str
     credential_type: CredentialType
     revokation_date: _timestamp_pb2.Timestamp
-    def __init__(self, common: _Optional[_Union[Common, _Mapping]] = ..., credential_id: _Optional[str] = ..., credential_type: _Optional[_Union[CredentialType, str]] = ..., revokation_date: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...
+    def __init__(self, common: _Optional[_Union[Common, _Mapping]] = ..., credential_id: _Optional[str] = ..., credential_type: _Optional[_Union[CredentialType, str]] = ..., revokation_date: _Optional[_Union[_timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...
 
 class DataModelChange(_message.Message):
     __slots__ = ("common", "model_id", "new_value", "old_value", "property_name")
@@ -990,7 +987,7 @@ class UserLoginFailure(_message.Message):
     mfa_type: MfaType
     user_type: UserType
     login_protocol: LoginProtocol
-    def __init__(self, common: _Optional[_Union[Common, _Mapping]] = ..., failure_reason: _Optional[_Union[FailureReason, str]] = ..., method: _Optional[_Union[LoginMethod, str]] = ..., is_admin: _Optional[bool] = ..., mfa_type: _Optional[_Union[MfaType, str]] = ..., user_type: _Optional[_Union[UserType, str]] = ..., login_protocol: _Optional[_Union[LoginProtocol, str]] = ...) -> None: ...
+    def __init__(self, common: _Optional[_Union[Common, _Mapping]] = ..., failure_reason: _Optional[_Union[FailureReason, str]] = ..., method: _Optional[_Union[LoginMethod, str]] = ..., is_admin: bool = ..., mfa_type: _Optional[_Union[MfaType, str]] = ..., user_type: _Optional[_Union[UserType, str]] = ..., login_protocol: _Optional[_Union[LoginProtocol, str]] = ...) -> None: ...
 
 class UserLoginSuccess(_message.Message):
     __slots__ = ("common", "is_admin", "method", "mfa_type", "user_type", "login_protocol")
@@ -1006,7 +1003,7 @@ class UserLoginSuccess(_message.Message):
     mfa_type: MfaType
     user_type: UserType
     login_protocol: LoginProtocol
-    def __init__(self, common: _Optional[_Union[Common, _Mapping]] = ..., is_admin: _Optional[bool] = ..., method: _Optional[_Union[LoginMethod, str]] = ..., mfa_type: _Optional[_Union[MfaType, str]] = ..., user_type: _Optional[_Union[UserType, str]] = ..., login_protocol: _Optional[_Union[LoginProtocol, str]] = ...) -> None: ...
+    def __init__(self, common: _Optional[_Union[Common, _Mapping]] = ..., is_admin: bool = ..., method: _Optional[_Union[LoginMethod, str]] = ..., mfa_type: _Optional[_Union[MfaType, str]] = ..., user_type: _Optional[_Union[UserType, str]] = ..., login_protocol: _Optional[_Union[LoginProtocol, str]] = ...) -> None: ...
 
 class UserLogoff(_message.Message):
     __slots__ = ("common", "logoff_type", "login_protocol")

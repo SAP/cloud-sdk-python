@@ -1,3 +1,5 @@
+import datetime
+
 from buf.validate import validate_pb2 as _validate_pb2
 from google.protobuf import struct_pb2 as _struct_pb2
 from google.protobuf import timestamp_pb2 as _timestamp_pb2
@@ -6,7 +8,8 @@ from google.protobuf.internal import containers as _containers
 from google.protobuf.internal import enum_type_wrapper as _enum_type_wrapper
 from google.protobuf import descriptor as _descriptor
 from google.protobuf import message as _message
-from typing import ClassVar as _ClassVar, Iterable as _Iterable, Mapping as _Mapping, Optional as _Optional, Union as _Union
+from collections.abc import Iterable as _Iterable, Mapping as _Mapping
+from typing import ClassVar as _ClassVar, Optional as _Optional, Union as _Union
 
 DESCRIPTOR: _descriptor.FileDescriptor
 
@@ -503,7 +506,7 @@ class CredentialExpiration(_message.Message):
     credential_id: str
     credential_type: CredentialType
     expiration_date: _timestamp_pb2.Timestamp
-    def __init__(self, credential_id: _Optional[str] = ..., credential_type: _Optional[_Union[CredentialType, str]] = ..., expiration_date: _Optional[_Union[_timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...
+    def __init__(self, credential_id: _Optional[str] = ..., credential_type: _Optional[_Union[CredentialType, str]] = ..., expiration_date: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...
 
 class CredentialRevokation(_message.Message):
     __slots__ = ("credential_id", "credential_type", "revokation_date")
@@ -513,7 +516,7 @@ class CredentialRevokation(_message.Message):
     credential_id: str
     credential_type: CredentialType
     revokation_date: _timestamp_pb2.Timestamp
-    def __init__(self, credential_id: _Optional[str] = ..., credential_type: _Optional[_Union[CredentialType, str]] = ..., revokation_date: _Optional[_Union[_timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...
+    def __init__(self, credential_id: _Optional[str] = ..., credential_type: _Optional[_Union[CredentialType, str]] = ..., revokation_date: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...
 
 class DataModelChange(_message.Message):
     __slots__ = ("model_id", "new_value", "old_value", "property_name")
@@ -883,7 +886,7 @@ class UserLoginSuccess(_message.Message):
     method: LoginMethod
     mfa_type: MfaType
     user_type: UserType
-    def __init__(self, is_admin: bool = ..., method: _Optional[_Union[LoginMethod, str]] = ..., mfa_type: _Optional[_Union[MfaType, str]] = ..., user_type: _Optional[_Union[UserType, str]] = ...) -> None: ...
+    def __init__(self, is_admin: _Optional[bool] = ..., method: _Optional[_Union[LoginMethod, str]] = ..., mfa_type: _Optional[_Union[MfaType, str]] = ..., user_type: _Optional[_Union[UserType, str]] = ...) -> None: ...
 
 class UserLogoff(_message.Message):
     __slots__ = ("logoff_type",)

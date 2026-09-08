@@ -36,22 +36,13 @@ jobs:
           echo "name=$PKG_NAME" >> $GITHUB_OUTPUT
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
-      - name: Validate release version, tag, and pre-release status
+      - name: Validate pre-release status
         env:
-          GH_TOKEN: ${{ github.token }}
           PACKAGE_VERSION: ${{ steps.metadata.outputs.version }}
-          RELEASE_ID: ${{ github.event.release.id }}
-          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          RELEASE_IS_PRERELEASE: ${{ github.event.release.prerelease }}
         run: |
-          # Read the current release state so corrected settings are picked up on rerun
-          CURRENT_PRERELEASE=$(
-            gh api "repos/$GITHUB_REPOSITORY/releases/$RELEASE_ID" \
-              --jq '.prerelease'
-          )
-          export CURRENT_PRERELEASE
-
-          python .github/scripts/validate_release.py \
-            "$PACKAGE_VERSION" "$RELEASE_TAG" "$CURRENT_PRERELEASE"
+          python .github/scripts/validate_prerelease.py \
+            "$PACKAGE_VERSION" "$RELEASE_IS_PRERELEASE"
 
       - name: Check if version already exists on PyPI
         run: |

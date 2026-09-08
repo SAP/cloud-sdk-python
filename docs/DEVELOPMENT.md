@@ -68,12 +68,12 @@ Automatically run quality checks before each commit using pre-commit hooks.
 
 2. **Install the git hooks:**
    ```bash
-   pre-commit install
+   uv run pre-commit install
    ```
 
 3. **Run on all files (one-time init):**
    ```bash
-   pre-commit run --all-files
+   uv run pre-commit run --all-files
    ```
 
 ### What It Does
@@ -91,15 +91,16 @@ Hooks run automatically on `git commit`. If checks fail, the commit is blocked u
 ### Manual Hook Execution
 
 Run hooks manually without committing:
+
 ```bash
 # Run on all files
-pre-commit run --all-files
+uv run pre-commit run --all-files
 
 # Run on staged files only
-pre-commit run
+uv run pre-commit run
 
 # Run specific hook
-pre-commit run ruff-check
+uv run pre-commit run ruff-check
 ```
 
 ## Build Project

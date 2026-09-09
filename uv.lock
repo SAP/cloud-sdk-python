@@ -4416,7 +4416,7 @@ requires-dist = [
     { name = "opentelemetry-instrumentation-sqlalchemy", specifier = "~=0.65b0" },
     { name = "opentelemetry-instrumentation-starlette", specifier = "~=0.65b0" },
     { name = "opentelemetry-sdk", specifier = "~=1.44.0" },
-    { name = "protobuf", specifier = ">=7.36.0" },
+    { name = "protobuf", specifier = ">=7.36.0,<8" },
     { name = "protovalidate", specifier = ">=1.0.0,<2" },
     { name = "pydantic", specifier = "~=2.12.3" },
     { name = "pyjwt", specifier = ">=2.13.0,<3" },

@@ -104,7 +104,7 @@ def create_client(
     config: Optional[DestinationConfig] = None,
     use_default_proxy: bool = False,
     _telemetry_source: Optional[Module] = None,
-):
+) -> DestinationClient:
     """Creates a Destination client with local/cloud detection.
 
     Behavior:
@@ -133,7 +133,7 @@ def create_client(
                 "Local mock mode active: using LocalDevDestinationClient backed by mocks/destination.json. "
                 "This is intended for local development only and must not be used in production."
             )
-            return LocalDevDestinationClient()
+            return LocalDevDestinationClient()  # type: ignore
 
         # Cloud mode via secret resolver or explicit config
         http = _build_destination_http(instance, config)
@@ -151,7 +151,7 @@ def create_fragment_client(
     instance: Optional[str] = None,
     config: Optional[DestinationConfig] = None,
     _telemetry_source: Optional[Module] = None,
-):
+) -> FragmentClient:
     """Creates a Fragment client with local/cloud detection.
 
     Behavior:
@@ -176,7 +176,7 @@ def create_fragment_client(
                 "Local mock mode active: using LocalDevFragmentClient backed by mocks/fragments.json. "
                 "This is intended for local development only and must not be used in production."
             )
-            return LocalDevFragmentClient()
+            return LocalDevFragmentClient()  # type: ignore
 
         # Use provided config or load from environment/mount (cloud mode)
         http = _build_destination_http(instance, config)
@@ -192,7 +192,7 @@ def create_certificate_client(
     instance: Optional[str] = None,
     config: Optional[DestinationConfig] = None,
     _telemetry_source: Optional[Module] = None,
-):
+) -> CertificateClient:
     """Creates a Certificate client with local/cloud detection.
 
     Behavior:
@@ -217,7 +217,7 @@ def create_certificate_client(
                 "Local mock mode active: using LocalDevCertificateClient backed by mocks/certificates.json. "
                 "This is intended for local development only and must not be used in production."
             )
-            return LocalDevCertificateClient()
+            return LocalDevCertificateClient()  # type: ignore
 
         # Use provided config or load from environment/mount (cloud mode)
         http = _build_destination_http(instance, config)

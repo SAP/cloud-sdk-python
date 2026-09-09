@@ -207,7 +207,9 @@ class HttpClient:
         self._base_url = base_url.rstrip("/")
         self._auth_provider = auth_provider
         self._timeout = timeout
-        self._plain_session: Optional[requests.Session] = None
+        self._plain_session: Optional[requests.Session] = (
+            requests.Session() if auth_provider is None else None
+        )
 
     def request(
         self,
@@ -253,8 +255,7 @@ class HttpClient:
             # refresh) so requests go to the correct URL after secret rotation.
             base_url = getattr(self._auth_provider, "base_url", None) or self._base_url
         else:
-            if self._plain_session is None:
-                self._plain_session = requests.Session()
+            assert self._plain_session is not None
             session = self._plain_session
             base_url = self._base_url
         return session.request(

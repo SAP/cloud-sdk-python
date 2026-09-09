@@ -47,6 +47,19 @@ from sap_cloud_sdk.core.telemetry import Module, Operation, record_metrics
 
 logger = logging.getLogger(__name__)
 
+_AGENT_ID_KEY = "agentID"
+_INVOKER_ID_KEY = "invokerID"
+_CONTENT_KEY = "content"
+_METADATA_KEY = "metadata"
+_QUERY_KEY = "query"
+_THRESHOLD_KEY = "threshold"
+_TOP_KEY = "top"
+_MESSAGE_GROUP_KEY = "messageGroup"
+_ROLE_KEY = "role"
+_MESSAGE_DAYS_KEY = "messageDays"
+_MEMORY_DAYS_KEY = "memoryDays"
+_USAGE_LOG_DAYS_KEY = "usageLogDays"
+
 
 def _require_non_empty(**fields: str) -> None:
     """Raise AgentMemoryValidationError if any named field is an empty string."""
@@ -199,12 +212,12 @@ class AgentMemoryClient:
         """
         _require_non_empty(agent_id=agent_id, invoker_id=invoker_id, content=content)
         payload: dict[str, Any] = {
-            "agentID": agent_id,
-            "invokerID": invoker_id,
-            "content": content,
+            _AGENT_ID_KEY: agent_id,
+            _INVOKER_ID_KEY: invoker_id,
+            _CONTENT_KEY: content,
         }
         if metadata is not None:
-            payload["metadata"] = metadata
+            payload[_METADATA_KEY] = metadata
         data = self._request(
             HttpMethod.POST, MEMORIES, json=payload, tenant_subdomain=self._tenant
         )
@@ -259,9 +272,9 @@ class AgentMemoryClient:
             )
         payload: dict[str, Any] = {}
         if content is not None:
-            payload["content"] = content
+            payload[_CONTENT_KEY] = content
         if metadata is not None:
-            payload["metadata"] = metadata
+            payload[_METADATA_KEY] = metadata
         self._request(
             HttpMethod.PATCH,
             f"{MEMORIES}({memory_id})",
@@ -402,11 +415,11 @@ class AgentMemoryClient:
         if not (1 <= limit <= 50):
             raise AgentMemoryValidationError("'limit' must be between 1 and 50")
         payload: dict[str, Any] = {
-            "agentID": agent_id,
-            "invokerID": invoker_id,
-            "query": query,
-            "threshold": threshold,
-            "top": limit,
+            _AGENT_ID_KEY: agent_id,
+            _INVOKER_ID_KEY: invoker_id,
+            _QUERY_KEY: query,
+            _THRESHOLD_KEY: threshold,
+            _TOP_KEY: limit,
         }
         response = self._request(
             HttpMethod.POST, MEMORY_SEARCH, json=payload, tenant_subdomain=self._tenant
@@ -454,14 +467,14 @@ class AgentMemoryClient:
             content=content,
         )
         payload: dict[str, Any] = {
-            "agentID": agent_id,
-            "invokerID": invoker_id,
-            "messageGroup": message_group,
-            "role": role,
-            "content": content,
+            _AGENT_ID_KEY: agent_id,
+            _INVOKER_ID_KEY: invoker_id,
+            _MESSAGE_GROUP_KEY: message_group,
+            _ROLE_KEY: role,
+            _CONTENT_KEY: content,
         }
         if metadata is not None:
-            payload["metadata"] = metadata
+            payload[_METADATA_KEY] = metadata
         data = self._request(
             HttpMethod.POST, MESSAGES, json=payload, tenant_subdomain=self._tenant
         )
@@ -624,11 +637,11 @@ class AgentMemoryClient:
 
         payload: dict[str, Any] = {}
         if message_days is not None:
-            payload["messageDays"] = message_days
+            payload[_MESSAGE_DAYS_KEY] = message_days
         if memory_days is not None:
-            payload["memoryDays"] = memory_days
+            payload[_MEMORY_DAYS_KEY] = memory_days
         if usage_log_days is not None:
-            payload["usageLogDays"] = usage_log_days
+            payload[_USAGE_LOG_DAYS_KEY] = usage_log_days
 
         self._request(
             HttpMethod.PATCH,

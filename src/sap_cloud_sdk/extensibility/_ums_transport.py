@@ -23,7 +23,7 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 import httpx
 from sap_cloud_sdk.core.telemetry import Module
-from sap_cloud_sdk.destination import ConsumptionLevel
+from sap_cloud_sdk.destination import ConsumptionLevel, Destination
 from sap_cloud_sdk.destination import create_client as create_destination_client
 from sap_cloud_sdk.extensibility._models import (
     DEFAULT_EXTENSION_CAPABILITY_ID,
@@ -555,6 +555,12 @@ class UmsTransport:
         if dest is None:
             raise TransportError(
                 f"Destination '{self._destination_name}' not found in Destination Service."
+            )
+
+        if not isinstance(dest, Destination):
+            raise TransportError(
+                f"Destination '{self._destination_name}' is a transparent proxy destination, "
+                "which is not supported by UmsTransport."
             )
 
         # 2. Resolve base URL --------------------------------------------

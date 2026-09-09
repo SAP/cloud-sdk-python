@@ -10,7 +10,6 @@ from sap_cloud_sdk.extensibility.client import (
     ExtensibilityClient,
     _EXECUTE_WORKFLOW_TOOL_NAME,
     _GET_EXECUTION_TOOL_NAME,
-    _N8N_MCP_SERVER_NAME,
 )
 from sap_cloud_sdk.extensibility._models import (
     ExtensionCapabilityImplementation,
@@ -26,6 +25,16 @@ from http import HTTPMethod
 from sap_cloud_sdk.extensibility.config import ExtensibilityConfig
 from sap_cloud_sdk.extensibility.exceptions import ExtensibilityError, TransportError
 from sap_cloud_sdk.agentgateway._models import MCPTool
+
+
+# ---------------------------------------------------------------------------
+# Shared constants for hook tool identity
+# ---------------------------------------------------------------------------
+
+_TOOL_NAME = "convertCurrency"
+_CARD_ORD_ID = "sap.n8nwfrt:apiResource:invoice-po-solution_currency-conversion.convertCurrency_mcp:v1"
+_ORD_ID = "sap.n8nwfrt:apiResource:invoice-po-solution_currency-conversion.convertCurrency:v1"
+_GLOBAL_TENANT_ID = "tenant-example-001"
 
 
 class TestCreateClient:
@@ -102,7 +111,10 @@ class TestExtensibilityClientGetExtensionCapabilityImplementation:
                     hook_id="agent_pre_hook",
                     id="9f6e5f66-7e4f-4ef0-a9f6-e6e1c1220c11",
                     n8n_workflow_config=N8nWorkflowConfig(
-                        workflow_id="wf-pre-001",
+                        ord_id=_ORD_ID,
+                        card_ord_id=_CARD_ORD_ID,
+                        tool_name=_TOOL_NAME,
+                        global_tenant_id=_GLOBAL_TENANT_ID,
                         method=HTTPMethod.POST,
                     ),
                     name="Before Agent Hook",
@@ -118,7 +130,10 @@ class TestExtensibilityClientGetExtensionCapabilityImplementation:
                     hook_id="agent_post_hook",
                     id="6a9e0cef-eed6-4f1b-9f86-3d8e9f5c1d22",
                     n8n_workflow_config=N8nWorkflowConfig(
-                        workflow_id="wf-post-001",
+                        ord_id=_ORD_ID,
+                        card_ord_id=_CARD_ORD_ID,
+                        tool_name=_TOOL_NAME,
+                        global_tenant_id=_GLOBAL_TENANT_ID,
                         method=HTTPMethod.POST,
                     ),
                     name="After Agent Hook",
@@ -217,15 +232,22 @@ class TestExtensibilityClientGetExtensionCapabilityImplementation:
 
 
 # ---------------------------------------------------------------------------
-# Helpers shared across call_hook tests
+# Helpers shared across call_hook_agw tests
 # ---------------------------------------------------------------------------
 
-def _make_hook(workflow_id: str = "wf-001", timeout: int = 30) -> Hook:
+def _make_hook(
+    tool_name: str = _TOOL_NAME,
+    card_ord_id: str = _CARD_ORD_ID,
+    timeout: int = 30,
+) -> Hook:
     return Hook(
         hook_id="agent_pre_hook",
         id="9f6e5f66-7e4f-4ef0-a9f6-e6e1c1220c11",
         n8n_workflow_config=N8nWorkflowConfig(
-            workflow_id=workflow_id,
+            ord_id=_ORD_ID,
+            card_ord_id=card_ord_id,
+            tool_name=tool_name,
+            global_tenant_id=_GLOBAL_TENANT_ID,
             method=HTTPMethod.POST,
         ),
         name="Pre Hook",
@@ -239,89 +261,37 @@ def _make_hook(workflow_id: str = "wf-001", timeout: int = 30) -> Hook:
     )
 
 
-def _make_n8n_tool(name: str) -> MCPTool:
-    """Return an MCPTool belonging to the N8N MCP server."""
+def _make_hook_tool(
+    tool_name: str = _TOOL_NAME,
+    card_ord_id: str = _CARD_ORD_ID,
+) -> MCPTool:
+    """Return an MCPTool matching the hook's tool_name and card_ord_id."""
     return MCPTool(
-        name=name,
-        server_name=_N8N_MCP_SERVER_NAME,
+        name=tool_name,
+        server_name=card_ord_id,
         description="",
         input_schema={},
-        url="https://agw.example.com/v1/mcp/sap.btpn8n:apiResource:ManagedN8nMcpServer:v1/gtid-1",
+        url="https://agw.example.com/v1/mcp/sap.n8nwfrt.../gtid-1",
     )
 
 
-def _make_other_server_tool(name: str) -> MCPTool:
-    """Return an MCPTool with the same name but from a different MCP server."""
+def _make_other_server_tool(tool_name: str = _TOOL_NAME) -> MCPTool:
+    """Return an MCPTool with the same tool name but from a different MCP server."""
     return MCPTool(
-        name=name,
-        server_name="sap.other:apiResource:OtherMcpServer:v1",
+        name=tool_name,
+        server_name="sap.other:apiResource:OtherServer:v1",
         description="",
         input_schema={},
         url="https://agw.example.com/v1/mcp/other/gtid-2",
     )
 
 
-def _success_payload(workflow_id: str = "wf-001") -> str:
+def _success_payload() -> str:
+    """A2A Message returned directly by the n8n MCP translation card."""
     return json.dumps({
-        "status": "success",
-        "data": {
-            "resultData": {
-                "lastNodeExecuted": "Respond to Webhook",
-                "runData": {
-                    "Respond to Webhook": [
-                        {
-                            "data": {
-                                "main": [
-                                    [
-                                        {
-                                            "json": {
-                                                "message_id": "msg-1",
-                                                "context_id": "ctx-1",
-                                                "role": 2,
-                                            }
-                                        }
-                                    ]
-                                ]
-                            }
-                        }
-                    ]
-                },
-            }
-        },
-    })
-
-
-def _running_payload(execution_id: str = "exec-1") -> str:
-    return json.dumps({"status": "running", "executionId": execution_id})
-
-
-def _poll_success_payload() -> str:
-    return json.dumps({
-        "status": "success",
-        "data": {
-            "resultData": {
-                "lastNodeExecuted": "Respond to Webhook",
-                "runData": {
-                    "Respond to Webhook": [
-                        {
-                            "data": {
-                                "main": [
-                                    [
-                                        {
-                                            "json": {
-                                                "message_id": "msg-2",
-                                                "context_id": "ctx-1",
-                                                "role": 2,
-                                            }
-                                        }
-                                    ]
-                                ]
-                            }
-                        }
-                    ]
-                },
-            }
-        },
+        "messageId": "msg-1",
+        "role": "agent",
+        "parts": [{"kind": "text", "text": "Currency converted successfully."}],
     })
 
 
@@ -334,209 +304,75 @@ def _make_agw_client(tools: list, tool_responses: list) -> MagicMock:
 
 
 # ---------------------------------------------------------------------------
-# Tests for ExtensibilityClient.call_hook
+# Tests for ExtensibilityClient.call_hook_agw
 # ---------------------------------------------------------------------------
 
 
-class TestCallHook:
-    """Tests for ExtensibilityClient.call_hook (async, AGW-based)."""
+class TestCallHookAgw:
+    """Tests for ExtensibilityClient.call_hook_agw (AGW-based MCP invocation)."""
 
-    def _make_client(self, agw: MagicMock) -> ExtensibilityClient:
-        """Build an ExtensibilityClient with a mock transport and patched AGW factory."""
+    def _make_client(self) -> ExtensibilityClient:
         return ExtensibilityClient(MagicMock())
 
     @pytest.mark.asyncio
-    async def test_execute_tool_not_found_raises(self):
-        """Raises ExtensibilityError when execute_workflow tool is absent."""
+    async def test_tool_not_found_raises(self):
+        """Raises ExtensibilityError when no tool matches tool_name + card_ord_id."""
         agw = _make_agw_client(tools=[], tool_responses=[])
-        client = self._make_client(agw)
+        client = self._make_client()
         with patch(
             "sap_cloud_sdk.extensibility.client.create_agw_client",
             return_value=agw,
         ):
-            with pytest.raises(ExtensibilityError, match=_EXECUTE_WORKFLOW_TOOL_NAME):
+            with pytest.raises(ExtensibilityError, match=_TOOL_NAME):
                 await client.call_hook_agw(hook=_make_hook(), tenant_subdomain="t")
 
     @pytest.mark.asyncio
-    async def test_get_exec_tool_not_found_raises(self):
-        """Raises ExtensibilityError when get_execution tool is absent."""
-        tools = [_make_n8n_tool(_EXECUTE_WORKFLOW_TOOL_NAME)]
-        agw = _make_agw_client(tools=tools, tool_responses=[])
-        client = self._make_client(agw)
+    async def test_wrong_server_does_not_match(self):
+        """A tool with the right name but wrong server_name must not match."""
+        agw = _make_agw_client(tools=[_make_other_server_tool()], tool_responses=[])
+        client = self._make_client()
         with patch(
             "sap_cloud_sdk.extensibility.client.create_agw_client",
             return_value=agw,
         ):
-            with pytest.raises(ExtensibilityError, match=_GET_EXECUTION_TOOL_NAME):
+            with pytest.raises(ExtensibilityError, match=_TOOL_NAME):
                 await client.call_hook_agw(hook=_make_hook(), tenant_subdomain="t")
 
     @pytest.mark.asyncio
-    async def test_composite_key_ignores_wrong_server(self):
-        """Tools from a different server with the same names must not match."""
-        tools = [
-            _make_other_server_tool(_EXECUTE_WORKFLOW_TOOL_NAME),
-            _make_other_server_tool(_GET_EXECUTION_TOOL_NAME),
-        ]
-        agw = _make_agw_client(tools=tools, tool_responses=[])
-        client = self._make_client(agw)
+    async def test_success_returns_message(self):
+        """Returns a Message on a successful single tool call."""
+        agw = _make_agw_client(tools=[_make_hook_tool()], tool_responses=[_success_payload()])
+        client = self._make_client()
         with patch(
             "sap_cloud_sdk.extensibility.client.create_agw_client",
             return_value=agw,
-        ):
-            with pytest.raises(ExtensibilityError, match=_EXECUTE_WORKFLOW_TOOL_NAME):
-                await client.call_hook_agw(hook=_make_hook(), tenant_subdomain="t")
-
-    @pytest.mark.asyncio
-    async def test_composite_key_picks_correct_tool_among_duplicates(self):
-        """Picks the N8N tool when another server exposes identically-named tools."""
-        tools = [
-            _make_other_server_tool(_EXECUTE_WORKFLOW_TOOL_NAME),
-            _make_other_server_tool(_GET_EXECUTION_TOOL_NAME),
-            _make_n8n_tool(_EXECUTE_WORKFLOW_TOOL_NAME),
-            _make_n8n_tool(_GET_EXECUTION_TOOL_NAME),
-        ]
-        agw = _make_agw_client(
-            tools=tools,
-            tool_responses=[_running_payload(), _poll_success_payload()],
-        )
-        client = self._make_client(agw)
-        with patch(
-            "sap_cloud_sdk.extensibility.client.create_agw_client",
-            return_value=agw,
-        ), patch(
-            "sap_cloud_sdk.extensibility.client.asyncio.sleep",
-            new_callable=AsyncMock,
         ):
             result = await client.call_hook_agw(hook=_make_hook(), tenant_subdomain="t")
         assert result is not None
-        # Both tool calls must have used the N8N server tools, not the other one
-        for call in agw.call_mcp_tool.call_args_list:
-            assert call[0][0].server_name == _N8N_MCP_SERVER_NAME
+        assert result.message_id == "msg-1"
+        assert agw.call_mcp_tool.call_count == 1
 
     @pytest.mark.asyncio
-    async def test_success_synchronous(self):
-        """Returns a Message when get_execution responds with status=success."""
-        tools = [
-            _make_n8n_tool(_EXECUTE_WORKFLOW_TOOL_NAME),
-            _make_n8n_tool(_GET_EXECUTION_TOOL_NAME),
-        ]
-        agw = _make_agw_client(
-            tools=tools,
-            tool_responses=[_running_payload(), _poll_success_payload()],
-        )
-        client = self._make_client(agw)
+    async def test_picks_correct_tool_among_duplicates(self):
+        """Picks the hook's card tool when another server exposes an identically-named tool."""
+        tools = [_make_other_server_tool(), _make_hook_tool()]
+        agw = _make_agw_client(tools=tools, tool_responses=[_success_payload()])
+        client = self._make_client()
         with patch(
             "sap_cloud_sdk.extensibility.client.create_agw_client",
             return_value=agw,
-        ), patch(
-            "sap_cloud_sdk.extensibility.client.asyncio.sleep",
-            new_callable=AsyncMock,
         ):
             result = await client.call_hook_agw(hook=_make_hook(), tenant_subdomain="t")
         assert result is not None
-        assert result.message_id == "msg-2"
-        assert agw.call_mcp_tool.call_count == 2
+        assert agw.call_mcp_tool.call_args[0][0].server_name == _CARD_ORD_ID
 
     @pytest.mark.asyncio
-    async def test_success_after_polling(self):
-        """Returns a Message after one poll round via get_execution."""
-        tools = [
-            _make_n8n_tool(_EXECUTE_WORKFLOW_TOOL_NAME),
-            _make_n8n_tool(_GET_EXECUTION_TOOL_NAME),
-        ]
-        agw = _make_agw_client(
-            tools=tools,
-            tool_responses=[_running_payload(), _poll_success_payload()],
-        )
-        client = self._make_client(agw)
-        with patch(
-            "sap_cloud_sdk.extensibility.client.create_agw_client",
-            return_value=agw,
-        ), patch(
-            "sap_cloud_sdk.extensibility.client.asyncio.sleep",
-            new_callable=AsyncMock,
-        ):
-            result = await client.call_hook_agw(hook=_make_hook(), tenant_subdomain="t")
-        assert result is not None
-        assert result.message_id == "msg-2"
-        assert agw.call_mcp_tool.call_count == 2
-
-    @pytest.mark.asyncio
-    async def test_terminal_status_from_execute_raises(self):
-        """Raises ExtensibilityError on a terminal status from execute_workflow."""
-        tools = [
-            _make_n8n_tool(_EXECUTE_WORKFLOW_TOOL_NAME),
-            _make_n8n_tool(_GET_EXECUTION_TOOL_NAME),
-        ]
-        terminal_payload = json.dumps({"status": "error", "error": "workflow crashed"})
-        agw = _make_agw_client(tools=tools, tool_responses=[terminal_payload])
-        client = self._make_client(agw)
-        with patch(
-            "sap_cloud_sdk.extensibility.client.create_agw_client",
-            return_value=agw,
-        ):
-            with pytest.raises(ExtensibilityError, match="workflow crashed"):
-                await client.call_hook_agw(hook=_make_hook(), tenant_subdomain="t")
-
-    @pytest.mark.asyncio
-    async def test_terminal_status_from_poll_raises(self):
-        """Raises ExtensibilityError on a terminal status from get_execution poll."""
-        tools = [
-            _make_n8n_tool(_EXECUTE_WORKFLOW_TOOL_NAME),
-            _make_n8n_tool(_GET_EXECUTION_TOOL_NAME),
-        ]
-        poll_terminal = json.dumps({"status": "error", "error": "node failed"})
-        agw = _make_agw_client(
-            tools=tools,
-            tool_responses=[_running_payload(), poll_terminal],
-        )
-        client = self._make_client(agw)
-        with patch(
-            "sap_cloud_sdk.extensibility.client.create_agw_client",
-            return_value=agw,
-        ), patch(
-            "sap_cloud_sdk.extensibility.client.asyncio.sleep",
-            new_callable=AsyncMock,
-        ):
-            with pytest.raises(ExtensibilityError, match="node failed"):
-                await client.call_hook_agw(hook=_make_hook(), tenant_subdomain="t")
-
-    @pytest.mark.asyncio
-    async def test_timeout_raises(self):
-        """Raises ExtensibilityError when deadline is exceeded without a success status."""
-        tools = [
-            _make_n8n_tool(_EXECUTE_WORKFLOW_TOOL_NAME),
-            _make_n8n_tool(_GET_EXECUTION_TOOL_NAME),
-        ]
-        # Always returns "running" so the loop never exits via success/terminal
-        agw = _make_agw_client(
-            tools=tools,
-            tool_responses=[_running_payload()] + [_running_payload()] * 100,
-        )
-        client = self._make_client(agw)
-        # Use a hook with timeout=0 so monotonic deadline is immediately exceeded
-        hook = _make_hook(timeout=0)
-        with patch(
-            "sap_cloud_sdk.extensibility.client.create_agw_client",
-            return_value=agw,
-        ), patch(
-            "sap_cloud_sdk.extensibility.client.asyncio.sleep",
-            new_callable=AsyncMock,
-        ):
-            with pytest.raises(ExtensibilityError, match="timed out"):
-                await client.call_hook_agw(hook=hook, tenant_subdomain="t")
-
-    @pytest.mark.asyncio
-    async def test_agw_call_mcp_tool_exception_raises_transport_error(self):
+    async def test_agw_call_exception_raises_transport_error(self):
         """Wraps call_mcp_tool exceptions in TransportError."""
-        tools = [
-            _make_n8n_tool(_EXECUTE_WORKFLOW_TOOL_NAME),
-            _make_n8n_tool(_GET_EXECUTION_TOOL_NAME),
-        ]
         agw = MagicMock()
-        agw.list_mcp_tools = AsyncMock(return_value=tools)
+        agw.list_mcp_tools = AsyncMock(return_value=[_make_hook_tool()])
         agw.call_mcp_tool = AsyncMock(side_effect=RuntimeError("network error"))
-        client = self._make_client(agw)
+        client = self._make_client()
         with patch(
             "sap_cloud_sdk.extensibility.client.create_agw_client",
             return_value=agw,
@@ -545,27 +381,30 @@ class TestCallHook:
                 await client.call_hook_agw(hook=_make_hook(), tenant_subdomain="t")
 
     @pytest.mark.asyncio
-    async def test_workflow_id_passed_to_execute_tool(self):
-        """Verifies the correct workflowId is forwarded to call_mcp_tool."""
-        tools = [
-            _make_n8n_tool(_EXECUTE_WORKFLOW_TOOL_NAME),
-            _make_n8n_tool(_GET_EXECUTION_TOOL_NAME),
-        ]
-        agw = _make_agw_client(
-            tools=tools,
-            tool_responses=[_running_payload(), _poll_success_payload()],
-        )
-        client = self._make_client(agw)
+    async def test_non_a2a_response_raises_extensibility_error(self):
+        """Raises ExtensibilityError when the tool response is not a valid A2A Message."""
+        bad_payload = json.dumps({"not": "a2a"})
+        agw = _make_agw_client(tools=[_make_hook_tool()], tool_responses=[bad_payload])
+        client = self._make_client()
         with patch(
             "sap_cloud_sdk.extensibility.client.create_agw_client",
             return_value=agw,
-        ), patch(
-            "sap_cloud_sdk.extensibility.client.asyncio.sleep",
-            new_callable=AsyncMock,
         ):
-            await client.call_hook_agw(
-                hook=_make_hook(workflow_id="wf-xyz"), tenant_subdomain="t"
-            )
-        # First call is execute_workflow — check workflowId was forwarded correctly
-        first_call_kwargs = agw.call_mcp_tool.call_args_list[0][1]
-        assert first_call_kwargs["workflowId"] == "wf-xyz"
+            with pytest.raises(ExtensibilityError, match="A2A"):
+                await client.call_hook_agw(hook=_make_hook(), tenant_subdomain="t")
+
+    @pytest.mark.asyncio
+    async def test_webhook_inputs_forwarded_to_tool(self):
+        """Verifies webhook payload structure is forwarded correctly to call_mcp_tool."""
+        agw = _make_agw_client(tools=[_make_hook_tool()], tool_responses=[_success_payload()])
+        client = self._make_client()
+        with patch(
+            "sap_cloud_sdk.extensibility.client.create_agw_client",
+            return_value=agw,
+        ):
+            await client.call_hook_agw(hook=_make_hook(), tenant_subdomain="t")
+        call_kwargs = agw.call_mcp_tool.call_args[1]
+        assert "inputs" in call_kwargs
+        assert call_kwargs["inputs"]["type"] == "webhook"
+        assert "webhookData" in call_kwargs["inputs"]
+        assert call_kwargs["inputs"]["webhookData"]["method"] == HTTPMethod.POST

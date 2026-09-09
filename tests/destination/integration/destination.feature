@@ -253,6 +253,27 @@ Feature: Destination Service Integration
     And I clean up the instance destination "test-v2-full-options"
     And I clean up the instance fragment "test-v2-full-fragment"
 
+  Scenario: DestinationHttpClient mounts mTLS adapter for PEM certificate with encrypted key
+    Given I have a subaccount destination with a generated encrypted PEM certificate named "test-mtls-pem"
+    When I fetch the destination "test-mtls-pem" using the v2 API at subaccount level
+    Then the DestinationHttpClient mounts a client certificate adapter
+    And I clean up the subaccount destination "test-mtls-pem"
+    And I clean up the subaccount certificate "test-mtls-pem.pem"
+
+  Scenario: DestinationHttpClient mounts mTLS adapter for PKCS12 P12 certificate
+    Given I have a subaccount destination with a generated P12 certificate named "test-mtls-p12"
+    When I fetch the destination "test-mtls-p12" using the v2 API at subaccount level
+    Then the DestinationHttpClient mounts a client certificate adapter
+    And I clean up the subaccount destination "test-mtls-p12"
+    And I clean up the subaccount certificate "test-mtls-p12.p12"
+
+  Scenario: DestinationHttpClient mounts mTLS adapter for PKCS12 PFX certificate
+    Given I have a subaccount destination with a generated PFX certificate named "test-mtls-pfx"
+    When I fetch the destination "test-mtls-pfx" using the v2 API at subaccount level
+    Then the DestinationHttpClient mounts a client certificate adapter
+    And I clean up the subaccount destination "test-mtls-pfx"
+    And I clean up the subaccount certificate "test-mtls-pfx.pfx"
+
   Scenario: DestinationHttpClient sends an authenticated request using token fetched from BTP
     Given I have a destination named "sdk-test-http-client" of type "HTTP"
     And the destination has URL "https://httpbin.org"

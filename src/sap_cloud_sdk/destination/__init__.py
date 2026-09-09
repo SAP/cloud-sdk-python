@@ -68,6 +68,7 @@ from sap_cloud_sdk.destination.exceptions import (
     HttpError,
     DestinationOperationError,
     DestinationNotFoundError,
+    DestinationCertificateError,
 )
 
 
@@ -253,4 +254,5 @@ __all__ = [
     "HttpError",
     "DestinationOperationError",
     "DestinationNotFoundError",
+    "DestinationCertificateError",
 ]

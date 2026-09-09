@@ -49,3 +49,9 @@ class DestinationNotFoundError(DestinationOperationError):
     """Raised when a requested Destination is not found (HTTP 404)."""
 
     pass
+
+
+class DestinationCertificateError(DestinationError):
+    """Raised when a client certificate cannot be loaded or wired into the HTTP session."""
+
+    pass

@@ -928,7 +928,8 @@ class TestSetAICoreConfigDestinationMode:
         auth_tokens=None,
     ):
         from unittest.mock import MagicMock
-        dest = MagicMock()
+        from sap_cloud_sdk.destination import Destination
+        dest = MagicMock(spec=Destination)
         dest.url = url
         dest.properties = properties or {
             "clientId": "sb-client-id",

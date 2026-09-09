@@ -133,11 +133,7 @@ class ExtensibilityClient:
         card_ord_id = hook.n8n_workflow_config.card_ord_id
 
         hook_tool = next(
-            (
-                t
-                for t in tools
-                if t.name == tool_name and t.server_name == card_ord_id
-            ),
+            (t for t in tools if t.name == tool_name and t.server_name == card_ord_id),
             None,
         )
         if hook_tool is None:

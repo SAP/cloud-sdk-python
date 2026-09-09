@@ -18,6 +18,7 @@ from requests_oauthlib import OAuth2Session
 
 from sap_cloud_sdk.destination.config import DestinationConfig
 from sap_cloud_sdk.destination.exceptions import HttpError
+from sap_cloud_sdk.core._tenant import _validate_tenant_subdomain
 
 # API version constants
 API_V1 = "v1"
@@ -64,12 +65,10 @@ class TokenProvider:
         token_url = self._config.token_url
         identityzone = self._config.identityzone
 
+        _validate_tenant_subdomain(tenant_subdomain)
+
         if tenant_subdomain:
-            try:
-                token_url = token_url.replace(str(identityzone), tenant_subdomain)
-            except Exception:
-                # Fallback to base token_url if replacement fails
-                token_url = self._config.token_url
+            token_url = token_url.replace(str(identityzone), tenant_subdomain)
 
         token: Dict[str, Any] = self._session.fetch_token(
             token_url=token_url,

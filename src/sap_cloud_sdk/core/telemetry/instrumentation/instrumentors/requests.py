@@ -1,7 +1,7 @@
 from opentelemetry.instrumentation.requests import RequestsInstrumentor
 
 from sap_cloud_sdk.core.telemetry.instrumentation.base import LibraryInstrumentor
-from sap_cloud_sdk.core.telemetry.instrumentation._registry import register
+from sap_cloud_sdk.core.telemetry.instrumentation._registry import Library, register
 
 _instrumentor = RequestsInstrumentor()
 
@@ -9,7 +9,7 @@ _instrumentor = RequestsInstrumentor()
 class RequestsInstrumentorWrapper(LibraryInstrumentor):
     """Instruments the requests library with OTel spans and W3C header propagation."""
 
-    library_name = "requests"
+    library_name = Library.REQUESTS
 
     def is_instrumented(self) -> bool:
         return _instrumentor.is_instrumented_by_opentelemetry

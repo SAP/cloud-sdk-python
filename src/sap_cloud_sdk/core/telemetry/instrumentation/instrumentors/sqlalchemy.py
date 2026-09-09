@@ -1,7 +1,7 @@
 from opentelemetry.instrumentation.sqlalchemy import SQLAlchemyInstrumentor
 
 from sap_cloud_sdk.core.telemetry.instrumentation.base import LibraryInstrumentor
-from sap_cloud_sdk.core.telemetry.instrumentation._registry import register
+from sap_cloud_sdk.core.telemetry.instrumentation._registry import Library, register
 
 _instrumentor = SQLAlchemyInstrumentor()
 
@@ -9,7 +9,7 @@ _instrumentor = SQLAlchemyInstrumentor()
 class SQLAlchemyInstrumentorWrapper(LibraryInstrumentor):
     """Instruments SQLAlchemy with OTel spans for database queries."""
 
-    library_name = "sqlalchemy"
+    library_name = Library.SQLALCHEMY
 
     def is_instrumented(self) -> bool:
         return _instrumentor.is_instrumented_by_opentelemetry

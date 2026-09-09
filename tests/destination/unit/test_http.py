@@ -73,6 +73,31 @@ class TestTokenProvider:
             provider.get_token()
 
     @patch("sap_cloud_sdk.destination._http.OAuth2Session")
+    def test_invalid_tenant_subdomain_raises_value_error(self, mock_oauth):
+        mock_session = MagicMock()
+        mock_oauth.return_value = mock_session
+
+        binding = DestinationConfig(
+            url="https://destination.example.com",
+            token_url="https://provider-zone.authentication.region/oauth/token",
+            client_id="cid",
+            client_secret="csecret",
+            identityzone="provider-zone",
+        )
+        provider = TokenProvider(binding)
+
+        with pytest.raises(ValueError, match="Invalid tenant_subdomain"):
+            provider.get_token(tenant_subdomain="-invalid")
+
+        with pytest.raises(ValueError, match="Invalid tenant_subdomain"):
+            provider.get_token(tenant_subdomain="has.dot")
+
+        with pytest.raises(ValueError, match="Invalid tenant_subdomain"):
+            provider.get_token(tenant_subdomain="trailing-hyphen-")
+
+        mock_session.fetch_token.assert_not_called()
+
+    @patch("sap_cloud_sdk.destination._http.OAuth2Session")
     def test_tenant_subdomain_replaces_identityzone(self, mock_oauth):
         mock_session = MagicMock()
         mock_oauth.return_value = mock_session

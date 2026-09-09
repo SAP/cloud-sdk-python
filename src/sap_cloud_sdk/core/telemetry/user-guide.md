@@ -42,17 +42,6 @@ with invoke_agent_span(
     # autoinstrumented LLM call is a child of this span
     response = client.chat.completions.create(...)
 ```
-
-### 3. Set tenant ID at the request boundary
-
-```python
-from sap_cloud_sdk.core.telemetry import set_tenant_id
-
-
-def handle_request(request):
-    set_tenant_id(extract_tenant_from_jwt(request))
-```
-
 ---
 
 ## Library instrumentation
@@ -77,6 +66,18 @@ def handle_request(request):
 Instrumentation activates based on what is installed in the service, not on what extras were used to install the SDK. If your service has `django` in its own requirements, the SDK will instrument it automatically.
 
 The SDK ships `opentelemetry-instrumentation-*` packages for all of the above as hard dependencies. The target frameworks themselves are optional — install them via your service's own requirements or via the SDK's convenience extras (e.g. `sap-cloud-sdk[django]`).
+
+### Introspection
+
+Use `get_instrumented_libraries()` to query which libraries were actually patched at runtime:
+
+```python
+from sap_cloud_sdk.core.telemetry import Library, get_instrumented_libraries
+
+get_instrumented_libraries()  # -> [Library.HTTPX, Library.SQLALCHEMY, ...] after auto_instrument(), [] before
+```
+
+Only libraries that were installed **and** successfully instrumented appear in the list. Libraries skipped because they are not installed do not appear. Returns an empty list if `auto_instrument()` has not been called yet.
 
 ---
 
@@ -192,6 +193,15 @@ logger.warning("Retrying request, attempt %d", attempt)
 logger.error("Failed to connect", exc_info=True)
 ```
 
+### Identity attributes
+
+`sap.tenancy.tenant_id` and `user.id` are automatically stamped on every log record when a request context is active — no extra code needed. The same identity used for traces is used for logs.
+
+Resolution priority:
+1. Runtime context populated by `bootstrap()` (`GLOBAL_TENANT_ID`, `USER_ID` from `IASContextProvider`)
+2. IAS auth context set by `StarletteIASTelemetryMiddleware` (`sap_gtid`, `user_uuid` claims)
+3. Omitted when no identity is available (e.g. log lines emitted at startup)
+
 ### Structured fields
 
 Use `extra={}` to attach structured attributes to a log record:
@@ -295,6 +305,7 @@ from litellm import completion
 
 logger = logging.getLogger(__name__)
 
+
 async def handle_request(query: str, user_id: str):
     set_tenant_id("bh7sjh...")
 
@@ -369,13 +380,6 @@ auto_instrument(middlewares=[StarletteIASTelemetryMiddleware(app=app)])
 
 ---
 
-## Multi-tenancy
-
-- **Supported:** N/A
-- **Authentication:** N/A
-- **How to use:** This is an infrastructure module. `set_tenant_id()` and `StarletteIASTelemetryMiddleware` allow attaching a tenant identifier to OpenTelemetry spans as metadata, but this is observability context.
-- **Further reading:** N/A
-
 ## Configuration
 
 ### Production
@@ -435,10 +439,10 @@ The `record_metrics` decorator records request and error counters for any SDK mo
 ```python
 from sap_cloud_sdk.core.telemetry import record_metrics
 
+
 class MyClient:
     @record_metrics("my_module", "my_operation")
-    def my_method(self):
-        ...
+    def my_method(self): ...
 ```
 
 Each call to the decorated method increments `sap.cloud_sdk.capability.requests`. On exception it increments `sap.cloud_sdk.capability.errors` and re-raises. Metrics are emitted only when `OTEL_EXPORTER_OTLP_ENDPOINT` is set — no-op otherwise.
@@ -450,10 +454,10 @@ For modules that live inside this package, use the `Module` and `Operation` enum
 ```python
 from sap_cloud_sdk.core.telemetry import record_metrics, Module, Operation
 
+
 class DestinationClient:
     @record_metrics(Module.DESTINATION, Operation.DESTINATION_GET_DESTINATION)
-    def get_destination(self, name: str):
-        ...
+    def get_destination(self, name: str): ...
 ```
 
 ### Using plain strings (external packages)
@@ -463,10 +467,10 @@ External packages that depend on `sap-cloud-sdk` can pass plain strings directly
 ```python
 from sap_cloud_sdk.core.telemetry import record_metrics
 
+
 class MyExternalClient:
     @record_metrics("my_module", "my_operation")
-    def my_method(self):
-        ...
+    def my_method(self): ...
 ```
 
 The `Module` enum values are still the canonical form for OSS modules. Plain strings are the extension point for packages that have their own release lifecycle.

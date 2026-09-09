@@ -271,9 +271,9 @@ Both fields default to empty lists. `agent_names` is applied after fetching; `or
 from sap_cloud_sdk.agentgateway import MCPToolFilter
 
 MCPToolFilter(
-    names=[],    # tool names to include (matched against MCPTool.name); empty = no filter
+    names=[],  # tool names to include (matched against MCPTool.name); empty = no filter
     ord_ids=[],  # ORD IDs to include (extracted from fragment URL for LoB, or matched
-                 # against IntegrationDependency.ord_id for customer agents); empty = no filter
+    # against IntegrationDependency.ord_id for customer agents); empty = no filter
 )
 ```
 

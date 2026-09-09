@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager, contextmanager
 from contextvars import ContextVar
 from typing import Any, AsyncGenerator, Dict, Generator, Optional, TypeVar
 
-from sap_cloud_sdk.core.runtime_context._keys import ContextKey
+from sap_cloud_sdk.core.runtime_context._keys import ContextKey, FEATURE_TOGGLES
 
 T = TypeVar("T")
 
@@ -62,6 +62,17 @@ def get_context() -> RuntimeContext:
     Returns an empty :class:`RuntimeContext` when no context has been set.
     """
     return _context_var.get()
+
+
+def is_feature_enabled(name: str) -> bool:
+    """Return ``True`` if *name* is in the active feature toggles for the current request.
+
+    Feature toggles are populated from the ``dwc-stage-configuration`` DWC request
+    header by :class:`~sap_cloud_sdk.core.runtime_context.DWCContextProvider`.
+    Returns ``False`` when no toggles header was present or the toggle is absent.
+    """
+    toggles = get_context().get(FEATURE_TOGGLES)
+    return name in toggles if toggles is not None else False
 
 
 @contextmanager

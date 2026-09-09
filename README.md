@@ -59,7 +59,7 @@ The SDK automatically resolves configuration from multiple sources with the foll
 
 2. **Environment variables**: `CLOUD_SDK_CFG_<MODULE>_<INSTANCE>_<FIELD>`
    - For instance names, hyphens (`"-"`) are replaced with underscores (`"_"`) for compatibility with system environment variables.
-   - You can see examples in our [env_integration_tests.example](.env_integration_tests.example)
+   - You can see examples in our [env_integration_tests.example](.env_integration_tests.example).
 
 ### Usage Guides
 

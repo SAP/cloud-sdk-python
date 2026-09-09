@@ -4,7 +4,7 @@ from opentelemetry.instrumentation.grpc import (
 )
 
 from sap_cloud_sdk.core.telemetry.instrumentation.base import LibraryInstrumentor
-from sap_cloud_sdk.core.telemetry.instrumentation._registry import register
+from sap_cloud_sdk.core.telemetry.instrumentation._registry import Library, register
 
 _client_instrumentor = GrpcInstrumentorClient()
 _server_instrumentor = GrpcInstrumentorServer()
@@ -13,7 +13,7 @@ _server_instrumentor = GrpcInstrumentorServer()
 class GrpcInstrumentorWrapper(LibraryInstrumentor):
     """Instruments gRPC client and server interceptors with OTel spans."""
 
-    library_name = "grpc"
+    library_name = Library.GRPC
 
     def is_instrumented(self) -> bool:
         return (

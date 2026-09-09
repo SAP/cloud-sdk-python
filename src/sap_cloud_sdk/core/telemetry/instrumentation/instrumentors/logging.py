@@ -6,7 +6,7 @@ from opentelemetry.instrumentation.logging.handler import (
 )
 
 from sap_cloud_sdk.core.telemetry.instrumentation.base import LibraryInstrumentor
-from sap_cloud_sdk.core.telemetry.instrumentation._registry import register
+from sap_cloud_sdk.core.telemetry.instrumentation._registry import Library, register
 
 _instrumentor = LoggingInstrumentor()
 
@@ -27,7 +27,7 @@ def _has_otel_handler_on_root() -> bool:
 class LoggingInstrumentorWrapper(LibraryInstrumentor):
     """Injects trace_id and span_id into every stdlib log record for log-trace correlation."""
 
-    library_name = "logging"
+    library_name = Library.LOGGING
 
     def is_instrumented(self) -> bool:
         return _instrumentor.is_instrumented_by_opentelemetry

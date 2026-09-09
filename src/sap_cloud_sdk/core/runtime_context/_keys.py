@@ -1,6 +1,6 @@
 """Typed context key for RuntimeContext."""
 
-from typing import Generic, TypeVar
+from typing import Generic, List, TypeVar
 
 T = TypeVar("T")
 
@@ -37,3 +37,4 @@ class ContextKey(Generic[T]):
 TRIGGER_TYPE = ContextKey[str]("trigger_type")
 DWC_SUBDOMAIN = ContextKey[str]("dwc_subdomain")
 DWC_TENANT = ContextKey[str]("dwc_tenant")
+FEATURE_TOGGLES = ContextKey[List[str]]("dwc_feature_toggles")

@@ -1,7 +1,7 @@
 from opentelemetry.instrumentation.starlette import StarletteInstrumentor
 
 from sap_cloud_sdk.core.telemetry.instrumentation.base import LibraryInstrumentor
-from sap_cloud_sdk.core.telemetry.instrumentation._registry import register
+from sap_cloud_sdk.core.telemetry.instrumentation._registry import Library, register
 
 _instrumentor = StarletteInstrumentor()
 
@@ -13,7 +13,7 @@ class StarletteInstrumentorWrapper(LibraryInstrumentor):
     instance via auto_instrument(app=app) from within a lifespan handler.
     """
 
-    library_name = "starlette"
+    library_name = Library.STARLETTE
 
     def is_instrumented(self) -> bool:
         return _instrumentor.is_instrumented_by_opentelemetry

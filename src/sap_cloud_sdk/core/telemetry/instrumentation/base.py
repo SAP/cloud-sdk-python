@@ -1,7 +1,10 @@
 import importlib.util
 import logging
 from abc import ABC, abstractmethod
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from sap_cloud_sdk.core.telemetry.instrumentation._registry import Library
 
 logger = logging.getLogger(__name__)
 
@@ -18,8 +21,8 @@ class LibraryInstrumentor(ABC):
     subclasses to accept optional arguments (e.g. app= for framework instrumentors).
     """
 
-    #: Import name of the library being instrumented (e.g. "httpx").
-    library_name: str
+    #: Library enum member identifying the library being instrumented.
+    library_name: "Library"
 
     def instrument(self, **kwargs: Any) -> None:
         if not self._is_library_installed():
@@ -37,6 +40,11 @@ class LibraryInstrumentor(ABC):
                 "%s instrumentation skipped — library not importable", self.library_name
             )
             return
+        from sap_cloud_sdk.core.telemetry.instrumentation._registry import (
+            record_instrumented,
+        )
+
+        record_instrumented(self.library_name)
         logger.debug("Instrumented %s", self.library_name)
 
     def uninstrument(self) -> None:

@@ -1,7 +1,9 @@
 """Configuration for OpenTelemetry telemetry."""
 
+import logging
 import os
 from dataclasses import dataclass
+from importlib.metadata import entry_points as _entry_points
 from typing import Optional
 from opentelemetry.sdk.resources import SERVICE_NAME
 from sap_cloud_sdk.core._version import get_version
@@ -21,6 +23,8 @@ from sap_cloud_sdk.core.telemetry.constants import (
     ATTR_SAP_SERVICE_DISPLAY_NAME,
     SDK_NAME,
 )
+
+logger = logging.getLogger(__name__)
 
 # Default attribute values
 DEFAULT_UNKNOWN = "unknown"
@@ -171,6 +175,13 @@ def create_resource_attributes_from_env() -> dict:
     service_display_name = _get_service_display_name()
     if service_display_name is not None:
         attributes[ATTR_SAP_SERVICE_DISPLAY_NAME] = service_display_name
+
+    for _ep in _entry_points(group="sap_cloud_sdk.resource_providers"):
+        try:
+            _provider = _ep.load()
+            attributes.update(_provider())
+        except Exception:
+            logger.debug("Failed to load resource provider %s", _ep.name, exc_info=True)
 
     return attributes
 

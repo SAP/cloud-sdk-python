@@ -1,7 +1,7 @@
 from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 
 from sap_cloud_sdk.core.telemetry.instrumentation.base import LibraryInstrumentor
-from sap_cloud_sdk.core.telemetry.instrumentation._registry import register
+from sap_cloud_sdk.core.telemetry.instrumentation._registry import Library, register
 
 _instrumentor = FastAPIInstrumentor()
 
@@ -13,7 +13,7 @@ class FastAPIInstrumentorWrapper(LibraryInstrumentor):
     instance via auto_instrument(app=app) from within a lifespan handler.
     """
 
-    library_name = "fastapi"
+    library_name = Library.FASTAPI
 
     def is_instrumented(self) -> bool:
         return _instrumentor.is_instrumented_by_opentelemetry

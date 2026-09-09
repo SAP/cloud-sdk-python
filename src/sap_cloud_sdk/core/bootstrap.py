@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from typing import Any, List, Optional
 
 from sap_cloud_sdk.core.runtime_context._protocol import ContextProvider
-from sap_cloud_sdk.core.runtime_context._registry import get_registry
+from sap_cloud_sdk.core.runtime_context._registry import get_registry, record_attached
 from sap_cloud_sdk.core.runtime_context import (
     DWCContextProvider,
     IASContextProvider,
@@ -89,6 +89,7 @@ def bootstrap(
     for adapter in get_registry():
         if adapter.matches(app):
             adapter.attach(app, providers)
+            record_attached(adapter.name)
             return
 
     raise TypeError(

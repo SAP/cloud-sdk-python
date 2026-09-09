@@ -1,5 +1,6 @@
 """Data models for Agent Gateway MCP tools."""
 
+import json
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -94,6 +95,33 @@ class CustomerCredentials:
     integration_dependencies: list[IntegrationDependency]
     certificate: str | None = None
     private_key: str | None = None
+
+
+@dataclass
+class JsonRpcError:
+    """Parsed JSON-RPC error from an Agent Gateway response.
+
+    AGW returns HTTP 200 with a JSON-RPC error body when the request is
+    structurally valid but the server encountered an error.
+
+    Example: {"jsonrpc": "2.0", "error": {"code": -32603, "message": "Internal Server Error"}}
+
+    Attributes:
+        code: JSON-RPC error code.
+        message: Human-readable error message from AGW.
+    """
+
+    code: int
+    message: str
+
+    @classmethod
+    def parse(cls, text: str) -> "JsonRpcError | None":
+        try:
+            data = json.loads(text)
+            error = data.get("error", {})
+            return cls(code=error["code"], message=error["message"])
+        except Exception:
+            return None
 
 
 @dataclass

@@ -142,7 +142,10 @@ def _get_config_from_destination(
     if destination is None or not isinstance(destination, Destination):
         return {}
 
-    endpoint = destination.url or ""
+    if not destination.url:
+        return {}
+
+    endpoint = destination.url
     props = destination.properties
 
     deployment_id = props.get(_DestinationProperties.DEPLOYMENT_ID.value) or ""

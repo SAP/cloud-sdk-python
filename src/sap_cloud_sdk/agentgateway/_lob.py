@@ -9,6 +9,7 @@ import asyncio
 import logging
 import os
 import uuid
+from typing import Any, Awaitable
 
 import httpx
 from mcp import ClientSession
@@ -55,6 +56,42 @@ from sap_cloud_sdk.agentgateway.exceptions import (
 logger = logging.getLogger(__name__)
 
 _DESTINATION_INSTANCE = "default"
+
+
+async def _mcp_call_with_deadline(
+    operation: str,
+    awaitable: Awaitable,
+    *,
+    timeout: float,
+    target: str,
+) -> Any:
+    """Run an MCP protocol call under a wall-clock deadline.
+
+    The ``httpx.AsyncClient`` timeout only bounds individual HTTP chunk
+    reads; an MCP stream's SSE keep-alives reset that timer continuously, so
+    an unresponsive server can keep ``session.initialize()`` /
+    ``list_tools()`` / ``call_tool()`` alive forever. Wrapping the protocol
+    call in ``asyncio.wait_for`` enforces a deadline that keep-alives cannot
+    extend, letting the caller fail fast instead of hanging.
+
+    Args:
+        operation: Human-readable protocol operation name (for the error).
+        awaitable: The protocol coroutine to run under the deadline.
+        timeout: Wall-clock seconds budget for the call.
+        target: Human-readable server/tool name (for the error).
+
+    Returns:
+        The protocol call's result.
+
+    Raises:
+        AgentGatewaySDKError: If the call does not complete within ``timeout``.
+    """
+    try:
+        return await asyncio.wait_for(awaitable, timeout=timeout)
+    except asyncio.TimeoutError as exc:
+        raise AgentGatewaySDKError(
+            f"MCP {operation} on '{target}' timed out after {timeout}s"
+        ) from exc
 
 
 def _system_scope_key(tenant_subdomain: str) -> str:
@@ -383,9 +420,19 @@ async def list_server_tools(
             *_,
         ):
             async with ClientSession(read, write) as session:
-                init_result = await session.initialize()
+                init_result = await _mcp_call_with_deadline(
+                    "initialize",
+                    session.initialize(),
+                    timeout=timeout,
+                    target=fragment_name,
+                )
                 server_name = mcp_server_name(init_result) or fragment_name
-                result = await session.list_tools()
+                result = await _mcp_call_with_deadline(
+                    "list_tools",
+                    session.list_tools(),
+                    timeout=timeout,
+                    target=fragment_name,
+                )
                 tools = result.tools or []
                 if not tools:
                     logger.info(
@@ -514,8 +561,18 @@ async def call_mcp_tool_lob(
             *_,
         ):
             async with ClientSession(read, write) as session:
-                await session.initialize()
-                result = await session.call_tool(tool.name, kwargs)
+                await _mcp_call_with_deadline(
+                    "initialize",
+                    session.initialize(),
+                    timeout=timeout,
+                    target=tool.fragment_name or tool.name,
+                )
+                result = await _mcp_call_with_deadline(
+                    f"call_tool({tool.name})",
+                    session.call_tool(tool.name, kwargs),
+                    timeout=timeout,
+                    target=tool.fragment_name or tool.name,
+                )
                 if not result.content:
                     logger.warning(
                         "Tool '%s' on '%s' returned empty content", tool.name, tool.url

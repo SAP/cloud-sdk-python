@@ -1,5 +1,6 @@
 """Unit tests for LoB agent flow."""
 
+import asyncio
 import logging
 import os
 from unittest.mock import patch, MagicMock, AsyncMock
@@ -905,6 +906,73 @@ class TestListServerTools:
         assert result[0].server_name == "real-server-name"
 
     @pytest.mark.asyncio
+    async def test_initialize_timeout_raises_agent_gateway_error(self):
+        """A stalled MCP server must fail fast instead of hanging forever.
+
+        The httpx client timeout only bounds individual chunk reads; SSE
+        keep-alives reset it continuously, so the protocol call needs its own
+        wall-clock deadline (xorbitsai/xagent-issue #313).
+        """
+        with (
+            patch("sap_cloud_sdk.agentgateway._lob.httpx.AsyncClient") as mock_http,
+            patch(
+                "sap_cloud_sdk.agentgateway._lob.streamable_http_client"
+            ) as mock_stream,
+            patch("sap_cloud_sdk.agentgateway._lob.ClientSession") as mock_session,
+        ):
+            mock_http.return_value.__aenter__.return_value = AsyncMock()
+            mock_stream.return_value.__aenter__.return_value = (
+                AsyncMock(),
+                AsyncMock(),
+                None,
+            )
+
+            async def _never_returns():
+                await asyncio.sleep(3600)
+
+            mock_session_instance = AsyncMock()
+            mock_session_instance.initialize = _never_returns
+            mock_session.return_value.__aenter__.return_value = mock_session_instance
+
+            with pytest.raises(AgentGatewaySDKError, match="timed out"):
+                await list_server_tools(
+                    "https://example.com/mcp", "token", "my-fragment", 0.05
+                )
+
+    @pytest.mark.asyncio
+    async def test_list_tools_timeout_raises_agent_gateway_error(self):
+        """list_tools also gets the protocol-level deadline."""
+        with (
+            patch("sap_cloud_sdk.agentgateway._lob.httpx.AsyncClient") as mock_http,
+            patch(
+                "sap_cloud_sdk.agentgateway._lob.streamable_http_client"
+            ) as mock_stream,
+            patch("sap_cloud_sdk.agentgateway._lob.ClientSession") as mock_session,
+        ):
+            mock_http.return_value.__aenter__.return_value = AsyncMock()
+            mock_stream.return_value.__aenter__.return_value = (
+                AsyncMock(),
+                AsyncMock(),
+                None,
+            )
+
+            async def _never_returns():
+                await asyncio.sleep(3600)
+
+            mock_init = MagicMock()
+            mock_init.server_info = None
+
+            mock_session_instance = AsyncMock()
+            mock_session_instance.initialize = AsyncMock(return_value=mock_init)
+            mock_session_instance.list_tools = _never_returns
+            mock_session.return_value.__aenter__.return_value = mock_session_instance
+
+            with pytest.raises(AgentGatewaySDKError, match="list_tools"):
+                await list_server_tools(
+                    "https://example.com/mcp", "token", "my-fragment", 0.05
+                )
+
+    @pytest.mark.asyncio
     async def test_falls_back_to_fragment_name_when_server_info_missing(self):
         """Fall back to fragment_name when server_info or its name is absent."""
         tool_mock = MagicMock(spec=["name", "description", "input_schema"])
@@ -1027,6 +1095,43 @@ class TestCallMcpToolLob:
             result = await call_mcp_tool_lob(tool, "user-auth-token", 60.0)
 
             assert result == ""
+
+    @pytest.mark.asyncio
+    async def test_call_tool_timeout_raises_agent_gateway_error(self):
+        """Tool invocation also gets the protocol-level deadline."""
+        tool = MCPTool(
+            name="test-tool",
+            server_name="test-server",
+            description="Test tool",
+            input_schema={},
+            url="https://example.com/mcp",
+            fragment_name="mcp-server-a",
+        )
+
+        async def _never_returns(*_args, **_kwargs):
+            await asyncio.sleep(3600)
+
+        with (
+            patch("sap_cloud_sdk.agentgateway._lob.httpx.AsyncClient") as mock_http,
+            patch(
+                "sap_cloud_sdk.agentgateway._lob.streamable_http_client"
+            ) as mock_stream,
+            patch("sap_cloud_sdk.agentgateway._lob.ClientSession") as mock_session,
+        ):
+            mock_http.return_value.__aenter__.return_value = AsyncMock()
+            mock_stream.return_value.__aenter__.return_value = (
+                AsyncMock(),
+                AsyncMock(),
+                None,
+            )
+
+            mock_session_instance = AsyncMock()
+            mock_session_instance.initialize = AsyncMock()
+            mock_session_instance.call_tool = _never_returns
+            mock_session.return_value.__aenter__.return_value = mock_session_instance
+
+            with pytest.raises(AgentGatewaySDKError, match="call_tool\\("):
+                await call_mcp_tool_lob(tool, "user-auth-token", 0.05)
 
 
 # ============================================================

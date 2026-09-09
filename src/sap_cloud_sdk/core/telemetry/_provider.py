@@ -30,6 +30,9 @@ from opentelemetry.sdk.metrics import (
     ObservableUpDownCounter,
     UpDownCounter,
 )
+
+# Stable reference for isinstance checks — not overwritten when tests patch MeterProvider
+_SDKMeterProvider = MeterProvider
 from opentelemetry.sdk.metrics.export import (
     AggregationTemporality,
     PeriodicExportingMetricReader,
@@ -46,6 +49,18 @@ from sap_cloud_sdk.core.telemetry.constants import SDK_PACKAGE_NAME
 from sap_cloud_sdk.core.telemetry.log_filters.identity import IdentityLogFilter
 
 logger = logging.getLogger(__name__)
+
+
+def _merge_sdk_resource_into_meter_provider(
+    provider: MeterProvider, sdk_resource: Resource
+) -> None:
+    """OTel SDK has no public API to swap a MeterProvider's Resource after construction.
+    SdkConfiguration is a dataclass so _sdk_config.resource is mutable in-place;
+    _measurement_consumer holds the same object reference so it sees the update too."""
+    provider._sdk_config.resource = provider._sdk_config.resource.merge(sdk_resource)
+    logger.info(
+        "Merged sap-cloud-sdk resource attrs onto wrapper-installed MeterProvider"
+    )
 
 
 def _merge_sdk_resource_into_log_provider(
@@ -214,6 +229,21 @@ def _setup_meter_provider() -> Optional[MeterProvider]:
 
     try:
         resource = Resource.create(create_resource_attributes_from_env())
+        existing = cast(MeterProvider, metrics.get_meter_provider())
+
+        if isinstance(existing, _SDKMeterProvider):
+            logger.warning(
+                "Global MeterProvider was already set by another library. "
+                "Merging sap.cloud_sdk.* resource attributes into the existing provider."
+            )
+            _merge_sdk_resource_into_meter_provider(existing, resource)
+            logger.info(
+                f"OpenTelemetry meter provider merged. "
+                f"Service: {config.service_name}, "
+                f"Endpoint: {config.otlp_endpoint}"
+            )
+            return existing
+
         exporter = _create_metric_exporter()
         reader = PeriodicExportingMetricReader(exporter=exporter)
         provider = MeterProvider(resource=resource, metric_readers=[reader])

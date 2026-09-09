@@ -990,7 +990,7 @@ class TestCallExtensionHook:
     def test_calls_extensibility_client(self):
         async def _run():
             mock_client = AsyncMock()
-            mock_client.call_hook.return_value = {"status": "ok"}
+            mock_client.call_hook_agw.return_value = {"status": "ok"}
             mock_hook = MagicMock()
             mock_hook.name = "pre_process"
 
@@ -998,11 +998,16 @@ class TestCallExtensionHook:
             result = await call_extension_hook(
                 extensibility_client=mock_client,
                 hook=mock_hook,
-                payload={"data": 1},
+                message={"data": 1},
                 extension_name="My Ext",
             )
             assert result == {"status": "ok"}
-            mock_client.call_hook.assert_awaited_once_with(mock_hook, {"data": 1})
+            mock_client.call_hook_agw.assert_awaited_once_with(
+                mock_hook,
+                user_token=None,
+                message={"data": 1},
+                tenant_subdomain=None,
+            )
             count, _ = get_hook_call_metrics()
             assert count == 1
 
@@ -1011,14 +1016,14 @@ class TestCallExtensionHook:
     def test_hook_without_name_uses_hook_id(self):
         async def _run():
             mock_client = AsyncMock()
-            mock_client.call_hook.return_value = None
+            mock_client.call_hook_agw.return_value = None
             mock_hook = object()  # No .name attribute
 
             reset_hook_call_metrics()
             await call_extension_hook(
                 extensibility_client=mock_client,
                 hook=mock_hook,
-                payload={},
+                message={},
                 extension_name="Ext",
                 hook_id="ord:hook:1",
             )

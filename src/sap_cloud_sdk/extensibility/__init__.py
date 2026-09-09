@@ -91,7 +91,7 @@ from sap_cloud_sdk.extensibility._models import (
 from sap_cloud_sdk.extensibility._noop_transport import NoOpTransport
 from sap_cloud_sdk.extensibility._ums_transport import UmsTransport
 from sap_cloud_sdk.extensibility.client import ExtensibilityClient
-from sap_cloud_sdk.extensibility.config import ExtensibilityConfig, HookConfig
+from sap_cloud_sdk.extensibility.config import ExtensibilityConfig
 from sap_cloud_sdk.extensibility.exceptions import (
     ClientCreationError,
     ExtensibilityError,
@@ -205,7 +205,6 @@ __all__ = [
     "OnFailure",
     # Config
     "ExtensibilityConfig",
-    "HookConfig",
     # Transports
     "UmsTransport",
     # Exceptions

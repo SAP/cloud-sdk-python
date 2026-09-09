@@ -142,30 +142,9 @@ def get_extension_capability_implementation(
 - `skip_cache`: When `True`, bypasses the transport-level cache and fetches a fresh result from UMS. The fresh result is still written back into the cache. Defaults to `False`.
 - Returns an `ExtensionCapabilityImplementation`. On any error during the request, returns an instance with an empty `mcp_servers` list.
 
-### `ExtensibilityClient.call_hook()`
-
-Executes a hook endpoint with the provided payload.
-
-```python
-def call_hook(
-    self,
-    hook: Hook,
-    hook_config: HookConfig,
-) -> Optional[Message]: ...
-```
-
-- `hook`: Hook configuration object containing workflow config (`n8n_workflow_config`), timeout, and other settings.
-- `hook_config`: Hook invocation configuration (`endpoint`, optional `auth_token`, and optional `payload`).
-- Returns the response data as a `Message` object, or `None` if no message is produced.
-- Raises `TransportError` if the HTTP request or SSE parsing fails.
-- Raises `ExtensibilityError` if the workflow reaches a terminal failure status, times out, or n8n returns an application-level error.
-- The hook's `timeout` setting is used for the HTTP request timeout.
-- The hook HTTP method is taken from `hook.n8n_workflow_config.method`.
-- The workflow ID is taken from `hook.n8n_workflow_config.workflow_id` (legacy direct-HTTP path).
-
 ### `ExtensibilityClient.call_hook_agw()`
 
-Async variant of `call_hook()` that invokes a hook via the Agent Gateway MCP tool interface instead of a direct HTTP call. Auth and endpoint resolution are handled internally — no manual URL or token configuration is needed.
+Invokes a hook via the Agent Gateway MCP tool interface. Auth and endpoint resolution are handled internally — no manual URL or token configuration is needed.
 
 ```python
 async def call_hook_agw(
@@ -199,21 +178,7 @@ class N8nWorkflowConfig:
     method: HTTPMethod   # HTTP method used by webhook execution
 ```
 
-#### `HookConfig`
-
-Runtime invocation config required by `call_hook()`.
-
-```python
-@dataclass
-class HookConfig:
-    endpoint: str  # Full URL of the hook MCP endpoint
-    auth_token: Optional[str]  # Bearer token for authentication
-    payload: Optional[dict]  # Optional JSON payload
-```
-
 ### `build_extension_capabilities()`
-
-Converts extension capability declarations into A2A `AgentExtension` objects.
 
 ```python
 def build_extension_capabilities(
@@ -458,7 +423,7 @@ for server in ext.mcp_servers:
 
 ### Using Hooks
 
-Hooks allow you to execute custom workflows before or after agent operations. The extensibility client provides a `call_hook()` method to invoke hook endpoints.
+Hooks allow you to execute custom workflows before or after agent operations. Use `call_hook_agw()` to invoke a hook through the Agent Gateway MCP interface.
 
 ```python
 from sap_cloud_sdk.extensibility import create_client
@@ -503,48 +468,6 @@ if before_hooks:
         print(f"Hook response: {result}")
 ```
 
-### Calling Hook Endpoints
-
-Use the `call_hook()` method to execute a hook with a custom payload. Payloads use the `Message` type from `a2a.types`.
-
-```python
-from sap_cloud_sdk.extensibility import create_client, HookType
-from sap_cloud_sdk.extensibility.config import HookConfig
-from a2a.types import Message, Role, TextPart
-
-client = create_client("sap.ai:agent:myAgent:v1")
-ext = client.get_extension_capability_implementation(tenant=tenant_id)
-
-# Find a specific hook by type
-before_hooks = [h for h in ext.hooks if h.type == HookType.BEFORE]
-
-if before_hooks:
-    hook = before_hooks[0]
-
-    hook_config = HookConfig(
-        endpoint="https://gateway.example.com/v1/mcp/{ORD_ID}/{GTID}",
-        auth_token="my-secret-token",
-        payload=Message(
-            message_id="msg-hook-call-001",
-            role=Role.user,
-            parts=[
-                TextPart(
-                    text="Tool execution starting: create_ticket with priority=high"
-                )
-            ],
-        ),
-    )
-
-    try:
-        response = client.call_hook(hook, hook_config)
-        if response:
-            print(f"Hook response: {response}")
-        else:
-            print("Hook returned no content (204)")
-    except Exception as e:
-        print(f"Hook execution failed: {e}")
-```
-
 ### Hook Execution Patterns
 
 #### HTTP Methods for Hooks
@@ -553,8 +476,6 @@ Hooks support configurable HTTP methods via `hook.n8n_workflow_config.method`. B
 
 ```python
 from sap_cloud_sdk.extensibility import create_client
-from sap_cloud_sdk.extensibility.config import HookConfig
-from http import HTTPMethod
 from a2a.types import Message, Role, TextPart
 
 client = create_client("sap.ai:agent:myAgent:v1")
@@ -563,18 +484,16 @@ ext = client.get_extension_capability_implementation(tenant=tenant_id)
 for hook in ext.hooks:
     print(f"Hook {hook.name} uses HTTP {hook.n8n_workflow_config.method}")
 
-    hook_config = HookConfig(
-        endpoint="https://gateway.example.com/v1/mcp/{ORD_ID}/{GTID}",
-        auth_token="my-secret-token",
-        payload=Message(
+    # The client uses hook.n8n_workflow_config.method internally
+    response = await client.call_hook_agw(
+        hook=hook,
+        message=Message(
             message_id="msg-hook-payload-001",
-            role=Role.user,
+            role=Role.ROLE_USER,
             parts=[TextPart(text="Hook payload")],
         ),
+        tenant_subdomain="my-tenant",
     )
-
-    # The client uses hook.n8n_workflow_config.method internally
-    response = client.call_hook(hook, hook_config)
 ```
 
 The `HTTPMethod` enum ensures type safety:
@@ -593,7 +512,6 @@ For hooks with `execution_mode=ExecutionMode.SYNC`, the call waits for the hook 
 
 ```python
 from sap_cloud_sdk.extensibility import create_client, ExecutionMode
-from sap_cloud_sdk.extensibility.config import HookConfig
 from a2a.types import Message, Role, TextPart
 
 client = create_client("sap.ai:agent:myAgent:v1")
@@ -601,16 +519,15 @@ ext = client.get_extension_capability_implementation(tenant=tenant_id)
 
 for hook in ext.hooks:
     if hook.execution_mode == ExecutionMode.SYNC:
-        hook_config = HookConfig(
-            endpoint="https://gateway.example.com/v1/mcp/{ORD_ID}/{GTID}",
-            auth_token="my-secret-token",
-            payload=Message(
+        response = await client.call_hook_agw(
+            hook=hook,
+            message=Message(
                 message_id="msg-sync-hook-001",
-                role=Role.user,
+                role=Role.ROLE_USER,
                 parts=[TextPart(text="Processing sync hook")],
             ),
+            tenant_subdomain="my-tenant",
         )
-        response = client.call_hook(hook, hook_config)
         # Process response immediately
         if response:
             print(f"Sync hook completed: {response}")
@@ -622,7 +539,6 @@ Hooks can be configured with different failure behaviors via the `on_failure` fi
 
 ```python
 from sap_cloud_sdk.extensibility import create_client, OnFailure
-from sap_cloud_sdk.extensibility.config import HookConfig
 from sap_cloud_sdk.extensibility.exceptions import ExtensibilityError
 from a2a.types import Message, Role, TextPart
 
@@ -630,18 +546,16 @@ client = create_client("sap.ai:agent:myAgent:v1")
 ext = client.get_extension_capability_implementation(tenant=tenant_id)
 
 for hook in ext.hooks:
-    hook_config = HookConfig(
-        endpoint="https://gateway.example.com/v1/mcp/{ORD_ID}/{GTID}",
-        auth_token="my-secret-token",
-        payload=Message(
-            message_id="msg-validate-001",
-            role=Role.user,
-            parts=[TextPart(text="Validating operation")],
-        ),
-    )
-
     try:
-        response = client.call_hook(hook, hook_config)
+        response = await client.call_hook_agw(
+            hook=hook,
+            message=Message(
+                message_id="msg-validate-001",
+                role=Role.ROLE_USER,
+                parts=[TextPart(text="Validating operation")],
+            ),
+            tenant_subdomain="my-tenant",
+        )
         if response:
             print(f"Hook succeeded: {response}")
     except ExtensibilityError as e:
@@ -660,7 +574,6 @@ Hooks have an `order` field that specifies their execution sequence:
 
 ```python
 from sap_cloud_sdk.extensibility import create_client
-from sap_cloud_sdk.extensibility.config import HookConfig
 from a2a.types import Message, Role, TextPart
 
 client = create_client("sap.ai:agent:myAgent:v1")
@@ -671,16 +584,15 @@ sorted_hooks = sorted(ext.hooks, key=lambda h: h.order)
 
 for hook in sorted_hooks:
     print(f"Executing hook {hook.name} (order: {hook.order})")
-    hook_config = HookConfig(
-        endpoint="https://gateway.example.com/v1/mcp/{ORD_ID}/{GTID}",
-        auth_token="my-secret-token",
-        payload=Message(
+    response = await client.call_hook_agw(
+        hook=hook,
+        message=Message(
             message_id=f"msg-step-{hook.order}",
-            role=Role.user,
+            role=Role.ROLE_USER,
             parts=[TextPart(text=f"Step {hook.order}")],
         ),
+        tenant_subdomain="my-tenant",
     )
-    response = client.call_hook(hook, hook_config)
     if response:
         print(f"Response: {response}")
 ```
@@ -691,7 +603,6 @@ Some hooks can short-circuit the main execution flow:
 
 ```python
 from sap_cloud_sdk.extensibility import create_client, HookType
-from sap_cloud_sdk.extensibility.config import HookConfig
 from a2a.types import Message, Role, TextPart
 
 client = create_client("sap.ai:agent:myAgent:v1")
@@ -699,16 +610,15 @@ ext = client.get_extension_capability_implementation(tenant=tenant_id)
 
 for hook in ext.hooks:
     if hook.type == HookType.BEFORE:
-        hook_config = HookConfig(
-            endpoint="https://gateway.example.com/v1/mcp/{ORD_ID}/{GTID}",
-            auth_token="my-secret-token",
-            payload=Message(
+        response = await client.call_hook_agw(
+            hook=hook,
+            message=Message(
                 message_id="msg-pre-validation-001",
-                role=Role.user,
+                role=Role.ROLE_USER,
                 parts=[TextPart(text="Pre-validation check")],
             ),
+            tenant_subdomain="my-tenant",
         )
-        response = client.call_hook(hook, hook_config)
 
         # Check if hook wants to short-circuit
         if hook.can_short_circuit and response and response.metadata:
@@ -770,7 +680,7 @@ Validation issues produce log warnings but never prevent output generation.
 
 - `ExtensibilityError` -- Base exception for all extensibility module errors. Also raised directly for workflow-level failures: terminal execution status, timeout, n8n application-level errors (JSON-RPC errors, `isError` results), and missing MCP tools via AGW.
 - `ClientCreationError(ExtensibilityError)` -- Represents a client construction failure. Not raised by `create_client()` (which handles it internally), but available for use in custom client-construction logic.
-- `TransportError(ExtensibilityError)` -- Raised by the transport layer on network-level failures: HTTP errors, SSE parsing failures, response decode errors. Not seen when using `get_extension_capability_implementation()`, which catches all errors and returns an empty result. May be raised by `call_hook()` and `call_hook_agw()` on network failures.
+- `TransportError(ExtensibilityError)` -- Raised by the transport layer on network-level failures: HTTP errors, response decode errors. Not seen when using `get_extension_capability_implementation()`, which catches all errors and returns an empty result. May be raised by `call_hook_agw()` on network failures.
 
 ## Service Binding
 
@@ -883,4 +793,4 @@ See `src/sap_cloud_sdk/extensibility/local_extensibility_example.json` for a rea
 - Create one `ExtensibilityClient` (via `create_client()`) and reuse it for multiple capability lookups where appropriate.
 - The `instruction` field in the service response accepts both a plain string (`"Use these tools carefully."`) and a nested object (`{"text": "Use these tools carefully."}`).
 - Hook payloads and responses use the `Message` type from `a2a.types` for type-safe, structured communication. This ensures compatibility with the Agent-to-Agent (A2A) protocol.
-- OpenTelemetry metrics are recorded automatically for `ExtensibilityClient.get_extension_capability_implementation()` and `ExtensibilityClient.call_hook()` calls.
+- OpenTelemetry metrics are recorded automatically for `ExtensibilityClient.get_extension_capability_implementation()` and `ExtensibilityClient.call_hook_agw()` calls.

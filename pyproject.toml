@@ -41,7 +41,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-extensibility = ["a2a-sdk>=0.2.0,<2"]
+extensibility = ["a2a-sdk>=0.2.0,<1"]
 starlette = ["starlette>=0.40.0,<1"]
 fastapi = ["fastapi>=0.100.0,<1"]
 aiohttp = ["aiohttp>=3.9.0,<4"]
@@ -75,7 +75,7 @@ dev = [
     "sqlalchemy>=2.0.0",
     "django>=4.0",
     "flask>=3.0",
-    "a2a-sdk>=0.2.0",
+    "a2a-sdk>=0.2.0,<1",
     "langchain-core>=1.2.7",
     "langgraph>=0.2.0",
     "langchain-community>=0.3.0",

@@ -32,20 +32,3 @@ class ExtensibilityConfig:
 
     destination_name: Optional[str] = None
     destination_instance: str = "default"
-
-
-@dataclass
-class HookConfig:
-    """Configuration for calling hooks.
-
-    Attributes:
-        endpoint: Full URL of the hook endpoint to call including MCP ORD ID, GTID, and any path segments (e.g. ``"https://gateway.example.com/v1/mcp/{ORD_ID}/{GTID}"``).
-        auth_token: Optional bearer token for authenticating against the hook endpoint.
-        payload: Optional dictionary to send as JSON payload in the hook request.
-        headers: Optional additional HTTP headers to include in the hook request.
-    """
-
-    endpoint: str
-    auth_token: Optional[str] = None
-    payload: Optional[dict] = None
-    headers: Optional[dict] = None

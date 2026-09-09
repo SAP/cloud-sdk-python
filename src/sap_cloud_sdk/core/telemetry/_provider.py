@@ -30,14 +30,14 @@ from opentelemetry.sdk.metrics import (
     ObservableUpDownCounter,
     UpDownCounter,
 )
-
-# Stable reference for isinstance checks — not overwritten when tests patch MeterProvider
-_SDKMeterProvider = MeterProvider
 from opentelemetry.sdk.metrics.export import (
     AggregationTemporality,
     PeriodicExportingMetricReader,
 )
 from opentelemetry.sdk.resources import Resource
+
+# Stable reference for isinstance checks — not overwritten when tests patch MeterProvider
+_SDKMeterProvider = MeterProvider
 
 from sap_cloud_sdk.core.telemetry.config import (
     get_config,

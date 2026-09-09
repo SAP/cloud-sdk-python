@@ -96,7 +96,7 @@ class TestObjectStoreClient:
     @patch('sap_cloud_sdk.objectstore._s3.Minio')
     def test_put_object_from_bytes_s3_error(self, mock_minio_class):
         mock_minio = Mock()
-        s3_error = S3Error("AccessDenied", "Access denied", "test.txt", "123", "456", Mock())
+        s3_error = S3Error(Mock(), "AccessDenied", "Access denied", "test.txt", "123", "456")
         mock_minio.put_object.side_effect = s3_error
         mock_minio_class.return_value = mock_minio
 
@@ -237,7 +237,7 @@ class TestObjectStoreClient:
     @patch('sap_cloud_sdk.objectstore._s3.Minio')
     def test_list_objects_s3_error(self, mock_minio_class):
         mock_minio = Mock()
-        s3_error = S3Error("AccessDenied", "Access denied", "", "123", "456", Mock())
+        s3_error = S3Error(Mock(), "AccessDenied", "Access denied", "", "123", "456")
         mock_minio.list_objects.side_effect = s3_error
         mock_minio_class.return_value = mock_minio
 

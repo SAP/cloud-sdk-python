@@ -44,7 +44,7 @@ packages = ["src/sap_cloud_sdk", "src/buf"]
 
 [dependency-groups]
 dev = [
-    "pytest>=8.4.2,<9",
+    "pytest>=9.1.1,<10",
     "pytest-cov>=7.0.0,<8",
     "pytest-asyncio>=1.0.0,<2",
     "pytest-bdd>=8.1.0,<9",

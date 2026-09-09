@@ -56,20 +56,10 @@ def _merge_sdk_resource_into_meter_provider(
 ) -> None:
     """Merge SDK resource attrs into an already-installed MeterProvider.
 
-    OTel exposes no public API to swap a MeterProvider's Resource after
-    construction, so we mutate the private SdkConfiguration. This is safe and
-    needs no lock (unlike _merge_sdk_resource_into_log_provider):
-
-    - SdkConfiguration is a dataclass; _sdk_config.resource is mutable in place.
-    - MetricReaderStorage.collect() reads _sdk_config.resource live at export
-      time via the same object reference (_measurement_consumer and every
-      MetricReaderStorage share it), so this single reassignment propagates.
-    - Meters do not cache their own resource, so there is no active-instances
-      collection to iterate under a lock. The log provider needs its
-      _active_loggers_lock only because each Logger caches its own _resource.
-    - The reassignment is a GIL-atomic single store, runs once at startup, and
-      Resource.merge preserves schema_url, so a race with the periodic collect
-      thread is negligible and self-heals on the next export cycle.
+    No lock needed (unlike the log provider): meters don't cache a resource, so
+    there's no per-instance collection to iterate. collect() reads
+    _sdk_config.resource live at export time via the same shared reference we
+    mutate here, so this single reassignment propagates.
     """
     provider._sdk_config.resource = provider._sdk_config.resource.merge(sdk_resource)
     logger.info(

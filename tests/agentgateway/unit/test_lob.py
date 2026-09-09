@@ -1,7 +1,9 @@
 """Unit tests for LoB agent flow."""
 
+import asyncio
 import logging
 import os
+import time
 from unittest.mock import patch, MagicMock, AsyncMock
 
 import pytest
@@ -819,6 +821,136 @@ class TestGetMcpToolsLob:
             )
 
             assert [t.name for t in result] == ["get-sales-order"]
+
+    @pytest.mark.asyncio
+    async def test_lists_fragments_concurrently(self):
+        """Fetch tools from all fragments concurrently, not sequentially."""
+        per_call = 0.05
+        fragments = []
+        for i in range(3):
+            frag = MagicMock()
+            frag.name = f"frag-{i}"
+            frag.properties = {"URL": f"https://example{i}.com/mcp"}
+            fragments.append(frag)
+
+        call_order: list[str] = []
+
+        async def _sleepy_tools(url, *_args, **_kwargs):
+            # Record order by fragment URL, then sleep to simulate network I/O.
+            call_order.append(url)
+            await asyncio.sleep(per_call)
+            idx = url.split("example")[1].split(".")[0]
+            return [
+                MCPTool(
+                    name=f"tool-{idx}",
+                    server_name="s",
+                    description="",
+                    input_schema={},
+                    url=url,
+                    fragment_name=f"frag-{idx}",
+                )
+            ]
+
+        with (
+            patch("sap_cloud_sdk.agentgateway._lob.list_mcp_fragments") as mock_list,
+            patch(
+                "sap_cloud_sdk.agentgateway._lob.list_server_tools",
+                side_effect=_sleepy_tools,
+            ),
+        ):
+            mock_list.return_value = fragments
+
+            start = time.monotonic()
+            result = await get_mcp_tools_lob("tenant-sub", "system-token", 60.0)
+            elapsed = time.monotonic() - start
+
+        assert [t.name for t in result] == ["tool-0", "tool-1", "tool-2"]
+        # Sequential execution would take 3 * per_call; concurrent ~1 * per_call.
+        assert elapsed < 2 * per_call
+
+    @pytest.mark.asyncio
+    async def test_failure_in_one_fragment_does_not_fail_others(self):
+        """A failing fragment is isolated — other fragments' tools are returned."""
+        fragments = []
+        for i in range(3):
+            frag = MagicMock()
+            frag.name = f"frag-{i}"
+            frag.properties = {"URL": f"https://example{i}.com/mcp"}
+            fragments.append(frag)
+
+        async def _one_failure(url, *_args, **_kwargs):
+            if "example1" in url:
+                raise RuntimeError("boom")
+            return [
+                MCPTool(
+                    name=f"tool-for-{url}",
+                    server_name="s",
+                    description="",
+                    input_schema={},
+                    url=url,
+                    fragment_name=url,
+                )
+            ]
+
+        with (
+            patch("sap_cloud_sdk.agentgateway._lob.list_mcp_fragments") as mock_list,
+            patch(
+                "sap_cloud_sdk.agentgateway._lob.list_server_tools",
+                side_effect=_one_failure,
+            ),
+        ):
+            mock_list.return_value = fragments
+
+            result = await get_mcp_tools_lob("tenant-sub", "system-token", 60.0)
+
+        assert len(result) == 2
+        assert "example0" in result[0].url
+        assert "example2" in result[1].url
+
+    @pytest.mark.asyncio
+    async def test_preserves_fragment_order(self):
+        """Returned tools follow fragment order, not completion order."""
+        fragments = []
+        for i in range(3):
+            frag = MagicMock()
+            frag.name = f"frag-{i}"
+            frag.properties = {"URL": f"https://example{i}.com/mcp"}
+            fragments.append(frag)
+
+        async def _varied_latency(url, *_args, **_kwargs):
+            # Later fragments finish first — order must still follow fragments.
+            if "example0" in url:
+                await asyncio.sleep(0.05)
+                name = "tool-a"
+            elif "example1" in url:
+                await asyncio.sleep(0.01)
+                name = "tool-b"
+            else:
+                await asyncio.sleep(0.0)
+                name = "tool-c"
+            return [
+                MCPTool(
+                    name=name,
+                    server_name="s",
+                    description="",
+                    input_schema={},
+                    url=url,
+                    fragment_name=url,
+                )
+            ]
+
+        with (
+            patch("sap_cloud_sdk.agentgateway._lob.list_mcp_fragments") as mock_list,
+            patch(
+                "sap_cloud_sdk.agentgateway._lob.list_server_tools",
+                side_effect=_varied_latency,
+            ),
+        ):
+            mock_list.return_value = fragments
+
+            result = await get_mcp_tools_lob("tenant-sub", "system-token", 60.0)
+
+        assert [t.name for t in result] == ["tool-a", "tool-b", "tool-c"]
 
 
 # ============================================================

@@ -1,9 +1,6 @@
 # HTTP Client User Guide
 
-A shared HTTP client with injectable authentication and rotation-resilient token
-management. Used internally by Agent Memory, Destination, and other SDK modules.
-Can also be used directly when you need authenticated HTTP access to a BTP service
-that is not yet covered by a dedicated SDK module.
+A shared HTTP client with injectable authentication and rotation-resilient token management. Used internally by Agent Memory, Destination, and other SDK modules. Can also be used directly when you need authenticated HTTP access to a BTP service that is not yet covered by a dedicated SDK module.
 
 ## Table of Contents
 
@@ -100,8 +97,7 @@ HttpClient(
 
 ### `XsuaaAuthProvider`
 
-OAuth2 client-credentials provider for XSUAA. Maintains a per-tenant token cache with
-expiry-aware eviction and rotation resilience.
+OAuth2 client-credentials provider for XSUAA. Maintains a per-tenant token cache with expiry-aware eviction and rotation resilience.
 
 ```python
 XsuaaAuthProvider(
@@ -111,20 +107,15 @@ XsuaaAuthProvider(
 )
 ```
 
-The `config_factory` must return an object with `token_url`, `client_id`, `client_secret`,
-and `identityzone` attributes — both `AgentMemoryConfig` and `DestinationConfig` satisfy
-this contract.
+The `config_factory` must return an object with `token_url`, `client_id`, `client_secret`, and `identityzone` attributes — both `AgentMemoryConfig` and `DestinationConfig` satisfy this contract.
 
-Token derivation for subscriber tenants: when `tenant_subdomain` is provided to
-`get_session()`, the subscriber token URL is derived by replacing `identityzone` in
-`token_url` with the tenant subdomain.
+Token derivation for subscriber tenants: when `tenant_subdomain` is provided to `get_session()`, the subscriber token URL is derived by replacing `identityzone` in `token_url` with the tenant subdomain.
 
 ---
 
 ### `AuthProvider`
 
-Abstract base class for custom authentication strategies. Implement this to plug in
-a non-XSUAA auth mechanism.
+Abstract base class for custom authentication strategies. Implement this to plug in a non-XSUAA auth mechanism.
 
 ```python
 class MyAuthProvider(AuthProvider):
@@ -153,9 +144,7 @@ class HttpMethod(Enum):
 
 ## Binding Rotation
 
-When BTP rotates the service binding secrets (e.g., periodic credential rotation in
-Kubernetes), the client automatically picks up the new credentials without requiring a
-restart. No configuration is required.
+When BTP rotates the service binding secrets (e.g., periodic credential rotation in Kubernetes), the client automatically picks up the new credentials without requiring a restart. No configuration is required.
 
 Two complementary layers handle this:
 
@@ -178,6 +167,4 @@ The token endpoint rejected the request. Common causes:
 
 - `client_id` or `client_secret` in the service binding is incorrect.
 - `token_url` is unreachable from the current environment.
-- The binding was rotated but the old `ConfigFactory` cache was not evicted (should not
-  happen under normal use — the reactive 401-retry will recover automatically on the next
-  real request).
+- The binding was rotated but the old `ConfigFactory` cache was not evicted (should not happen under normal use — the reactive 401-retry will recover automatically on the next real request).

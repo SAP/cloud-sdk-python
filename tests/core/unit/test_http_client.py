@@ -5,7 +5,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 import requests
 
-from sap_cloud_sdk.core._http_client import HttpClient, HttpMethod, XsuaaAuthProvider
+from sap_cloud_sdk.core.protocol.http import HttpClient, HttpMethod, XsuaaAuthProvider
 
 
 def _make_response(status_code: int) -> MagicMock:

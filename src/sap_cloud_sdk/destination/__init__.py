@@ -51,7 +51,7 @@ from sap_cloud_sdk.destination.config import (
     DestinationConfig,
     _make_config_factory,
 )
-from sap_cloud_sdk.core._http_client import HttpClient, XsuaaAuthProvider
+from sap_cloud_sdk.core.protocol.http import HttpClient, XsuaaAuthProvider
 from sap_cloud_sdk.destination._destination_http_client import DestinationHttpClient
 from sap_cloud_sdk.destination.client import DestinationClient
 from sap_cloud_sdk.destination.fragment_client import FragmentClient

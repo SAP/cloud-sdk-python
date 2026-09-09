@@ -949,9 +949,12 @@ export CLOUD_SDK_CFG_DESTINATION_DEFAULT_IDENTITYZONE="subdomain"
 
 The OAuth2 token URL is derived from service binding (`DestinationConfig.token_url`). For subscriber context, when a `tenant` is provided, the token provider constructs the subscriber token URL by replacing the identityzone segment with the tenant sub-domain.
 
+## Binding Rotation
+
+The client handles BTP credential rotation automatically. See the [HTTP Client guide](../core/protocol/http/user-guide.md) for details.
+
 ## Notes
 
-- Current implementation omits explicit HTTP retries/timeouts for simplicity.
 - The v2 consumption API (`get_destination`) is supported for runtime scenarios requiring automatic token retrieval.
 
 ## Utilities

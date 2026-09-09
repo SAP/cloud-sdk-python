@@ -5,7 +5,7 @@ from unittest.mock import Mock, call
 from requests import Response
 
 from sap_cloud_sdk.destination.certificate_client import CertificateClient
-from sap_cloud_sdk.core._http_client import HttpMethod
+from sap_cloud_sdk.core.protocol.http import HttpMethod
 from sap_cloud_sdk.destination._models import AccessStrategy, Certificate, Label, Level, ListOptions, PatchLabels
 from sap_cloud_sdk.destination.utils._pagination import PagedResult
 from sap_cloud_sdk.destination.exceptions import (

@@ -26,7 +26,7 @@ from sap_cloud_sdk.agent_memory.exceptions import (
     AgentMemoryConfigError,
     AgentMemoryValidationError,
 )
-from sap_cloud_sdk.core._http_client import HttpClient, HttpMethod
+from sap_cloud_sdk.core.protocol.http import HttpClient, HttpMethod
 
 
 def _parse_call_params(call_args) -> dict:

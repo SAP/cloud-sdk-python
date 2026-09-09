@@ -41,7 +41,6 @@ if TYPE_CHECKING:
     from sap_cloud_sdk.core.secret_resolver import ConfigFactory
 
 _TRANSPARENT_PROXY_ENV_VAR = "APPFND_CONHOS_TRANSP_PROXY"
-_TRANSPARENT_PROXY_ENV_VAR = "APPFND_CONHOS_TRANSP_PROXY"
 
 
 @dataclass

@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Callable, List, Optional, TypeVar
 
 from sap_cloud_sdk.core.telemetry import Module, Operation, record_metrics
-from sap_cloud_sdk.core._http_client import HttpClient
+from sap_cloud_sdk.core.protocol.http import HttpClient
 from sap_cloud_sdk.destination._http import API_V1, HttpMethod, _request
 from sap_cloud_sdk.destination._models import (
     AccessStrategy,

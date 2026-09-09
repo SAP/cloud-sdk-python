@@ -38,7 +38,7 @@ from sap_cloud_sdk.agent_memory._models import (
     SearchResult,
 )
 from sap_cloud_sdk.agent_memory.utils._odata import FilterDefinition
-from sap_cloud_sdk.core._http_client import HttpClient, XsuaaAuthProvider
+from sap_cloud_sdk.core.protocol.http import HttpClient, XsuaaAuthProvider
 
 
 def _build_agent_memory_http(

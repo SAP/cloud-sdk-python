@@ -5,7 +5,7 @@ from unittest.mock import MagicMock
 from requests import Response
 from requests.exceptions import RequestException
 
-from sap_cloud_sdk.core._http_client import HttpClient, HttpMethod
+from sap_cloud_sdk.core.protocol.http import HttpClient, HttpMethod
 from sap_cloud_sdk.destination._http import _request
 from sap_cloud_sdk.destination.exceptions import HttpError
 

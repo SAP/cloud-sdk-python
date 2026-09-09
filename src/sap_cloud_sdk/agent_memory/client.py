@@ -41,7 +41,7 @@ from sap_cloud_sdk.agent_memory.exceptions import (
     AgentMemoryNotFoundError,
     AgentMemoryValidationError,
 )
-from sap_cloud_sdk.core._http_client import HttpClient, HttpMethod
+from sap_cloud_sdk.core.protocol.http import HttpClient, HttpMethod
 from sap_cloud_sdk.core._tenant import _validate_tenant_subdomain
 from sap_cloud_sdk.core.telemetry import Module, Operation, record_metrics
 

@@ -5,7 +5,7 @@ from unittest.mock import Mock, patch
 from requests import Response
 
 from sap_cloud_sdk.destination.client import DestinationClient
-from sap_cloud_sdk.core._http_client import HttpMethod
+from sap_cloud_sdk.core.protocol.http import HttpMethod
 from sap_cloud_sdk.destination._models import (
     Destination,
     Label,

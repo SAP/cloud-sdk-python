@@ -7,7 +7,7 @@ from typing import Any, Optional
 from requests import Response
 from requests.exceptions import RequestException
 
-from sap_cloud_sdk.core._http_client import HttpClient, HttpMethod
+from sap_cloud_sdk.core.protocol.http import HttpClient, HttpMethod
 from sap_cloud_sdk.destination.exceptions import HttpError
 
 API_V1 = "v1"

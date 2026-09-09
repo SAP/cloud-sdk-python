@@ -8,7 +8,7 @@ from typing import Any, Dict, List, Optional, Callable, TypeVar
 
 from sap_cloud_sdk.core.telemetry import Module, Operation, record_metrics
 from sap_cloud_sdk.core.secret_resolver import read_from_mount_and_fallback_to_env_var
-from sap_cloud_sdk.core._http_client import HttpClient
+from sap_cloud_sdk.core.protocol.http import HttpClient
 from sap_cloud_sdk.destination._http import API_V1, API_V2, HttpMethod, _request
 from sap_cloud_sdk.destination._models import (
     AccessStrategy,

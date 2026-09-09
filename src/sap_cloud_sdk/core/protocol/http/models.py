@@ -81,7 +81,7 @@ class XsuaaAuthProvider(AuthProvider):
         has_changed = getattr(self._config_factory, "has_changed", None)
         if callable(has_changed) and has_changed():
             with self._lock:
-                logger.info("Invalidating token cache due to secret rotation")
+                logger.debug("Invalidating token cache due to secret rotation")
                 self._invalidate_all_unsafe()
 
         with self._lock:

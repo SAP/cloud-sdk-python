@@ -17,11 +17,10 @@ Usage::
 
 from typing import Optional
 
-from sap_cloud_sdk.agent_memory._http_transport import HttpTransport
 from sap_cloud_sdk.agent_memory.client import AgentMemoryClient
 from sap_cloud_sdk.agent_memory.config import (
     AgentMemoryConfig,
-    _load_config_from_env,
+    _make_config_factory,
 )
 from sap_cloud_sdk.agent_memory.exceptions import (
     AgentMemoryConfigError,
@@ -39,6 +38,19 @@ from sap_cloud_sdk.agent_memory._models import (
     SearchResult,
 )
 from sap_cloud_sdk.agent_memory.utils._odata import FilterDefinition
+from sap_cloud_sdk.core.protocol.http import HttpClient, XsuaaAuthProvider
+
+
+def _build_agent_memory_http(
+    instance: str, config: Optional[AgentMemoryConfig]
+) -> HttpClient:
+    if config is not None:
+        auth = XsuaaAuthProvider(lambda: config) if config.token_url else None
+        return HttpClient(config.base_url, auth, timeout=config.timeout)
+    factory = _make_config_factory(instance)
+    cfg = factory()
+    auth = XsuaaAuthProvider(factory) if cfg.token_url else None
+    return HttpClient(cfg.base_url, auth, timeout=cfg.timeout)
 
 
 def create_client(
@@ -76,13 +88,11 @@ def create_client(
     """
     try:
         if config is not None:
-            resolved_config = config
+            http = _build_agent_memory_http("default", config)
         else:
-            resolved_config = _load_config_from_env()
-
-        transport = HttpTransport(resolved_config)
+            http = _build_agent_memory_http("default", None)
         return AgentMemoryClient(
-            transport,
+            http,
             access_strategy=access_strategy,
             tenant=tenant,
         )

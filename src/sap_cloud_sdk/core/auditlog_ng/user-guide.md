@@ -1,9 +1,6 @@
-# Using the `auditlog_ng` Client in an Agent
+# Audit Log NG User Guide
 
-This module provides an OTLP/gRPC client for sending structured audit log events
- to the SAP Audit Log Service (v3/NG). It supports mTLS, insecure mode for local
- testing, and both binary protobuf and JSON serialization formats.
----
+This module provides an OTLP/gRPC client for sending structured audit log events to the SAP Audit Log Service (v3/NG). It supports mTLS, insecure mode for local testing, and both binary protobuf and JSON serialization formats.
 
 ## Overview
 
@@ -39,17 +36,18 @@ The client depends on generated protobuf classes.
 
 `create_client` supports three mutually exclusive ways to provide configuration, evaluated in this order:
 
-1. **Explicit config object** — pass a pre-built `AuditLogNGConfig` via `config=`.
-2. **Destination-based resolution** — pass `destination_name` and `destination_instance`; connection parameters are resolved from the named SAP Destination automatically.
+1. **Destination-based resolution (recommended)** — pass `tenant`; connection parameters are resolved from the named SAP Destination automatically. This is the recommended path for SPII-based deployments.
+2. **Explicit config object** — pass a pre-built `AuditLogNGConfig` via `config=`.
 3. **Explicit keyword arguments** — pass `endpoint`, `deployment_id`, and `namespace` directly.
 
 ### Destination-based configuration parameters
 
-| Parameter              | Type   | Required | Description |
-|------------------------|--------|----------|-------------|
-| `destination_name`     | `str`  | ✅ Yes   | Name of the SAP Destination to resolve. |
-| `destination_instance` | `str`  | ❌ No    | Destination service binding instance name. |
-| `fragment_name`        | `str`  | ❌ No    | Destination fragment merged before resolution (for tenant-specific overrides). |
+| Parameter              | Type   | Required | Default                    | Description |
+|------------------------|--------|----------|----------------------------|-------------|
+| `tenant`               | `str`  | ✅ Yes   | —                          | Tenant subdomain. **Required to activate destination-based resolution.** |
+| `destination_name`     | `str`  | ❌ No    | `"AuditLogV3_Destination"` | Name of the SAP Destination to resolve. |
+| `destination_instance` | `str`  | ❌ No    | `"default"`                | Destination service binding instance name. |
+| `fragment_name`        | `str`  | ❌ No    | `None`                     | Destination fragment merged before resolution (for tenant-specific overrides). Follows the pattern `AuditLogV3_Fragment_{tenant_subdomain}`. |
 
 The destination must expose these custom properties:
 
@@ -109,26 +107,30 @@ from sap_cloud_sdk.core.auditlog_ng.gen.sap.auditlog.auditevent.v2 import (
 
 **From a Destination (SPII-based deployments):**
 
+The minimal recommended call is just `tenant` — `destination_name` and `destination_instance`
+default to the values provisioned for SPII-based deployments:
+
 ```python
-client = create_client(
-    destination_name="my_destination",
-    destination_instance="my-destination-binding",
-    # fragment_name="prod-fragment",  # optional: merge a tenant-specific fragment
-)
+client = create_client(tenant="tenant_subdomain")
 ```
 
 The SDK resolves `endpoint`, `deployment_id`, and `namespace` from the destination automatically.
-You can still pass connection options alongside the destination parameters:
+You can spell out the destination parameters and pass connection options alongside:
 
 ```python
 client = create_client(
-    destination_name="my_destination",
-    destination_instance="my-destination-binding",
-    fragment_name="prod-fragment",
+    tenant="tenant_subdomain",                    # required to activate destination resolution
+    destination_name="AuditLogV3_Destination",    # optional — this is the default
+    destination_instance="default",               # optional — this is the default
+    # fragment_name="AuditLogV3_Fragment_tenant_subdomain",  # optional tenant-specific fragment
     service_name="my-agent",
     batch=True,
 )
 ```
+
+> **Note:** Omitting `tenant` disables destination resolution — `create_client` then expects
+> `endpoint`, `deployment_id`, and `namespace` (or a `config=` object) and raises `ValueError`
+> otherwise.
 
 **With mTLS (explicit configuration):**
 
@@ -154,7 +156,7 @@ client = create_client(
 )
 ```
 
-> ⚠️ **Important:** `deployment_id` and `namespace` are validated at construction time.
+> **Important:** `deployment_id` and `namespace` are validated at construction time.
 > Invalid values (e.g. containing spaces) will raise a `ValueError`.
 
 ### Step 3: Build an Audit Event
@@ -211,14 +213,8 @@ from datetime import datetime, timezone
 
 
 class AgentAuditLogger:
-    def __init__(self):
-        self.client = create_client(
-            endpoint="us30.als.services.cloud.sap:443",
-            deployment_id="us30-staging",
-            namespace="sap.als",
-            cert_file="/path/to/client-certificate_chain.pem",
-            key_file="/path/to/private-key.pem",
-        )
+    def __init__(self, tenant: str):
+        self.client = create_client(tenant=tenant)
 
     def log_data_access(self, user: str, tenant_id: str, resource: str):
         event = pb.DataAccess()
@@ -238,7 +234,7 @@ class AgentAuditLogger:
 
 
 # In your agent main loop
-audit_logger = AgentAuditLogger()
+audit_logger = AgentAuditLogger(tenant="tenant_subdomain")
 try:
     event_id = audit_logger.log_data_access(
         user="agent-user@example.com",
@@ -259,13 +255,7 @@ For simple, one-off audit events without managing a persistent client:
 ```python
 from sap_cloud_sdk.core.auditlog_ng import create_client
 
-with create_client(
-    endpoint="us30.als.services.cloud.sap:443",
-    deployment_id="us30-staging",
-    namespace="sap.als",
-    cert_file="/path/to/cert.pem",
-    key_file="/path/to/key.pem",
-) as client:
+with create_client(tenant="tenant_subdomain") as client:
     event_id = client.send(event)
 ```
 

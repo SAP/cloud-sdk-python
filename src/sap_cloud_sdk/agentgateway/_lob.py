@@ -450,6 +450,7 @@ async def get_mcp_tools_lob(
             in ord_ids_set
         ]
 
+    pending: list[tuple[str, str]] = []
     for fragment in fragments:
         fragment_name = fragment.name
         mcp_url = fragment.properties.get("URL") or fragment.properties.get("url")
@@ -460,18 +461,27 @@ async def get_mcp_tools_lob(
             )
             continue
 
-        try:
-            server_tools = await list_server_tools(
-                mcp_url, system_token, fragment_name, timeout
-            )
+        pending.append((fragment_name, mcp_url))
+
+    results = await asyncio.gather(
+        *(
+            list_server_tools(mcp_url, system_token, fragment_name, timeout)
+            for fragment_name, mcp_url in pending
+        ),
+        return_exceptions=True,
+    )
+
+    for (fragment_name, _mcp_url), result in zip(pending, results):
+        if isinstance(result, Exception):
+            _log_mcp_server_error(fragment_name, result)
+        else:
+            server_tools = result
             tools.extend(server_tools)
             logger.debug(
                 "Loaded %d tool(s) from fragment '%s'",
                 len(server_tools),
                 fragment_name,
             )
-        except Exception as exc:
-            _log_mcp_server_error(fragment_name, exc)
 
     # Post-fetch filter: tool names are only known after fetching
     if f.names:

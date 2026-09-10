@@ -36,6 +36,9 @@ from opentelemetry.sdk.metrics.export import (
 )
 from opentelemetry.sdk.resources import Resource
 
+# Stable reference for isinstance checks — not overwritten when tests patch MeterProvider
+_SDKMeterProvider = MeterProvider
+
 from sap_cloud_sdk.core.telemetry.config import (
     get_config,
     create_resource_attributes_from_env,
@@ -46,6 +49,22 @@ from sap_cloud_sdk.core.telemetry.constants import SDK_PACKAGE_NAME
 from sap_cloud_sdk.core.telemetry.log_filters.identity import IdentityLogFilter
 
 logger = logging.getLogger(__name__)
+
+
+def _merge_sdk_resource_into_meter_provider(
+    provider: MeterProvider, sdk_resource: Resource
+) -> None:
+    """Merge SDK resource attrs into an already-installed MeterProvider.
+
+    No lock needed (unlike the log provider): meters don't cache a resource, so
+    there's no per-instance collection to iterate. collect() reads
+    _sdk_config.resource live at export time via the same shared reference we
+    mutate here, so this single reassignment propagates.
+    """
+    provider._sdk_config.resource = provider._sdk_config.resource.merge(sdk_resource)
+    logger.info(
+        "Merged sap-cloud-sdk resource attrs onto wrapper-installed MeterProvider"
+    )
 
 
 def _merge_sdk_resource_into_log_provider(
@@ -214,6 +233,21 @@ def _setup_meter_provider() -> Optional[MeterProvider]:
 
     try:
         resource = Resource.create(create_resource_attributes_from_env())
+        existing = cast(MeterProvider, metrics.get_meter_provider())
+
+        if isinstance(existing, _SDKMeterProvider):
+            logger.warning(
+                "Global MeterProvider was already set by another library. "
+                "Merging sap.cloud_sdk.* resource attributes into the existing provider."
+            )
+            _merge_sdk_resource_into_meter_provider(existing, resource)
+            logger.info(
+                f"OpenTelemetry meter provider merged. "
+                f"Service: {config.service_name}, "
+                f"Endpoint: {config.otlp_endpoint}"
+            )
+            return existing
+
         exporter = _create_metric_exporter()
         reader = PeriodicExportingMetricReader(exporter=exporter)
         provider = MeterProvider(resource=resource, metric_readers=[reader])

@@ -280,6 +280,7 @@ class TestHttpTransport:
 
         cert_path = transport._resolve_cert()
 
+        assert isinstance(cert_path, str)
         assert Path(cert_path).exists()
         assert "BEGIN RSA PRIVATE KEY" in Path(cert_path).read_text(encoding="utf-8")
         transport._session = MagicMock()
@@ -329,6 +330,7 @@ class TestHttpTransport:
 
         cert_path = transport._resolve_cert()
 
+        assert isinstance(cert_path, str)
         assert Path(cert_path).exists()
         assert "BEGIN CERTIFICATE" in Path(cert_path).read_text(encoding="utf-8")
         transport._session = MagicMock()
@@ -373,13 +375,13 @@ class TestHttpTransport:
 
     def test_resolve_cert_without_config_raises(self) -> None:
         transport = object.__new__(HttpTransport)
-        transport._config = types.SimpleNamespace(
-            cert=None,
-            key=None,
-            cert_path=None,
-            key_path=None,
-            destination_name=None,
-        )
+        config = object.__new__(DataAnonymizationConfig)
+        config.cert = None
+        config.key = None
+        config.cert_path = None
+        config.key_path = None
+        config.destination_name = None
+        transport._config = config
 
         assert_raises(
             AuthenticationError,

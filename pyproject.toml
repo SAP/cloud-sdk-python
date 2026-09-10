@@ -1,6 +1,6 @@
 [project]
 name = "sap-cloud-sdk"
-version = "0.36.1"
+version = "0.36.2"
 description = "SAP Cloud SDK for Python"
 readme = "README.md"
 license = "Apache-2.0"
@@ -15,17 +15,17 @@ dependencies = [
     "requests-oauthlib~=2.0.0",
     "pydantic~=2.12.3",
     "hatchling~=1.27.0",
-    "opentelemetry-exporter-otlp-proto-grpc~=1.42.1",
-    "opentelemetry-exporter-otlp-proto-http~=1.42.1",
+    "opentelemetry-exporter-otlp-proto-grpc~=1.44.0",
+    "opentelemetry-exporter-otlp-proto-http~=1.44.0",
     "traceloop-sdk~=0.61.0",
     "opentelemetry-instrumentation-langchain>=0.61.0,<1",
     "httpx>=0.27.0,<1",
     "PyJWT>=2.13.0,<3",
-    "protobuf>=5.0.0,<8",
-    "protovalidate>=0.13.0,<1",
+    "protobuf>=7.36.0,<8",
+    "protovalidate>=1.0.0,<2",
     "grpcio>=1.60.0,<2",
-    "opentelemetry-api>=1.42.1,<2",
-    "opentelemetry-sdk>=1.42.1,<2",
+    "opentelemetry-api~=1.44.0",
+    "opentelemetry-sdk~=1.44.0",
     "mcp>=1.1.0,<2",
 ]
 
@@ -44,13 +44,13 @@ packages = ["src/sap_cloud_sdk", "src/buf"]
 
 [dependency-groups]
 dev = [
-    "pytest>=8.4.2,<9",
+    "pytest>=9.1.1,<10",
     "pytest-cov>=7.0.0,<8",
     "pytest-asyncio>=1.0.0,<2",
     "pytest-bdd>=8.1.0,<9",
     "python-dotenv>=1.0.0,<2",
     "ty>=0.0.21,<1",
-    "cryptography>=46.0.3,<47",
+    "cryptography>=48.0.1,<51",
     "ruff>=0.8.0,<1",
     "starlette>=0.40.0,<1",
     "anyio>=4.5,<5",

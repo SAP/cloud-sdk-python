@@ -2,11 +2,15 @@
 
 from __future__ import annotations
 
+import itertools
 import json
 import logging
-from typing import TYPE_CHECKING, Any, Optional, Union
+import time
+from typing import TYPE_CHECKING, Any, Optional, Union, cast
 
+import httpx
 from a2a.types import Message
+from opentelemetry.propagate import inject
 from pydantic_core import ValidationError
 
 from sap_cloud_sdk.core.telemetry import Module, Operation
@@ -17,6 +21,7 @@ from sap_cloud_sdk.extensibility._models import (
     ExtensionCapabilityImplementation,
     Hook,
 )
+from sap_cloud_sdk.extensibility.config import HookConfig
 from sap_cloud_sdk.extensibility.exceptions import ExtensibilityError, TransportError
 
 if TYPE_CHECKING:
@@ -27,6 +32,89 @@ if TYPE_CHECKING:
     Transport = Union[LocalTransport, NoOpTransport, UmsTransport]
 
 logger = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+# n8n MCP constants
+# ---------------------------------------------------------------------------
+
+_EXECUTE_WORKFLOW_TOOL_NAME = "execute_workflow"
+_GET_EXECUTION_TOOL_NAME = "get_execution"
+
+_JSONRPC_VERSION = "2.0"
+
+_JSONRPC_HEADERS: dict[str, str] = {
+    "Content-Type": "application/json",
+    "Accept": "application/json, text/event-stream",
+}
+
+#: execute-workflow statuses that mean the execution cannot continue.
+_EXECUTE_TERMINAL_STATUSES = frozenset({"error", "canceled", "crashed", "unknown"})
+#: get-execution statuses that mean the execution has permanently failed.
+_EXECUTION_TERMINAL_STATUSES = frozenset({"error", "canceled", "crashed"})
+
+_HOOK_POLL_INTERVAL = 0.5  # seconds between get-execution polls
+
+# ---------------------------------------------------------------------------
+# JSON-RPC helpers
+# ---------------------------------------------------------------------------
+
+_request_id_counter = itertools.count(1)
+
+
+def _build_tool_call(arguments: dict[str, Any], tool_name: str) -> dict[str, Any]:
+    return {
+        "jsonrpc": _JSONRPC_VERSION,
+        "id": next(_request_id_counter),
+        "method": "tools/call",
+        "params": {"name": tool_name, "arguments": arguments},
+    }
+
+
+def _parse_sse_response(text: str) -> dict[str, Any]:
+    """Extract the last JSON-RPC message from an SSE ``data:`` stream."""
+    result: dict[str, Any] | None = None
+    for line in text.splitlines():
+        if line.startswith("data:"):
+            payload = line[len("data:") :].strip()
+            if payload:
+                result = json.loads(payload)
+    if result is None:
+        raise TransportError("No JSON-RPC message found in SSE response.")
+    return result
+
+
+def _parse_response(response: httpx.Response) -> dict[str, Any]:
+    response.raise_for_status()
+    if "text/event-stream" in response.headers.get("content-type", ""):
+        return _parse_sse_response(response.text)
+    return response.json()
+
+
+def _extract_tool_result(jsonrpc: dict[str, Any]) -> dict[str, Any]:
+    if "error" in jsonrpc:
+        msg = jsonrpc["error"].get("message", "Unknown error")
+        raise ExtensibilityError(f"n8n returned an error: {msg}")
+
+    result = jsonrpc.get("result", {})
+    if result.get("isError"):
+        content = result.get("content", [])
+        error_text = next(
+            (c.get("text", "") for c in content if c.get("type") == "text"), ""
+        )
+        raise ExtensibilityError(f"n8n tool call failed: {error_text}")
+
+    for item in result.get("content", []):
+        if item.get("type") == "text":
+            try:
+                return json.loads(item["text"])
+            except (json.JSONDecodeError, KeyError):
+                continue
+
+    structured = result.get("structuredContent")
+    if structured is not None:
+        return structured
+
+    raise ExtensibilityError("Hook response contains no parseable content.")
 
 
 class ExtensibilityClient:
@@ -124,6 +212,189 @@ class ExtensibilityClient:
             )
             return ExtensionCapabilityImplementation(capability_id=capability_id)
 
+    @record_metrics(
+        Module.EXTENSIBILITY,
+        Operation.EXTENSIBILITY_CALL_HOOK,
+    )
+    def call_hook(
+        self,
+        hook: Hook,
+        hook_config: HookConfig,
+    ) -> Optional[Message]:
+        """Call a hook's MCP endpoint and poll until completion.
+
+        Executes the workflow via ``execute-workflow``, then polls
+        ``get-execution`` every 500 ms until the execution succeeds, fails,
+        or ``hook.timeout`` seconds elapse.
+
+        This method is transport-agnostic: regardless of how extension
+        metadata was fetched (backend, local file, or no-op),
+        the actual hook invocation is always a direct HTTP call to the
+        URL embedded in the :class:`Hook` object.
+
+        Args:
+            hook: Hook configuration (workflow ID, method, timeout).
+            hook_config: Hook invocation configuration (endpoint URL, auth token, optional payload).
+
+        Returns:
+            Parsed ``Message`` from the last executed workflow node, or ``None``
+            if the hook completed successfully but produced no message.
+
+        Raises:
+            TransportError: On HTTP errors, terminal execution failures, or timeout.
+
+        Example:
+            ```python
+            from sap_cloud_sdk.extensibility import create_client
+
+            client = create_client("sap.ai:agent:myAgent:v1")
+            impl = client.get_extension_capability_implementation(tenant="tenant-abc")
+
+            if impl.hooks:
+                hook = impl.hooks[0]
+                result = client.call_hook(
+                    hook,
+                    HookConfig(
+                        endpoint="https://gateway.example.com/v1/mcp/{ORD_ID}/{GTID}",
+                        auth_token="my-secret-token",
+                        payload={"foo": "bar"},
+                    ),
+                )
+            ```
+        """
+        headers = {**_JSONRPC_HEADERS}
+        inject(headers)
+
+        message_payload: dict[str, Any] = {}
+        if hook_config.payload is not None:
+            model_dump = getattr(hook_config.payload, "model_dump", None)
+            if callable(model_dump):
+                message_payload = cast(dict[str, Any], model_dump(exclude_none=True))
+
+        # 1. Execute workflow
+        execute_workflow_arguments = {
+            "workflowId": hook.n8n_workflow_config.workflow_id,
+            "inputs": {
+                "type": "webhook",
+                "webhookData": {
+                    "method": hook.n8n_workflow_config.method,
+                    "query": {},
+                    "body": message_payload,
+                    "headers": headers,
+                },
+            },
+        }
+
+        try:
+            with httpx.Client(
+                headers={"Authorization": f"Bearer {hook_config.auth_token}"},
+                timeout=hook.timeout,
+            ) as client:
+                tool_resp = client.post(
+                    hook_config.endpoint,
+                    json=_build_tool_call(
+                        execute_workflow_arguments, _EXECUTE_WORKFLOW_TOOL_NAME
+                    ),
+                    headers=headers,
+                )
+        except TransportError:
+            raise
+        except Exception as exc:
+            raise TransportError(
+                f"HTTP request to hook MCP endpoint failed: {exc}"
+            ) from exc
+
+        try:
+            data = _extract_tool_result(_parse_response(tool_resp))
+        except TransportError:
+            raise
+        except Exception as exc:
+            raise TransportError(f"Could not parse hook response: {exc}") from exc
+
+        status = data.get("status", "")
+
+        # 2. Fail fast on terminal statuses from execute-workflow
+        if status in _EXECUTE_TERMINAL_STATUSES:
+            error_msg = data.get("error", "")
+            raise ExtensibilityError(
+                f"Workflow execution failed with status {status!r}"
+                + (f": {error_msg}" if error_msg else "")
+            )
+
+        # 3. Poll get-execution for running/new/waiting/started
+        execution_id = data.get("executionId")
+        get_execution_arguments = {
+            "workflowId": hook.n8n_workflow_config.workflow_id,
+            "executionId": str(execution_id),
+            "includeData": True,
+        }
+
+        deadline = time.monotonic() + hook.timeout
+        last_status = status
+        while time.monotonic() < deadline:
+            time.sleep(_HOOK_POLL_INTERVAL)
+
+            try:
+                with httpx.Client(
+                    headers={"Authorization": f"Bearer {hook_config.auth_token}"},
+                    timeout=hook.timeout,
+                ) as client:
+                    tool_resp = client.post(
+                        hook_config.endpoint,
+                        json=_build_tool_call(
+                            get_execution_arguments, _GET_EXECUTION_TOOL_NAME
+                        ),
+                        headers=headers,
+                    )
+            except TransportError:
+                raise
+            except Exception as exc:
+                raise TransportError(
+                    f"HTTP request to hook MCP endpoint failed: {exc}"
+                ) from exc
+
+            try:
+                data = _extract_tool_result(_parse_response(tool_resp))
+            except TransportError:
+                raise
+            except Exception as exc:
+                raise TransportError(f"Could not parse hook response: {exc}") from exc
+
+            last_status = data.get("execution", {}).get("status", "") or data.get(
+                "status", ""
+            )
+
+            if last_status == "success":
+                try:
+                    result_data = data.get("data", {}).get("resultData", {})
+                    last_node = result_data.get("lastNodeExecuted", "")
+                    response_json = (
+                        result_data.get("runData", {})
+                        .get(last_node, [{}])[0]
+                        .get("data", {})
+                        .get("main", [[{}]])[0][0]
+                        .get("json", {})
+                    )
+                    return Message(**response_json)
+                except (KeyError, IndexError, TypeError, ValidationError) as exc:
+                    raise ExtensibilityError(
+                        f"Failed to extract response from last executed node: {exc}"
+                    ) from exc
+
+            if last_status in _EXECUTION_TERMINAL_STATUSES:
+                error_msg = data.get("error", "")
+                raise ExtensibilityError(
+                    f"Workflow execution failed with status {last_status!r}"
+                    + (f": {error_msg}" if error_msg else "")
+                )
+
+            # Continue polling for: running, waiting, new, unknown
+
+        raise ExtensibilityError(
+            f"Workflow execution timed out after {hook.timeout}s. "
+            f"Last status: {last_status!r}"
+        )
+
     async def _discover_n8n_tools(
         self, agw_client: Any, hook: Hook, user_token: Optional[str]
     ) -> Any:
@@ -193,6 +464,24 @@ class ExtensibilityClient:
                 f"Hook response did not conform to the A2A Message protocol: {exc}"
             ) from exc
 
+    @staticmethod
+    def _extract_message(data: dict) -> Message:
+        try:
+            result_data = data.get("data", {}).get("resultData", {})
+            last_node = result_data.get("lastNodeExecuted", "")
+            response_json = (
+                result_data.get("runData", {})
+                .get(last_node, [{}])[0]
+                .get("data", {})
+                .get("main", [[{}]])[0][0]
+                .get("json", {})
+            )
+            return Message(**response_json)
+        except (KeyError, IndexError, TypeError, ValidationError) as exc:
+            raise TransportError(
+                f"Failed to extract response from last executed node: {exc}"
+            ) from exc
+
     @record_metrics(
         Module.EXTENSIBILITY,
         Operation.EXTENSIBILITY_CALL_HOOK,
@@ -232,8 +521,7 @@ class ExtensibilityClient:
 
         Raises:
             TransportError: On AGW tool call errors or unparseable responses.
-            ExtensibilityError: When the hook tool is not found via Agent Gateway,
-                or the hook response does not conform to the A2A Message protocol.
+            ExtensibilityError: When the hook tool is not found via Agent Gateway.
 
         Example:
             ```python

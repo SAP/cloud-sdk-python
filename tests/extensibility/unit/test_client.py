@@ -6,7 +6,11 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from sap_cloud_sdk.extensibility import create_client
-from sap_cloud_sdk.extensibility.client import ExtensibilityClient
+from sap_cloud_sdk.extensibility.client import (
+    ExtensibilityClient,
+    _EXECUTE_WORKFLOW_TOOL_NAME,
+    _GET_EXECUTION_TOOL_NAME,
+)
 from sap_cloud_sdk.extensibility._models import (
     ExtensionCapabilityImplementation,
     McpServer,

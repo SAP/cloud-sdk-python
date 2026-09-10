@@ -521,13 +521,11 @@ async def call_extension_tool(
 async def call_extension_hook(
     extensibility_client: Any,
     hook: Any,
-    message: Any,
+    payload: Any,
     extension_name: str,
     capability: str = "default",
     source_mapping: dict[str, Any] | None = None,
     hook_id: str = "",
-    user_token: str | None = None,
-    tenant_subdomain: str | None = None,
 ) -> Any:
     """Call an extension hook with telemetry instrumentation.
 
@@ -538,10 +536,10 @@ async def call_extension_hook(
 
     Args:
         extensibility_client: The extensibility client.  Must have an async
-            ``call_hook_agw(hook, ...)`` method.
+            ``call_hook(hook, payload)`` method.
         hook: The hook object to invoke.  If it has a ``name`` attribute,
             that is used as the ``item_name`` in telemetry.
-        message: Optional A2A ``Message`` payload sent to the hook.
+        payload: The payload to send to the hook endpoint.
         extension_name: Human-readable name of the extension.  Used as
             fallback when *source_mapping* does not contain the hook.
         capability: Extension capability ID (default: ``"default"``).
@@ -549,8 +547,6 @@ async def call_extension_hook(
             objects (from ``ext_impl.source.hooks``).
         hook_id: The unique hook ``id`` (UUID), used as lookup key in
             *source_mapping*.
-        user_token: Optional user token forwarded to the Agent Gateway client.
-        tenant_subdomain: Tenant subdomain for the Agent Gateway client.
 
     Returns:
         The hook's response.
@@ -598,12 +594,7 @@ async def call_extension_hook(
             ),
         ):
             logger.info("Calling extension hook: %s", item_name)
-            result = await extensibility_client.call_hook_agw(
-                hook,
-                user_token=user_token,
-                message=message,
-                tenant_subdomain=tenant_subdomain,
-            )
+            result = await extensibility_client.call_hook(hook, payload)
             logger.info("Extension hook completed: %s", item_name)
             return result
     finally:

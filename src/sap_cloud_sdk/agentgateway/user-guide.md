@@ -95,6 +95,36 @@ agents = await agw_client.list_agent_cards(
 )
 ```
 
+### Caching Tool Lists
+
+In agentic loops, `list_mcp_tools()` can be called repeatedly. By default every call opens fresh MCP sessions — expensive for a tool list that rarely changes. Pass a `CacheOptions` instance to cache results in-process.
+
+```python
+from sap_cloud_sdk.agentgateway import CacheOptions, create_client
+
+agw_client = create_client(tenant_subdomain="my-tenant")
+cache = CacheOptions(ttl=300)  # cache for 5 minutes
+
+# First call fetches from network and stores in cache
+tools = await agw_client.list_mcp_tools(cache=cache)
+
+# Subsequent calls within TTL return immediately — no network round-trip
+tools = await agw_client.list_mcp_tools(cache=cache)
+
+# Force a fresh fetch (e.g. after a tool was added on the server):
+cache.evict()
+tools = await agw_client.list_mcp_tools(cache=cache)
+```
+
+The cache is scoped to the `CacheOptions` instance — different instances don't share state. Distinct filter and auth-type combinations are cached as independent entries, up to `max_size` entries total (LRU eviction when the limit is hit).
+
+```python
+# Custom TTL and size cap
+cache = CacheOptions(ttl=600, max_size=10)
+```
+
+The cache is **in-process only** — not shared across client instances, processes, or Kubernetes pods.
+
 ### LangChain Integration
 
 Convert MCP tools to LangChain `StructuredTool` objects for use with LangChain agents:
@@ -221,6 +251,7 @@ class AgentGatewayClient:
         self,
         user_token: str | Callable[[], str] | None = None,
         filter: MCPToolFilter | None = None,
+        cache: CacheOptions | None = None,
     ) -> list[MCPTool]
 
     async def call_mcp_tool(
@@ -280,6 +311,21 @@ MCPToolFilter(
 Both fields default to empty lists. `names` is applied after fetching; `ord_ids` is applied before fetching, skipping non-matching fragments.
 
 > Both filter classes use AND semantics: if both fields are set, a result must match all of them to be included.
+
+### CacheOptions
+
+```python
+from sap_cloud_sdk.agentgateway import CacheOptions
+
+CacheOptions(
+    ttl=600.0,  # cache lifetime in seconds; default 600
+    max_size=32,  # max distinct cached entries (LRU eviction); default 32
+)
+```
+
+- `ttl`: How long a cached tool list is considered valid. After expiry the next call fetches fresh from the network.
+- `max_size`: Cap on how many distinct entries (filter + auth-type combinations) are held in memory. When exceeded, the least-recently-used entry is evicted.
+- `.evict()`: Clears all entries immediately, forcing a fresh fetch on the next call.
 
 ### Data Models
 

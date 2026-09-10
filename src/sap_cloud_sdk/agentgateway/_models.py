@@ -1,8 +1,18 @@
 """Data models for Agent Gateway MCP tools."""
 
+from __future__ import annotations
+
 import json
 from dataclasses import dataclass, field
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+from sap_cloud_sdk.agentgateway.config import (
+    DEFAULT_MAX_MCP_TOOLS_CACHE_SIZE,
+    DEFAULT_MCP_TOOLS_CACHE_TTL_SECONDS,
+)
+
+if TYPE_CHECKING:
+    from sap_cloud_sdk.agentgateway._tools_cache import MCPToolsCache
 
 
 @dataclass
@@ -213,3 +223,50 @@ class MCPToolFilter:
 
     names: list[str] = field(default_factory=list)
     ord_ids: list[str] = field(default_factory=list)
+
+
+class CacheOptions:
+    """Options for caching the result of list_mcp_tools.
+
+    Pass an instance to list_mcp_tools(cache=...) to enable result caching.
+    The same instance can be reused across calls — cache state is stored on
+    it. Call evict() to force a fresh fetch on the next call.
+
+    Args:
+        ttl: Cache lifetime in seconds. Defaults to 600 s.
+        max_size: Maximum number of distinct cached entries (keyed by filter
+            combo + auth type). Oldest entry is evicted when the limit is
+            exceeded. Defaults to 32.
+
+    Example:
+        ```python
+        from sap_cloud_sdk.agentgateway import CacheOptions
+
+        cache = CacheOptions(ttl=300)
+        tools = await agw_client.list_mcp_tools(cache=cache)
+
+        # Later — force a fresh fetch (e.g. after a tool was added):
+        cache.evict()
+        tools = await agw_client.list_mcp_tools(cache=cache)
+        ```
+
+    Note:
+        Cache is in-process only. It is not shared across client instances,
+        processes, or Kubernetes pods. Two concurrent calls that both miss
+        the cache will both fetch independently — the last writer wins, no
+        data corruption occurs.
+    """
+
+    def __init__(
+        self,
+        ttl: float = DEFAULT_MCP_TOOLS_CACHE_TTL_SECONDS,
+        max_size: int = DEFAULT_MAX_MCP_TOOLS_CACHE_SIZE,
+    ) -> None:
+        self.ttl = ttl
+        self.max_size = max_size
+        self._cache: MCPToolsCache | None = None
+
+    def evict(self) -> None:
+        """Clear all cached tool list entries. Forces a fresh fetch on the next call."""
+        if self._cache is not None:
+            self._cache.evict()

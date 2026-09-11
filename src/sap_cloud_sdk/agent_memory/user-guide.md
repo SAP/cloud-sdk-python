@@ -838,6 +838,12 @@ The `uaa` key must contain a JSON string with the XSUAA credentials:
 }
 ```
 
+## Binding Rotation
+
+The client handles BTP credential rotation automatically. See the [HTTP Client guide](../core/protocol/http/user-guide.md) for details.
+
+---
+
 ## LangGraph Checkpointer
 
 > This section covers the LangGraph-specific

@@ -20,9 +20,14 @@ Env fallback convention::
 
 import json
 from dataclasses import dataclass
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
 
 from sap_cloud_sdk.agent_memory.exceptions import AgentMemoryConfigError
+
+_SERVICE_NAME = "hana-agent-memory"
+
+if TYPE_CHECKING:
+    from sap_cloud_sdk.core.secret_resolver import ConfigFactory
 
 
 @dataclass
@@ -136,24 +141,43 @@ def _load_config_from_env() -> AgentMemoryConfig:
     Raises:
         AgentMemoryConfigError: If configuration cannot be loaded or is incomplete.
     """
-    from sap_cloud_sdk.core.secret_resolver import (
-        read_from_mount_and_fallback_to_env_var,
-    )
-
     try:
-        binding = BindingData()
-        read_from_mount_and_fallback_to_env_var(
-            base_volume_mount="/etc/secrets/appfnd",
-            base_var_name="CLOUD_SDK_CFG",
-            module="hana-agent-memory",
-            instance="default",
-            target=binding,
-        )
-        binding.validate()
-        return binding.extract_config()
+        return _make_config_factory("default")()
     except AgentMemoryConfigError:
         raise
     except Exception as exc:
         raise AgentMemoryConfigError(
             f"Failed to load Agent Memory configuration: {exc}"
         ) from exc
+
+
+def _make_config_factory(instance: str) -> "ConfigFactory[AgentMemoryConfig]":
+    """Return a :class:`~sap_cloud_sdk.core.secret_resolver.ConfigFactory` for the given instance.
+
+    The factory re-reads the binding on every call and tracks the secret
+    directory mtime for proactive rotation detection.
+
+    Args:
+        instance: Binding instance name (``"default"`` or a tenant subdomain).
+
+    Returns:
+        A callable that produces a fresh :class:`AgentMemoryConfig`.
+    """
+    from sap_cloud_sdk.core.secret_resolver import ConfigFactory
+
+    def _extract(binding: BindingData) -> AgentMemoryConfig:
+        try:
+            return binding.extract_config()
+        except AgentMemoryConfigError:
+            raise
+        except Exception as exc:
+            raise AgentMemoryConfigError(
+                f"Failed to load Agent Memory configuration for instance '{instance}': {exc}"
+            ) from exc
+
+    return ConfigFactory(
+        module=_SERVICE_NAME,
+        instance=instance,
+        binding_cls=BindingData,
+        extract=_extract,
+    )

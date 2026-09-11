@@ -50,6 +50,7 @@ from sap_cloud_sdk.agentgateway._models import (
 from sap_cloud_sdk.agentgateway._token_cache import _GatewayUrlCache, _TokenCache
 from sap_cloud_sdk.agentgateway.exceptions import (
     AgentGatewaySDKError,
+    AgentGatewayServerError,
     MCPServerNotFoundError,
 )
 
@@ -526,11 +527,8 @@ async def call_mcp_tool_lob(
                 text = str(getattr(first, "text", ""))
 
                 if mcp_is_error(result):
-                    logger.error(
-                        "Tool '%s' on '%s' returned an error: %s",
-                        tool.name,
-                        tool.url,
-                        text,
+                    raise AgentGatewayServerError(
+                        f"Tool '{tool.name}' on '{tool.url}' returned an error: {text}"
                     )
 
                 return text

@@ -1,0 +1,9 @@
+diff --git a/src/module.py b/src/module.py
+index 111..222 100644
+--- a/src/module.py
++++ b/src/module.py
+@@ -1,3 +1,4 @@
+ # existing code
++def new_helper() -> None:
++    return None
+ x = 1

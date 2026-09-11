@@ -72,6 +72,7 @@ class TestUmsTransportPagination:
                                     "id": "ext-1",
                                     "title": "Extension A",
                                     "extensionVersion": "1.0.0",
+                                    "isActive": True,
                                     "capabilityImplementations": [
                                         {
                                             "capabilityId": "default",
@@ -110,6 +111,7 @@ class TestUmsTransportPagination:
                                     "id": "ext-2",
                                     "title": "Extension B",
                                     "extensionVersion": "2.0.0",
+                                    "isActive": True,
                                     "capabilityImplementations": [
                                         {
                                             "capabilityId": "default",
@@ -179,6 +181,7 @@ class TestUmsTransportPagination:
                                     "id": "ext-1",
                                     "title": "Ext",
                                     "extensionVersion": "1.0.0",
+                                    "isActive": True,
                                     "capabilityImplementations": [
                                         {
                                             "capabilityId": "default",
@@ -269,6 +272,7 @@ class TestUmsTransportPagination:
                                     "id": "ext-1",
                                     "title": "Ext",
                                     "extensionVersion": "1.0.0",
+                                    "isActive": True,
                                     "capabilityImplementations": [
                                         {
                                             "capabilityId": "default",
@@ -311,6 +315,7 @@ class TestUmsTransportPagination:
                                     "id": "ext-1",
                                     "title": "Ext",
                                     "extensionVersion": "1.0.0",
+                                    "isActive": True,
                                     "capabilityImplementations": [
                                         {
                                             "capabilityId": "default",

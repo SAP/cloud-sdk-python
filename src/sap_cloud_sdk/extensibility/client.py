@@ -273,7 +273,7 @@ class ExtensibilityClient:
 
         # 1. Execute workflow
         execute_workflow_arguments = {
-            "workflowId": hook.n8n_workflow_config.workflow_id,
+            "workflowId": hook.n8n_workflow_config.workflow_id,  # ty: ignore[unresolved-attribute]
             "inputs": {
                 "type": "webhook",
                 "webhookData": {
@@ -324,7 +324,7 @@ class ExtensibilityClient:
         # 3. Poll get-execution for running/new/waiting/started
         execution_id = data.get("executionId")
         get_execution_arguments = {
-            "workflowId": hook.n8n_workflow_config.workflow_id,
+            "workflowId": hook.n8n_workflow_config.workflow_id,  # ty: ignore[unresolved-attribute]
             "executionId": str(execution_id),
             "includeData": True,
         }

@@ -27,7 +27,10 @@ from sap_cloud_sdk.agentgateway._models import (
 )
 from sap_cloud_sdk.agentgateway._token_cache import _TokenCache
 from sap_cloud_sdk.agentgateway.config import ClientConfig
-from sap_cloud_sdk.agentgateway.exceptions import AgentGatewaySDKError
+from sap_cloud_sdk.agentgateway.exceptions import (
+    AgentGatewaySDKError,
+    AgentGatewayServerError,
+)
 
 
 # ============================================================
@@ -766,6 +769,8 @@ class TestCallMcpToolCustomer:
             mock_content = MagicMock()
             mock_content.text = "Order created successfully"
             mock_result.content = [mock_content]
+            mock_result.is_error = False
+            mock_result.isError = False
             mock_session.call_tool = AsyncMock(return_value=mock_result)
             mock_session_ctx = AsyncMock()
             mock_session_ctx.__aenter__ = AsyncMock(return_value=mock_session)
@@ -823,6 +828,58 @@ class TestCallMcpToolCustomer:
             )
 
             assert result == ""
+
+    @pytest.mark.asyncio
+    async def test_raises_server_error_on_is_error(
+        self, credentials, mock_tool
+    ):
+        """Raise AgentGatewayServerError when tool returns isError."""
+        tool = MCPTool(
+            name="test-tool",
+            server_name="test-server",
+            description="Test tool",
+            input_schema={},
+            url="https://example.com/mcp",
+            fragment_name="test-fragment",
+        )
+
+        with (
+            patch(
+                "httpx.AsyncClient",
+            ),
+            patch(
+                "sap_cloud_sdk.agentgateway._customer.streamable_http_client",
+            ) as mock_stream,
+            patch(
+                "sap_cloud_sdk.agentgateway._customer.ClientSession",
+            ) as mock_session_class,
+        ):
+            mock_stream_ctx = AsyncMock()
+            mock_stream_ctx.__aenter__ = AsyncMock(
+                return_value=(AsyncMock(), AsyncMock(), None)
+            )
+            mock_stream_ctx.__aexit__ = AsyncMock(return_value=None)
+            mock_stream.return_value = mock_stream_ctx
+
+            mock_session = AsyncMock()
+            mock_session.initialize = AsyncMock()
+            mock_result = MagicMock()
+            mock_result.content = [MagicMock()]
+            mock_result.content[0].text = "backend exploded"
+            mock_result.is_error = True
+            mock_result.isError = True
+            mock_session.call_tool = AsyncMock(return_value=mock_result)
+            mock_session_ctx = AsyncMock()
+            mock_session_ctx.__aenter__ = AsyncMock(return_value=mock_session)
+            mock_session_ctx.__aexit__ = AsyncMock(return_value=None)
+            mock_session_class.return_value = mock_session_ctx
+
+            with pytest.raises(
+                AgentGatewayServerError, match="backend exploded"
+            ):
+                await call_mcp_tool_customer(tool, "auth-token", 60.0)
+
+            mock_session.call_tool.assert_called_once()
 
 
 # ============================================================

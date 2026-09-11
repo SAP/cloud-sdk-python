@@ -1,10 +1,6 @@
 # Audit Log NG User Guide
 
-This module provides an OTLP/gRPC client for sending structured audit log events to the SAP Audit Log Service (v3/NG). It supports mTLS, insecure mode for local testing, and both binary protobuf and JSON serialization formats.
-
-## Overview
-
-The Auditlog NG client sends audit log events as OpenTelemetry (OTLP) LogRecords over gRPC to the SAP Audit Log Service. It supports:
+This module provides an OTLP/gRPC client for sending structured audit log events to the SAP Audit Log Service (v3/NG). It sends events as OpenTelemetry (OTLP) LogRecords over gRPC and supports:
 
 - **mTLS** (mutual TLS with client certificates)
 - **Insecure** mode (local testing / no-auth)
@@ -34,46 +30,46 @@ The client depends on generated protobuf classes.
 
 ## Configuration
 
-`create_client` supports three mutually exclusive ways to provide configuration, evaluated in this order:
+`create_client` supports three mutually exclusive ways to provide configuration. They are evaluated in this order of precedence:
 
-1. **Destination-based resolution (recommended)** — pass `tenant`; connection parameters are resolved from the named SAP Destination automatically. This is the recommended path for SPII-based deployments.
-2. **Explicit config object** — pass a pre-built `AuditLogNGConfig` via `config=`.
+1. **Explicit config object** — pass a pre-built `AuditLogNGConfig` via `config=`. When provided, it takes precedence over the other paths.
+2. **Destination-based resolution (recommended)** — pass `tenant`; connection parameters are resolved from the named SAP Destination automatically. This is the recommended path for SPII-based deployments.
 3. **Explicit keyword arguments** — pass `endpoint`, `deployment_id`, and `namespace` directly.
 
 ### Destination-based configuration parameters
 
 | Parameter              | Type   | Required | Default                    | Description |
 |------------------------|--------|----------|----------------------------|-------------|
-| `tenant`               | `str`  | ✅ Yes   | —                          | Tenant subdomain. **Required to activate destination-based resolution.** |
-| `destination_name`     | `str`  | ❌ No    | `"AuditLogV3_Destination"` | Name of the SAP Destination to resolve. |
-| `destination_instance` | `str`  | ❌ No    | `"default"`                | Destination service binding instance name. |
-| `fragment_name`        | `str`  | ❌ No    | `None`                     | Destination fragment merged before resolution (for tenant-specific overrides). Follows the pattern `AuditLogV3_Fragment_{tenant_subdomain}`. |
+| `tenant`               | `str`  | Yes      | —                          | Tenant subdomain. **Required to activate destination-based resolution.** |
+| `destination_name`     | `str`  | No       | `"AuditLogV3_Destination"` | Name of the SAP Destination to resolve. |
+| `destination_instance` | `str`  | No       | `"default"`                | Destination service binding instance name. |
+| `fragment_name`        | `str`  | No       | `None`                     | Destination fragment merged before resolution (for tenant-specific overrides). Follows the pattern `AuditLogV3_Fragment_{tenant_subdomain}`. |
 
 The destination must expose these custom properties:
 
 | Property           | Required | Description |
 |--------------------|----------|-------------|
-| `deploymentId`     | ✅ Yes (or `deploymentRegion`) | Deployment identifier. Falls back to `deploymentRegion` when absent or empty. |
-| `deploymentRegion` | ✅ Fallback | Used as `deployment_id` when `deploymentId` is missing or empty. |
-| `namespace`        | ✅ Yes   | Audit log namespace (e.g. `sap.als`). |
+| `deploymentId`     | Yes (or `deploymentRegion`) | Deployment identifier. Falls back to `deploymentRegion` when absent or empty. |
+| `deploymentRegion` | Fallback | Used as `deployment_id` when `deploymentId` is missing or empty. |
+| `namespace`        | Yes      | Audit log namespace (e.g. `sap.als`). |
 
 The destination `url` is used as the OTLP endpoint. The lookup is always performed at subaccount level.
 
-### Explicit configuration parameters for `AuditClient`:
+### Explicit configuration parameters for `AuditClient`
 
 | Parameter       | Type    | Required | Default        | Description                                                                                           |
 |-----------------|---------|----------|----------------|-------------------------------------------------------------------------------------------------------|
-| `endpoint`      | `str`   | ✅ Yes   | —              | OTLP endpoint of the Audit Log Service (`host:port`)                                             |
-| `deployment_id` | `str`   | ✅ Yes   | —              | Deployment/region identifier. Validated: only `[a-zA-Z0-9._-/~]` allowed. Raises `ValueError` if invalid. |
-| `namespace`     | `str`   | ✅ Yes   | —              | Audit log namespace (e.g. `sap.als`). Same character-set validation as `deployment_id`.               |
-| `cert_file`     | `str`   | ❌ No    | `None`         | Path to the mTLS client certificate file (PEM). Required together with `key_file` for mTLS.           |
-| `key_file`      | `str`   | ❌ No    | `None`         | Path to the mTLS client private key file (PEM). Required together with `cert_file` for mTLS.          |
-| `ca_file`       | `str`   | ❌ No    | `None`         | Path to a custom CA certificate (PEM) for server verification. Uses system trust store if omitted.    |
-| `insecure`      | `bool`  | ❌ No    | `False`        | Disable TLS entirely (plaintext gRPC).                                                                |
-| `service_name`  | `str`   | ❌ No    | `"audit-client"` | OpenTelemetry `service.name` resource attribute attached to every log record.                       |
-| `batch`         | `bool`  | ❌ No    | `False`        | When `True`, uses `BatchLogRecordProcessor` (better throughput, small delay). When `False`, uses `SimpleLogRecordProcessor` (immediate, lower throughput). |
-| `compression`   | `bool`  | ❌ No    | `True`         | Enable gzip compression on the gRPC channel (`grpc.Compression.Gzip`). Set to `False` to disable.    |
-| `schema_url`    | `str`   | ❌ No    | `SCHEMA_URL`   | OpenTelemetry schema URL attached to the logger. Defaults to the canonical ALS proto schema URL.      |
+| `endpoint`      | `str`   | Yes      | —              | OTLP endpoint of the Audit Log Service (`host:port`)                                             |
+| `deployment_id` | `str`   | Yes      | —              | Deployment/region identifier. Validated: only `[a-zA-Z0-9._-/~]` allowed. Raises `ValueError` if invalid. |
+| `namespace`     | `str`   | Yes      | —              | Audit log namespace (e.g. `sap.als`). Same character-set validation as `deployment_id`.               |
+| `cert_file`     | `str`   | No       | `None`         | Path to the mTLS client certificate file (PEM). Required together with `key_file` for mTLS.           |
+| `key_file`      | `str`   | No       | `None`         | Path to the mTLS client private key file (PEM). Required together with `cert_file` for mTLS.          |
+| `ca_file`       | `str`   | No       | `None`         | Path to a custom CA certificate (PEM) for server verification. Uses system trust store if omitted.    |
+| `insecure`      | `bool`  | No       | `False`        | Disable TLS entirely (plaintext gRPC).                                                                |
+| `service_name`  | `str`   | No       | `"audit-client"` | OpenTelemetry `service.name` resource attribute attached to every log record.                       |
+| `batch`         | `bool`  | No       | `False`        | When `True`, uses `BatchLogRecordProcessor` (better throughput, small delay). When `False`, uses `SimpleLogRecordProcessor` (immediate, lower throughput). |
+| `compression`   | `bool`  | No       | `True`         | Enable gzip compression on the gRPC channel (`grpc.Compression.Gzip`). Set to `False` to disable.    |
+| `schema_url`    | `str`   | No       | `SCHEMA_URL`   | OpenTelemetry schema URL attached to the logger. Defaults to the canonical ALS proto schema URL.      |
 
 ### Example values
 
@@ -288,7 +284,7 @@ Events are validated against protobuf constraints using `protovalidate` before s
 
 ---
 
-## Automatic tenant and user injection
+## Automatic Tenant and User Injection
 
 When `StarletteIASTelemetryMiddleware` is registered on your app, it parses the
 incoming `Authorization: Bearer <token>` header on every request and stores the
@@ -334,11 +330,3 @@ event_id = client.send(event)
 
 If neither the middleware nor an explicit value provides `tenant_id`, the event
 will fail `protovalidate` validation and raise a `ValidationError`.
-
----
-
-## Running the Unit Tests
-
-```bash
-    uv run pytest tests/core/unit/auditlog_ng/
-```

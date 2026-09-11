@@ -284,7 +284,7 @@ The destination `url` is used as the OTLP endpoint. The lookup is always perform
 | Parameter       | Type    | Required | Default        | Description                                                                                           |
 |-----------------|---------|----------|----------------|-------------------------------------------------------------------------------------------------------|
 | `endpoint`      | `str`   | Yes      | —              | OTLP endpoint of the Audit Log Service (`host:port`)                                             |
-| `deployment_id` | `str`   | Yes      | —              | Deployment/region identifier. Validated: only `[a-zA-Z0-9._-/~]` allowed. Raises `ValueError` if invalid. |
+| `deployment_id` | `str`   | Yes      | —              | Deployment/region identifier. Validated: only `[a-zA-Z0-9._/~-]` allowed. Raises `ValueError` if invalid. |
 | `namespace`     | `str`   | Yes      | —              | Audit log namespace (e.g. `sap.als`). Same character-set validation as `deployment_id`.               |
 | `cert_file`     | `str`   | No       | `None`         | Path to the mTLS client certificate file (PEM). Required together with `key_file` for mTLS.           |
 | `key_file`      | `str`   | No       | `None`         | Path to the mTLS client private key file (PEM). Required together with `cert_file` for mTLS.          |
@@ -320,8 +320,9 @@ The destination `url` is used as the OTLP endpoint. The lookup is always perform
 
 ## Error Handling
 
-Events are validated against protobuf constraints using `protovalidate` before sending. A `ValueError` is raised if:
+Events are validated against protobuf constraints using `protovalidate` before sending.
+`AuditClient.send()` (and `send_json()`) can raise:
 
-- The event fails schema validation
-- The `tenant_id` is not a valid UUID
-- The client has already been closed
+- `ValidationError` — the event fails `protovalidate` schema validation. This is a subclass of `AuditLogNGError`.
+- `ValueError` — `common.tenant_id` is not a string, or contains characters outside `[a-zA-Z0-9._/~-]`.
+- `RuntimeError` — `send()` was called on a client that has already been closed.

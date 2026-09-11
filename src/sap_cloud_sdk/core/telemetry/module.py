@@ -15,6 +15,7 @@ class Module(str, Enum):
     BOOTSTRAP = "bootstrap"
     DATA_ANONYMIZATION = "data_anonymization"
     DESTINATION = "destination"
+    DPI_NG = "dpi_ng"
     DMS = "dms"
     EXTENSIBILITY = "extensibility"
     OBJECTSTORE = "objectstore"

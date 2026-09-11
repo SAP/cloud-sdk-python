@@ -7,11 +7,9 @@ This module provides an OTLP/gRPC client for sending structured audit log events
 - **Binary protobuf** and **JSON** serialization formats
 - **Destination-based configuration** — resolve connection parameters automatically from a named SAP Destination (SPII-based deployments)
 
----
+## Installation
 
-## Prerequisites
-
-### 1. Required Dependencies
+### Required Dependencies
 
 ```
 grpcio>=1.60.0
@@ -22,11 +20,237 @@ opentelemetry-sdk>=1.28.0
 opentelemetry-exporter-otlp-proto-grpc>=1.28.0
 ```
 
-### 2. Generated Protobuf Code
+### Generated Protobuf Code
 
 The client depends on generated protobuf classes.
 
----
+## Quick Start
+
+The minimal recommended call is just `tenant` — `destination_name` and `destination_instance`
+default to the values provisioned for SPII-based deployments:
+
+```python
+from sap_cloud_sdk.core.auditlog_ng import create_client
+from sap_cloud_sdk.core.auditlog_ng.gen.sap.auditlog.auditevent.v2 import (
+    auditevent_pb2 as pb,
+)
+from datetime import datetime, timezone
+
+client = create_client(tenant="tenant_subdomain")
+
+event = pb.DataAccess()
+event.common.timestamp.FromDatetime(datetime.now(timezone.utc))
+event.common.user_initiator_id = "agent@example.com"
+event.common.tenant_id = "9e0d89c9-17cd-439d-8a8b-9c44d3d272f0"
+event.channel_type = "API"
+event.channel_id = "agent-v1"
+event.object_type = "resource"
+event.object_id = "resource-001"
+
+event_id = client.send(event)
+client.close()
+```
+
+The SDK resolves `endpoint`, `deployment_id`, and `namespace` from the destination automatically.
+
+## Usage
+
+### Initialize the Client
+
+**From a Destination (SPII-based deployments):**
+
+You can spell out the destination parameters and pass connection options alongside:
+
+```python
+client = create_client(
+    tenant="tenant_subdomain",                    # required to activate destination resolution
+    destination_name="AuditLogV3_Destination",    # optional — this is the default
+    destination_instance="default",               # optional — this is the default
+    # fragment_name="AuditLogV3_Fragment_tenant_subdomain",  # optional tenant-specific fragment
+    service_name="my-agent",
+    batch=True,
+)
+```
+
+> **Note:** Omitting `tenant` disables destination resolution — `create_client` then expects
+> `endpoint`, `deployment_id`, and `namespace` (or a `config=` object) and raises `ValueError`
+> otherwise.
+
+**With mTLS (explicit configuration):**
+
+```python
+client = create_client(
+    endpoint="us30.als.services.cloud.sap:443",
+    deployment_id="us30-staging",
+    namespace="sap.als",
+    cert_file="/path/to/client-certificate_chain.pem",
+    key_file="/path/to/private-key.pem",
+    ca_file="/path/to/ca.pem",  # optional
+)
+```
+
+**Insecure mode (local testing):**
+
+```python
+client = create_client(
+    endpoint="localhost:4317",
+    deployment_id="my-deployment",
+    namespace="sap.als",
+    insecure=True,
+)
+```
+
+> **Important:** `deployment_id` and `namespace` are validated at construction time.
+> Invalid values (e.g. containing spaces) will raise a `ValueError`.
+
+### Build an Audit Event
+
+```python
+event = pb.DataAccess()
+event.common.timestamp.FromDatetime(datetime.now(timezone.utc))
+event.common.user_initiator_id = "agent@example.com"
+event.common.tenant_id = "9e0d89c9-17cd-439d-8a8b-9c44d3d272f0"
+event.channel_type = "API"
+event.channel_id = "agent-v1"
+event.object_type = "resource"
+event.object_id = "resource-001"
+```
+
+> **Tip:** When using `StarletteIASTelemetryMiddleware` (see [Automatic Tenant and User Injection](#automatic-tenant-and-user-injection)), `common.tenant_id` and `common.user_initiator_id` are filled automatically from the incoming IAS JWT. You only need to set them explicitly if you want to override the values from the token.
+
+### Send the Event
+
+**Binary protobuf:**
+
+```python
+event_id = client.send(event)
+print(f"Sent event with ID: {event_id}")
+```
+
+**JSON format:**
+
+```python
+event_id = client.send_json(event)
+```
+
+### Close the Client
+
+Always close the client when the agent shuts down to flush pending events:
+
+```python
+client.close()
+```
+
+> Calling `send()` on a closed client raises a `RuntimeError`.
+
+### Full Agent Integration Example
+
+```python
+from sap_cloud_sdk.core.auditlog_ng import create_client
+from sap_cloud_sdk.core.auditlog_ng.gen.sap.auditlog.auditevent.v2 import (
+    auditevent_pb2 as pb,
+)
+from datetime import datetime, timezone
+
+
+class AgentAuditLogger:
+    def __init__(self, tenant: str):
+        self.client = create_client(tenant=tenant)
+
+    def log_data_access(self, user: str, tenant_id: str, resource: str):
+        event = pb.DataAccess()
+        event.common.timestamp.FromDatetime(datetime.now(timezone.utc))
+        event.common.user_initiator_id = user
+        event.common.tenant_id = tenant_id
+        event.channel_type = "API"
+        event.channel_id = "agent-v1"
+        event.object_type = "resource"
+        event.object_id = resource
+
+        event_id = self.client.send(event)
+        return event_id
+
+    def shutdown(self):
+        self.client.close()
+
+
+# In your agent main loop
+audit_logger = AgentAuditLogger(tenant="tenant_subdomain")
+try:
+    event_id = audit_logger.log_data_access(
+        user="agent-user@example.com",
+        tenant_id="9e0d89c9-17cd-439d-8a8b-9c44d3d272f0",
+        resource="sensitive-record-42",
+    )
+    print(f"Audit event logged: {event_id}")
+finally:
+    audit_logger.shutdown()
+```
+
+### One-Off Sends (Convenience Function)
+
+For simple, one-off audit events without managing a persistent client:
+
+```python
+from sap_cloud_sdk.core.auditlog_ng import create_client
+
+with create_client(tenant="tenant_subdomain") as client:
+    event_id = client.send(event)
+```
+
+### Event Serialization Formats
+
+| Method        | Format             | MIME Type              |
+|---------------|--------------------|------------------------|
+| `send()`      | Binary protobuf    | `application/protobuf` |
+| `send_json()` | JSON               | `application/json`     |
+
+### Automatic Tenant and User Injection
+
+When `StarletteIASTelemetryMiddleware` is registered on your app, it parses the
+incoming `Authorization: Bearer <token>` header on every request and stores the
+IAS claims in the current async context.
+
+`AuditClient.send()` reads that context automatically before validation and
+back-fills two fields on the event's `common` block — only if they are not
+already set by the caller:
+
+| Field populated | IAS claim used |
+|---|---|
+| `common.tenant_id` | `app_tid` |
+| `common.user_initiator_id` | `user_uuid` |
+
+#### Setup
+
+Register the middleware once when your app starts:
+
+```python
+from sap_cloud_sdk.core.telemetry import auto_instrument
+from sap_cloud_sdk.core.telemetry.middleware import StarletteIASTelemetryMiddleware
+
+app = FastAPI(...)
+auto_instrument(middlewares=[StarletteIASTelemetryMiddleware(app=app)])
+```
+
+#### Usage
+
+With the middleware in place, you can omit `tenant_id` and `user_initiator_id`
+from every event — they are injected automatically:
+
+```python
+event = pb.DataAccess()
+event.common.timestamp.FromDatetime(datetime.now(timezone.utc))
+# tenant_id and user_initiator_id are filled from the IAS JWT automatically
+event.channel_type = "API"
+event.channel_id = "agent-v1"
+event.object_type = "resource"
+event.object_id = "resource-001"
+
+event_id = client.send(event)
+```
+
+If neither the middleware nor an explicit value provides `tenant_id`, the event
+will fail `protovalidate` validation and raise a `ValidationError`.
 
 ## Configuration
 
@@ -86,186 +310,6 @@ The destination `url` is used as the OTLP endpoint. The lookup is always perform
 | `batch`         | `True` (high-throughput agents)                   |
 | `compression`   | `True`                                            |
 
----
-
-## Usage in an Agent
-
-### Step 1: Import the Client and Generated Protobuf
-
-```python
-from sap_cloud_sdk.core.auditlog_ng import create_client, AuditLogNGConfig
-from sap_cloud_sdk.core.auditlog_ng.gen.sap.auditlog.auditevent.v2 import (
-    auditevent_pb2 as pb,
-)
-```
-
-### Step 2: Initialize the Client
-
-**From a Destination (SPII-based deployments):**
-
-The minimal recommended call is just `tenant` — `destination_name` and `destination_instance`
-default to the values provisioned for SPII-based deployments:
-
-```python
-client = create_client(tenant="tenant_subdomain")
-```
-
-The SDK resolves `endpoint`, `deployment_id`, and `namespace` from the destination automatically.
-You can spell out the destination parameters and pass connection options alongside:
-
-```python
-client = create_client(
-    tenant="tenant_subdomain",                    # required to activate destination resolution
-    destination_name="AuditLogV3_Destination",    # optional — this is the default
-    destination_instance="default",               # optional — this is the default
-    # fragment_name="AuditLogV3_Fragment_tenant_subdomain",  # optional tenant-specific fragment
-    service_name="my-agent",
-    batch=True,
-)
-```
-
-> **Note:** Omitting `tenant` disables destination resolution — `create_client` then expects
-> `endpoint`, `deployment_id`, and `namespace` (or a `config=` object) and raises `ValueError`
-> otherwise.
-
-**With mTLS (explicit configuration):**
-
-```python
-client = create_client(
-    endpoint="us30.als.services.cloud.sap:443",
-    deployment_id="us30-staging",
-    namespace="sap.als",
-    cert_file="/path/to/client-certificate_chain.pem",
-    key_file="/path/to/private-key.pem",
-    ca_file="/path/to/ca.pem",  # optional
-)
-```
-
-**Insecure mode (local testing):**
-
-```python
-client = create_client(
-    endpoint="localhost:4317",
-    deployment_id="my-deployment",
-    namespace="sap.als",
-    insecure=True,
-)
-```
-
-> **Important:** `deployment_id` and `namespace` are validated at construction time.
-> Invalid values (e.g. containing spaces) will raise a `ValueError`.
-
-### Step 3: Build an Audit Event
-
-```python
-event = pb.DataAccess()
-event.common.timestamp.FromDatetime(datetime.now(timezone.utc))
-event.common.user_initiator_id = "agent@example.com"
-event.common.tenant_id = "9e0d89c9-17cd-439d-8a8b-9c44d3d272f0"
-event.channel_type = "API"
-event.channel_id = "agent-v1"
-event.object_type = "resource"
-event.object_id = "resource-001"
-```
-
-> **Tip:** When using `StarletteIASTelemetryMiddleware` (see [Automatic tenant and user injection](#automatic-tenant-and-user-injection)), `common.tenant_id` and `common.user_initiator_id` are filled automatically from the incoming IAS JWT. You only need to set them explicitly if you want to override the values from the token.
-
-### Step 4: Send the Event
-
-**Binary protobuf:**
-
-```python
-event_id = client.send(event)
-print(f"Sent event with ID: {event_id}")
-```
-
-**JSON format:**
-
-```python
-event_id = client.send_json(event)
-```
-
-
-### Step 5: Close the Client
-
-Always close the client when the agent shuts down to flush pending events:
-
-```python
-client.close()
-```
-
-> Calling `send()` on a closed client raises a `RuntimeError`.
-
----
-
-## Full Agent Integration Example
-
-```python
-from sap_cloud_sdk.core.auditlog_ng import create_client
-from sap_cloud_sdk.core.auditlog_ng.gen.sap.auditlog.auditevent.v2 import (
-    auditevent_pb2 as pb,
-)
-from datetime import datetime, timezone
-
-
-class AgentAuditLogger:
-    def __init__(self, tenant: str):
-        self.client = create_client(tenant=tenant)
-
-    def log_data_access(self, user: str, tenant_id: str, resource: str):
-        event = pb.DataAccess()
-        event.common.timestamp.FromDatetime(datetime.now(timezone.utc))
-        event.common.user_initiator_id = user
-        event.common.tenant_id = tenant_id
-        event.channel_type = "API"
-        event.channel_id = "agent-v1"
-        event.object_type = "resource"
-        event.object_id = resource
-
-        event_id = self.client.send(event)
-        return event_id
-
-    def shutdown(self):
-        self.client.close()
-
-
-# In your agent main loop
-audit_logger = AgentAuditLogger(tenant="tenant_subdomain")
-try:
-    event_id = audit_logger.log_data_access(
-        user="agent-user@example.com",
-        tenant_id="9e0d89c9-17cd-439d-8a8b-9c44d3d272f0",
-        resource="sensitive-record-42",
-    )
-    print(f"Audit event logged: {event_id}")
-finally:
-    audit_logger.shutdown()
-```
-
----
-
-## One-Off Sends (Convenience Function)
-
-For simple, one-off audit events without managing a persistent client:
-
-```python
-from sap_cloud_sdk.core.auditlog_ng import create_client
-
-with create_client(tenant="tenant_subdomain") as client:
-    event_id = client.send(event)
-```
-
----
-
-## Event Serialization Formats
-
-| Method        | Format             | MIME Type              |
-|---------------|--------------------|------------------------|
-| `send()`      | Binary protobuf    | `application/protobuf` |
-| `send_json()` | JSON               | `application/json`     |
-
----
-
 ## Multi-tenancy
 
 - **Supported:** N/A at auth level
@@ -274,59 +318,10 @@ with create_client(tenant="tenant_subdomain") as client:
 - **Further reading:**
   - [SAP Audit Log Service — SAP Help Portal](https://help.sap.com/docs/btp/sap-business-technology-platform/audit-log-service)
 
-## Validation
+## Error Handling
 
 Events are validated against protobuf constraints using `protovalidate` before sending. A `ValueError` is raised if:
 
 - The event fails schema validation
 - The `tenant_id` is not a valid UUID
 - The client has already been closed
-
----
-
-## Automatic Tenant and User Injection
-
-When `StarletteIASTelemetryMiddleware` is registered on your app, it parses the
-incoming `Authorization: Bearer <token>` header on every request and stores the
-IAS claims in the current async context.
-
-`AuditClient.send()` reads that context automatically before validation and
-back-fills two fields on the event's `common` block — only if they are not
-already set by the caller:
-
-| Field populated | IAS claim used |
-|---|---|
-| `common.tenant_id` | `app_tid` |
-| `common.user_initiator_id` | `user_uuid` |
-
-### Setup
-
-Register the middleware once when your app starts:
-
-```python
-from sap_cloud_sdk.core.telemetry import auto_instrument
-from sap_cloud_sdk.core.telemetry.middleware import StarletteIASTelemetryMiddleware
-
-app = FastAPI(...)
-auto_instrument(middlewares=[StarletteIASTelemetryMiddleware(app=app)])
-```
-
-### Usage
-
-With the middleware in place, you can omit `tenant_id` and `user_initiator_id`
-from every event — they are injected automatically:
-
-```python
-event = pb.DataAccess()
-event.common.timestamp.FromDatetime(datetime.now(timezone.utc))
-# tenant_id and user_initiator_id are filled from the IAS JWT automatically
-event.channel_type = "API"
-event.channel_id = "agent-v1"
-event.object_type = "resource"
-event.object_id = "resource-001"
-
-event_id = client.send(event)
-```
-
-If neither the middleware nor an explicit value provides `tenant_id`, the event
-will fail `protovalidate` validation and raise a `ValidationError`.

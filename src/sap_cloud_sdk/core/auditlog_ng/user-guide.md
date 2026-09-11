@@ -116,7 +116,7 @@ event.object_type = "resource"
 event.object_id = "resource-001"
 ```
 
-> **Tip:** When using `StarletteIASTelemetryMiddleware` (see [Automatic Tenant and User Injection](#automatic-tenant-and-user-injection)), `common.tenant_id` and `common.user_initiator_id` are filled automatically from the incoming IAS JWT. You only need to set them explicitly if you want to override the values from the token.
+> **Tip:** When your app is wired with `bootstrap()` (see [Automatic Tenant and User Injection](#automatic-tenant-and-user-injection)), `common.tenant_id` and `common.user_initiator_id` are filled automatically from the incoming IAS JWT. You only need to set them explicitly if you want to override the values from the token.
 
 ### Send the Event
 
@@ -207,9 +207,9 @@ with create_client(tenant="tenant_subdomain") as client:
 
 ### Automatic Tenant and User Injection
 
-When `StarletteIASTelemetryMiddleware` is registered on your app, it parses the
-incoming `Authorization: Bearer <token>` header on every request and stores the
-IAS claims in the current async context.
+When your app is wired with `bootstrap()`, the SDK parses the incoming
+`Authorization: Bearer <token>` header on every request and stores the IAS
+claims in the SDK runtime context for the current invocation.
 
 `AuditClient.send()` reads that context automatically before validation and
 back-fills two fields on the event's `common` block — only if they are not
@@ -222,19 +222,21 @@ already set by the caller:
 
 #### Setup
 
-Register the middleware once when your app starts:
+Call `bootstrap()` once when your app starts:
 
 ```python
-from sap_cloud_sdk.core.telemetry import auto_instrument
-from sap_cloud_sdk.core.telemetry.middleware import StarletteIASTelemetryMiddleware
+from sap_cloud_sdk import bootstrap
 
 app = FastAPI(...)
-auto_instrument(middlewares=[StarletteIASTelemetryMiddleware(app=app)])
+bootstrap(app)
 ```
+
+A single `bootstrap(app)` call registers the IAS context provider — which reads
+the incoming JWT on each request — and initializes telemetry for your app.
 
 #### Usage
 
-With the middleware in place, you can omit `tenant_id` and `user_initiator_id`
+With `bootstrap()` in place, you can omit `tenant_id` and `user_initiator_id`
 from every event — they are injected automatically:
 
 ```python
@@ -249,8 +251,25 @@ event.object_id = "resource-001"
 event_id = client.send(event)
 ```
 
-If neither the middleware nor an explicit value provides `tenant_id`, the event
-will fail `protovalidate` validation and raise a `ValidationError`.
+If neither the runtime context nor an explicit value provides `tenant_id`, the
+event will fail `protovalidate` validation and raise a `ValidationError`.
+
+#### Legacy: `StarletteIASTelemetryMiddleware`
+
+Apps not yet using `bootstrap()` can register the telemetry middleware directly:
+
+```python
+from sap_cloud_sdk.core.telemetry import auto_instrument
+from sap_cloud_sdk.core.telemetry.middleware import StarletteIASTelemetryMiddleware
+
+app = FastAPI(...)
+auto_instrument(middlewares=[StarletteIASTelemetryMiddleware(app=app)])
+```
+
+`send()` reads the runtime context populated by `bootstrap()` first and falls
+back to the IAS claims captured by this middleware when the runtime context is
+empty, so automatic tenant/user injection still applies. Prefer `bootstrap()`
+for new apps.
 
 ## Configuration
 

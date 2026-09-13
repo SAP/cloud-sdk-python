@@ -7,6 +7,7 @@ class Module(str, Enum):
     """SDK module identifiers for telemetry."""
 
     ADMS = "adms"
+    CBC = "cbc"
     AGENT_MEMORY = "agent_memory"
     AGENTGATEWAY = "agentgateway"
     AICORE = "aicore"

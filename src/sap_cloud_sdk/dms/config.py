@@ -1,6 +1,6 @@
 import json
 from dataclasses import dataclass
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, TYPE_CHECKING
 from urllib.parse import urlparse
 
 from sap_cloud_sdk.core.secret_resolver.resolver import (
@@ -8,6 +8,9 @@ from sap_cloud_sdk.core.secret_resolver.resolver import (
 )
 from sap_cloud_sdk.destination.exceptions import ConfigError
 from sap_cloud_sdk.dms.model import DMSCredentials
+
+if TYPE_CHECKING:
+    from sap_cloud_sdk.core.secret_resolver import ConfigFactory
 
 
 @dataclass
@@ -19,8 +22,8 @@ class BindingData:
         uaa: JSON string containing XSUAA authentication credentials
     """
 
-    uri: str
-    uaa: str
+    uri: str = ""
+    uaa: str = ""
 
     def validate(self) -> None:
         """Validate the binding data.
@@ -134,3 +137,37 @@ def load_sdm_config_from_env_or_mount(instance: Optional[str] = None) -> DMSCred
         raise ConfigError(
             f"failed to load sdm configuration for instance='{inst}': {e}"
         )
+
+
+def _make_config_factory(
+    instance: Optional[str] = None,
+) -> "ConfigFactory[DMSCredentials]":
+    """Return a :class:`~sap_cloud_sdk.core.secret_resolver.ConfigFactory` for the given instance.
+
+    The factory re-reads the binding on every call and tracks the secret
+    directory mtime for proactive rotation detection.
+
+    Args:
+        instance: Binding instance name. Defaults to ``"default"``.
+
+    Returns:
+        A callable that produces fresh :class:`DMSCredentials`.
+    """
+    from sap_cloud_sdk.core.secret_resolver import ConfigFactory
+
+    inst = instance or "default"
+
+    def _extract(binding: BindingData) -> DMSCredentials:
+        try:
+            return binding.to_credentials()
+        except Exception as exc:
+            raise ConfigError(
+                f"failed to load DMS configuration for instance '{inst}': {exc}"
+            ) from exc
+
+    return ConfigFactory(
+        module="sdm",
+        instance=inst,
+        binding_cls=BindingData,
+        extract=_extract,
+    )

@@ -1,7 +1,7 @@
 """Unit tests for sap_cloud_sdk.dms._auth.Auth."""
 
 import pytest
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 from sap_cloud_sdk.dms._auth import Auth, _MAX_CACHE_SIZE
 from sap_cloud_sdk.dms.model import DMSCredentials
@@ -127,3 +127,56 @@ class TestGetToken:
             assert len(auth._cache) == _MAX_CACHE_SIZE
             assert "tenant-00" not in auth._cache
             assert "tenant-99" in auth._cache
+
+
+class TestAuthRotation:
+
+    def test_proactive_rotation_clears_cache_when_binding_changed(self):
+        original_creds = _make_credentials()
+        new_creds = _make_credentials(identityzone="new-zone")
+
+        mock_factory = MagicMock(return_value=original_creds)
+        mock_factory.has_changed = MagicMock(side_effect=[False, True])
+
+        auth = Auth(mock_factory)
+        with patch.object(
+            auth, "_fetch_token", return_value={"access_token": "old-tok", "expires_in": 3600}
+        ):
+            auth.get_token()
+        assert "technical" in auth._cache
+
+        # Next call: has_changed() returns True → cache cleared, new credentials loaded
+        mock_factory.return_value = new_creds
+        with patch.object(
+            auth, "_fetch_token", return_value={"access_token": "new-tok", "expires_in": 3600}
+        ):
+            token = auth.get_token()
+
+        assert token == "new-tok"
+        assert auth._credentials is new_creds
+
+    def test_no_cache_clear_when_binding_unchanged(self):
+        creds = _make_credentials()
+        mock_factory = MagicMock(return_value=creds)
+        mock_factory.has_changed = MagicMock(return_value=False)
+
+        auth = Auth(mock_factory)
+        with patch.object(
+            auth, "_fetch_token", return_value={"access_token": "tok", "expires_in": 3600}
+        ):
+            auth.get_token()  # populates cache
+
+        # Second call: has_changed() False → cache hit, no new fetch
+        with patch.object(auth, "_fetch_token") as mock_fetch:
+            auth.get_token()
+            mock_fetch.assert_not_called()
+
+    def test_static_credentials_skips_rotation_check(self):
+        creds = _make_credentials()
+        auth = Auth(creds)
+        with patch.object(
+            auth, "_fetch_token", return_value={"access_token": "tok", "expires_in": 3600}
+        ):
+            auth.get_token()
+        # No has_changed attribute on plain DMSCredentials — no error raised
+        assert "technical" in auth._cache

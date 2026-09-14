@@ -57,7 +57,7 @@ from sap_cloud_sdk.adms._relation_api import (
     _DocumentRelationApi,
 )
 from sap_cloud_sdk.adms._token_cache import TokenCache
-from sap_cloud_sdk.adms.config import AdmsConfig, load_from_env_or_mount
+from sap_cloud_sdk.adms.config import AdmsConfig, _make_config_factory
 
 
 # ---------------------------------------------------------------------------
@@ -171,9 +171,15 @@ def create_client(
         raise ValueError(
             "instance must not be an empty string; omit it to use 'default'"
         )
-    binding = config or load_from_env_or_mount(instance)
-    token_fetcher = IasTokenFetcher(config=binding, cache=token_cache)
-    http = AdmsHttp(config=binding, token_fetcher=token_fetcher, user_jwt=user_jwt)
+    if config is not None:
+        token_fetcher = IasTokenFetcher(config=config, cache=token_cache)
+    else:
+        token_fetcher = IasTokenFetcher(
+            config=_make_config_factory(instance), cache=token_cache
+        )
+    http = AdmsHttp(
+        config=token_fetcher._config, token_fetcher=token_fetcher, user_jwt=user_jwt
+    )
     return AdmsClient(http)
 
 
@@ -206,10 +212,14 @@ def create_async_client(
         raise ValueError(
             "instance must not be an empty string; omit it to use 'default'"
         )
-    binding = config or load_from_env_or_mount(instance)
-    token_fetcher = IasTokenFetcher(config=binding, cache=token_cache)
+    if config is not None:
+        token_fetcher = IasTokenFetcher(config=config, cache=token_cache)
+    else:
+        token_fetcher = IasTokenFetcher(
+            config=_make_config_factory(instance), cache=token_cache
+        )
     http = AsyncAdmsHttp(
-        config=binding,
+        config=token_fetcher._config,
         token_fetcher=token_fetcher,
         client=http_client,
         user_jwt=user_jwt,

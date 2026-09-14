@@ -822,6 +822,128 @@ class TestGetMcpToolsLob:
 
             assert [t.name for t in result] == ["get-sales-order"]
 
+    @pytest.mark.asyncio
+    async def test_fragments_fetched_concurrently(self):
+        """All fragments are dispatched concurrently, not one-by-one."""
+        import asyncio as _asyncio
+
+        started: list[str] = []
+        finished: list[str] = []
+
+        async def slow_tools(url, token, name, timeout):
+            started.append(name)
+            await _asyncio.sleep(0.05)
+            finished.append(name)
+            return [
+                MCPTool(
+                    name=f"tool-{name}",
+                    server_name=name,
+                    description="",
+                    input_schema={},
+                    url=url,
+                    fragment_name=name,
+                )
+            ]
+
+        fragments = []
+        for i in range(3):
+            f = MagicMock()
+            f.name = f"frag-{i}"
+            f.properties = {"URL": f"https://example.com/mcp/{i}"}
+            fragments.append(f)
+
+        with (
+            patch("sap_cloud_sdk.agentgateway._lob.list_mcp_fragments") as mock_list,
+            patch(
+                "sap_cloud_sdk.agentgateway._lob.list_server_tools",
+                side_effect=slow_tools,
+            ),
+        ):
+            mock_list.return_value = fragments
+            result = await get_mcp_tools_lob("tenant-sub", "token", 60.0)
+
+        # All 3 started before any finished — proves concurrent dispatch
+        assert len(started) == 3
+        assert set(started) == {"frag-0", "frag-1", "frag-2"}
+        assert len(result) == 3
+
+    @pytest.mark.asyncio
+    async def test_all_fragments_attempted_even_if_some_fail(self):
+        """Failures in some fragments do not prevent others from being fetched."""
+        good = MagicMock()
+        good.name = "good"
+        good.properties = {"URL": "https://example.com/mcp/good"}
+
+        bad1 = MagicMock()
+        bad1.name = "bad1"
+        bad1.properties = {"URL": "https://example.com/mcp/bad1"}
+
+        bad2 = MagicMock()
+        bad2.name = "bad2"
+        bad2.properties = {"URL": "https://example.com/mcp/bad2"}
+
+        expected_tool = MCPTool(
+            name="good-tool",
+            server_name="good",
+            description="",
+            input_schema={},
+            url="https://example.com/mcp/good",
+            fragment_name="good",
+        )
+
+        async def selective(*args, **kwargs):
+            name = args[2]
+            if name != "good":
+                raise RuntimeError(f"connection refused: {name}")
+            return [expected_tool]
+
+        with (
+            patch("sap_cloud_sdk.agentgateway._lob.list_mcp_fragments") as mock_list,
+            patch(
+                "sap_cloud_sdk.agentgateway._lob.list_server_tools",
+                side_effect=selective,
+            ),
+        ):
+            mock_list.return_value = [bad1, bad2, good]
+            result = await get_mcp_tools_lob("tenant-sub", "token", 60.0)
+
+        assert len(result) == 1
+        assert result[0].name == "good-tool"
+
+    @pytest.mark.asyncio
+    async def test_fragment_count_in_log_excludes_url_missing_fragments(self):
+        """The final 'Loaded N tool(s) from M fragment(s)' counts only fetchable fragments."""
+        no_url = MagicMock()
+        no_url.name = "no-url"
+        no_url.properties = {}
+
+        with_url = MagicMock()
+        with_url.name = "with-url"
+        with_url.properties = {"URL": "https://example.com/mcp"}
+
+        tool = MCPTool(
+            name="t",
+            server_name="s",
+            description="",
+            input_schema={},
+            url="https://example.com/mcp",
+            fragment_name="with-url",
+        )
+
+        with (
+            patch("sap_cloud_sdk.agentgateway._lob.list_mcp_fragments") as mock_list,
+            patch(
+                "sap_cloud_sdk.agentgateway._lob.list_server_tools",
+                new_callable=AsyncMock,
+                return_value=[tool],
+            ),
+        ):
+            mock_list.return_value = [no_url, with_url]
+            result = await get_mcp_tools_lob("tenant-sub", "token", 60.0)
+
+        # Only the fragment with a URL contributes to results
+        assert len(result) == 1
+
 
 # ============================================================
 # Test: list_server_tools
@@ -1372,6 +1494,75 @@ class TestGetAgentCardsLob:
 
         assert len(result) == 1
         assert result[0].ord_id == "ord-ok"
+
+    @pytest.mark.asyncio
+    async def test_fragments_fetched_concurrently(self):
+        """All A2A fragments are dispatched concurrently, not one-by-one."""
+        import asyncio as _asyncio
+
+        started: list[str] = []
+
+        async def slow_fetch(fragment_url, token, timeout):
+            started.append(fragment_url)
+            await _asyncio.sleep(0.05)
+            return AgentCard(raw={"name": "Agent"})
+
+        fragments = [
+            self._make_fragment(
+                f"frag-{i}",
+                f"https://agw.example.com/v1/a2a/ord-{i}/tenant",
+            )
+            for i in range(3)
+        ]
+
+        with (
+            patch(
+                "sap_cloud_sdk.agentgateway._lob.list_a2a_fragments",
+                return_value=fragments,
+            ),
+            patch(
+                "sap_cloud_sdk.agentgateway._lob._fetch_agent_card",
+                side_effect=slow_fetch,
+            ),
+        ):
+            result = await get_agent_cards_lob("tenant-sub", "token", 60.0)
+
+        # All 3 started before any finished — proves concurrent dispatch
+        assert len(started) == 3
+        assert len(result) == 3
+
+    @pytest.mark.asyncio
+    async def test_fetch_errors_isolated_per_fragment(self):
+        """A fetch error on one fragment does not abort the others."""
+        frags = [
+            self._make_fragment(
+                f"frag-{i}",
+                f"https://agw.example.com/v1/a2a/ord-{i}/tenant",
+            )
+            for i in range(3)
+        ]
+
+        async def selective(fragment_url, token, timeout):
+            if "ord-1" in fragment_url:
+                raise ConnectionError("timeout")
+            return AgentCard(raw={"name": "Agent"})
+
+        with (
+            patch(
+                "sap_cloud_sdk.agentgateway._lob.list_a2a_fragments",
+                return_value=frags,
+            ),
+            patch(
+                "sap_cloud_sdk.agentgateway._lob._fetch_agent_card",
+                side_effect=selective,
+            ),
+        ):
+            result = await get_agent_cards_lob("tenant-sub", "token", 60.0)
+
+        # ord-1 failed; ord-0 and ord-2 succeed
+        assert len(result) == 2
+        ord_ids = {a.ord_id for a in result}
+        assert ord_ids == {"ord-0", "ord-2"}
 
 
 class TestGetIasClientIdLob:

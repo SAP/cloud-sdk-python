@@ -132,7 +132,6 @@ class Entities(_FrozenModel):
     items: list[Entity]
 
 
-
 class EntityContent:
     """Configuration content for an entity.
 
@@ -231,7 +230,11 @@ class ConfigData:
             Matching :class:`ConfigObject`, or ``None`` if not found.
         """
         return next(
-            (co for co in self.config_objects if co.config_object_id == config_object_id),
+            (
+                co
+                for co in self.config_objects
+                if co.config_object_id == config_object_id
+            ),
             None,
         )
 

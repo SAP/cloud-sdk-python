@@ -18,6 +18,25 @@ class ObjectStoreBindingData:
     bucket: str = ""
     host: str = ""
 
+    def validate(self) -> None:
+        """Raise ClientCreationError if any required field is empty."""
+        from sap_cloud_sdk.objectstore.exceptions import ClientCreationError
+
+        missing = [
+            name
+            for name, value in [
+                ("access_key_id", self.access_key_id),
+                ("secret_access_key", self.secret_access_key),
+                ("bucket", self.bucket),
+                ("host", self.host),
+            ]
+            if not value
+        ]
+        if missing:
+            raise ClientCreationError(
+                f"Object Store binding missing required fields: {', '.join(missing)}"
+            )
+
 
 @dataclass(frozen=True)
 class ObjectMetadata:

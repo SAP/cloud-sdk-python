@@ -48,7 +48,9 @@ def integration_env() -> Dict[str, str]:
             missing_vars.append(var)
 
     if missing_vars:
-        pytest.skip(f"Missing required environment variables for cloud integration tests: {missing_vars}")
+        pytest.skip(
+            f"Missing required environment variables for cloud integration tests: {missing_vars}"
+        )
 
     # Ensure SSL is enabled for cloud services
     env_vars["CLOUD_SDK_CFG_OBJECTSTORE_DEFAULT_SSL_ENABLED"] = os.getenv(
@@ -66,19 +68,17 @@ def integration_env() -> Dict[str, str]:
 
 @pytest.fixture(scope="session")
 def objectstore_client(integration_env):
-    """Create an ObjectStore client for cloud testing using explicit configuration."""
+    """Create an ObjectStore client via ConfigFactory (reads CLOUD_SDK_CFG_* env vars)."""
     try:
-        config = ObjectStoreBindingData(
-            host=integration_env["CLOUD_SDK_CFG_OBJECTSTORE_DEFAULT_HOST"],
-            access_key_id=integration_env["CLOUD_SDK_CFG_OBJECTSTORE_DEFAULT_ACCESS_KEY_ID"],
-            secret_access_key=integration_env["CLOUD_SDK_CFG_OBJECTSTORE_DEFAULT_SECRET_ACCESS_KEY"],
-            bucket=integration_env["CLOUD_SDK_CFG_OBJECTSTORE_DEFAULT_BUCKET"],
-        )
-        disable_ssl = integration_env.get("CLOUD_SDK_CFG_OBJECTSTORE_DEFAULT_SSL_ENABLED", "true").lower() in ("false", "0")
-        client = create_client("default", config=config, disable_ssl=disable_ssl)
+        disable_ssl = integration_env.get(
+            "CLOUD_SDK_CFG_OBJECTSTORE_DEFAULT_SSL_ENABLED", "true"
+        ).lower() in ("false", "0")
+        client = create_client("default", disable_ssl=disable_ssl)
         return client
     except Exception as e:
-        pytest.fail(f"Failed to create ObjectStore client for cloud integration tests: {e}")
+        pytest.fail(
+            f"Failed to create ObjectStore client for cloud integration tests: {e}"
+        )
 
 
 @pytest.fixture
@@ -88,6 +88,7 @@ def test_prefix() -> str:
 
 
 # ===== CLEANUP INFRASTRUCTURE =====
+
 
 def cleanup_by_prefix(client, prefix: str, timeout: float = 10.0) -> bool:
     """Timeout-controlled cleanup with eventual consistency handling."""
@@ -103,7 +104,9 @@ def cleanup_by_prefix(client, prefix: str, timeout: float = 10.0) -> bool:
 
             # Check timeout
             if time.time() - start_time > timeout:
-                logger.warning(f"Cleanup timeout reached after {timeout}s, cleaned {cleaned_count} objects")
+                logger.warning(
+                    f"Cleanup timeout reached after {timeout}s, cleaned {cleaned_count} objects"
+                )
                 break
 
         if cleaned_count > 0:
@@ -126,8 +129,12 @@ def integration_test_session_cleanup(objectstore_client):
         try:
             objects = objectstore_client.list_objects("sdk-python-integration-tests/")
             if objects:
-                logger.info(f"Found {len(objects)} leftover integration test objects, cleaning up...")
-                cleanup_by_prefix(objectstore_client, "sdk-python-integration-tests/", timeout=30.0)
+                logger.info(
+                    f"Found {len(objects)} leftover integration test objects, cleaning up..."
+                )
+                cleanup_by_prefix(
+                    objectstore_client, "sdk-python-integration-tests/", timeout=30.0
+                )
                 logger.info("Session cleanup completed")
         except Exception as e:
             logger.warning(f"Session cleanup failed: {e}")
@@ -166,7 +173,9 @@ def cleanup_objects(objectstore_client, test_prefix):
 
                 # Respect timeout
                 if time.time() - start_time > 10.0:
-                    logger.warning(f"Object cleanup timeout reached, cleaned {cleaned_count}/{len(created_objects)} objects")
+                    logger.warning(
+                        f"Object cleanup timeout reached, cleaned {cleaned_count}/{len(created_objects)} objects"
+                    )
                     break
 
             except Exception as e:
@@ -182,11 +191,17 @@ def failure_simulation(integration_env):
     """Utilities for simulating various failure conditions using explicit configuration."""
     base_config = ObjectStoreBindingData(
         host=integration_env["CLOUD_SDK_CFG_OBJECTSTORE_DEFAULT_HOST"],
-        access_key_id=integration_env["CLOUD_SDK_CFG_OBJECTSTORE_DEFAULT_ACCESS_KEY_ID"],
-        secret_access_key=integration_env["CLOUD_SDK_CFG_OBJECTSTORE_DEFAULT_SECRET_ACCESS_KEY"],
+        access_key_id=integration_env[
+            "CLOUD_SDK_CFG_OBJECTSTORE_DEFAULT_ACCESS_KEY_ID"
+        ],
+        secret_access_key=integration_env[
+            "CLOUD_SDK_CFG_OBJECTSTORE_DEFAULT_SECRET_ACCESS_KEY"
+        ],
         bucket=integration_env["CLOUD_SDK_CFG_OBJECTSTORE_DEFAULT_BUCKET"],
     )
-    disable_ssl = integration_env.get("CLOUD_SDK_CFG_OBJECTSTORE_DEFAULT_SSL_ENABLED", "true").lower() in ("false", "0")
+    disable_ssl = integration_env.get(
+        "CLOUD_SDK_CFG_OBJECTSTORE_DEFAULT_SSL_ENABLED", "true"
+    ).lower() in ("false", "0")
 
     class FailureSimulator:
         def create_client_with_network_failure(self):
@@ -219,10 +234,7 @@ def failure_simulation(integration_env):
 # Configure pytest markers for integration tests
 def pytest_configure(config):
     """Configure pytest markers."""
-    config.addinivalue_line(
-        "markers",
-        "integration: mark test as integration test"
-    )
+    config.addinivalue_line("markers", "integration: mark test as integration test")
 
 
 def pytest_collection_modifyitems(config, items):

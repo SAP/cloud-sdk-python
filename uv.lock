@@ -4300,7 +4300,7 @@ wheels = [
 
 [[package]]
 name = "sap-cloud-sdk"
-version = "0.53.3"
+version = "0.54.0"
 source = { editable = "." }
 dependencies = [
     { name = "cryptography" },

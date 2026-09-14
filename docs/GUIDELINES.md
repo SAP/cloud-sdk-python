@@ -106,3 +106,87 @@
 - Never log or expose sensitive information (passwords, tokens, etc.)
 - Validate all inputs, especially from external sources
 - Follow principle of least privilege in code design
+
+## Credential Binding Rotation
+
+BTP service bindings can rotate at runtime. Long-lived clients holding stale credentials will fail with auth errors once the old secrets expire. Every SDK module that reads credentials from mounts or env vars must support rotation.
+
+### Two resilience layers
+
+**Proactive** — check `ConfigFactory.has_changed()` before every credential use. If the mtime of the secret directory changed, re-read the binding and discard any cached tokens or session objects.
+
+**Reactive** — on a credential-rejection error (e.g. HTTP 401 for OAuth modules, S3 `InvalidAccessKeyId`/`SignatureDoesNotMatch` for object store), refresh credentials and retry the operation once.
+
+### Pattern for OAuth2 modules
+
+Token providers and auth classes must accept either a fixed config object **or** a callable (factory) returning the config:
+
+```python
+if callable(config) and not isinstance(config, MyConfig):
+    self._config_factory: Callable[[], MyConfig] = config
+    self._config = config()
+else:
+    self._config_factory = lambda: config  # static; no rotation tracking
+    self._config = config
+```
+
+Before serving a cached token, call `_refresh_if_rotated()`:
+
+```python
+def _refresh_if_rotated(self) -> None:
+    has_changed = getattr(self._config_factory, "has_changed", None)
+    if callable(has_changed) and has_changed():
+        self._config = self._config_factory()
+        self._cached_token = None          # discard stale token
+        # rebuild session/client if needed
+```
+
+### Pattern for key-based clients (e.g. object store / MinIO)
+
+Credentials are baked into the client at construction time, so the client itself must be rebuilt on rotation. Wrap every public operation in `_execute_with_retry`:
+
+```python
+_CREDENTIAL_ERROR_CODES = frozenset({"InvalidAccessKeyId", "SignatureDoesNotMatch"})
+
+def _execute_with_retry(self, fn):
+    self._refresh_if_rotated()
+    try:
+        return fn()
+    except S3Error as e:
+        if e.code in _CREDENTIAL_ERROR_CODES:
+            with self._lock:
+                self._creds = self._config_factory()
+                self._client = self._create_client()
+            return fn()
+        raise
+```
+
+Use a `threading.Lock` when rebuilding the client to avoid races under concurrent calls.
+
+### Public API factory functions (`create_client`)
+
+- **Auto-detection path** (no explicit `config=`): pass a `ConfigFactory` instance directly to the token provider / auth class. `ConfigFactory` carries `has_changed()` automatically.
+- **Explicit `config=` path**: wrap in a static lambda to preserve the factory interface without rotation tracking.
+
+```python
+def create_client(*, instance=None, config=None):
+    if config is not None:
+        credentials = lambda: config  # static, no rotation
+    else:
+        credentials = _make_config_factory(instance)
+    return MyClient(credentials)
+```
+
+### `ConfigFactory` contract
+
+`ConfigFactory[C]` (from `sap_cloud_sdk.core.secret_resolver`) reads bindings on every `__call__()` and tracks secret directory mtime via `has_changed()`. To use it, the binding dataclass must:
+- Have all fields defaulting to `""` so `binding_cls()` can be called with no args.
+- Implement `validate()` raising on missing required fields.
+
+### Testing rotation
+
+Every module that supports rotation must have tests for:
+1. **Proactive**: `has_changed()` returns `True` → token/session/client is rebuilt before the next operation.
+2. **Reactive** (key-based clients): credential-rejection error on first call → retried once with fresh credentials.
+3. **No rebuild**: `has_changed()` returns `False` → existing session/client reused.
+4. **Static config**: plain config object (no `has_changed`) → no error, no rotation check.

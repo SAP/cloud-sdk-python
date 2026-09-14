@@ -106,7 +106,6 @@ class _ClientConfig:
     replace_subdomain: bool
 
 
-
 # ---------------------------------------------------------------------------
 # DefaultClient
 # ---------------------------------------------------------------------------
@@ -230,9 +229,7 @@ class DefaultClient:
             tenant_context,
             f"/consumptionVersions?appTenantId={tenant_context.app_tenant_id}",
         )
-        return ConsumptionVersions.model_validate(
-            self._request("GET", url).json()
-        )
+        return ConsumptionVersions.model_validate(self._request("GET", url).json())
 
     def _get_entities(
         self, tenant_context: TenantContext, consumption_version: str
@@ -365,7 +362,9 @@ class DefaultClient:
         )
         response_data = self._request("GET", url).json()
 
-        api_meta = response_data.get("metadata", {}) if isinstance(response_data, dict) else {}
+        api_meta = (
+            response_data.get("metadata", {}) if isinstance(response_data, dict) else {}
+        )
         raw_data = (
             response_data["items"]
             if isinstance(response_data, dict) and "items" in response_data
@@ -414,7 +413,9 @@ class DefaultClient:
                 request_url=url,
             )
             error = ApiError.from_response(response.content)
-            exc_class = CBCServerError if response.status_code >= 500 else CBCClientError
+            exc_class = (
+                CBCServerError if response.status_code >= 500 else CBCClientError
+            )
             raise exc_class(error.message, code=error.code, http_context=ctx)
 
         return response

@@ -11,7 +11,12 @@ import pytest
 
 from sap_cloud_sdk.cbc.client import DefaultClient, create_client
 from sap_cloud_sdk.cbc.config import ENV_URL, ENV_CERT_PATH, ENV_KEY_PATH
-from sap_cloud_sdk.cbc.exceptions import CBCClientError, CBCConfigError, CBCNetworkError, CBCServerError
+from sap_cloud_sdk.cbc.exceptions import (
+    CBCClientError,
+    CBCConfigError,
+    CBCNetworkError,
+    CBCServerError,
+)
 from sap_cloud_sdk.cbc._models import (
     ConfigData,
     TenantContext,
@@ -42,7 +47,9 @@ def _mock_response(
     )
 
 
-def _make_client(base_url: str = "https://cbc.example.ondemand.com") -> tuple[DefaultClient, MagicMock]:
+def _make_client(
+    base_url: str = "https://cbc.example.ondemand.com",
+) -> tuple[DefaultClient, MagicMock]:
     mock_http = MagicMock(spec=httpx.Client)
     client = DefaultClient(base_url=base_url, http_client=mock_http)
     return client, mock_http
@@ -194,9 +201,7 @@ class TestGetEntityData:
 class TestGetConfiguration:
     def test_resolves_latest_version_when_none_given(self):
         client, mock_http = _make_client()
-        versions_response = _mock_response(
-            json_body={"items": [{"version": "v2"}]}
-        )
+        versions_response = _mock_response(json_body={"items": [{"version": "v2"}]})
         entities_response = _mock_response(json_body={"items": []})
         mock_http.request.side_effect = [versions_response, entities_response]
 
@@ -216,7 +221,11 @@ class TestGetConfiguration:
         entities_response = _mock_response(
             json_body={
                 "items": [
-                    {"entityId": "i1", "entityName": "payment-mode", "configurationObjectId": "payment-config"}
+                    {
+                        "entityId": "i1",
+                        "entityName": "payment-mode",
+                        "configurationObjectId": "payment-config",
+                    }
                 ]
             }
         )

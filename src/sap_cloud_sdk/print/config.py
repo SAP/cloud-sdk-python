@@ -15,7 +15,7 @@ Env fallback convention:
 """
 
 from dataclasses import dataclass
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
 import json
 import logging
 
@@ -23,6 +23,9 @@ from sap_cloud_sdk.core.secret_resolver.resolver import (
     read_from_mount_and_fallback_to_env_var,
 )
 from sap_cloud_sdk.print.exceptions import ConfigError
+
+if TYPE_CHECKING:
+    from sap_cloud_sdk.core.secret_resolver import ConfigFactory
 
 logger = logging.getLogger(__name__)
 
@@ -118,3 +121,37 @@ def load_from_env_or_mount(instance: Optional[str] = None) -> PrintConfig:
         raise ConfigError(
             f"failed to load print configuration for instance='{inst}': {e}"
         ) from e
+
+
+def _make_config_factory(
+    instance: Optional[str] = None,
+) -> "ConfigFactory[PrintConfig]":
+    """Return a :class:`~sap_cloud_sdk.core.secret_resolver.ConfigFactory` for the given instance.
+
+    The factory re-reads the binding on every call and tracks the secret
+    directory mtime for proactive rotation detection.
+
+    Args:
+        instance: Binding instance name. Defaults to ``"default"``.
+
+    Returns:
+        A callable that produces a fresh :class:`PrintConfig`.
+    """
+    from sap_cloud_sdk.core.secret_resolver import ConfigFactory
+
+    inst = instance or "default"
+
+    def _extract(binding: _BindingData) -> PrintConfig:
+        try:
+            return binding.to_config()
+        except Exception as exc:
+            raise ConfigError(
+                f"failed to load print configuration for instance '{inst}': {exc}"
+            ) from exc
+
+    return ConfigFactory(
+        module="print",
+        instance=inst,
+        binding_cls=_BindingData,
+        extract=_extract,
+    )

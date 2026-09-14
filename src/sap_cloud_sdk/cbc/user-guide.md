@@ -134,11 +134,15 @@ except CBCNetworkError:
 | Variable | Required | Description |
 |---|---|---|
 | `CLOUD_SDK_CBC_URL` | yes | Base URL of the CBC service |
-| `CLOUD_SDK_CBC_CERT_PATH` | prod only | Path to the mTLS client certificate (PEM) |
-| `CLOUD_SDK_CBC_KEY_PATH` | prod only | Path to the mTLS private key (PEM) |
+| `CLOUD_SDK_CBC_CERT_PATH` | prod only | Path to the mTLS client certificate (PEM file) |
+| `CLOUD_SDK_CBC_KEY_PATH` | prod only | Path to the mTLS private key (PEM file) |
+| `CLOUD_SDK_CBC_CERT` | prod only | mTLS client certificate value (PEM string, alternative to `CERT_PATH`) |
+| `CLOUD_SDK_CBC_KEY` | prod only | mTLS private key value (PEM string, alternative to `KEY_PATH`) |
 | `CLOUD_SDK_CBC_REPLACE_SUBDOMAIN` | no | Override subdomain replacement (`true`/`false`). Auto-detected from URL when unset. |
 
 Local mode (loopback URL) requires only `CLOUD_SDK_CBC_URL`.
+
+`CERT_PATH`/`KEY_PATH` (file paths) take precedence over `CERT`/`KEY` (values) when both are set.
 
 ## Using a test double
 

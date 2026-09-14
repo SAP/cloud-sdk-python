@@ -18,7 +18,7 @@ import os
 
 import pytest
 
-from sap_cloud_sdk.cbc import DefaultClient, TenantContext, create_client
+from sap_cloud_sdk.cbc import CBCClient, TenantContext, create_client
 from sap_cloud_sdk.cbc.exceptions import CBCConfigError
 
 ENV_CBC_TENANT_ID = "CLOUD_SDK_CBC_CBC_TENANT_ID"
@@ -37,7 +37,7 @@ def cbc_tenant() -> TenantContext:
 
 
 @pytest.fixture(scope="session")
-def cbc_client() -> DefaultClient:
+def cbc_client() -> CBCClient:
     try:
         return create_client()
     except CBCConfigError as exc:

@@ -65,6 +65,7 @@ _GRAPHQL_QUERY_FRAGMENT = """\
         id
         title
         extensionVersion
+        isActive
         solutionId
         jouleStudioGsid
         capabilityImplementations {
@@ -372,6 +373,10 @@ def _transform_ums_response(
 
     for edge in edges:
         node = edge.get("node", {})
+        # Only include extensions that are explicitly active.
+        # isActive absent/None means the extension is not active.
+        if node.get("isActive") is not True:
+            continue
         nodes.append(node)
         title = node.get("title", "")
         if title:

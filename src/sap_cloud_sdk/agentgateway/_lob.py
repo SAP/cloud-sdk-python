@@ -646,6 +646,7 @@ async def get_agent_cards_lob(
     Returns:
         List of Agent objects, each containing ORD ID and fetched AgentCard.
     """
+    start_time = asyncio.get_event_loop().time()
     f = filter or AgentCardFilter()
     loop = asyncio.get_running_loop()
 
@@ -704,6 +705,7 @@ async def get_agent_cards_lob(
         ),
         return_exceptions=True,
     )
+    elapsed = asyncio.get_event_loop().time() - start_time
 
     agents: list[Agent] = []
     for (fragment_name, _, ord_id), result in zip(pending_cards, card_results):
@@ -723,8 +725,9 @@ async def get_agent_cards_lob(
         agents = [a for a in agents if a.agent_card.raw.get("name") in agent_names_set]
 
     logger.info(
-        "Fetched %d agent card(s) from %d A2A fragment(s)",
+        "Fetched %d agent card(s) from %d A2A fragment(s) in %.2fs",
         len(agents),
         len(pending_cards),
+        elapsed,
     )
     return agents

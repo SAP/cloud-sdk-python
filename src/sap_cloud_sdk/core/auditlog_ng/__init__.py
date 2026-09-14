@@ -108,11 +108,15 @@ def _get_config_from_destination(
         ValueError: If required properties (``deploymentId``/``deploymentRegion``
             or ``namespace``) are missing from the resolved destination.
     """
+    if destination_name is None:
+        return {}
+
     # Lazy import — keeps destination an optional dependency; importing auditlog_ng
     # in environments without the destination package continues to work.
     from sap_cloud_sdk.destination import (
         ConsumptionOptions,
         ConsumptionLevel,
+        Destination,
         create_client as _dest_create_client,
     )
 
@@ -135,7 +139,10 @@ def _get_config_from_destination(
         level=ConsumptionLevel.SUBACCOUNT,
     )
 
-    if destination is None:
+    if destination is None or not isinstance(destination, Destination):
+        return {}
+
+    if not destination.url:
         return {}
 
     endpoint = destination.url

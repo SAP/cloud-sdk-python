@@ -22,6 +22,7 @@ from sap_cloud_sdk.destination import (
     create_client as create_destination_client,
     ConsumptionLevel,
     ConsumptionOptions,
+    Destination,
 )
 from sap_cloud_sdk.core.telemetry import Module
 
@@ -117,7 +118,7 @@ def _fetch_auth_token(
         tenant=tenant_subdomain,
     )
 
-    if not dest or not dest.auth_tokens:
+    if not dest or not isinstance(dest, Destination) or not dest.auth_tokens:
         raise MCPServerNotFoundError(
             f"No auth token returned for destination '{dest_name}'"
         )
@@ -160,7 +161,7 @@ def get_ias_client_id_lob() -> str:
         level=ConsumptionLevel.PROVIDER_SUBACCOUNT,
         options=ConsumptionOptions(skip_token_retrieval=True),
     )
-    if not dest:
+    if not dest or not isinstance(dest, Destination):
         raise AgentGatewaySDKError(f"IAS destination '{dest_name}' not found")
     client_id = dest.properties.get("clientId", "")
     if not client_id:

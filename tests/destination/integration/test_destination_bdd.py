@@ -1589,6 +1589,148 @@ def certificate_should_have_label(context, key, value):
     ), f"Expected label key='{key}' value='{value}' in {context.retrieved_labels}"
 
 
+# ==================== MTLS / CLIENT CERTIFICATE STEPS ====================
+
+def _generate_encrypted_pem() -> tuple[str, str]:
+    """Return (base64-encoded combined PEM, password) for an encrypted-key PEM cert."""
+    from cryptography import x509
+    from cryptography.hazmat.primitives import hashes, serialization
+    from cryptography.hazmat.primitives.asymmetric import rsa
+    from cryptography.x509.oid import NameOID
+    from datetime import datetime, timedelta, timezone
+    import base64
+
+    key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    subject = issuer = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, "test-mtls")])
+    cert = (
+        x509.CertificateBuilder()
+        .subject_name(subject)
+        .issuer_name(issuer)
+        .public_key(key.public_key())
+        .serial_number(x509.random_serial_number())
+        .not_valid_before(datetime.now(timezone.utc))
+        .not_valid_after(datetime.now(timezone.utc) + timedelta(days=365))
+        .sign(key, hashes.SHA256())
+    )
+    password = "testpassword"
+    key_pem = key.private_bytes(
+        serialization.Encoding.PEM,
+        serialization.PrivateFormat.PKCS8,
+        serialization.BestAvailableEncryption(password.encode()),
+    )
+    cert_pem = cert.public_bytes(serialization.Encoding.PEM)
+    combined = base64.b64encode(key_pem + cert_pem).decode()
+    return combined, password
+
+
+def _generate_pkcs12(extension: str) -> tuple[str, str]:
+    """Return (base64-encoded PKCS12 bytes, password) for a P12/PFX cert."""
+    from cryptography import x509
+    from cryptography.hazmat.primitives import hashes, serialization
+    from cryptography.hazmat.primitives.asymmetric import rsa
+    from cryptography.hazmat.primitives.serialization import pkcs12
+    from cryptography.x509.oid import NameOID
+    from datetime import datetime, timedelta, timezone
+    import base64
+
+    key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    subject = issuer = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, f"test-mtls-{extension}")])
+    cert = (
+        x509.CertificateBuilder()
+        .subject_name(subject)
+        .issuer_name(issuer)
+        .public_key(key.public_key())
+        .serial_number(x509.random_serial_number())
+        .not_valid_before(datetime.now(timezone.utc))
+        .not_valid_after(datetime.now(timezone.utc) + timedelta(days=365))
+        .sign(key, hashes.SHA256())
+    )
+    password = "testpassword"
+    p12_bytes = pkcs12.serialize_key_and_certificates(
+        name=b"test-mtls",
+        key=key,
+        cert=cert,
+        cas=None,
+        encryption_algorithm=serialization.BestAvailableEncryption(password.encode()),
+    )
+    return base64.b64encode(p12_bytes).decode(), password
+
+
+def _create_mtls_destination_and_cert(
+    context,
+    destination_client,
+    certificate_client,
+    name: str,
+    cert_filename: str,
+    content: str,
+    password: str,
+) -> None:
+    """Upload a certificate and create a matching ClientCertificateAuthentication destination."""
+    cert = Certificate(name=cert_filename, content=content)
+    certificate_client.create_certificate(cert, level=Level.SUB_ACCOUNT)
+    context.cleanup_certificates.append((cert_filename, Level.SUB_ACCOUNT, None))
+
+    dest = Destination.from_dict({
+        "Name": name,
+        "Type": "HTTP",
+        "URL": "https://httpbin.org",
+        "Authentication": "ClientCertificateAuthentication",
+        "KeyStore.Source": "DestinationService",
+        "KeyStoreLocation": cert_filename,
+        "KeyStorePassword": password,
+    })
+    destination_client.create_destination(dest, level=Level.SUB_ACCOUNT)
+    context.cleanup_destinations.append((name, Level.SUB_ACCOUNT, None))
+    context.destination = dest
+
+
+@given(parsers.parse('I have a subaccount destination with a generated encrypted PEM certificate named "{name}"'))
+def have_mtls_pem_destination(context, destination_client, certificate_client, name):
+    content, password = _generate_encrypted_pem()
+    _create_mtls_destination_and_cert(
+        context, destination_client, certificate_client,
+        name=name, cert_filename=f"{name}.pem", content=content, password=password,
+    )
+
+
+@given(parsers.parse('I have a subaccount destination with a generated P12 certificate named "{name}"'))
+def have_mtls_p12_destination(context, destination_client, certificate_client, name):
+    content, password = _generate_pkcs12("p12")
+    _create_mtls_destination_and_cert(
+        context, destination_client, certificate_client,
+        name=name, cert_filename=f"{name}.p12", content=content, password=password,
+    )
+
+
+@given(parsers.parse('I have a subaccount destination with a generated PFX certificate named "{name}"'))
+def have_mtls_pfx_destination(context, destination_client, certificate_client, name):
+    content, password = _generate_pkcs12("pfx")
+    _create_mtls_destination_and_cert(
+        context, destination_client, certificate_client,
+        name=name, cert_filename=f"{name}.pfx", content=content, password=password,
+    )
+
+
+@when(parsers.parse('I fetch the destination "{name}" using the v2 API at subaccount level'))
+def fetch_destination_v2_subaccount(context, destination_client, name):
+    from sap_cloud_sdk.destination._models import ConsumptionLevel
+    context.retrieved_destination = destination_client.get_destination(
+        name, level=ConsumptionLevel.PROVIDER_SUBACCOUNT
+    )
+    assert context.retrieved_destination is not None, f"Destination '{name}' not found via v2 API"
+
+
+@then("the DestinationHttpClient mounts a client certificate adapter")
+def assert_client_cert_adapter_mounted(context):
+    from sap_cloud_sdk.destination._destination_http_client import _ClientCertAdapter
+    with DestinationHttpClient(context.retrieved_destination) as http:
+        adapter = http._session.get_adapter("https://example.com")
+        assert isinstance(adapter, _ClientCertAdapter), (
+            f"Expected _ClientCertAdapter but got {type(adapter).__name__}. "
+            "The SDK is not applying the client certificate to the HTTP session."
+        )
+
+
 # ==================== DESTINATION HTTP CLIENT STEPS ====================
 
 @given("the destination has OAuth2 credentials from environment")

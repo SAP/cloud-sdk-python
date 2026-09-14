@@ -7,6 +7,8 @@ Environment variables::
     CLOUD_SDK_CBC_URL         CBC service base URL (required)
     CLOUD_SDK_CBC_CERT_PATH   Path to PEM client certificate file
     CLOUD_SDK_CBC_KEY_PATH    Path to PEM private key file
+    CLOUD_SDK_CBC_CERT        PEM client certificate value (alternative to CERT_PATH)
+    CLOUD_SDK_CBC_KEY         PEM private key value (alternative to KEY_PATH)
 """
 
 from __future__ import annotations
@@ -20,6 +22,8 @@ from sap_cloud_sdk.cbc.exceptions import CBCConfigError
 ENV_URL = "CLOUD_SDK_CBC_URL"
 ENV_CERT_PATH = "CLOUD_SDK_CBC_CERT_PATH"
 ENV_KEY_PATH = "CLOUD_SDK_CBC_KEY_PATH"
+ENV_CERT = "CLOUD_SDK_CBC_CERT"
+ENV_KEY = "CLOUD_SDK_CBC_KEY"
 ENV_REPLACE_SUBDOMAIN = "CLOUD_SDK_CBC_REPLACE_SUBDOMAIN"
 
 
@@ -31,6 +35,8 @@ class CBCConfig:
         base_url: CBC service base URL.
         cert_path: Path to the PEM client certificate file, or ``None`` for local/mock mode.
         key_path: Path to the PEM private key file, or ``None`` for local/mock mode.
+        cert_pem: PEM client certificate value. Alternative to ``cert_path``.
+        key_pem: PEM private key value. Alternative to ``key_path``.
         replace_subdomain: Whether to rewrite the URL subdomain to the CBC tenant ID
             on each request. ``None`` (default) auto-detects: loopback URLs disable it,
             all others enable it. Set explicitly to ``False`` for HTTPS mock servers.
@@ -39,6 +45,8 @@ class CBCConfig:
     base_url: str
     cert_path: Path | None = None
     key_path: Path | None = None
+    cert_pem: str | None = None
+    key_pem: str | None = None
     replace_subdomain: bool | None = None
 
 
@@ -47,10 +55,13 @@ def load_from_env() -> CBCConfig:
 
     Resolution order (first match wins):
 
-    1. **Credential triplet** — ``CLOUD_SDK_CBC_CERT_PATH``,
-       ``CLOUD_SDK_CBC_KEY_PATH``, and ``CLOUD_SDK_CBC_URL`` must all be set.
-       The path vars must point to existing PEM files.
-    2. **URL only** — loopback addresses (``http://localhost``,
+    1. **Path triplet** — ``CLOUD_SDK_CBC_CERT_PATH``, ``CLOUD_SDK_CBC_KEY_PATH``,
+       and ``CLOUD_SDK_CBC_URL`` must all be set. The path vars must point to
+       existing PEM files.
+    2. **Value triplet** — ``CLOUD_SDK_CBC_CERT``, ``CLOUD_SDK_CBC_KEY``, and
+       ``CLOUD_SDK_CBC_URL`` must all be set. PEM values are written to temp
+       files deleted after the first connection.
+    3. **URL only** — loopback addresses (``http://localhost``,
        ``http://127.0.0.1``) trigger local/mock mode (no mTLS, no subdomain
        replacement). Non-loopback URLs produce a client without mTLS.
 
@@ -63,28 +74,45 @@ def load_from_env() -> CBCConfig:
             path env var points to a non-existent file.
     """
     url = os.environ.get(ENV_URL)
+    replace_subdomain = _read_env_bool(ENV_REPLACE_SUBDOMAIN)
 
-    cert = _read_env_path(ENV_CERT_PATH)
-    key = _read_env_path(ENV_KEY_PATH)
-    if cert and key and url:
+    cert_path = _read_env_path(ENV_CERT_PATH)
+    key_path = _read_env_path(ENV_KEY_PATH)
+    if cert_path and key_path and url:
         return CBCConfig(
             base_url=url,
-            cert_path=cert,
-            key_path=key,
-            replace_subdomain=_read_env_bool(ENV_REPLACE_SUBDOMAIN),
+            cert_path=cert_path,
+            key_path=key_path,
+            replace_subdomain=replace_subdomain,
         )
-    if cert or key:
+    if cert_path or key_path:
         raise CBCConfigError(
             "CBC env-var credential triplet is incomplete. "
             f"Set all of {ENV_CERT_PATH}, {ENV_KEY_PATH}, and {ENV_URL} — or none."
         )
 
+    cert_pem = os.environ.get(ENV_CERT)
+    key_pem = os.environ.get(ENV_KEY)
+    if cert_pem and key_pem and url:
+        return CBCConfig(
+            base_url=url,
+            cert_pem=cert_pem,
+            key_pem=key_pem,
+            replace_subdomain=replace_subdomain,
+        )
+    if cert_pem or key_pem:
+        raise CBCConfigError(
+            "CBC env-var credential pair is incomplete. "
+            f"Set both {ENV_CERT} and {ENV_KEY} together with {ENV_URL} — or none."
+        )
+
     if url:
-        return CBCConfig(base_url=url, replace_subdomain=_read_env_bool(ENV_REPLACE_SUBDOMAIN))
+        return CBCConfig(base_url=url, replace_subdomain=replace_subdomain)
 
     raise CBCConfigError(
         f"No CBC configuration found. Set {ENV_URL} at minimum, "
-        f"or provide mTLS credentials via {ENV_CERT_PATH} / {ENV_KEY_PATH}."
+        f"or provide mTLS credentials via {ENV_CERT_PATH} / {ENV_KEY_PATH} "
+        f"or {ENV_CERT} / {ENV_KEY}."
     )
 
 

@@ -5,7 +5,9 @@ from __future__ import annotations
 import pytest
 
 from sap_cloud_sdk.cbc.config import (
+    ENV_CERT,
     ENV_CERT_PATH,
+    ENV_KEY,
     ENV_KEY_PATH,
     ENV_URL,
     _read_env_path,
@@ -57,6 +59,24 @@ class TestLoadFromEnv:
         monkeypatch.delenv(ENV_URL, raising=False)
         with pytest.raises(CBCConfigError, match="incomplete"):
             load_from_env()
+
+    def test_raises_for_incomplete_cert_pem_pair(self, monkeypatch):
+        monkeypatch.setenv(ENV_CERT, "-----BEGIN CERTIFICATE-----")
+        monkeypatch.delenv(ENV_KEY, raising=False)
+        monkeypatch.setenv(ENV_URL, "https://cbc.example.ondemand.com")
+        with pytest.raises(CBCConfigError, match="incomplete"):
+            load_from_env()
+
+    def test_returns_config_with_cert_pem_pair(self, monkeypatch):
+        monkeypatch.setenv(ENV_CERT, "-----BEGIN CERTIFICATE-----")
+        monkeypatch.setenv(ENV_KEY, "-----BEGIN PRIVATE KEY-----")
+        monkeypatch.setenv(ENV_URL, "https://cbc.example.ondemand.com")
+        monkeypatch.delenv(ENV_CERT_PATH, raising=False)
+        monkeypatch.delenv(ENV_KEY_PATH, raising=False)
+        cfg = load_from_env()
+        assert cfg.cert_pem == "-----BEGIN CERTIFICATE-----"
+        assert cfg.key_pem == "-----BEGIN PRIVATE KEY-----"
+        assert cfg.cert_path is None
 
     def test_raises_for_missing_cert_file(self, monkeypatch, tmp_path):
         monkeypatch.setenv(ENV_CERT_PATH, str(tmp_path / "missing.crt"))

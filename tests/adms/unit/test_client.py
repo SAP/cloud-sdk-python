@@ -152,18 +152,26 @@ class TestCreateClientFactory:
                 create_client(instance="nonexistent-instance")
 
     def test_unexpected_exception_propagates_as_is(self):
-        """Real bugs (e.g. ``RuntimeError`` from internal logic) must surface
-        as themselves rather than being silently wrapped — wrapping makes
-        debugging harder and previously masked SDK programming errors as
-        "client creation failed".
-        """
-        factory = MagicMock(side_effect=RuntimeError("unexpected"))
+        """Exceptions other than RuntimeError (e.g. programming errors) must
+        surface as themselves rather than being silently swallowed."""
+        factory = MagicMock(side_effect=ValueError("unexpected"))
         with patch(
             "sap_cloud_sdk.adms.client._make_config_factory",
             return_value=factory,
         ):
-            with pytest.raises(RuntimeError, match="unexpected"):
+            with pytest.raises(ValueError, match="unexpected"):
                 create_client(instance="bad-instance")
+
+    def test_runtime_error_from_secret_resolver_becomes_config_error(self):
+        """RuntimeError from ConfigFactory (missing secrets) must be wrapped as
+        ConfigError so callers only need to handle one exception type."""
+        factory = MagicMock(side_effect=RuntimeError("env var not found: CLOUD_SDK_CFG_ADMS_DEFAULT_CLIENTID"))
+        with patch(
+            "sap_cloud_sdk.adms.client._make_config_factory",
+            return_value=factory,
+        ):
+            with pytest.raises(ConfigError):
+                create_client(instance="missing")
 
     def test_returns_adms_client_on_success(self):
         mock_config = AdmsConfig(

@@ -3,7 +3,7 @@ import time
 import requests
 from collections import OrderedDict
 from requests.exceptions import RequestException
-from typing import Optional, TypedDict
+from typing import Callable, Optional, TypedDict
 from sap_cloud_sdk.dms.exceptions import (
     DMSError,
     DMSConnectionError,
@@ -33,13 +33,35 @@ _MAX_CACHE_SIZE = 10
 
 
 class Auth:
-    """Fetches and caches OAuth2 access tokens for DMS service requests."""
+    """Fetches and caches OAuth2 access tokens for DMS service requests.
 
-    def __init__(self, credentials: DMSCredentials) -> None:
-        self._credentials = credentials
+    Accepts either a fixed :class:`DMSCredentials` or a config factory (any callable
+    returning ``DMSCredentials`` with an optional ``has_changed() -> bool`` method).
+    When a factory is supplied, credentials are re-read on every token fetch and
+    the factory's ``has_changed()`` method is checked before serving a cached token
+    so that rotated secrets are picked up proactively.
+    """
+
+    def __init__(
+        self, credentials: DMSCredentials | Callable[[], DMSCredentials]
+    ) -> None:
+        if callable(credentials) and not isinstance(credentials, DMSCredentials):
+            self._credentials_factory: Callable[[], DMSCredentials] = credentials
+            self._credentials = credentials()
+        else:
+            self._credentials_factory = lambda: credentials  # type: ignore[arg-type]
+            self._credentials = credentials  # type: ignore[assignment]
         self._cache: OrderedDict[str, _CachedToken] = OrderedDict()
 
+    def _refresh_if_rotated(self) -> None:
+        has_changed = getattr(self._credentials_factory, "has_changed", None)
+        if callable(has_changed) and has_changed():
+            logger.debug("DMS binding rotated — invalidating token cache")
+            self._credentials = self._credentials_factory()
+            self._cache.clear()
+
     def get_token(self, tenant_subdomain: Optional[str] = None) -> str:
+        self._refresh_if_rotated()
         cache_key = tenant_subdomain or "technical"
 
         cached = self._cache.get(cache_key)

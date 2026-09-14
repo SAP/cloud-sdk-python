@@ -42,7 +42,7 @@ from sap_cloud_sdk.dms.model import (
     UserClaim,
 )
 from sap_cloud_sdk.dms.client import DMSClient
-from sap_cloud_sdk.dms.config import load_sdm_config_from_env_or_mount
+from sap_cloud_sdk.dms.config import _make_config_factory
 from sap_cloud_sdk.dms.exceptions import DMSError
 
 
@@ -70,7 +70,10 @@ def create_client(
         DMSError: If client creation fails due to configuration or initialization issues.
     """
     try:
-        credentials = dms_cred or load_sdm_config_from_env_or_mount(instance)
+        if dms_cred is not None:
+            credentials = dms_cred
+        else:
+            credentials = _make_config_factory(instance)
         client = DMSClient(
             credentials,
             connect_timeout=connect_timeout,

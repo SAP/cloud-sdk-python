@@ -117,8 +117,8 @@ class DefaultClient:
 
     **Production** (any ``https://`` or non-loopback URL): subdomain-per-tenant
     routing rewrites the URL subdomain to the ``cbc_tenant_id`` for each request;
-    mTLS credentials must be provided via ``cert``, ``cert_pem``/``key_pem``, or
-    ``ssl_context``.
+    mTLS credentials must be provided via ``cert_path``/``key_path``,
+    ``cert_pem``/``key_pem``, or ``ssl_context``.
 
     **Local / mock** (``http://localhost``, ``http://127.0.0.1``, ``http://[::1]``):
     no subdomain replacement, no mTLS — detected automatically from the URL.
@@ -138,7 +138,8 @@ class DefaultClient:
 
         client = DefaultClient(
             base_url="https://cbc.example.ondemand.com",
-            cert=(Path("/run/secrets/tls.crt"), Path("/run/secrets/tls.key")),
+            cert_path=Path("/run/secrets/tls.crt"),
+            key_path=Path("/run/secrets/tls.key"),
         )
 
     Args:
@@ -147,10 +148,10 @@ class DefaultClient:
         http_client: Optional pre-configured ``httpx.Client`` — takes full
             precedence over all mTLS arguments.  Use for testing.
         ssl_context: Optional pre-built :class:`ssl.SSLContext` with mTLS loaded.
-        cert: ``(cert_path, key_path)`` tuple of :class:`pathlib.Path` objects.
-        cert_pem: Raw PEM string for the client certificate.  Requires
-            ``key_pem`` to also be set.  Written to a temp file deleted after
-            the first connection.
+        cert_path: Path to the PEM client certificate file.  Requires ``key_path``.
+        key_path: Path to the PEM private key file.  Requires ``cert_path``.
+        cert_pem: Raw PEM string for the client certificate.  Requires ``key_pem``.
+            Written to a temp file deleted after the first connection.
         key_pem: Raw PEM string for the private key.  Requires ``cert_pem``.
     """
 
@@ -159,7 +160,8 @@ class DefaultClient:
         base_url: str,
         http_client: httpx.Client | None = None,
         ssl_context: ssl.SSLContext | None = None,
-        cert: tuple[Path, Path] | None = None,
+        cert_path: Path | None = None,
+        key_path: Path | None = None,
         cert_pem: str | None = None,
         key_pem: str | None = None,
         replace_subdomain: bool | None = None,
@@ -176,8 +178,8 @@ class DefaultClient:
         )
 
         if http_client is None and ssl_context is None:
-            if cert is not None:
-                transport = _LazyCertTransport(str(cert[0]), str(cert[1]))
+            if cert_path is not None and key_path is not None:
+                transport = _LazyCertTransport(str(cert_path), str(key_path))
                 http_client = httpx.Client(transport=transport)
             elif cert_pem is not None and key_pem is not None:
                 with tempfile.NamedTemporaryFile(delete=False, suffix=".pem") as cf:
@@ -444,13 +446,11 @@ def create_client(*, config: CBCConfig | None = None) -> CBCClient:
     from sap_cloud_sdk.cbc.config import load_from_env
 
     resolved: CBCConfig = config if config is not None else load_from_env()
-    cert = (
-        (resolved.cert_path, resolved.key_path)
-        if resolved.cert_path and resolved.key_path
-        else None
-    )
     return DefaultClient(
         base_url=resolved.base_url,
-        cert=cert,
+        cert_path=resolved.cert_path,
+        key_path=resolved.key_path,
+        cert_pem=resolved.cert_pem,
+        key_pem=resolved.key_pem,
         replace_subdomain=resolved.replace_subdomain,
     )

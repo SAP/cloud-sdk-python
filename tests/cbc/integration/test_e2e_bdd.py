@@ -59,7 +59,9 @@ def test_configuration_has_config_objects():
     pass
 
 
-@scenario("cbc.feature", "Every entity within each config object has an entity_id and data")
+@scenario(
+    "cbc.feature", "Every entity within each config object has an entity_id and data"
+)
 def test_every_entity_has_id_and_data():
     pass
 
@@ -124,7 +126,9 @@ def assert_entity_ids(ctx: dict):
     config: ConfigData = ctx["config"]
     for co in config.config_objects:
         for ed in co.entities:
-            assert ed.entity_id, f"entity_id missing in config_object={co.config_object_id!r}"
+            assert ed.entity_id, (
+                f"entity_id missing in config_object={co.config_object_id!r}"
+            )
 
 
 @then("every entity data should be accessible as a list or object")

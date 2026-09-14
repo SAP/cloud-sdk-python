@@ -68,7 +68,9 @@ class TestConsumptionVersionsLatest:
                 self._version("v2", modified=t2),
             ]
         )
-        assert v.latest().version == "v2"
+        result = v.latest()
+        assert result is not None
+        assert result.version == "v2"
 
     def test_returns_latest_by_created_date_when_no_modified(self):
         t1 = datetime(2024, 1, 1, tzinfo=timezone.utc)
@@ -79,13 +81,15 @@ class TestConsumptionVersionsLatest:
                 self._version("v2", created=t2),
             ]
         )
-        assert v.latest().version == "v2"
+        result = v.latest()
+        assert result is not None
+        assert result.version == "v2"
 
     def test_returns_last_item_when_no_dates(self):
-        v = ConsumptionVersions(
-            items=[self._version("v1"), self._version("v2")]
-        )
-        assert v.latest().version == "v2"
+        v = ConsumptionVersions(items=[self._version("v1"), self._version("v2")])
+        result = v.latest()
+        assert result is not None
+        assert result.version == "v2"
 
 
 # ---------------------------------------------------------------------------

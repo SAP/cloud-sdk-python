@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 import itertools
 import json
 import logging
@@ -40,7 +39,6 @@ logger = logging.getLogger(__name__)
 
 _EXECUTE_WORKFLOW_TOOL_NAME = "execute_workflow"
 _GET_EXECUTION_TOOL_NAME = "get_execution"
-_N8N_MCP_SERVER_NAME = "sap.btpn8n:apiResource:ManagedN8nMcpServer:v1"
 
 _JSONRPC_VERSION = "2.0"
 
@@ -275,7 +273,7 @@ class ExtensibilityClient:
 
         # 1. Execute workflow
         execute_workflow_arguments = {
-            "workflowId": hook.n8n_workflow_config.workflow_id,
+            "workflowId": hook.n8n_workflow_config.workflow_id,  # ty: ignore[unresolved-attribute]
             "inputs": {
                 "type": "webhook",
                 "webhookData": {
@@ -326,7 +324,7 @@ class ExtensibilityClient:
         # 3. Poll get-execution for running/new/waiting/started
         execution_id = data.get("executionId")
         get_execution_arguments = {
-            "workflowId": hook.n8n_workflow_config.workflow_id,
+            "workflowId": hook.n8n_workflow_config.workflow_id,  # ty: ignore[unresolved-attribute]
             "executionId": str(execution_id),
             "includeData": True,
         }
@@ -398,56 +396,36 @@ class ExtensibilityClient:
         )
 
     async def _discover_n8n_tools(
-        self, agw_client: Any, user_token: Optional[str]
-    ) -> tuple[Any, Any]:
+        self, agw_client: Any, hook: Hook, user_token: Optional[str]
+    ) -> Any:
         tools = await agw_client.list_mcp_tools(user_token=user_token or None)
 
-        execute_tool = next(
-            (
-                t
-                for t in tools
-                if t.name == _EXECUTE_WORKFLOW_TOOL_NAME
-                and t.server_name == _N8N_MCP_SERVER_NAME
-            ),
+        tool_name = hook.n8n_workflow_config.tool_name
+        card_ord_id = hook.n8n_workflow_config.card_ord_id
+
+        hook_tool = next(
+            (t for t in tools if t.name == tool_name and t.server_name == card_ord_id),
             None,
         )
-        if execute_tool is None:
+        if hook_tool is None:
             raise ExtensibilityError(
-                f"MCP tool '{_EXECUTE_WORKFLOW_TOOL_NAME}' on server '{_N8N_MCP_SERVER_NAME}' "
+                f"MCP tool '{tool_name}' on server '{card_ord_id}' "
                 "not found via Agent Gateway."
             )
-        logger.info("Fetched n8n execute_tool: %s", _EXECUTE_WORKFLOW_TOOL_NAME)
-
-        get_exec_tool = next(
-            (
-                t
-                for t in tools
-                if t.name == _GET_EXECUTION_TOOL_NAME
-                and t.server_name == _N8N_MCP_SERVER_NAME
-            ),
-            None,
-        )
-        if get_exec_tool is None:
-            raise ExtensibilityError(
-                f"MCP tool '{_GET_EXECUTION_TOOL_NAME}' on server '{_N8N_MCP_SERVER_NAME}' "
-                "not found via Agent Gateway."
-            )
-        logger.info("Fetched n8n get_exec_tool: %s", _GET_EXECUTION_TOOL_NAME)
-
-        return execute_tool, get_exec_tool
+        logger.info("Discovered hook tool: name=%s server=%s", tool_name, card_ord_id)
+        return hook_tool
 
     async def _execute_workflow_via_agw(
         self,
         agw_client: Any,
-        execute_tool: Any,
+        hook_tool: Any,
         hook: Hook,
         user_token: Optional[str],
         message: Optional[Any],
         headers: Optional[dict],
-    ) -> tuple[str, Any]:
+    ) -> Optional[Message]:
         message_body = message.model_dump(mode="json") if message is not None else {}
-        execute_arguments = {
-            "workflowId": hook.n8n_workflow_config.workflow_id,
+        tool_arguments = {
             "inputs": {
                 "type": "webhook",
                 "webhookData": {
@@ -458,16 +436,20 @@ class ExtensibilityClient:
                 },
             },
         }
-        logger.info("Executing workflow id=%s", hook.n8n_workflow_config.workflow_id)
+        logger.info(
+            "Calling hook tool=%s server=%s",
+            hook.n8n_workflow_config.tool_name,
+            hook.n8n_workflow_config.card_ord_id,
+        )
         try:
             result_str = await agw_client.call_mcp_tool(
-                execute_tool,
+                hook_tool,
                 user_token=user_token or None,
-                **execute_arguments,  # type: ignore[arg-type]
+                **tool_arguments,  # type: ignore[arg-type]
             )
         except Exception as exc:
             raise TransportError(
-                f"AGW tool call for '{_EXECUTE_WORKFLOW_TOOL_NAME}' failed: {exc}"
+                f"AGW tool call for '{hook.n8n_workflow_config.tool_name}' failed: {exc}"
             ) from exc
 
         try:
@@ -475,21 +457,12 @@ class ExtensibilityClient:
         except Exception as exc:
             raise TransportError(f"Could not parse hook response: {exc}") from exc
 
-        status = data.get("status", "")
-        if status in _EXECUTE_TERMINAL_STATUSES:
-            error_msg = data.get("error", "")
+        try:
+            return Message(**data) if data else None
+        except (TypeError, ValidationError) as exc:
             raise ExtensibilityError(
-                f"Workflow execution failed with status {status!r}"
-                + (f": {error_msg}" if error_msg else "")
-            )
-
-        execution_id = data.get("executionId")
-        logger.info(
-            "Workflow execution complete: execution_id=%s, status=%s",
-            execution_id,
-            status,
-        )
-        return str(execution_id), status
+                f"Hook response did not conform to the A2A Message protocol: {exc}"
+            ) from exc
 
     @staticmethod
     def _extract_message(data: dict) -> Message:
@@ -509,67 +482,6 @@ class ExtensibilityClient:
                 f"Failed to extract response from last executed node: {exc}"
             ) from exc
 
-    async def _poll_hook_execution(
-        self,
-        agw_client: Any,
-        get_exec_tool: Any,
-        hook: Hook,
-        execution_id: str,
-        user_token: Optional[str],
-        initial_status: str,
-    ) -> Optional[Message]:
-        deadline = time.monotonic() + hook.timeout
-        last_status = initial_status
-        logger.info(
-            "Polling for workflow %s execution result (timeout=%ss)",
-            hook.n8n_workflow_config.workflow_id,
-            hook.timeout,
-        )
-
-        while time.monotonic() < deadline:
-            await asyncio.sleep(_HOOK_POLL_INTERVAL)
-
-            try:
-                get_execution_arguments = {
-                    "workflowId": hook.n8n_workflow_config.workflow_id,
-                    "executionId": execution_id,
-                    "includeData": True,
-                }
-                result_str = await agw_client.call_mcp_tool(
-                    get_exec_tool,
-                    user_token=user_token or None,
-                    **get_execution_arguments,  # type: ignore[arg-type]
-                )
-            except Exception as exc:
-                raise TransportError(
-                    f"AGW tool call for '{_GET_EXECUTION_TOOL_NAME}' failed: {exc}"
-                ) from exc
-
-            try:
-                data = json.loads(result_str)
-            except Exception as exc:
-                raise TransportError(f"Could not parse hook response: {exc}") from exc
-
-            last_status = data.get("execution", {}).get("status", "") or data.get(
-                "status", ""
-            )
-
-            if last_status == "success":
-                logger.info("Execution %s completed successfully", execution_id)
-                return self._extract_message(data)
-
-            if last_status in _EXECUTION_TERMINAL_STATUSES:
-                error_msg = data.get("error", "")
-                raise ExtensibilityError(
-                    f"Workflow execution failed with status {last_status!r}"
-                    + (f": {error_msg}" if error_msg else "")
-                )
-
-        raise ExtensibilityError(
-            f"Workflow execution timed out after {hook.timeout}s. "
-            f"Last status: {last_status!r}"
-        )
-
     @record_metrics(
         Module.EXTENSIBILITY,
         Operation.EXTENSIBILITY_CALL_HOOK,
@@ -584,16 +496,16 @@ class ExtensibilityClient:
     ) -> Optional[Message]:
         """Call a hook via Agent Gateway MCP tool invocation.
 
-        Discovers the N8N MCP tools via Agent Gateway, executes the workflow via
-        ``execute_workflow``, then polls ``get_execution`` every 500 ms until the
-        execution succeeds, fails, or ``hook.timeout`` seconds elapse.
+        Discovers the hook's MCP tool via Agent Gateway by matching ``tool_name``
+        and ``card_ord_id`` from the hook config, then calls it and returns
+        the result.
 
         Auth and endpoint resolution are handled internally by an AGW client
         created from ``tenant_subdomain`` — no manual token or URL configuration
         is required.
 
         Args:
-            hook: Hook configuration (workflow ID, method, timeout).
+            hook: Hook configuration (tool name, card ORD ID, method, timeout).
             user_token: Optional user token forwarded to the Agent Gateway client
                 for MCP tool discovery and invocation.
             message: Optional A2A ``Message`` payload serialised into the webhook
@@ -604,12 +516,12 @@ class ExtensibilityClient:
                 Gateway client. Pass ``None`` to use the default subdomain.
 
         Returns:
-            Parsed ``Message`` from the last executed workflow node, or ``None``
+            Parsed ``Message`` from the hook tool response, or ``None``
             if the hook completed successfully but produced no message.
 
         Raises:
-            TransportError: On AGW tool call errors, terminal execution failures,
-                or timeout.
+            TransportError: On AGW tool call errors or unparseable responses.
+            ExtensibilityError: When the hook tool is not found via Agent Gateway.
 
         Example:
             ```python
@@ -633,18 +545,8 @@ class ExtensibilityClient:
         logger.info(
             "AGW client created successfully for tenant_subdomain=%s", tenant_subdomain
         )
-        execute_tool, get_exec_tool = await self._discover_n8n_tools(
-            agw_client, user_token
-        )
-        logger.info("Discovered n8n tools")
-        execution_id, status = await self._execute_workflow_via_agw(
-            agw_client, execute_tool, hook, user_token, message, headers
-        )
-        logger.info(
-            "Workflow triggered: execution_id=%s, initial_status=%s",
-            execution_id,
-            status,
-        )
-        return await self._poll_hook_execution(
-            agw_client, get_exec_tool, hook, execution_id, user_token, status
+        hook_tool = await self._discover_n8n_tools(agw_client, hook, user_token)
+        logger.info("Discovered n8n workflow tool")
+        return await self._execute_workflow_via_agw(
+            agw_client, hook_tool, hook, user_token, message, headers
         )

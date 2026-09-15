@@ -236,11 +236,17 @@ class N8nWorkflowConfig:
     """n8n workflow configuration embedded in a hook.
 
     Attributes:
-        workflow_id: n8n workflow ID.
+        ord_id: ORD ID of the API resource for this workflow.
+        card_ord_id: MCP translation card ORD ID (per ADR-021).
+        tool_name: MCP tool name (apiName segment of ordId, per ADR-021).
+        global_tenant_id: Global tenant ID of the n8n workflow tenant (per ADR-022).
         method: HTTP method for the n8n webhook call.
     """
 
-    workflow_id: str
+    ord_id: str
+    card_ord_id: str
+    tool_name: str
+    global_tenant_id: str
     method: HTTPMethod
 
     @classmethod
@@ -250,7 +256,10 @@ class N8nWorkflowConfig:
         Expected JSON shape::
 
             {
-                "workflowId": "unique_n8n_workflow_id",
+                "ordId": "sap.n8nwfrt:apiResource:invoice-po-solution_my-workflow.postInvoice:v1",
+                "cardOrdId": "sap.n8nwfrt:apiResource:invoice-po-solution_my-workflow.postInvoice_mcp:v1",
+                "toolName": "postInvoice",
+                "globalTenantId": "tenant-abc",
                 "method": "POST"
             }
 
@@ -262,7 +271,10 @@ class N8nWorkflowConfig:
         """
         method = _parse_http_method(obj.get("method", "POST")) or HTTPMethod.POST
         return cls(
-            workflow_id=obj.get("workflowId", ""),
+            ord_id=obj.get("ordId", ""),
+            card_ord_id=obj.get("cardOrdId", ""),
+            tool_name=obj.get("toolName", ""),
+            global_tenant_id=obj.get("globalTenantId", ""),
             method=method,
         )
 
@@ -338,7 +350,10 @@ class Hook:
                 "order": 1,
                 "canShortCircuit": true,
                 "n8nWorkflowConfig": {
-                    "workflowId": "unique_n8n_workflow_id",
+                    "ordId": "sap.n8nwfrt:apiResource:invoice-po-solution_my-workflow.postInvoice:v1",
+                    "cardOrdId": "sap.n8nwfrt:apiResource:invoice-po-solution_my-workflow.postInvoice_mcp:v1",
+                    "toolName": "postInvoice",
+                    "globalTenantId": "tenant-abc",
                     "method": "POST"
                 }
             }
@@ -641,6 +656,9 @@ class ExtensionCapabilityImplementation:
         hooks: List of hooks attached for this extension capability.
         source: Per-tool and per-hook attribution mapping. ``None`` when the
             backend does not provide source information.
+        joule_studio_gsid: Global solution ID of Joule Studio. Set when a
+            single Joule Studio extension contributes to this capability;
+            empty string otherwise.
     """
 
     capability_id: str
@@ -649,6 +667,7 @@ class ExtensionCapabilityImplementation:
     instruction: Optional[str] = None
     hooks: List[Hook] = field(default_factory=list)
     source: Optional[ExtensionSourceMapping] = None
+    joule_studio_gsid: str = ""
 
     @classmethod
     def from_dict(cls, obj: Dict[str, Any]) -> ExtensionCapabilityImplementation:
@@ -679,7 +698,10 @@ class ExtensionCapabilityImplementation:
                         "order": 1,
                         "canShortCircuit": true,
                         "n8nWorkflowConfig": {
-                            "workflowId": "unique_n8n_workflow_id",
+                            "ordId": "sap.n8nwfrt:apiResource:invoice-po-solution_my-workflow.postInvoice:v1",
+                            "cardOrdId": "sap.n8nwfrt:apiResource:invoice-po-solution_my-workflow.postInvoice_mcp:v1",
+                            "toolName": "postInvoice",
+                            "globalTenantId": "tenant-abc",
                             "method": "POST"
                         }
                     }

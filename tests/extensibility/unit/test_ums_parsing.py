@@ -74,7 +74,7 @@ class TestBuildHook:
             "timeout": 30,
             "deploymentType": "N8N",
             "canShortCircuit": False,
-            "n8nWorkflowConfig": {"workflowId": "wf-before-001", "method": "POST"},
+            "n8nWorkflowConfig": {"ordId": "sap.n8nwfrt:apiResource:test-solution_hook.testHook:v1", "cardOrdId": "sap.n8nwfrt:apiResource:test-solution_hook.testHook_mcp:v1", "toolName": "testHook", "globalTenantId": "tenant-test-001", "method": "POST"},
         }
         hook = _build_hook(raw)
         assert hook is not None
@@ -83,7 +83,7 @@ class TestBuildHook:
         assert hook.name == "Before Tool Execution"
         assert hook.type == HookType.BEFORE
         assert hook.deployment_type == DeploymentType.N8N
-        assert hook.n8n_workflow_config.workflow_id == "wf-before-001"
+        assert hook.n8n_workflow_config.tool_name == "testHook"
         assert hook.n8n_workflow_config.method == HTTPMethod.POST
         assert hook.timeout == 30
         assert hook.execution_mode == ExecutionMode.SYNC
@@ -100,7 +100,7 @@ class TestBuildHook:
             "timeout": 60,
             "deploymentType": "SERVERLESS",
             "canShortCircuit": True,
-            "n8nWorkflowConfig": {"workflowId": "wf-after-001", "method": "POST"},
+            "n8nWorkflowConfig": {"ordId": "sap.n8nwfrt:apiResource:test-solution_hook.testHook:v1", "cardOrdId": "sap.n8nwfrt:apiResource:test-solution_hook.testHook_mcp:v1", "toolName": "testHook", "globalTenantId": "tenant-test-001", "method": "POST"},
         }
         hook = _build_hook(raw)
         assert hook is not None
@@ -352,7 +352,10 @@ class TestTransformUmsResponse:
                                             "deploymentType": "N8N",
                                             "canShortCircuit": False,
                                             "n8nWorkflowConfig": {
-                                                "workflowId": "wf-valid",
+                                                "ordId": "sap.n8nwfrt:apiResource:test-solution_hook.testHook:v1",
+                                                "cardOrdId": "sap.n8nwfrt:apiResource:test-solution_hook.testHook_mcp:v1",
+                                                "toolName": "testHook",
+                                                "globalTenantId": "tenant-test-001",
                                                 "method": "POST",
                                             },
                                         },

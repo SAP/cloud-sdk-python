@@ -41,6 +41,7 @@ from sap_cloud_sdk.agentgateway.config import ClientConfig
 from sap_cloud_sdk.destination import ConsumptionOptions, ConsumptionLevel
 from sap_cloud_sdk.agentgateway.exceptions import (
     AgentGatewaySDKError,
+    AgentGatewayServerError,
     MCPServerNotFoundError,
 )
 from sap_cloud_sdk.destination import ConsumptionLevel
@@ -953,6 +954,7 @@ class TestCallMcpToolLob:
         mock_result = MagicMock()
         mock_result.content = [MagicMock()]
         mock_result.content[0].text = "Tool result"
+        mock_result.is_error = False
 
         with (
             patch("sap_cloud_sdk.agentgateway._lob.httpx.AsyncClient") as mock_http,
@@ -1030,9 +1032,76 @@ class TestCallMcpToolLob:
 
             assert result == ""
 
+    @pytest.mark.asyncio
+    async def test_raises_when_result_is_none(self):
+        """Raise AgentGatewayServerError when call_tool returns None."""
+        tool = MCPTool(
+            name="test-tool",
+            server_name="test-server",
+            description="Test tool",
+            input_schema={},
+            url="https://example.com/mcp",
+            fragment_name="test-fragment",
+        )
 
-# ============================================================
-# Test: list_a2a_fragments
+        with (
+            patch("sap_cloud_sdk.agentgateway._lob.httpx.AsyncClient") as mock_http,
+            patch(
+                "sap_cloud_sdk.agentgateway._lob.streamable_http_client"
+            ) as mock_stream,
+            patch("sap_cloud_sdk.agentgateway._lob.ClientSession") as mock_session,
+        ):
+            mock_http.return_value.__aenter__.return_value = AsyncMock()
+            mock_stream.return_value.__aenter__.return_value = (
+                AsyncMock(),
+                AsyncMock(),
+                None,
+            )
+            mock_session_instance = AsyncMock()
+            mock_session_instance.initialize = AsyncMock()
+            mock_session_instance.call_tool = AsyncMock(return_value=None)
+            mock_session.return_value.__aenter__.return_value = mock_session_instance
+
+            with pytest.raises(AgentGatewayServerError, match="returned None"):
+                await call_mcp_tool_lob(tool, "user-auth-token", 60.0)
+
+    @pytest.mark.asyncio
+    async def test_raises_when_tool_returns_is_error(self):
+        """Raise AgentGatewayServerError when call_tool result has isError=True."""
+        tool = MCPTool(
+            name="test-tool",
+            server_name="test-server",
+            description="Test tool",
+            input_schema={},
+            url="https://example.com/mcp",
+            fragment_name="test-fragment",
+        )
+
+        mock_result = MagicMock()
+        mock_result.content = [MagicMock()]
+        mock_result.content[0].text = "change number test_sm doesn't exist"
+        mock_result.is_error = True
+
+        with (
+            patch("sap_cloud_sdk.agentgateway._lob.httpx.AsyncClient") as mock_http,
+            patch(
+                "sap_cloud_sdk.agentgateway._lob.streamable_http_client"
+            ) as mock_stream,
+            patch("sap_cloud_sdk.agentgateway._lob.ClientSession") as mock_session,
+        ):
+            mock_http.return_value.__aenter__.return_value = AsyncMock()
+            mock_stream.return_value.__aenter__.return_value = (
+                AsyncMock(),
+                AsyncMock(),
+                None,
+            )
+            mock_session_instance = AsyncMock()
+            mock_session_instance.initialize = AsyncMock()
+            mock_session_instance.call_tool = AsyncMock(return_value=mock_result)
+            mock_session.return_value.__aenter__.return_value = mock_session_instance
+
+            with pytest.raises(AgentGatewayServerError, match="returned an error"):
+                await call_mcp_tool_lob(tool, "user-auth-token", 60.0)
 # ============================================================
 
 

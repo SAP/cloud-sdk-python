@@ -217,7 +217,7 @@ ATTR_SUMMARY_TOTAL_DURATION_MS = "sap.extension.summary.totalDurationMs"
 ATTR_SUMMARY_TOOL_CALL_COUNT = "sap.extension.summary.toolCallCount"
 ATTR_SUMMARY_HOOK_CALL_COUNT = "sap.extension.summary.hookCallCount"
 ATTR_SUMMARY_HAS_INSTRUCTION = "sap.extension.summary.hasInstruction"
-ATTR_SUMMARY_JOULE_STUDIO_GSID = "sap.extension.summary.joule_studio_gsid"
+ATTR_SUMMARY_JOULE_STUDIO_GSID = "sap.extension.joule_studio_gsid"
 
 # ---------------------------------------------------------------------------
 # Private state

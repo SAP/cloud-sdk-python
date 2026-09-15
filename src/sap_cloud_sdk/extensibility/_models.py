@@ -641,6 +641,9 @@ class ExtensionCapabilityImplementation:
         hooks: List of hooks attached for this extension capability.
         source: Per-tool and per-hook attribution mapping. ``None`` when the
             backend does not provide source information.
+        joule_studio_gsid: Global solution ID of Joule Studio. Set when a
+            single Joule Studio extension contributes to this capability;
+            empty string otherwise.
     """
 
     capability_id: str
@@ -649,6 +652,7 @@ class ExtensionCapabilityImplementation:
     instruction: Optional[str] = None
     hooks: List[Hook] = field(default_factory=list)
     source: Optional[ExtensionSourceMapping] = None
+    joule_studio_gsid: str = ""
 
     @classmethod
     def from_dict(cls, obj: Dict[str, Any]) -> ExtensionCapabilityImplementation:

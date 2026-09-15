@@ -173,6 +173,12 @@ The SDK discovers resources via BTP Destination Service fragments filtered by th
   - **Customer flow:** N/A
 - **Further reading:** N/A
 
+## Performance
+
+`list_mcp_tools` (LoB and Customer flows) and `list_agent_cards` (LoB only) fetch all fragments **concurrently** using `asyncio.gather`. Wall-clock time is bounded by the slowest single fragment regardless of how many fragments are registered.
+
+The maximum number of concurrent fetches is controlled by `ClientConfig.max_concurrent_tasks` (default: `15`). Lower it if you need to reduce connection pressure on the gateway or increase it to improve performance when dealing with many fragments.
+
 ## API
 
 ### Factory Function
@@ -200,6 +206,7 @@ config = ClientConfig(
     token_expiry_buffer_seconds=30.0,
     max_system_token_cache_size=32,
     max_user_token_cache_size=256,
+    max_concurrent_tasks=15,
 )
 
 agw_client = create_client(tenant_subdomain="my-tenant", config=config)
@@ -210,6 +217,7 @@ agw_client = create_client(tenant_subdomain="my-tenant", config=config)
 - `token_expiry_buffer_seconds`: Safety buffer subtracted from explicit token expiries before a cached token is reused. Default: `30.0`.
 - `max_system_token_cache_size`: Maximum number of cached system tokens per client instance. Default: `32`.
 - `max_user_token_cache_size`: Maximum number of cached exchanged user tokens per client instance. Default: `256`.
+- `max_concurrent_tasks`: Maximum number of MCP tool and agent card fetches that run concurrently during `list_mcp_tools` and `list_agent_cards`. Default: `15`.
 
 The SDK keeps token caches per `AgentGatewayClient` instance and reuses valid cached tokens for repeated authentication calls. System and user token caches are bounded independently with least-recently-used eviction.
 

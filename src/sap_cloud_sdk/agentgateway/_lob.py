@@ -18,6 +18,7 @@ try:
     from mcp.shared.exceptions import McpError
 except ImportError:
     from mcp.shared.exceptions import MCPError as McpError  # type: ignore[no-redef]  # ty: ignore[unresolved-import]
+from sap_cloud_sdk.agentgateway.config import DEFAULT_MAX_CONCURRENT_TASKS
 from sap_cloud_sdk.destination import (
     create_client as create_destination_client,
     ConsumptionLevel,
@@ -410,6 +411,7 @@ async def get_mcp_tools_lob(
     system_token: str,
     timeout: float,
     filter: MCPToolFilter | None = None,
+    max_concurrent_tasks: int = DEFAULT_MAX_CONCURRENT_TASKS,
 ) -> list[MCPTool]:
     """List all MCP tools using LoB flow (destination-based).
 
@@ -421,6 +423,8 @@ async def get_mcp_tools_lob(
         timeout: HTTP timeout in seconds for MCP server calls.
         filter: Optional MCPToolFilter narrowing results by tool name or ORD ID.
             If None or empty, all tools are included.
+        max_concurrent_tasks: Maximum number of fragment fetches that run
+            concurrently. Defaults to 15.
 
     Returns:
         List of MCPTool objects from all MCP servers.
@@ -465,11 +469,16 @@ async def get_mcp_tools_lob(
         tasks.append((fragment_name, mcp_url))
 
     # Fetch all fragments concurrently; isolate per-fragment failures
+    semaphore = asyncio.Semaphore(max_concurrent_tasks)
+
+    async def _guarded_mcp(mcp_url: str, fragment_name: str) -> list[MCPTool]:
+        async with semaphore:
+            return await list_server_tools(
+                mcp_url, system_token, fragment_name, timeout
+            )
+
     results = await asyncio.gather(
-        *(
-            list_server_tools(mcp_url, system_token, fragment_name, timeout)
-            for fragment_name, mcp_url in tasks
-        ),
+        *(_guarded_mcp(mcp_url, fragment_name) for fragment_name, mcp_url in tasks),
         return_exceptions=True,
     )
 
@@ -624,6 +633,7 @@ async def get_agent_cards_lob(
     system_token: str,
     timeout: float,
     filter: AgentCardFilter | None = None,
+    max_concurrent_tasks: int = DEFAULT_MAX_CONCURRENT_TASKS,
 ) -> list[Agent]:
     """List A2A agents and their agent cards using LoB flow.
 
@@ -642,6 +652,8 @@ async def get_agent_cards_lob(
         timeout: HTTP timeout in seconds.
         filter: Optional AgentCardFilter narrowing results by agent card name
             or ORD ID. If None or empty, all A2A fragments are included.
+        max_concurrent_tasks: Maximum number of agent card fetches that run
+            concurrently. Defaults to 15.
 
     Returns:
         List of Agent objects, each containing ORD ID and fetched AgentCard.
@@ -698,11 +710,14 @@ async def get_agent_cards_lob(
         tasks.append((fragment_name, fragment_url, ord_id))
 
     # Fetch all agent cards concurrently; isolate per-fragment failures
+    semaphore = asyncio.Semaphore(max_concurrent_tasks)
+
+    async def _guarded_card(fragment_url: str) -> AgentCard:
+        async with semaphore:
+            return await _fetch_agent_card(fragment_url, system_token, timeout)
+
     card_results = await asyncio.gather(
-        *(
-            _fetch_agent_card(fragment_url, system_token, timeout)
-            for _, fragment_url, _ in tasks
-        ),
+        *(_guarded_card(fragment_url) for _, fragment_url, _ in tasks),
         return_exceptions=True,
     )
     elapsed = asyncio.get_event_loop().time() - start_time

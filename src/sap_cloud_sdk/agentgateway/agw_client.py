@@ -439,6 +439,7 @@ class AgentGatewayClient:
                     auth.access_token,
                     self._config.timeout,
                     filter=filter,
+                    max_concurrent_tasks=self._config.max_concurrent_tasks,
                 )
 
             # Check for transparent mode
@@ -450,6 +451,7 @@ class AgentGatewayClient:
                     auth.access_token,
                     self._config.timeout,
                     filter=filter,
+                    max_concurrent_tasks=self._config.max_concurrent_tasks,
                 )
 
             # LoB flow - requires tenant_subdomain
@@ -459,6 +461,7 @@ class AgentGatewayClient:
                 auth.access_token,
                 self._config.timeout,
                 filter=filter,
+                max_concurrent_tasks=self._config.max_concurrent_tasks,
             )
 
         except AgentGatewaySDKError:
@@ -525,6 +528,7 @@ class AgentGatewayClient:
                 auth.access_token,
                 self._config.timeout,
                 filter=filter,
+                max_concurrent_tasks=self._config.max_concurrent_tasks,
             )
         except AgentGatewaySDKError:
             raise

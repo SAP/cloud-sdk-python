@@ -1074,7 +1074,7 @@ class TestEmitExtensionsSummarySpan:
 
             attrs = mock_tracer.start_span.call_args[1]["attributes"]
             assert attrs[ATTR_SUMMARY_TOTAL_OPERATION_COUNT] == 1  # no +1
-    
+
     def test_joule_studio_gsid_included_when_provided(self):
         with patch("sap_cloud_sdk.core.telemetry.extensions._tracer") as mock_tracer:
             mock_span = MagicMock()

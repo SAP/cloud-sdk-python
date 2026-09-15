@@ -20,6 +20,12 @@ from sap_cloud_sdk.destination import (
 from sap_cloud_sdk.destination.config import DestinationConfig
 
 
+@pytest.fixture(scope="session", autouse=True)
+def cleanup_mocks_folder():
+    """Remove the mocks folder before integration tests run to prevent local dev mode."""
+    _ensure_mocks_folder_not_exists()
+
+
 @pytest.fixture(scope="session")
 def destination_client():
     """Create a Destination client for cloud testing using secret resolver."""
@@ -167,6 +173,13 @@ def _setup_cloud_mode():
     if env_file.exists():
         load_dotenv(env_file)
 
+
+def _ensure_mocks_folder_not_exists():
+    """Ensure that the mocks folder does not exist before running tests."""
+    mocks_dir = Path(os.getcwd()) / "mocks"
+    if mocks_dir.exists():
+        import shutil
+        shutil.rmtree(mocks_dir)
 
 # Configure pytest markers for integration tests
 def pytest_configure(config):

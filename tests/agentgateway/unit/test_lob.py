@@ -4,6 +4,8 @@ import logging
 import os
 from unittest.mock import patch, MagicMock, AsyncMock
 
+from sap_cloud_sdk.destination import Destination
+
 import pytest
 
 from sap_cloud_sdk.agentgateway._fragments import (
@@ -92,7 +94,7 @@ class TestFetchAuthToken:
     def test_fetches_and_decodes_token_and_url(self):
         """Strip Bearer prefix from auth header and return raw JWT with gateway URL."""
         header_value = "Bearer my-raw-jwt-token-123"
-        mock_dest = MagicMock()
+        mock_dest = MagicMock(spec=Destination)
         mock_dest.auth_tokens = [MagicMock()]
         mock_dest.auth_tokens[0].error = None
         mock_dest.auth_tokens[0].http_header = {"value": header_value}
@@ -116,7 +118,7 @@ class TestFetchAuthToken:
     def test_strips_trailing_slashes_from_url(self):
         """Strip trailing slashes from gateway URL."""
         header_value = "Bearer token"
-        mock_dest = MagicMock()
+        mock_dest = MagicMock(spec=Destination)
         mock_dest.auth_tokens = [MagicMock()]
         mock_dest.auth_tokens[0].error = None
         mock_dest.auth_tokens[0].http_header = {"value": header_value}
@@ -143,7 +145,7 @@ class TestFetchAuthToken:
 
     def test_raises_when_no_auth_tokens(self):
         """Raise MCPServerNotFoundError when no auth tokens."""
-        mock_dest = MagicMock()
+        mock_dest = MagicMock(spec=Destination)
         mock_dest.auth_tokens = []
 
         with patch(
@@ -156,7 +158,7 @@ class TestFetchAuthToken:
 
     def test_raises_when_empty_token_value(self):
         """Raise MCPServerNotFoundError when http_header value is empty."""
-        mock_dest = MagicMock()
+        mock_dest = MagicMock(spec=Destination)
         mock_dest.auth_tokens = [MagicMock()]
         mock_dest.auth_tokens[0].error = None
         mock_dest.auth_tokens[0].http_header = {"value": ""}
@@ -171,7 +173,7 @@ class TestFetchAuthToken:
 
     def test_passes_options_to_destination(self):
         """Pass consumption options to get_destination."""
-        mock_dest = MagicMock()
+        mock_dest = MagicMock(spec=Destination)
         mock_dest.auth_tokens = [MagicMock()]
         mock_dest.auth_tokens[0].error = None
         mock_dest.auth_tokens[0].http_header = {"value": "Bearer token"}
@@ -1376,7 +1378,7 @@ class TestGetIasClientIdLob:
     """Tests for get_ias_client_id_lob()."""
 
     def test_returns_client_id_from_destination_properties(self):
-        mock_dest = MagicMock()
+        mock_dest = MagicMock(spec=Destination)
         mock_dest.properties = {"clientId": "lob-client-id"}
         mock_dest_client = MagicMock()
         mock_dest_client.get_destination.return_value = mock_dest
@@ -1420,7 +1422,7 @@ class TestGetIasClientIdLob:
                 get_ias_client_id_lob()
 
     def test_raises_when_client_id_property_absent(self):
-        mock_dest = MagicMock()
+        mock_dest = MagicMock(spec=Destination)
         mock_dest.properties = {}
         mock_dest_client = MagicMock()
         mock_dest_client.get_destination.return_value = mock_dest

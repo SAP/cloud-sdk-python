@@ -117,6 +117,7 @@ to check a toggle for the current request:
 ```python
 from sap_cloud_sdk.core.runtime_context import is_feature_enabled
 
+
 @app.route("/")
 async def handler(request):
     if is_feature_enabled("my-feature"):

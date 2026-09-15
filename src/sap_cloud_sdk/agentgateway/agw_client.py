@@ -34,11 +34,13 @@ from sap_cloud_sdk.agentgateway._models import (
     Agent,
     AgentCardFilter,
     AuthResult,
+    CacheOptions,
     MCPTool,
     MCPToolFilter,
 )
 from sap_cloud_sdk.core._tenant import _validate_tenant_subdomain
 from sap_cloud_sdk.agentgateway._token_cache import _GatewayUrlCache, _TokenCache
+from sap_cloud_sdk.agentgateway._tools_cache import MCPToolsCache
 from sap_cloud_sdk.agentgateway.exceptions import AgentGatewaySDKError
 from sap_cloud_sdk.core.telemetry import Module, Operation, record_metrics
 
@@ -375,6 +377,7 @@ class AgentGatewayClient:
         self,
         user_token: str | Callable[[], str] | None = None,
         filter: MCPToolFilter | None = None,
+        cache: CacheOptions | None = None,
     ) -> list[MCPTool]:
         """List all MCP tools from MCP servers.
 
@@ -395,6 +398,11 @@ class AgentGatewayClient:
                 If provided, uses user-scoped auth instead of system auth.
             filter: Optional filter to narrow results by tool name or ORD ID.
                 If None or empty, all tools are included.
+            cache: Optional caching options. When provided, tool lists are cached
+                in-process for ``cache.ttl`` seconds (default 600 s). Distinct filter
+                and auth-type combinations are cached independently, up to
+                ``cache.max_size`` entries (LRU eviction). Call ``cache.evict()`` to
+                clear all entries and force a fresh fetch on the next call.
 
         Returns:
             List of MCPTool objects from all MCP servers.
@@ -419,9 +427,32 @@ class AgentGatewayClient:
                     ord_ids=["sap.s4:apiAccess:salesOrder:v1"],
                 )
             )
+
+            # With caching — avoids redundant MCP round-trips:
+            from sap_cloud_sdk.agentgateway import CacheOptions
+            cache = CacheOptions(ttl=300)
+            tools = await agw_client.list_mcp_tools(cache=cache)
+
+            # Force a fresh fetch (e.g. after a tool was added on the server):
+            cache.evict()
+            tools = await agw_client.list_mcp_tools(cache=cache)
             ```
         """
         try:
+            user_scoped = bool(user_token)
+
+            if cache is not None:
+                if cache._cache is None:
+                    cache._cache = MCPToolsCache()
+                tools_cache: MCPToolsCache | None = cache._cache
+                cache_opts: CacheOptions | None = cache
+                cached = tools_cache.get(filter, user_scoped)
+                if cached is not None:
+                    return cached
+            else:
+                tools_cache = None
+                cache_opts = None
+
             if user_token:
                 auth = await self.get_user_auth(user_token)
             else:
@@ -434,32 +465,41 @@ class AgentGatewayClient:
                     "Customer agent credentials detected at '%s'", credentials_path
                 )
                 credentials = load_customer_credentials(credentials_path)
-                return await get_mcp_tools_customer(
+                tools = await get_mcp_tools_customer(
                     credentials,
                     auth.access_token,
                     self._config.timeout,
                     filter=filter,
                 )
+                if tools_cache is not None and cache_opts is not None:
+                    tools_cache.set(tools, filter, user_scoped, cache_opts)
+                return tools
 
             # Check for transparent mode
             if detect_transparent_credentials():
                 logger.info(_LOG_TRANSPARENT_MODE)
                 credentials = load_customer_credentials_from_env()
-                return await get_mcp_tools_customer(
+                tools = await get_mcp_tools_customer(
                     credentials,
                     auth.access_token,
                     self._config.timeout,
                     filter=filter,
                 )
+                if tools_cache is not None and cache_opts is not None:
+                    tools_cache.set(tools, filter, user_scoped, cache_opts)
+                return tools
 
             # LoB flow - requires tenant_subdomain
             tenant = self._resolve_tenant_subdomain()
-            return await get_mcp_tools_lob(
+            tools = await get_mcp_tools_lob(
                 tenant,
                 auth.access_token,
                 self._config.timeout,
                 filter=filter,
             )
+            if tools_cache is not None and cache_opts is not None:
+                tools_cache.set(tools, filter, user_scoped, cache_opts)
+            return tools
 
         except AgentGatewaySDKError:
             raise

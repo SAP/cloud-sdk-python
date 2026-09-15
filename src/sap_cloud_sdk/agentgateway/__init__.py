@@ -54,6 +54,7 @@ Usage (Customer agent):
 
 from sap_cloud_sdk.agentgateway._models import (
     AuthResult,
+    CacheOptions,
     MCPTool,
     MCPToolFilter,
     Agent,
@@ -78,6 +79,7 @@ __all__ = [
     "ClientConfig",
     # Data models
     "AuthResult",
+    "CacheOptions",
     "MCPTool",
     "MCPToolFilter",
     "Agent",

@@ -25,6 +25,7 @@ from sap_cloud_sdk.core.telemetry.extensions import (
     ATTR_SUMMARY_TOOL_CALL_COUNT,
     ATTR_SUMMARY_HOOK_CALL_COUNT,
     ATTR_SUMMARY_HAS_INSTRUCTION,
+    ATTR_SUMMARY_JOULE_STUDIO_GSID,
     resolve_source_info,
     build_extension_span_attributes,
     reset_tool_call_metrics,
@@ -1073,6 +1074,37 @@ class TestEmitExtensionsSummarySpan:
 
             attrs = mock_tracer.start_span.call_args[1]["attributes"]
             assert attrs[ATTR_SUMMARY_TOTAL_OPERATION_COUNT] == 1  # no +1
+
+    def test_joule_studio_gsid_included_when_provided(self):
+        with patch("sap_cloud_sdk.core.telemetry.extensions._tracer") as mock_tracer:
+            mock_span = MagicMock()
+            mock_tracer.start_span.return_value = mock_span
+
+            emit_extensions_summary_span(
+                tool_call_count=1,
+                hook_call_count=0,
+                has_instruction=False,
+                total_duration_ms=100.0,
+                joule_studio_gsid="019ffc41-01a5-7b73-bda2-cb33b2eae292",
+            )
+
+            attrs = mock_tracer.start_span.call_args[1]["attributes"]
+            assert attrs[ATTR_SUMMARY_JOULE_STUDIO_GSID] == "019ffc41-01a5-7b73-bda2-cb33b2eae292"
+
+    def test_joule_studio_gsid_omitted_when_empty(self):
+        with patch("sap_cloud_sdk.core.telemetry.extensions._tracer") as mock_tracer:
+            mock_span = MagicMock()
+            mock_tracer.start_span.return_value = mock_span
+
+            emit_extensions_summary_span(
+                tool_call_count=1,
+                hook_call_count=0,
+                has_instruction=False,
+                total_duration_ms=100.0,
+            )
+
+            attrs = mock_tracer.start_span.call_args[1]["attributes"]
+            assert ATTR_SUMMARY_JOULE_STUDIO_GSID not in attrs
 
 
 # ---------------------------------------------------------------------------

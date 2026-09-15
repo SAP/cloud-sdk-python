@@ -217,6 +217,7 @@ ATTR_SUMMARY_TOTAL_DURATION_MS = "sap.extension.summary.totalDurationMs"
 ATTR_SUMMARY_TOOL_CALL_COUNT = "sap.extension.summary.toolCallCount"
 ATTR_SUMMARY_HOOK_CALL_COUNT = "sap.extension.summary.hookCallCount"
 ATTR_SUMMARY_HAS_INSTRUCTION = "sap.extension.summary.hasInstruction"
+ATTR_SUMMARY_JOULE_STUDIO_GSID = "sap.extension.joule_studio_gsid"
 
 # ---------------------------------------------------------------------------
 # Private state
@@ -612,6 +613,7 @@ def emit_extensions_summary_span(
     hook_call_count: int,
     has_instruction: bool,
     total_duration_ms: float,
+    joule_studio_gsid: str = "",
 ) -> None:
     """Emit a sibling summary span with aggregate extension metrics.
 
@@ -633,6 +635,8 @@ def emit_extensions_summary_span(
             into the system prompt.
         total_duration_ms: Wall-clock sum (milliseconds) of all extension
             operations.
+        joule_studio_gsid: Global solution ID of Joule Studio (empty string
+            if not available).
     """
     total = tool_call_count + hook_call_count + (1 if has_instruction else 0)
     attrs = {
@@ -642,6 +646,8 @@ def emit_extensions_summary_span(
         ATTR_SUMMARY_HOOK_CALL_COUNT: hook_call_count,
         ATTR_SUMMARY_HAS_INSTRUCTION: has_instruction,
     }
+    if joule_studio_gsid:
+        attrs[ATTR_SUMMARY_JOULE_STUDIO_GSID] = joule_studio_gsid
     span = _tracer.start_span("agent_extensions_summary", attributes=attrs)
     span.end()
 

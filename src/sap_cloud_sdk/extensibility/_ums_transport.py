@@ -404,6 +404,15 @@ def _transform_ums_response(
 
     instruction = "\n\n".join(instructions) if instructions else None
 
+    joule_studio_gsid = next(
+        (
+            node.get("jouleStudioGsid") or ""
+            for node in nodes
+            if node.get("jouleStudioGsid")
+        ),
+        "",
+    )
+
     return ExtensionCapabilityImplementation(
         capability_id=capability_id,
         extension_names=extension_names,
@@ -411,6 +420,7 @@ def _transform_ums_response(
         instruction=instruction,
         hooks=hooks,
         source=source,
+        joule_studio_gsid=joule_studio_gsid,
     )
 
 

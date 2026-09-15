@@ -1,0 +1,8 @@
+diff --git a/src/sap_cloud_sdk/mymodule/client.py b/src/sap_cloud_sdk/mymodule/client.py
+index 111..222 100644
+--- a/src/sap_cloud_sdk/mymodule/client.py
++++ b/src/sap_cloud_sdk/mymodule/client.py
+@@ -1,3 +1,4 @@
+ # existing
++API_URL = "https://api.example-real-service.com/v1"
+ x = 1

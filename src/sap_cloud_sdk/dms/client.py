@@ -24,6 +24,7 @@ from sap_cloud_sdk.dms.model import (
 from sap_cloud_sdk.dms._auth import Auth
 from sap_cloud_sdk.dms._http import HttpInvoker
 from sap_cloud_sdk.core.telemetry import Module, Operation, record_metrics
+from typing import Callable
 
 logger = logging.getLogger(__name__)
 
@@ -86,7 +87,7 @@ class DMSClient:
 
     def __init__(
         self,
-        credentials: DMSCredentials,
+        credentials: Union[DMSCredentials, Callable[[], DMSCredentials]],
         connect_timeout: Optional[int] = None,
         read_timeout: Optional[int] = None,
     ) -> None:
@@ -98,14 +99,14 @@ class DMSClient:
             authentication and handles environment detection.
 
         Args:
-            credentials: OAuth2 credentials and service URI for the DMS instance.
+            credentials: OAuth2 credentials (or a factory returning them) for the DMS instance.
             connect_timeout: TCP connection timeout in seconds. Defaults to 10.
             read_timeout: Response read timeout in seconds. Defaults to 30.
         """
         auth = Auth(credentials)
         self._http: HttpInvoker = HttpInvoker(
             auth=auth,
-            base_url=credentials.uri,
+            base_url=auth._credentials.uri,
             connect_timeout=connect_timeout,
             read_timeout=read_timeout,
         )

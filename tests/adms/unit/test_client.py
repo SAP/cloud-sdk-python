@@ -143,25 +143,35 @@ class TestAdmsClientInit:
 
 class TestCreateClientFactory:
     def test_raises_config_error_on_missing_binding(self):
+        factory = MagicMock(side_effect=ConfigError("missing fields"))
         with patch(
-            "sap_cloud_sdk.adms.client.load_from_env_or_mount",
-            side_effect=ConfigError("missing fields"),
+            "sap_cloud_sdk.adms.client._make_config_factory",
+            return_value=factory,
         ):
             with pytest.raises(ConfigError, match="missing fields"):
                 create_client(instance="nonexistent-instance")
 
     def test_unexpected_exception_propagates_as_is(self):
-        """Real bugs (e.g. ``RuntimeError`` from internal logic) must surface
-        as themselves rather than being silently wrapped — wrapping makes
-        debugging harder and previously masked SDK programming errors as
-        "client creation failed".
-        """
+        """Exceptions other than RuntimeError (e.g. programming errors) must
+        surface as themselves rather than being silently swallowed."""
+        factory = MagicMock(side_effect=ValueError("unexpected"))
         with patch(
-            "sap_cloud_sdk.adms.client.load_from_env_or_mount",
-            side_effect=RuntimeError("unexpected"),
+            "sap_cloud_sdk.adms.client._make_config_factory",
+            return_value=factory,
         ):
-            with pytest.raises(RuntimeError, match="unexpected"):
+            with pytest.raises(ValueError, match="unexpected"):
                 create_client(instance="bad-instance")
+
+    def test_runtime_error_from_secret_resolver_becomes_config_error(self):
+        """RuntimeError from ConfigFactory (missing secrets) must be wrapped as
+        ConfigError so callers only need to handle one exception type."""
+        factory = MagicMock(side_effect=RuntimeError("env var not found: CLOUD_SDK_CFG_ADMS_DEFAULT_CLIENTID"))
+        with patch(
+            "sap_cloud_sdk.adms.client._make_config_factory",
+            return_value=factory,
+        ):
+            with pytest.raises(ConfigError):
+                create_client(instance="missing")
 
     def test_returns_adms_client_on_success(self):
         mock_config = AdmsConfig(
@@ -170,9 +180,11 @@ class TestCreateClientFactory:
             client_id="cid",
             client_secret="cs",
         )
+        factory = MagicMock(return_value=mock_config)
+        factory.has_changed = MagicMock(return_value=False)
         with patch(
-            "sap_cloud_sdk.adms.client.load_from_env_or_mount",
-            return_value=mock_config,
+            "sap_cloud_sdk.adms.client._make_config_factory",
+            return_value=factory,
         ):
             client = create_client()
 
@@ -185,10 +197,10 @@ class TestCreateClientFactory:
             client_id="cid",
             client_secret="cs",
         )
-        with patch("sap_cloud_sdk.adms.client.load_from_env_or_mount") as mock_load:
+        with patch("sap_cloud_sdk.adms.client._make_config_factory") as mock_factory_fn:
             client = create_client(config=mock_config)
 
-        mock_load.assert_not_called()
+        mock_factory_fn.assert_not_called()
         assert isinstance(client, AdmsClient)
 
     def test_user_jwt_forwarded_to_http(self):
@@ -198,9 +210,11 @@ class TestCreateClientFactory:
             client_id="cid",
             client_secret="cs",
         )
+        factory = MagicMock(return_value=mock_config)
+        factory.has_changed = MagicMock(return_value=False)
         with patch(
-            "sap_cloud_sdk.adms.client.load_from_env_or_mount",
-            return_value=mock_config,
+            "sap_cloud_sdk.adms.client._make_config_factory",
+            return_value=factory,
         ):
             client = create_client(user_jwt="user-jwt-123")
 
@@ -444,25 +458,28 @@ class TestAsyncAdmsClient:
 
 class TestCreateAsyncClient:
     def test_raises_config_error_when_no_binding(self):
+        mock_factory = MagicMock(side_effect=ConfigError("no binding"))
         with patch(
-            "sap_cloud_sdk.adms.client.load_from_env_or_mount",
-            side_effect=ConfigError("no binding"),
+            "sap_cloud_sdk.adms.client._make_config_factory",
+            return_value=mock_factory,
         ):
             with pytest.raises(ConfigError):
                 create_async_client(instance="missing")
 
     def test_returns_async_client(self, config):
+        mock_factory = MagicMock(return_value=config)
+        mock_factory.has_changed = MagicMock(return_value=False)
         with patch(
-            "sap_cloud_sdk.adms.client.load_from_env_or_mount",
-            return_value=config,
+            "sap_cloud_sdk.adms.client._make_config_factory",
+            return_value=mock_factory,
         ):
             client = create_async_client()
         assert isinstance(client, AsyncAdmsClient)
 
     def test_accepts_explicit_config(self, config):
-        with patch("sap_cloud_sdk.adms.client.load_from_env_or_mount") as mock_load:
+        with patch("sap_cloud_sdk.adms.client._make_config_factory") as mock_make:
             client = create_async_client(config=config)
-        mock_load.assert_not_called()
+        mock_make.assert_not_called()
         assert isinstance(client, AsyncAdmsClient)
 
 

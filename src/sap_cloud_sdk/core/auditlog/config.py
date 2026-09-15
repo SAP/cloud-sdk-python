@@ -6,8 +6,12 @@ service bindings where OAuth2 credentials are embedded as JSON strings.
 
 import json
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 from sap_cloud_sdk.core.auditlog.exceptions import ClientCreationError
+
+if TYPE_CHECKING:
+    from sap_cloud_sdk.core.secret_resolver import ConfigFactory
 
 
 @dataclass
@@ -43,8 +47,8 @@ class BindingData:
     and returns a flat AuditLogConfig.
     """
 
-    url: str
-    uaa: str
+    url: str = ""
+    uaa: str = ""
 
     def validate(self) -> None:
         """Validate that all required fields are set."""
@@ -121,3 +125,32 @@ def _load_config_from_env() -> AuditLogConfig:
 
     except Exception as e:
         raise ClientCreationError(f"Failed to load configuration: {e}")
+
+
+def _make_config_factory() -> "ConfigFactory[AuditLogConfig]":
+    """Return a :class:`~sap_cloud_sdk.core.secret_resolver.ConfigFactory` for auditlog.
+
+    The factory re-reads the binding on every call and tracks the secret
+    directory mtime for proactive rotation detection.
+
+    Returns:
+        A callable that produces a fresh :class:`AuditLogConfig`.
+    """
+    from sap_cloud_sdk.core.secret_resolver import ConfigFactory
+
+    def _extract(binding: BindingData) -> AuditLogConfig:
+        try:
+            return binding.extract_config()
+        except ClientCreationError:
+            raise
+        except Exception as exc:
+            raise ClientCreationError(
+                f"Failed to load auditlog configuration: {exc}"
+            ) from exc
+
+    return ConfigFactory(
+        module="auditlog",
+        instance="default",
+        binding_cls=BindingData,
+        extract=_extract,
+    )

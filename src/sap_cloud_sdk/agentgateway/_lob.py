@@ -453,7 +453,7 @@ async def get_mcp_tools_lob(
         ]
 
     # Collect fragments that have a valid URL; skip and warn the rest up front
-    pending: list[tuple[str, str]] = []
+    tasks: list[tuple[str, str]] = []
     for fragment in fragments:
         fragment_name = fragment.name
         mcp_url = fragment.properties.get("URL") or fragment.properties.get("url")
@@ -462,18 +462,18 @@ async def get_mcp_tools_lob(
                 "Fragment '%s' has no URL property — skipping", fragment_name
             )
             continue
-        pending.append((fragment_name, mcp_url))
+        tasks.append((fragment_name, mcp_url))
 
     # Fetch all fragments concurrently; isolate per-fragment failures
     results = await asyncio.gather(
         *(
             list_server_tools(mcp_url, system_token, fragment_name, timeout)
-            for fragment_name, mcp_url in pending
+            for fragment_name, mcp_url in tasks
         ),
         return_exceptions=True,
     )
 
-    for (fragment_name, _), result in zip(pending, results):
+    for (fragment_name, _), result in zip(tasks, results):
         if isinstance(result, BaseException):
             _log_mcp_server_error(fragment_name, result)
         else:
@@ -491,7 +491,7 @@ async def get_mcp_tools_lob(
     logger.info(
         "Loaded %d MCP tool(s) from %d fragment(s) in %.2fs",
         len(tools),
-        len(pending),
+        len(tasks),
         elapsed,
     )
     return tools
@@ -672,7 +672,7 @@ async def get_agent_cards_lob(
         ]
 
     # Collect fragments that have a valid URL and extractable ORD ID; skip the rest
-    pending_cards: list[tuple[str, str, str]] = []  # (fragment_name, url, ord_id)
+    tasks: list[tuple[str, str, str]] = []
     for fragment in fragments:
         fragment_name = fragment.name
         props_lower = {k.lower(): v for k, v in fragment.properties.items()}
@@ -695,20 +695,20 @@ async def get_agent_cards_lob(
             )
             continue
 
-        pending_cards.append((fragment_name, fragment_url, ord_id))
+        tasks.append((fragment_name, fragment_url, ord_id))
 
     # Fetch all agent cards concurrently; isolate per-fragment failures
     card_results = await asyncio.gather(
         *(
             _fetch_agent_card(fragment_url, system_token, timeout)
-            for _, fragment_url, _ in pending_cards
+            for _, fragment_url, _ in tasks
         ),
         return_exceptions=True,
     )
     elapsed = asyncio.get_event_loop().time() - start_time
 
     agents: list[Agent] = []
-    for (fragment_name, _, ord_id), result in zip(pending_cards, card_results):
+    for (fragment_name, _, ord_id), result in zip(tasks, card_results):
         if isinstance(result, BaseException):
             logger.exception(
                 "Failed to fetch agent card for fragment '%s' — skipping",
@@ -727,7 +727,7 @@ async def get_agent_cards_lob(
     logger.info(
         "Fetched %d agent card(s) from %d A2A fragment(s) in %.2fs",
         len(agents),
-        len(pending_cards),
+        len(tasks),
         elapsed,
     )
     return agents

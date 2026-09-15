@@ -27,7 +27,7 @@ from sap_cloud_sdk.agentgateway._models import (
 )
 from sap_cloud_sdk.agentgateway._token_cache import _TokenCache
 from sap_cloud_sdk.agentgateway.config import ClientConfig
-from sap_cloud_sdk.agentgateway.exceptions import AgentGatewaySDKError
+from sap_cloud_sdk.agentgateway.exceptions import AgentGatewaySDKError, AgentGatewayServerError
 
 
 # ============================================================
@@ -766,6 +766,7 @@ class TestCallMcpToolCustomer:
             mock_content = MagicMock()
             mock_content.text = "Order created successfully"
             mock_result.content = [mock_content]
+            mock_result.is_error = False
             mock_session.call_tool = AsyncMock(return_value=mock_result)
             mock_session_ctx = AsyncMock()
             mock_session_ctx.__aenter__ = AsyncMock(return_value=mock_session)
@@ -824,9 +825,80 @@ class TestCallMcpToolCustomer:
 
             assert result == ""
 
+    @pytest.mark.asyncio
+    async def test_raises_when_result_is_none(self, credentials, mock_tool):
+        """Raise AgentGatewayServerError when call_tool returns None."""
+        with (
+            patch("httpx.AsyncClient") as mock_client_class,
+            patch(
+                "sap_cloud_sdk.agentgateway._customer.streamable_http_client"
+            ) as mock_stream,
+            patch(
+                "sap_cloud_sdk.agentgateway._customer.ClientSession"
+            ) as mock_session_class,
+        ):
+            mock_client = AsyncMock()
+            mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_client.__aexit__ = AsyncMock(return_value=None)
+            mock_client_class.return_value = mock_client
 
-# ============================================================
-# Test: detect_transparent_credentials
+            mock_stream_ctx = AsyncMock()
+            mock_stream_ctx.__aenter__ = AsyncMock(
+                return_value=(AsyncMock(), AsyncMock(), None)
+            )
+            mock_stream_ctx.__aexit__ = AsyncMock(return_value=None)
+            mock_stream.return_value = mock_stream_ctx
+
+            mock_session = AsyncMock()
+            mock_session.initialize = AsyncMock()
+            mock_session.call_tool = AsyncMock(return_value=None)
+            mock_session_ctx = AsyncMock()
+            mock_session_ctx.__aenter__ = AsyncMock(return_value=mock_session)
+            mock_session_ctx.__aexit__ = AsyncMock(return_value=None)
+            mock_session_class.return_value = mock_session_ctx
+
+            with pytest.raises(AgentGatewayServerError, match="returned None"):
+                await call_mcp_tool_customer(mock_tool, "auth-token", 60.0)
+
+    @pytest.mark.asyncio
+    async def test_raises_when_tool_returns_is_error(self, credentials, mock_tool):
+        """Raise AgentGatewayServerError when call_tool result has isError=True."""
+        with (
+            patch("httpx.AsyncClient") as mock_client_class,
+            patch(
+                "sap_cloud_sdk.agentgateway._customer.streamable_http_client"
+            ) as mock_stream,
+            patch(
+                "sap_cloud_sdk.agentgateway._customer.ClientSession"
+            ) as mock_session_class,
+        ):
+            mock_client = AsyncMock()
+            mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_client.__aexit__ = AsyncMock(return_value=None)
+            mock_client_class.return_value = mock_client
+
+            mock_stream_ctx = AsyncMock()
+            mock_stream_ctx.__aenter__ = AsyncMock(
+                return_value=(AsyncMock(), AsyncMock(), None)
+            )
+            mock_stream_ctx.__aexit__ = AsyncMock(return_value=None)
+            mock_stream.return_value = mock_stream_ctx
+
+            mock_session = AsyncMock()
+            mock_session.initialize = AsyncMock()
+            mock_result = MagicMock()
+            mock_content = MagicMock()
+            mock_content.text = "change number test_sm doesn't exist"
+            mock_result.content = [mock_content]
+            mock_result.is_error = True
+            mock_session.call_tool = AsyncMock(return_value=mock_result)
+            mock_session_ctx = AsyncMock()
+            mock_session_ctx.__aenter__ = AsyncMock(return_value=mock_session)
+            mock_session_ctx.__aexit__ = AsyncMock(return_value=None)
+            mock_session_class.return_value = mock_session_ctx
+
+            with pytest.raises(AgentGatewayServerError, match="returned an error"):
+                await call_mcp_tool_customer(mock_tool, "auth-token", 60.0)
 # ============================================================
 
 

@@ -46,9 +46,7 @@ updates:
     labels:
       - "dependencies"
       - "github-actions"
-    # Batch all Actions bumps (including majors) into one PR: a bad major fails
-    # the workflow loudly on the PR, so isolating them buys little and only adds
-    # churn
+    # Batch all Actions bumps (including majors) into one PR
     groups:
       github-actions:
         patterns:

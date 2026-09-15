@@ -3,7 +3,8 @@ updates:
   # Python pip dependencies
   # Non-major (minor + patch) version updates are batched into one grouped PR;
   # majors are left ungrouped so each breaking bump lands in its own PR for
-  # review. Security updates (enabled in repo settings) come as a separate grouped PR of their own
+  # review. Security updates (enabled in repo settings) come as a separate
+  # grouped PR of their own
   - package-ecosystem: "pip"
     directory: "/"
     schedule:
@@ -12,6 +13,8 @@ updates:
       time: "09:00"
     groups:
       version-minor-patch:
+        patterns:
+          - "*"
         update-types:
           - "minor"
           - "patch"
@@ -19,6 +22,8 @@ updates:
         applies-to: security-updates
         patterns:
           - "*"
+    labels:
+      - "dependencies"
     # Commit message configuration
     commit-message:
       prefix: "chore"

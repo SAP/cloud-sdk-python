@@ -18,6 +18,7 @@ try:
     from mcp.shared.exceptions import McpError
 except ImportError:
     from mcp.shared.exceptions import MCPError as McpError  # type: ignore[no-redef]  # ty: ignore[unresolved-import]
+from sap_cloud_sdk.agentgateway.config import DEFAULT_MAX_CONCURRENT_TASKS
 from sap_cloud_sdk.destination import (
     create_client as create_destination_client,
     ConsumptionLevel,
@@ -410,6 +411,7 @@ async def get_mcp_tools_lob(
     system_token: str,
     timeout: float,
     filter: MCPToolFilter | None = None,
+    max_concurrent_tasks: int = DEFAULT_MAX_CONCURRENT_TASKS,
 ) -> list[MCPTool]:
     """List all MCP tools using LoB flow (destination-based).
 
@@ -421,10 +423,13 @@ async def get_mcp_tools_lob(
         timeout: HTTP timeout in seconds for MCP server calls.
         filter: Optional MCPToolFilter narrowing results by tool name or ORD ID.
             If None or empty, all tools are included.
+        max_concurrent_tasks: Maximum number of fragment fetches that run
+            concurrently. Defaults to 15.
 
     Returns:
         List of MCPTool objects from all MCP servers.
     """
+    start_time = asyncio.get_event_loop().time()
     f = filter or MCPToolFilter()
     tools: list[MCPTool] = []
     loop = asyncio.get_running_loop()
@@ -451,35 +456,53 @@ async def get_mcp_tools_lob(
             in ord_ids_set
         ]
 
+    # Collect fragments that have a valid URL; skip and warn the rest up front
+    tasks: list[tuple[str, str]] = []
     for fragment in fragments:
         fragment_name = fragment.name
         mcp_url = fragment.properties.get("URL") or fragment.properties.get("url")
-
         if not mcp_url:
             logger.warning(
                 "Fragment '%s' has no URL property — skipping", fragment_name
             )
             continue
+        tasks.append((fragment_name, mcp_url))
 
-        try:
-            server_tools = await list_server_tools(
+    # Fetch all fragments concurrently; isolate per-fragment failures
+    semaphore = asyncio.Semaphore(max_concurrent_tasks)
+
+    async def _guarded_mcp(mcp_url: str, fragment_name: str) -> list[MCPTool]:
+        async with semaphore:
+            return await list_server_tools(
                 mcp_url, system_token, fragment_name, timeout
             )
-            tools.extend(server_tools)
+
+    results = await asyncio.gather(
+        *(_guarded_mcp(mcp_url, fragment_name) for fragment_name, mcp_url in tasks),
+        return_exceptions=True,
+    )
+
+    for (fragment_name, _), result in zip(tasks, results):
+        if isinstance(result, BaseException):
+            _log_mcp_server_error(fragment_name, result)
+        else:
+            tools.extend(result)
             logger.debug(
-                "Loaded %d tool(s) from fragment '%s'",
-                len(server_tools),
-                fragment_name,
+                "Loaded %d tool(s) from fragment '%s'", len(result), fragment_name
             )
-        except Exception as exc:
-            _log_mcp_server_error(fragment_name, exc)
 
     # Post-fetch filter: tool names are only known after fetching
     if f.names:
         names_set = set(f.names)
         tools = [t for t in tools if t.name in names_set]
 
-    logger.info("Loaded %d MCP tool(s) from %d fragment(s)", len(tools), len(fragments))
+    elapsed = asyncio.get_event_loop().time() - start_time
+    logger.info(
+        "Loaded %d MCP tool(s) from %d fragment(s) in %.2fs",
+        len(tools),
+        len(tasks),
+        elapsed,
+    )
     return tools
 
 
@@ -610,6 +633,7 @@ async def get_agent_cards_lob(
     system_token: str,
     timeout: float,
     filter: AgentCardFilter | None = None,
+    max_concurrent_tasks: int = DEFAULT_MAX_CONCURRENT_TASKS,
 ) -> list[Agent]:
     """List A2A agents and their agent cards using LoB flow.
 
@@ -628,10 +652,13 @@ async def get_agent_cards_lob(
         timeout: HTTP timeout in seconds.
         filter: Optional AgentCardFilter narrowing results by agent card name
             or ORD ID. If None or empty, all A2A fragments are included.
+        max_concurrent_tasks: Maximum number of agent card fetches that run
+            concurrently. Defaults to 15.
 
     Returns:
         List of Agent objects, each containing ORD ID and fetched AgentCard.
     """
+    start_time = asyncio.get_event_loop().time()
     f = filter or AgentCardFilter()
     loop = asyncio.get_running_loop()
 
@@ -656,8 +683,8 @@ async def get_agent_cards_lob(
             in ord_ids_set
         ]
 
-    agents: list[Agent] = []
-
+    # Collect fragments that have a valid URL and extractable ORD ID; skip the rest
+    tasks: list[tuple[str, str, str]] = []
     for fragment in fragments:
         fragment_name = fragment.name
         props_lower = {k.lower(): v for k, v in fragment.properties.items()}
@@ -680,14 +707,32 @@ async def get_agent_cards_lob(
             )
             continue
 
-        try:
-            card = await _fetch_agent_card(fragment_url, system_token, timeout)
-            agents.append(Agent(ord_id=ord_id, agent_card=card))
-            logger.debug("Fetched agent card for fragment '%s'", fragment_name)
-        except Exception:
+        tasks.append((fragment_name, fragment_url, ord_id))
+
+    # Fetch all agent cards concurrently; isolate per-fragment failures
+    semaphore = asyncio.Semaphore(max_concurrent_tasks)
+
+    async def _guarded_card(fragment_url: str) -> AgentCard:
+        async with semaphore:
+            return await _fetch_agent_card(fragment_url, system_token, timeout)
+
+    card_results = await asyncio.gather(
+        *(_guarded_card(fragment_url) for _, fragment_url, _ in tasks),
+        return_exceptions=True,
+    )
+    elapsed = asyncio.get_event_loop().time() - start_time
+
+    agents: list[Agent] = []
+    for (fragment_name, _, ord_id), result in zip(tasks, card_results):
+        if isinstance(result, BaseException):
             logger.exception(
-                "Failed to fetch agent card for fragment '%s' — skipping", fragment_name
+                "Failed to fetch agent card for fragment '%s' — skipping",
+                fragment_name,
+                exc_info=result,
             )
+        else:
+            agents.append(Agent(ord_id=ord_id, agent_card=result))
+            logger.debug("Fetched agent card for fragment '%s'", fragment_name)
 
     # Post-fetch filter: agent card name is only known after fetching
     if f.agent_names:
@@ -695,6 +740,9 @@ async def get_agent_cards_lob(
         agents = [a for a in agents if a.agent_card.raw.get("name") in agent_names_set]
 
     logger.info(
-        "Fetched %d agent card(s) from %d A2A fragment(s)", len(agents), len(fragments)
+        "Fetched %d agent card(s) from %d A2A fragment(s) in %.2fs",
+        len(agents),
+        len(tasks),
+        elapsed,
     )
     return agents

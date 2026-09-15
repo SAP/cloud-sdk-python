@@ -693,6 +693,80 @@ class TestGetMcpToolsCustomer:
         assert result == []
         assert mock_list.call_count == 0
 
+    @pytest.mark.asyncio
+    async def test_servers_fetched_concurrently(self):
+        """All servers start before any finishes — confirms asyncio.gather parallelism."""
+        import asyncio
+
+        active: set[str] = set()
+        max_concurrent = 0
+
+        async def slow_fetch(url, token, timeout):
+            nonlocal max_concurrent
+            ord_id = url.split("/")[-2]
+            active.add(ord_id)
+            max_concurrent = max(max_concurrent, len(active))
+            await asyncio.sleep(0.05)
+            active.discard(ord_id)
+            return []
+
+        credentials = CustomerCredentials(
+            token_service_url="https://ias.example.com/oauth2/token",
+            client_id="test-client",
+            certificate="cert",
+            private_key="key",
+            gateway_url="https://agw.example.com",
+            integration_dependencies=[
+                IntegrationDependency(ord_id=f"server{i}", global_tenant_id="t")
+                for i in range(3)
+            ],
+        )
+
+        with patch(
+            "sap_cloud_sdk.agentgateway._customer._list_server_tools",
+            side_effect=slow_fetch,
+        ):
+            await get_mcp_tools_customer(credentials, "token", 60.0)
+
+        assert max_concurrent > 1, "Expected servers to be fetched concurrently"
+
+    @pytest.mark.asyncio
+    async def test_fetch_errors_isolated_per_server(self):
+        """A BaseException from one server does not prevent others from being fetched."""
+        mock_tool = MCPTool(
+            name="tool-ok",
+            server_name="server2",
+            description="OK",
+            input_schema={},
+            url="https://example.com",
+        )
+
+        async def mock_list(url, token, timeout):
+            if "server1" in url:
+                raise RuntimeError("server1 exploded")
+            return [mock_tool]
+
+        credentials = CustomerCredentials(
+            token_service_url="https://ias.example.com/oauth2/token",
+            client_id="test-client",
+            certificate="cert",
+            private_key="key",
+            gateway_url="https://agw.example.com",
+            integration_dependencies=[
+                IntegrationDependency(ord_id="server1", global_tenant_id="t"),
+                IntegrationDependency(ord_id="server2", global_tenant_id="t"),
+            ],
+        )
+
+        with patch(
+            "sap_cloud_sdk.agentgateway._customer._list_server_tools",
+            side_effect=mock_list,
+        ):
+            result = await get_mcp_tools_customer(credentials, "token", 60.0)
+
+        assert len(result) == 1
+        assert result[0].name == "tool-ok"
+
 
 # ============================================================
 # Test: call_mcp_tool_customer

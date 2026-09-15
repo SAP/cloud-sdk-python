@@ -488,7 +488,7 @@ class TestListMcpTools:
             await agw_client.list_mcp_tools()
 
             mock_lob.assert_called_once_with(
-                "my-tenant", "system-token", 60.0, filter=None
+                "my-tenant", "system-token", 60.0, filter=None, max_concurrent_tasks=15
             )
 
     @pytest.mark.asyncio
@@ -515,7 +515,7 @@ class TestListMcpTools:
             await agw_client.list_mcp_tools()
 
             mock_lob.assert_called_once_with(
-                "my-tenant", "system-token-xyz", 60.0, filter=None
+                "my-tenant", "system-token-xyz", 60.0, filter=None, max_concurrent_tasks=15
             )
 
     @pytest.mark.asyncio
@@ -581,7 +581,7 @@ class TestListMcpTools:
             await agw_client.list_mcp_tools()
 
             mock_customer.assert_called_once_with(
-                mock_creds, "customer-system-token", 60.0, filter=None
+                mock_creds, "customer-system-token", 60.0, filter=None, max_concurrent_tasks=15
             )
 
     @pytest.mark.asyncio
@@ -609,7 +609,7 @@ class TestListMcpTools:
 
             assert mock_user_auth.call_count == 1
             mock_lob.assert_called_once_with(
-                "my-tenant", "user-token-xyz", 60.0, filter=None
+                "my-tenant", "user-token-xyz", 60.0, filter=None, max_concurrent_tasks=15
             )
 
     @pytest.mark.asyncio
@@ -637,7 +637,7 @@ class TestListMcpTools:
             await agw_client.list_mcp_tools(user_token="user-jwt")
 
             mock_customer.assert_called_once_with(
-                mock_creds, "exchanged-user-token", 60.0, filter=None
+                mock_creds, "exchanged-user-token", 60.0, filter=None, max_concurrent_tasks=15
             )
 
     @pytest.mark.asyncio
@@ -671,6 +671,7 @@ class TestListMcpTools:
             "token",
             60.0,
             filter=f,
+            max_concurrent_tasks=15,
         )
 
     @pytest.mark.asyncio
@@ -697,7 +698,7 @@ class TestListMcpTools:
             await agw_client.list_mcp_tools(filter=f)
 
         mock_lob.assert_called_once_with(
-            "my-tenant", "token", 60.0, filter=f
+            "my-tenant", "token", 60.0, filter=f, max_concurrent_tasks=15
         )
 
     @pytest.mark.asyncio
@@ -737,6 +738,7 @@ class TestListMcpTools:
             "customer-system-token",
             60.0,
             filter=f,
+            max_concurrent_tasks=15,
         )
 
 
@@ -1047,6 +1049,7 @@ class TestListAgentCards:
             "system-token",
             60.0,
             filter=None,
+            max_concurrent_tasks=15,
         )
 
     @pytest.mark.asyncio
@@ -1080,6 +1083,7 @@ class TestListAgentCards:
             filter=AgentCardFilter(
                 agent_names=["Billing Agent"], ord_ids=["sap.s4:agent:v1"]
             ),
+            max_concurrent_tasks=15,
         )
 
     @pytest.mark.asyncio

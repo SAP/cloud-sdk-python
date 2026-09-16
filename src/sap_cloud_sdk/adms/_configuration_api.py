@@ -153,7 +153,9 @@ class _ConfigurationApi:
         """Return all registered business object node types."""
         params = options.to_query_params() if options else {}
         resp = self._http.get(
-            "BusinessObjectNodeType", params=params, service_base=_CONFIG_SERVICE_PATH
+            "BusinessObjectNodeType",
+            params=params,
+            service_base=_CONFIG_SERVICE_PATH,
         )
         return [
             BusinessObjectNodeType.from_dict(item)
@@ -262,7 +264,9 @@ class _ConfigurationApi:
             rather than a breaking API change.
         """
         resp = self._http.get(
-            build_doctype_botype_map_key_path(document_type_id, business_object_node_type_unique_id),
+            build_doctype_botype_map_key_path(
+                document_type_id, business_object_node_type_unique_id
+            ),
             service_base=_CONFIG_SERVICE_PATH,
         )
         return DocumentTypeBusinessObjectTypeMap.from_dict(resp.json())
@@ -280,11 +284,14 @@ class _ConfigurationApi:
             business_object_node_type_unique_id: The ``BusinessObjectNodeTypeUniqueID`` half.
 
         Note:
-            Same composite-key fix as :meth:`get_type_mapping` — the previous single-argument
-            overload used a non-existent ``DocumentTypeBOTypeMapID`` field.
+            Same composite-key fix as :meth:`get_type_mapping` — the previous
+            single-argument overload used a non-existent ``DocumentTypeBOTypeMapID``
+            field.
         """
         self._http.delete(
-            build_doctype_botype_map_key_path(document_type_id, business_object_node_type_unique_id),
+            build_doctype_botype_map_key_path(
+                document_type_id, business_object_node_type_unique_id
+            ),
             service_base=_CONFIG_SERVICE_PATH,
         )
 
@@ -300,8 +307,11 @@ class _ConfigurationApi:
             document_type_id: The ``DocumentTypeID`` half of the composite key.
             business_object_node_type_unique_id: The ``BusinessObjectNodeTypeUniqueID`` half.
         """
+        key_path = build_doctype_botype_map_key_path(
+            document_type_id, business_object_node_type_unique_id
+        )
         self._http.post(
-            f"{build_doctype_botype_map_key_path(document_type_id, business_object_node_type_unique_id)}/com.sap.adm.ConfigurationService.markDefault",
+            f"{key_path}/com.sap.adm.ConfigurationService.markDefault",
             json={},
             service_base=_CONFIG_SERVICE_PATH,
         )
@@ -315,7 +325,9 @@ class _ConfigurationApi:
         """Return all document-type file extension policies."""
         params = options.to_query_params() if options else {}
         resp = self._http.get(
-            "DocumentTypeFileExtensionPolicy", params=params, service_base=_CONFIG_SERVICE_PATH
+            "DocumentTypeFileExtensionPolicy",
+            params=params,
+            service_base=_CONFIG_SERVICE_PATH,
         )
         return [
             FileExtensionPolicy.from_dict(item) for item in resp.json().get("value", [])
@@ -334,10 +346,15 @@ class _ConfigurationApi:
         return FileExtensionPolicy.from_dict(resp.json())
 
     @record_metrics(Module.ADMS, Operation.ADMS_CONFIG_DELETE_FILE_EXT_POLICY)
-    def delete_file_extension_policy(self, document_type_id: str, file_extension: str) -> None:
+    def delete_file_extension_policy(
+        self, document_type_id: str, file_extension: str
+    ) -> None:
         """Delete a document-type file extension policy by composite key."""
+        doc_id_key = quote_odata_string_key(document_type_id)
+        ext_key = quote_odata_string_key(file_extension)
         self._http.delete(
-            f"DocumentTypeFileExtensionPolicy(DocumentTypeID={quote_odata_string_key(document_type_id)},FileExtension={quote_odata_string_key(file_extension)})",
+            f"DocumentTypeFileExtensionPolicy("
+            f"DocumentTypeID={doc_id_key},FileExtension={ext_key})",
             service_base=_CONFIG_SERVICE_PATH,
         )
 
@@ -446,7 +463,7 @@ class _AsyncConfigurationApi:
         self,
         options: ConfigQueryOptions | None = None,
     ) -> list[AllowedDomain]:
-        """Async variant of :meth:`_ConfigurationApi.get_all_allowed_domains` — same semantics."""
+        """Async variant of :meth:`_ConfigurationApi.get_all_allowed_domains`."""
         params = options.to_query_params() if options else {}
         resp = await self._http.get(
             "AllowedDomain", params=params, service_base=_CONFIG_SERVICE_PATH
@@ -457,7 +474,7 @@ class _AsyncConfigurationApi:
     async def create_allowed_domain(
         self, payload: CreateAllowedDomainInput
     ) -> AllowedDomain:
-        """Async variant of :meth:`_ConfigurationApi.create_allowed_domain` — same semantics."""
+        """Async variant of :meth:`_ConfigurationApi.create_allowed_domain`."""
         resp = await self._http.post(
             "AllowedDomain",
             json=payload.to_odata_dict(),
@@ -467,7 +484,7 @@ class _AsyncConfigurationApi:
 
     @record_metrics(Module.ADMS, Operation.ADMS_CONFIG_GET_ALLOWED_DOMAIN)
     async def get_allowed_domain(self, allowed_domain_id: str) -> AllowedDomain:
-        """Async variant of :meth:`_ConfigurationApi.get_allowed_domain` — same semantics."""
+        """Async variant of :meth:`_ConfigurationApi.get_allowed_domain`."""
         resp = await self._http.get(
             build_allowed_domain_key_path(allowed_domain_id),
             service_base=_CONFIG_SERVICE_PATH,
@@ -478,7 +495,7 @@ class _AsyncConfigurationApi:
     async def update_allowed_domain(
         self, allowed_domain_id: str, payload: UpdateAllowedDomainInput
     ) -> AllowedDomain:
-        """Async variant of :meth:`_ConfigurationApi.update_allowed_domain` — same semantics."""
+        """Async variant of :meth:`_ConfigurationApi.update_allowed_domain`."""
         resp = await self._http.patch(
             build_allowed_domain_key_path(allowed_domain_id),
             json=payload.to_odata_dict(),
@@ -488,7 +505,7 @@ class _AsyncConfigurationApi:
 
     @record_metrics(Module.ADMS, Operation.ADMS_CONFIG_DELETE_ALLOWED_DOMAIN)
     async def delete_allowed_domain(self, allowed_domain_id: str) -> None:
-        """Async variant of :meth:`_ConfigurationApi.delete_allowed_domain` — same semantics."""
+        """Async variant of :meth:`_ConfigurationApi.delete_allowed_domain`."""
         await self._http.delete(
             build_allowed_domain_key_path(allowed_domain_id),
             service_base=_CONFIG_SERVICE_PATH,
@@ -499,7 +516,7 @@ class _AsyncConfigurationApi:
         self,
         options: ConfigQueryOptions | None = None,
     ) -> list[DocumentType]:
-        """Async variant of :meth:`_ConfigurationApi.get_all_document_types` — same semantics."""
+        """Async variant of :meth:`_ConfigurationApi.get_all_document_types`."""
         params = options.to_query_params() if options else {}
         resp = await self._http.get(
             "DocumentType", params=params, service_base=_CONFIG_SERVICE_PATH
@@ -510,7 +527,7 @@ class _AsyncConfigurationApi:
     async def create_document_type(
         self, payload: CreateDocumentTypeInput
     ) -> DocumentType:
-        """Async variant of :meth:`_ConfigurationApi.create_document_type` — same semantics."""
+        """Async variant of :meth:`_ConfigurationApi.create_document_type`."""
         resp = await self._http.post(
             "DocumentType",
             json=payload.to_odata_dict(),
@@ -520,7 +537,7 @@ class _AsyncConfigurationApi:
 
     @record_metrics(Module.ADMS, Operation.ADMS_CONFIG_GET_DOCUMENT_TYPE)
     async def get_document_type(self, document_type_id: str) -> DocumentType:
-        """Async variant of :meth:`_ConfigurationApi.get_document_type` — same semantics."""
+        """Async variant of :meth:`_ConfigurationApi.get_document_type`."""
         resp = await self._http.get(
             build_document_type_key_path(document_type_id),
             service_base=_CONFIG_SERVICE_PATH,
@@ -531,7 +548,7 @@ class _AsyncConfigurationApi:
     async def update_document_type(
         self, document_type_id: str, payload: UpdateDocumentTypeInput
     ) -> DocumentType:
-        """Async variant of :meth:`_ConfigurationApi.update_document_type` — same semantics."""
+        """Async variant of :meth:`_ConfigurationApi.update_document_type`."""
         resp = await self._http.patch(
             build_document_type_key_path(document_type_id),
             json=payload.to_odata_dict(),
@@ -541,7 +558,7 @@ class _AsyncConfigurationApi:
 
     @record_metrics(Module.ADMS, Operation.ADMS_CONFIG_DELETE_DOCUMENT_TYPE)
     async def delete_document_type(self, document_type_id: str) -> None:
-        """Async variant of :meth:`_ConfigurationApi.delete_document_type` — same semantics."""
+        """Async variant of :meth:`_ConfigurationApi.delete_document_type`."""
         await self._http.delete(
             build_document_type_key_path(document_type_id),
             service_base=_CONFIG_SERVICE_PATH,
@@ -552,10 +569,12 @@ class _AsyncConfigurationApi:
         self,
         options: ConfigQueryOptions | None = None,
     ) -> list[BusinessObjectNodeType]:
-        """Async variant of :meth:`_ConfigurationApi.get_all_business_object_types` — same semantics."""
+        """Async variant of :meth:`_ConfigurationApi.get_all_business_object_types`."""
         params = options.to_query_params() if options else {}
         resp = await self._http.get(
-            "BusinessObjectNodeType", params=params, service_base=_CONFIG_SERVICE_PATH
+            "BusinessObjectNodeType",
+            params=params,
+            service_base=_CONFIG_SERVICE_PATH,
         )
         return [
             BusinessObjectNodeType.from_dict(item)
@@ -566,7 +585,7 @@ class _AsyncConfigurationApi:
     async def create_business_object_type(
         self, payload: CreateBusinessObjectNodeTypeInput
     ) -> BusinessObjectNodeType:
-        """Async variant of :meth:`_ConfigurationApi.create_business_object_type` — same semantics."""
+        """Async variant of :meth:`_ConfigurationApi.create_business_object_type`."""
         resp = await self._http.post(
             "BusinessObjectNodeType",
             json=payload.to_odata_dict(),
@@ -578,7 +597,7 @@ class _AsyncConfigurationApi:
     async def get_business_object_type(
         self, business_object_node_type_unique_id: str
     ) -> BusinessObjectNodeType:
-        """Async variant of :meth:`_ConfigurationApi.get_business_object_type` — same semantics."""
+        """Async variant of :meth:`_ConfigurationApi.get_business_object_type`."""
         resp = await self._http.get(
             build_business_object_node_type_key_path(
                 business_object_node_type_unique_id
@@ -593,7 +612,7 @@ class _AsyncConfigurationApi:
         business_object_node_type_unique_id: str,
         payload: UpdateBusinessObjectNodeTypeInput,
     ) -> BusinessObjectNodeType:
-        """Async variant of :meth:`_ConfigurationApi.update_business_object_type` — same semantics."""
+        """Async variant of :meth:`_ConfigurationApi.update_business_object_type`."""
         resp = await self._http.patch(
             build_business_object_node_type_key_path(
                 business_object_node_type_unique_id
@@ -607,7 +626,7 @@ class _AsyncConfigurationApi:
     async def delete_business_object_type(
         self, business_object_node_type_unique_id: str
     ) -> None:
-        """Async variant of :meth:`_ConfigurationApi.delete_business_object_type` — same semantics."""
+        """Async variant of :meth:`_ConfigurationApi.delete_business_object_type`."""
         await self._http.delete(
             build_business_object_node_type_key_path(
                 business_object_node_type_unique_id
@@ -620,7 +639,7 @@ class _AsyncConfigurationApi:
         self,
         options: ConfigQueryOptions | None = None,
     ) -> list[DocumentTypeBusinessObjectTypeMap]:
-        """Async variant of :meth:`_ConfigurationApi.get_type_mappings` — same semantics."""
+        """Async variant of :meth:`_ConfigurationApi.get_type_mappings`."""
         params = options.to_query_params() if options else {}
         resp = await self._http.get(
             "DocumentTypeBusinessObjectTypeMap",
@@ -636,7 +655,7 @@ class _AsyncConfigurationApi:
     async def create_type_mapping(
         self, payload: CreateDocumentTypeBoTypeMapInput
     ) -> DocumentTypeBusinessObjectTypeMap:
-        """Async variant of :meth:`_ConfigurationApi.create_type_mapping` — same semantics."""
+        """Async variant of :meth:`_ConfigurationApi.create_type_mapping`."""
         resp = await self._http.post(
             "DocumentTypeBusinessObjectTypeMap",
             json=payload.to_odata_dict(),
@@ -646,28 +665,45 @@ class _AsyncConfigurationApi:
 
     @record_metrics(Module.ADMS, Operation.ADMS_CONFIG_GET_DOCTYPE_BOTYPE_MAP)
     async def get_type_mapping(
-        self, document_type_id: str, business_object_node_type_unique_id: str
+        self,
+        document_type_id: str,
+        business_object_node_type_unique_id: str,
     ) -> DocumentTypeBusinessObjectTypeMap:
-        """Async variant of :meth:`_ConfigurationApi.get_type_mapping` — same semantics."""
+        """Async variant of :meth:`_ConfigurationApi.get_type_mapping`."""
         resp = await self._http.get(
-            build_doctype_botype_map_key_path(document_type_id, business_object_node_type_unique_id),
+            build_doctype_botype_map_key_path(
+                document_type_id, business_object_node_type_unique_id
+            ),
             service_base=_CONFIG_SERVICE_PATH,
         )
         return DocumentTypeBusinessObjectTypeMap.from_dict(resp.json())
 
     @record_metrics(Module.ADMS, Operation.ADMS_CONFIG_DELETE_DOCTYPE_BOTYPE_MAP)
-    async def delete_type_mapping(self, document_type_id: str, business_object_node_type_unique_id: str) -> None:
-        """Async variant of :meth:`_ConfigurationApi.delete_type_mapping` — same semantics."""
+    async def delete_type_mapping(
+        self,
+        document_type_id: str,
+        business_object_node_type_unique_id: str,
+    ) -> None:
+        """Async variant of :meth:`_ConfigurationApi.delete_type_mapping`."""
         await self._http.delete(
-            build_doctype_botype_map_key_path(document_type_id, business_object_node_type_unique_id),
+            build_doctype_botype_map_key_path(
+                document_type_id, business_object_node_type_unique_id
+            ),
             service_base=_CONFIG_SERVICE_PATH,
         )
 
     @record_metrics(Module.ADMS, Operation.ADMS_CONFIG_MARK_DEFAULT)
-    async def mark_default(self, document_type_id: str, business_object_node_type_unique_id: str) -> None:
-        """Async variant of :meth:`_ConfigurationApi.mark_default` — same semantics."""
+    async def mark_default(
+        self,
+        document_type_id: str,
+        business_object_node_type_unique_id: str,
+    ) -> None:
+        """Async variant of :meth:`_ConfigurationApi.mark_default`."""
+        key_path = build_doctype_botype_map_key_path(
+            document_type_id, business_object_node_type_unique_id
+        )
         await self._http.post(
-            f"{build_doctype_botype_map_key_path(document_type_id, business_object_node_type_unique_id)}/com.sap.adm.ConfigurationService.markDefault",
+            f"{key_path}/com.sap.adm.ConfigurationService.markDefault",
             json={},
             service_base=_CONFIG_SERVICE_PATH,
         )
@@ -676,10 +712,12 @@ class _AsyncConfigurationApi:
     async def get_all_file_extension_policies(
         self, options: ConfigQueryOptions | None = None
     ) -> list[FileExtensionPolicy]:
-        """Async variant of :meth:`_ConfigurationApi.get_all_file_extension_policies` — same semantics."""
+        """Async variant of :meth:`_ConfigurationApi.get_all_file_extension_policies`."""
         params = options.to_query_params() if options else {}
         resp = await self._http.get(
-            "DocumentTypeFileExtensionPolicy", params=params, service_base=_CONFIG_SERVICE_PATH
+            "DocumentTypeFileExtensionPolicy",
+            params=params,
+            service_base=_CONFIG_SERVICE_PATH,
         )
         return [
             FileExtensionPolicy.from_dict(item) for item in resp.json().get("value", [])
@@ -689,7 +727,7 @@ class _AsyncConfigurationApi:
     async def create_file_extension_policy(
         self, payload: CreateFileExtensionPolicyInput
     ) -> FileExtensionPolicy:
-        """Async variant of :meth:`_ConfigurationApi.create_file_extension_policy` — same semantics."""
+        """Async variant of :meth:`_ConfigurationApi.create_file_extension_policy`."""
         resp = await self._http.post(
             "DocumentTypeFileExtensionPolicy",
             json=payload.to_odata_dict(),
@@ -698,10 +736,15 @@ class _AsyncConfigurationApi:
         return FileExtensionPolicy.from_dict(resp.json())
 
     @record_metrics(Module.ADMS, Operation.ADMS_CONFIG_DELETE_FILE_EXT_POLICY)
-    async def delete_file_extension_policy(self, document_type_id: str, file_extension: str) -> None:
-        """Async variant of :meth:`_ConfigurationApi.delete_file_extension_policy` — same semantics."""
+    async def delete_file_extension_policy(
+        self, document_type_id: str, file_extension: str
+    ) -> None:
+        """Async variant of :meth:`_ConfigurationApi.delete_file_extension_policy`."""
+        doc_id_key = quote_odata_string_key(document_type_id)
+        ext_key = quote_odata_string_key(file_extension)
         await self._http.delete(
-            f"DocumentTypeFileExtensionPolicy(DocumentTypeID={quote_odata_string_key(document_type_id)},FileExtension={quote_odata_string_key(file_extension)})",
+            f"DocumentTypeFileExtensionPolicy("
+            f"DocumentTypeID={doc_id_key},FileExtension={ext_key})",
             service_base=_CONFIG_SERVICE_PATH,
         )
 
@@ -712,7 +755,7 @@ class _AsyncConfigurationApi:
         *,
         subaccount_id: str | None = None,
     ) -> list[ApplicationTenant]:
-        """Async variant of :meth:`_ConfigurationApi.get_all_application_tenants` — same semantics."""
+        """Async variant of :meth:`_ConfigurationApi.get_all_application_tenants`."""
         params = options.to_query_params() if options else {}
         resp = await self._http.get(
             "ApplicationTenant",
@@ -731,7 +774,7 @@ class _AsyncConfigurationApi:
         *,
         subaccount_id: str | None = None,
     ) -> ApplicationTenant:
-        """Async variant of :meth:`_ConfigurationApi.create_application_tenant` — same semantics."""
+        """Async variant of :meth:`_ConfigurationApi.create_application_tenant`."""
         resp = await self._http.post(
             "ApplicationTenant",
             json=payload.to_odata_dict(),
@@ -747,7 +790,7 @@ class _AsyncConfigurationApi:
         *,
         subaccount_id: str | None = None,
     ) -> ApplicationTenant:
-        """Async variant of :meth:`_ConfigurationApi.get_application_tenant` — same semantics."""
+        """Async variant of :meth:`_ConfigurationApi.get_application_tenant`."""
         resp = await self._http.get(
             f"ApplicationTenant(ApplicationTenantID='{application_tenant_id}')",
             service_base=_CONFIG_SERVICE_PATH,
@@ -762,7 +805,7 @@ class _AsyncConfigurationApi:
         *,
         subaccount_id: str | None = None,
     ) -> None:
-        """Async variant of :meth:`_ConfigurationApi.delete_application_tenant` — same semantics."""
+        """Async variant of :meth:`_ConfigurationApi.delete_application_tenant`."""
         await self._http.delete(
             f"ApplicationTenant(ApplicationTenantID='{application_tenant_id}')",
             service_base=_CONFIG_SERVICE_PATH,

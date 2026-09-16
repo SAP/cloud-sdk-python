@@ -18,14 +18,17 @@ from sap_cloud_sdk.adms._query_options import (
 )
 from sap_cloud_sdk.adms._models import (
     AllowedDomain,
+    ApplicationTenant,
     BaseType,
     BusinessObjectNodeType,
     CreateAllowedDomainInput,
+    CreateApplicationTenantInput,
     CreateBusinessObjectNodeTypeInput,
     CreateDocumentInput,
     CreateDocumentRelationInput,
     CreateDocumentTypeBoTypeMapInput,
     CreateDocumentTypeInput,
+    CreateFileExtensionPolicyInput,
     DeleteUserDataJobParameters,
     Document,
     DocumentRelation,
@@ -33,6 +36,7 @@ from sap_cloud_sdk.adms._models import (
     DocumentTypeBusinessObjectTypeMap,
     DraftActivateInput,
     DraftInput,
+    FileExtensionPolicy,
     JobOutput,
     JobStatus,
     ScanStatus,
@@ -1127,10 +1131,9 @@ _BO_NODE_TYPE_DICT = {
 }
 
 _MAPPING_DICT = {
-    "DocumentTypeBOTypeMapID": "44444444-4444-4444-4444-444444444444",
     "BusinessObjectNodeTypeUniqueID": "bo-uuid-1",
     "DocumentTypeID": "INVOICE",
-    "IsDefault": False,
+    "DocumentTypeIsDefault": False,
 }
 
 
@@ -1341,10 +1344,6 @@ class TestConfigurationApiTypeMappings:
 
         assert len(result) == 1
         assert isinstance(result[0], DocumentTypeBusinessObjectTypeMap)
-        assert (
-            result[0].document_type_bo_type_map_id
-            == "44444444-4444-4444-4444-444444444444"
-        )
         assert result[0].business_object_node_type_unique_id == "bo-uuid-1"
         assert result[0].document_type_id == "INVOICE"
         assert result[0].is_default is False
@@ -1355,7 +1354,6 @@ class TestConfigurationApiTypeMappings:
         payload = CreateDocumentTypeBoTypeMapInput(
             business_object_node_type_unique_id="bo-uuid-1",
             document_type_id="INVOICE",
-            is_default=False,
         )
         result = api.create_type_mapping(payload)
 
@@ -1365,18 +1363,18 @@ class TestConfigurationApiTypeMappings:
         assert kwargs["json"] == {
             "BusinessObjectNodeTypeUniqueID": "bo-uuid-1",
             "DocumentTypeID": "INVOICE",
-            "IsDefault": False,
         }
         assert isinstance(result, DocumentTypeBusinessObjectTypeMap)
 
-    def test_delete_mapping_uses_map_id(self):
+    def test_delete_mapping_uses_composite_key(self):
         http = _cfg_sync_http()
         api = _ConfigurationApi(http)
-        api.delete_type_mapping("44444444-4444-4444-4444-444444444444")
+        api.delete_type_mapping("INVOICE", "bo-uuid-1")
 
         http.delete.assert_called_once()
         call_path = http.delete.call_args[0][0]
-        assert "44444444-4444-4444-4444-444444444444" in call_path
+        assert "INVOICE" in call_path
+        assert "bo-uuid-1" in call_path
 
 
 class TestAsyncConfigurationApiAllowedDomain:
@@ -1502,8 +1500,330 @@ class TestAsyncConfigurationApiTypeMappings:
     async def test_delete_called(self):
         http = _cfg_async_http()
         api = _AsyncConfigurationApi(http)
-        await api.delete_type_mapping("44444444-4444-4444-4444-444444444444")
+        await api.delete_type_mapping("INVOICE", "bo-uuid-1")
         http.delete.assert_called_once()
+        call_path = http.delete.call_args[0][0]
+        assert "INVOICE" in call_path
+        assert "bo-uuid-1" in call_path
+
+
+_FILE_EXT_POLICY_DICT = {
+    "DocumentTypeID": "INVOICE",
+    "FileExtension": "pdf",
+}
+
+_APP_TENANT_DICT = {
+    "ApplicationTenantID": "tenant-uuid-1",
+    "ApplicationTenantName": "My Tenant",
+}
+
+
+class TestConfigurationApiFileExtensionPolicy:
+    def test_get_all_returns_list(self):
+        http = _cfg_sync_http(get_data={"value": [_FILE_EXT_POLICY_DICT]})
+        api = _ConfigurationApi(http)
+        result = api.get_all_file_extension_policies()
+
+        assert len(result) == 1
+        assert isinstance(result[0], FileExtensionPolicy)
+        assert result[0].document_type_id == "INVOICE"
+        assert result[0].file_extension == "pdf"
+
+    def test_get_all_uses_correct_entity_set(self):
+        http = _cfg_sync_http(get_data={"value": []})
+        api = _ConfigurationApi(http)
+        api.get_all_file_extension_policies()
+
+        args, _ = http.get.call_args
+        assert args[0] == "DocumentTypeFileExtensionPolicy"
+
+    def test_create_posts_correct_payload(self):
+        http = _cfg_sync_http(post_data=_FILE_EXT_POLICY_DICT)
+        api = _ConfigurationApi(http)
+        payload = CreateFileExtensionPolicyInput(
+            document_type_id="INVOICE", file_extension="pdf"
+        )
+        result = api.create_file_extension_policy(payload)
+
+        http.post.assert_called_once()
+        args, kwargs = http.post.call_args
+        assert args[0] == "DocumentTypeFileExtensionPolicy"
+        assert kwargs["json"] == {"DocumentTypeID": "INVOICE", "FileExtension": "pdf"}
+        assert isinstance(result, FileExtensionPolicy)
+
+    def test_delete_uses_composite_key_path(self):
+        http = _cfg_sync_http()
+        api = _ConfigurationApi(http)
+        api.delete_file_extension_policy("INVOICE", "pdf")
+
+        http.delete.assert_called_once()
+        call_path = http.delete.call_args[0][0]
+        assert "DocumentTypeFileExtensionPolicy" in call_path
+        assert "INVOICE" in call_path
+        assert "pdf" in call_path
+
+
+class TestConfigurationApiMarkDefault:
+    def test_posts_to_mark_default_action(self):
+        http = _cfg_sync_http()
+        api = _ConfigurationApi(http)
+        api.mark_default("INVOICE", "bo-uuid-1")
+
+        http.post.assert_called_once()
+        call_path = http.post.call_args[0][0]
+        assert "com.sap.adm.ConfigurationService.markDefault" in call_path
+        assert "INVOICE" in call_path
+        assert "bo-uuid-1" in call_path
+
+    def test_posts_empty_body(self):
+        http = _cfg_sync_http()
+        api = _ConfigurationApi(http)
+        api.mark_default("INVOICE", "bo-uuid-1")
+
+        assert http.post.call_args[1]["json"] == {}
+
+
+class TestConfigurationApiApplicationTenant:
+    def test_get_all_returns_list(self):
+        http = _cfg_sync_http(get_data={"value": [_APP_TENANT_DICT]})
+        api = _ConfigurationApi(http)
+        result = api.get_all_application_tenants()
+
+        assert len(result) == 1
+        assert isinstance(result[0], ApplicationTenant)
+        assert result[0].application_tenant_id == "tenant-uuid-1"
+        assert result[0].application_tenant_name == "My Tenant"
+
+    def test_get_all_forwards_subaccount_header(self):
+        http = _cfg_sync_http(get_data={"value": []})
+        api = _ConfigurationApi(http)
+        api.get_all_application_tenants(subaccount_id="sub-123")
+
+        _, kwargs = http.get.call_args
+        assert kwargs["extra_headers"] == {"X-SubaccountId": "sub-123"}
+
+    def test_get_all_no_subaccount_passes_none_header(self):
+        http = _cfg_sync_http(get_data={"value": []})
+        api = _ConfigurationApi(http)
+        api.get_all_application_tenants()
+
+        _, kwargs = http.get.call_args
+        assert kwargs["extra_headers"] is None
+
+    def test_create_posts_correct_payload(self):
+        http = _cfg_sync_http(post_data=_APP_TENANT_DICT)
+        api = _ConfigurationApi(http)
+        payload = CreateApplicationTenantInput(
+            application_tenant_id="tenant-uuid-1",
+            application_tenant_name="My Tenant",
+        )
+        result = api.create_application_tenant(payload)
+
+        http.post.assert_called_once()
+        args, kwargs = http.post.call_args
+        assert args[0] == "ApplicationTenant"
+        assert kwargs["json"] == {
+            "ApplicationTenantID": "tenant-uuid-1",
+            "ApplicationTenantName": "My Tenant",
+        }
+        assert isinstance(result, ApplicationTenant)
+
+    def test_create_forwards_subaccount_header(self):
+        http = _cfg_sync_http(post_data=_APP_TENANT_DICT)
+        api = _ConfigurationApi(http)
+        payload = CreateApplicationTenantInput(
+            application_tenant_id="tenant-uuid-1",
+            application_tenant_name="My Tenant",
+        )
+        api.create_application_tenant(payload, subaccount_id="sub-456")
+
+        _, kwargs = http.post.call_args
+        assert kwargs["extra_headers"] == {"X-SubaccountId": "sub-456"}
+
+    def test_get_single_uses_correct_path(self):
+        http = _cfg_sync_http(get_data=_APP_TENANT_DICT)
+        api = _ConfigurationApi(http)
+        result = api.get_application_tenant("tenant-uuid-1")
+
+        call_path = http.get.call_args[0][0]
+        assert "ApplicationTenant" in call_path
+        assert "tenant-uuid-1" in call_path
+        assert isinstance(result, ApplicationTenant)
+
+    def test_get_single_forwards_subaccount_header(self):
+        http = _cfg_sync_http(get_data=_APP_TENANT_DICT)
+        api = _ConfigurationApi(http)
+        api.get_application_tenant("tenant-uuid-1", subaccount_id="sub-789")
+
+        _, kwargs = http.get.call_args
+        assert kwargs["extra_headers"] == {"X-SubaccountId": "sub-789"}
+
+    def test_delete_uses_correct_path(self):
+        http = _cfg_sync_http()
+        api = _ConfigurationApi(http)
+        api.delete_application_tenant("tenant-uuid-1")
+
+        http.delete.assert_called_once()
+        call_path = http.delete.call_args[0][0]
+        assert "ApplicationTenant" in call_path
+        assert "tenant-uuid-1" in call_path
+
+    def test_delete_forwards_subaccount_header(self):
+        http = _cfg_sync_http()
+        api = _ConfigurationApi(http)
+        api.delete_application_tenant("tenant-uuid-1", subaccount_id="sub-abc")
+
+        _, kwargs = http.delete.call_args
+        assert kwargs["extra_headers"] == {"X-SubaccountId": "sub-abc"}
+
+
+class TestAsyncConfigurationApiFileExtensionPolicy:
+    @pytest.mark.asyncio
+    async def test_get_all_returns_list(self):
+        http = _cfg_async_http(get_data={"value": [_FILE_EXT_POLICY_DICT]})
+        api = _AsyncConfigurationApi(http)
+        result = await api.get_all_file_extension_policies()
+
+        assert len(result) == 1
+        assert isinstance(result[0], FileExtensionPolicy)
+        assert result[0].document_type_id == "INVOICE"
+        assert result[0].file_extension == "pdf"
+
+    @pytest.mark.asyncio
+    async def test_create_posts_correct_payload(self):
+        http = _cfg_async_http(post_data=_FILE_EXT_POLICY_DICT)
+        api = _AsyncConfigurationApi(http)
+        payload = CreateFileExtensionPolicyInput(
+            document_type_id="INVOICE", file_extension="pdf"
+        )
+        result = await api.create_file_extension_policy(payload)
+
+        http.post.assert_called_once()
+        args, kwargs = http.post.call_args
+        assert args[0] == "DocumentTypeFileExtensionPolicy"
+        assert kwargs["json"] == {"DocumentTypeID": "INVOICE", "FileExtension": "pdf"}
+        assert isinstance(result, FileExtensionPolicy)
+
+    @pytest.mark.asyncio
+    async def test_delete_uses_composite_key_path(self):
+        http = _cfg_async_http()
+        api = _AsyncConfigurationApi(http)
+        await api.delete_file_extension_policy("INVOICE", "pdf")
+
+        http.delete.assert_called_once()
+        call_path = http.delete.call_args[0][0]
+        assert "DocumentTypeFileExtensionPolicy" in call_path
+        assert "INVOICE" in call_path
+        assert "pdf" in call_path
+
+
+class TestAsyncConfigurationApiMarkDefault:
+    @pytest.mark.asyncio
+    async def test_posts_to_mark_default_action(self):
+        http = _cfg_async_http()
+        api = _AsyncConfigurationApi(http)
+        await api.mark_default("INVOICE", "bo-uuid-1")
+
+        http.post.assert_called_once()
+        call_path = http.post.call_args[0][0]
+        assert "com.sap.adm.ConfigurationService.markDefault" in call_path
+        assert "INVOICE" in call_path
+        assert "bo-uuid-1" in call_path
+
+    @pytest.mark.asyncio
+    async def test_posts_empty_body(self):
+        http = _cfg_async_http()
+        api = _AsyncConfigurationApi(http)
+        await api.mark_default("INVOICE", "bo-uuid-1")
+
+        assert http.post.call_args[1]["json"] == {}
+
+
+class TestAsyncConfigurationApiApplicationTenant:
+    @pytest.mark.asyncio
+    async def test_get_all_returns_list(self):
+        http = _cfg_async_http(get_data={"value": [_APP_TENANT_DICT]})
+        api = _AsyncConfigurationApi(http)
+        result = await api.get_all_application_tenants()
+
+        assert len(result) == 1
+        assert isinstance(result[0], ApplicationTenant)
+        assert result[0].application_tenant_id == "tenant-uuid-1"
+
+    @pytest.mark.asyncio
+    async def test_get_all_forwards_subaccount_header(self):
+        http = _cfg_async_http(get_data={"value": []})
+        api = _AsyncConfigurationApi(http)
+        await api.get_all_application_tenants(subaccount_id="sub-123")
+
+        _, kwargs = http.get.call_args
+        assert kwargs["extra_headers"] == {"X-SubaccountId": "sub-123"}
+
+    @pytest.mark.asyncio
+    async def test_create_posts_correct_payload(self):
+        http = _cfg_async_http(post_data=_APP_TENANT_DICT)
+        api = _AsyncConfigurationApi(http)
+        payload = CreateApplicationTenantInput(
+            application_tenant_id="tenant-uuid-1",
+            application_tenant_name="My Tenant",
+        )
+        result = await api.create_application_tenant(payload)
+
+        http.post.assert_called_once()
+        assert isinstance(result, ApplicationTenant)
+
+    @pytest.mark.asyncio
+    async def test_create_forwards_subaccount_header(self):
+        http = _cfg_async_http(post_data=_APP_TENANT_DICT)
+        api = _AsyncConfigurationApi(http)
+        payload = CreateApplicationTenantInput(
+            application_tenant_id="tenant-uuid-1",
+            application_tenant_name="My Tenant",
+        )
+        await api.create_application_tenant(payload, subaccount_id="sub-456")
+
+        _, kwargs = http.post.call_args
+        assert kwargs["extra_headers"] == {"X-SubaccountId": "sub-456"}
+
+    @pytest.mark.asyncio
+    async def test_get_single_uses_correct_path(self):
+        http = _cfg_async_http(get_data=_APP_TENANT_DICT)
+        api = _AsyncConfigurationApi(http)
+        result = await api.get_application_tenant("tenant-uuid-1")
+
+        call_path = http.get.call_args[0][0]
+        assert "ApplicationTenant" in call_path
+        assert "tenant-uuid-1" in call_path
+        assert isinstance(result, ApplicationTenant)
+
+    @pytest.mark.asyncio
+    async def test_get_single_forwards_subaccount_header(self):
+        http = _cfg_async_http(get_data=_APP_TENANT_DICT)
+        api = _AsyncConfigurationApi(http)
+        await api.get_application_tenant("tenant-uuid-1", subaccount_id="sub-789")
+
+        _, kwargs = http.get.call_args
+        assert kwargs["extra_headers"] == {"X-SubaccountId": "sub-789"}
+
+    @pytest.mark.asyncio
+    async def test_delete_uses_correct_path(self):
+        http = _cfg_async_http()
+        api = _AsyncConfigurationApi(http)
+        await api.delete_application_tenant("tenant-uuid-1")
+
+        http.delete.assert_called_once()
+        call_path = http.delete.call_args[0][0]
+        assert "ApplicationTenant" in call_path
+        assert "tenant-uuid-1" in call_path
+
+    @pytest.mark.asyncio
+    async def test_delete_forwards_subaccount_header(self):
+        http = _cfg_async_http()
+        api = _AsyncConfigurationApi(http)
+        await api.delete_application_tenant("tenant-uuid-1", subaccount_id="sub-abc")
+
+        _, kwargs = http.delete.call_args
+        assert kwargs["extra_headers"] == {"X-SubaccountId": "sub-abc"}
 
 
 # ── _JobApi (sync) ─────────────────────────────────────────────────────────────

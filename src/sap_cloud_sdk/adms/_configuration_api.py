@@ -442,13 +442,6 @@ def _subaccount_header(subaccount_id: str | None) -> dict[str, str] | None:
     return {"X-SubaccountId": subaccount_id} if subaccount_id else None
 
 
-def _quote_guid(value: str) -> str:
-    """Wrap a UUID value in the OData Edm.Guid format for key segments."""
-    from sap_cloud_sdk.adms._http import quote_odata_guid_key
-
-    return quote_odata_guid_key(value)
-
-
 class _AsyncConfigurationApi:
     """Async version of :class:`_ConfigurationApi`.
 

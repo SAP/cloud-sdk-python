@@ -103,7 +103,11 @@ class DMSClient:
             connect_timeout: TCP connection timeout in seconds. Defaults to 10.
             read_timeout: Response read timeout in seconds. Defaults to 30.
         """
-        factory = credentials if callable(credentials) else lambda: credentials
+        factory: Callable[[], DMSCredentials]
+        if callable(credentials) and not isinstance(credentials, DMSCredentials):
+            factory = credentials
+        else:
+            factory = lambda: credentials  # type: ignore[return-value]
         auth_provider = XsuaaAuthProvider(factory)
         base_url = factory().uri
         self._http: HttpInvoker = HttpInvoker(

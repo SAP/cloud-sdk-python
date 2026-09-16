@@ -102,7 +102,9 @@ class ObjectStoreClient:
         if callable(has_changed) and has_changed():
             with self._lock:
                 self._refresh_credentials()
-            logger.info("ObjectStore credentials updated due to binding rotation (proactive)")
+            logger.info(
+                "ObjectStore credentials updated due to binding rotation (proactive)"
+            )
 
     def _execute_with_retry(self, fn: Callable[[], _T]) -> _T:
         """Run *fn* against the current MinIO client, retrying once on credential errors.
@@ -116,7 +118,10 @@ class ObjectStoreClient:
             return fn()
         except S3Error as e:
             if e.code in _CREDENTIAL_ERROR_CODES:
-                logger.info("ObjectStore credentials updated due to binding rotation (reactive, code=%s)", e.code)
+                logger.info(
+                    "ObjectStore credentials updated due to binding rotation (reactive, code=%s)",
+                    e.code,
+                )
                 with self._lock:
                     self._refresh_credentials()
                 return fn()

@@ -802,4 +802,5 @@ class _AsyncConfigurationApi:
         await self._http.delete(
             f"ApplicationTenant(ApplicationTenantID='{application_tenant_id}')",
             service_base=_CONFIG_SERVICE_PATH,
+            extra_headers=_subaccount_header(subaccount_id),
         )

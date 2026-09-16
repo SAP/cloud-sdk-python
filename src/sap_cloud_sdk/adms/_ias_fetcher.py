@@ -14,9 +14,12 @@ Token caching:
 
 from __future__ import annotations
 
+import logging
 from typing import Callable, Optional
 
 import requests
+
+logger = logging.getLogger(__name__)
 
 from sap_cloud_sdk.adms._token_cache import InMemoryTokenCache, TokenCache
 from sap_cloud_sdk.adms.config import AdmsConfig
@@ -105,6 +108,7 @@ class IasTokenFetcher:
             self._config = self._config_factory()
             self._apply_config()
             self._cache = InMemoryTokenCache()
+            logger.info("ADMS credentials updated due to binding rotation")
 
     # ------------------------------------------------------------------
     # Public API

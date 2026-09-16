@@ -56,7 +56,7 @@ class Auth:
     def _refresh_if_rotated(self) -> None:
         has_changed = getattr(self._credentials_factory, "has_changed", None)
         if callable(has_changed) and has_changed():
-            logger.debug("DMS binding rotated — invalidating token cache")
+            logger.info("DMS credentials updated due to binding rotation")
             self._credentials = self._credentials_factory()
             self._cache.clear()
 

@@ -1,8 +1,11 @@
 """HTTP transport implementation for cloud mode."""
 
+import logging
 from typing import Callable, Optional
 
 import requests
+
+logger = logging.getLogger(__name__)
 from oauthlib.oauth2 import BackendApplicationClient
 from requests_oauthlib import OAuth2Session
 
@@ -50,6 +53,7 @@ class HttpTransport(Transport):
         if callable(has_changed) and has_changed():
             self.config = self._config_factory()
             self.oauth = None
+            logger.info("AuditLog credentials updated due to binding rotation")
 
         if self.oauth is None:
             token_url = f"{self.config.oauth_url.rstrip('/')}/oauth/token"

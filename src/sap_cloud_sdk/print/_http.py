@@ -50,7 +50,7 @@ class TokenProvider:
     def _refresh_if_rotated(self) -> None:
         has_changed = getattr(self._config_factory, "has_changed", None)
         if callable(has_changed) and has_changed():
-            logger.debug("Print binding rotated — invalidating cached token")
+            logger.info("Print credentials updated due to binding rotation")
             self._config = self._config_factory()
             self._cached_token = None
             client = BackendApplicationClient(client_id=self._config.client_id)

@@ -129,7 +129,7 @@ def create_client(
         ClientCreationError: If client creation fails due to configuration or initialization issues.
     """
     try:
-        if os.path.isfile(_mock_file(DESTINATION_MOCK_FILE)):
+        if config is None and os.path.isfile(_mock_file(DESTINATION_MOCK_FILE)):
             logger.warning(
                 "Local mock mode active: using LocalDevDestinationClient backed by mocks/destination.json. "
                 "This is intended for local development only and must not be used in production."
@@ -172,7 +172,7 @@ def create_fragment_client(
         ClientCreationError: If client creation fails due to configuration or initialization issues.
     """
     try:
-        if os.path.isfile(_mock_file(FRAGMENT_MOCK_FILE)):
+        if config is None and os.path.isfile(_mock_file(FRAGMENT_MOCK_FILE)):
             logger.warning(
                 "Local mock mode active: using LocalDevFragmentClient backed by mocks/fragments.json. "
                 "This is intended for local development only and must not be used in production."
@@ -213,7 +213,7 @@ def create_certificate_client(
         ClientCreationError: If client creation fails due to configuration or initialization issues.
     """
     try:
-        if os.path.isfile(_mock_file(CERTIFICATE_MOCK_FILE)):
+        if config is None and os.path.isfile(_mock_file(CERTIFICATE_MOCK_FILE)):
             logger.warning(
                 "Local mock mode active: using LocalDevCertificateClient backed by mocks/certificates.json. "
                 "This is intended for local development only and must not be used in production."

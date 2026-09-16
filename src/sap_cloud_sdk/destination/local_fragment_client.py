@@ -141,7 +141,7 @@ class LocalDevFragmentClient(LocalDevClientBase[Fragment]):
     def list_instance_fragments(
         self,
         tenant: Optional[str] = None,
-        _filter: Optional[Any] = None,
+        filter: Optional[Any] = None,
     ) -> List[Fragment]:
         """List all fragments from the service instance scope.
 
@@ -168,7 +168,7 @@ class LocalDevFragmentClient(LocalDevClientBase[Fragment]):
         self,
         access_strategy: AccessStrategy = AccessStrategy.SUBSCRIBER_FIRST,
         tenant: Optional[str] = None,
-        _filter: Optional[Any] = None,
+        filter: Optional[Any] = None,
     ) -> List[Fragment]:
         """List fragments from the subaccount scope with an access strategy.
 

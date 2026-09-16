@@ -9,6 +9,7 @@ from sap_cloud_sdk.destination._local_client_base import (
     CERTIFICATE_MOCK_FILE,
 )
 from sap_cloud_sdk.destination import create_client, create_fragment_client, create_certificate_client
+from sap_cloud_sdk.destination._models import ListOptions, Label, AccessStrategy
 from sap_cloud_sdk.destination.client import DestinationClient
 from sap_cloud_sdk.destination.fragment_client import FragmentClient
 from sap_cloud_sdk.destination.certificate_client import CertificateClient
@@ -112,8 +113,23 @@ class TestCreateClientLocalMode:
         client = create_client()
         assert isinstance(client, DestinationClient)
 
-
-class TestCreateFragmentClient:
+    @patch("sap_cloud_sdk.destination._local_client_base.os.path.abspath")
+    @patch("sap_cloud_sdk.destination.os.path.isfile", new=lambda _: True)
+    @patch("sap_cloud_sdk.destination.TokenProvider")
+    @patch("sap_cloud_sdk.destination.DestinationHttp")
+    def test_explicit_config_bypasses_mock_file(self, mock_http, mock_tp, mock_abspath, tmp_path):
+        mock_abspath.return_value = str(tmp_path)
+        mock_tp.return_value = Mock()
+        mock_http.return_value = Mock()
+        config = DestinationConfig(
+            url="https://destination.example.com",
+            token_url="https://auth.example.com/oauth/token",
+            client_id="test-client",
+            client_secret="test-secret",
+            identityzone="provider-zone",
+        )
+        client = create_client(config=config)
+        assert isinstance(client, DestinationClient)
     """Tests for create_fragment_client cloud mode."""
 
     @_NO_MOCK_FILE
@@ -202,8 +218,23 @@ class TestCreateFragmentClientLocalMode:
         client = create_fragment_client()
         assert isinstance(client, FragmentClient)
 
-
-class TestCreateCertificateClient:
+    @patch("sap_cloud_sdk.destination._local_client_base.os.path.abspath")
+    @patch("sap_cloud_sdk.destination.os.path.isfile", new=lambda _: True)
+    @patch("sap_cloud_sdk.destination.TokenProvider")
+    @patch("sap_cloud_sdk.destination.DestinationHttp")
+    def test_explicit_config_bypasses_mock_file(self, mock_http, mock_tp, mock_abspath, tmp_path):
+        mock_abspath.return_value = str(tmp_path)
+        mock_tp.return_value = Mock()
+        mock_http.return_value = Mock()
+        config = DestinationConfig(
+            url="https://destination.example.com",
+            token_url="https://auth.example.com/oauth/token",
+            client_id="test-client",
+            client_secret="test-secret",
+            identityzone="provider-zone",
+        )
+        client = create_fragment_client(config=config)
+        assert isinstance(client, FragmentClient)
     """Tests for create_certificate_client cloud mode."""
 
     @_NO_MOCK_FILE
@@ -290,6 +321,24 @@ class TestCreateCertificateClientLocalMode:
     def test_falls_through_to_cloud_when_no_mock_file(self, mock_build_http):
         mock_build_http.return_value = Mock()
         client = create_certificate_client()
+        assert isinstance(client, CertificateClient)
+
+    @patch("sap_cloud_sdk.destination._local_client_base.os.path.abspath")
+    @patch("sap_cloud_sdk.destination.os.path.isfile", new=lambda _: True)
+    @patch("sap_cloud_sdk.destination.TokenProvider")
+    @patch("sap_cloud_sdk.destination.DestinationHttp")
+    def test_explicit_config_bypasses_mock_file(self, mock_http, mock_tp, mock_abspath, tmp_path):
+        mock_abspath.return_value = str(tmp_path)
+        mock_tp.return_value = Mock()
+        mock_http.return_value = Mock()
+        config = DestinationConfig(
+            url="https://destination.example.com",
+            token_url="https://auth.example.com/oauth/token",
+            client_id="test-client",
+            client_secret="test-secret",
+            identityzone="provider-zone",
+        )
+        client = create_certificate_client(config=config)
         assert isinstance(client, CertificateClient)
 
 

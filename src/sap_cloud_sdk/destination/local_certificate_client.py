@@ -248,7 +248,7 @@ class LocalDevCertificateClient(LocalDevClientBase[Certificate]):
     def list_instance_certificates(
         self,
         tenant: Optional[str] = None,
-        _filter: Optional[Any] = None,
+        filter: Optional[Any] = None,
     ) -> PagedResult[Certificate]:
         """List all certificates from the service instance scope.
 
@@ -281,7 +281,7 @@ class LocalDevCertificateClient(LocalDevClientBase[Certificate]):
         self,
         access_strategy: AccessStrategy = AccessStrategy.SUBSCRIBER_FIRST,
         tenant: Optional[str] = None,
-        _filter: Optional[Any] = None,
+        filter: Optional[Any] = None,
     ) -> PagedResult[Certificate]:
         """List certificates from the subaccount scope with an access strategy.
 

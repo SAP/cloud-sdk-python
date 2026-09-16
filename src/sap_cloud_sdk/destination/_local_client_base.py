@@ -227,12 +227,23 @@ class LocalDevClientBase(ABC, Generic[T]):
         When tenant is provided, returns entries matching that tenant (subscriber context).
         When tenant is None, returns entries without a tenant field (provider context).
         """
+        def _safe_parse(entry: Dict[str, Any]) -> Optional[T]:
+            try:
+                return self.from_dict(entry)
+            except Exception:
+                return None
+
         if tenant is not None:
             return [
-                self.from_dict(e) for e in instance_list if e.get("tenant") == tenant
+                parsed for e in instance_list
+                if e.get("tenant") == tenant
+                for parsed in [_safe_parse(e)] if parsed is not None
             ]
 
-        return [self.from_dict(e) for e in instance_list if not e.get("tenant")]
+        return [
+            parsed for e in instance_list if not e.get("tenant")
+            for parsed in [_safe_parse(e)] if parsed is not None
+        ]
 
     def _resolve_subaccount_list(
         self,
@@ -242,18 +253,25 @@ class LocalDevClientBase(ABC, Generic[T]):
     ) -> List[T]:
         """Resolve a list of entities from the subaccount list using the given access strategy."""
 
+        def _safe_parse(entry: Dict[str, Any]) -> Optional[T]:
+            try:
+                return self.from_dict(entry)
+            except Exception:
+                return None
+
         def list_subscriber() -> List[T]:
             if tenant is None:
                 return []
             return [
-                self.from_dict(entry)
-                for entry in sub_list
+                parsed for entry in sub_list
                 if entry.get("tenant") == tenant
+                for parsed in [_safe_parse(entry)] if parsed is not None
             ]
 
         def list_provider() -> List[T]:
             return [
-                self.from_dict(entry) for entry in sub_list if not entry.get("tenant")
+                parsed for entry in sub_list if not entry.get("tenant")
+                for parsed in [_safe_parse(entry)] if parsed is not None
             ]
 
         order_map: Dict[AccessStrategy, tuple[Callable[[], List[T]], ...]] = {

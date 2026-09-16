@@ -314,6 +314,11 @@ def create_all_instance_destinations(context, destination_client):
     """Create all destinations at instance level."""
     context.concurrent_results = []
     for dest in context.destinations:
+        # Idempotent cleanup before create
+        try:
+            destination_client.delete_destination(dest.name, level=Level.SERVICE_INSTANCE)
+        except Exception:
+            pass
         try:
             destination_client.create_destination(dest, level=Level.SERVICE_INSTANCE)
             context.concurrent_results.append(True)
@@ -840,6 +845,11 @@ def list_subaccount_fragments_with_label_filter(context, fragment_client, strate
 def create_certificate_subaccount(context, certificate_client):
     """Create certificate at subaccount level."""
     try:
+        certificate_client.delete_certificate(context.certificate.name, level=Level.SUB_ACCOUNT)
+    except Exception:
+        pass
+
+    try:
         certificate_client.create_certificate(context.certificate, level=Level.SUB_ACCOUNT)
         context.operation_success = True
         context.cleanup_certificates.append((context.certificate.name, Level.SUB_ACCOUNT, None))
@@ -857,6 +867,11 @@ def create_all_subaccount_certificates(context, certificate_client, sample_pem_c
         # Set content if not already set
         if not cert.content:
             cert.content = sample_pem_certificate
+        # Idempotent cleanup before create
+        try:
+            certificate_client.delete_certificate(cert.name, level=Level.SERVICE_INSTANCE)
+        except Exception:
+            pass
         try:
             certificate_client.create_certificate(cert, level=Level.SERVICE_INSTANCE)
             context.concurrent_results.append(True)

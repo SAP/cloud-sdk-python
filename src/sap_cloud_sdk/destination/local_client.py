@@ -11,10 +11,41 @@ from sap_cloud_sdk.destination._models import (
     Destination,
     Label,
     Level,
+    ListOptions,
     PatchLabels,
 )
 from sap_cloud_sdk.destination.utils._pagination import PagedResult
 from sap_cloud_sdk.destination.exceptions import DestinationOperationError, HttpError
+
+
+def _apply_list_options(
+    items: List[Destination], filter: Optional[ListOptions]
+) -> List[Destination]:
+    """Apply filter_names from ListOptions to a list of destinations."""
+    if not filter or not filter.filter_names:
+        return items
+    name_set = set(filter.filter_names)
+    return [d for d in items if d.name in name_set]
+
+
+def _filter_raw_by_labels(
+    raw_list: List[Dict[str, Any]], filter: Optional[ListOptions]
+) -> List[Dict[str, Any]]:
+    """Pre-filter raw dicts by filter_labels before parsing."""
+    if not filter or not filter.filter_labels:
+        return raw_list
+
+    def _matches(entry: Dict[str, Any]) -> bool:
+        entry_labels: Dict[str, List[str]] = {
+            lbl["key"]: lbl.get("values", [])
+            for lbl in entry.get("labels", [])
+        }
+        for label in filter.filter_labels:
+            if not any(v in entry_labels.get(label.key, []) for v in label.values):
+                return False
+        return True
+
+    return [e for e in raw_list if _matches(e)]
 
 
 class LocalDevDestinationClient(LocalDevClientBase[Destination]):
@@ -246,7 +277,7 @@ class LocalDevDestinationClient(LocalDevClientBase[Destination]):
     def list_instance_destinations(
         self,
         tenant: Optional[str] = None,
-        _filter: Optional[Any] = None,
+        filter: Optional[ListOptions] = None,
     ) -> PagedResult[Destination]:
         """List all destinations from the service instance scope.
 
@@ -254,7 +285,8 @@ class LocalDevDestinationClient(LocalDevClientBase[Destination]):
             tenant: Optional subscriber tenant subdomain. When provided, returns only entries
                 matching that tenant (subscriber context); otherwise returns provider-level
                 entries (no tenant field).
-            _filter: Optional ListDestinationsFilter (ignored in local dev mode).
+            filter: Optional ListOptions. filter_names and filter_labels are applied in local mode;
+                pagination options are ignored.
 
         Returns:
             PagedResult[Destination] containing destinations and pagination info.
@@ -266,7 +298,9 @@ class LocalDevDestinationClient(LocalDevClientBase[Destination]):
         """
         try:
             data = self._read()
-            items = self._resolve_instance_list(tenant, data.get("instance", []))
+            raw = _filter_raw_by_labels(data.get("instance", []), filter)
+            items = self._resolve_instance_list(tenant, raw)
+            items = _apply_list_options(items, filter)
             return PagedResult(items=items)
         except DestinationOperationError:
             raise
@@ -279,7 +313,7 @@ class LocalDevDestinationClient(LocalDevClientBase[Destination]):
         self,
         access_strategy: AccessStrategy = AccessStrategy.SUBSCRIBER_FIRST,
         tenant: Optional[str] = None,
-        _filter: Optional[Any] = None,
+        filter: Optional[ListOptions] = None,
     ) -> PagedResult[Destination]:
         """List destinations from the subaccount scope with an access strategy.
 
@@ -292,7 +326,8 @@ class LocalDevDestinationClient(LocalDevClientBase[Destination]):
         Args:
             access_strategy: Strategy controlling precedence between subscriber and provider contexts.
             tenant: Subscriber tenant subdomain, required for subscriber access strategies.
-            filter: Optional ListDestinationsFilter (ignored in local dev mode).
+            filter: Optional ListOptions. filter_names and filter_labels are applied in local mode;
+                pagination options are ignored.
 
         Returns:
             PagedResult[Destination] containing destinations and pagination info.
@@ -305,8 +340,9 @@ class LocalDevDestinationClient(LocalDevClientBase[Destination]):
         self._validate_subscriber_access(access_strategy, tenant, "destinations")
         try:
             data = self._read()
-            sub_list = data.get("subaccount", [])
-            items = self._resolve_subaccount_list(access_strategy, tenant, sub_list)
+            raw = _filter_raw_by_labels(data.get("subaccount", []), filter)
+            items = self._resolve_subaccount_list(access_strategy, tenant, raw)
+            items = _apply_list_options(items, filter)
             return PagedResult(items=items)
         except DestinationOperationError:
             raise

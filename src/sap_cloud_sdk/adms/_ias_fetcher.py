@@ -108,7 +108,6 @@ class IasTokenFetcher:
             self._config = self._config_factory()
             self._apply_config()
             self._cache = InMemoryTokenCache()
-            logger.info("ADMS credentials updated due to binding rotation")
 
     # ------------------------------------------------------------------
     # Public API

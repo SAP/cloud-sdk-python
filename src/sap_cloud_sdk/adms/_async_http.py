@@ -29,6 +29,7 @@ Usage::
 from __future__ import annotations
 
 import asyncio
+import inspect
 from typing import Any, Callable, Dict, Optional
 
 import httpx
@@ -216,7 +217,7 @@ class AsyncHttpClient:
         """Resolve the bearer token, handling both sync and async callables."""
         if self._get_token is None:
             return None
-        if asyncio.iscoroutinefunction(self._get_token):
+        if inspect.iscoroutinefunction(self._get_token):
             return await self._get_token()
         return await asyncio.to_thread(self._get_token)
 

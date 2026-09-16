@@ -112,38 +112,25 @@ class _ClientConfig:
 
 
 class DefaultClient:
-    """CBC client for both production (mTLS + envoy) and local/mock environments.
+    """CBC client implementation.
 
-    **Production** (any ``https://`` or non-loopback URL): subdomain-per-tenant
-    routing rewrites the URL subdomain to the ``cbc_tenant_id`` for each request;
-    mTLS credentials must be provided via ``cert_path``/``key_path``,
-    ``cert_pem``/``key_pem``, or ``ssl_context``.
+    Prefer :func:`create_client` over direct instantiation — it resolves
+    credentials automatically (BTP Destination Service or environment variables,
+    or accepts an explicit :class:`~sap_cloud_sdk.cbc.config.CBCConfig`)::
 
-    **Local / mock** (``http://localhost``, ``http://127.0.0.1``, ``http://[::1]``):
-    no subdomain replacement, no mTLS — detected automatically from the URL.
-    Point it at the CBC mock server and it works without any extra arguments.
+        client = create_client()
 
-    Do **not** instantiate directly — use :func:`create_client` in production
-    code, which resolves credentials from the environment automatically.
-
-    Example (local mock)::
-
-        client = DefaultClient(base_url="http://localhost:8001")
-        config = client.get_configuration(
-            TenantContext(cbcTenantId="t1", appTenantId="app-t1")
-        )
-
-    Example (production)::
-
-        client = DefaultClient(
-            base_url="https://cbc.example.ondemand.com",
+        # explicit config
+        client = create_client(config=CBCConfig(
+            base_url="https://service.app.prod-eu.cbc.services.cloud.sap",
             cert_path=Path("/run/secrets/tls.crt"),
             key_path=Path("/run/secrets/tls.key"),
-        )
+        ))
+
+    Direct instantiation is supported for testing (inject a mock ``http_client``).
 
     Args:
-        base_url: Base URL of the CBC service.  Loopback addresses trigger
-            local mode automatically.
+        base_url: Base URL of the CBC service.
         http_client: Optional pre-configured ``httpx.Client`` — takes full
             precedence over all mTLS arguments.  Use for testing.
         ssl_context: Optional pre-built :class:`ssl.SSLContext` with mTLS loaded.

@@ -27,7 +27,10 @@ from sap_cloud_sdk.agentgateway._models import (
 )
 from sap_cloud_sdk.agentgateway._token_cache import _TokenCache
 from sap_cloud_sdk.agentgateway.config import ClientConfig
-from sap_cloud_sdk.agentgateway.exceptions import AgentGatewaySDKError, AgentGatewayServerError
+from sap_cloud_sdk.agentgateway.exceptions import (
+    AgentGatewaySDKError,
+    AgentGatewayServerError,
+)
 
 
 # ============================================================

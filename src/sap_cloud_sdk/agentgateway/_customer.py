@@ -46,7 +46,10 @@ from sap_cloud_sdk.agentgateway._models import (
     MCPToolFilter,
 )
 from sap_cloud_sdk.agentgateway._token_cache import _TokenCache
-from sap_cloud_sdk.agentgateway.exceptions import AgentGatewaySDKError, AgentGatewayServerError
+from sap_cloud_sdk.agentgateway.exceptions import (
+    AgentGatewaySDKError,
+    AgentGatewayServerError,
+)
 from sap_cloud_sdk.core.secret_resolver import resolve_base_mount
 
 logger = logging.getLogger(__name__)

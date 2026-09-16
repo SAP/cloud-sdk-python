@@ -212,7 +212,7 @@ def _configure_destination_mode(name: str) -> None:
     Raises ``RuntimeError`` if the destination is not found or does not
     return ``clientId`` / ``clientSecret``.
     """
-    from sap_cloud_sdk.destination import create_client  # lazy import
+    from sap_cloud_sdk.destination import create_client, Destination  # lazy import
 
     client = create_client()
     dest = client.get_destination(name)
@@ -221,6 +221,12 @@ def _configure_destination_mode(name: str) -> None:
         raise RuntimeError(
             f"AI Core destination '{name}' not found in Destination Service. "
             "Check that the destination exists and the binding has access."
+        )
+
+    if not isinstance(dest, Destination):
+        raise RuntimeError(
+            f"AI Core destination '{name}' returned a transparent proxy destination, "
+            "which is not supported for AI Core credential resolution."
         )
 
     base_url = dest.url or ""

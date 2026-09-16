@@ -3,6 +3,8 @@
 import pytest
 from unittest.mock import patch, Mock, MagicMock
 
+from sap_cloud_sdk.destination import Destination
+
 from sap_cloud_sdk.core.auditlog_ng import create_client, AuditClient
 from sap_cloud_sdk.core.auditlog_ng.config import AuditLogNGConfig
 from sap_cloud_sdk.core.auditlog_ng.exceptions import ClientCreationError
@@ -210,7 +212,7 @@ def _make_mock_destination(
     if namespace is not None:
         props["namespace"] = namespace
 
-    dest = MagicMock()
+    dest = MagicMock(spec=Destination)
     dest.url = url
     dest.properties = props
     return dest

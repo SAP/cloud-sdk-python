@@ -559,7 +559,10 @@ class ExtensionSourceMapping:
         return cls(
             tools={k: ExtensionSourceInfo.from_value(v) for k, v in raw_tools.items()},
             hooks={k: ExtensionSourceInfo.from_value(v) for k, v in raw_hooks.items()},
-            instructions={k: ExtensionSourceInfo.from_value(v) for k, v in raw_instructions.items()},
+            instructions={
+                k: ExtensionSourceInfo.from_value(v)
+                for k, v in raw_instructions.items()
+            },
         )
 
 
@@ -825,7 +828,9 @@ class ExtensionCapabilityImplementation:
             return self.source.hooks[hook_id]
         return None
 
-    def get_source_info_for_instruction(self, extension_id: str) -> Optional[ExtensionSourceInfo]:
+    def get_source_info_for_instruction(
+        self, extension_id: str
+    ) -> Optional[ExtensionSourceInfo]:
         """Look up the full source info for a specific instruction contributor.
 
         Returns the :class:`ExtensionSourceInfo` containing extension name,

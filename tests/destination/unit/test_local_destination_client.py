@@ -6,7 +6,7 @@ import pytest
 
 from sap_cloud_sdk.destination.local_client import LocalDevDestinationClient
 from sap_cloud_sdk.destination._local_client_base import DESTINATION_MOCK_FILE
-from sap_cloud_sdk.destination._models import AccessStrategy, Destination, Label, Level, PatchLabels
+from sap_cloud_sdk.destination._models import AccessStrategy, Destination, Label, Level, ListOptions, PatchLabels
 from sap_cloud_sdk.destination.utils._pagination import PagedResult
 from sap_cloud_sdk.destination.exceptions import DestinationOperationError, HttpError
 
@@ -151,9 +151,24 @@ class TestListInstanceDestinations:
         assert len(result.items) == 0
 
     def test_filter_param_is_accepted_and_ignored(self, client):
-        _write_store(client, {"instance": [{"name": "d1", "type": "HTTP"}], "subaccount": []})
-        result = client.list_instance_destinations(_filter=object())
+        _write_store(client, {"instance": [{"name": "d1", "type": "HTTP"}, {"name": "d2", "type": "HTTP"}], "subaccount": []})
+        result = client.list_instance_destinations(filter=ListOptions())
+        assert len(result.items) == 2
+
+    def test_filter_names_applied(self, client):
+        _write_store(client, {"instance": [{"name": "d1", "type": "HTTP"}, {"name": "d2", "type": "HTTP"}], "subaccount": []})
+        result = client.list_instance_destinations(filter=ListOptions(filter_names=["d1"]))
         assert len(result.items) == 1
+        assert result.items[0].name == "d1"
+
+    def test_filter_labels_applied(self, client):
+        _write_store(client, {"instance": [
+            {"name": "labeled", "type": "HTTP", "labels": [{"key": "env", "values": ["prod"]}]},
+            {"name": "unlabeled", "type": "HTTP"},
+        ], "subaccount": []})
+        result = client.list_instance_destinations(filter=ListOptions(filter_labels=[Label(key="env", values=["prod"])]))
+        assert len(result.items) == 1
+        assert result.items[0].name == "labeled"
 
     def test_does_not_include_subaccount_entries(self, client):
         _write_store(client, {

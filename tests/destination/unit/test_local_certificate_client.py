@@ -131,7 +131,7 @@ class TestListInstanceCertificates:
 
     def test_filter_param_is_accepted_and_ignored(self, client):
         _write_store(client, {"instance": [{"Name": "cert.pem", "Content": "c1"}], "subaccount": []})
-        result = client.list_instance_certificates(_filter=object())
+        result = client.list_instance_certificates(filter=object())
         assert len(result.items) == 1
 
     def test_does_not_include_subaccount_entries(self, client):

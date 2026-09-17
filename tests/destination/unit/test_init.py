@@ -115,12 +115,10 @@ class TestCreateClientLocalMode:
 
     @patch("sap_cloud_sdk.destination._local_client_base.os.path.abspath")
     @patch("sap_cloud_sdk.destination.os.path.isfile", new=lambda _: True)
-    @patch("sap_cloud_sdk.destination.TokenProvider")
-    @patch("sap_cloud_sdk.destination.DestinationHttp")
-    def test_explicit_config_bypasses_mock_file(self, mock_http, mock_tp, mock_abspath, tmp_path):
+    @patch(_BUILD_HTTP)
+    def test_explicit_config_bypasses_mock_file(self, mock_build_http, mock_abspath, tmp_path):
         mock_abspath.return_value = str(tmp_path)
-        mock_tp.return_value = Mock()
-        mock_http.return_value = Mock()
+        mock_build_http.return_value = Mock()
         config = DestinationConfig(
             url="https://destination.example.com",
             token_url="https://auth.example.com/oauth/token",
@@ -220,12 +218,10 @@ class TestCreateFragmentClientLocalMode:
 
     @patch("sap_cloud_sdk.destination._local_client_base.os.path.abspath")
     @patch("sap_cloud_sdk.destination.os.path.isfile", new=lambda _: True)
-    @patch("sap_cloud_sdk.destination.TokenProvider")
-    @patch("sap_cloud_sdk.destination.DestinationHttp")
-    def test_explicit_config_bypasses_mock_file(self, mock_http, mock_tp, mock_abspath, tmp_path):
+    @patch(_BUILD_HTTP)
+    def test_explicit_config_bypasses_mock_file(self, mock_build_http, mock_abspath, tmp_path):
         mock_abspath.return_value = str(tmp_path)
-        mock_tp.return_value = Mock()
-        mock_http.return_value = Mock()
+        mock_build_http.return_value = Mock()
         config = DestinationConfig(
             url="https://destination.example.com",
             token_url="https://auth.example.com/oauth/token",
@@ -325,12 +321,10 @@ class TestCreateCertificateClientLocalMode:
 
     @patch("sap_cloud_sdk.destination._local_client_base.os.path.abspath")
     @patch("sap_cloud_sdk.destination.os.path.isfile", new=lambda _: True)
-    @patch("sap_cloud_sdk.destination.TokenProvider")
-    @patch("sap_cloud_sdk.destination.DestinationHttp")
-    def test_explicit_config_bypasses_mock_file(self, mock_http, mock_tp, mock_abspath, tmp_path):
+    @patch(_BUILD_HTTP)
+    def test_explicit_config_bypasses_mock_file(self, mock_build_http, mock_abspath, tmp_path):
         mock_abspath.return_value = str(tmp_path)
-        mock_tp.return_value = Mock()
-        mock_http.return_value = Mock()
+        mock_build_http.return_value = Mock()
         config = DestinationConfig(
             url="https://destination.example.com",
             token_url="https://auth.example.com/oauth/token",

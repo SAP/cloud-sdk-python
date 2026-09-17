@@ -4,8 +4,6 @@ import io
 import logging
 import os
 import threading
-
-logger = logging.getLogger(__name__)
 from datetime import datetime
 from http.client import HTTPResponse
 from typing import TYPE_CHECKING, Any, BinaryIO, Callable, List, TypeVar, cast
@@ -26,6 +24,8 @@ from sap_cloud_sdk.objectstore.utils import _normalize_host
 
 if TYPE_CHECKING:
     from sap_cloud_sdk.core.secret_resolver import ConfigFactory
+
+logger = logging.getLogger(__name__)
 
 # Validation error message constants
 EMPTY_NAME_ERROR = "name must be a non-empty string"

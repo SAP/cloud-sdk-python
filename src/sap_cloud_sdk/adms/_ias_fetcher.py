@@ -19,11 +19,11 @@ from typing import Callable, Optional
 
 import requests
 
-logger = logging.getLogger(__name__)
-
 from sap_cloud_sdk.adms._token_cache import InMemoryTokenCache, TokenCache
 from sap_cloud_sdk.adms.config import AdmsConfig
 from sap_cloud_sdk.adms.exceptions import AuthError
+
+logger = logging.getLogger(__name__)
 
 # Grant types (RFC 6749 / RFC 7523)
 _GRANT_CLIENT_CREDENTIALS = "client_credentials"

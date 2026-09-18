@@ -1,7 +1,6 @@
 """Low-level HTTP transport for the CBC (Central Business Configuration) module.
 
 Provides:
-- :func:`_is_local_url` — detects loopback URLs that skip mTLS and subdomain routing.
 - :class:`_LazyCertTransport` — httpx transport that defers mTLS cert loading
   until the first real connection, so clients can be constructed with cert data
   that has not yet been written to disk.
@@ -14,27 +13,6 @@ import os
 import ssl
 
 import httpx
-
-
-def _is_local_url(url: str) -> bool:
-    """Return ``True`` when *url* targets a loopback address.
-
-    Loopback addresses (``http://localhost``, ``http://127.0.0.1``,
-    ``http://[::1]``) bypass mTLS and subdomain-per-tenant routing — they
-    point directly at a mock or local dev server.
-
-    Args:
-        url: Base URL to test.
-
-    Returns:
-        ``True`` if the URL targets a loopback address, ``False`` otherwise.
-    """
-    lower = url.lower()
-    return (
-        lower.startswith("http://localhost")
-        or lower.startswith("http://127.0.0.1")
-        or lower.startswith("http://[::1]")
-    )
 
 
 class _LazyCertTransport(httpx.BaseTransport):

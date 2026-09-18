@@ -5,7 +5,7 @@ This module provides:
 - :class:`CBCClient` — Protocol defining the client interface; use for type
   annotations and test doubles.
 - :class:`DefaultClient` — Production client.  Handles both production (mTLS +
-  envoy subdomain routing) and local/mock mode (detected automatically from the URL).
+  envoy subdomain routing) and mock-server mode (set ``CLOUD_SDK_CBC_REPLACE_SUBDOMAIN=false``).
 - :func:`create_client` — Factory that resolves the right client from environment
   variables via :func:`~sap_cloud_sdk.cbc.config.load_from_env`.
 
@@ -34,7 +34,7 @@ import httpx
 if TYPE_CHECKING:
     from sap_cloud_sdk.cbc.config import CBCConfig
 
-from sap_cloud_sdk.cbc._http import _LazyCertTransport, _is_local_url
+from sap_cloud_sdk.cbc._http import _LazyCertTransport
 from sap_cloud_sdk.cbc._models import (
     ApiError,
     ConfigData,
@@ -153,11 +153,7 @@ class DefaultClient:
         replace_subdomain: bool | None = None,
     ) -> None:
         self._base_url = base_url.rstrip("/")
-        resolved_replace = (
-            replace_subdomain
-            if replace_subdomain is not None
-            else not _is_local_url(base_url)
-        )
+        resolved_replace = replace_subdomain if replace_subdomain is not None else True
         self._config = _ClientConfig(
             configurations_path="/configuration/v1",
             replace_subdomain=resolved_replace,

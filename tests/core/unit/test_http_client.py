@@ -217,3 +217,70 @@ class TestHttpClient:
         client.close()
         mock_session.close.assert_called_once()
         assert client._plain_session is None
+
+
+class TestXsuaaAuthProviderSubdomainValidation:
+
+    def _make_config(self, identityzone: str = "provider-zone") -> MagicMock:
+        cfg = MagicMock()
+        cfg.token_url = f"https://{identityzone}.authentication.region/oauth/token"
+        cfg.identityzone = identityzone
+        cfg.client_id = "cid"
+        cfg.client_secret = "csecret"
+        return cfg
+
+    def _make_provider(self, identityzone: str = "provider-zone") -> XsuaaAuthProvider:
+        cfg = self._make_config(identityzone)
+        factory = MagicMock(return_value=cfg)
+        factory.has_changed = MagicMock(return_value=False)
+        return XsuaaAuthProvider(factory)
+
+    @patch("sap_cloud_sdk.core.protocol.http.models._validate_tenant_subdomain")
+    def test_validator_called_with_tenant_subdomain(self, mock_validate):
+        provider = self._make_provider()
+        with patch.object(provider, "_fetch_token") as mock_fetch:
+            mock_fetch.return_value = MagicMock()
+            provider.get_session("tenant-123")
+        mock_fetch.assert_called_once_with("tenant-123")
+
+    def test_invalid_subdomain_raises_value_error_before_fetch_token(self):
+        provider = self._make_provider()
+        with patch("sap_cloud_sdk.core.protocol.http.models.OAuth2Session") as mock_oauth_cls:
+            with pytest.raises(ValueError, match="Invalid tenant_subdomain"):
+                provider._fetch_token("evil.example/oauth/token?ignore=")
+            mock_oauth_cls.return_value.fetch_token.assert_not_called()
+
+    @pytest.mark.parametrize("bad_subdomain", [
+        "evil.example/oauth/token?ignore=",
+        "has.dot",
+        "-leading-hyphen",
+        "trailing-hyphen-",
+        "has space",
+        "has/slash",
+        "a" * 64,
+    ])
+    def test_delimiter_bearing_subdomains_rejected(self, bad_subdomain):
+        provider = self._make_provider()
+        with pytest.raises(ValueError, match="Invalid tenant_subdomain"):
+            provider._fetch_token(bad_subdomain)
+
+    def test_none_subdomain_skips_validation_and_uses_provider_url(self):
+        provider = self._make_provider()
+        cfg = provider._config
+        with patch("sap_cloud_sdk.core.protocol.http.models.OAuth2Session") as mock_oauth_cls:
+            mock_session = MagicMock()
+            mock_oauth_cls.return_value = mock_session
+            mock_session.fetch_token.return_value = {"access_token": "tok", "expires_in": 3600}
+            provider._fetch_token(None)
+        call_kwargs = mock_session.fetch_token.call_args[1]
+        assert call_kwargs["token_url"] == cfg.token_url
+
+    def test_valid_subdomain_replaces_identityzone_in_token_url(self):
+        provider = self._make_provider("provider-zone")
+        with patch("sap_cloud_sdk.core.protocol.http.models.OAuth2Session") as mock_oauth_cls:
+            mock_session = MagicMock()
+            mock_oauth_cls.return_value = mock_session
+            mock_session.fetch_token.return_value = {"access_token": "tok", "expires_in": 3600}
+            provider._fetch_token("tenant-123")
+        call_kwargs = mock_session.fetch_token.call_args[1]
+        assert call_kwargs["token_url"] == "https://tenant-123.authentication.region/oauth/token"

@@ -197,3 +197,51 @@ class TestIasTokenFetcherCore:
             if call[1]["data"]["grant_type"] == "client_credentials"
         ]
         assert len(cc_grant_calls) == 1
+
+
+class TestIasTokenFetcherRotation:
+
+    def test_proactive_rotation_clears_cache_when_binding_changed(self, mock_session):
+        original_config = _make_config()
+        new_config = _make_config(client_id="new-client-id", client_secret="new-secret")
+
+        mock_session.post.return_value = _make_token_response("new-token")
+
+        mock_factory = MagicMock(return_value=original_config)
+        mock_factory.has_changed = MagicMock(side_effect=[False, True])
+
+        fetcher = IasTokenFetcher(config=mock_factory, session=mock_session)
+        # Seed the cache
+        mock_session.post.return_value = _make_token_response("old-token")
+        fetcher.get_token()
+        assert fetcher._cache.get(_CC_CACHE_KEY) == "old-token"
+
+        # Next call: has_changed() returns True → cache is cleared → new token fetched
+        mock_factory.return_value = new_config
+        mock_session.post.return_value = _make_token_response("new-token")
+        token = fetcher.get_token()
+
+        assert token == "new-token"
+        assert fetcher._config is new_config
+
+    def test_no_cache_clear_when_binding_unchanged(self, mock_session):
+        config = _make_config()
+        mock_session.post.return_value = _make_token_response("cached-token")
+
+        mock_factory = MagicMock(return_value=config)
+        mock_factory.has_changed = MagicMock(return_value=False)
+
+        fetcher = IasTokenFetcher(config=mock_factory, session=mock_session)
+        fetcher.get_token()  # populates cache
+
+        mock_session.post.reset_mock()
+        fetcher.get_token()  # second call: has_changed() False → cache hit
+
+        mock_session.post.assert_not_called()
+
+    def test_static_config_skips_rotation_check(self, config, mock_session):
+        mock_session.post.return_value = _make_token_response("tok")
+        fetcher = IasTokenFetcher(config=config, session=mock_session)
+        fetcher.get_token()
+        # No has_changed attribute on a plain AdmsConfig — should not raise
+        assert fetcher._cache.get(_CC_CACHE_KEY) == "tok"

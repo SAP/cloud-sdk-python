@@ -29,6 +29,9 @@ class TestHttpTransport:
         mock_session = MagicMock()
         mock_oauth_session.return_value = mock_session
         mock_session.fetch_token.return_value = {"access_token": "test_token"}
+        mock_response = MagicMock()
+        mock_response.status_code = 201
+        mock_session.post.return_value = mock_response
 
         config = AuditLogConfig(
             client_id="test_client",
@@ -38,8 +41,10 @@ class TestHttpTransport:
         )
 
         transport = HttpTransport(config)
-
         assert transport.config == config
+        assert transport.oauth is None  # lazy — no session yet
+
+        transport.send(SecurityEvent(data="init test"))
         mock_session.fetch_token.assert_called_once_with(
             token_url="https://oauth.example.com/oauth/token",
             client_id="test_client",
@@ -51,6 +56,9 @@ class TestHttpTransport:
         mock_session = MagicMock()
         mock_oauth_session.return_value = mock_session
         mock_session.fetch_token.return_value = {"access_token": "test_token"}
+        mock_response = MagicMock()
+        mock_response.status_code = 201
+        mock_session.post.return_value = mock_response
 
         config = AuditLogConfig(
             client_id="test_client",
@@ -60,6 +68,7 @@ class TestHttpTransport:
         )
 
         transport = HttpTransport(config)
+        transport.send(SecurityEvent(data="trailing slash test"))
 
         mock_session.fetch_token.assert_called_once_with(
             token_url="https://oauth.example.com/oauth/token",
@@ -80,8 +89,9 @@ class TestHttpTransport:
             service_url="https://service.example.com"
         )
 
-        with pytest.raises(AuthenticationError, match="Failed to obtain OAuth2 token"):
-            HttpTransport(config)
+        transport = HttpTransport(config)
+        with pytest.raises(TransportError):
+            transport.send(SecurityEvent(data="auth fail test"))
 
     def test_get_endpoint_security_event(self):
         with patch('sap_cloud_sdk.core.auditlog._http_transport.OAuth2Session') as mock_oauth:
@@ -368,3 +378,88 @@ class TestHttpTransport:
 
         with pytest.raises(TransportError, match="Unexpected error sending audit event"):
             transport.send(event)
+
+
+class TestHttpTransportRotation:
+
+    @patch('sap_cloud_sdk.core.auditlog._http_transport.OAuth2Session')
+    def test_proactive_rotation_rebuilds_session_when_binding_changed(self, mock_oauth):
+        original_config = AuditLogConfig(
+            client_id="old-client",
+            client_secret="old-secret",
+            oauth_url="https://old-oauth.example.com",
+            service_url="https://service.example.com",
+        )
+        new_config = AuditLogConfig(
+            client_id="new-client",
+            client_secret="new-secret",
+            oauth_url="https://new-oauth.example.com",
+            service_url="https://service.example.com",
+        )
+
+        mock_session = MagicMock()
+        mock_oauth.return_value = mock_session
+        mock_session.fetch_token.return_value = {"access_token": "new-token"}
+        mock_response = MagicMock()
+        mock_response.status_code = 201
+        mock_session.post.return_value = mock_response
+
+        mock_factory = MagicMock(return_value=original_config)
+        mock_factory.has_changed = MagicMock(return_value=True)
+        mock_factory.return_value = new_config
+
+        transport = HttpTransport(mock_factory)
+        transport.send(SecurityEvent(data="rotation test"))
+
+        assert transport.config is new_config
+        # factory called once at init, once on rotation
+        assert mock_factory.call_count == 2
+
+    @patch('sap_cloud_sdk.core.auditlog._http_transport.OAuth2Session')
+    def test_no_rebuild_when_binding_unchanged(self, mock_oauth):
+        config = AuditLogConfig(
+            client_id="client",
+            client_secret="secret",
+            oauth_url="https://oauth.example.com",
+            service_url="https://service.example.com",
+        )
+        mock_session = MagicMock()
+        mock_oauth.return_value = mock_session
+        mock_session.fetch_token.return_value = {"access_token": "tok"}
+        mock_response = MagicMock()
+        mock_response.status_code = 201
+        mock_session.post.return_value = mock_response
+
+        mock_factory = MagicMock(return_value=config)
+        mock_factory.has_changed = MagicMock(return_value=False)
+
+        transport = HttpTransport(mock_factory)
+        transport.send(SecurityEvent(data="no rotation"))
+        oauth_after_first = transport.oauth
+
+        transport.send(SecurityEvent(data="second call"))
+
+        mock_factory.has_changed.assert_called()
+        assert mock_factory.call_count == 1  # no extra factory call
+        assert transport.oauth is oauth_after_first  # same session
+
+    @patch('sap_cloud_sdk.core.auditlog._http_transport.OAuth2Session')
+    def test_static_config_skips_rotation_check(self, mock_oauth):
+        config = AuditLogConfig(
+            client_id="client",
+            client_secret="secret",
+            oauth_url="https://oauth.example.com",
+            service_url="https://service.example.com",
+        )
+        mock_session = MagicMock()
+        mock_oauth.return_value = mock_session
+        mock_session.fetch_token.return_value = {"access_token": "tok"}
+        mock_response = MagicMock()
+        mock_response.status_code = 201
+        mock_session.post.return_value = mock_response
+
+        transport = HttpTransport(config)
+        transport.send(SecurityEvent(data="static config"))
+
+        # No has_changed on plain AuditLogConfig — no error, session created once
+        assert transport.oauth is mock_session

@@ -1,6 +1,9 @@
 """HTTP transport implementation for cloud mode."""
 
+from typing import Callable, Optional
+
 import requests
+
 from oauthlib.oauth2 import BackendApplicationClient
 from requests_oauthlib import OAuth2Session
 
@@ -18,29 +21,52 @@ from sap_cloud_sdk.core.auditlog.exceptions import TransportError, Authenticatio
 
 
 class HttpTransport(Transport):
-    """HTTP-based transport for cloud mode with OAuth2 authentication."""
+    """HTTP-based transport for cloud mode with OAuth2 authentication.
 
-    def __init__(self, config: AuditLogConfig):
+    Accepts either a fixed :class:`AuditLogConfig` or a config factory (any callable
+    returning ``AuditLogConfig`` with an optional ``has_changed() -> bool`` method).
+    When a factory is supplied, credentials are re-read on every token refresh and
+    the factory's ``has_changed()`` method is checked proactively before each request
+    so that rotated secrets are picked up automatically.
+    """
+
+    def __init__(self, config: AuditLogConfig | Callable[[], AuditLogConfig]):
         """Initialize HTTP transport with provided configuration.
 
         Args:
-            config: AuditLogConfig with OAuth2 credentials and service URL
+            config: AuditLogConfig (or a factory returning one) with OAuth2 credentials
+                and service URL.
         """
-        self.config = config
+        if callable(config) and not isinstance(config, AuditLogConfig):
+            self._config_factory: Callable[[], AuditLogConfig] = config
+            self.config = config()
+        else:
+            self._config_factory = lambda: config  # type: ignore[arg-type]
+            self.config = config  # type: ignore[assignment]
+        self.oauth: Optional[OAuth2Session] = None
 
-        token_url = f"{config.oauth_url.rstrip('/')}/oauth/token"
+    def _ensure_session(self) -> OAuth2Session:
+        """Return a valid OAuth2 session, refreshing credentials if the binding changed."""
+        has_changed = getattr(self._config_factory, "has_changed", None)
+        if callable(has_changed) and has_changed():
+            self.config = self._config_factory()
+            self.oauth = None
 
-        client = BackendApplicationClient(client_id=config.client_id)
-        self.oauth = OAuth2Session(client=client)
+        if self.oauth is None:
+            token_url = f"{self.config.oauth_url.rstrip('/')}/oauth/token"
+            client = BackendApplicationClient(client_id=self.config.client_id)
+            oauth = OAuth2Session(client=client)
+            try:
+                oauth.fetch_token(
+                    token_url=token_url,
+                    client_id=self.config.client_id,
+                    client_secret=self.config.client_secret,
+                )
+            except Exception as e:
+                raise AuthenticationError(f"Failed to obtain OAuth2 token: {e}")
+            self.oauth = oauth
 
-        try:
-            _token = self.oauth.fetch_token(
-                token_url=token_url,
-                client_id=config.client_id,
-                client_secret=config.client_secret,
-            )
-        except Exception as e:
-            raise AuthenticationError(f"Failed to obtain OAuth2 token: {e}")
+        return self.oauth
 
     def send(self, event: AuditMessage) -> None:
         """Send audit event via HTTP.
@@ -58,7 +84,8 @@ class HttpTransport(Transport):
             path_prefix = "/audit-log/oauth2/v2"
             url = f"{self.config.service_url.rstrip('/')}{path_prefix}{endpoint}"
 
-            response = self.oauth.post(
+            oauth = self._ensure_session()
+            response = oauth.post(
                 url,
                 json=event_dict,
                 headers={"Content-Type": "application/json"},

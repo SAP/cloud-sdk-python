@@ -52,17 +52,22 @@ def _setup_test_repositories(dms_client):
         )
         created_repos.append(repo.id)
     except DMSError as e:
+        for repo_id in created_repos:
+            try:
+                dms_client.delete_repository(repo_id)
+            except Exception:
+                logger.warning("Failed to clean up partially-created repository %s", repo_id)
         pytest.skip(f"DMS ECM repository connection not available — skipping DMS integration tests: {e}")
 
-    yield
-
-    # Cleanup: delete repositories we created
-    for repo_id in created_repos:
-        try:
-            dms_client.delete_repository(repo_id)
-            logger.info("Cleaned up test repository %s", repo_id)
-        except Exception as e:
-            logger.warning("Failed to clean up test repository %s: %s", repo_id, e)
+    try:
+        yield
+    finally:
+        for repo_id in created_repos:
+            try:
+                dms_client.delete_repository(repo_id)
+                logger.info("Cleaned up test repository %s", repo_id)
+            except Exception as e:
+                logger.warning("Failed to clean up test repository %s: %s", repo_id, e)
 
 
 def _setup_cloud_mode():

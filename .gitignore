@@ -17,6 +17,9 @@ env.bak/
 venv.bak/
 piperBuild-env/
 
+# Local scratch
+tmp/
+
 # IDEs
 .vscode/
 .idea/

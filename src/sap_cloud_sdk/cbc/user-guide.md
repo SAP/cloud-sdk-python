@@ -26,12 +26,10 @@ from sap_cloud_sdk.cbc import create_client, TenantContext
 client = create_client()   # reads CLOUD_SDK_CBC_URL, CLOUD_SDK_CBC_CERT_PATH, CLOUD_SDK_CBC_KEY_PATH
 ```
 
-For local development against a mock server — no credentials needed:
+For local development against a mock server, set `CLOUD_SDK_CBC_REPLACE_SUBDOMAIN=false` to disable subdomain rewriting:
 
-```python
-from sap_cloud_sdk.cbc import DefaultClient
-
-client = DefaultClient(base_url="http://localhost:8001")
+```bash
+CLOUD_SDK_CBC_URL=http://localhost:8001 CLOUD_SDK_CBC_REPLACE_SUBDOMAIN=false python my_agent.py
 ```
 
 ## Reading configuration
@@ -138,9 +136,7 @@ except CBCNetworkError:
 | `CLOUD_SDK_CBC_KEY_PATH` | prod only | Path to the mTLS private key (PEM file) |
 | `CLOUD_SDK_CBC_CERT` | prod only | mTLS client certificate value (PEM string, alternative to `CERT_PATH`) |
 | `CLOUD_SDK_CBC_KEY` | prod only | mTLS private key value (PEM string, alternative to `KEY_PATH`) |
-| `CLOUD_SDK_CBC_REPLACE_SUBDOMAIN` | no | Override subdomain replacement (`true`/`false`). Auto-detected from URL when unset. |
-
-Local mode (loopback URL) requires only `CLOUD_SDK_CBC_URL`.
+| `CLOUD_SDK_CBC_REPLACE_SUBDOMAIN` | no | Override subdomain replacement (`true`/`false`). Defaults to `true`. Set to `false` when pointing at a local mock server. |
 
 `CERT_PATH`/`KEY_PATH` (file paths) take precedence over `CERT`/`KEY` (values) when both are set.
 

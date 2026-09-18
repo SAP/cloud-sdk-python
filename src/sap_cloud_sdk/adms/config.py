@@ -17,11 +17,15 @@ Environment variable fallback (uppercase):
 """
 
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 from sap_cloud_sdk.core.secret_resolver.resolver import (
     read_from_mount_and_fallback_to_env_var,
 )
 from sap_cloud_sdk.adms.exceptions import ConfigError
+
+if TYPE_CHECKING:
+    from sap_cloud_sdk.core.secret_resolver import ConfigFactory
 
 _DEFAULT_INSTANCE = "default"
 _SECRET_MOUNT_BASE = "/etc/secrets/appfnd"
@@ -125,3 +129,35 @@ def load_from_env_or_mount(instance: str | None = None) -> AdmsConfig:
 
     raw.validate()
     return raw.to_config()
+
+
+def _make_config_factory(instance: str | None = None) -> "ConfigFactory[AdmsConfig]":
+    """Return a :class:`~sap_cloud_sdk.core.secret_resolver.ConfigFactory` for the given instance.
+
+    The factory re-reads the binding on every call and tracks the secret
+    directory mtime for proactive rotation detection.
+
+    Args:
+        instance: Binding instance name. Defaults to ``"default"``.
+
+    Returns:
+        A callable that produces a fresh :class:`AdmsConfig`.
+    """
+    from sap_cloud_sdk.core.secret_resolver import ConfigFactory
+
+    inst = instance or _DEFAULT_INSTANCE
+
+    def _extract(binding: _BindingData) -> AdmsConfig:
+        try:
+            return binding.to_config()
+        except Exception as exc:
+            raise ConfigError(
+                f"failed to load ADMS configuration for instance '{inst}': {exc}"
+            ) from exc
+
+    return ConfigFactory(
+        module="adms",
+        instance=inst,
+        binding_cls=_BindingData,
+        extract=_extract,
+    )

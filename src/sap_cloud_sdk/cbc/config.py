@@ -33,13 +33,13 @@ class CBCConfig:
 
     Attributes:
         base_url: CBC service base URL.
-        cert_path: Path to the PEM client certificate file, or ``None`` for local/mock mode.
-        key_path: Path to the PEM private key file, or ``None`` for local/mock mode.
+        cert_path: Path to the PEM client certificate file, or ``None`` when not using mTLS.
+        key_path: Path to the PEM private key file, or ``None`` when not using mTLS.
         cert_pem: PEM client certificate value. Alternative to ``cert_path``.
         key_pem: PEM private key value. Alternative to ``key_path``.
         replace_subdomain: Whether to rewrite the URL subdomain to the CBC tenant ID
-            on each request. ``None`` (default) auto-detects: loopback URLs disable it,
-            all others enable it. Set explicitly to ``False`` for HTTPS mock servers.
+            on each request. Defaults to ``True``. Set to ``False`` when pointing
+            at a local mock server (e.g. via ``CLOUD_SDK_CBC_REPLACE_SUBDOMAIN=false``).
     """
 
     base_url: str
@@ -61,9 +61,7 @@ def load_from_env() -> CBCConfig:
     2. **Value triplet** — ``CLOUD_SDK_CBC_CERT``, ``CLOUD_SDK_CBC_KEY``, and
        ``CLOUD_SDK_CBC_URL`` must all be set. PEM values are written to temp
        files deleted after the first connection.
-    3. **URL only** — loopback addresses (``http://localhost``,
-       ``http://127.0.0.1``) trigger local/mock mode (no mTLS, no subdomain
-       replacement). Non-loopback URLs produce a client without mTLS.
+    3. **URL only** — ``CLOUD_SDK_CBC_URL`` is set without credentials. No mTLS.
 
     Returns:
         A :class:`CBCConfig` ready for use by :func:`~sap_cloud_sdk.cbc.create_client`.

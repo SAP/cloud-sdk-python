@@ -56,25 +56,6 @@ def _make_client(
 
 
 # ---------------------------------------------------------------------------
-# DefaultClient — URL detection
-# ---------------------------------------------------------------------------
-
-
-class TestDefaultClientLocalMode:
-    def test_loopback_localhost_disables_subdomain_replacement(self):
-        client, _ = _make_client("http://localhost:8001")
-        assert not client._config.replace_subdomain
-
-    def test_loopback_127_disables_subdomain_replacement(self):
-        client, _ = _make_client("http://127.0.0.1:8001")
-        assert not client._config.replace_subdomain
-
-    def test_production_url_enables_subdomain_replacement(self):
-        client, _ = _make_client("https://cbc.example.ondemand.com")
-        assert client._config.replace_subdomain
-
-
-# ---------------------------------------------------------------------------
 # DefaultClient — URL building
 # ---------------------------------------------------------------------------
 
@@ -84,12 +65,6 @@ class TestConfigurationsUrl:
         client, _ = _make_client("https://cbc.example.ondemand.com")
         url = client._configurations_url(_tenant("my-tenant"), "/consumptionVersions")
         assert url.startswith("https://my-tenant.")
-
-    def test_local_does_not_replace_subdomain(self):
-        client, _ = _make_client("http://localhost:8001")
-        url = client._configurations_url(_tenant("my-tenant"), "/consumptionVersions")
-        assert "localhost:8001" in url
-        assert "my-tenant" not in url.split("//")[1].split("/")[0]
 
 
 # ---------------------------------------------------------------------------

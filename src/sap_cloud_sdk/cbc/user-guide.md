@@ -23,7 +23,13 @@ object has one or more related entities; each entity has a stable authored `id`
 ```python
 from sap_cloud_sdk.cbc import create_client, TenantContext
 
-client = create_client()   # reads CLOUD_SDK_CBC_URL, CLOUD_SDK_CBC_CERT_PATH, CLOUD_SDK_CBC_KEY_PATH
+# single-tenant: bind tenant IDs at startup
+client = create_client(
+    tenant_context=TenantContext(cbcTenantId="<cbc-tenant-id>", appTenantId="<app-tenant-id>")
+)
+
+# multi-tenant: callable is invoked on every request
+client = create_client(tenant_context=lambda: resolve_tenant_from_request_context())
 ```
 
 For local development against a mock server, set `CLOUD_SDK_CBC_REPLACE_SUBDOMAIN=false` to disable subdomain rewriting:
@@ -37,18 +43,16 @@ CLOUD_SDK_CBC_URL=http://localhost:8001 CLOUD_SDK_CBC_REPLACE_SUBDOMAIN=false py
 ### Fetch everything in one call
 
 ```python
-tenant = TenantContext(cbcTenantId="<cbc-tenant-id>", appTenantId="<app-tenant-id>")
-
 # latest version resolved automatically
-config = client.get_configuration(tenant)
+config = client.get_configuration()
 
 # pin a specific version
-config = client.get_configuration(tenant, consumption_version="a0392d4f-72a9-...")
+config = client.get_configuration(consumption_version="a0392d4f-72a9-...")
 
 # pick from the list
-versions = client.get_consumption_versions(tenant)
+versions = client.get_consumption_versions()
 cv = versions.latest()   # or versions.items[0], or your own selection logic
-config = client.get_configuration(tenant, consumption_version=cv.version)
+config = client.get_configuration(consumption_version=cv.version)
 ```
 
 ### ConfigData structure

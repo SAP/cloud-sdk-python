@@ -458,7 +458,8 @@ class ExtensibilityClient:
             raise TransportError(f"Could not parse hook response: {exc}") from exc
 
         try:
-            return Message(**data) if data else None
+            structured = data.get("structuredContent") if data else None
+            return Message(**structured) if structured else None
         except (TypeError, ValidationError) as exc:
             raise ExtensibilityError(
                 f"Hook response did not conform to the A2A Message protocol: {exc}"

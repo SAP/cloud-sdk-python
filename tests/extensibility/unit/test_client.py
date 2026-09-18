@@ -287,11 +287,14 @@ def _make_other_server_tool(tool_name: str = _TOOL_NAME) -> MCPTool:
 
 
 def _success_payload() -> str:
-    """A2A Message returned directly by the n8n MCP translation card."""
+    """Full MCP tool result JSON; AGW puts the A2A Message in structuredContent."""
     return json.dumps({
-        "messageId": "msg-1",
-        "role": "agent",
-        "parts": [{"kind": "text", "text": "Currency converted successfully."}],
+        "content": [{"type": "text", "text": "Currency converted successfully."}],
+        "structuredContent": {
+            "messageId": "msg-1",
+            "role": "agent",
+            "parts": [{"kind": "text", "text": "Currency converted successfully."}],
+        },
     })
 
 
@@ -382,8 +385,8 @@ class TestCallHookAgw:
 
     @pytest.mark.asyncio
     async def test_non_a2a_response_raises_extensibility_error(self):
-        """Raises ExtensibilityError when the tool response is not a valid A2A Message."""
-        bad_payload = json.dumps({"not": "a2a"})
+        """Raises ExtensibilityError when structuredContent is not a valid A2A Message."""
+        bad_payload = json.dumps({"structuredContent": {"not": "a2a"}})
         agw = _make_agw_client(tools=[_make_hook_tool()], tool_responses=[bad_payload])
         client = self._make_client()
         with patch(

@@ -75,17 +75,13 @@ def cbc_context(cbc_client: DefaultClient, cbc_tenant: TenantContext):
 
 
 @when("I call get_consumption_versions")
-def call_get_consumption_versions(
-    ctx: dict, cbc_client: DefaultClient, cbc_tenant: TenantContext
-):
-    ctx["versions"] = cbc_client.get_consumption_versions(cbc_tenant)
+def call_get_consumption_versions(ctx: dict, cbc_client: DefaultClient):
+    ctx["versions"] = cbc_client.get_consumption_versions()
 
 
 @when("I call get_configuration")
-def call_get_configuration(
-    ctx: dict, cbc_client: DefaultClient, cbc_tenant: TenantContext
-):
-    ctx["config"] = cbc_client.get_configuration(cbc_tenant)
+def call_get_configuration(ctx: dict, cbc_client: DefaultClient):
+    ctx["config"] = cbc_client.get_configuration()
 
 
 @then("the result should contain at least one version")

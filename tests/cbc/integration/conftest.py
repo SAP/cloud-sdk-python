@@ -25,8 +25,7 @@ ENV_CBC_TENANT_ID = "CLOUD_SDK_CBC_CBC_TENANT_ID"
 ENV_APP_TENANT_ID = "CLOUD_SDK_CBC_APP_TENANT_ID"
 
 
-@pytest.fixture(scope="session")
-def cbc_tenant() -> TenantContext:
+def _require_tenant() -> TenantContext:
     cbc_tid = os.environ.get(ENV_CBC_TENANT_ID)
     app_tid = os.environ.get(ENV_APP_TENANT_ID)
     if not cbc_tid or not app_tid:
@@ -37,8 +36,14 @@ def cbc_tenant() -> TenantContext:
 
 
 @pytest.fixture(scope="session")
+def cbc_tenant() -> TenantContext:
+    return _require_tenant()
+
+
+@pytest.fixture(scope="session")
 def cbc_client() -> CBCClient:
+    tenant = _require_tenant()
     try:
-        return create_client()
+        return create_client(tenant_context=tenant)
     except CBCConfigError as exc:
         pytest.skip(f"CBC integration tests skipped — missing config: {exc}")

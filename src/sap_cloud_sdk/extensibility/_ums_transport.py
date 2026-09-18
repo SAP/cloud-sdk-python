@@ -312,14 +312,15 @@ def _build_source_mapping(
     mcp_servers: List[McpServer],
     hooks: List[Hook],
 ) -> ExtensionSourceMapping:
-    """Build a source mapping from per-node title to contributed tools/hooks.
+    """Build a source mapping from per-node title to contributed tools/hooks/instructions.
 
     Each node has a ``title`` (the extension name) and a list of
-    ``capabilityImplementations`` whose tools and hooks were contributed
-    by that extension.
+    ``capabilityImplementations`` whose tools, hooks, and instructions were
+    contributed by that extension.
     """
     tool_map: Dict[str, ExtensionSourceInfo] = {}
     hook_map: Dict[str, ExtensionSourceInfo] = {}
+    instruction_map: Dict[str, ExtensionSourceInfo] = {}
 
     for node in nodes:
         title = node.get("title", "")
@@ -346,7 +347,19 @@ def _build_source_mapping(
                 if hook_id:
                     hook_map[hook_id] = source_info
 
-    return ExtensionSourceMapping(tools=tool_map, hooks=hook_map)
+            # Map instructions (use the extension instance id as the mapping key)
+            raw_instruction = cap_impl.get("instruction")
+            if raw_instruction and isinstance(raw_instruction, dict):
+                if raw_instruction.get("text"):
+                    instruction_key = node.get("id", "") or title
+                    if instruction_key:
+                        instruction_map[instruction_key] = source_info
+
+    return ExtensionSourceMapping(
+        tools=tool_map,
+        hooks=hook_map,
+        instructions=instruction_map,
+    )
 
 
 def _transform_ums_response(

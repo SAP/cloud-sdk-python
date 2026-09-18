@@ -197,6 +197,7 @@ class TestBuildSourceMapping:
         mapping = _build_source_mapping([], [], [])
         assert mapping.tools == {}
         assert mapping.hooks == {}
+        assert mapping.instructions == {}
 
     def test_null_hooks_in_capability(self):
         """hooks: null should not crash _build_source_mapping."""
@@ -242,6 +243,105 @@ class TestBuildSourceMapping:
         ]
         mapping = _build_source_mapping(nodes, [], [])
         assert mapping.tools["tool_x"].extension_version == ""
+
+    def test_maps_instruction_by_instance_id(self):
+        nodes = [
+            {
+                "id": "ext-instance-1",
+                "title": "ServiceNow Extension",
+                "extensionVersion": "2.1.0",
+                "solutionId": "sol-abc",
+                "jouleStudioGsid": "gsid-xyz",
+                "capabilityImplementations": [
+                    {
+                        "capabilityId": "default",
+                        "instruction": {"text": "Use ServiceNow tools."},
+                        "tools": {"additions": []},
+                        "hooks": [],
+                    }
+                ],
+            }
+        ]
+        mapping = _build_source_mapping(nodes, [], [])
+        assert "ext-instance-1" in mapping.instructions
+        info = mapping.instructions["ext-instance-1"]
+        assert info.extension_name == "ServiceNow Extension"
+        assert info.extension_id == "ext-instance-1"
+        assert info.extension_version == "2.1.0"
+        assert info.solution_id == "sol-abc"
+        assert info.joule_studio_gsid == "gsid-xyz"
+
+    def test_instruction_falls_back_to_title_when_id_missing(self):
+        """Node without an id keys the instruction map by title."""
+        nodes = [
+            {
+                "title": "Titled Extension",
+                "capabilityImplementations": [
+                    {
+                        "capabilityId": "default",
+                        "instruction": {"text": "Some instruction."},
+                        "tools": {"additions": []},
+                        "hooks": [],
+                    }
+                ],
+            }
+        ]
+        mapping = _build_source_mapping(nodes, [], [])
+        assert "Titled Extension" in mapping.instructions
+
+    def test_instruction_without_text_not_mapped(self):
+        nodes = [
+            {
+                "id": "ext-1",
+                "title": "Empty Instruction",
+                "capabilityImplementations": [
+                    {
+                        "capabilityId": "default",
+                        "instruction": {"text": ""},
+                        "tools": {"additions": []},
+                        "hooks": [],
+                    }
+                ],
+            }
+        ]
+        mapping = _build_source_mapping(nodes, [], [])
+        assert mapping.instructions == {}
+
+    def test_missing_instruction_not_mapped(self):
+        nodes = [
+            {
+                "id": "ext-1",
+                "title": "No Instruction",
+                "capabilityImplementations": [
+                    {
+                        "capabilityId": "default",
+                        "tools": {"additions": []},
+                        "hooks": [],
+                    }
+                ],
+            }
+        ]
+        mapping = _build_source_mapping(nodes, [], [])
+        assert mapping.instructions == {}
+
+    def test_instruction_non_dict_not_mapped(self):
+        """A legacy plain-string instruction should not crash or map."""
+        nodes = [
+            {
+                "id": "ext-1",
+                "title": "String Instruction",
+                "capabilityImplementations": [
+                    {
+                        "capabilityId": "default",
+                        "instruction": "plain string",
+                        "tools": {"additions": []},
+                        "hooks": [],
+                    }
+                ],
+            }
+        ]
+        mapping = _build_source_mapping(nodes, [], [])
+        assert mapping.instructions == {}
 
 # ---------------------------------------------------------------------------
 # Tests: _transform_ums_response
@@ -330,6 +430,21 @@ class TestTransformUmsResponse:
         assert result.source.tools["create_ticket"].extension_id == "ext-instance-1"
         assert result.source.tools["create_ticket"].extension_version == "2.1.0"
         assert "9f6e5f66-7e4f-4ef0-a9f6-e6e1c1220c11" in result.source.hooks
+        # Instruction attribution is mapped by extension instance id
+        assert "ext-instance-1" in result.source.instructions
+        assert (
+            result.source.instructions["ext-instance-1"].extension_name
+            == "ServiceNow Extension"
+        )
+        assert (
+            result.source.instructions["ext-instance-1"].extension_id
+            == "ext-instance-1"
+        )
+
+    def test_source_instructions_empty_when_no_instruction(self):
+        result = _transform_ums_response(UMS_RESPONSE_NO_INSTRUCTION["data"], "default")
+        assert result.source is not None
+        assert result.source.instructions == {}
 
     def test_hooks_with_unknown_type_skipped(self):
         data = {

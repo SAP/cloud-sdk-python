@@ -500,16 +500,19 @@ class ExtensionSourceMapping:
     (e.g., ``"create_ticket"``).
     Hook keys are hook IDs (UUIDs) (e.g.,
     ``"3f5c8c8a-7b4d-4f9c-a4c0-7d5cb1a39f7e"``).
+    Instruction keys are extension instance IDs (e.g., ``"ext-instance-1"``).
     Values are :class:`ExtensionSourceInfo` objects containing the extension's
     name, version, and unique identifier.
 
     Attributes:
         tools: Mapping of tool name to extension source info.
         hooks: Mapping of hook ID to extension source info.
+        instructions: Mapping of extension instance ID to extension source info.
     """
 
     tools: Dict[str, ExtensionSourceInfo] = field(default_factory=dict)
     hooks: Dict[str, ExtensionSourceInfo] = field(default_factory=dict)
+    instructions: Dict[str, ExtensionSourceInfo] = field(default_factory=dict)
 
     @classmethod
     def from_dict(cls, obj: Dict[str, Any]) -> ExtensionSourceMapping:
@@ -531,6 +534,13 @@ class ExtensionSourceMapping:
                         "extensionVersion": "1",
                         "extensionId": "a1b2c3d4-..."
                     }
+                },
+                "instructions": {
+                    "ext-instance-1": {
+                        "extensionName": "ServiceNow Extension",
+                        "extensionVersion": "1.0.0",
+                        "extensionId": "ext-instance-1"
+                    }
                 }
             }
 
@@ -545,9 +555,14 @@ class ExtensionSourceMapping:
         """
         raw_tools = obj.get("tools", {})
         raw_hooks = obj.get("hooks", {})
+        raw_instructions = obj.get("instructions", {})
         return cls(
             tools={k: ExtensionSourceInfo.from_value(v) for k, v in raw_tools.items()},
             hooks={k: ExtensionSourceInfo.from_value(v) for k, v in raw_hooks.items()},
+            instructions={
+                k: ExtensionSourceInfo.from_value(v)
+                for k, v in raw_instructions.items()
+            },
         )
 
 
@@ -811,4 +826,25 @@ class ExtensionCapabilityImplementation:
         """
         if self.source and hook_id in self.source.hooks:
             return self.source.hooks[hook_id]
+        return None
+
+    def get_source_info_for_instruction(
+        self, extension_id: str
+    ) -> Optional[ExtensionSourceInfo]:
+        """Look up the full source info for a specific instruction contributor.
+
+        Returns the :class:`ExtensionSourceInfo` containing extension name,
+        version, and ID for the extension that contributed an instruction
+        fragment.  Returns ``None`` when source mapping is not available or
+        the extension ID is not found.
+
+        Args:
+            extension_id: The extension instance ID used as the key in
+                ``source.instructions`` (e.g., ``"ext-instance-1"``).
+
+        Returns:
+            :class:`ExtensionSourceInfo` for the instruction contributor, or ``None``.
+        """
+        if self.source and extension_id in self.source.instructions:
+            return self.source.instructions[extension_id]
         return None

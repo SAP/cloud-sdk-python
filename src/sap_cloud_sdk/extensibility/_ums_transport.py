@@ -412,7 +412,11 @@ def _transform_ums_response(
     instruction = "\n\n".join(instructions) if instructions else None
 
     joule_studio_gsid = next(
-        (node.get("jouleStudioGsid") or "" for node in nodes if node.get("jouleStudioGsid")),
+        (
+            node.get("jouleStudioGsid") or ""
+            for node in nodes
+            if node.get("jouleStudioGsid")
+        ),
         "",
     )
 

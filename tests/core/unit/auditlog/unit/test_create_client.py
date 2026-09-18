@@ -11,16 +11,11 @@ from sap_cloud_sdk.core.auditlog.exceptions import ClientCreationError
 
 class TestCreateClient:
 
-    @patch('sap_cloud_sdk.core.auditlog._load_config_from_env')
+    @patch('sap_cloud_sdk.core.auditlog._make_config_factory')
     @patch('sap_cloud_sdk.core.auditlog.HttpTransport')
-    def test_create_client_cloud_mode(self, mock_http_transport, mock_load_config):
-        mock_config = AuditLogConfig(
-            client_id="test_client",
-            client_secret="test_secret",
-            oauth_url="https://oauth.example.com",
-            service_url="https://service.example.com"
-        )
-        mock_load_config.return_value = mock_config
+    def test_create_client_cloud_mode(self, mock_http_transport, mock_make_factory):
+        mock_factory = MagicMock()
+        mock_make_factory.return_value = mock_factory
 
         mock_transport = MagicMock()
         mock_http_transport.return_value = mock_transport
@@ -28,8 +23,8 @@ class TestCreateClient:
         client = create_client()
 
         assert isinstance(client, AuditLogClient)
-        mock_load_config.assert_called_once()
-        mock_http_transport.assert_called_once_with(mock_config)
+        mock_make_factory.assert_called_once()
+        mock_http_transport.assert_called_once_with(mock_factory)
         assert client._transport == mock_transport
 
     @patch('sap_cloud_sdk.core.auditlog.HttpTransport')
@@ -50,23 +45,18 @@ class TestCreateClient:
         mock_http_transport.assert_called_once_with(custom_config)
         assert client._transport == mock_transport
 
-    @patch('sap_cloud_sdk.core.auditlog._load_config_from_env')
-    def test_create_client_config_loading_exception(self, mock_load_config):
-        mock_load_config.side_effect = Exception("Config loading failed")
+    @patch('sap_cloud_sdk.core.auditlog._make_config_factory')
+    def test_create_client_config_loading_exception(self, mock_make_factory):
+        mock_make_factory.side_effect = Exception("Config loading failed")
 
         with pytest.raises(ClientCreationError, match="Failed to create audit log client"):
             create_client()
 
-    @patch('sap_cloud_sdk.core.auditlog._load_config_from_env')
+    @patch('sap_cloud_sdk.core.auditlog._make_config_factory')
     @patch('sap_cloud_sdk.core.auditlog.HttpTransport')
-    def test_create_client_http_transport_exception(self, mock_http_transport, mock_load_config):
-        mock_config = AuditLogConfig(
-            client_id="test_client",
-            client_secret="test_secret",
-            oauth_url="https://oauth.example.com",
-            service_url="https://service.example.com"
-        )
-        mock_load_config.return_value = mock_config
+    def test_create_client_http_transport_exception(self, mock_http_transport, mock_make_factory):
+        mock_factory = MagicMock()
+        mock_make_factory.return_value = mock_factory
 
         mock_http_transport.side_effect = Exception("HTTP transport failed")
 
@@ -87,17 +77,12 @@ class TestCreateClient:
         with pytest.raises(ClientCreationError, match="Failed to create audit log client"):
             create_client(config=custom_config)
 
-    @patch('sap_cloud_sdk.core.auditlog._load_config_from_env')
+    @patch('sap_cloud_sdk.core.auditlog._make_config_factory')
     @patch('sap_cloud_sdk.core.auditlog.HttpTransport')
     @patch('sap_cloud_sdk.core.auditlog.AuditLogClient')
-    def test_create_client_client_creation_exception(self, mock_client_class, mock_http_transport, mock_load_config):
-        mock_config = AuditLogConfig(
-            client_id="test_client",
-            client_secret="test_secret",
-            oauth_url="https://oauth.example.com",
-            service_url="https://service.example.com"
-        )
-        mock_load_config.return_value = mock_config
+    def test_create_client_client_creation_exception(self, mock_client_class, mock_http_transport, mock_make_factory):
+        mock_factory = MagicMock()
+        mock_make_factory.return_value = mock_factory
 
         mock_transport = MagicMock()
         mock_http_transport.return_value = mock_transport

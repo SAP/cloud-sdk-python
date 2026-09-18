@@ -5,7 +5,7 @@ from __future__ import annotations
 import base64
 import json
 import logging
-from typing import Any, Dict, Optional, Protocol
+from typing import Any, Callable, Dict, Optional, Protocol
 
 import requests
 from requests import Response
@@ -27,13 +27,33 @@ class AbstractTokenProvider(Protocol):
 
 
 class TokenProvider:
-    """Provides OAuth2 access tokens via client credentials flow."""
+    """Provides OAuth2 access tokens via client credentials flow.
 
-    def __init__(self, config: PrintConfig) -> None:
-        self._config = config
-        client = BackendApplicationClient(client_id=config.client_id)
+    Accepts either a fixed :class:`PrintConfig` or a config factory (any callable
+    returning ``PrintConfig`` with an optional ``has_changed() -> bool`` method).
+    When a factory is supplied, credentials are re-read on every token fetch and
+    the factory's ``has_changed()`` method is checked before serving a cached token
+    so that rotated secrets are picked up proactively.
+    """
+
+    def __init__(self, config: PrintConfig | Callable[[], PrintConfig]) -> None:
+        if callable(config) and not isinstance(config, PrintConfig):
+            self._config_factory: Callable[[], PrintConfig] = config
+            self._config = config()
+        else:
+            self._config_factory = lambda: config  # type: ignore[arg-type]
+            self._config = config  # type: ignore[assignment]
+        client = BackendApplicationClient(client_id=self._config.client_id)
         self._session = OAuth2Session(client=client)
         self._cached_token: Optional[str] = None
+
+    def _refresh_if_rotated(self) -> None:
+        has_changed = getattr(self._config_factory, "has_changed", None)
+        if callable(has_changed) and has_changed():
+            self._config = self._config_factory()
+            self._cached_token = None
+            client = BackendApplicationClient(client_id=self._config.client_id)
+            self._session = OAuth2Session(client=client)
 
     def get_token(self) -> str:
         """Return a valid bearer token for the Print Service.
@@ -45,6 +65,7 @@ class TokenProvider:
             HttpError: If the token response is missing an access_token or
                 token acquisition fails.
         """
+        self._refresh_if_rotated()
 
         try:
             token: Dict[str, Any] = self._session.fetch_token(

@@ -22,6 +22,9 @@ from tests.extensibility.unit._ums_test_helpers import (
     UMS_RESPONSE_NO_INSTRUCTION,
     UMS_RESPONSE_EMPTY_INSTRUCTION,
     UMS_RESPONSE_DIFFERENT_CAPABILITY,
+    UMS_RESPONSE_DEACTIVATED,
+    UMS_RESPONSE_MIXED_ACTIVE,
+    UMS_RESPONSE_LEGACY_NO_IS_ACTIVE,
 )
 
 
@@ -339,6 +342,7 @@ class TestTransformUmsResponse:
                         "node": {
                             "id": "ext-1",
                             "title": "Test",
+                            "isActive": True,
                             "capabilityImplementations": [
                                 {
                                     "capabilityId": "default",
@@ -381,6 +385,7 @@ class TestTransformUmsResponse:
                     {
                         "node": {
                             "id": "ext-1",
+                            "isActive": True,
                             "capabilityImplementations": [
                                 {
                                     "capabilityId": "default",
@@ -408,6 +413,7 @@ class TestTransformUmsResponse:
                         "node": {
                             "id": "ext-1",
                             "title": "Null Hooks Extension",
+                            "isActive": True,
                             "capabilityImplementations": [
                                 {
                                     "capabilityId": "default",
@@ -446,6 +452,7 @@ class TestTransformUmsResponse:
                         "node": {
                             "id": "ext-1",
                             "title": "No tools",
+                            "isActive": True,
                             "capabilityImplementations": [
                                 {
                                     "capabilityId": "default",
@@ -459,3 +466,29 @@ class TestTransformUmsResponse:
         }
         result = _transform_ums_response(data, "default")
         assert result.mcp_servers == []
+
+    def test_deactivated_extension_excluded(self):
+        """isActive: False node must be filtered out entirely."""
+        result = _transform_ums_response(UMS_RESPONSE_DEACTIVATED["data"], "default")
+        assert result.extension_names == []
+        assert result.mcp_servers == []
+        assert result.instruction is None
+        assert result.hooks == []
+
+    def test_mixed_active_inactive(self):
+        """Active node included; deactivated node excluded from the same response."""
+        result = _transform_ums_response(UMS_RESPONSE_MIXED_ACTIVE["data"], "default")
+        assert result.extension_names == ["Active Extension"]
+        assert len(result.mcp_servers) == 1
+        assert result.mcp_servers[0].ord_id == "sap.mcp:apiResource:active:v1"
+        assert result.instruction == "Active instruction."
+
+    def test_legacy_extension_without_is_active_excluded(self):
+        """isActive absent (null) means not active — extension is excluded."""
+        result = _transform_ums_response(
+            UMS_RESPONSE_LEGACY_NO_IS_ACTIVE["data"], "default"
+        )
+        assert result.extension_names == []
+        assert result.mcp_servers == []
+        assert result.instruction is None
+        assert result.hooks == []

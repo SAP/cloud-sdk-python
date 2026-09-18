@@ -40,6 +40,7 @@ UMS_RESPONSE_SINGLE = {
                         "id": "ext-instance-1",
                         "title": "ServiceNow Extension",
                         "extensionVersion": "2.1.0",
+                        "isActive": True,
                         "capabilityImplementations": [
                             {
                                 "capabilityId": "default",
@@ -96,6 +97,7 @@ UMS_RESPONSE_MULTIPLE = {
                         "id": "ext-instance-1",
                         "title": "ServiceNow Extension",
                         "extensionVersion": "1.0.0",
+                        "isActive": True,
                         "capabilityImplementations": [
                             {
                                 "capabilityId": "default",
@@ -122,6 +124,7 @@ UMS_RESPONSE_MULTIPLE = {
                         "id": "ext-instance-2",
                         "title": "Jira Extension",
                         "extensionVersion": "3.2.1",
+                        "isActive": True,
                         "capabilityImplementations": [
                             {
                                 "capabilityId": "default",
@@ -182,6 +185,7 @@ UMS_RESPONSE_NO_INSTRUCTION = {
                         "id": "ext-1",
                         "title": "Minimal Extension",
                         "extensionVersion": "0.1.0",
+                        "isActive": True,
                         "capabilityImplementations": [
                             {
                                 "capabilityId": "default",
@@ -217,6 +221,7 @@ UMS_RESPONSE_EMPTY_INSTRUCTION = {
                         "id": "ext-1",
                         "title": "Empty Instruction Extension",
                         "extensionVersion": "1.0.0",
+                        "isActive": True,
                         "capabilityImplementations": [
                             {
                                 "capabilityId": "default",
@@ -233,8 +238,7 @@ UMS_RESPONSE_EMPTY_INSTRUCTION = {
     }
 }
 
-UMS_RESPONSE_DIFFERENT_CAPABILITY = {
-    "data": {
+UMS_RESPONSE_DIFFERENT_CAPABILITY = {    "data": {
         "EXTHUB__ExtCapImplementationInstances": {
             "edges": [
                 {
@@ -242,6 +246,7 @@ UMS_RESPONSE_DIFFERENT_CAPABILITY = {
                         "id": "ext-1",
                         "title": "Other Extension",
                         "extensionVersion": "2.0.0",
+                        "isActive": True,
                         "capabilityImplementations": [
                             {
                                 "capabilityId": "onboarding",
@@ -277,6 +282,146 @@ UMS_RESPONSE_DIFFERENT_CAPABILITY = {
                                 },
                                 "hooks": [],
                             },
+                        ],
+                    }
+                }
+            ],
+            "pageInfo": {"hasNextPage": False, "cursor": None},
+        }
+    }
+}
+
+# A single extension explicitly deactivated (isActive: False).
+UMS_RESPONSE_DEACTIVATED = {
+    "data": {
+        "EXTHUB__ExtCapImplementationInstances": {
+            "edges": [
+                {
+                    "node": {
+                        "id": "ext-deactivated-1",
+                        "title": "Deactivated Extension",
+                        "extensionVersion": "1.0.0",
+                        "isActive": False,
+                        "capabilityImplementations": [
+                            {
+                                "capabilityId": "default",
+                                "instruction": {"text": "Should not appear."},
+                                "tools": {
+                                    "additions": [
+                                        {
+                                            "type": "MCP",
+                                            "mcpConfig": {
+                                                "globalTenantId": "tenant-x",
+                                                "ordId": "sap.mcp:apiResource:deactivated:v1",
+                                                "toolNames": ["hidden_tool"],
+                                            },
+                                        }
+                                    ]
+                                },
+                                "hooks": [],
+                            }
+                        ],
+                    }
+                }
+            ],
+            "pageInfo": {"hasNextPage": False, "cursor": None},
+        }
+    }
+}
+
+# One active extension and one deactivated extension in the same response.
+UMS_RESPONSE_MIXED_ACTIVE = {
+    "data": {
+        "EXTHUB__ExtCapImplementationInstances": {
+            "edges": [
+                {
+                    "node": {
+                        "id": "ext-active-1",
+                        "title": "Active Extension",
+                        "extensionVersion": "2.0.0",
+                        "isActive": True,
+                        "capabilityImplementations": [
+                            {
+                                "capabilityId": "default",
+                                "instruction": {"text": "Active instruction."},
+                                "tools": {
+                                    "additions": [
+                                        {
+                                            "type": "MCP",
+                                            "mcpConfig": {
+                                                "globalTenantId": "tenant-a",
+                                                "ordId": "sap.mcp:apiResource:active:v1",
+                                                "toolNames": ["active_tool"],
+                                            },
+                                        }
+                                    ]
+                                },
+                                "hooks": [],
+                            }
+                        ],
+                    }
+                },
+                {
+                    "node": {
+                        "id": "ext-inactive-1",
+                        "title": "Inactive Extension",
+                        "extensionVersion": "1.0.0",
+                        "isActive": False,
+                        "capabilityImplementations": [
+                            {
+                                "capabilityId": "default",
+                                "instruction": {"text": "Should not appear."},
+                                "tools": {
+                                    "additions": [
+                                        {
+                                            "type": "MCP",
+                                            "mcpConfig": {
+                                                "globalTenantId": "tenant-b",
+                                                "ordId": "sap.mcp:apiResource:inactive:v1",
+                                                "toolNames": ["inactive_tool"],
+                                            },
+                                        }
+                                    ]
+                                },
+                                "hooks": [],
+                            }
+                        ],
+                    }
+                },
+            ],
+            "pageInfo": {"hasNextPage": False, "cursor": None},
+        }
+    }
+}
+
+# Extension with no isActive field — deployed before activate/deactivate existed.
+UMS_RESPONSE_LEGACY_NO_IS_ACTIVE = {
+    "data": {
+        "EXTHUB__ExtCapImplementationInstances": {
+            "edges": [
+                {
+                    "node": {
+                        "id": "ext-legacy-1",
+                        "title": "Legacy Extension",
+                        "extensionVersion": "1.0.0",
+                        "capabilityImplementations": [
+                            {
+                                "capabilityId": "default",
+                                "instruction": {"text": "Legacy instruction."},
+                                "tools": {
+                                    "additions": [
+                                        {
+                                            "type": "MCP",
+                                            "mcpConfig": {
+                                                "globalTenantId": "tenant-leg",
+                                                "ordId": "sap.mcp:apiResource:legacy:v1",
+                                                "toolNames": ["legacy_tool"],
+                                            },
+                                        }
+                                    ]
+                                },
+                                "hooks": [],
+                            }
                         ],
                     }
                 }

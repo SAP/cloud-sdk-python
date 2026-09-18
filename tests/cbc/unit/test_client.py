@@ -49,10 +49,52 @@ def _mock_response(
 
 def _make_client(
     base_url: str = "https://cbc.example.ondemand.com",
+    tenant: TenantContext | None = None,
 ) -> tuple[DefaultClient, MagicMock]:
     mock_http = MagicMock(spec=httpx.Client)
-    client = DefaultClient(base_url=base_url, http_client=mock_http)
+    client = DefaultClient(
+        base_url=base_url,
+        tenant_context=tenant or _tenant(),
+        http_client=mock_http,
+    )
     return client, mock_http
+
+
+# ---------------------------------------------------------------------------
+# DefaultClient — tenant_context
+# ---------------------------------------------------------------------------
+
+
+class TestTenantContext:
+    def test_callable_is_invoked_on_each_call(self):
+        call_count = 0
+
+        def tenant_fn() -> TenantContext:
+            nonlocal call_count
+            call_count += 1
+            return _tenant()
+
+        mock_http = MagicMock(spec=httpx.Client)
+        mock_http.request.return_value = _mock_response(
+            json_body={"items": [{"version": "cv1"}]}
+        )
+        client = DefaultClient(
+            base_url="https://cbc.example.ondemand.com",
+            tenant_context=tenant_fn,
+            http_client=mock_http,
+        )
+        client.get_consumption_versions()
+        client.get_consumption_versions()
+        assert call_count == 2
+
+    def test_raises_when_no_tenant_context(self):
+        mock_http = MagicMock(spec=httpx.Client)
+        client = DefaultClient(
+            base_url="https://cbc.example.ondemand.com",
+            http_client=mock_http,
+        )
+        with pytest.raises(ValueError, match="tenant_context"):
+            client.get_consumption_versions()
 
 
 # ---------------------------------------------------------------------------
@@ -78,7 +120,7 @@ class TestGetConsumptionVersions:
         mock_http.request.return_value = _mock_response(
             json_body={"items": [{"version": "cv1"}]}
         )
-        result = client.get_consumption_versions(_tenant())
+        result = client.get_consumption_versions()
         assert len(result.items) == 1
         assert result.items[0].version == "cv1"
 
@@ -89,19 +131,19 @@ class TestGetConsumptionVersions:
             content=b'{"error":{"code":"NOT_FOUND","message":"not found"}}',
         )
         with pytest.raises(CBCClientError):
-            client.get_consumption_versions(_tenant())
+            client.get_consumption_versions()
 
     def test_raises_server_error_on_500(self):
         client, mock_http = _make_client()
         mock_http.request.return_value = _mock_response(status_code=500, content=b"")
         with pytest.raises(CBCServerError):
-            client.get_consumption_versions(_tenant())
+            client.get_consumption_versions()
 
     def test_raises_network_error_on_connection_failure(self):
         client, mock_http = _make_client()
         mock_http.request.side_effect = httpx.ConnectError("refused")
         with pytest.raises(CBCNetworkError):
-            client.get_consumption_versions(_tenant())
+            client.get_consumption_versions()
 
 
 # ---------------------------------------------------------------------------
@@ -180,7 +222,7 @@ class TestGetConfiguration:
         entities_response = _mock_response(json_body={"items": []})
         mock_http.request.side_effect = [versions_response, entities_response]
 
-        result = client.get_configuration(_tenant())
+        result = client.get_configuration()
         assert isinstance(result, ConfigData)
         assert result.consumption_version == "v2"
         assert result.config_objects == []
@@ -189,7 +231,7 @@ class TestGetConfiguration:
         client, mock_http = _make_client()
         mock_http.request.return_value = _mock_response(json_body={"items": []})
         with pytest.raises(CBCClientError, match="no consumption version"):
-            client.get_configuration(_tenant())
+            client.get_configuration()
 
     def test_uses_explicit_consumption_version(self):
         client, mock_http = _make_client()
@@ -207,7 +249,7 @@ class TestGetConfiguration:
         data_response = _mock_response(json_body={"items": [{"k": "v"}]})
         mock_http.request.side_effect = [entities_response, data_response]
 
-        result = client.get_configuration(_tenant(), consumption_version="cv1")
+        result = client.get_configuration(consumption_version="cv1")
         assert len(result.config_objects) == 1
         assert result.config_objects[0].config_object_id == "payment-config"
         assert len(result.config_objects[0].entities) == 1

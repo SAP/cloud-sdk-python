@@ -13,10 +13,15 @@ Quick start::
 
     from sap_cloud_sdk.cbc import create_client, TenantContext
 
-    client = create_client()
-    config = client.get_configuration(
-        TenantContext(cbcTenantId="my-cbc-tenant", appTenantId="my-app-tenant")
+    # single-tenant: bind at construction time
+    client = create_client(
+        tenant_context=TenantContext(cbcTenantId="my-cbc-tenant", appTenantId="my-app-tenant")
     )
+    config = client.get_configuration()
+
+    # multi-tenant: callable reads from request-scoped context at call time
+    client = create_client(tenant_context=lambda: resolve_tenant())
+    config = client.get_configuration()
 """
 
 from __future__ import annotations
@@ -25,6 +30,7 @@ import logging
 import re
 import ssl
 import tempfile
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Protocol
@@ -69,10 +75,8 @@ class CBCClient(Protocol):
     double, offline stub, or alternative production client.
     """
 
-    def get_consumption_versions(
-        self, tenant_context: TenantContext
-    ) -> ConsumptionVersions:
-        """Return the available consumption versions for the given tenant.
+    def get_consumption_versions(self) -> ConsumptionVersions:
+        """Return the available consumption versions for the configured tenant.
 
         A consumption version represents a snapshot of the business configuration
         for an app tenant at a point in time.  Use this to discover the active
@@ -82,7 +86,6 @@ class CBCClient(Protocol):
 
     def get_configuration(
         self,
-        tenant_context: TenantContext,
         consumption_version: str | None = None,
     ) -> ConfigData:
         """Return the business configuration for all entities in one call.
@@ -118,19 +121,30 @@ class DefaultClient:
     credentials automatically (BTP Destination Service or environment variables,
     or accepts an explicit :class:`~sap_cloud_sdk.cbc.config.CBCConfig`)::
 
-        client = create_client()
+        client = create_client(
+            tenant_context=TenantContext(cbcTenantId="my-cbc-tenant", appTenantId="my-app-tenant")
+        )
+
+        # multi-tenant: callable is invoked on every request
+        client = create_client(tenant_context=lambda: resolve_tenant())
 
         # explicit config
-        client = create_client(config=CBCConfig(
-            base_url="https://service.app.prod-eu.cbc.services.cloud.sap",
-            cert_path=Path("/run/secrets/tls.crt"),
-            key_path=Path("/run/secrets/tls.key"),
-        ))
+        client = create_client(
+            config=CBCConfig(
+                base_url="https://service.app.prod-eu.cbc.services.cloud.sap",
+                cert_path=Path("/run/secrets/tls.crt"),
+                key_path=Path("/run/secrets/tls.key"),
+            ),
+            tenant_context=TenantContext(...),
+        )
 
     Direct instantiation is supported for testing (inject a mock ``http_client``).
 
     Args:
         base_url: Base URL of the CBC service.
+        tenant_context: Tenant identification, or a callable that returns it.
+            The callable form is for multi-tenant agents where the tenant varies
+            per request (e.g. read from a request-scoped context variable).
         http_client: Optional pre-configured ``httpx.Client`` — takes full
             precedence over all mTLS arguments.  Use for testing.
         ssl_context: Optional pre-built :class:`ssl.SSLContext` with mTLS loaded.
@@ -144,6 +158,7 @@ class DefaultClient:
     def __init__(
         self,
         base_url: str,
+        tenant_context: TenantContext | Callable[[], TenantContext] | None = None,
         http_client: httpx.Client | None = None,
         ssl_context: ssl.SSLContext | None = None,
         cert_path: Path | None = None,
@@ -153,6 +168,7 @@ class DefaultClient:
         replace_subdomain: bool | None = None,
     ) -> None:
         self._base_url = base_url.rstrip("/")
+        self._tenant_context = tenant_context
         resolved_replace = replace_subdomain if replace_subdomain is not None else True
         self._config = _ClientConfig(
             configurations_path="/configuration/v1",
@@ -187,18 +203,23 @@ class DefaultClient:
     def __exit__(self, *args: Any) -> None:
         self.close()
 
+    def _resolve_tenant(self) -> TenantContext:
+        if self._tenant_context is None:
+            raise ValueError(
+                "No tenant_context configured. Pass tenant_context to create_client() "
+                "or DefaultClient()."
+            )
+        if callable(self._tenant_context):
+            return self._tenant_context()
+        return self._tenant_context
+
     # ------------------------------------------------------------------
     # Public API methods
     # ------------------------------------------------------------------
 
     @record_metrics(Module.CBC, Operation.CBC_GET_CONSUMPTION_VERSIONS)
-    def get_consumption_versions(
-        self, tenant_context: TenantContext
-    ) -> ConsumptionVersions:
-        """Return available consumption versions for the given tenant.
-
-        Args:
-            tenant_context: Tenant identification.
+    def get_consumption_versions(self) -> ConsumptionVersions:
+        """Return available consumption versions for the configured tenant.
 
         Returns:
             :class:`ConsumptionVersions` with all versions for the tenant.
@@ -208,6 +229,7 @@ class DefaultClient:
             CBCServerError: On 5xx responses.
             CBCNetworkError: On connection failures.
         """
+        tenant_context = self._resolve_tenant()
         url = self._configurations_url(
             tenant_context,
             f"/consumptionVersions?appTenantId={tenant_context.app_tenant_id}",
@@ -266,17 +288,15 @@ class DefaultClient:
     @record_metrics(Module.CBC, Operation.CBC_GET_CONFIGURATION)
     def get_configuration(
         self,
-        tenant_context: TenantContext,
         consumption_version: str | None = None,
     ) -> ConfigData:
-        """Return the full business configuration for the given tenant.
+        """Return the full business configuration for the configured tenant.
 
         Fetches all entities and their data for the specified consumption version.
         When ``consumption_version`` is omitted, the latest version is resolved
         automatically via :meth:`get_consumption_versions`.
 
         Args:
-            tenant_context: Tenant identification.
             consumption_version: Consumption version ID.  When ``None``, the
                 latest version is resolved via :meth:`get_consumption_versions`.
 
@@ -289,8 +309,9 @@ class DefaultClient:
             CBCServerError: On 5xx responses.
             CBCNetworkError: On connection failures.
         """
+        tenant_context = self._resolve_tenant()
         if consumption_version is None:
-            versions = self.get_consumption_versions(tenant_context)
+            versions = self.get_consumption_versions()
             latest = versions.latest()
             if latest is None:
                 raise CBCClientError(
@@ -409,7 +430,11 @@ class DefaultClient:
 # ---------------------------------------------------------------------------
 
 
-def create_client(*, config: CBCConfig | None = None) -> CBCClient:
+def create_client(
+    *,
+    config: CBCConfig | None = None,
+    tenant_context: TenantContext | Callable[[], TenantContext] | None = None,
+) -> CBCClient:
     """Create a :class:`DefaultClient` from environment variables or an explicit config.
 
     When ``config`` is omitted, credentials are resolved via
@@ -419,6 +444,9 @@ def create_client(*, config: CBCConfig | None = None) -> CBCClient:
     Args:
         config: Optional explicit :class:`~sap_cloud_sdk.cbc.config.CBCConfig`.
             When provided, env resolution is skipped entirely.
+        tenant_context: Tenant identification, or a callable that returns it.
+            The callable form is for multi-tenant agents where the tenant varies
+            per request.
 
     Returns:
         A configured :class:`DefaultClient`.
@@ -432,6 +460,7 @@ def create_client(*, config: CBCConfig | None = None) -> CBCClient:
     resolved: CBCConfig = config if config is not None else load_from_env()
     return DefaultClient(
         base_url=resolved.base_url,
+        tenant_context=tenant_context,
         cert_path=resolved.cert_path,
         key_path=resolved.key_path,
         cert_pem=resolved.cert_pem,

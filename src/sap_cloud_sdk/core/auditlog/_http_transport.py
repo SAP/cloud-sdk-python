@@ -87,4 +87,3 @@ class HttpTransport(Transport):
             return "/configuration-changes"
         else:
             raise TransportError(f"Unknown event type: {type(event)}")
-

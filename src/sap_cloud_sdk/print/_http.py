@@ -12,7 +12,7 @@ from requests.exceptions import RequestException
 from oauthlib.oauth2 import BackendApplicationClient
 from requests_oauthlib import OAuth2Session
 
-from sap_cloud_sdk.core.protocol.http import HttpClient, HttpMethod, XsuaaAuthProvider
+from sap_cloud_sdk.core.protocol.http import HttpClient
 from sap_cloud_sdk.print.config import PrintConfig
 from sap_cloud_sdk.print.exceptions import HttpError
 

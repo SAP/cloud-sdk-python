@@ -14,7 +14,9 @@ from sap_cloud_sdk.print.exceptions import HttpError
 def _make_jwt(claims: dict) -> str:
     """Build a minimal unsigned JWT with the given claims."""
     header = base64.urlsafe_b64encode(b'{"alg":"none"}').rstrip(b"=").decode()
-    payload = base64.urlsafe_b64encode(json.dumps(claims).encode()).rstrip(b"=").decode()
+    payload = (
+        base64.urlsafe_b64encode(json.dumps(claims).encode()).rstrip(b"=").decode()
+    )
     return f"{header}.{payload}."
 
 
@@ -28,7 +30,6 @@ def _config() -> PrintConfig:
 
 
 class TestTokenProvider:
-
     @patch("sap_cloud_sdk.print._http.OAuth2Session")
     def test_returns_access_token(self, mock_oauth):
         mock_session = MagicMock()
@@ -53,7 +54,9 @@ class TestTokenProvider:
         mock_session = MagicMock()
         mock_oauth.return_value = mock_session
         mock_session.fetch_token.return_value = {
-            "access_token": _make_jwt({"user_name": "john.doe@example.com", "client_id": "sb-app"})
+            "access_token": _make_jwt(
+                {"user_name": "john.doe@example.com", "client_id": "sb-app"}
+            )
         }
 
         provider = TokenProvider(_config())
@@ -71,7 +74,9 @@ class TestTokenProvider:
         assert provider.resolve_username() == "sb-app!t123"
 
     @patch("sap_cloud_sdk.print._http.OAuth2Session")
-    def test_resolve_username_falls_back_to_config_client_id_on_bad_token(self, mock_oauth):
+    def test_resolve_username_falls_back_to_config_client_id_on_bad_token(
+        self, mock_oauth
+    ):
         mock_session = MagicMock()
         mock_oauth.return_value = mock_session
         mock_session.fetch_token.return_value = {"access_token": "not.a.jwt"}
@@ -96,7 +101,6 @@ class TestTokenProvider:
 
 
 class TestPrintHttp:
-
     def _http(self, mock_http_client) -> PrintHttp:
         mock_tp = MagicMock()
         mock_tp.resolve_username.return_value = "user@example.com"
@@ -177,7 +181,9 @@ class TestPrintHttp:
         mock_http_client = MagicMock()
         resp = MagicMock()
         resp.status_code = 500
-        type(resp).text = property(lambda self: (_ for _ in ()).throw(RuntimeError("unreadable")))
+        type(resp).text = property(
+            lambda self: (_ for _ in ()).throw(RuntimeError("unreadable"))
+        )
         mock_http_client.request.return_value = resp
 
         http = self._http(mock_http_client)
@@ -196,12 +202,13 @@ class TestPrintHttp:
 
 
 class TestTokenProviderFetchFailure:
-
     @patch("sap_cloud_sdk.print._http.OAuth2Session")
     def test_fetch_token_exception_raises_http_error(self, mock_oauth):
         mock_session = MagicMock()
         mock_oauth.return_value = mock_session
-        mock_session.fetch_token.side_effect = Exception("(invalid_client) Bad credentials")
+        mock_session.fetch_token.side_effect = Exception(
+            "(invalid_client) Bad credentials"
+        )
 
         provider = TokenProvider(_config())
         with pytest.raises(HttpError, match="failed to acquire token"):
@@ -209,7 +216,6 @@ class TestTokenProviderFetchFailure:
 
 
 class TestTokenProviderRotation:
-
     @patch("sap_cloud_sdk.print._http.OAuth2Session")
     def test_proactive_rotation_rebuilds_session_when_binding_changed(self, mock_oauth):
         new_config = PrintConfig(
@@ -265,4 +271,3 @@ class TestTokenProviderRotation:
 
         # no has_changed() — session stays the same
         assert provider._session is init_session
-

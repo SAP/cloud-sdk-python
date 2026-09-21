@@ -140,6 +140,22 @@ def _make_logging_handler(provider: LoggerProvider) -> LoggingHandler:
     return handler
 
 
+def _raise_stream_handlers_to_warn() -> None:
+    # When both a StreamHandler and the OTel LoggingHandler are active on the root
+    # logger, every record hits stdout via the StreamHandler AND flows through OTLP
+    # via the LoggingHandler. Apps that also add a ConsoleLogExporter to the OTel
+    # pipeline then echo each OTLP record back to stdout, so the filelog receiver on
+    # the collector reads every log line twice — doubling CLS queue pressure and
+    # driving collector memory spikes on high-volume workspaces.
+    # Raising existing StreamHandlers to WARN routes INFO/DEBUG exclusively through
+    # OTLP (with full trace correlation), while stdout still shows warnings and errors
+    # for kubectl logs. DEBUG still reaches CLS via OTLP, so developer debugging is
+    # unaffected. Exact type check leaves FileHandler/SocketHandler subclasses alone.
+    for handler in logging.getLogger().handlers:
+        if type(handler) is logging.StreamHandler and handler.level < logging.WARNING:
+            handler.setLevel(logging.WARNING)
+
+
 def setup_log_provider() -> Optional[LoggerProvider]:
     """Set up the global OTel LoggerProvider using the shared resource attributes.
 
@@ -170,6 +186,7 @@ def setup_log_provider() -> Optional[LoggerProvider]:
             _merge_sdk_resource_into_log_provider(existing, resource)
             if not _root_logger_has_otel_handler():
                 logging.getLogger().addHandler(_make_logging_handler(existing))
+            _raise_stream_handlers_to_warn()
             _log_provider = existing
         else:
             provider = LoggerProvider(resource=resource)
@@ -178,6 +195,7 @@ def setup_log_provider() -> Optional[LoggerProvider]:
             )
             set_logger_provider(provider)
             logging.getLogger().addHandler(_make_logging_handler(provider))
+            _raise_stream_handlers_to_warn()
             _log_provider = provider
 
         logger.info(

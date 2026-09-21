@@ -47,6 +47,11 @@ class AuditLogConfig:
         """Service base URL (alias for service_url, used by XsuaaAuthProvider)."""
         return self.service_url
 
+    @property
+    def identityzone(self) -> None:
+        """No identity zone — auditlog does not support tenant substitution."""
+        return None
+
 
 @dataclass
 class BindingData:

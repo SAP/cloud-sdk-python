@@ -96,7 +96,6 @@ class HttpTransport(Transport):
                 f"{_PATH_PREFIX}{endpoint}",
                 json=event.to_dict(),
                 headers={"Content-Type": "application/json"},
-                timeout=10,
             )
 
             if not (200 <= response.status_code < 300):

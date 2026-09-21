@@ -46,6 +46,16 @@ class PrintConfig:
     client_id: str
     client_secret: str
 
+    @property
+    def base_url(self) -> str:
+        """Service base URL (alias for url, used by XsuaaAuthProvider)."""
+        return self.url
+
+    @property
+    def identityzone(self) -> None:
+        """No identity zone — print service does not support tenant substitution."""
+        return None
+
 
 @dataclass
 class _BindingData:

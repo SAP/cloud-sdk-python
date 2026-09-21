@@ -35,8 +35,7 @@ from sap_cloud_sdk.print._models import (
     PrintTaskMetadata,
 )
 from sap_cloud_sdk.print.config import PrintConfig, _make_config_factory
-from sap_cloud_sdk.print._http import TokenProvider
-from sap_cloud_sdk.print.client import PrintClient
+from sap_cloud_sdk.print.client import PrintClient, TokenProvider
 from sap_cloud_sdk.print.exceptions import (
     PrintError,
     ClientCreationError,

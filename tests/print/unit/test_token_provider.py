@@ -1,11 +1,11 @@
-"""Unit tests for Print HTTP transport and TokenProvider."""
+"""Unit tests for TokenProvider."""
 
 import base64
 import json
 import pytest
 from unittest.mock import MagicMock, patch
 
-from sap_cloud_sdk.print._http import TokenProvider
+from sap_cloud_sdk.print.client import TokenProvider
 from sap_cloud_sdk.print.config import PrintConfig
 from sap_cloud_sdk.print.exceptions import HttpError
 
@@ -29,7 +29,7 @@ def _config() -> PrintConfig:
 
 
 class TestTokenProvider:
-    @patch("sap_cloud_sdk.print._http.OAuth2Session")
+    @patch("sap_cloud_sdk.print.client.OAuth2Session")
     def test_returns_access_token(self, mock_oauth):
         mock_session = MagicMock()
         mock_oauth.return_value = mock_session
@@ -38,7 +38,7 @@ class TestTokenProvider:
         provider = TokenProvider(_config())
         assert provider.get_token() == "tok-abc"
 
-    @patch("sap_cloud_sdk.print._http.OAuth2Session")
+    @patch("sap_cloud_sdk.print.client.OAuth2Session")
     def test_missing_access_token_raises(self, mock_oauth):
         mock_session = MagicMock()
         mock_oauth.return_value = mock_session
@@ -48,7 +48,7 @@ class TestTokenProvider:
         with pytest.raises(HttpError, match="missing access_token"):
             provider.get_token()
 
-    @patch("sap_cloud_sdk.print._http.OAuth2Session")
+    @patch("sap_cloud_sdk.print.client.OAuth2Session")
     def test_resolve_username_returns_user_name_claim(self, mock_oauth):
         mock_session = MagicMock()
         mock_oauth.return_value = mock_session
@@ -61,7 +61,7 @@ class TestTokenProvider:
         provider = TokenProvider(_config())
         assert provider.resolve_username() == "john.doe@example.com"
 
-    @patch("sap_cloud_sdk.print._http.OAuth2Session")
+    @patch("sap_cloud_sdk.print.client.OAuth2Session")
     def test_resolve_username_falls_back_to_client_id_claim(self, mock_oauth):
         mock_session = MagicMock()
         mock_oauth.return_value = mock_session
@@ -72,7 +72,7 @@ class TestTokenProvider:
         provider = TokenProvider(_config())
         assert provider.resolve_username() == "sb-app!t123"
 
-    @patch("sap_cloud_sdk.print._http.OAuth2Session")
+    @patch("sap_cloud_sdk.print.client.OAuth2Session")
     def test_resolve_username_falls_back_to_config_client_id_on_bad_token(
         self, mock_oauth
     ):
@@ -83,7 +83,7 @@ class TestTokenProvider:
         provider = TokenProvider(_config())
         assert provider.resolve_username() == "client-id"
 
-    @patch("sap_cloud_sdk.print._http.OAuth2Session")
+    @patch("sap_cloud_sdk.print.client.OAuth2Session")
     def test_resolve_username_uses_cached_token(self, mock_oauth):
         mock_session = MagicMock()
         mock_oauth.return_value = mock_session
@@ -100,7 +100,7 @@ class TestTokenProvider:
 
 
 class TestTokenProviderFetchFailure:
-    @patch("sap_cloud_sdk.print._http.OAuth2Session")
+    @patch("sap_cloud_sdk.print.client.OAuth2Session")
     def test_fetch_token_exception_raises_http_error(self, mock_oauth):
         mock_session = MagicMock()
         mock_oauth.return_value = mock_session
@@ -114,7 +114,7 @@ class TestTokenProviderFetchFailure:
 
 
 class TestTokenProviderRotation:
-    @patch("sap_cloud_sdk.print._http.OAuth2Session")
+    @patch("sap_cloud_sdk.print.client.OAuth2Session")
     def test_proactive_rotation_rebuilds_session_when_binding_changed(self, mock_oauth):
         new_config = PrintConfig(
             url="https://api.eu10.print.services.sap",
@@ -138,7 +138,7 @@ class TestTokenProviderRotation:
         # factory called once at init, once on rotation
         assert mock_factory.call_count == 2
 
-    @patch("sap_cloud_sdk.print._http.OAuth2Session")
+    @patch("sap_cloud_sdk.print.client.OAuth2Session")
     def test_no_rebuild_when_binding_unchanged(self, mock_oauth):
         mock_session = MagicMock()
         mock_oauth.return_value = mock_session
@@ -156,7 +156,7 @@ class TestTokenProviderRotation:
         assert provider._session is init_session  # no rebuild
         assert mock_factory.call_count == 1  # no extra factory call
 
-    @patch("sap_cloud_sdk.print._http.OAuth2Session")
+    @patch("sap_cloud_sdk.print.client.OAuth2Session")
     def test_static_config_has_no_has_changed_check(self, mock_oauth):
         mock_session = MagicMock()
         mock_oauth.return_value = mock_session

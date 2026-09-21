@@ -45,6 +45,7 @@ from sap_cloud_sdk.print.exceptions import (
     PrintOperationError,
 )
 
+from sap_cloud_sdk.core.protocol.http import HttpClient, XsuaaAuthProvider
 from sap_cloud_sdk.core.telemetry import (
     Module,
     Operation,
@@ -74,10 +75,18 @@ def create_client(
     try:
         if config is not None:
             tp = TokenProvider(config)
+            auth_provider = XsuaaAuthProvider(lambda: config)
+            base_url = config.url
         else:
             factory = _make_config_factory(instance)
+            initial_config = factory()
             tp = TokenProvider(factory)
-        http = PrintHttp(config=tp._config, token_provider=tp)
+            auth_provider = XsuaaAuthProvider(factory)
+            base_url = initial_config.url
+        http = PrintHttp(
+            token_provider=tp,
+            http_client=HttpClient(base_url, auth_provider),
+        )
         return PrintClient(http, _telemetry_source=_telemetry_source)
     except Exception as e:
         _record_error_metric(

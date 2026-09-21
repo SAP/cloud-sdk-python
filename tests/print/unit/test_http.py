@@ -97,11 +97,10 @@ class TestTokenProvider:
 
 class TestPrintHttp:
 
-    def _http(self, mock_session) -> PrintHttp:
-        config = _config()
+    def _http(self, mock_http_client) -> PrintHttp:
         mock_tp = MagicMock()
-        mock_tp.get_token.return_value = "test-token"
-        return PrintHttp(config=config, token_provider=mock_tp, session=mock_session)
+        mock_tp.resolve_username.return_value = "user@example.com"
+        return PrintHttp(token_provider=mock_tp, http_client=mock_http_client)
 
     def _ok_response(self, status_code: int = 200):
         resp = MagicMock()
@@ -115,96 +114,82 @@ class TestPrintHttp:
         resp.text = "error body"
         return resp
 
-    def test_get_constructs_correct_url(self):
-        mock_session = MagicMock()
-        mock_session.request.return_value = self._ok_response()
+    def test_get_delegates_to_http_client(self):
+        mock_http_client = MagicMock()
+        mock_http_client.request.return_value = self._ok_response()
 
-        http = self._http(mock_session)
+        http = self._http(mock_http_client)
         http.get("qm/api/v1/rest/queues")
 
-        _, kwargs = mock_session.request.call_args
-        assert "print.services.sap" in kwargs["url"]
-        assert "queues" in kwargs["url"]
-        assert kwargs["method"] == "GET"
-
-    def test_authorization_header_set(self):
-        mock_session = MagicMock()
-        mock_session.request.return_value = self._ok_response()
-
-        http = self._http(mock_session)
-        http.get("some/path")
-
-        _, kwargs = mock_session.request.call_args
-        assert kwargs["headers"]["Authorization"] == "Bearer test-token"
+        mock_http_client.request.assert_called_once()
+        args, kwargs = mock_http_client.request.call_args
+        assert args[0] == "GET"
+        assert "queues" in args[1]
 
     def test_non_2xx_raises_http_error(self):
-        mock_session = MagicMock()
-        mock_session.request.return_value = self._error_response(500)
+        mock_http_client = MagicMock()
+        mock_http_client.request.return_value = self._error_response(500)
 
-        http = self._http(mock_session)
+        http = self._http(mock_http_client)
         with pytest.raises(HttpError) as exc_info:
             http.get("some/path")
         assert exc_info.value.status_code == 500
 
     def test_request_exception_raises_http_error(self):
-        mock_session = MagicMock()
-        mock_session.request.side_effect = RequestException("connection refused")
+        mock_http_client = MagicMock()
+        mock_http_client.request.side_effect = RequestException("connection refused")
 
-        http = self._http(mock_session)
+        http = self._http(mock_http_client)
         with pytest.raises(HttpError, match="request failed"):
             http.get("some/path")
 
     def test_put_sends_json_body(self):
-        mock_session = MagicMock()
-        mock_session.request.return_value = self._ok_response(204)
+        mock_http_client = MagicMock()
+        mock_http_client.request.return_value = self._ok_response(204)
 
-        http = self._http(mock_session)
+        http = self._http(mock_http_client)
         http.put("some/path", json={"key": "value"})
 
-        _, kwargs = mock_session.request.call_args
+        _, kwargs = mock_http_client.request.call_args
         assert kwargs["json"] == {"key": "value"}
-        assert kwargs["method"] == "PUT"
 
     def test_post_multipart_sends_files(self):
-        mock_session = MagicMock()
-        mock_session.request.return_value = self._ok_response(201)
+        mock_http_client = MagicMock()
+        mock_http_client.request.return_value = self._ok_response(201)
 
-        http = self._http(mock_session)
+        http = self._http(mock_http_client)
         http.post("some/path", files={"file": ("doc.pdf", b"data")})
 
-        _, kwargs = mock_session.request.call_args
+        _, kwargs = mock_http_client.request.call_args
         assert kwargs["files"] is not None
-        assert kwargs["method"] == "POST"
 
-    def test_extra_headers_merged_into_request(self):
-        mock_session = MagicMock()
-        mock_session.request.return_value = self._ok_response()
+    def test_extra_headers_forwarded(self):
+        mock_http_client = MagicMock()
+        mock_http_client.request.return_value = self._ok_response()
 
-        http = self._http(mock_session)
+        http = self._http(mock_http_client)
         http.get("some/path", headers={"X-Custom": "value"})
 
-        _, kwargs = mock_session.request.call_args
+        _, kwargs = mock_http_client.request.call_args
         assert kwargs["headers"]["X-Custom"] == "value"
-        assert kwargs["headers"]["Authorization"] == "Bearer test-token"
 
     def test_response_text_read_failure_still_raises_http_error(self):
-        mock_session = MagicMock()
+        mock_http_client = MagicMock()
         resp = MagicMock()
         resp.status_code = 500
         type(resp).text = property(lambda self: (_ for _ in ()).throw(RuntimeError("unreadable")))
-        mock_session.request.return_value = resp
+        mock_http_client.request.return_value = resp
 
-        http = self._http(mock_session)
+        http = self._http(mock_http_client)
         with pytest.raises(HttpError) as exc_info:
             http.get("some/path")
         assert exc_info.value.status_code == 500
 
     def test_get_username_delegates_to_token_provider(self):
-        mock_session = MagicMock()
-        config = _config()
+        mock_http_client = MagicMock()
         mock_tp = MagicMock()
         mock_tp.resolve_username.return_value = "user@example.com"
-        http = PrintHttp(config=config, token_provider=mock_tp, session=mock_session)
+        http = PrintHttp(token_provider=mock_tp, http_client=mock_http_client)
 
         assert http.get_username() == "user@example.com"
         mock_tp.resolve_username.assert_called_once()
@@ -280,3 +265,4 @@ class TestTokenProviderRotation:
 
         # no has_changed() — session stays the same
         assert provider._session is init_session
+

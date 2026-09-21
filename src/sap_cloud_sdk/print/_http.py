@@ -7,12 +7,12 @@ import json
 import logging
 from typing import Any, Callable, Dict, Optional, Protocol
 
-import requests
 from requests import Response
 from requests.exceptions import RequestException
 from oauthlib.oauth2 import BackendApplicationClient
 from requests_oauthlib import OAuth2Session
 
+from sap_cloud_sdk.core.protocol.http import HttpClient, HttpMethod, XsuaaAuthProvider
 from sap_cloud_sdk.print.config import PrintConfig
 from sap_cloud_sdk.print.exceptions import HttpError
 
@@ -113,22 +113,15 @@ class PrintHttp:
 
     def __init__(
         self,
-        config: PrintConfig,
         token_provider: AbstractTokenProvider,
-        session: Optional[requests.Session] = None,
+        http_client: HttpClient,
     ) -> None:
-        self._config = config
         self._token_provider = token_provider
-        self._session = session or requests.Session()
-        self._base_url = config.url.rstrip("/")
+        self._http = http_client
 
     def get_username(self) -> str:
         """Resolve the username from the current OAuth token (or fall back to client_id)."""
         return self._token_provider.resolve_username()
-
-    def _auth_headers(self) -> Dict[str, str]:
-        token = self._token_provider.get_token()
-        return {"Authorization": f"Bearer {token}"}
 
     def _request(
         self,
@@ -141,23 +134,18 @@ class PrintHttp:
         files: Optional[Any] = None,
         extra_headers: Optional[Dict[str, str]] = None,
     ) -> Response:
-        url = f"{self._base_url}/{path.lstrip('/')}"
-        headers = self._auth_headers()
-        if extra_headers:
-            headers.update(extra_headers)
-
         try:
-            resp = self._session.request(
-                method=method,
-                url=url,
-                headers=headers,
+            resp = self._http.request(
+                method,
+                f"/{path.lstrip('/')}",
                 params=params,
                 json=json,
                 data=data,
                 files=files,
+                headers=extra_headers,
             )
         except RequestException as e:
-            logger.error("request failed [%s %s]: %s", method, url, e)
+            logger.error("request failed [%s %s]: %s", method, path, e)
             raise HttpError(f"request failed: {e}") from e
 
         if 200 <= resp.status_code < 300:
@@ -170,7 +158,7 @@ class PrintHttp:
             text = "<failed to read response body>"
 
         raise HttpError(
-            f"HTTP {resp.status_code} for {method} {url}",
+            f"HTTP {resp.status_code} for {method} {path}",
             status_code=resp.status_code,
             response_text=text,
         )

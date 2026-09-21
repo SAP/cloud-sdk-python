@@ -1,12 +1,8 @@
 """HTTP transport implementation for cloud mode."""
 
-from typing import Callable, Optional
+from typing import Callable
 
-import requests
-
-from oauthlib.oauth2 import BackendApplicationClient
-from requests_oauthlib import OAuth2Session
-
+from sap_cloud_sdk.core.protocol.http import HttpClient, HttpMethod, XsuaaAuthProvider
 from sap_cloud_sdk.core.auditlog.models import (
     SecurityEvent,
     DataAccessEvent,
@@ -17,7 +13,9 @@ from sap_cloud_sdk.core.auditlog.models import (
 )
 from sap_cloud_sdk.core.auditlog._transport import Transport, AuditMessage
 from sap_cloud_sdk.core.auditlog.config import AuditLogConfig
-from sap_cloud_sdk.core.auditlog.exceptions import TransportError, AuthenticationError
+from sap_cloud_sdk.core.auditlog.exceptions import TransportError
+
+_PATH_PREFIX = "/audit-log/oauth2/v2"
 
 
 class HttpTransport(Transport):
@@ -43,30 +41,9 @@ class HttpTransport(Transport):
         else:
             self._config_factory = lambda: config  # type: ignore[arg-type]
             self.config = config  # type: ignore[assignment]
-        self.oauth: Optional[OAuth2Session] = None
 
-    def _ensure_session(self) -> OAuth2Session:
-        """Return a valid OAuth2 session, refreshing credentials if the binding changed."""
-        has_changed = getattr(self._config_factory, "has_changed", None)
-        if callable(has_changed) and has_changed():
-            self.config = self._config_factory()
-            self.oauth = None
-
-        if self.oauth is None:
-            token_url = f"{self.config.oauth_url.rstrip('/')}/oauth/token"
-            client = BackendApplicationClient(client_id=self.config.client_id)
-            oauth = OAuth2Session(client=client)
-            try:
-                oauth.fetch_token(
-                    token_url=token_url,
-                    client_id=self.config.client_id,
-                    client_secret=self.config.client_secret,
-                )
-            except Exception as e:
-                raise AuthenticationError(f"Failed to obtain OAuth2 token: {e}")
-            self.oauth = oauth
-
-        return self.oauth
+        auth_provider = XsuaaAuthProvider(self._config_factory)
+        self._http = HttpClient(self.config.service_url, auth_provider)
 
     def send(self, event: AuditMessage) -> None:
         """Send audit event via HTTP.
@@ -78,27 +55,23 @@ class HttpTransport(Transport):
             TransportError: If the HTTP request fails.
         """
         try:
-            event_dict = event.to_dict()
-
             endpoint = self._get_endpoint(event)
-            path_prefix = "/audit-log/oauth2/v2"
-            url = f"{self.config.service_url.rstrip('/')}{path_prefix}{endpoint}"
-
-            oauth = self._ensure_session()
-            response = oauth.post(
-                url,
-                json=event_dict,
+            response = self._http.request(
+                HttpMethod.POST,
+                f"{_PATH_PREFIX}{endpoint}",
+                json=event.to_dict(),
                 headers={"Content-Type": "application/json"},
                 timeout=10,
             )
 
             if not (200 <= response.status_code < 300):
+                url = f"{self.config.service_url.rstrip('/')}{_PATH_PREFIX}{endpoint}"
                 raise TransportError(
                     f"POST request to {url} completed with status {response.status_code}: {response.text}"
                 )
 
-        except requests.exceptions.RequestException as e:
-            raise TransportError(f"Network error: {e}")
+        except TransportError:
+            raise
         except Exception as e:
             raise TransportError(f"Unexpected error sending audit event: {e}")
 
@@ -109,10 +82,9 @@ class HttpTransport(Transport):
         elif isinstance(event, DataAccessEvent):
             return "/data-accesses"
         elif isinstance(event, (DataModificationEvent, DataDeletionEvent)):
-            # DataDeletionEvent maps to same endpoint as DataModificationEvent
             return "/data-modifications"
         elif isinstance(event, (ConfigurationChangeEvent, ConfigurationDeletionEvent)):
-            # ConfigurationDeletionEvent maps to same endpoint as ConfigurationChangeEvent
             return "/configuration-changes"
         else:
             raise TransportError(f"Unknown event type: {type(event)}")
+

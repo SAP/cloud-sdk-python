@@ -1,29 +1,19 @@
-"""HTTP transport and OAuth utilities for SAP Print Service."""
+"""OAuth token provider for SAP Print Service."""
 
 from __future__ import annotations
 
 import base64
 import json
 import logging
-from typing import Any, Callable, Dict, Optional, Protocol
+from typing import Any, Callable, Dict, Optional
 
-from requests import Response
-from requests.exceptions import RequestException
 from oauthlib.oauth2 import BackendApplicationClient
 from requests_oauthlib import OAuth2Session
 
-from sap_cloud_sdk.core.protocol.http import HttpClient
 from sap_cloud_sdk.print.config import PrintConfig
 from sap_cloud_sdk.print.exceptions import HttpError
 
 logger = logging.getLogger(__name__)
-
-
-class AbstractTokenProvider(Protocol):
-    """Protocol for token providers — allows injection of mock providers in tests."""
-
-    def get_token(self) -> str: ...
-    def resolve_username(self) -> str: ...
 
 
 class TokenProvider:
@@ -106,90 +96,3 @@ class TokenProvider:
         except Exception:
             logger.debug("could not decode JWT claims, falling back to client_id")
             return self._config.client_id
-
-
-class PrintHttp:
-    """HTTP client for SAP Print Service."""
-
-    def __init__(
-        self,
-        token_provider: AbstractTokenProvider,
-        http_client: HttpClient,
-    ) -> None:
-        self._token_provider = token_provider
-        self._http = http_client
-
-    def get_username(self) -> str:
-        """Resolve the username from the current OAuth token (or fall back to client_id)."""
-        return self._token_provider.resolve_username()
-
-    def _request(
-        self,
-        method: str,
-        path: str,
-        *,
-        params: Optional[Dict[str, Any]] = None,
-        json: Optional[Any] = None,
-        data: Optional[Any] = None,
-        files: Optional[Any] = None,
-        extra_headers: Optional[Dict[str, str]] = None,
-    ) -> Response:
-        try:
-            resp = self._http.request(
-                method,
-                f"/{path.lstrip('/')}",
-                params=params,
-                json=json,
-                data=data,
-                files=files,
-                headers=extra_headers,
-            )
-        except RequestException as e:
-            logger.error("request failed [%s %s]: %s", method, path, e)
-            raise HttpError(f"request failed: {e}") from e
-
-        if 200 <= resp.status_code < 300:
-            return resp
-
-        text: str = ""
-        try:
-            text = resp.text
-        except Exception:
-            text = "<failed to read response body>"
-
-        raise HttpError(
-            f"HTTP {resp.status_code} for {method} {path}",
-            status_code=resp.status_code,
-            response_text=text,
-        )
-
-    def get(
-        self,
-        path: str,
-        *,
-        params: Optional[Dict[str, Any]] = None,
-        headers: Optional[Dict[str, str]] = None,
-    ) -> Response:
-        return self._request("GET", path, params=params, extra_headers=headers)
-
-    def put(
-        self,
-        path: str,
-        *,
-        json: Optional[Any] = None,
-        headers: Optional[Dict[str, str]] = None,
-    ) -> Response:
-        return self._request("PUT", path, json=json, extra_headers=headers)
-
-    def post(
-        self,
-        path: str,
-        *,
-        json: Optional[Any] = None,
-        data: Optional[Any] = None,
-        files: Optional[Any] = None,
-        headers: Optional[Dict[str, str]] = None,
-    ) -> Response:
-        return self._request(
-            "POST", path, json=json, data=data, files=files, extra_headers=headers
-        )

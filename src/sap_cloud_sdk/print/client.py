@@ -5,14 +5,17 @@ from __future__ import annotations
 import logging
 from typing import IO, Optional, Union
 
+from requests.exceptions import RequestException
+
+from sap_cloud_sdk.core.protocol.http import HttpClient
 from sap_cloud_sdk.core.telemetry import Module, Operation, record_metrics
-from sap_cloud_sdk.print._http import PrintHttp
+from sap_cloud_sdk.print._http import TokenProvider
 from sap_cloud_sdk.print.exceptions import HttpError, PrintOperationError
 from sap_cloud_sdk.print._models import PrintProfile, PrintQueue, PrintTask
 
-_QUEUES_PATH = "qm/api/v1/rest/queues"
-_DOCUMENTS_PATH = "dm/api/v1/rest/print-documents"
-_TASKS_PATH = "qm/api/v1/rest/print-tasks"
+_QUEUES_PATH = "/qm/api/v1/rest/queues"
+_DOCUMENTS_PATH = "/dm/api/v1/rest/print-documents"
+_TASKS_PATH = "/qm/api/v1/rest/print-tasks"
 
 _IF_NONE_MATCH = {"If-None-Match": "*"}
 
@@ -51,10 +54,51 @@ class PrintClient:
     """
 
     def __init__(
-        self, http: PrintHttp, _telemetry_source: Optional[Module] = None
+        self,
+        http: HttpClient,
+        token_provider: TokenProvider,
+        _telemetry_source: Optional[Module] = None,
     ) -> None:
         self._http = http
+        self._token_provider = token_provider
         self._telemetry_source = _telemetry_source
+
+    def get_username(self) -> str:
+        """Resolve the username from the current OAuth token (or fall back to client_id)."""
+        return self._token_provider.resolve_username()
+
+    def _request(self, method: str, path: str, **kwargs):
+        try:
+            resp = self._http.request(method, path, **kwargs)
+        except RequestException as e:
+            logger.error("request failed [%s %s]: %s", method, path, e)
+            raise HttpError(f"request failed: {e}") from e
+
+        if 200 <= resp.status_code < 300:
+            return resp
+
+        text: str = ""
+        try:
+            text = resp.text
+        except Exception:
+            text = "<failed to read response body>"
+
+        raise HttpError(
+            f"HTTP {resp.status_code} for {method} {path}",
+            status_code=resp.status_code,
+            response_text=text,
+        )
+
+    def get(self, path: str, *, params=None, headers=None):
+        return self._request("GET", path, params=params, headers=headers)
+
+    def put(self, path: str, *, json=None, headers=None):
+        return self._request("PUT", path, json=json, headers=headers)
+
+    def post(self, path: str, *, json=None, data=None, files=None, headers=None):
+        return self._request(
+            "POST", path, json=json, data=data, files=files, headers=headers
+        )
 
     @record_metrics(Module.PRINT, Operation.PRINT_LIST_QUEUES)
     def list_queues(self) -> list[PrintQueue]:
@@ -67,7 +111,7 @@ class PrintClient:
             PrintOperationError: If the request fails or the response cannot be parsed.
         """
         try:
-            resp = self._http.get(_QUEUES_PATH)
+            resp = self.get(_QUEUES_PATH)
             data = resp.json()
             return [PrintQueue.from_dict(item) for item in data]
         except HttpError as e:
@@ -91,7 +135,7 @@ class PrintClient:
             PrintOperationError: If the request fails.
         """
         try:
-            self._http.put(
+            self.put(
                 f"{_QUEUES_PATH}/{queue.qname}",
                 json=queue.to_dict(),
                 headers=_IF_NONE_MATCH,
@@ -119,7 +163,7 @@ class PrintClient:
             PrintOperationError: If the request fails or the response cannot be parsed.
         """
         try:
-            resp = self._http.get(f"{_QUEUES_PATH}/{qname}/profiles")
+            resp = self.get(f"{_QUEUES_PATH}/{qname}/profiles")
             data = resp.json()
             return [PrintProfile.from_dict(item) for item in data]
         except HttpError as e:
@@ -158,7 +202,7 @@ class PrintClient:
         """
         try:
             headers = {**_IF_NONE_MATCH, "scan": str(scan).lower()}
-            resp = self._http.post(
+            resp = self.post(
                 _DOCUMENTS_PATH,
                 files={"file": (filename, file)},
                 headers=headers,
@@ -186,9 +230,9 @@ class PrintClient:
             PrintOperationError: If the request fails.
         """
         if not task.username:
-            task.username = self._http.get_username()
+            task.username = self.get_username()
         try:
-            self._http.put(
+            self.put(
                 f"{_TASKS_PATH}/{task.item_id}",
                 json=task.to_body(),
                 headers=_IF_NONE_MATCH,

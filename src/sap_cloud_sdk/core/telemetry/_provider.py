@@ -135,7 +135,9 @@ def shutdown() -> None:
 
 
 def _make_logging_handler(provider: LoggerProvider) -> LoggingHandler:
-    handler = LoggingHandler(logger_provider=provider)
+    # INFO floor prevents DEBUG records from reaching production telemetry pipelines
+    # even when the root logger level is set to DEBUG by the application.
+    handler = LoggingHandler(level=logging.INFO, logger_provider=provider)
     handler.addFilter(IdentityLogFilter())
     return handler
 

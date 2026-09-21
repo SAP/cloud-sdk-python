@@ -489,6 +489,13 @@ class TestMakeLoggingHandler:
         handler = _make_logging_handler(mock_provider)
         assert any(isinstance(f, IdentityLogFilter) for f in handler.filters)
 
+    def test_handler_level_is_info(self):
+        import logging
+
+        mock_provider = MagicMock()
+        handler = _make_logging_handler(mock_provider)
+        assert handler.level == logging.INFO
+
 
 class TestSetupLogProviderInstallsFilter:
     @pytest.fixture(autouse=True)

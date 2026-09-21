@@ -9,6 +9,7 @@ Usage:
     client = create_client("object-store-1")
 """
 
+import warnings
 from typing import Optional
 
 from sap_cloud_sdk.objectstore.exceptions import (
@@ -57,6 +58,14 @@ def create_client(
     """
     if not instance or not instance.strip():
         raise ValueError("instance parameter must be a non-empty string")
+
+    warnings.warn(
+        "sap_cloud_sdk.objectstore is deprecated and will be removed in a future "
+        "release. Use sap_cloud_sdk.object_storage, which also supports Azure Blob "
+        "Storage and Google Cloud Storage.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
 
     if config is not None:
         return ObjectStoreClient(_make_static_factory(config), disable_ssl=disable_ssl)

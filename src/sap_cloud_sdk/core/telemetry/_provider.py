@@ -142,6 +142,20 @@ def _make_logging_handler(provider: LoggerProvider) -> LoggingHandler:
     return handler
 
 
+def _raise_stream_handlers_to_warn() -> None:
+    # When both a StreamHandler and a LoggingHandler are active on the root logger
+    # at INFO, every record hits stdout twice: once via StreamHandler and once via
+    # the OTel LoggingHandler → ConsoleLogExporter pattern that some apps use.
+    # The filelog receiver picks up both copies, doubling CLS queue pressure.
+    # Raising existing StreamHandlers to WARN means INFO+ flows exclusively via
+    # OTLP with full trace correlation; stdout still carries warnings and errors
+    # for kubectl logs visibility.
+    # Use exact type check to avoid touching FileHandler/SocketHandler subclasses.
+    for handler in logging.getLogger().handlers:
+        if type(handler) is logging.StreamHandler and handler.level < logging.WARNING:
+            handler.setLevel(logging.WARNING)
+
+
 def setup_log_provider() -> Optional[LoggerProvider]:
     """Set up the global OTel LoggerProvider using the shared resource attributes.
 
@@ -172,6 +186,7 @@ def setup_log_provider() -> Optional[LoggerProvider]:
             _merge_sdk_resource_into_log_provider(existing, resource)
             if not _root_logger_has_otel_handler():
                 logging.getLogger().addHandler(_make_logging_handler(existing))
+            _raise_stream_handlers_to_warn()
             _log_provider = existing
         else:
             provider = LoggerProvider(resource=resource)
@@ -180,6 +195,7 @@ def setup_log_provider() -> Optional[LoggerProvider]:
             )
             set_logger_provider(provider)
             logging.getLogger().addHandler(_make_logging_handler(provider))
+            _raise_stream_handlers_to_warn()
             _log_provider = provider
 
         logger.info(

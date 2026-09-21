@@ -27,6 +27,7 @@ from sap_cloud_sdk.core.telemetry._provider import (
     _merge_sdk_resource_into_log_provider,
     _root_logger_has_otel_handler,
     _make_logging_handler,
+    _raise_stream_handlers_to_warn,
 )
 from sap_cloud_sdk.core.telemetry.log_filters.identity import IdentityLogFilter
 from sap_cloud_sdk.core.telemetry.config import InstrumentationConfig
@@ -495,6 +496,47 @@ class TestMakeLoggingHandler:
         mock_provider = MagicMock()
         handler = _make_logging_handler(mock_provider)
         assert handler.level == logging.INFO
+
+
+class TestRaiseStreamHandlersToWarn:
+    def setup_method(self):
+        import logging
+        self._original_handlers = logging.getLogger().handlers[:]
+        logging.getLogger().handlers.clear()
+
+    def teardown_method(self):
+        import logging
+        logging.getLogger().handlers = self._original_handlers
+
+    def test_raises_stream_handler_below_warn(self):
+        import logging
+        h = logging.StreamHandler()
+        h.setLevel(logging.DEBUG)
+        logging.getLogger().addHandler(h)
+        _raise_stream_handlers_to_warn()
+        assert h.level == logging.WARNING
+
+    def test_does_not_lower_stream_handler_above_warn(self):
+        import logging
+        h = logging.StreamHandler()
+        h.setLevel(logging.ERROR)
+        logging.getLogger().addHandler(h)
+        _raise_stream_handlers_to_warn()
+        assert h.level == logging.ERROR
+
+    def test_ignores_file_handler_subclass(self):
+        import logging, tempfile, os
+        with tempfile.NamedTemporaryFile(delete=False) as f:
+            path = f.name
+        try:
+            h = logging.FileHandler(path)
+            h.setLevel(logging.DEBUG)
+            logging.getLogger().addHandler(h)
+            _raise_stream_handlers_to_warn()
+            assert h.level == logging.DEBUG
+        finally:
+            h.close()
+            os.unlink(path)
 
 
 class TestSetupLogProviderInstallsFilter:

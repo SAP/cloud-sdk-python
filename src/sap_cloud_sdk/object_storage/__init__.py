@@ -7,7 +7,7 @@ providers: S3/MinIO, Azure Blob Storage, Google Cloud Storage.
 Usage:
     from sap_cloud_sdk.object_storage import create_client
 
-    client = create_client("object-store-1")
+    client = create_client(instance="object-store-1")
 """
 
 from sap_cloud_sdk.object_storage._factory import create_client

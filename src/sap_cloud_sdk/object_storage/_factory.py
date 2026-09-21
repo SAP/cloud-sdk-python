@@ -17,8 +17,8 @@ from sap_cloud_sdk.object_storage.exceptions import ClientCreationError
 
 
 def create_client(
-    instance: str,
     *,
+    instance: str | None = None,
     config: Union[S3Config, AzureConfig, GcsConfig, None] = None,
 ) -> ObjectStoreClient:
     """Create an object store client with automatic provider detection.
@@ -28,7 +28,8 @@ def create_client(
     cloud provider, and returns the matching concrete client.
 
     Args:
-        instance: Instance name used for secret resolution. Must be non-empty.
+        instance: Instance name used for secret resolution. Defaults to
+            ``"default"`` and is ignored when ``config`` is provided.
         config: Optional explicit client configuration. If provided,
             auto-detection is skipped and this configuration is used directly.
 
@@ -36,22 +37,20 @@ def create_client(
         A client satisfying the ``ObjectStoreClient`` protocol.
 
     Raises:
-        ValueError: If ``instance`` is empty or None.
         ConfigError: If the binding cannot be loaded or is missing required fields.
         ClientCreationError: If no provider can be detected or client creation fails.
     """
-    if not instance or not instance.strip():
-        raise ValueError("instance parameter must be a non-empty string")
-
     if config is None:
-        keys = read_binding_keys(instance)
+        resolved_instance = instance or "default"
+        keys = read_binding_keys(resolved_instance)
         try:
             provider = detect_provider(keys)
         except ValueError as e:
             raise ClientCreationError(
-                f"Cannot create objectstore client for instance '{instance}': {e}"
+                "Cannot create objectstore client for instance "
+                f"'{resolved_instance}': {e}"
             ) from e
-        config = load_from_env_or_mount(provider, instance)
+        config = load_from_env_or_mount(provider, resolved_instance)
 
     if isinstance(config, S3Config):
         return S3Client(config)

@@ -33,7 +33,7 @@ GCS from its keys, and creates the matching client.
 ```python
 from sap_cloud_sdk.object_storage import create_client
 
-client = create_client("my-instance")
+client = create_client(instance="my-instance")
 ```
 
 > **`instance` refers to the instance name defined in your Cloud descriptor.**
@@ -47,7 +47,6 @@ Pass a public configuration type to bypass service-binding discovery:
 from sap_cloud_sdk.object_storage import S3Config, create_client
 
 client = create_client(
-    "local-minio",
     config=S3Config(
         access_key_id="...",
         secret_access_key="...",
@@ -64,7 +63,6 @@ For Azure Blob Storage and GCS, pass `AzureConfig` or `GcsConfig` respectively:
 from sap_cloud_sdk.object_storage import AzureConfig, GcsConfig, create_client
 
 azure_client = create_client(
-    "azure-store",
     config=AzureConfig(
         container_name="my-container",
         container_uri="https://my-account.blob.core.windows.net/my-container",
@@ -73,7 +71,6 @@ azure_client = create_client(
 )
 
 gcs_client = create_client(
-    "gcs-store",
     config=GcsConfig(
         base64_encoded_private_key_data="...",
         project_id="my-project",
@@ -229,7 +226,7 @@ except ObjectOperationError as error:
     print(f"Operation failed: {error}")
 
 try:
-    client = create_client("my-instance")
+    client = create_client(instance="my-instance")
 except ConfigError as error:
     print(f"Invalid or incomplete binding: {error}")
 except ClientCreationError as error:
@@ -248,7 +245,9 @@ except ListObjectsError as error:
 ### Provider Detection and Binding Discovery
 
 With no explicit `config`, `create_client()` detects the provider from binding
-keys. Detection is case-insensitive. Binding values are loaded in this order:
+keys. The instance defaults to `"default"`. When both `instance` and `config`
+are supplied, the explicit configuration takes precedence and the instance is
+ignored. Detection is case-insensitive. Binding values are loaded in this order:
 
 1. When `SERVICE_BINDING_ROOT` is set, the servicebinding.io flat path:
    `$SERVICE_BINDING_ROOT/objectstore/<field>`.

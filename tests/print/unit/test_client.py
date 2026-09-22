@@ -1,13 +1,16 @@
 """Unit tests for PrintClient."""
 
+import base64
+import json
 import pytest
 from unittest.mock import MagicMock
 from requests import Response
 from requests.exceptions import RequestException
 
-from sap_cloud_sdk.print.client import PrintClient
+from sap_cloud_sdk.print.client import PrintClient, _resolve_username
 from sap_cloud_sdk.print._models import PrintContent, PrintProfile, PrintQueue, PrintTask
 from sap_cloud_sdk.print.exceptions import HttpError, PrintOperationError
+from sap_cloud_sdk.print.config import PrintConfig
 
 
 def _mock_response(status_code: int, json_data=None, text: str = "") -> Response:
@@ -18,12 +21,28 @@ def _mock_response(status_code: int, json_data=None, text: str = "") -> Response
     return resp
 
 
-def _make_client(mock_http=None, mock_tp=None) -> PrintClient:
+def _make_jwt(claims: dict) -> str:
+    header = base64.urlsafe_b64encode(b'{"alg":"none"}').rstrip(b"=").decode()
+    payload = base64.urlsafe_b64encode(json.dumps(claims).encode()).rstrip(b"=").decode()
+    return f"{header}.{payload}."
+
+
+def _make_config() -> PrintConfig:
+    return PrintConfig(
+        url="https://api.eu10.print.services.sap",
+        token_url="https://tenant.authentication.eu10.hana.ondemand.com/oauth/token",
+        client_id="client-id",
+        client_secret="client-secret",
+    )
+
+
+def _make_client(mock_http=None, mock_auth=None, config=None) -> PrintClient:
     if mock_http is None:
         mock_http = MagicMock()
-    if mock_tp is None:
-        mock_tp = MagicMock()
-    return PrintClient(http=mock_http, token_provider=mock_tp)
+    if mock_auth is None:
+        mock_auth = MagicMock()
+    cfg = config or _make_config()
+    return PrintClient(http=mock_http, auth_provider=mock_auth, config_factory=lambda: cfg)
 
 
 class TestListQueues:
@@ -227,15 +246,15 @@ class TestCreatePrintTask:
     def test_username_auto_resolved_when_empty(self):
         mock_http = MagicMock()
         mock_http.request.return_value = _mock_response(204)
-        mock_tp = MagicMock()
-        mock_tp.resolve_username.return_value = "auto@example.com"
+        mock_auth = MagicMock()
+        mock_auth.get_session.return_value.access_token = _make_jwt({"user_name": "auto@example.com"})
 
         task = PrintTask(
             item_id="doc-id",
             qname="q1",
             print_contents=[PrintContent(object_key="doc-id", document_name="f.pdf")],
         )
-        client = _make_client(mock_http, mock_tp)
+        client = _make_client(mock_http, mock_auth)
         client.create_print_task(task)
 
         _, kwargs = mock_http.request.call_args
@@ -245,8 +264,7 @@ class TestCreatePrintTask:
     def test_username_not_overwritten_when_provided(self):
         mock_http = MagicMock()
         mock_http.request.return_value = _mock_response(204)
-        mock_tp = MagicMock()
-        mock_tp.resolve_username.return_value = "auto@example.com"
+        mock_auth = MagicMock()
 
         task = PrintTask(
             item_id="doc-id",
@@ -254,12 +272,12 @@ class TestCreatePrintTask:
             print_contents=[PrintContent(object_key="doc-id", document_name="f.pdf")],
             username="explicit@example.com",
         )
-        client = _make_client(mock_http, mock_tp)
+        client = _make_client(mock_http, mock_auth)
         client.create_print_task(task)
 
         _, kwargs = mock_http.request.call_args
         assert kwargs["json"]["username"] == "explicit@example.com"
-        mock_tp.resolve_username.assert_not_called()
+        mock_auth.get_session.assert_not_called()
 
     def test_http_error_raises_operation_error(self):
         mock_http = MagicMock()
@@ -304,3 +322,20 @@ class TestPrintTaskMetadata:
         _, kwargs = mock_http.request.call_args
         assert "metadata" in kwargs["json"]
         assert kwargs["json"]["metadata"]["version"] == 1.0
+
+
+class TestResolveUsername:
+
+    def test_returns_user_name_claim(self):
+        token = _make_jwt({"user_name": "john@example.com", "client_id": "sb-app"})
+        assert _resolve_username(token, "fallback") == "john@example.com"
+
+    def test_falls_back_to_client_id_claim(self):
+        token = _make_jwt({"client_id": "sb-app!t123"})
+        assert _resolve_username(token, "fallback") == "sb-app!t123"
+
+    def test_falls_back_to_fallback_client_id_on_bad_token(self):
+        assert _resolve_username("not.a.jwt", "my-client-id") == "my-client-id"
+
+    def test_falls_back_to_fallback_client_id_on_empty_token(self):
+        assert _resolve_username("", "my-client-id") == "my-client-id"

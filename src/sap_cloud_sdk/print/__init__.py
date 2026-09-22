@@ -35,7 +35,7 @@ from sap_cloud_sdk.print._models import (
     PrintTaskMetadata,
 )
 from sap_cloud_sdk.print.config import PrintConfig, _make_config_factory
-from sap_cloud_sdk.print.client import PrintClient, TokenProvider
+from sap_cloud_sdk.print.client import PrintClient
 from sap_cloud_sdk.print.exceptions import (
     PrintError,
     ClientCreationError,
@@ -73,20 +73,23 @@ def create_client(
     """
     try:
         if config is not None:
-            tp = TokenProvider(config)
             auth_provider = XsuaaAuthProvider(lambda: config)
-            base_url = config.url
+            return PrintClient(
+                http=HttpClient(config.url, auth_provider),
+                auth_provider=auth_provider,
+                config_factory=lambda: config,
+                _telemetry_source=_telemetry_source,
+            )
         else:
             factory = _make_config_factory(instance)
             initial_config = factory()
-            tp = TokenProvider(factory)
             auth_provider = XsuaaAuthProvider(factory)
-            base_url = initial_config.url
-        return PrintClient(
-            http=HttpClient(base_url, auth_provider),
-            token_provider=tp,
-            _telemetry_source=_telemetry_source,
-        )
+            return PrintClient(
+                http=HttpClient(initial_config.url, auth_provider),
+                auth_provider=auth_provider,
+                config_factory=factory,
+                _telemetry_source=_telemetry_source,
+            )
     except Exception as e:
         _record_error_metric(
             Module.PRINT,

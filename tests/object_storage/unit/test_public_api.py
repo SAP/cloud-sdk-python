@@ -78,16 +78,16 @@ class TestConfigRedaction:
         assert "my-host" in text
 
     def test_azureconfig_repr_hides_sas_token_keeps_public_fields(self):
+        container_uri = "https://acct.blob.core.windows.net/c"
         text = repr(
             AzureConfig(
                 container_name="c",
-                container_uri="https://acct.blob.core.windows.net/c",
+                container_uri=container_uri,
                 sas_token="sv=secret-token",
             )
         )
         assert "sv=secret-token" not in text
-        assert "c" in text
-        assert "acct.blob.core.windows.net" in text
+        assert container_uri in text
 
     def test_gcsconfig_repr_hides_private_key_keeps_public_fields(self):
         text = repr(

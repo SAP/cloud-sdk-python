@@ -23,42 +23,31 @@ _DEFAULT_BASE_MOUNT = "/etc/secrets/appfnd"
 
 
 def read_binding_keys(instance: str) -> set[str]:
-    """Enumerate present binding keys from mount (flat + legacy layouts) then env.
+    """Enumerate binding keys from the first source that has any.
 
-    Mirrors the three lookup strategies of ``read_from_mount_and_fallback_to_env_var``:
-
-    1. If ``SERVICE_BINDING_ROOT`` is set → flat path
-       ``$ROOT/objectstore/`` (servicebinding.io spec).
-    2. Legacy path ``{base}/objectstore/{instance}/`` (always tried; falls back
-       from the flat attempt if SERVICE_BINDING_ROOT is set).
-    3. Env-var prefix
-       ``CLOUD_SDK_CFG_OBJECTSTORE_{instance_upper}_`` → strip the prefix,
-       return the remaining key as-is.
+    Sources are consulted in the same precedence order the credential loader
+    uses (flat mount → legacy mount → env) and the first non-empty one wins.
 
     Returns:
-        Set of key names present in any of the above sources.
+        Set of key names from the first source that has any, else empty.
     """
-    keys: set[str] = set()
     resolved_base = resolve_base_mount(_DEFAULT_BASE_MOUNT)
 
-    # servicebinding.io flat path ($ROOT/objectstore/)
     if os.environ.get("SERVICE_BINDING_ROOT") is not None:
-        flat_dir = os.path.join(resolved_base, "objectstore")
-        keys.update(_scan_dir(flat_dir))
+        flat_keys = _scan_dir(os.path.join(resolved_base, "objectstore"))
+        if flat_keys:
+            return flat_keys
 
-    # Three-level path ($ROOT/objectstore/{instance}/)
-    legacy_dir = os.path.join(resolved_base, "objectstore", instance)
-    keys.update(_scan_dir(legacy_dir))
+    legacy_keys = _scan_dir(os.path.join(resolved_base, "objectstore", instance))
+    if legacy_keys:
+        return legacy_keys
 
-    # Environment variables
     prefix = f"CLOUD_SDK_CFG_OBJECTSTORE_{instance.upper().replace('-', '_')}_"
-    for var in os.environ:
-        if var.upper().startswith(prefix):
-            key = var[len(prefix) :]
-            if key:
-                keys.add(key)
-
-    return keys
+    return {
+        var[len(prefix) :]
+        for var in os.environ
+        if var.upper().startswith(prefix) and var[len(prefix) :]
+    }
 
 
 def _scan_dir(directory: str) -> set[str]:
@@ -79,19 +68,25 @@ def detect_provider(keys: set[str]) -> ObjectStoreProvider:
         Detected object store provider.
 
     Raises:
-        ValueError: If no provider can be identified from the available keys.
+        ValueError: If the keys identify no provider, or match more than one.
     """
     lowered = {k.lower() for k in keys}
 
-    def matches(provider: ObjectStoreProvider) -> bool:
-        return {d.lower() for d in _DISCRIMINATORS[provider]}.issubset(lowered)
+    matched = [
+        provider
+        for provider, discriminators in _DISCRIMINATORS.items()
+        if {d.lower() for d in discriminators}.issubset(lowered)
+    ]
 
-    if matches(ObjectStoreProvider.AZURE):
-        return ObjectStoreProvider.AZURE
-    if matches(ObjectStoreProvider.GCS):
-        return ObjectStoreProvider.GCS
-    if matches(ObjectStoreProvider.S3):
-        return ObjectStoreProvider.S3
+    if len(matched) == 1:
+        return matched[0]
+
+    if matched:
+        names = ", ".join(sorted(p.value for p in matched))
+        raise ValueError(
+            f"binding keys {sorted(lowered)} match multiple providers ({names}); "
+            "a single objectstore binding must belong to exactly one provider."
+        )
 
     raise ValueError(
         f"Cannot detect objectstore provider from keys: {sorted(lowered)}. "

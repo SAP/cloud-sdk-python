@@ -1,4 +1,4 @@
-"""Constants for the Output Management SDK."""
+"""Constants for the Agent Output Tools SDK."""
 
 from enum import Enum
 

@@ -1,10 +1,10 @@
-"""Exception classes for the Output Management SDK."""
+"""Exception classes for the Agent Output Tools SDK."""
 
 from typing import Optional, Dict, Any
 
 
 class OutputManagementException(Exception):
-    """Base exception for Output Management SDK."""
+    """Base exception for Agent Output Tools SDK."""
 
     def __init__(
         self,

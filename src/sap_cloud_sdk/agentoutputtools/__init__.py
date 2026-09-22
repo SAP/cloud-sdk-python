@@ -1,4 +1,4 @@
-"""SAP Ariba Output Management Service SDK for Python."""
+"""SAP Ariba Agent Output Tools SDK for Python."""
 
 import logging
 import os
@@ -39,7 +39,7 @@ def create_client(
     instance: Optional[str] = None,
 ) -> OutputManagementClient:
     """
-    Create an Output Management client with configuration from environment or parameters.
+    Create an Agent Output Tools client with configuration from environment or parameters.
 
     This is the recommended factory function for creating clients. It follows the SDK's
     standard pattern of reading configuration from environment variables with optional overrides.
@@ -68,7 +68,7 @@ def create_client(
 
     Example:
         ```python
-        from sap_cloud_sdk.outputmanagement import create_client, DestinationCredentialConfig
+        from sap_cloud_sdk.agentoutputtools import create_client, DestinationCredentialConfig
 
         # Using environment variables
         client = create_client()
@@ -100,7 +100,7 @@ def create_client(
     if destination_credential_config is not None:
         destination_config = destination_credential_config
         logger.info(
-            f"Creating Output Management client with provided DestinationCredentialConfig: "
+            f"Creating Agent Output Tools client with provided DestinationCredentialConfig: "
             f"destination '{destination_config.destination_name}'"
         )
     else:
@@ -120,7 +120,7 @@ def create_client(
             )
 
         logger.info(
-            f"Creating Output Management client with destination '{dest_name}', "
+            f"Creating Agent Output Tools client with destination '{dest_name}', "
             f"access_strategy '{access_strat}', instance '{inst}'"
         )
 
@@ -145,7 +145,7 @@ def create_client(
         destination_instance=destination_config.instance or "default",
     )
 
-    # Wrap it in the unified OutputManagementClient
+    # Wrap it in the unified Agent Output Tools client
     return OutputManagementClient(service_client)
 
 

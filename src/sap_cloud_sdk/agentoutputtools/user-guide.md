@@ -1,8 +1,8 @@
-# SAP Cloud SDK for Python - Output Management Service User Guide
+# SAP Cloud SDK for Python - Agent Output Tools Service User Guide
 
 ## Overview
 
-The Output Management Service provides a simplified way to send emails through SAP Ariba Output Service. This guide covers the unified `OutputManagementClient` which offers four main methods for sending notification emails with optional attachments using ANS (Ariba Notification Service) templates.
+The Agent Output Tools Service provides a simplified way to send emails through SAP Ariba Output Service. This guide covers the unified `OutputManagementClient` which offers four main methods for sending notification emails with optional attachments using ANS (Ariba Notification Service) templates.
 
 ## Installation
 
@@ -32,7 +32,7 @@ See further information about installation in the [main documentation](/README.m
 
 ### Required Setup
 
-1. **SAP BTP Destination**: Configure a destination in SAP BTP Destination Service pointing to your Output Management service.
+1. **SAP BTP Destination**: Configure a destination in SAP BTP Destination Service pointing to your Agent Output Tools service.
 2. **ANS Template**: Create notification templates in Ariba Notification Service (ANS)
 3. **Python Environment**: Python 3.11 or higher
 4. **SAP Cloud SDK**: Install the SAP Cloud SDK for Python
@@ -46,7 +46,7 @@ pip install sap-cloud-sdk
 Your destination should be configured with:
 - **Name**: e.g., `ARIBA_OUTPUT_SERVICE`
 - **Type**: HTTP
-- **URL**: Your Output Management service endpoint
+- **URL**: Your Agent Output Tools service endpoint
 - **Authentication**: OAuth2 with mTLS (client certificate)
 - **Properties**: Include OAuth token service URL and certificate configuration
 
@@ -55,7 +55,7 @@ Your destination should be configured with:
 Here's the simplest way to send an email:
 
 ```python
-from sap_cloud_sdk.outputmanagement import create_client
+from sap_cloud_sdk.agentoutputtools import create_client
 
 # Create client using the factory function
 client = create_client(destination_name="ARIBA_OUTPUT_SERVICE")
@@ -180,7 +180,7 @@ response = await client.send_email_with_mcp(
 Send a notification email using an ANS template:
 
 ```python
-from sap_cloud_sdk.outputmanagement import create_client
+from sap_cloud_sdk.agentoutputtools import create_client
 
 # Create client
 client = create_client(destination_name="ARIBA_OUTPUT_SERVICE")
@@ -210,7 +210,7 @@ else:
 Send to multiple recipients with CC:
 
 ```python
-from sap_cloud_sdk.outputmanagement import create_client
+from sap_cloud_sdk.agentoutputtools import create_client
 
 client = create_client(destination_name="ARIBA_OUTPUT_SERVICE")
 
@@ -233,7 +233,7 @@ response = client.send_email(
 Specify the template language:
 
 ```python
-from sap_cloud_sdk.outputmanagement import create_client
+from sap_cloud_sdk.agentoutputtools import create_client
 
 client = create_client(destination_name="ARIBA_OUTPUT_SERVICE")
 
@@ -252,7 +252,7 @@ response = client.send_email(
 Attach a pre-generated document from DMS (Document Management Service):
 
 ```python
-from sap_cloud_sdk.outputmanagement import create_client
+from sap_cloud_sdk.agentoutputtools import create_client
 
 client = create_client(destination_name="ARIBA_OUTPUT_SERVICE")
 
@@ -273,7 +273,7 @@ response = client.send_email(
 Attach multiple documents from DMS:
 
 ```python
-from sap_cloud_sdk.outputmanagement import create_client
+from sap_cloud_sdk.agentoutputtools import create_client
 
 client = create_client(destination_name="ARIBA_OUTPUT_SERVICE")
 
@@ -298,7 +298,7 @@ response = client.send_email(
 The recommended way to create a client is using the `create_client()` factory function. This function supports configuration via environment variables or explicit parameters:
 
 ```python
-from sap_cloud_sdk.outputmanagement import create_client
+from sap_cloud_sdk.agentoutputtools import create_client
 
 # Option 1: Using environment variables
 # Set CLOUD_SDK_OMS_DESTINATION_NAME, CLOUD_SDK_OMS_ACCESS_STRATEGY, CLOUD_SDK_OMS_INSTANCE
@@ -317,7 +317,7 @@ client = create_client(
 Control how the destination is accessed:
 
 ```python
-from sap_cloud_sdk.outputmanagement import create_client
+from sap_cloud_sdk.agentoutputtools import create_client
 
 # Provider-only access (default)
 client = create_client(
@@ -335,7 +335,7 @@ client = create_client(
 Specify a custom destination service instance:
 
 ```python
-from sap_cloud_sdk.outputmanagement import create_client
+from sap_cloud_sdk.agentoutputtools import create_client
 
 client = create_client(
     destination_name="ARIBA_OUTPUT_SERVICE", instance="my-custom-instance"
@@ -347,7 +347,7 @@ client = create_client(
 For more control, create the output request object separately:
 
 ```python
-from sap_cloud_sdk.outputmanagement import create_client
+from sap_cloud_sdk.agentoutputtools import create_client
 
 client = create_client(destination_name="ARIBA_OUTPUT_SERVICE")
 
@@ -378,7 +378,7 @@ response = client.send_output_request(output_request)
 Always check for errors in the response:
 
 ```python
-from sap_cloud_sdk.outputmanagement import create_client
+from sap_cloud_sdk.agentoutputtools import create_client
 
 client = create_client(destination_name="ARIBA_OUTPUT_SERVICE")
 
@@ -400,7 +400,7 @@ else:
 Validation errors occur before the request is sent:
 
 ```python
-from sap_cloud_sdk.outputmanagement import create_client
+from sap_cloud_sdk.agentoutputtools import create_client
 
 client = create_client(destination_name="ARIBA_OUTPUT_SERVICE")
 
@@ -422,7 +422,7 @@ if response.error:
 Handle network and authentication errors:
 
 ```python
-from sap_cloud_sdk.outputmanagement import create_client
+from sap_cloud_sdk.agentoutputtools import create_client
 
 try:
     client = create_client(destination_name="ARIBA_OUTPUT_SERVICE")
@@ -456,7 +456,7 @@ except Exception as e:
 Create the client once and reuse it:
 
 ```python
-from sap_cloud_sdk.outputmanagement import create_client
+from sap_cloud_sdk.agentoutputtools import create_client
 
 # Good: Create once and reuse
 client = create_client(destination_name="ARIBA_OUTPUT_SERVICE")
@@ -481,7 +481,7 @@ for order in orders:
 Validate your data before calling the API:
 
 ```python
-from sap_cloud_sdk.outputmanagement import create_client
+from sap_cloud_sdk.agentoutputtools import create_client
 
 
 def send_order_confirmation(order):
@@ -532,7 +532,7 @@ business_document = {
 Always handle errors and provide meaningful feedback:
 
 ```python
-from sap_cloud_sdk.outputmanagement import create_client
+from sap_cloud_sdk.agentoutputtools import create_client
 import time
 
 
@@ -577,7 +577,7 @@ Always log the request ID for tracking:
 
 ```python
 import logging
-from sap_cloud_sdk.outputmanagement import create_client
+from sap_cloud_sdk.agentoutputtools import create_client
 
 logger = logging.getLogger(__name__)
 
@@ -601,7 +601,7 @@ else:
 
 ### create_client()
 
-Factory function to create an Output Management client.
+Factory function to create an Agent Output Tools client.
 
 **Parameters:**
 
@@ -616,7 +616,7 @@ Factory function to create an Output Management client.
 **Example:**
 
 ```python
-from sap_cloud_sdk.outputmanagement import create_client
+from sap_cloud_sdk.agentoutputtools import create_client
 
 # Using explicit parameters
 client = create_client(
@@ -633,7 +633,7 @@ client = create_client()
 
 #### `send_email()`
 
-Send an email directly using the Output Management service.
+Send an email directly using the Agent Output Tools service.
 
 **Parameters:**
 
@@ -691,7 +691,7 @@ output_request = client.create_output_request(
 
 #### `send_output_request()`
 
-Send a pre-configured output request to the Output Management service.
+Send a pre-configured output request to the Agent Output Tools service.
 
 **Parameters:**
 
@@ -744,7 +744,7 @@ response = await client.send_email_with_mcp(
 ### Use Case 1: Order Confirmation
 
 ```python
-from sap_cloud_sdk.outputmanagement import create_client
+from sap_cloud_sdk.agentoutputtools import create_client
 
 
 def send_order_confirmation(order):
@@ -778,7 +778,7 @@ def send_order_confirmation(order):
 ### Use Case 2: Invoice with PDF Attachment
 
 ```python
-from sap_cloud_sdk.outputmanagement import create_client
+from sap_cloud_sdk.agentoutputtools import create_client
 
 
 def send_invoice_with_pdf(invoice, pdf_dms_url):
@@ -806,7 +806,7 @@ def send_invoice_with_pdf(invoice, pdf_dms_url):
 ### Use Case 3: Bulk Notification
 
 ```python
-from sap_cloud_sdk.outputmanagement import create_client
+from sap_cloud_sdk.agentoutputtools import create_client
 
 
 def send_bulk_notification(recipients, notification_data):
@@ -872,7 +872,7 @@ to = ["invalid-email", "user@"]
 The SDK provides specific exception classes for different error scenarios:
 
 ```python
-from sap_cloud_sdk.outputmanagement import (
+from sap_cloud_sdk.agentoutputtools import (
     create_client,
     OutputManagementException,
     AuthenticationException,
@@ -931,7 +931,7 @@ client = create_client()  # Uses environment variables
 
 ## Additional Resources
 
-- [SAP Ariba Output Management Documentation](https://help.sap.com/docs/ariba)
+- [SAP Ariba Agent Output Tools Documentation](https://help.sap.com/docs/ariba)
 - [SAP BTP Destination Service](https://help.sap.com/docs/connectivity)
 - [SAP Cloud SDK for Python](https://github.com/SAP/cloud-sdk-python)
 

@@ -1,5 +1,7 @@
 """Google Cloud Storage backend implementation for object store operations."""
 
+import base64
+import json
 import os
 from typing import BinaryIO, List, NoReturn
 
@@ -29,7 +31,10 @@ class GcsClient:
     Google Cloud Storage. Obtain an instance via ``create_client()``.
     """
 
-    def __init__(self, config: GcsConfig) -> None:
+    def __init__(
+        self,
+        config: GcsConfig,
+    ) -> None:
         """Initialise the GCS object storage client.
 
         Args:
@@ -44,7 +49,9 @@ class GcsClient:
         except ClientCreationError:
             raise
         except Exception as e:
-            raise ClientCreationError(f"Failed to initialise GcsClient: {e}") from e
+            raise ClientCreationError(
+                "Failed to create Google Cloud Storage client"
+            ) from e
 
     def _create_storage_client(self, cfg: GcsConfig):
         """Build a Google Cloud Storage Client from binding data.
@@ -53,9 +60,6 @@ class GcsClient:
         storage.Client using the embedded credentials.
         """
         try:
-            import base64
-            import json
-
             from google.cloud import storage
             from google.oauth2 import service_account
 
@@ -64,12 +68,11 @@ class GcsClient:
             return storage.Client(project=cfg.project_id, credentials=creds)
         except ImportError as e:
             raise ClientCreationError(
-                "google-cloud-storage is required for GCS Object Store support. "
-                "Install it with: pip install 'sap-cloud-sdk[gcs]'"
+                "Google Cloud Storage support is unavailable"
             ) from e
         except Exception as e:
             raise ClientCreationError(
-                f"Failed to create GCS storage client: {e}"
+                "Failed to create Google Cloud Storage client"
             ) from e
 
     @record_metrics(Module.OBJECTSTORE, Operation.OBJECTSTORE_PUT_OBJECT_FROM_BYTES)
@@ -89,9 +92,12 @@ class GcsClient:
 
         try:
             blob = self._bucket.blob(name)
-            blob.upload_from_string(data, content_type=content_type)
+            blob.upload_from_string(
+                data,
+                content_type=content_type,
+            )
         except Exception as e:
-            raise ObjectOperationError(f"Failed to upload object '{name}': {e}") from e
+            raise ObjectOperationError(f"Failed to upload object '{name}'") from e
 
     @record_metrics(Module.OBJECTSTORE, Operation.OBJECTSTORE_PUT_OBJECT)
     def put_object(
@@ -113,9 +119,13 @@ class GcsClient:
 
         try:
             blob = self._bucket.blob(name)
-            blob.upload_from_file(stream, size=size, content_type=content_type)
+            blob.upload_from_file(
+                stream,
+                size=size,
+                content_type=content_type,
+            )
         except Exception as e:
-            raise ObjectOperationError(f"Failed to upload object '{name}': {e}") from e
+            raise ObjectOperationError(f"Failed to upload object '{name}'") from e
 
     @record_metrics(Module.OBJECTSTORE, Operation.OBJECTSTORE_PUT_OBJECT_FROM_FILE)
     def put_object_from_file(
@@ -139,11 +149,14 @@ class GcsClient:
                 raise ObjectOperationError(f"File not found: {file_path}")
 
             blob = self._bucket.blob(name)
-            blob.upload_from_filename(file_path, content_type=content_type)
+            blob.upload_from_filename(
+                file_path,
+                content_type=content_type,
+            )
         except ObjectOperationError:
             raise
         except Exception as e:
-            raise ObjectOperationError(f"Failed to upload object '{name}': {e}") from e
+            raise ObjectOperationError(f"Failed to upload object '{name}'") from e
 
     @record_metrics(Module.OBJECTSTORE, Operation.OBJECTSTORE_GET_OBJECT)
     def get_object(self, name: str) -> ObjectReader:
@@ -193,7 +206,7 @@ class GcsClient:
                     return  # idempotent
             except ImportError:
                 pass
-            raise ObjectOperationError(f"Failed to delete object '{name}': {e}") from e
+            raise ObjectOperationError(f"Failed to delete object '{name}'") from e
 
     @record_metrics(Module.OBJECTSTORE, Operation.OBJECTSTORE_LIST_OBJECTS)
     def list_objects(self, prefix: str) -> List[ObjectMetadata]:
@@ -213,7 +226,10 @@ class GcsClient:
 
         try:
             result = []
-            for blob in self._client.list_blobs(self._bucket, prefix=prefix):
+            for blob in self._client.list_blobs(
+                self._bucket,
+                prefix=prefix,
+            ):
                 result.append(
                     ObjectMetadata(
                         key=blob.name,
@@ -227,7 +243,7 @@ class GcsClient:
             return result
         except Exception as e:
             raise ListObjectsError(
-                f"Failed to list objects with prefix '{prefix}': {e}"
+                f"Failed to list objects with prefix '{prefix}'"
             ) from e
 
     @record_metrics(Module.OBJECTSTORE, Operation.OBJECTSTORE_HEAD_OBJECT)
@@ -263,7 +279,7 @@ class GcsClient:
             raise
         except Exception as e:
             raise ObjectOperationError(
-                f"Failed to get metadata for object '{name}': {e}"
+                f"Failed to get metadata for object '{name}'"
             ) from e
 
     @record_metrics(Module.OBJECTSTORE, Operation.OBJECTSTORE_OBJECT_EXISTS)
@@ -287,9 +303,13 @@ class GcsClient:
             return True
         except ObjectNotFoundError:
             return False
+        except ObjectOperationError as e:
+            raise ObjectOperationError(
+                f"Failed to check if object '{name}' exists"
+            ) from e
         except Exception as e:
             raise ObjectOperationError(
-                f"Failed to check if object '{name}' exists: {e}"
+                f"Failed to check if object '{name}' exists"
             ) from e
 
     def _map_gcs_error(self, exc: Exception, name: str, operation: str) -> NoReturn:
@@ -301,6 +321,4 @@ class GcsClient:
                 raise ObjectNotFoundError(f"Object '{name}' not found") from exc
         except ImportError:
             pass
-        raise ObjectOperationError(
-            f"Failed to {operation} object '{name}': {exc}"
-        ) from exc
+        raise ObjectOperationError(f"Failed to {operation} object '{name}'") from exc

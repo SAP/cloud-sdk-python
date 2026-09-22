@@ -28,6 +28,8 @@ from sap_cloud_sdk.object_storage.exceptions import (
 )
 from sap_cloud_sdk.object_storage.utils import _normalize_host
 
+_S3_NOT_FOUND_CODES = {"NoSuchKey", "NoSuchObject"}
+
 
 class S3Client:
     """S3-compatible object storage client.
@@ -36,7 +38,10 @@ class S3Client:
     Supports upload, download, delete, list, and metadata operations on S3-compatible storage.
     """
 
-    def __init__(self, config: S3Config) -> None:
+    def __init__(
+        self,
+        config: S3Config,
+    ) -> None:
         """Initialize the object storage client.
 
         Args:
@@ -59,7 +64,7 @@ class S3Client:
             )
 
         except Exception as e:
-            raise ClientCreationError(f"Failed to create MinIO client: {e}") from e
+            raise ClientCreationError("Failed to create S3 object store client") from e
 
     @record_metrics(Module.OBJECTSTORE, Operation.OBJECTSTORE_PUT_OBJECT_FROM_BYTES)
     def put_object_from_bytes(self, name: str, data: bytes, content_type: str) -> None:
@@ -84,12 +89,8 @@ class S3Client:
                 length=len(data),
                 content_type=content_type,
             )
-        except S3Error as e:
-            raise ObjectOperationError(
-                f"Failed to upload object '{name}': {e.code} - {e.message}"
-            ) from e
         except Exception as e:
-            raise ObjectOperationError(f"Failed to upload object '{name}': {e}") from e
+            raise ObjectOperationError(f"Failed to upload object '{name}'") from e
 
     @record_metrics(Module.OBJECTSTORE, Operation.OBJECTSTORE_PUT_OBJECT)
     def put_object(
@@ -117,12 +118,8 @@ class S3Client:
                 length=size,
                 content_type=content_type,
             )
-        except S3Error as e:
-            raise ObjectOperationError(
-                f"Failed to upload object '{name}': {e.code} - {e.message}"
-            ) from e
         except Exception as e:
-            raise ObjectOperationError(f"Failed to upload object '{name}': {e}") from e
+            raise ObjectOperationError(f"Failed to upload object '{name}'") from e
 
     @record_metrics(Module.OBJECTSTORE, Operation.OBJECTSTORE_PUT_OBJECT_FROM_FILE)
     def put_object_from_file(
@@ -156,12 +153,10 @@ class S3Client:
                     length=file_size,
                     content_type=content_type,
                 )
-        except S3Error as e:
-            raise ObjectOperationError(
-                f"Failed to upload object '{name}': {e.code} - {e.message}"
-            ) from e
+        except ObjectOperationError:
+            raise
         except Exception as e:
-            raise ObjectOperationError(f"Failed to upload object '{name}': {e}") from e
+            raise ObjectOperationError(f"Failed to upload object '{name}'") from e
 
     @record_metrics(Module.OBJECTSTORE, Operation.OBJECTSTORE_GET_OBJECT)
     def get_object(self, name: str) -> ObjectReader:
@@ -186,15 +181,11 @@ class S3Client:
             )
             return response
         except S3Error as e:
-            if e.code == "NoSuchKey":
+            if e.code in _S3_NOT_FOUND_CODES:
                 raise ObjectNotFoundError(f"Object '{name}' not found") from e
-            raise ObjectOperationError(
-                f"Failed to download object '{name}': {e.code} - {e.message}"
-            ) from e
+            raise ObjectOperationError(f"Failed to download object '{name}'") from e
         except Exception as e:
-            raise ObjectOperationError(
-                f"Failed to download object '{name}': {e}"
-            ) from e
+            raise ObjectOperationError(f"Failed to download object '{name}'") from e
 
     @record_metrics(Module.OBJECTSTORE, Operation.OBJECTSTORE_DELETE_OBJECT)
     def delete_object(self, name: str) -> None:
@@ -214,13 +205,11 @@ class S3Client:
                 bucket_name=self._config.bucket, object_name=name
             )
         except S3Error as e:
-            if e.code != "NoSuchKey":
-                raise ObjectOperationError(
-                    f"Failed to delete object '{name}': {e.code} - {e.message}"
-                ) from e
+            if e.code not in _S3_NOT_FOUND_CODES:
+                raise ObjectOperationError(f"Failed to delete object '{name}'") from e
             # For NoSuchKey, we still consider it successful (idempotent delete)
         except Exception as e:
-            raise ObjectOperationError(f"Failed to delete object '{name}': {e}") from e
+            raise ObjectOperationError(f"Failed to delete object '{name}'") from e
 
     @record_metrics(Module.OBJECTSTORE, Operation.OBJECTSTORE_LIST_OBJECTS)
     def list_objects(self, prefix: str) -> List[ObjectMetadata]:
@@ -256,13 +245,9 @@ class S3Client:
                 result.append(metadata)
 
             return result
-        except S3Error as e:
-            raise ListObjectsError(
-                f"Failed to list objects with prefix '{prefix}': {e.code} - {e.message}"
-            ) from e
         except Exception as e:
             raise ListObjectsError(
-                f"Failed to list objects with prefix '{prefix}': {e}"
+                f"Failed to list objects with prefix '{prefix}'"
             ) from e
 
     @record_metrics(Module.OBJECTSTORE, Operation.OBJECTSTORE_HEAD_OBJECT)
@@ -296,14 +281,14 @@ class S3Client:
                 owner=None,  # stat_object doesn't provide owner
             )
         except S3Error as e:
-            if e.code == "NoSuchKey":
+            if e.code in _S3_NOT_FOUND_CODES:
                 raise ObjectNotFoundError(f"Object '{name}' not found") from e
             raise ObjectOperationError(
-                f"Failed to get metadata for object '{name}': {e.code} - {e.message}"
+                f"Failed to get metadata for object '{name}'"
             ) from e
         except Exception as e:
             raise ObjectOperationError(
-                f"Failed to get metadata for object '{name}': {e}"
+                f"Failed to get metadata for object '{name}'"
             ) from e
 
     @record_metrics(Module.OBJECTSTORE, Operation.OBJECTSTORE_OBJECT_EXISTS)
@@ -327,7 +312,11 @@ class S3Client:
             return True
         except ObjectNotFoundError:
             return False
+        except ObjectOperationError as e:
+            raise ObjectOperationError(
+                f"Failed to check if object '{name}' exists"
+            ) from e
         except Exception as e:
             raise ObjectOperationError(
-                f"Failed to check if object '{name}' exists: {e}"
+                f"Failed to check if object '{name}' exists"
             ) from e

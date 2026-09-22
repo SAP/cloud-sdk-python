@@ -21,8 +21,8 @@ class S3Config:
             development against an HTTP-only MinIO instance. Defaults to False.
     """
 
-    access_key_id: str
-    secret_access_key: str
+    access_key_id: str = field(repr=False)
+    secret_access_key: str = field(repr=False)
     bucket: str
     host: str
     disable_ssl: bool = False
@@ -40,7 +40,7 @@ class AzureConfig:
 
     container_name: str
     container_uri: str
-    sas_token: str
+    sas_token: str = field(repr=False)
 
 
 @dataclass
@@ -53,7 +53,7 @@ class GcsConfig:
         bucket: Target bucket name.
     """
 
-    base64_encoded_private_key_data: str
+    base64_encoded_private_key_data: str = field(repr=False)
     project_id: str
     bucket: str
 
@@ -65,8 +65,8 @@ class S3BindingData:
     Filled by the secret resolver; all fields are plain strings.
     """
 
-    access_key_id: str = ""
-    secret_access_key: str = ""
+    access_key_id: str = field(default="", repr=False)
+    secret_access_key: str = field(default="", repr=False)
     bucket: str = ""
     host: str = ""
 
@@ -107,7 +107,7 @@ class AzureBindingData:
 
     container_name: str = ""
     container_uri: str = ""
-    sas_token: str = ""
+    sas_token: str = field(default="", repr=False)
 
     def validate(self) -> None:
         """Raise ConfigError if any runtime-required field is empty."""
@@ -142,7 +142,9 @@ class GcsBindingData:
     """
 
     base64EncodedPrivateKeyData: str = field(
-        default="", metadata={"secret": "base64EncodedPrivateKeyData"}
+        default="",
+        repr=False,
+        metadata={"secret": "base64EncodedPrivateKeyData"},
     )
     projectId: str = field(default="", metadata={"secret": "projectId"})
     bucket: str = ""

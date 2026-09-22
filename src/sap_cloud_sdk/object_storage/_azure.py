@@ -66,7 +66,10 @@ class AzureClient:
     Azure Blob Storage. Obtain an instance via ``create_client()``.
     """
 
-    def __init__(self, config: AzureConfig) -> None:
+    def __init__(
+        self,
+        config: AzureConfig,
+    ) -> None:
         """Initialise the Azure object storage client.
 
         Args:
@@ -80,7 +83,9 @@ class AzureClient:
         except ClientCreationError:
             raise
         except Exception as e:
-            raise ClientCreationError(f"Failed to initialise AzureClient: {e}") from e
+            raise ClientCreationError(
+                "Failed to create Azure Blob Storage client"
+            ) from e
 
     def _create_container_client(self, cfg: AzureConfig):
         """Build an Azure ContainerClient from binding data.
@@ -92,16 +97,16 @@ class AzureClient:
             from azure.storage.blob import ContainerClient
 
             return ContainerClient.from_container_url(
-                cfg.container_uri, credential=cfg.sas_token
+                cfg.container_uri,
+                credential=cfg.sas_token,
             )
         except ImportError as e:
             raise ClientCreationError(
-                "azure-storage-blob is required for Azure Object Store support. "
-                "Install it with: pip install 'sap-cloud-sdk[azure]'"
+                "Azure Blob Storage support is unavailable"
             ) from e
         except Exception as e:
             raise ClientCreationError(
-                f"Failed to create Azure ContainerClient: {e}"
+                "Failed to create Azure Blob Storage client"
             ) from e
 
     def _blob_client(self, name: str):
@@ -132,7 +137,7 @@ class AzureClient:
                 content_settings=ContentSettings(content_type=content_type),
             )
         except Exception as e:
-            raise ObjectOperationError(f"Failed to upload object '{name}': {e}") from e
+            raise ObjectOperationError(f"Failed to upload object '{name}'") from e
 
     @record_metrics(Module.OBJECTSTORE, Operation.OBJECTSTORE_PUT_OBJECT)
     def put_object(
@@ -162,7 +167,7 @@ class AzureClient:
                 content_settings=ContentSettings(content_type=content_type),
             )
         except Exception as e:
-            raise ObjectOperationError(f"Failed to upload object '{name}': {e}") from e
+            raise ObjectOperationError(f"Failed to upload object '{name}'") from e
 
     @record_metrics(Module.OBJECTSTORE, Operation.OBJECTSTORE_PUT_OBJECT_FROM_FILE)
     def put_object_from_file(
@@ -196,7 +201,7 @@ class AzureClient:
         except ObjectOperationError:
             raise
         except Exception as e:
-            raise ObjectOperationError(f"Failed to upload object '{name}': {e}") from e
+            raise ObjectOperationError(f"Failed to upload object '{name}'") from e
 
     @record_metrics(Module.OBJECTSTORE, Operation.OBJECTSTORE_GET_OBJECT)
     def get_object(self, name: str) -> ObjectReader:
@@ -237,14 +242,9 @@ class AzureClient:
         try:
             self._blob_client(name).delete_blob()
         except Exception as e:
-            try:
-                from azure.core.exceptions import ResourceNotFoundError
-
-                if isinstance(e, ResourceNotFoundError):
-                    return  # idempotent
-            except ImportError:
-                pass
-            raise ObjectOperationError(f"Failed to delete object '{name}': {e}") from e
+            if self._is_blob_not_found(e):
+                return  # idempotent
+            raise ObjectOperationError(f"Failed to delete object '{name}'") from e
 
     @record_metrics(Module.OBJECTSTORE, Operation.OBJECTSTORE_LIST_OBJECTS)
     def list_objects(self, prefix: str) -> List[ObjectMetadata]:
@@ -278,7 +278,7 @@ class AzureClient:
             return result
         except Exception as e:
             raise ListObjectsError(
-                f"Failed to list objects with prefix '{prefix}': {e}"
+                f"Failed to list objects with prefix '{prefix}'"
             ) from e
 
     @record_metrics(Module.OBJECTSTORE, Operation.OBJECTSTORE_HEAD_OBJECT)
@@ -332,25 +332,30 @@ class AzureClient:
             return True
         except ObjectNotFoundError:
             return False
+        except ObjectOperationError as e:
+            raise ObjectOperationError(
+                f"Failed to check if object '{name}' exists"
+            ) from e
         except Exception as e:
             raise ObjectOperationError(
-                f"Failed to check if object '{name}' exists: {e}"
+                f"Failed to check if object '{name}' exists"
             ) from e
+
+    @staticmethod
+    def _is_blob_not_found(exc: Exception) -> bool:
+        """Return whether Azure identified the missing resource as a blob."""
+        try:
+            from azure.core.exceptions import ResourceNotFoundError
+        except ImportError:
+            return False
+
+        return (
+            isinstance(exc, ResourceNotFoundError)
+            and getattr(exc, "error_code", None) == "BlobNotFound"
+        )
 
     def _map_azure_error(self, exc: Exception, name: str, operation: str) -> NoReturn:
         """Map Azure SDK exceptions to objectstore exceptions and re-raise."""
-        try:
-            from azure.core.exceptions import (
-                HttpResponseError,
-                ResourceNotFoundError,
-            )
-
-            if isinstance(exc, ResourceNotFoundError) or (
-                isinstance(exc, HttpResponseError) and exc.status_code == 404
-            ):
-                raise ObjectNotFoundError(f"Object '{name}' not found") from exc
-        except ImportError:
-            pass
-        raise ObjectOperationError(
-            f"Failed to {operation} object '{name}': {exc}"
-        ) from exc
+        if self._is_blob_not_found(exc):
+            raise ObjectNotFoundError(f"Object '{name}' not found") from exc
+        raise ObjectOperationError(f"Failed to {operation} object '{name}'") from exc

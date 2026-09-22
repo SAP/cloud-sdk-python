@@ -4,6 +4,9 @@ import os
 from types import TracebackType
 from typing import TYPE_CHECKING, BinaryIO, List, NoReturn, Self
 
+from azure.core.exceptions import ResourceNotFoundError
+from azure.storage.blob import ContainerClient, ContentSettings
+
 from sap_cloud_sdk.core.telemetry import Module, Operation, record_metrics
 from sap_cloud_sdk.object_storage.config import AzureConfig
 from sap_cloud_sdk.object_storage._models import ObjectMetadata
@@ -94,16 +97,10 @@ class AzureClient:
         to construct a ContainerClient — avoids double-appending the container path.
         """
         try:
-            from azure.storage.blob import ContainerClient
-
             return ContainerClient.from_container_url(
                 cfg.container_uri,
                 credential=cfg.sas_token,
             )
-        except ImportError as e:
-            raise ClientCreationError(
-                "Azure Blob Storage support is unavailable"
-            ) from e
         except Exception as e:
             raise ClientCreationError(
                 "Failed to create Azure Blob Storage client"
@@ -129,8 +126,6 @@ class AzureClient:
         validate_put_from_bytes(name, data, content_type)
 
         try:
-            from azure.storage.blob import ContentSettings
-
             self._blob_client(name).upload_blob(
                 data,
                 overwrite=True,
@@ -158,8 +153,6 @@ class AzureClient:
         validate_put_object(name, stream, size, content_type)
 
         try:
-            from azure.storage.blob import ContentSettings
-
             self._blob_client(name).upload_blob(
                 stream,
                 length=size,
@@ -187,8 +180,6 @@ class AzureClient:
         validate_put_from_file(name, file_path, content_type)
 
         try:
-            from azure.storage.blob import ContentSettings
-
             if not os.path.isfile(file_path):
                 raise ObjectOperationError(f"File not found: {file_path}")
 
@@ -332,10 +323,8 @@ class AzureClient:
             return True
         except ObjectNotFoundError:
             return False
-        except ObjectOperationError as e:
-            raise ObjectOperationError(
-                f"Failed to check if object '{name}' exists"
-            ) from e
+        except ObjectOperationError:
+            raise
         except Exception as e:
             raise ObjectOperationError(
                 f"Failed to check if object '{name}' exists"
@@ -344,11 +333,6 @@ class AzureClient:
     @staticmethod
     def _is_blob_not_found(exc: Exception) -> bool:
         """Return whether Azure identified the missing resource as a blob."""
-        try:
-            from azure.core.exceptions import ResourceNotFoundError
-        except ImportError:
-            return False
-
         return (
             isinstance(exc, ResourceNotFoundError)
             and getattr(exc, "error_code", None) == "BlobNotFound"

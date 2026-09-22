@@ -5,6 +5,10 @@ import json
 import os
 from typing import BinaryIO, List, NoReturn
 
+from google.cloud import storage
+from google.cloud.exceptions import NotFound
+from google.oauth2 import service_account
+
 from sap_cloud_sdk.core.telemetry import Module, Operation, record_metrics
 from sap_cloud_sdk.object_storage.config import GcsConfig
 from sap_cloud_sdk.object_storage._models import ObjectMetadata
@@ -60,16 +64,9 @@ class GcsClient:
         storage.Client using the embedded credentials.
         """
         try:
-            from google.cloud import storage
-            from google.oauth2 import service_account
-
             info = json.loads(base64.b64decode(cfg.base64_encoded_private_key_data))
             creds = service_account.Credentials.from_service_account_info(info)
             return storage.Client(project=cfg.project_id, credentials=creds)
-        except ImportError as e:
-            raise ClientCreationError(
-                "Google Cloud Storage support is unavailable"
-            ) from e
         except Exception as e:
             raise ClientCreationError(
                 "Failed to create Google Cloud Storage client"
@@ -199,13 +196,9 @@ class GcsClient:
             blob = self._bucket.blob(name)
             blob.delete()
         except Exception as e:
-            try:
-                from google.cloud.exceptions import NotFound
-
-                if isinstance(e, NotFound):
-                    return  # idempotent
-            except ImportError:
-                pass
+            if self._is_not_found(e):
+                self._confirm_bucket_exists(e, name, "delete")
+                return  # idempotent
             raise ObjectOperationError(f"Failed to delete object '{name}'") from e
 
     @record_metrics(Module.OBJECTSTORE, Operation.OBJECTSTORE_LIST_OBJECTS)
@@ -264,9 +257,8 @@ class GcsClient:
         validate_object_name(name)
 
         try:
-            blob = self._bucket.get_blob(name)
-            if blob is None:
-                raise ObjectNotFoundError(f"Object '{name}' not found")
+            blob = self._bucket.blob(name)
+            blob.reload()
             return ObjectMetadata(
                 key=blob.name,
                 last_modified=blob.updated,
@@ -275,12 +267,8 @@ class GcsClient:
                 storage_class=blob.storage_class,
                 owner=None,
             )
-        except ObjectNotFoundError:
-            raise
         except Exception as e:
-            raise ObjectOperationError(
-                f"Failed to get metadata for object '{name}'"
-            ) from e
+            self._map_gcs_error(e, name, "get metadata for")
 
     @record_metrics(Module.OBJECTSTORE, Operation.OBJECTSTORE_OBJECT_EXISTS)
     def object_exists(self, name: str) -> bool:
@@ -303,22 +291,34 @@ class GcsClient:
             return True
         except ObjectNotFoundError:
             return False
-        except ObjectOperationError as e:
-            raise ObjectOperationError(
-                f"Failed to check if object '{name}' exists"
-            ) from e
+        except ObjectOperationError:
+            raise
         except Exception as e:
             raise ObjectOperationError(
                 f"Failed to check if object '{name}' exists"
             ) from e
 
+    @staticmethod
+    def _is_not_found(exc: Exception) -> bool:
+        """Return whether Google Cloud Storage returned HTTP 404."""
+        return isinstance(exc, NotFound)
+
+    def _confirm_bucket_exists(self, exc: Exception, name: str, operation: str) -> None:
+        """Ensure a 404 belongs to an object in an available bucket."""
+        try:
+            bucket_exists = self._bucket.exists()
+        except Exception as verification_error:
+            raise ObjectOperationError(
+                f"Failed to {operation} object '{name}'"
+            ) from verification_error
+        if not bucket_exists:
+            raise ObjectOperationError(
+                f"Failed to {operation} object '{name}'"
+            ) from exc
+
     def _map_gcs_error(self, exc: Exception, name: str, operation: str) -> NoReturn:
         """Map GCS SDK exceptions to objectstore exceptions and re-raise."""
-        try:
-            from google.cloud.exceptions import NotFound
-
-            if isinstance(exc, NotFound):
-                raise ObjectNotFoundError(f"Object '{name}' not found") from exc
-        except ImportError:
-            pass
+        if self._is_not_found(exc):
+            self._confirm_bucket_exists(exc, name, operation)
+            raise ObjectNotFoundError(f"Object '{name}' not found") from exc
         raise ObjectOperationError(f"Failed to {operation} object '{name}'") from exc

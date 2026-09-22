@@ -4,6 +4,7 @@ import io
 import logging
 import os
 import threading
+import warnings
 from datetime import datetime
 from http.client import HTTPResponse
 from typing import TYPE_CHECKING, Any, BinaryIO, Callable, List, TypeVar, cast
@@ -73,6 +74,13 @@ class ObjectStoreClient:
         Raises:
             ClientCreationError: If client initialization fails.
         """
+        warnings.warn(
+            "sap_cloud_sdk.objectstore is deprecated and will be removed in a "
+            "future release. Use sap_cloud_sdk.object_storage, which also "
+            "supports Azure Blob Storage and Google Cloud Storage.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         self._config_factory = config_factory
         self._disable_ssl = disable_ssl
         self._lock = threading.Lock()

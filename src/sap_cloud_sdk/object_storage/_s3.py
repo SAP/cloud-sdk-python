@@ -2,7 +2,7 @@
 
 import io
 import os
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import BinaryIO, List
 
 import minio.datatypes
@@ -236,8 +236,8 @@ class S3Client:
             for obj in objects:
                 metadata = ObjectMetadata(
                     key=obj.object_name,
-                    last_modified=obj.last_modified,
-                    etag=obj.etag,
+                    last_modified=obj.last_modified or datetime.min.replace(tzinfo=UTC),
+                    etag=(obj.etag or "").strip('"'),
                     size=obj.size,
                     storage_class=obj.storage_class,
                     owner=obj.owner_name,
@@ -274,7 +274,7 @@ class S3Client:
 
             return ObjectMetadata(
                 key=name,
-                last_modified=stat.last_modified or datetime.min,
+                last_modified=stat.last_modified or datetime.min.replace(tzinfo=UTC),
                 etag=(stat.etag or "").strip('"'),  # Remove quotes from etag
                 size=stat.size or 0,
                 storage_class=None,  # stat_object doesn't provide storage class
@@ -312,10 +312,8 @@ class S3Client:
             return True
         except ObjectNotFoundError:
             return False
-        except ObjectOperationError as e:
-            raise ObjectOperationError(
-                f"Failed to check if object '{name}' exists"
-            ) from e
+        except ObjectOperationError:
+            raise
         except Exception as e:
             raise ObjectOperationError(
                 f"Failed to check if object '{name}' exists"

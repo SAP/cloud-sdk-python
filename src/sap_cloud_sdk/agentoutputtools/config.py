@@ -1,4 +1,4 @@
-"""Destination credential configuration for Output Management Service."""
+"""Destination credential configuration for Agent Output Tools Service."""
 
 from typing import Optional
 from pydantic import BaseModel, Field, field_validator
@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 
 
 class DestinationCredentialConfig(BaseModel):
-    """Configuration for accessing Output Management Service via SAP BTP Destination.
+    """Configuration for accessing Agent Output Tools Service via SAP BTP Destination.
     This class provides a simple configuration wrapper for destination-based access.
     Uses relative imports since this module is part of sap_cloud_sdk.
     Attributes:
@@ -18,8 +18,8 @@ class DestinationCredentialConfig(BaseModel):
         access_strategy: Optional access strategy - "PROVIDER_ONLY" or "SUBSCRIBER_ONLY"
     Example:
         ```python
-        from sap_cloud_sdk.outputmanagement import OutputManagementServiceClientProvider
-        from sap_cloud_sdk.outputmanagement.config import DestinationCredentialConfig
+        from sap_cloud_sdk.agentoutputtools import AgentOutputToolsServiceClientProvider
+        from sap_cloud_sdk.agentoutputtools.config import DestinationCredentialConfig
         # Create config
         config = DestinationCredentialConfig(
             destination_name="OUTPUT_MANAGEMENT_DEST",

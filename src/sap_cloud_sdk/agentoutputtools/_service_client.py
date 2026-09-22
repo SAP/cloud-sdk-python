@@ -1,4 +1,4 @@
-"""Output Management service client implementation."""
+"""Agent Output Tools client implementation."""
 
 import base64
 import logging
@@ -28,7 +28,7 @@ logger = logging.getLogger(__name__)
 
 
 class OutputManagementServiceClient:
-    """Service client for Output Management.
+    """Service client for Agent Output Tools.
 
     Handles low-level HTTP communication, authentication (OAuth with mTLS),
     certificate management, and request/response processing.
@@ -61,10 +61,10 @@ class OutputManagementServiceClient:
                 f"Loaded SENDER_PROVIDER_SUBACCOUNT_ID: {self._sender_provider_subaccount_id}"
             )
 
-        logger.info(f"Initialized Output Management Service client for {base_url}")
+        logger.info(f"Initialized Agent Output Tools client for {base_url}")
 
     def send_output_request(self, output_request: OutputRequest) -> OutputResponse:
-        """Send an output request to the Output Management service.
+        """Send an output request to the Agent Output service.
 
         Args:
             output_request: The output request to submit

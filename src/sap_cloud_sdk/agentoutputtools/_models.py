@@ -1,4 +1,4 @@
-"""Data models for SAP Output Management Service."""
+"""Data models for SAP Agent Output Tools."""
 
 from __future__ import annotations
 
@@ -16,14 +16,14 @@ from .constants import Channel
 
 
 class FormConfiguration(BaseModel):
-    """Form channel configuration.
+    """Form channel configuration for Agent Output Tools.
 
     Attributes:
         form_id: Form identifier
-        form_name: Form name (required by Output Management service)
-        form_template_name: Form template name (required by Output Management service)
-        form_language: Form language code (required by Output Management service)
-        file_format: File format for the generated form (required by Output Management service)
+        form_name: Form name (required by Agent Output Tools)
+        form_template_name: Form template name (required by Agent Output Tools)
+        form_language: Form language code (required by Agent Output Tools)
+        file_format: File format for the generated form (required by Agent Output Tools)
         form_data: Optional form data
         callback_url: Optional callback URL for form submission
     """
@@ -69,7 +69,7 @@ class PreGeneratedAttachment(BaseModel):
 
     Example:
         ```python
-        from sap_cloud_sdk.outputmanagement._models import PreGeneratedAttachment
+        from sap_cloud_sdk.agentoutputtools._models import PreGeneratedAttachment
 
         attachment = PreGeneratedAttachment(
             url="https://dms.example.com/browser/root?objectId=12345&cmisselector=content",
@@ -136,8 +136,8 @@ class AttachmentConfig(BaseModel):
 
     Example - Generated Attachment:
         ```python
-        from sap_cloud_sdk.outputmanagement._models import AttachmentConfig, FormConfiguration
-        from sap_cloud_sdk.outputmanagement.constants import FileFormat
+        from sap_cloud_sdk.agentoutputtools._models import AttachmentConfig, FormConfiguration
+        from sap_cloud_sdk.agentoutputtools.constants import FileFormat
 
         form_config = FormConfiguration(
             form_name="PurchaseOrderForm",
@@ -151,7 +151,7 @@ class AttachmentConfig(BaseModel):
 
     Example - Pre-generated Attachment from DMS:
         ```python
-        from sap_cloud_sdk.outputmanagement._models import AttachmentConfig, PreGeneratedAttachment
+        from sap_cloud_sdk.agentoutputtools._models import AttachmentConfig, PreGeneratedAttachment
 
         pre_gen_attachment = PreGeneratedAttachment(
             url="https://dms.example.com/browser/root?objectId=12345&cmisselector=content",
@@ -216,7 +216,7 @@ class EmailConfiguration(BaseModel):
 
     Example - Simple Notification:
         ```python
-        from sap_cloud_sdk.outputmanagement._models import EmailConfiguration
+        from sap_cloud_sdk.agentoutputtools._models import EmailConfiguration
 
         config = EmailConfiguration(
             emailNotificationTemplateKey="PO_APPROVAL_NOTIFICATION",
@@ -228,12 +228,12 @@ class EmailConfiguration(BaseModel):
 
     Example - With Document Attachment:
         ```python
-        from sap_cloud_sdk.outputmanagement._models import (
+        from sap_cloud_sdk.agentoutputtools._models import (
             EmailConfiguration,
             AttachmentConfig,
             FormConfiguration
         )
-        from sap_cloud_sdk.outputmanagement.constants import FileFormat
+        from sap_cloud_sdk.agentoutputtools.constants import FileFormat
 
         form_config = FormConfiguration(
             form_name="PurchaseOrderForm",
@@ -336,7 +336,7 @@ class DirectShareConfiguration(BaseModel):
 
 class OutputManagementInfo(BaseModel):
     """
-    Contains information required by Output Management to decide on how to orchestrate the output.
+    Contains information required by Agent Output Tools to decide on how to orchestrate the output.
 
     This class encapsulates the configuration and metadata needed for output processing,
     including business document identification, delivery channels, and channel-specific configurations.
@@ -353,11 +353,11 @@ class OutputManagementInfo(BaseModel):
 
     Example:
         ```python
-        from sap_cloud_sdk.outputmanagement._models import (
+        from sap_cloud_sdk.agentoutputtools._models import (
             OutputManagementInfo,
             EmailConfiguration
         )
-        from sap_cloud_sdk.outputmanagement.constants import Channel
+        from sap_cloud_sdk.agentoutputtools.constants import Channel
 
         email_config = EmailConfiguration(
             emailNotificationTemplateKey="PO_NOTIFICATION",
@@ -435,7 +435,7 @@ class OutputManagementInfo(BaseModel):
 
 class OutputRequestData(BaseModel):
     """
-    Container for the data payload of an Output Management request.
+    Container for the data payload of an Agent Output request.
 
     This class serves as the envelope for the actual request data, containing two essential components:
     - OutputManagement: Metadata and configuration for output orchestration
@@ -463,16 +463,16 @@ class OutputRequestData(BaseModel):
         ```
 
     Attributes:
-        output_management: Information required by Output Management for orchestration (required)
+        output_management: Information required by Agent Output Tools for orchestration (required)
         business_document: The business document as a dictionary/JSON object (required)
 
     Example:
         ```python
-        from sap_cloud_sdk.outputmanagement._models import (
+        from sap_cloud_sdk.agentoutputtools._models import (
             OutputRequestData,
             OutputManagementInfo
         )
-        from sap_cloud_sdk.outputmanagement.constants import Channel
+        from sap_cloud_sdk.agentoutputtools.constants import Channel
 
         output_mgmt = OutputManagementInfo(
             businessDocumentType="com.sap.procurement.PurchaseOrder",
@@ -499,7 +499,7 @@ class OutputRequestData(BaseModel):
     output_management: OutputManagementInfo = Field(
         ...,
         alias="OutputManagement",
-        description="Information required by Output Management to orchestrate the output",
+        description="Information required by Agent Output Tools to orchestrate the output",
     )
 
     business_document: Dict[str, Any] = Field(
@@ -521,10 +521,10 @@ class OutputRequestData(BaseModel):
 
 class OutputRequest(BaseModel):
     """
-    Represents an Output Management request following the CloudEvents 1.0 specification.
+    Represents an Agent Output Tools request following the CloudEvents 1.0 specification.
 
     This is the main request object that encapsulates all information required to trigger
-    document generation and delivery through the Output Management service. It follows the
+    document generation and delivery through the Agent Output Tools. It follows the
     CloudEvents specification for event-driven architectures.
 
     Attributes:
@@ -541,13 +541,13 @@ class OutputRequest(BaseModel):
 
     Example:
         ```python
-        from sap_cloud_sdk.outputmanagement._models import (
+        from sap_cloud_sdk.agentoutputtools._models import (
             OutputRequest,
             OutputRequestData,
             OutputManagementInfo,
             EmailConfiguration
         )
-        from sap_cloud_sdk.outputmanagement.constants import Channel
+        from sap_cloud_sdk.agentoutputtools.constants import Channel
 
         # Create email configuration
         email_config = EmailConfiguration(
@@ -771,7 +771,7 @@ class ErrorResponse(BaseModel):
 class OutputResponse(BaseModel):
     """Output response wrapper.
 
-    Response object for Output Management service operations.
+    Response object for Agent Output Tools operations.
     Contains the request identifier or error information.
     """
 

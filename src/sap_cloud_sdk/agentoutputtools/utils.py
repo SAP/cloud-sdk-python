@@ -1,9 +1,9 @@
 """Request validation utilities.
 
-This module provides comprehensive validation for Output Management requests including:
+This module provides comprehensive validation for Agent Output Tools requests including:
 - CloudEvents specification compliance
 - Business document validation
-- Output management configuration validation
+- Agent Output Tools configuration validation
 - Channel-specific validation
 
 Author: SAP SE
@@ -22,12 +22,12 @@ from .constants import Channel
 
 class RequestValidator:
     """
-    Validator utility class for Output Management requests.
+    Validator utility class for Agent Output Tools requests.
 
     This class provides comprehensive validation for OutputRequest objects including:
     - CloudEvents specification compliance
     - Business document validation
-    - Output management configuration validation
+    - Agent Output Tools configuration validation
     - Channel-specific validation (delegates to specific validators)
     """
 
@@ -43,7 +43,7 @@ class RequestValidator:
         This method performs comprehensive validation including:
         - CloudEvents specification compliance (source, id, type format)
         - Required business document information
-        - Output management metadata validation
+        - Agent Output Tools metadata validation
         - Channel configuration validation (delegates to channel-specific validators)
 
         Args:

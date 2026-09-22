@@ -24,6 +24,26 @@ from sap_cloud_sdk.object_storage import ObjectStoreClient, create_client
 
 ---
 
+## Quick Start
+
+```python
+from sap_cloud_sdk.object_storage import create_client
+
+client = create_client(instance="default")
+
+client.put_object_from_bytes(
+    name="hello.txt", data=b"Hello, World!", content_type="text/plain"
+)
+
+response = client.get_object("hello.txt")
+try:
+    print(response.read().decode("utf-8"))
+finally:
+    response.close()
+```
+
+---
+
 ## Getting Started
 
 Use `create_client()` with the logical instance name from your Cloud descriptor.
@@ -33,7 +53,7 @@ GCS from its keys, and creates the matching client.
 ```python
 from sap_cloud_sdk.object_storage import create_client
 
-client = create_client(instance="my-instance")
+client = create_client(instance="default")
 ```
 
 > **`instance` refers to the instance name defined in your Cloud descriptor.**
@@ -57,6 +77,8 @@ client = create_client(
 )
 ```
 
+> **Note:** `disable_ssl` is S3-only and has no effect for Azure or GCS.
+
 For Azure Blob Storage and GCS, pass `AzureConfig` or `GcsConfig` respectively:
 
 ```python
@@ -78,6 +100,23 @@ gcs_client = create_client(
     ),
 )
 ```
+
+---
+
+## Portable Interface
+
+Regardless of the detected provider, `create_client()` returns an
+`ObjectStoreClient`. The following surface is guaranteed to behave the same
+across S3, Azure, and GCS:
+
+- The eight client methods (`put_object*`, `get_object`, `delete_object`,
+  `list_objects`, `head_object`, `object_exists`).
+- The `ObjectReader` returned by `get_object()` — `read()`, `read(size)`, and
+  `close()`.
+- The `ObjectMetadata` fields returned by `head_object()` and `list_objects()`.
+- `delete_object()` is idempotent, and the exception hierarchy is shared.
+
+Concrete provider clients are internal; do not import or depend on them.
 
 ---
 
@@ -129,21 +168,14 @@ with open("/path/to/file.txt", "rb") as file:
 
 ### Get Object Content
 
-`get_object()` returns an `ObjectReader`. Its `read()`, `read(size)`, `close()`,
-and context-manager operations are portable across all supported providers.
-
-```python
-with client.get_object("hello.txt") as response:
-    content = response.read()
-    text_content = content.decode("utf-8")
-```
-
-You can close a reader explicitly when a context manager is not practical:
+`get_object()` returns an `ObjectReader`. Read its content with `read()` or
+`read(size)`, then release it with `close()`:
 
 ```python
 response = client.get_object("hello.txt")
 try:
     content = response.read()
+    text_content = content.decode("utf-8")
 finally:
     response.close()
 ```
@@ -156,6 +188,10 @@ if client.object_exists("hello.txt"):
 else:
     print("File not found")
 ```
+
+`object_exists()` returns `False` only when the object is genuinely absent.
+Authorization or network failures raise `ObjectOperationError` rather than
+reporting the object as missing.
 
 ### Get Object Metadata
 
@@ -218,15 +254,18 @@ from sap_cloud_sdk.object_storage import (
 )
 
 try:
-    with client.get_object("missing-file.txt") as response:
+    response = client.get_object("missing-file.txt")
+    try:
         content = response.read()
+    finally:
+        response.close()
 except ObjectNotFoundError:
     print("File not found")
 except ObjectOperationError as error:
     print(f"Operation failed: {error}")
 
 try:
-    client = create_client(instance="my-instance")
+    client = create_client(instance="default")
 except ConfigError as error:
     print(f"Invalid or incomplete binding: {error}")
 except ClientCreationError as error:
@@ -258,6 +297,12 @@ ignored. Detection is case-insensitive. Binding values are loaded in this order:
    `CLOUD_SDK_CFG_OBJECTSTORE_{INSTANCE}_{FIELD}`, with the instance and field
    uppercased and hyphens in the instance replaced by underscores.
 
+The provider is inferred from the first source that contains a *complete*
+provider signature; a source with only partial keys is skipped in favour of a
+later, complete one. A binding whose keys match more than one provider is
+rejected with `ClientCreationError`, since one binding must belong to exactly
+one provider.
+
 See the [Secret Resolver guide](../core/secret_resolver/user-guide.md) for the
 general mounting conventions.
 
@@ -269,13 +314,13 @@ general mounting conventions.
 - `bucket` — Bucket name
 - `host` — S3-compatible endpoint (e.g. `s3.eu-central-1.amazonaws.com`)
 
-**Environment variables** for instance `my-instance`:
+**Environment variables** for instance `default`:
 
 ```bash
-export CLOUD_SDK_CFG_OBJECTSTORE_MY_INSTANCE_ACCESS_KEY_ID="your-access-key"
-export CLOUD_SDK_CFG_OBJECTSTORE_MY_INSTANCE_SECRET_ACCESS_KEY="your-secret-key"
-export CLOUD_SDK_CFG_OBJECTSTORE_MY_INSTANCE_BUCKET="your-bucket-name"
-export CLOUD_SDK_CFG_OBJECTSTORE_MY_INSTANCE_HOST="s3.eu-central-1.amazonaws.com"
+export CLOUD_SDK_CFG_OBJECTSTORE_DEFAULT_ACCESS_KEY_ID="your-access-key"
+export CLOUD_SDK_CFG_OBJECTSTORE_DEFAULT_SECRET_ACCESS_KEY="your-secret-key"
+export CLOUD_SDK_CFG_OBJECTSTORE_DEFAULT_BUCKET="your-bucket-name"
+export CLOUD_SDK_CFG_OBJECTSTORE_DEFAULT_HOST="s3.eu-central-1.amazonaws.com"
 ```
 
 Supported S3 endpoints: `s3.{region}.amazonaws.com`, MinIO (`localhost:9000`), or any S3-compatible service.
@@ -287,12 +332,12 @@ Supported S3 endpoints: `s3.{region}.amazonaws.com`, MinIO (`localhost:9000`), o
 - `sas_token` — Shared Access Signature (SAS) token
 - `container_name` — Azure container name
 
-**Environment variables** for instance `my-instance`:
+**Environment variables** for instance `default`:
 
 ```bash
-export CLOUD_SDK_CFG_OBJECTSTORE_MY_INSTANCE_CONTAINER_URI="https://mystorageaccount.blob.core.windows.net/my-container"
-export CLOUD_SDK_CFG_OBJECTSTORE_MY_INSTANCE_SAS_TOKEN="sp=racwdl&st=2024-01-01T00:00:00Z&..."
-export CLOUD_SDK_CFG_OBJECTSTORE_MY_INSTANCE_CONTAINER_NAME="my-container"
+export CLOUD_SDK_CFG_OBJECTSTORE_DEFAULT_CONTAINER_URI="https://mystorageaccount.blob.core.windows.net/my-container"
+export CLOUD_SDK_CFG_OBJECTSTORE_DEFAULT_SAS_TOKEN="sp=racwdl&st=2024-01-01T00:00:00Z&..."
+export CLOUD_SDK_CFG_OBJECTSTORE_DEFAULT_CONTAINER_NAME="my-container"
 ```
 
 ### Google Cloud Storage Configuration
@@ -302,10 +347,10 @@ export CLOUD_SDK_CFG_OBJECTSTORE_MY_INSTANCE_CONTAINER_NAME="my-container"
 - `projectId` — GCP project ID (camelCase filename for mounted bindings)
 - `bucket` — Bucket name
 
-**Environment variables** for instance `my-instance`:
+**Environment variables** for instance `default`:
 
 ```bash
-export CLOUD_SDK_CFG_OBJECTSTORE_MY_INSTANCE_BASE64ENCODEDPRIVATEKEYDATA="..."
-export CLOUD_SDK_CFG_OBJECTSTORE_MY_INSTANCE_PROJECTID="my-gcp-project"
-export CLOUD_SDK_CFG_OBJECTSTORE_MY_INSTANCE_BUCKET="my-bucket"
+export CLOUD_SDK_CFG_OBJECTSTORE_DEFAULT_BASE64ENCODEDPRIVATEKEYDATA="..."
+export CLOUD_SDK_CFG_OBJECTSTORE_DEFAULT_PROJECTID="my-gcp-project"
+export CLOUD_SDK_CFG_OBJECTSTORE_DEFAULT_BUCKET="my-bucket"
 ```

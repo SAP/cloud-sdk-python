@@ -182,15 +182,26 @@ Tests are skipped automatically when `CLOUD_SDK_CFG_DPI_NG_DEFAULT_BASE_URL` or 
 
 ### ObjectStore Integration Tests
 
-For ObjectStore integration tests, configure the following variables in `.env_integration_tests`:
+For ObjectStore integration tests, configure the variables for the provider
+under test in `.env_integration_tests`. Provider is auto-detected from the keys
+present, so define exactly one set per instance.
 
 ```bash
-# ObjectStore Configuration
+# ObjectStore S3 Configuration
 CLOUD_SDK_CFG_OBJECTSTORE_DEFAULT_HOST=your-host-here
 CLOUD_SDK_CFG_OBJECTSTORE_DEFAULT_ACCESS_KEY_ID=your-access-key-id-here
-CLOUD_SDK_CFG_OBJECTSTORE_DEFAULT_SECRET_ACCESS_KEY=your-secret-access-key-kere
+CLOUD_SDK_CFG_OBJECTSTORE_DEFAULT_SECRET_ACCESS_KEY=your-secret-access-key-here
 CLOUD_SDK_CFG_OBJECTSTORE_DEFAULT_BUCKET=your-bucket-here
-CLOUD_SDK_CFG_OBJECTSTORE_DEFAULT_SSL_ENABLED=false
+
+# ObjectStore Azure Blob Storage Configuration
+CLOUD_SDK_CFG_OBJECTSTORE_DEFAULT_CONTAINER_NAME=your-container-name-here
+CLOUD_SDK_CFG_OBJECTSTORE_DEFAULT_CONTAINER_URI=your-container-uri-here
+CLOUD_SDK_CFG_OBJECTSTORE_DEFAULT_SAS_TOKEN=your-sas-token-here
+
+# ObjectStore GCS Configuration
+CLOUD_SDK_CFG_OBJECTSTORE_DEFAULT_BASE64ENCODEDPRIVATEKEYDATA=your-base64-service-account-json-here
+CLOUD_SDK_CFG_OBJECTSTORE_DEFAULT_PROJECTID=your-gcp-project-id-here
+CLOUD_SDK_CFG_OBJECTSTORE_DEFAULT_BUCKET=your-bucket-here
 ```
 
 ## Running Integration Tests
@@ -209,6 +220,7 @@ uv run pytest tests/destination/integration/ -v
 uv run pytest tests/dms/integration/ -v
 uv run pytest tests/dpi_ng/integration/consent/ -v
 uv run pytest tests/objectstore/integration/ -v
+uv run pytest tests/object_storage/integration/ -v
 ```
 
 ### BDD Scenarios

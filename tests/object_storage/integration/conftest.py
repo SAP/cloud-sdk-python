@@ -1,14 +1,11 @@
 """Fixtures for the multi-provider object storage integration tests.
 
-One ``pytest`` run exercises every scenario against each provider whose
+One ``pytest`` run exercises every live scenario against each provider whose
 credentials are present in ``.env_integration_tests``; providers without
-credentials are skipped per scenario. The failure-simulation fixtures need no
-live credentials, so the failure scenarios run for every provider (GCS uses a
-throwaway in-process RSA key so its client constructs offline).
+credentials are skipped per scenario. The S3 and Azure network-failure
+scenarios use dummy credentials and a dead local endpoint, so they always run.
 """
 
-import base64
-import json
 import logging
 import os
 import uuid
@@ -17,8 +14,6 @@ from pathlib import Path
 import pytest
 import urllib3
 from azure.storage.blob import ContainerClient
-from cryptography.hazmat.primitives import serialization
-from cryptography.hazmat.primitives.asymmetric import rsa
 from dotenv import load_dotenv
 
 from sap_cloud_sdk.object_storage import create_client
@@ -83,8 +78,8 @@ def _azure_config_from_env() -> AzureConfig | None:
 
 def _gcs_config_from_env() -> GcsConfig | None:
     prefix = "CLOUD_SDK_CFG_OBJECTSTORE_GCS_"
-    key = os.getenv(f"{prefix}BASE64_PRIVATE_KEY_DATA")
-    project = os.getenv(f"{prefix}PROJECT_ID")
+    key = os.getenv(f"{prefix}BASE64ENCODEDPRIVATEKEYDATA")
+    project = os.getenv(f"{prefix}PROJECTID")
     bucket = os.getenv(f"{prefix}BUCKET")
     if not all([key, project, bucket]):
         return None
@@ -102,53 +97,27 @@ _CONFIG_LOADERS = {
 }
 
 
-def build_live_client(provider: str):
-    """Return a live client for ``provider``, or skip if it has no credentials."""
+def _require(provider: str):
+    """Load a provider's live config, skipping the scenario if it is absent."""
     config = _CONFIG_LOADERS[provider]()
     if config is None:
         pytest.skip(f"no credentials configured for provider '{provider}'")
-    return create_client(config=config)
+    return config
 
 
-def _dummy_gcs_key() -> str:
-    """Base64-encode a service-account JSON with a throwaway RSA private key.
-
-    Lets ``GcsClient`` construct fully offline so GCS can join the network-failure
-    matrix without real credentials.
-    """
-    key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
-    pem = key.private_bytes(
-        serialization.Encoding.PEM,
-        serialization.PrivateFormat.TraditionalOpenSSL,
-        serialization.NoEncryption(),
-    ).decode()
-    account = {
-        "type": "service_account",
-        "project_id": "dummy-project",
-        "private_key_id": "dummy",
-        "private_key": pem,
-        "client_email": "dummy@dummy-project.iam.gserviceaccount.com",
-        "client_id": "0",
-        "token_uri": "https://oauth2.googleapis.com/token",
-    }
-    return base64.b64encode(json.dumps(account).encode()).decode()
+def build_live_client(provider: str):
+    """Return a live client for ``provider``, or skip if it has no credentials."""
+    return create_client(config=_require(provider))
 
 
 def build_unreachable_client(provider: str):
-    """Return a client pointed at a dead endpoint, tuned to fail fast.
-
-    The provider SDKs default to multi-second retry budgets, which would make
-    these failure scenarios take minutes. The clients expose no retry knobs, so
-    the test tunes each transport to zero retries and a short timeout after
-    construction. GCS needs no tuning — it fails offline while refreshing the
-    throwaway credential.
-    """
+    """Return a credential-free client aimed at a dead local endpoint."""
     if provider == "s3":
         client = create_client(
             config=S3Config(
-                access_key_id="ak",
-                secret_access_key="sk",
-                bucket="bucket",
+                access_key_id="dummy-access-key",
+                secret_access_key="dummy-secret-key",
+                bucket="dummy-bucket",
                 host=_DEAD_ENDPOINT,
                 disable_ssl=True,
             )
@@ -158,28 +127,23 @@ def build_unreachable_client(provider: str):
         )
         return client
     if provider == "azure":
+        dead_uri = f"http://{_DEAD_ENDPOINT}/dummy-container"
         client = create_client(
             config=AzureConfig(
-                container_name="c",
-                container_uri=f"http://{_DEAD_ENDPOINT}/c",
-                sas_token="sv=token",
+                container_name="dummy-container",
+                container_uri=dead_uri,
+                sas_token="sv=dummy-token",
             )
         )
         client._container = ContainerClient.from_container_url(  # ty: ignore[unresolved-attribute]
-            f"http://{_DEAD_ENDPOINT}/c",
-            credential="sv=token",
+            dead_uri,
+            credential="sv=dummy-token",
             retry_total=0,
             connection_timeout=1,
             read_timeout=1,
         )
         return client
-    return create_client(
-        config=GcsConfig(
-            base64_encoded_private_key_data=_dummy_gcs_key(),
-            project_id="dummy-project",
-            bucket="nonexistent-bucket",
-        )
-    )
+    raise ValueError(f"unsupported network-failure provider: {provider}")
 
 
 @pytest.fixture

@@ -182,9 +182,9 @@ Tests are skipped automatically when `CLOUD_SDK_CFG_DPI_NG_DEFAULT_BASE_URL` or 
 
 ### ObjectStore Integration Tests
 
-For ObjectStore integration tests, configure the variables for the provider
-under test in `.env_integration_tests`. Provider is auto-detected from the keys
-present, so define exactly one set per instance.
+For ObjectStore integration tests, configure the variables for the provider(s)
+under test in `.env_integration_tests`. Each provider lives under its own
+instance name so a single run can exercise all three at once. Providers without credentials are skipped.
 
 ```bash
 # ObjectStore S3 Configuration
@@ -194,14 +194,14 @@ CLOUD_SDK_CFG_OBJECTSTORE_DEFAULT_SECRET_ACCESS_KEY=your-secret-access-key-here
 CLOUD_SDK_CFG_OBJECTSTORE_DEFAULT_BUCKET=your-bucket-here
 
 # ObjectStore Azure Blob Storage Configuration
-CLOUD_SDK_CFG_OBJECTSTORE_DEFAULT_CONTAINER_NAME=your-container-name-here
-CLOUD_SDK_CFG_OBJECTSTORE_DEFAULT_CONTAINER_URI=your-container-uri-here
-CLOUD_SDK_CFG_OBJECTSTORE_DEFAULT_SAS_TOKEN=your-sas-token-here
+CLOUD_SDK_CFG_OBJECTSTORE_AZURE_CONTAINER_NAME=your-container-name-here
+CLOUD_SDK_CFG_OBJECTSTORE_AZURE_CONTAINER_URI=your-container-uri-here
+CLOUD_SDK_CFG_OBJECTSTORE_AZURE_SAS_TOKEN=your-sas-token-here
 
 # ObjectStore GCS Configuration
-CLOUD_SDK_CFG_OBJECTSTORE_DEFAULT_BASE64ENCODEDPRIVATEKEYDATA=your-base64-service-account-json-here
-CLOUD_SDK_CFG_OBJECTSTORE_DEFAULT_PROJECTID=your-gcp-project-id-here
-CLOUD_SDK_CFG_OBJECTSTORE_DEFAULT_BUCKET=your-bucket-here
+CLOUD_SDK_CFG_OBJECTSTORE_GCS_BASE64ENCODEDPRIVATEKEYDATA=your-base64-service-account-json-here
+CLOUD_SDK_CFG_OBJECTSTORE_GCS_PROJECTID=your-gcp-project-id-here
+CLOUD_SDK_CFG_OBJECTSTORE_GCS_BUCKET=your-bucket-here
 ```
 
 ## Running Integration Tests

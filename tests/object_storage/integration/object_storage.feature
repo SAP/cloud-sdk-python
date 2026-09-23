@@ -80,6 +80,18 @@ Feature: Multi-provider object storage
     Given an unreachable "<provider>" object storage client
     When I upload "data" as bytes to "unreachable.txt"
     Then the operation fails with "ObjectOperationError"
+    When I upload a 5-byte stream to "unreachable-stream.bin"
+    Then the operation fails with "ObjectOperationError"
+    When I upload a temporary file to "unreachable-file.txt"
+    Then the operation fails with "ObjectOperationError"
+    When I download the missing object "unreachable.txt"
+    Then the operation fails with "ObjectOperationError"
+    When I fetch metadata for "unreachable.txt"
+    Then the operation fails with "ObjectOperationError"
+    When I check whether "unreachable.txt" exists
+    Then the operation fails with "ObjectOperationError"
+    When I delete "unreachable.txt"
+    Then the operation fails with "ObjectOperationError"
     When I list the test prefix
     Then the operation fails with "ListObjectsError"
 
@@ -87,4 +99,3 @@ Feature: Multi-provider object storage
       | provider |
       | s3       |
       | azure    |
-      | gcs      |

@@ -78,7 +78,8 @@ def _upload_bytes(context, content, name):
             key, content.encode(), "text/plain"
         ),
     )
-    context.created.append(key)
+    if context.error is None:
+        context.created.append(key)
 
 
 @when(parsers.parse('I upload a 5-byte stream to "{name}"'))
@@ -90,7 +91,8 @@ def _upload_stream(context, name):
             key, io.BytesIO(b"abcde"), 5, "application/octet-stream"
         ),
     )
-    context.created.append(key)
+    if context.error is None:
+        context.created.append(key)
 
 
 @when(parsers.parse('I upload a temporary file to "{name}"'))
@@ -102,7 +104,8 @@ def _upload_file(context, name, tmp_path):
         context,
         lambda: context.client.put_object_from_file(key, str(source), "text/plain"),
     )
-    context.created.append(key)
+    if context.error is None:
+        context.created.append(key)
 
 
 @when(parsers.parse('I upload the missing file "{path}" to "{name}"'))
@@ -118,6 +121,16 @@ def _upload_missing_file(context, path, name):
 @when(parsers.parse('I download the missing object "{name}"'))
 def _download_missing(context, name):
     _run(context, lambda: context.client.get_object(context.key(name)))
+
+
+@when(parsers.parse('I fetch metadata for "{name}"'))
+def _head(context, name):
+    _run(context, lambda: context.client.head_object(context.key(name)))
+
+
+@when(parsers.parse('I check whether "{name}" exists'))
+def _check_exists(context, name):
+    _run(context, lambda: context.client.object_exists(context.key(name)))
 
 
 @when(parsers.parse('I delete "{name}"'))

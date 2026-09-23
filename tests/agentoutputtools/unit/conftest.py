@@ -1,7 +1,7 @@
 # SPDX-FileCopyrightText: 2024 SAP SE or an SAP affiliate company
 # SPDX-License-Identifier: Apache-2.0
 
-"""Pytest configuration for output management unit tests."""
+"""Pytest configuration for agent output tools unit tests."""
 
 import pytest
 
@@ -9,7 +9,7 @@ import pytest
 @pytest.fixture
 def sample_email_config():
     """Provide a sample email configuration for testing."""
-    from sap_cloud_sdk.outputmanagement import EmailConfiguration
+    from sap_cloud_sdk.agentoutputtools import EmailConfiguration
 
     return EmailConfiguration(
         emailNotificationTemplateKey="TEST_TEMPLATE",
@@ -21,7 +21,7 @@ def sample_email_config():
 @pytest.fixture
 def sample_attachment():
     """Provide a sample attachment for testing."""
-    from sap_cloud_sdk.outputmanagement import AttachmentConfig, FormConfiguration
+    from sap_cloud_sdk.agentoutputtools import AttachmentConfig, FormConfiguration
 
     form_config = FormConfiguration(
         form_id="test-form",
@@ -36,7 +36,7 @@ def sample_attachment():
 @pytest.fixture
 def sample_output_response():
     """Provide a sample output response for testing."""
-    from sap_cloud_sdk.outputmanagement import OutputResponse
+    from sap_cloud_sdk.agentoutputtools import OutputResponse
 
     return OutputResponse(outputRequestId="test-req-123")
 
@@ -44,7 +44,7 @@ def sample_output_response():
 @pytest.fixture
 def sample_pre_generated_attachment():
     """Provide a sample pre-generated attachment for testing."""
-    from sap_cloud_sdk.outputmanagement import PreGeneratedAttachment
+    from sap_cloud_sdk.agentoutputtools import PreGeneratedAttachment
 
     return PreGeneratedAttachment(
         url="https://dms.example.com/attachments/test-file.pdf", source="DMS"
@@ -54,6 +54,6 @@ def sample_pre_generated_attachment():
 @pytest.fixture
 def sample_destination_config():
     """Provide a sample destination configuration for testing."""
-    from sap_cloud_sdk.outputmanagement import DestinationCredentialConfig
+    from sap_cloud_sdk.agentoutputtools import DestinationCredentialConfig
 
     return DestinationCredentialConfig(destination_name="test-output-management")

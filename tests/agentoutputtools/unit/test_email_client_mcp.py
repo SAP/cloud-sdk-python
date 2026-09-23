@@ -5,8 +5,8 @@
 
 import pytest
 from unittest.mock import Mock, AsyncMock, patch
-from sap_cloud_sdk.outputmanagement import OutputManagementClient
-from sap_cloud_sdk.outputmanagement._service_client import OutputManagementServiceClient
+from sap_cloud_sdk.agentoutputtools import OutputManagementClient
+from sap_cloud_sdk.agentoutputtools._service_client import OutputManagementServiceClient
 
 
 class TestOutputManagementClientMCP:

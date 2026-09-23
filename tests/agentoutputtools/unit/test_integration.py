@@ -1,11 +1,11 @@
 # SPDX-FileCopyrightText: 2024 SAP SE or an SAP affiliate company
 # SPDX-License-Identifier: Apache-2.0
 
-"""Integration-style unit tests for output management module."""
+"""Integration-style unit tests for agent output tools module."""
 
 import pytest
 
-from sap_cloud_sdk.outputmanagement import (
+from sap_cloud_sdk.agentoutputtools import (
     DestinationCredentialConfig,
     EmailConfiguration,
     AttachmentConfig,
@@ -15,11 +15,11 @@ from sap_cloud_sdk.outputmanagement import (
     OutputManagementException,
     ValidationException,
 )
-from sap_cloud_sdk.outputmanagement._models import ErrorResponse
+from sap_cloud_sdk.agentoutputtools._models import ErrorResponse
 
 
 class TestOutputManagementIntegration:
-    """Integration-style tests for output management."""
+    """Integration-style tests for agent output tools."""
 
     def test_end_to_end_email_workflow(self):
         """Test complete email sending workflow."""

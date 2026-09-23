@@ -1,9 +1,9 @@
 # SPDX-FileCopyrightText: 2024 SAP SE or an SAP affiliate company
 # SPDX-License-Identifier: Apache-2.0
 
-"""Comprehensive tests for output management module."""
+"""Comprehensive tests for agent output tools module."""
 
-from sap_cloud_sdk.outputmanagement import (
+from sap_cloud_sdk.agentoutputtools import (
     OutputResponse,
     EmailConfiguration,
     AttachmentConfig,
@@ -13,7 +13,7 @@ from sap_cloud_sdk.outputmanagement import (
     ValidationException,
     AuthenticationException,
 )
-from sap_cloud_sdk.outputmanagement._models import ErrorResponse
+from sap_cloud_sdk.agentoutputtools._models import ErrorResponse
 
 
 class TestPydanticModelFeatures:

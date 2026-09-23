@@ -1,11 +1,11 @@
 # SPDX-FileCopyrightText: 2024 SAP SE or an SAP affiliate company
 # SPDX-License-Identifier: Apache-2.0
 
-"""Unit tests for output management exceptions."""
+"""Unit tests for agent output tools exceptions."""
 
 import pytest
 
-from sap_cloud_sdk.outputmanagement.exceptions import (
+from sap_cloud_sdk.agentoutputtools.exceptions import (
     OutputManagementException,
     ValidationException,
     AuthenticationException,
@@ -16,7 +16,7 @@ from sap_cloud_sdk.outputmanagement.exceptions import (
 
 
 class TestOutputManagementExceptions:
-    """Test output management exception classes."""
+    """Test agent output tools exception classes."""
 
     def test_output_management_exception_basic(self):
         """Test basic OutputManagementException."""
@@ -26,7 +26,7 @@ class TestOutputManagementExceptions:
 
     def test_output_management_exception_with_message(self):
         """Test OutputManagementException with custom message."""
-        message = "Something went wrong in output management"
+        message = "Something went wrong in agent output tools"
         error = OutputManagementException(message)
         assert error.message == message
 
@@ -70,12 +70,14 @@ class TestOutputManagementExceptions:
         error = DestinationNotFoundException("Destination not found")
         assert error.message == "Destination not found"
         assert isinstance(error, OutputManagementException)
+        assert isinstance(error, Exception)
 
     def test_destination_access_exception(self):
         """Test DestinationAccessException."""
         error = DestinationAccessException("Cannot access destination")
         assert error.message == "Cannot access destination"
         assert isinstance(error, OutputManagementException)
+        assert isinstance(error, Exception)
 
     def test_exception_inheritance_chain(self):
         """Test exception inheritance chain."""
@@ -96,6 +98,7 @@ class TestOutputManagementExceptions:
 
         with pytest.raises(AuthenticationException):
             raise AuthenticationException("Test")
+        assert isinstance(AuthenticationException("Test"), Exception)
 
     def test_validation_error_caught_as_base_error(self):
         """Test that ValidationException can be caught as base OutputManagementException."""

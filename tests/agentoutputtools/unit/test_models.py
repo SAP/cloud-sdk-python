@@ -1,19 +1,19 @@
 # SPDX-FileCopyrightText: 2024 SAP SE or an SAP affiliate company
 # SPDX-License-Identifier: Apache-2.0
 
-"""Unit tests for output management models."""
+"""Unit tests for agent output tools models."""
 
 import pytest
 from dataclasses import is_dataclass
 
-from sap_cloud_sdk.outputmanagement import (
+from sap_cloud_sdk.agentoutputtools import (
     OutputResponse,
     EmailConfiguration,
     AttachmentConfig,
     PreGeneratedAttachment,
     FormConfiguration,
 )
-from sap_cloud_sdk.outputmanagement._models import ErrorResponse
+from sap_cloud_sdk.agentoutputtools._models import ErrorResponse
 
 
 class TestOutputResponse:

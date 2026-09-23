@@ -1,15 +1,15 @@
 # SPDX-FileCopyrightText: 2024 SAP SE or an SAP affiliate company
 # SPDX-License-Identifier: Apache-2.0
 
-"""Unit tests for the output management client."""
+"""Unit tests for the agent output tools client."""
 
 from unittest.mock import Mock, patch
 
 import pytest
 
-from sap_cloud_sdk.outputmanagement import OutputManagementClient
-from sap_cloud_sdk.outputmanagement._service_client import OutputManagementServiceClient
-from sap_cloud_sdk.outputmanagement._models import OutputRequest, OutputResponse
+from sap_cloud_sdk.agentoutputtools import OutputManagementClient
+from sap_cloud_sdk.agentoutputtools._service_client import OutputManagementServiceClient
+from sap_cloud_sdk.agentoutputtools._models import OutputRequest, OutputResponse
 from sap_cloud_sdk.core.telemetry import Module, Operation
 
 

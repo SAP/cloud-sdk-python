@@ -1,27 +1,27 @@
 # SPDX-FileCopyrightText: 2024 SAP SE or an SAP affiliate company
 # SPDX-License-Identifier: Apache-2.0
 
-"""Basic unit tests for output management module."""
+"""Basic unit tests for agent output tools module."""
 
 
 class TestOutputManagementModule:
-    """Test basic output management module functionality."""
+    """Test basic agent output tools module functionality."""
 
     def test_module_imports(self):
-        """Test that output management module can be imported."""
-        from sap_cloud_sdk import outputmanagement
+        """Test that agent output tools module can be imported."""
+        from sap_cloud_sdk import agentoutputtools
 
-        assert outputmanagement is not None
+        assert agentoutputtools is not None
 
     def test_client_import(self):
         """Test that unified client can be imported."""
-        from sap_cloud_sdk.outputmanagement import OutputManagementClient
+        from sap_cloud_sdk.agentoutputtools import OutputManagementClient
 
         assert OutputManagementClient is not None
 
     def test_service_client_import(self):
         """Test that service client can be imported."""
-        from sap_cloud_sdk.outputmanagement._service_client import (
+        from sap_cloud_sdk.agentoutputtools._service_client import (
             OutputManagementServiceClient,
         )
 
@@ -29,14 +29,14 @@ class TestOutputManagementModule:
 
     def test_create_client_import(self):
         """Test that create_client factory function can be imported."""
-        from sap_cloud_sdk.outputmanagement import create_client
+        from sap_cloud_sdk.agentoutputtools import create_client
 
         assert create_client is not None
 
     def test_constants_import(self):
         """Test that constants can be imported."""
-        from sap_cloud_sdk.outputmanagement import FileFormat, Channel
-        from sap_cloud_sdk.outputmanagement.constants import Constants
+        from sap_cloud_sdk.agentoutputtools import FileFormat, Channel
+        from sap_cloud_sdk.agentoutputtools.constants import Constants
 
         assert Constants.API_OUTPUT_CONTROL is not None
         assert FileFormat.PDF is not None
@@ -44,7 +44,7 @@ class TestOutputManagementModule:
 
     def test_exceptions_import(self):
         """Test that exceptions can be imported."""
-        from sap_cloud_sdk.outputmanagement import (
+        from sap_cloud_sdk.agentoutputtools import (
             OutputManagementException,
             ValidationException,
             AuthenticationException,
@@ -62,7 +62,7 @@ class TestOutputManagementModule:
 
     def test_models_import(self):
         """Test that models can be imported."""
-        from sap_cloud_sdk.outputmanagement import (
+        from sap_cloud_sdk.agentoutputtools import (
             OutputRequest,
             OutputRequestBuilder,
             OutputResponse,
@@ -88,12 +88,12 @@ class TestOutputManagementModule:
 
     def test_config_import(self):
         """Test that config can be imported."""
-        from sap_cloud_sdk.outputmanagement import DestinationCredentialConfig
+        from sap_cloud_sdk.agentoutputtools import DestinationCredentialConfig
 
         assert DestinationCredentialConfig is not None
 
     def test_utils_import(self):
         """Test that utils can be imported."""
-        from sap_cloud_sdk.outputmanagement.utils import RequestValidator
+        from sap_cloud_sdk.agentoutputtools.utils import RequestValidator
 
         assert RequestValidator is not None

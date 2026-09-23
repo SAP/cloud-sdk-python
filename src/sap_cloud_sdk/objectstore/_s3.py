@@ -128,7 +128,11 @@ class ObjectStoreClient:
                 return fn()
             raise
 
-    @record_metrics(Module.OBJECTSTORE, Operation.OBJECTSTORE_PUT_OBJECT_FROM_BYTES)
+    @record_metrics(
+        Module.OBJECTSTORE,
+        Operation.OBJECTSTORE_PUT_OBJECT_FROM_BYTES,
+        deprecated=True,
+    )
     def put_object_from_bytes(self, name: str, data: bytes, content_type: str) -> None:
         """Upload an object from bytes.
 
@@ -165,7 +169,11 @@ class ObjectStoreClient:
         except Exception as e:
             raise ObjectOperationError(f"Failed to upload object '{name}': {e}") from e
 
-    @record_metrics(Module.OBJECTSTORE, Operation.OBJECTSTORE_PUT_OBJECT)
+    @record_metrics(
+        Module.OBJECTSTORE,
+        Operation.OBJECTSTORE_PUT_OBJECT,
+        deprecated=True,
+    )
     def put_object(
         self, name: str, stream: BinaryIO, size: int, content_type: str
     ) -> None:
@@ -207,7 +215,11 @@ class ObjectStoreClient:
         except Exception as e:
             raise ObjectOperationError(f"Failed to upload object '{name}': {e}") from e
 
-    @record_metrics(Module.OBJECTSTORE, Operation.OBJECTSTORE_PUT_OBJECT_FROM_FILE)
+    @record_metrics(
+        Module.OBJECTSTORE,
+        Operation.OBJECTSTORE_PUT_OBJECT_FROM_FILE,
+        deprecated=True,
+    )
     def put_object_from_file(
         self, name: str, file_path: str, content_type: str
     ) -> None:
@@ -252,7 +264,11 @@ class ObjectStoreClient:
         except Exception as e:
             raise ObjectOperationError(f"Failed to upload object '{name}': {e}") from e
 
-    @record_metrics(Module.OBJECTSTORE, Operation.OBJECTSTORE_GET_OBJECT)
+    @record_metrics(
+        Module.OBJECTSTORE,
+        Operation.OBJECTSTORE_GET_OBJECT,
+        deprecated=True,
+    )
     def get_object(self, name: str) -> HTTPResponse:
         """Download an object as a stream.
 
@@ -291,7 +307,11 @@ class ObjectStoreClient:
                 f"Failed to download object '{name}': {e}"
             ) from e
 
-    @record_metrics(Module.OBJECTSTORE, Operation.OBJECTSTORE_DELETE_OBJECT)
+    @record_metrics(
+        Module.OBJECTSTORE,
+        Operation.OBJECTSTORE_DELETE_OBJECT,
+        deprecated=True,
+    )
     def delete_object(self, name: str) -> None:
         """Delete an object.
 
@@ -320,7 +340,11 @@ class ObjectStoreClient:
         except Exception as e:
             raise ObjectOperationError(f"Failed to delete object '{name}': {e}") from e
 
-    @record_metrics(Module.OBJECTSTORE, Operation.OBJECTSTORE_LIST_OBJECTS)
+    @record_metrics(
+        Module.OBJECTSTORE,
+        Operation.OBJECTSTORE_LIST_OBJECTS,
+        deprecated=True,
+    )
     def list_objects(self, prefix: str) -> List[ObjectMetadata]:
         """List objects with a given prefix.
 
@@ -366,7 +390,11 @@ class ObjectStoreClient:
                 f"Failed to list objects with prefix '{prefix}': {e}"
             ) from e
 
-    @record_metrics(Module.OBJECTSTORE, Operation.OBJECTSTORE_HEAD_OBJECT)
+    @record_metrics(
+        Module.OBJECTSTORE,
+        Operation.OBJECTSTORE_HEAD_OBJECT,
+        deprecated=True,
+    )
     def head_object(self, name: str) -> ObjectMetadata:
         """Get metadata for an object without downloading it.
 
@@ -410,7 +438,11 @@ class ObjectStoreClient:
                 f"Failed to get metadata for object '{name}': {e}"
             ) from e
 
-    @record_metrics(Module.OBJECTSTORE, Operation.OBJECTSTORE_OBJECT_EXISTS)
+    @record_metrics(
+        Module.OBJECTSTORE,
+        Operation.OBJECTSTORE_OBJECT_EXISTS,
+        deprecated=True,
+    )
     def object_exists(self, name: str) -> bool:
         """Check if an object exists.
 

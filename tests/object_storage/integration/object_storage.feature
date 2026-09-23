@@ -67,7 +67,7 @@ Feature: Multi-provider object storage
 
   Scenario Outline: Invalid object name is rejected before any I/O
     Given a live "<provider>" object storage client
-    When I download the missing object ""
+    When I download an object with an empty name
     Then the operation fails with "ValueError"
 
     Examples:

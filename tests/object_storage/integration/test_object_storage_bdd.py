@@ -123,6 +123,11 @@ def _download_missing(context, name):
     _run(context, lambda: context.client.get_object(context.key(name)))
 
 
+@when("I download an object with an empty name")
+def _download_empty_name(context):
+    _run(context, lambda: context.client.get_object(""))
+
+
 @when(parsers.parse('I fetch metadata for "{name}"'))
 def _head(context, name):
     _run(context, lambda: context.client.head_object(context.key(name)))

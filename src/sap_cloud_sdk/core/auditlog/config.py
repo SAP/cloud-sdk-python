@@ -37,6 +37,21 @@ class AuditLogConfig:
         if not self.service_url:
             raise ValueError("service_url is required")
 
+    @property
+    def token_url(self) -> str:
+        """OAuth2 token endpoint derived from oauth_url."""
+        return self.oauth_url.rstrip("/") + "/oauth/token"
+
+    @property
+    def base_url(self) -> str:
+        """Service base URL (alias for service_url, used by XsuaaAuthProvider)."""
+        return self.service_url
+
+    @property
+    def identityzone(self) -> None:
+        """No identity zone — auditlog does not support tenant substitution."""
+        return None
+
 
 @dataclass
 class BindingData:

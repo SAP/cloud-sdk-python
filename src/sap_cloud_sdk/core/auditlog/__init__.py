@@ -18,7 +18,7 @@ from typing import Optional
 
 from sap_cloud_sdk.core.telemetry import Module
 from sap_cloud_sdk.core.auditlog.client import AuditLogClient
-from sap_cloud_sdk.core.auditlog._http_transport import HttpTransport
+from sap_cloud_sdk.core.auditlog._transport import HttpTransport
 from sap_cloud_sdk.core.auditlog.models import (
     SecurityEvent,
     DataAccessEvent,

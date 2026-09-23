@@ -1,4 +1,4 @@
-"""Data models for SAP Agent Output Tools."""
+"""Data models for SAP Agent Output Tools Service."""
 
 from __future__ import annotations
 
@@ -20,10 +20,10 @@ class FormConfiguration(BaseModel):
 
     Attributes:
         form_id: Form identifier
-        form_name: Form name (required by Agent Output Tools)
-        form_template_name: Form template name (required by Agent Output Tools)
-        form_language: Form language code (required by Agent Output Tools)
-        file_format: File format for the generated form (required by Agent Output Tools)
+        form_name: Form name (required by Agent Output Tools service)
+        form_template_name: Form template name (required by Agent Output Tools service)
+        form_language: Form language code (required by Agent Output Tools service)
+        file_format: File format for the generated form (required by Agent Output Tools service)
         form_data: Optional form data
         callback_url: Optional callback URL for form submission
     """
@@ -524,7 +524,7 @@ class OutputRequest(BaseModel):
     Represents an Agent Output Tools request following the CloudEvents 1.0 specification.
 
     This is the main request object that encapsulates all information required to trigger
-    document generation and delivery through the Agent Output Tools. It follows the
+    document generation and delivery through the Agent Output Tools service. It follows the
     CloudEvents specification for event-driven architectures.
 
     Attributes:
@@ -771,7 +771,7 @@ class ErrorResponse(BaseModel):
 class OutputResponse(BaseModel):
     """Output response wrapper.
 
-    Response object for Agent Output Tools operations.
+    Response object for Agent Output Tools service operations.
     Contains the request identifier or error information.
     """
 

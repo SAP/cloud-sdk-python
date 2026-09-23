@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: 2024 SAP SE or an SAP affiliate company and Cloud SDK contributors
 # SPDX-License-Identifier: Apache-2.0
-"""Pytest configuration for Output Management integration tests."""
+"""Pytest configuration for Agent Output Tools integration tests."""
 
 import logging
 import os
@@ -14,8 +14,8 @@ from http.server import HTTPServer, BaseHTTPRequestHandler
 import pytest
 from dotenv import load_dotenv
 
-from sap_cloud_sdk.outputmanagement import create_client, OutputManagementClient, DestinationCredentialConfig
-from sap_cloud_sdk.outputmanagement._service_client import OutputManagementServiceClient
+from sap_cloud_sdk.agentoutputtools import create_client, OutputManagementClient, DestinationCredentialConfig
+from sap_cloud_sdk.agentoutputtools._service_client import OutputManagementServiceClient
 from sap_cloud_sdk.destination.config import DestinationConfig
 
 logger = logging.getLogger(__name__)
@@ -101,15 +101,15 @@ class MockOutputManagementServer:
         if self.server:
             self.server.shutdown()
             self.server.server_close()
-            logger.info("Mock Output Management server stopped")
+            logger.info("Mock Agent Output Tools server stopped")
 
 
 @pytest.fixture(scope="session")
 def output_management_client():
-    """Create an Output Management client for testing.
+    """Create an Agent Output Tools client for integration testing.
 
     Supports two modes:
-    1. Cloud mode (default): Uses real BTP Output Management service
+    1. Cloud mode (default): Uses real BTP Agent Output Tools service
     2. Local mode (CLOUD_SDK_OMS_TEST_MODE=local): Uses mock HTTP server
 
     Cloud mode is the default for proper integration testing.
@@ -120,10 +120,10 @@ def output_management_client():
     test_mode = os.getenv("CLOUD_SDK_OMS_TEST_MODE", "cloud").lower()
 
     if test_mode == "local":
-        logger.info("Using LOCAL mode for Output Management integration tests")
+        logger.info("Using LOCAL mode for Agent Output Tools integration tests")
         return _create_local_client()
     else:
-        logger.info("Using CLOUD mode for Output Management integration tests")
+        logger.info("Using CLOUD mode for Agent Output Tools integration tests")
         return _create_cloud_client()
 
 
@@ -153,7 +153,7 @@ def _create_local_client():
     # Create high-level client
     client = OutputManagementClient(service_client=service_client)
     logger.info(
-        f"Created Output Management client for local testing at {MOCK_BASE_URL}"
+        f"Created Agent Output Tools client for local testing at {MOCK_BASE_URL}"
     )
     return client
 

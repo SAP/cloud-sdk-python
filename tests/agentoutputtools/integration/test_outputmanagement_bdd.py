@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: 2024 SAP SE or an SAP affiliate company and Cloud SDK contributors
 # SPDX-License-Identifier: Apache-2.0
-"""BDD step definitions for Output Management integration tests."""
+"""BDD step definitions for Agent Output Tools integration tests."""
 
 import logging
 from pathlib import Path
@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 from pytest_bdd import given, parsers, scenarios, then, when
 
-from sap_cloud_sdk.outputmanagement import (
+from sap_cloud_sdk.agentoutputtools import (
     AttachmentConfig,
     Channel,
     EmailConfiguration,
@@ -21,7 +21,7 @@ from sap_cloud_sdk.outputmanagement import (
 logger = logging.getLogger(__name__)
 
 # Load all scenarios from the feature file
-scenarios(str(Path(__file__).parent / "outputmanagement.feature"))
+scenarios(str(Path(__file__).parent / "agentoutputtools.feature"))
 
 
 # ============================================================================
@@ -40,11 +40,11 @@ def context():
 # ============================================================================
 
 
-@given("an Output Management client")
+@given("an Agent Output Tools client")
 def output_management_client_available(output_management_client, context):
-    """Store the Output Management client in context."""
+    """Store the Agent Output Tools client in context."""
     context["client"] = output_management_client
-    logger.info("Output Management client initialized")
+    logger.info("Agent Output Tools client initialized")
 
 
 # ============================================================================

@@ -74,9 +74,9 @@ class TestAgentOutputToolsClient:
             # First call is from send_output_request
             assert mock_metric.call_args_list[0] == (
                 (
-                    Module.OUTPUT_MANAGEMENT,
+                    Module.AGENT_OUTPUT_TOOLS,
                     None,
-                    Operation.OUTPUT_MANAGEMENT_SEND_OUTPUT_REQUEST,
+                    Operation.AGENT_OUTPUT_TOOLS_SEND_OUTPUT_REQUEST,
                     False,
                 ),
             )
@@ -84,9 +84,9 @@ class TestAgentOutputToolsClient:
             # Second call is from send_email
             assert mock_metric.call_args_list[1] == (
                 (
-                    Module.OUTPUT_MANAGEMENT,
+                    Module.AGENT_OUTPUT_TOOLS,
                     None,
-                    Operation.OUTPUT_MANAGEMENT_SEND_EMAIL,
+                    Operation.AGENT_OUTPUT_TOOLS_SEND_EMAIL,
                     False,
                 ),
             )
@@ -109,9 +109,9 @@ class TestAgentOutputToolsClient:
             response = client.send_output_request(output_request)
 
             mock_metric.assert_called_once_with(
-                Module.OUTPUT_MANAGEMENT,
+                Module.AGENT_OUTPUT_TOOLS,
                 None,
-                Operation.OUTPUT_MANAGEMENT_SEND_OUTPUT_REQUEST,
+                Operation.AGENT_OUTPUT_TOOLS_SEND_OUTPUT_REQUEST,
                 False,
             )
 
@@ -141,9 +141,9 @@ class TestAgentOutputToolsClient:
             )
 
             mock_metric.assert_called_once_with(
-                Module.OUTPUT_MANAGEMENT,
+                Module.AGENT_OUTPUT_TOOLS,
                 None,
-                Operation.OUTPUT_MANAGEMENT_SEND_EMAIL_WITH_MCP,
+                Operation.AGENT_OUTPUT_TOOLS_SEND_EMAIL_WITH_MCP,
                 False,
             )
 

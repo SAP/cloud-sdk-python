@@ -41,9 +41,9 @@ def context():
 
 
 @given("an Agent Output Tools client")
-def output_management_client_available(output_management_client, context):
+def agent_output_tools_client_available(agent_output_tools_client, context):
     """Store the Agent Output Tools client in context."""
-    context["client"] = output_management_client
+    context["client"] = agent_output_tools_client
     logger.info("Agent Output Tools client initialized")
 
 

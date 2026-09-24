@@ -2,7 +2,7 @@
 
 ## Overview
 
-The Agent Output Tools Service provides a simplified way to send emails through SAP Ariba Output Service. This guide covers the unified `OutputManagementClient` which offers four main methods for sending notification emails with optional attachments using ANS (Ariba Notification Service) templates.
+The Agent Output Tools Service provides a simplified way to send emails through SAP Ariba Output Service. This guide covers the unified `AgentOutputToolsClient` which offers four main methods for sending notification emails with optional attachments using ANS (Ariba Notification Service) templates.
 
 ## Installation
 
@@ -82,7 +82,7 @@ else:
 
 ## Client Methods
 
-The `OutputManagementClient` provides four main methods:
+The `AgentOutputToolsClient` provides four main methods:
 
 ### 1. `send_email()` - Direct Email Sending
 Send an email directly with a single method call. This is the most convenient method for simple use cases.
@@ -924,7 +924,7 @@ export CLOUD_SDK_OMS_INSTANCE="default"
 
 Then use the factory function without parameters:
 ```python
-from sap_cloud_sdk.outputmanagement import create_client
+from sap_cloud_sdk.agentoutputtools import create_client
 
 client = create_client()  # Uses environment variables
 ```

@@ -1,7 +1,7 @@
 # SPDX-FileCopyrightText: 2024 SAP SE or an SAP affiliate company
 # SPDX-License-Identifier: Apache-2.0
 
-"""Integration-style unit tests for agent output tools module."""
+"""Integration-style unit tests for agent output tools module (AgentOutputTools)."""
 
 import pytest
 
@@ -12,13 +12,13 @@ from sap_cloud_sdk.agentoutputtools import (
     OutputResponse,
     FormConfiguration,
     PreGeneratedAttachment,
-    OutputManagementException,
+    AgentOutputToolsException,
     ValidationException,
 )
 from sap_cloud_sdk.agentoutputtools._models import ErrorResponse
 
 
-class TestOutputManagementIntegration:
+class TestAgentOutputToolsIntegration:
     """Integration-style tests for agent output tools."""
 
     def test_end_to_end_email_workflow(self):
@@ -132,8 +132,8 @@ class TestOutputManagementIntegration:
     def test_error_handling_workflow(self):
         """Test error handling in workflow."""
         # Test that exceptions can be raised and caught
-        with pytest.raises(OutputManagementException):
-            raise OutputManagementException("General error")
+        with pytest.raises(AgentOutputToolsException):
+            raise AgentOutputToolsException("General error")
 
         with pytest.raises(ValidationException):
             raise ValidationException("Validation error")

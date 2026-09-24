@@ -14,8 +14,8 @@ from http.server import HTTPServer, BaseHTTPRequestHandler
 import pytest
 from dotenv import load_dotenv
 
-from sap_cloud_sdk.agentoutputtools import create_client, OutputManagementClient, DestinationCredentialConfig
-from sap_cloud_sdk.agentoutputtools._service_client import OutputManagementServiceClient
+from sap_cloud_sdk.agentoutputtools import create_client, AgentOutputToolsClient, DestinationCredentialConfig
+from sap_cloud_sdk.agentoutputtools._service_client import AgentOutputToolsServiceClient
 from sap_cloud_sdk.destination.config import DestinationConfig
 
 logger = logging.getLogger(__name__)
@@ -26,8 +26,8 @@ MOCK_PORT = 18080
 MOCK_BASE_URL = f"http://{MOCK_HOST}:{MOCK_PORT}"
 
 
-class MockOutputManagementHandler(BaseHTTPRequestHandler):
-    """Mock HTTP handler for Output Management service."""
+class MockAgentOutputToolsHandler(BaseHTTPRequestHandler):
+    """Mock HTTP handler for Agent Output Tools service."""
 
     def log_message(self, format, *args):
         """Suppress default logging."""
@@ -78,8 +78,8 @@ class MockOutputManagementHandler(BaseHTTPRequestHandler):
         self.wfile.write(json.dumps(error_response).encode("utf-8"))
 
 
-class MockOutputManagementServer:
-    """Mock Output Management server for local testing."""
+class MockAgentOutputToolsServer:
+    """Mock Agent Output Tools server for local testing."""
 
     def __init__(self, host: str = MOCK_HOST, port: int = MOCK_PORT):
         self.host = host
@@ -89,11 +89,11 @@ class MockOutputManagementServer:
 
     def start(self):
         """Start the mock server."""
-        self.server = HTTPServer((self.host, self.port), MockOutputManagementHandler)
+        self.server = HTTPServer((self.host, self.port), MockAgentOutputToolsHandler)
         self.thread = Thread(target=self.server.serve_forever, daemon=True)
         self.thread.start()
         logger.info(
-            f"Mock Output Management server started at http://{self.host}:{self.port}"
+            f"Mock Agent Output Tools server started at http://{self.host}:{self.port}"
         )
 
     def stop(self):
@@ -105,7 +105,7 @@ class MockOutputManagementServer:
 
 
 @pytest.fixture(scope="session")
-def output_management_client():
+def agent_output_tools_client():
     """Create an Agent Output Tools client for integration testing.
 
     Supports two modes:
@@ -135,23 +135,23 @@ def _create_cloud_client():
         return client
     except Exception as e:
         pytest.skip(
-            f"Output Management cloud integration tests require credentials: {e}"
+            f"Agent Output Tools cloud integration tests require credentials: {e}"
         )
 
 
 def _create_local_client():
     """Create client for local testing with mock server."""
     # Start mock server
-    server = MockOutputManagementServer()
+    server = MockAgentOutputToolsServer()
     server.start()
 
     # Create service client pointing to mock server
-    service_client = OutputManagementServiceClient(
+    service_client = AgentOutputToolsServiceClient(
         base_url=MOCK_BASE_URL, destination=None, destination_instance=None
     )
 
     # Create high-level client
-    client = OutputManagementClient(service_client=service_client)
+    client = AgentOutputToolsClient(service_client=service_client)
     logger.info(
         f"Created Agent Output Tools client for local testing at {MOCK_BASE_URL}"
     )

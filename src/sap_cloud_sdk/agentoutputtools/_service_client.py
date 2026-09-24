@@ -27,7 +27,7 @@ from .utils import RequestValidator
 logger = logging.getLogger(__name__)
 
 
-class OutputManagementServiceClient:
+class AgentOutputToolsServiceClient:
     """Service client for Agent Output Tools.
 
     Handles low-level HTTP communication, authentication (OAuth with mTLS),

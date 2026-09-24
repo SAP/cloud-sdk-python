@@ -1,23 +1,23 @@
 # SPDX-FileCopyrightText: 2024 SAP SE or an SAP affiliate company
 # SPDX-License-Identifier: Apache-2.0
 
-"""Tests for OutputManagementClient MCP integration."""
+"""Tests for AgentOutputToolsClient MCP integration."""
 
 import pytest
 from unittest.mock import Mock, AsyncMock, patch
-from sap_cloud_sdk.agentoutputtools import OutputManagementClient
-from sap_cloud_sdk.agentoutputtools._service_client import OutputManagementServiceClient
+from sap_cloud_sdk.agentoutputtools import AgentOutputToolsClient
+from sap_cloud_sdk.agentoutputtools._service_client import AgentOutputToolsServiceClient
 
 
-class TestOutputManagementClientMCP:
-    """Test OutputManagementClient MCP integration methods."""
+class TestAgentOutputToolsClientMCP:
+    """Test AgentOutputToolsClient MCP integration methods."""
 
     @pytest.fixture
-    def output_management_client(self):
-        """Create an OutputManagementClient instance for testing."""
+    def agent_output_tools_client(self):
+        """Create an AgentOutputToolsClient instance for testing."""
         # Create a mock service client
-        mock_service_client = Mock(spec=OutputManagementServiceClient)
-        return OutputManagementClient(mock_service_client)
+        mock_service_client = Mock(spec=AgentOutputToolsServiceClient)
+        return AgentOutputToolsClient(mock_service_client)
 
     @pytest.fixture
     def sample_business_document(self):
@@ -45,10 +45,10 @@ class TestOutputManagementClientMCP:
 
     @pytest.mark.asyncio
     async def test_send_email_with_mcp_basic(
-        self, output_management_client, sample_business_document, mock_mcp_tool
+        self, agent_output_tools_client, sample_business_document, mock_mcp_tool
     ):
         """Test basic MCP email sending."""
-        result = await output_management_client.send_email_with_mcp(
+        result = await agent_output_tools_client.send_email_with_mcp(
             tool_name="send_output_request",
             notification_template_key="PO_APPROVAL_NOTIFICATION",
             to_emails=["finance@company.com"],
@@ -63,10 +63,10 @@ class TestOutputManagementClientMCP:
 
     @pytest.mark.asyncio
     async def test_send_email_with_mcp_with_cc(
-        self, output_management_client, sample_business_document, mock_mcp_tool
+        self, agent_output_tools_client, sample_business_document, mock_mcp_tool
     ):
         """Test MCP email sending with CC."""
-        result = await output_management_client.send_email_with_mcp(
+        result = await agent_output_tools_client.send_email_with_mcp(
             tool_name="send_output_request",
             notification_template_key="PO_APPROVAL_NOTIFICATION",
             to_emails=["finance@company.com"],
@@ -87,7 +87,7 @@ class TestOutputManagementClientMCP:
 
     @pytest.mark.asyncio
     async def test_send_email_with_mcp_with_attachments(
-        self, output_management_client, sample_business_document, mock_mcp_tool
+        self, agent_output_tools_client, sample_business_document, mock_mcp_tool
     ):
         """Test MCP email sending with attachments."""
         attachment_urls = [
@@ -95,7 +95,7 @@ class TestOutputManagementClientMCP:
             "https://dms.example.com/browser/root?objectId=67890&cmisselector=content",
         ]
 
-        result = await output_management_client.send_email_with_mcp(
+        result = await agent_output_tools_client.send_email_with_mcp(
             tool_name="send_output_request",
             notification_template_key="PO_APPROVAL_NOTIFICATION",
             to_emails=["finance@company.com"],
@@ -118,10 +118,10 @@ class TestOutputManagementClientMCP:
 
     @pytest.mark.asyncio
     async def test_send_email_with_mcp_traceparent_generated(
-        self, output_management_client, sample_business_document, mock_mcp_tool
+        self, agent_output_tools_client, sample_business_document, mock_mcp_tool
     ):
         """Test that traceparent is generated correctly."""
-        result = await output_management_client.send_email_with_mcp(
+        result = await agent_output_tools_client.send_email_with_mcp(
             tool_name="send_output_request",
             notification_template_key="PO_APPROVAL_NOTIFICATION",
             to_emails=["finance@company.com"],
@@ -147,10 +147,10 @@ class TestOutputManagementClientMCP:
 
     @pytest.mark.asyncio
     async def test_send_email_with_mcp_sender_subaccount_from_param(
-        self, output_management_client, sample_business_document, mock_mcp_tool
+        self, agent_output_tools_client, sample_business_document, mock_mcp_tool
     ):
         """Test sender_provider_subaccount_id from parameter."""
-        result = await output_management_client.send_email_with_mcp(
+        result = await agent_output_tools_client.send_email_with_mcp(
             tool_name="send_output_request",
             notification_template_key="PO_APPROVAL_NOTIFICATION",
             to_emails=["finance@company.com"],
@@ -170,10 +170,10 @@ class TestOutputManagementClientMCP:
     @pytest.mark.asyncio
     @patch.dict("os.environ", {"APPFND_CONHOS_SUBACCOUNTID": "env-subaccount-456"})
     async def test_send_email_with_mcp_sender_subaccount_from_env(
-        self, output_management_client, sample_business_document, mock_mcp_tool
+        self, agent_output_tools_client, sample_business_document, mock_mcp_tool
     ):
         """Test sender_provider_subaccount_id from environment variable."""
-        result = await output_management_client.send_email_with_mcp(
+        result = await agent_output_tools_client.send_email_with_mcp(
             tool_name="send_output_request",
             notification_template_key="PO_APPROVAL_NOTIFICATION",
             to_emails=["finance@company.com"],
@@ -191,14 +191,20 @@ class TestOutputManagementClientMCP:
 
     @pytest.mark.asyncio
     async def test_send_email_with_mcp_missing_tool_raises_error(
-        self, output_management_client, sample_business_document
+        self, agent_output_tools_client, sample_business_document
     ):
         """Test that missing MCP tool raises Exception."""
         with pytest.raises(
             Exception,
             match="MCP tool invocation failed: mcp_tool parameter is required",
         ):
-            await output_management_client.send_email_with_mcp(
+            await agent_output_tools_client.send_email_with_mcp(
+                tool_name="send_output_request",
+                notification_template_key="PO_APPROVAL_NOTIFICATION",
+                to_emails=["finance@company.com"],
+                business_document=sample_business_document,
+            )
+            await agent_output_tools_client.send_email_with_mcp(
                 tool_name="send_output_request",
                 notification_template_key="PO_APPROVAL_NOTIFICATION",
                 to_emails=["finance@company.com"],
@@ -208,14 +214,14 @@ class TestOutputManagementClientMCP:
 
     @pytest.mark.asyncio
     async def test_send_email_with_mcp_tool_failure(
-        self, output_management_client, sample_business_document
+        self, agent_output_tools_client, sample_business_document
     ):
         """Test handling of MCP tool invocation failure."""
         mock_tool = Mock()
         mock_tool.ainvoke = AsyncMock(side_effect=Exception("MCP tool error"))
 
         with pytest.raises(Exception, match="MCP tool invocation failed"):
-            await output_management_client.send_email_with_mcp(
+            await agent_output_tools_client.send_email_with_mcp(
                 tool_name="send_output_request",
                 notification_template_key="PO_APPROVAL_NOTIFICATION",
                 to_emails=["finance@company.com"],
@@ -225,10 +231,10 @@ class TestOutputManagementClientMCP:
 
     @pytest.mark.asyncio
     async def test_send_email_with_mcp_payload_structure(
-        self, output_management_client, sample_business_document, mock_mcp_tool
+        self, agent_output_tools_client, sample_business_document, mock_mcp_tool
     ):
         """Test that the MCP payload has correct structure."""
-        result = await output_management_client.send_email_with_mcp(
+        result = await agent_output_tools_client.send_email_with_mcp(
             tool_name="send_output_request",
             notification_template_key="PO_APPROVAL_NOTIFICATION",
             to_emails=["finance@company.com", "accounting@company.com"],
@@ -278,7 +284,7 @@ class TestOutputManagementClientMCP:
 
     @pytest.mark.asyncio
     async def test_send_email_with_mcp_multiple_recipients(
-        self, output_management_client, sample_business_document, mock_mcp_tool
+        self, agent_output_tools_client, sample_business_document, mock_mcp_tool
     ):
         """Test MCP email sending with multiple recipients."""
         recipients = [
@@ -287,7 +293,7 @@ class TestOutputManagementClientMCP:
             "manager@company.com",
         ]
 
-        result = await output_management_client.send_email_with_mcp(
+        result = await agent_output_tools_client.send_email_with_mcp(
             tool_name="send_output_request",
             notification_template_key="PO_APPROVAL_NOTIFICATION",
             to_emails=recipients,
@@ -308,7 +314,7 @@ class TestOutputManagementClientMCP:
 
     @pytest.mark.asyncio
     async def test_send_email_with_mcp_complex_business_document(
-        self, output_management_client, mock_mcp_tool
+        self, agent_output_tools_client, mock_mcp_tool
     ):
         """Test MCP email with complex nested business document."""
         complex_doc = {
@@ -345,7 +351,7 @@ class TestOutputManagementClientMCP:
             }
         }
 
-        result = await output_management_client.send_email_with_mcp(
+        result = await agent_output_tools_client.send_email_with_mcp(
             tool_name="send_output_request",
             notification_template_key="INVOICE_NOTIFICATION",
             to_emails=["billing@customer.com"],
@@ -365,11 +371,11 @@ class TestOutputManagementClientMCP:
 
     @pytest.mark.asyncio
     async def test_send_email_with_mcp_unique_trace_ids(
-        self, output_management_client, sample_business_document, mock_mcp_tool
+        self, agent_output_tools_client, sample_business_document, mock_mcp_tool
     ):
         """Test that each invocation generates unique trace IDs."""
         # Call the method twice
-        await output_management_client.send_email_with_mcp(
+        await agent_output_tools_client.send_email_with_mcp(
             tool_name="send_output_request",
             notification_template_key="PO_APPROVAL_NOTIFICATION",
             to_emails=["finance@company.com"],
@@ -377,7 +383,7 @@ class TestOutputManagementClientMCP:
             mcp_tool=mock_mcp_tool,
         )
 
-        await output_management_client.send_email_with_mcp(
+        await agent_output_tools_client.send_email_with_mcp(
             tool_name="send_output_request",
             notification_template_key="PO_APPROVAL_NOTIFICATION",
             to_emails=["finance@company.com"],
@@ -400,10 +406,10 @@ class TestOutputManagementClientMCP:
 
     @pytest.mark.asyncio
     async def test_send_email_with_mcp_no_optional_params(
-        self, output_management_client, sample_business_document, mock_mcp_tool
+        self, agent_output_tools_client, sample_business_document, mock_mcp_tool
     ):
         """Test MCP email with only required parameters."""
-        result = await output_management_client.send_email_with_mcp(
+        result = await agent_output_tools_client.send_email_with_mcp(
             tool_name="send_output_request",
             notification_template_key="PO_APPROVAL_NOTIFICATION",
             to_emails=["finance@company.com"],

@@ -3,7 +3,7 @@
 from typing import Optional, Dict, Any
 
 
-class OutputManagementException(Exception):
+class AgentOutputToolsException(Exception):
     """Base exception for Agent Output Tools SDK."""
 
     def __init__(
@@ -37,31 +37,31 @@ class OutputManagementException(Exception):
         return " | ".join(parts)
 
 
-class AuthenticationException(OutputManagementException):
+class AuthenticationException(AgentOutputToolsException):
     """Exception for authentication failures."""
 
     pass
 
 
-class ValidationException(OutputManagementException):
+class ValidationException(AgentOutputToolsException):
     """Exception for validation failures."""
 
     pass
 
 
-class NetworkException(OutputManagementException):
+class NetworkException(AgentOutputToolsException):
     """Exception for network-related errors."""
 
     pass
 
 
-class DestinationNotFoundException(OutputManagementException):
+class DestinationNotFoundException(AgentOutputToolsException):
     """Exception for destination not found errors."""
 
     pass
 
 
-class DestinationAccessException(OutputManagementException):
+class DestinationAccessException(AgentOutputToolsException):
     """Exception for destination access errors."""
 
     pass

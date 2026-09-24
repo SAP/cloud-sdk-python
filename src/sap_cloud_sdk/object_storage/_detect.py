@@ -25,8 +25,6 @@ _SIGNATURES: dict[ObjectStoreProvider, set[str]] = {
     },
 }
 
-_DEFAULT_BASE_MOUNT = "/etc/secrets/appfnd"
-
 
 def read_binding_keys(instance: str) -> set[str]:
     """Enumerate keys from the first source with a complete provider signature.
@@ -39,7 +37,7 @@ def read_binding_keys(instance: str) -> set[str]:
         If none is complete, returns keys from the first non-empty source.
         Returns an empty set only when every source is empty.
     """
-    resolved_base = resolve_base_mount(_DEFAULT_BASE_MOUNT)
+    resolved_base = resolve_base_mount()
     sources: list[set[str]] = []
 
     if os.environ.get("SERVICE_BINDING_ROOT") is not None:

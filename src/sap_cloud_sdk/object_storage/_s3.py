@@ -27,7 +27,6 @@ from sap_cloud_sdk.object_storage.exceptions import (
     ObjectNotFoundError,
     ObjectOperationError,
 )
-from sap_cloud_sdk.object_storage.utils import _normalize_host
 
 _S3_NOT_FOUND_CODES = {"NoSuchKey", "NoSuchObject"}
 
@@ -35,6 +34,23 @@ _S3_NOT_FOUND_CODES = {"NoSuchKey", "NoSuchObject"}
 _CREDENTIAL_ERROR_CODES = frozenset({"InvalidAccessKeyId", "SignatureDoesNotMatch"})
 
 _T = TypeVar("_T")
+
+
+def _normalize_host(host: str) -> str:
+    """Normalize AWS S3 regional endpoints to standard format.
+
+    Converts s3-{region}.amazonaws.com to s3.{region}.amazonaws.com
+    to prevent Minio client from incorrectly transforming URLs.
+
+    Args:
+        host: The original host endpoint
+
+    Returns:
+        Normalized host endpoint
+    """
+    if host.startswith("s3-") and host.endswith(".amazonaws.com"):
+        return host.replace("s3-", "s3.", 1)
+    return host
 
 
 class S3Client:

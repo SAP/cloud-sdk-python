@@ -22,7 +22,7 @@ def _write_binding(directory, keys):
 @pytest.fixture
 def base_mount(tmp_path, monkeypatch):
     """Point detection at an isolated mount and clear objectstore env vars."""
-    monkeypatch.setattr(_detect, "resolve_base_mount", lambda _default: str(tmp_path))
+    monkeypatch.setattr(_detect, "resolve_base_mount", lambda *_: str(tmp_path))
     for var in list(os.environ):
         if var.upper().startswith("CLOUD_SDK_CFG_OBJECTSTORE_"):
             monkeypatch.delenv(var, raising=False)

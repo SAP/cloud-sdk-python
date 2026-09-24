@@ -5,6 +5,7 @@ from datetime import UTC, datetime
 from unittest.mock import Mock, patch
 
 import pytest
+from google.api_core.exceptions import Forbidden
 from google.cloud.exceptions import NotFound
 
 from sap_cloud_sdk.object_storage._gcs import GcsClient
@@ -35,7 +36,7 @@ def gcs():
 
 @pytest.fixture
 def client(gcs):
-    return GcsClient(CONFIG)
+    return GcsClient(lambda: CONFIG)
 
 
 @pytest.fixture
@@ -46,7 +47,7 @@ def bucket(gcs):
 class TestConstruction:
     def test_valid_key_builds_client_with_project(self, gcs):
         storage, _ = gcs
-        GcsClient(CONFIG)
+        GcsClient(lambda: CONFIG)
         assert storage.Client.call_args.kwargs["project"] == "p"
 
     def test_bad_base64_raises_client_creation_error(self):
@@ -57,7 +58,7 @@ class TestConstruction:
                 bucket="b",
             )
             with pytest.raises(ClientCreationError, match="Failed to create Google"):
-                GcsClient(cfg)
+                GcsClient(lambda: cfg)
 
     def test_bad_json_raises_client_creation_error(self):
         with patch(STORAGE), patch(SERVICE_ACCOUNT):
@@ -69,7 +70,7 @@ class TestConstruction:
                 bucket="b",
             )
             with pytest.raises(ClientCreationError, match="Failed to create Google"):
-                GcsClient(cfg)
+                GcsClient(lambda: cfg)
 
 
 class TestOperations:
@@ -163,3 +164,82 @@ class TestOperations:
     def test_validation_error_is_valueerror(self, client):
         with pytest.raises(ValueError):
             client.get_object("")
+
+
+class _RotatingFactory:
+    """Config factory stub with controllable rotation signalling."""
+
+    def __init__(self, config: GcsConfig, *, changed: bool = False) -> None:
+        self._config = config
+        self.changed = changed
+        self.calls = 0
+
+    def __call__(self) -> GcsConfig:
+        self.calls += 1
+        return self._config
+
+    def has_changed(self) -> bool:
+        return self.changed
+
+
+def _meta_blob() -> Mock:
+    blob = Mock(updated=None, etag="", size=0, storage_class=None)
+    blob.name = "k"
+    return blob
+
+
+class TestRotation:
+    def test_proactive_rebuild_when_secret_changed(self):
+        with patch(STORAGE) as storage, patch(SERVICE_ACCOUNT):
+            original, rotated = Mock(), Mock()
+            rotated.bucket.return_value.blob.return_value = _meta_blob()
+            storage.Client.side_effect = [original, rotated]
+            factory = _RotatingFactory(CONFIG)
+            client = GcsClient(factory)
+            assert factory.calls == 1
+            assert client._bucket is original.bucket.return_value
+
+            factory.changed = True
+            client.head_object("k")
+
+            assert factory.calls == 2  # re-read on rotation
+            assert storage.Client.call_count == 2  # storage client rebuilt
+            assert client._bucket is rotated.bucket.return_value  # holds new bucket
+
+    def test_reactive_retry_once_on_credential_error(self):
+        with patch(STORAGE) as storage, patch(SERVICE_ACCOUNT):
+            first, rebuilt = Mock(), Mock()
+            first_blob = Mock()
+            first_blob.reload.side_effect = Forbidden("rejected")
+            first.bucket.return_value.blob.return_value = first_blob
+            rebuilt.bucket.return_value.blob.return_value = _meta_blob()
+            storage.Client.side_effect = [first, rebuilt]
+
+            factory = _RotatingFactory(CONFIG)
+            client = GcsClient(factory)
+            client.head_object("k")
+
+            assert factory.calls == 2  # refreshed after rejection
+            rebuilt.bucket.return_value.blob.return_value.reload.assert_called_once()
+            assert client._bucket is rebuilt.bucket.return_value  # holds new bucket
+
+    def test_no_rebuild_when_secret_unchanged(self, gcs):
+        storage, bucket = gcs
+        bucket.blob.return_value = _meta_blob()
+        factory = _RotatingFactory(CONFIG, changed=False)
+        client = GcsClient(factory)
+
+        client.head_object("k")
+        client.head_object("k")
+
+        assert factory.calls == 1  # only the initial read
+
+    def test_static_factory_never_tracks_rotation(self, gcs):
+        storage, bucket = gcs
+        bucket.blob.return_value = _meta_blob()
+        client = GcsClient(lambda: CONFIG)  # no has_changed attribute
+
+        client.head_object("k")
+        client.head_object("k")
+
+        assert bucket.blob.return_value.reload.call_count == 2

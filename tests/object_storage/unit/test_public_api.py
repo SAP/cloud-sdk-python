@@ -43,7 +43,7 @@ class TestObjectStoreClientProtocol:
     def test_isinstance_concrete_client_satisfies_protocol_true(self):
         with patch("sap_cloud_sdk.object_storage._s3.Minio"):
             client = S3Client(
-                S3Config(
+                lambda: S3Config(
                     access_key_id="ak",
                     secret_access_key="sk",
                     bucket="b",

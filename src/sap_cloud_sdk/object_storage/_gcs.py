@@ -3,8 +3,11 @@
 import base64
 import json
 import os
-from typing import BinaryIO, List, NoReturn
+import threading
+from typing import Any, BinaryIO, Callable, List, NoReturn, TypeVar
 
+from google.api_core.exceptions import Forbidden, Unauthenticated
+from google.auth.exceptions import RefreshError
 from google.cloud import storage
 from google.cloud.exceptions import NotFound
 from google.oauth2 import service_account
@@ -27,37 +30,50 @@ from sap_cloud_sdk.object_storage.exceptions import (
     ObjectOperationError,
 )
 
+# GCS errors that indicate credential rejection (trigger reactive refresh).
+# RefreshError: failure minting an OAuth token from the service-account key.
+# Forbidden / Unauthenticated: 403 / 401 rejection on the request itself.
+_CREDENTIAL_ERRORS = (RefreshError, Forbidden, Unauthenticated)
+
+_T = TypeVar("_T")
+
 
 class GcsClient:
-    """Google Cloud Storage object storage client.
+    """Google Cloud Storage object storage client with binding-rotation support.
 
     Provides the standard 8-method object store interface backed by
     Google Cloud Storage. Obtain an instance via ``create_client()``.
+
+    Rotation resilience is handled in two layers:
+    - **Proactive**: checks the secret-directory mtime via the config factory's
+      ``has_changed()`` method before every operation and rebuilds the storage
+      client when a change is detected.
+    - **Reactive**: on a credential-rejection error (``RefreshError`` when minting a
+      token, or ``Forbidden`` / ``Unauthenticated`` on the request), refreshes
+      credentials and retries the operation exactly once.
     """
 
     def __init__(
         self,
-        config: GcsConfig,
+        config_factory: Callable[[], GcsConfig],
     ) -> None:
         """Initialise the GCS object storage client.
 
         Args:
-            config: GCS client configuration.
+            config_factory: Factory that re-reads GCS configuration on every call.
+                A :class:`~sap_cloud_sdk.core.secret_resolver.ConfigFactory` enables
+                rotation tracking; a plain callable disables it.
 
         Raises:
             ClientCreationError: If client initialisation fails.
         """
-        try:
-            self._client = self._create_storage_client(config)
-            self._bucket = self._client.bucket(config.bucket)
-        except ClientCreationError:
-            raise
-        except Exception as e:
-            raise ClientCreationError(
-                "Failed to create Google Cloud Storage client"
-            ) from e
+        self._config_factory = config_factory
+        self._lock = threading.Lock()
+        self._config = config_factory()
+        self._client = self._create_storage_client(self._config)
+        self._bucket = self._client.bucket(self._config.bucket)
 
-    def _create_storage_client(self, cfg: GcsConfig):
+    def _create_storage_client(self, cfg: GcsConfig) -> storage.Client:
         """Build a Google Cloud Storage Client from binding data.
 
         Decodes the base64-encoded service-account JSON and creates a
@@ -71,6 +87,34 @@ class GcsClient:
             raise ClientCreationError(
                 "Failed to create Google Cloud Storage client"
             ) from e
+
+    def _refresh_credentials(self) -> None:
+        """Re-read credentials and rebuild the storage client. Caller must hold ``_lock``."""
+        self._config = self._config_factory()
+        self._client = self._create_storage_client(self._config)
+        self._bucket = self._client.bucket(self._config.bucket)
+
+    def _refresh_if_rotated(self) -> None:
+        """Proactively refresh if the secret directory mtime has changed."""
+        has_changed: Any = getattr(self._config_factory, "has_changed", None)
+        if callable(has_changed) and has_changed():
+            with self._lock:
+                self._refresh_credentials()
+
+    def _execute_with_retry(self, fn: Callable[[], _T]) -> _T:
+        """Run *fn* against the current storage client, retrying once on credential errors.
+
+        Calls ``_refresh_if_rotated()`` first (proactive), then executes *fn*. On a
+        ``RefreshError``, ``Forbidden`` or ``Unauthenticated``, refreshes credentials
+        and retries exactly once (reactive).
+        """
+        self._refresh_if_rotated()
+        try:
+            return fn()
+        except _CREDENTIAL_ERRORS:
+            with self._lock:
+                self._refresh_credentials()
+            return fn()
 
     @record_metrics(Module.OBJECTSTORE, Operation.OBJECTSTORE_PUT_OBJECT_FROM_BYTES)
     def put_object_from_bytes(self, name: str, data: bytes, content_type: str) -> None:
@@ -88,10 +132,11 @@ class GcsClient:
         validate_put_from_bytes(name, data, content_type)
 
         try:
-            blob = self._bucket.blob(name)
-            blob.upload_from_string(
-                data,
-                content_type=content_type,
+            self._execute_with_retry(
+                lambda: self._bucket.blob(name).upload_from_string(
+                    data,
+                    content_type=content_type,
+                )
             )
         except Exception as e:
             raise ObjectOperationError(f"Failed to upload object '{name}'") from e
@@ -115,11 +160,12 @@ class GcsClient:
         validate_put_object(name, stream, size, content_type)
 
         try:
-            blob = self._bucket.blob(name)
-            blob.upload_from_file(
-                stream,
-                size=size,
-                content_type=content_type,
+            self._execute_with_retry(
+                lambda: self._bucket.blob(name).upload_from_file(
+                    stream,
+                    size=size,
+                    content_type=content_type,
+                )
             )
         except Exception as e:
             raise ObjectOperationError(f"Failed to upload object '{name}'") from e
@@ -145,10 +191,11 @@ class GcsClient:
             if not os.path.isfile(file_path):
                 raise ObjectOperationError(f"File not found: {file_path}")
 
-            blob = self._bucket.blob(name)
-            blob.upload_from_filename(
-                file_path,
-                content_type=content_type,
+            self._execute_with_retry(
+                lambda: self._bucket.blob(name).upload_from_filename(
+                    file_path,
+                    content_type=content_type,
+                )
             )
         except ObjectOperationError:
             raise
@@ -173,8 +220,7 @@ class GcsClient:
         validate_object_name(name)
 
         try:
-            blob = self._bucket.blob(name)
-            blob.reload()  # raises NotFound eagerly if absent; maps to ObjectNotFoundError
+            blob = self._execute_with_retry(lambda: self._reloaded_blob(name))
             return blob.open("rb")
         except Exception as e:
             self._map_gcs_error(e, name, "download")
@@ -193,8 +239,7 @@ class GcsClient:
         validate_object_name(name)
 
         try:
-            blob = self._bucket.blob(name)
-            blob.delete()
+            self._execute_with_retry(lambda: self._bucket.blob(name).delete())
         except Exception as e:
             if self._is_not_found(e):
                 self._confirm_bucket_exists(e, name, "delete")
@@ -219,10 +264,10 @@ class GcsClient:
 
         try:
             result = []
-            for blob in self._client.list_blobs(
-                self._bucket,
-                prefix=prefix,
-            ):
+            blobs = self._execute_with_retry(
+                lambda: list(self._client.list_blobs(self._bucket, prefix=prefix))
+            )
+            for blob in blobs:
                 result.append(
                     ObjectMetadata(
                         key=blob.name,
@@ -257,8 +302,7 @@ class GcsClient:
         validate_object_name(name)
 
         try:
-            blob = self._bucket.blob(name)
-            blob.reload()
+            blob = self._execute_with_retry(lambda: self._reloaded_blob(name))
             return ObjectMetadata(
                 key=blob.name,
                 last_modified=blob.updated,
@@ -297,6 +341,16 @@ class GcsClient:
             raise ObjectOperationError(
                 f"Failed to check if object '{name}' exists"
             ) from e
+
+    def _reloaded_blob(self, name: str):
+        """Return a freshly reloaded blob bound to the current bucket.
+
+        Reloading raises ``NotFound`` eagerly for absent objects and surfaces
+        credential errors so the retry wrapper can act on them.
+        """
+        blob = self._bucket.blob(name)
+        blob.reload()
+        return blob
 
     @staticmethod
     def _is_not_found(exc: Exception) -> bool:

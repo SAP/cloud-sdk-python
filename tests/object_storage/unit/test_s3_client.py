@@ -50,29 +50,29 @@ def minio_client():
 
 @pytest.fixture
 def client(minio_client):
-    return S3Client(_config())
+    return S3Client(lambda: _config())
 
 
 class TestConstruction:
     def test_secure_true_when_ssl_enabled(self):
         with patch(MINIO) as ctor:
-            S3Client(_config(disable_ssl=False))
+            S3Client(lambda: _config(disable_ssl=False))
             assert ctor.call_args.kwargs["secure"] is True
 
     def test_secure_false_when_ssl_disabled(self):
         with patch(MINIO) as ctor:
-            S3Client(_config(disable_ssl=True))
+            S3Client(lambda: _config(disable_ssl=True))
             assert ctor.call_args.kwargs["secure"] is False
 
     def test_regional_host_normalised(self):
         with patch(MINIO) as ctor:
-            S3Client(_config(host="s3-eu-west-1.amazonaws.com"))
+            S3Client(lambda: _config(host="s3-eu-west-1.amazonaws.com"))
             assert ctor.call_args.kwargs["endpoint"] == "s3.eu-west-1.amazonaws.com"
 
     def test_construction_failure_raises_client_creation_error(self):
         with patch(MINIO, side_effect=Exception("boom")):
             with pytest.raises(ClientCreationError, match="Failed to create S3"):
-                S3Client(_config())
+                S3Client(lambda: _config())
 
 
 class TestPutObject:
@@ -215,3 +215,82 @@ class TestObjectExists:
         minio_client.stat_object.side_effect = _s3_error("AccessDenied")
         with pytest.raises(ObjectOperationError):
             client.object_exists("k")
+
+
+class _RotatingFactory:
+    """Config factory stub with controllable rotation signalling."""
+
+    def __init__(self, config: S3Config, *, changed: bool = False) -> None:
+        self._config = config
+        self.changed = changed
+        self.calls = 0
+
+    def __call__(self) -> S3Config:
+        self.calls += 1
+        return self._config
+
+    def has_changed(self) -> bool:
+        return self.changed
+
+
+class TestRotation:
+    def test_proactive_rebuild_when_secret_changed(self):
+        with patch(MINIO) as ctor:
+            original, rotated = Mock(), Mock()
+            rotated.stat_object.return_value = Mock(
+                last_modified=None, etag='"e"', size=1
+            )
+            ctor.side_effect = [original, rotated]
+
+            factory = _RotatingFactory(_config())
+            client = S3Client(factory)
+            assert factory.calls == 1  # initial read
+            assert client._minio_client is original
+
+            factory.changed = True
+            client.head_object("k")
+
+            assert factory.calls == 2  # re-read on rotation
+            assert ctor.call_count == 2  # MinIO client rebuilt
+            assert client._minio_client is rotated  # holds the new client
+
+    @pytest.mark.parametrize("error_code", ["InvalidAccessKeyId", "SignatureDoesNotMatch"])
+    def test_reactive_retry_once_on_credential_error(self, error_code):
+        with patch(MINIO) as ctor:
+            first, rebuilt = Mock(), Mock()
+            first.stat_object.side_effect = _s3_error(error_code)
+            rebuilt.stat_object.return_value = Mock(
+                last_modified=None, etag='"e"', size=1
+            )
+            ctor.side_effect = [first, rebuilt]
+
+            factory = _RotatingFactory(_config())
+            client = S3Client(factory)  # builds `first`
+            client.head_object("k")  # first rejects → refresh → `rebuilt` succeeds
+
+            assert factory.calls == 2  # refreshed after rejection
+            first.stat_object.assert_called_once()
+            rebuilt.stat_object.assert_called_once()
+            assert client._minio_client is rebuilt  # holds the refreshed client
+
+    def test_no_rebuild_when_secret_unchanged(self, minio_client):
+        factory = _RotatingFactory(_config(), changed=False)
+        client = S3Client(factory)
+        minio_client.stat_object.return_value = Mock(
+            last_modified=None, etag="", size=0
+        )
+
+        client.head_object("k")
+        client.head_object("k")
+
+        assert factory.calls == 1  # only the initial read
+
+    def test_static_factory_never_tracks_rotation(self, minio_client):
+        minio_client.stat_object.return_value = Mock(
+            last_modified=None, etag="", size=0
+        )
+        client = S3Client(lambda: _config())  # no has_changed attribute
+        client.head_object("k")
+        client.head_object("k")
+        # No exception, no rebuild machinery invoked — behaves as a plain client.
+        assert minio_client.stat_object.call_count == 2

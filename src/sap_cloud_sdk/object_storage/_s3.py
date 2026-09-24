@@ -2,8 +2,9 @@
 
 import io
 import os
+import threading
 from datetime import UTC, datetime
-from typing import BinaryIO, List
+from typing import Any, BinaryIO, Callable, List, TypeVar
 
 import minio.datatypes
 from minio import Minio
@@ -30,31 +31,47 @@ from sap_cloud_sdk.object_storage.utils import _normalize_host
 
 _S3_NOT_FOUND_CODES = {"NoSuchKey", "NoSuchObject"}
 
+# S3 error codes that indicate credential rejection (trigger reactive refresh).
+_CREDENTIAL_ERROR_CODES = frozenset({"InvalidAccessKeyId", "SignatureDoesNotMatch"})
+
+_T = TypeVar("_T")
+
 
 class S3Client:
-    """S3-compatible object storage client.
+    """S3-compatible object storage client with binding-rotation support.
 
     Provides a unified interface for object storage operations using the MinIO client library.
     Supports upload, download, delete, list, and metadata operations on S3-compatible storage.
+
+    Rotation resilience is handled in two layers:
+    - **Proactive**: checks the secret-directory mtime via the config factory's
+      ``has_changed()`` method before every operation and rebuilds the MinIO client
+      when a change is detected.
+    - **Reactive**: on ``InvalidAccessKeyId`` or ``SignatureDoesNotMatch`` S3 errors,
+      refreshes credentials and retries the operation exactly once.
     """
 
     def __init__(
         self,
-        config: S3Config,
+        config_factory: Callable[[], S3Config],
     ) -> None:
         """Initialize the object storage client.
 
         Args:
-            config: S3 client configuration including credentials and runtime options.
+            config_factory: Factory that re-reads S3 configuration on every call.
+                A :class:`~sap_cloud_sdk.core.secret_resolver.ConfigFactory` enables
+                rotation tracking; a plain callable disables it.
 
         Raises:
             ClientCreationError: If client initialization fails.
         """
-        self._config = config
+        self._config_factory = config_factory
+        self._lock = threading.Lock()
+        self._config = config_factory()
         self._minio_client = self._create_minio_client()
 
     def _create_minio_client(self) -> Minio:
-        """Create MinIO client with proper configuration."""
+        """Create MinIO client from the current credentials config."""
         try:
             return Minio(
                 endpoint=_normalize_host(self._config.host),
@@ -65,6 +82,35 @@ class S3Client:
 
         except Exception as e:
             raise ClientCreationError("Failed to create S3 object store client") from e
+
+    def _refresh_credentials(self) -> None:
+        """Re-read credentials and rebuild the MinIO client. Caller must hold ``_lock``."""
+        self._config = self._config_factory()
+        self._minio_client = self._create_minio_client()
+
+    def _refresh_if_rotated(self) -> None:
+        """Proactively refresh if the secret directory mtime has changed."""
+        has_changed: Any = getattr(self._config_factory, "has_changed", None)
+        if callable(has_changed) and has_changed():
+            with self._lock:
+                self._refresh_credentials()
+
+    def _execute_with_retry(self, fn: Callable[[], _T]) -> _T:
+        """Run *fn* against the current MinIO client, retrying once on credential errors.
+
+        Calls ``_refresh_if_rotated()`` first (proactive), then executes *fn*.
+        On ``InvalidAccessKeyId`` or ``SignatureDoesNotMatch``, refreshes credentials
+        and retries exactly once (reactive).
+        """
+        self._refresh_if_rotated()
+        try:
+            return fn()
+        except S3Error as e:
+            if e.code in _CREDENTIAL_ERROR_CODES:
+                with self._lock:
+                    self._refresh_credentials()
+                return fn()
+            raise
 
     @record_metrics(Module.OBJECTSTORE, Operation.OBJECTSTORE_PUT_OBJECT_FROM_BYTES)
     def put_object_from_bytes(self, name: str, data: bytes, content_type: str) -> None:
@@ -82,12 +128,14 @@ class S3Client:
         validate_put_from_bytes(name, data, content_type)
 
         try:
-            self._minio_client.put_object(
-                bucket_name=self._config.bucket,
-                object_name=name,
-                data=io.BytesIO(data),
-                length=len(data),
-                content_type=content_type,
+            self._execute_with_retry(
+                lambda: self._minio_client.put_object(
+                    bucket_name=self._config.bucket,
+                    object_name=name,
+                    data=io.BytesIO(data),
+                    length=len(data),
+                    content_type=content_type,
+                )
             )
         except Exception as e:
             raise ObjectOperationError(f"Failed to upload object '{name}'") from e
@@ -111,12 +159,14 @@ class S3Client:
         validate_put_object(name, stream, size, content_type)
 
         try:
-            self._minio_client.put_object(
-                bucket_name=self._config.bucket,
-                object_name=name,
-                data=stream,
-                length=size,
-                content_type=content_type,
+            self._execute_with_retry(
+                lambda: self._minio_client.put_object(
+                    bucket_name=self._config.bucket,
+                    object_name=name,
+                    data=stream,
+                    length=size,
+                    content_type=content_type,
+                )
             )
         except Exception as e:
             raise ObjectOperationError(f"Failed to upload object '{name}'") from e
@@ -146,12 +196,14 @@ class S3Client:
             file_size = os.path.getsize(file_path)
 
             with open(file_path, "rb") as file_stream:
-                self._minio_client.put_object(
-                    bucket_name=self._config.bucket,
-                    object_name=name,
-                    data=file_stream,
-                    length=file_size,
-                    content_type=content_type,
+                self._execute_with_retry(
+                    lambda: self._minio_client.put_object(
+                        bucket_name=self._config.bucket,
+                        object_name=name,
+                        data=file_stream,
+                        length=file_size,
+                        content_type=content_type,
+                    )
                 )
         except ObjectOperationError:
             raise
@@ -176,8 +228,10 @@ class S3Client:
         validate_object_name(name)
 
         try:
-            response = self._minio_client.get_object(
-                bucket_name=self._config.bucket, object_name=name
+            response = self._execute_with_retry(
+                lambda: self._minio_client.get_object(
+                    bucket_name=self._config.bucket, object_name=name
+                )
             )
             return response
         except S3Error as e:
@@ -201,8 +255,10 @@ class S3Client:
         validate_object_name(name)
 
         try:
-            self._minio_client.remove_object(
-                bucket_name=self._config.bucket, object_name=name
+            self._execute_with_retry(
+                lambda: self._minio_client.remove_object(
+                    bucket_name=self._config.bucket, object_name=name
+                )
             )
         except S3Error as e:
             if e.code not in _S3_NOT_FOUND_CODES:
@@ -229,8 +285,10 @@ class S3Client:
 
         result = []
         try:
-            objects = self._minio_client.list_objects(
-                bucket_name=self._config.bucket, prefix=prefix
+            objects = self._execute_with_retry(
+                lambda: self._minio_client.list_objects(
+                    bucket_name=self._config.bucket, prefix=prefix
+                )
             )
 
             for obj in objects:
@@ -268,8 +326,10 @@ class S3Client:
         validate_object_name(name)
 
         try:
-            stat: minio.datatypes.Object = self._minio_client.stat_object(
-                bucket_name=self._config.bucket, object_name=name
+            stat: minio.datatypes.Object = self._execute_with_retry(
+                lambda: self._minio_client.stat_object(
+                    bucket_name=self._config.bucket, object_name=name
+                )
             )
 
             return ObjectMetadata(

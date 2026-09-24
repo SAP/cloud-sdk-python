@@ -1,10 +1,11 @@
 """Azure Blob Storage backend implementation for object store operations."""
 
 import os
+import threading
 from types import TracebackType
-from typing import TYPE_CHECKING, BinaryIO, List, NoReturn, Self
+from typing import TYPE_CHECKING, Any, BinaryIO, Callable, List, NoReturn, Self, TypeVar
 
-from azure.core.exceptions import ResourceNotFoundError
+from azure.core.exceptions import ClientAuthenticationError, ResourceNotFoundError
 from azure.storage.blob import ContainerClient, ContentSettings
 
 from sap_cloud_sdk.core.telemetry import Module, Operation, record_metrics
@@ -27,6 +28,8 @@ from sap_cloud_sdk.object_storage.exceptions import (
 
 if TYPE_CHECKING:
     from azure.storage.blob import StorageStreamDownloader
+
+_T = TypeVar("_T")
 
 
 class _AzureObjectReader:
@@ -63,34 +66,39 @@ class _AzureObjectReader:
 
 
 class AzureClient:
-    """Azure Blob Storage object storage client.
+    """Azure Blob Storage object storage client with binding-rotation support.
 
     Provides the standard 8-method object store interface backed by
     Azure Blob Storage. Obtain an instance via ``create_client()``.
+
+    Rotation resilience is handled in two layers:
+    - **Proactive**: checks the secret-directory mtime via the config factory's
+      ``has_changed()`` method before every operation and rebuilds the container
+      client when a change is detected.
+    - **Reactive**: on a ``ClientAuthenticationError`` (rejected/expired SAS token),
+      refreshes credentials and retries the operation exactly once.
     """
 
     def __init__(
         self,
-        config: AzureConfig,
+        config_factory: Callable[[], AzureConfig],
     ) -> None:
         """Initialise the Azure object storage client.
 
         Args:
-            config: Azure Blob Storage client configuration.
+            config_factory: Factory that re-reads Azure configuration on every call.
+                A :class:`~sap_cloud_sdk.core.secret_resolver.ConfigFactory` enables
+                rotation tracking; a plain callable disables it.
 
         Raises:
             ClientCreationError: If client initialisation fails.
         """
-        try:
-            self._container = self._create_container_client(config)
-        except ClientCreationError:
-            raise
-        except Exception as e:
-            raise ClientCreationError(
-                "Failed to create Azure Blob Storage client"
-            ) from e
+        self._config_factory = config_factory
+        self._lock = threading.Lock()
+        self._config = config_factory()
+        self._container = self._create_container_client(self._config)
 
-    def _create_container_client(self, cfg: AzureConfig):
+    def _create_container_client(self, cfg: AzureConfig) -> ContainerClient:
         """Build an Azure ContainerClient from binding data.
 
         Uses the container URI directly (which already includes the container name)
@@ -105,6 +113,33 @@ class AzureClient:
             raise ClientCreationError(
                 "Failed to create Azure Blob Storage client"
             ) from e
+
+    def _refresh_credentials(self) -> None:
+        """Re-read credentials and rebuild the container client. Caller must hold ``_lock``."""
+        self._config = self._config_factory()
+        self._container = self._create_container_client(self._config)
+
+    def _refresh_if_rotated(self) -> None:
+        """Proactively refresh if the secret directory mtime has changed."""
+        has_changed: Any = getattr(self._config_factory, "has_changed", None)
+        if callable(has_changed) and has_changed():
+            with self._lock:
+                self._refresh_credentials()
+
+    def _execute_with_retry(self, fn: Callable[[], _T]) -> _T:
+        """Run *fn* against the current container client, retrying once on auth errors.
+
+        Calls ``_refresh_if_rotated()`` first (proactive), then executes *fn*. On a
+        ``ClientAuthenticationError`` (rejected SAS token), refreshes credentials and
+        retries exactly once (reactive).
+        """
+        self._refresh_if_rotated()
+        try:
+            return fn()
+        except ClientAuthenticationError:
+            with self._lock:
+                self._refresh_credentials()
+            return fn()
 
     def _blob_client(self, name: str):
         """Return a BlobClient for the named blob in this container."""
@@ -126,10 +161,12 @@ class AzureClient:
         validate_put_from_bytes(name, data, content_type)
 
         try:
-            self._blob_client(name).upload_blob(
-                data,
-                overwrite=True,
-                content_settings=ContentSettings(content_type=content_type),
+            self._execute_with_retry(
+                lambda: self._blob_client(name).upload_blob(
+                    data,
+                    overwrite=True,
+                    content_settings=ContentSettings(content_type=content_type),
+                )
             )
         except Exception as e:
             raise ObjectOperationError(f"Failed to upload object '{name}'") from e
@@ -153,11 +190,13 @@ class AzureClient:
         validate_put_object(name, stream, size, content_type)
 
         try:
-            self._blob_client(name).upload_blob(
-                stream,
-                length=size,
-                overwrite=True,
-                content_settings=ContentSettings(content_type=content_type),
+            self._execute_with_retry(
+                lambda: self._blob_client(name).upload_blob(
+                    stream,
+                    length=size,
+                    overwrite=True,
+                    content_settings=ContentSettings(content_type=content_type),
+                )
             )
         except Exception as e:
             raise ObjectOperationError(f"Failed to upload object '{name}'") from e
@@ -184,10 +223,12 @@ class AzureClient:
                 raise ObjectOperationError(f"File not found: {file_path}")
 
             with open(file_path, "rb") as f:
-                self._blob_client(name).upload_blob(
-                    f,
-                    overwrite=True,
-                    content_settings=ContentSettings(content_type=content_type),
+                self._execute_with_retry(
+                    lambda: self._blob_client(name).upload_blob(
+                        f,
+                        overwrite=True,
+                        content_settings=ContentSettings(content_type=content_type),
+                    )
                 )
         except ObjectOperationError:
             raise
@@ -212,7 +253,9 @@ class AzureClient:
         validate_object_name(name)
 
         try:
-            downloader = self._blob_client(name).download_blob()
+            downloader = self._execute_with_retry(
+                lambda: self._blob_client(name).download_blob()
+            )
             return _AzureObjectReader(downloader)
         except Exception as e:
             self._map_azure_error(e, name, "download")
@@ -231,7 +274,7 @@ class AzureClient:
         validate_object_name(name)
 
         try:
-            self._blob_client(name).delete_blob()
+            self._execute_with_retry(lambda: self._blob_client(name).delete_blob())
         except Exception as e:
             if self._is_blob_not_found(e):
                 return  # idempotent
@@ -255,7 +298,10 @@ class AzureClient:
 
         try:
             result = []
-            for blob in self._container.list_blobs(name_starts_with=prefix):
+            blobs = self._execute_with_retry(
+                lambda: list(self._container.list_blobs(name_starts_with=prefix))
+            )
+            for blob in blobs:
                 result.append(
                     ObjectMetadata(
                         key=blob.name,
@@ -290,7 +336,9 @@ class AzureClient:
         validate_object_name(name)
 
         try:
-            props = self._blob_client(name).get_blob_properties()
+            props = self._execute_with_retry(
+                lambda: self._blob_client(name).get_blob_properties()
+            )
             return ObjectMetadata(
                 key=name,
                 last_modified=props.last_modified,

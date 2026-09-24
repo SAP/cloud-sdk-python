@@ -4,7 +4,7 @@ from datetime import UTC, datetime
 from unittest.mock import Mock, patch
 
 import pytest
-from azure.core.exceptions import ResourceNotFoundError
+from azure.core.exceptions import ClientAuthenticationError, ResourceNotFoundError
 
 from sap_cloud_sdk.object_storage._azure import AzureClient, _AzureObjectReader
 from sap_cloud_sdk.object_storage.config import AzureConfig
@@ -38,7 +38,7 @@ def container():
 
 @pytest.fixture
 def client(container):
-    return AzureClient(CONFIG)
+    return AzureClient(lambda: CONFIG)
 
 
 @pytest.fixture
@@ -49,7 +49,7 @@ def blob(container):
 class TestConstruction:
     def test_from_container_url_called_with_uri_and_token(self):
         with patch(CONTAINER) as ctor:
-            AzureClient(CONFIG)
+            AzureClient(lambda: CONFIG)
             ctor.from_container_url.assert_called_once_with(
                 CONFIG.container_uri, credential=CONFIG.sas_token
             )
@@ -58,7 +58,7 @@ class TestConstruction:
         with patch(CONTAINER) as ctor:
             ctor.from_container_url.side_effect = Exception("boom")
             with pytest.raises(ClientCreationError, match="Failed to create Azure"):
-                AzureClient(CONFIG)
+                AzureClient(lambda: CONFIG)
 
 
 class TestAzureObjectReader:
@@ -181,3 +181,82 @@ class TestOperations:
     def test_validation_error_is_valueerror(self, client):
         with pytest.raises(ValueError):
             client.get_object("")
+
+
+class _RotatingFactory:
+    """Config factory stub with controllable rotation signalling."""
+
+    def __init__(self, config: AzureConfig, *, changed: bool = False) -> None:
+        self._config = config
+        self.changed = changed
+        self.calls = 0
+
+    def __call__(self) -> AzureConfig:
+        self.calls += 1
+        return self._config
+
+    def has_changed(self) -> bool:
+        return self.changed
+
+
+def _props() -> Mock:
+    return Mock(last_modified=None, etag="", size=0, blob_tier=None)
+
+
+class TestRotation:
+    def test_proactive_rebuild_when_secret_changed(self):
+        with patch(CONTAINER) as ctor:
+            original, rotated = Mock(), Mock()
+            rotated.get_blob_client.return_value.get_blob_properties.return_value = (
+                _props()
+            )
+            ctor.from_container_url.side_effect = [original, rotated]
+            factory = _RotatingFactory(CONFIG)
+            client = AzureClient(factory)
+            assert factory.calls == 1
+            assert client._container is original
+
+            factory.changed = True
+            client.head_object("k")
+
+            assert factory.calls == 2  # re-read on rotation
+            assert ctor.from_container_url.call_count == 2  # container rebuilt
+            assert client._container is rotated  # holds the new container
+
+    def test_reactive_retry_once_on_auth_error(self):
+        with patch(CONTAINER) as ctor:
+            first, rebuilt = Mock(), Mock()
+            first.get_blob_client.return_value.get_blob_properties.side_effect = (
+                ClientAuthenticationError("rejected")
+            )
+            rebuilt.get_blob_client.return_value.get_blob_properties.return_value = (
+                _props()
+            )
+            ctor.from_container_url.side_effect = [first, rebuilt]
+
+            factory = _RotatingFactory(CONFIG)
+            client = AzureClient(factory)
+            client.head_object("k")
+
+            assert factory.calls == 2  # refreshed after rejection
+            rebuilt.get_blob_client.return_value.get_blob_properties.assert_called_once()
+            assert client._container is rebuilt  # holds the refreshed container
+
+    def test_no_rebuild_when_secret_unchanged(self, container, blob):
+        blob.get_blob_properties.return_value = _props()
+        factory = _RotatingFactory(CONFIG, changed=False)
+        client = AzureClient(factory)
+
+        client.head_object("k")
+        client.head_object("k")
+
+        assert factory.calls == 1  # only the initial read
+
+    def test_static_factory_never_tracks_rotation(self, container, blob):
+        blob.get_blob_properties.return_value = _props()
+        client = AzureClient(lambda: CONFIG)  # no has_changed attribute
+
+        client.head_object("k")
+        client.head_object("k")
+
+        assert blob.get_blob_properties.call_count == 2

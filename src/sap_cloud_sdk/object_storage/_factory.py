@@ -15,7 +15,7 @@ from sap_cloud_sdk.object_storage.config import (
     S3Config,
     _BINDING_TYPES,
 )
-from sap_cloud_sdk.object_storage.exceptions import ClientCreationError
+from sap_cloud_sdk.object_storage.exceptions import ClientCreationError, ConfigError
 
 _ProviderConfig = Union[S3Config, AzureConfig, GcsConfig]
 
@@ -75,12 +75,19 @@ def create_client(
             extract=lambda b: b.to_config(),
         )
 
-    if provider is ObjectStoreProvider.S3:
-        return S3Client(cast(Callable[[], S3Config], factory))
-    if provider is ObjectStoreProvider.AZURE:
-        return AzureClient(cast(Callable[[], AzureConfig], factory))
-    if provider is ObjectStoreProvider.GCS:
-        return GcsClient(cast(Callable[[], GcsConfig], factory))
+    try:
+        if provider is ObjectStoreProvider.S3:
+            return S3Client(cast(Callable[[], S3Config], factory))
+        if provider is ObjectStoreProvider.AZURE:
+            return AzureClient(cast(Callable[[], AzureConfig], factory))
+        if provider is ObjectStoreProvider.GCS:
+            return GcsClient(cast(Callable[[], GcsConfig], factory))
+    except (ConfigError, ClientCreationError):
+        raise
+    except Exception as e:
+        raise ConfigError(
+            f"failed to load objectstore configuration for instance '{instance}': {e}"
+        ) from e
     raise ClientCreationError(f"Unsupported provider: {provider}")
 
 

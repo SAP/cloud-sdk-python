@@ -19,7 +19,7 @@ class Module(str, Enum):
     DMS = "dms"
     EXTENSIBILITY = "extensibility"
     OBJECTSTORE = "objectstore"
-    OUTPUT_MANAGEMENT = "outputmanagement"
+    AGENT_OUTPUT_TOOLS = "agentoutputtools"
     PRINT = "print"
     TELEMETRY = "telemetry"
 

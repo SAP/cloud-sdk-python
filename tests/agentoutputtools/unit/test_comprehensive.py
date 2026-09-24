@@ -9,7 +9,7 @@ from sap_cloud_sdk.agentoutputtools import (
     AttachmentConfig,
     PreGeneratedAttachment,
     FormConfiguration,
-    OutputManagementException,
+    AgentOutputToolsException,
     ValidationException,
     AuthenticationException,
 )
@@ -172,27 +172,27 @@ class TestExceptionScenarios:
         try:
             raise ValueError("Inner error")
         except ValueError as e:
-            error = OutputManagementException(f"Outer error: {str(e)}")
+            error = AgentOutputToolsException(f"Outer error: {str(e)}")
             assert "Inner error" in error.message
             assert "Outer error" in error.message
 
     def test_multiple_exception_types(self):
         """Test catching different exception types."""
         errors = [
-            OutputManagementException("General error"),
+            AgentOutputToolsException("General error"),
             ValidationException("Validation error"),
             AuthenticationException("Authentication error"),
         ]
 
         for error in errors:
-            assert isinstance(error, OutputManagementException)
+            assert isinstance(error, AgentOutputToolsException)
             assert isinstance(error, Exception)
 
     def test_exception_repr(self):
         """Test exception representation."""
-        error = OutputManagementException("Test error")
+        error = AgentOutputToolsException("Test error")
         repr_str = repr(error)
-        assert "OutputManagementException" in repr_str or "Test error" in repr_str
+        assert "AgentOutputToolsException" in repr_str or "Test error" in repr_str
 
 
 class TestModelComparisons:

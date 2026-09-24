@@ -4,7 +4,7 @@
 """Basic unit tests for agent output tools module."""
 
 
-class TestOutputManagementModule:
+class TestAgentOutputToolsModule:
     """Test basic agent output tools module functionality."""
 
     def test_module_imports(self):
@@ -15,17 +15,17 @@ class TestOutputManagementModule:
 
     def test_client_import(self):
         """Test that unified client can be imported."""
-        from sap_cloud_sdk.agentoutputtools import OutputManagementClient
+        from sap_cloud_sdk.agentoutputtools import AgentOutputToolsClient
 
-        assert OutputManagementClient is not None
+        assert AgentOutputToolsClient is not None
 
     def test_service_client_import(self):
         """Test that service client can be imported."""
         from sap_cloud_sdk.agentoutputtools._service_client import (
-            OutputManagementServiceClient,
+            AgentOutputToolsServiceClient,
         )
 
-        assert OutputManagementServiceClient is not None
+        assert AgentOutputToolsServiceClient is not None
 
     def test_create_client_import(self):
         """Test that create_client factory function can be imported."""
@@ -45,7 +45,7 @@ class TestOutputManagementModule:
     def test_exceptions_import(self):
         """Test that exceptions can be imported."""
         from sap_cloud_sdk.agentoutputtools import (
-            OutputManagementException,
+            AgentOutputToolsException,
             ValidationException,
             AuthenticationException,
             NetworkException,
@@ -53,7 +53,7 @@ class TestOutputManagementModule:
             DestinationAccessException,
         )
 
-        assert OutputManagementException is not None
+        assert AgentOutputToolsException is not None
         assert ValidationException is not None
         assert AuthenticationException is not None
         assert NetworkException is not None

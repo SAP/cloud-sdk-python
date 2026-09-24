@@ -17,14 +17,14 @@ from ._models import (
     AttachmentConfig,
     PreGeneratedAttachment,
 )
-from ._service_client import OutputManagementServiceClient
+from ._service_client import AgentOutputToolsServiceClient
 from .constants import Channel
 from .utils import RequestValidator
 
 logger = logging.getLogger(__name__)
 
 
-class OutputManagementClient:
+class AgentOutputToolsClient:
     """
     Unified client for Agent Output Tools operations.
 
@@ -35,7 +35,7 @@ class OutputManagementClient:
     4. send_output_request() - Send a pre-configured output request
 
     Usage:
-        from sap_cloud_sdk.outputmanagement import create_client
+        from sap_cloud_sdk.agentoutputtools import create_client
 
         client = create_client(destination_name="ARIBA_OUTPUT_SERVICE")
 
@@ -47,7 +47,7 @@ class OutputManagementClient:
         )
     """
 
-    def __init__(self, service_client: OutputManagementServiceClient):
+    def __init__(self, service_client: AgentOutputToolsServiceClient):
         """
         Initialize the Agent Output Tools client.
 
@@ -56,7 +56,7 @@ class OutputManagementClient:
         """
         self._service_client = service_client
 
-    @record_metrics(Module.OUTPUT_MANAGEMENT, Operation.OUTPUT_MANAGEMENT_SEND_EMAIL)
+    @record_metrics(Module.AGENT_OUTPUT_TOOLS, Operation.AGENT_OUTPUT_TOOLS_SEND_EMAIL)
     def send_email(
         self,
         notification_template_key: str,
@@ -81,7 +81,7 @@ class OutputManagementClient:
             OutputResponse containing the request ID if successful, or error details
 
         Example:
-            >>> from sap_cloud_sdk.outputmanagement import create_client
+            >>> from sap_cloud_sdk.agentoutputtools import create_client
             >>> client = create_client(destination_name="ARIBA_OUTPUT_SERVICE")
             >>> response = client.send_email(
             ...     notification_template_key="PO_NOTIFICATION",
@@ -118,7 +118,7 @@ class OutputManagementClient:
         return self.send_output_request(output_request)
 
     @record_metrics(
-        Module.OUTPUT_MANAGEMENT, Operation.OUTPUT_MANAGEMENT_SEND_EMAIL_WITH_MCP
+        Module.AGENT_OUTPUT_TOOLS, Operation.AGENT_OUTPUT_TOOLS_SEND_EMAIL_WITH_MCP
     )
     async def send_email_with_mcp(
         self,
@@ -304,7 +304,7 @@ class OutputManagementClient:
         return output_request
 
     @record_metrics(
-        Module.OUTPUT_MANAGEMENT, Operation.OUTPUT_MANAGEMENT_SEND_OUTPUT_REQUEST
+        Module.AGENT_OUTPUT_TOOLS, Operation.AGENT_OUTPUT_TOOLS_SEND_OUTPUT_REQUEST
     )
     def send_output_request(self, output_request: OutputRequest) -> OutputResponse:
         """

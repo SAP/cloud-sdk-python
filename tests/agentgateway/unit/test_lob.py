@@ -1052,6 +1052,71 @@ class TestListServerTools:
 
         assert result[0].server_name == "my-fragment"
 
+    @pytest.mark.asyncio
+    async def test_raises_timeout_when_initialize_hangs(self):
+        """Raise TimeoutError when initialize() never returns (plain-text SSE body simulation)."""
+        import anyio
+
+        async def _hang(*a, **kw):
+            await anyio.sleep(9999)
+
+        with (
+            patch("sap_cloud_sdk.agentgateway._lob.httpx.AsyncClient") as mock_http,
+            patch(
+                "sap_cloud_sdk.agentgateway._lob.streamable_http_client"
+            ) as mock_stream,
+            patch("sap_cloud_sdk.agentgateway._lob.ClientSession") as mock_session,
+        ):
+            mock_http.return_value.__aenter__.return_value = AsyncMock()
+            mock_stream.return_value.__aenter__.return_value = (
+                AsyncMock(),
+                AsyncMock(),
+                None,
+            )
+
+            mock_session_instance = AsyncMock()
+            mock_session_instance.initialize = AsyncMock(side_effect=_hang)
+            mock_session.return_value.__aenter__.return_value = mock_session_instance
+
+            with pytest.raises(TimeoutError):
+                await list_server_tools(
+                    "https://example.com/mcp", "token", "fragment", timeout=0.05
+                )
+
+    @pytest.mark.asyncio
+    async def test_raises_timeout_when_list_tools_hangs(self):
+        """Raise TimeoutError when list_tools() never returns (SSE stream stalled simulation)."""
+        import anyio
+
+        async def _hang(*a, **kw):
+            await anyio.sleep(9999)
+
+        with (
+            patch("sap_cloud_sdk.agentgateway._lob.httpx.AsyncClient") as mock_http,
+            patch(
+                "sap_cloud_sdk.agentgateway._lob.streamable_http_client"
+            ) as mock_stream,
+            patch("sap_cloud_sdk.agentgateway._lob.ClientSession") as mock_session,
+        ):
+            mock_http.return_value.__aenter__.return_value = AsyncMock()
+            mock_stream.return_value.__aenter__.return_value = (
+                AsyncMock(),
+                AsyncMock(),
+                None,
+            )
+
+            mock_init = MagicMock(spec=[])
+            mock_init.server_info = None
+            mock_session_instance = AsyncMock()
+            mock_session_instance.initialize = AsyncMock(return_value=mock_init)
+            mock_session_instance.list_tools = AsyncMock(side_effect=_hang)
+            mock_session.return_value.__aenter__.return_value = mock_session_instance
+
+            with pytest.raises(TimeoutError):
+                await list_server_tools(
+                    "https://example.com/mcp", "token", "fragment", timeout=0.05
+                )
+
 
 # ============================================================
 # Test: call_mcp_tool_lob

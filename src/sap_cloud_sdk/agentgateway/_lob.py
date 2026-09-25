@@ -10,6 +10,8 @@ import logging
 import os
 import uuid
 
+import anyio
+
 import httpx
 from mcp import ClientSession
 from mcp.client.streamable_http import streamable_http_client
@@ -386,9 +388,10 @@ async def list_server_tools(
             *_,
         ):
             async with ClientSession(read, write) as session:
-                init_result = await session.initialize()
-                server_name = mcp_server_name(init_result) or fragment_name
-                result = await session.list_tools()
+                with anyio.fail_after(timeout):
+                    init_result = await session.initialize()
+                    server_name = mcp_server_name(init_result) or fragment_name
+                    result = await session.list_tools()
                 tools = result.tools or []
                 if not tools:
                     logger.info(

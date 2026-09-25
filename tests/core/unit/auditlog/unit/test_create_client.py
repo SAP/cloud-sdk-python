@@ -4,7 +4,7 @@ import pytest
 from unittest.mock import patch, MagicMock
 
 from sap_cloud_sdk.core.auditlog import create_client, AuditLogClient
-from sap_cloud_sdk.core.auditlog._http_transport import HttpTransport
+from sap_cloud_sdk.core.auditlog._transport import HttpTransport
 from sap_cloud_sdk.core.auditlog.config import AuditLogConfig
 from sap_cloud_sdk.core.auditlog.exceptions import ClientCreationError
 

@@ -59,8 +59,8 @@ There's also support for custom configuration:
 from sap_cloud_sdk.core.auditlog import create_client, AuditLogConfig
 
 config = AuditLogConfig(
-    service_url="https://api.auditlog.cf.example.com/audit-log/oauth2/v2",
-    oauth_url="https://example.authentication.com/oauth/token",
+    service_url="https://api.auditlog.cf.example.com",
+    oauth_url="https://example.authentication.com",
     client_id="your-client-id",
     client_secret="your-client-secret",
 )

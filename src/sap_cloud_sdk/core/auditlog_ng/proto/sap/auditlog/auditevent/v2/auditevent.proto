@@ -7,22 +7,297 @@ import "google/protobuf/timestamp.proto";
 
 option go_package = "sap.com/auditlog/auditevent";
 
+// User context with extended identity information
+message UserContext {
+  //UserType
+  UserType type = 1;
+  // Additional custom attributes
+  map<string, string> attributes = 2;
+}
+
+// OpenTelemetry trace context for correlation with distributed traces
+// Follows W3C Trace Context specification (https://www.w3.org/TR/trace-context/)
+message TraceContext {
+  // The trace-id (32 lowercase hex characters, e.g., "4bf92f3577b34da6a3ce929d0e0e4736")
+  optional string trace_id = 1 [(buf.validate.field).string.pattern = "^[0-9a-f]{32}$"];
+  // The span-id (16 lowercase hex characters, e.g., "00f067aa0ba902b7")
+  optional string span_id = 2 [(buf.validate.field).string.pattern = "^[0-9a-f]{16}$"];
+}
+
+// ============================================================================
+// OCSF-Aligned AI Structures
+// Based on OCSF 1.10.0-dev AI Operation Profile
+// https://schema.ocsf.io/1.10.0-dev/profiles/ai_operation
+// ============================================================================
+
+// AI Role in a conversation or operation
+// Aligned with OCSF ai_role_id enumeration
+enum AiRole {
+  //@ShortText: "Unspecified"
+  AI_ROLE_UNSPECIFIED = 0;
+  //@ShortText: "User"
+  AI_ROLE_USER = 1;
+  //@ShortText: "Assistant"
+  AI_ROLE_ASSISTANT = 2;
+  //@ShortText: "Tool"
+  AI_ROLE_TOOL = 3;
+  //@ShortText: "Agent"
+  AI_ROLE_AGENT = 4;
+  //@ShortText: "Orchestrator"
+  AI_ROLE_ORCHESTRATOR = 5;
+  //@ShortText: "Retriever"
+  AI_ROLE_RETRIEVER = 6;
+  //@ShortText: "Other"
+  AI_ROLE_OTHER = 99;
+}
+
+// AI Agent Type - normalized framework identifier
+// Aligned with OCSF ai_agent.type_id
+enum AiAgentType {
+  //@ShortText: "Unspecified"
+  AI_AGENT_TYPE_UNSPECIFIED = 0;
+  //@ShortText: "Conversational"
+  AI_AGENT_TYPE_CONVERSATIONAL = 1;
+  //@ShortText: "Autonomous"
+  AI_AGENT_TYPE_AUTONOMOUS = 2;
+  //@ShortText: "Retrieval"
+  AI_AGENT_TYPE_RETRIEVAL = 3;
+  //@ShortText: "Multi-Agent"
+  AI_AGENT_TYPE_MULTI_AGENT = 4;
+  //@ShortText: "Other"
+  AI_AGENT_TYPE_OTHER = 99;
+}
+
+// AI Session End Reason
+enum AiSessionEndReason {
+  //@ShortText: "Unspecified"
+  AI_SESSION_END_REASON_UNSPECIFIED = 0;
+  //@ShortText: "Normal"
+  AI_SESSION_END_REASON_NORMAL = 1;
+  //@ShortText: "Timeout"
+  AI_SESSION_END_REASON_TIMEOUT = 2;
+  //@ShortText: "User Terminated"
+  AI_SESSION_END_REASON_USER_TERMINATED = 3;
+  //@ShortText: "Error"
+  AI_SESSION_END_REASON_ERROR = 4;
+  //@ShortText: "Policy Violation"
+  AI_SESSION_END_REASON_POLICY_VIOLATION = 5;
+  //@ShortText: "Other"
+  AI_SESSION_END_REASON_OTHER = 99;
+}
+
+// AI Guardrail Type
+enum AiGuardrailType {
+  //@ShortText: "Unspecified"
+  AI_GUARDRAIL_TYPE_UNSPECIFIED = 0;
+  //@ShortText: "Input"
+  AI_GUARDRAIL_TYPE_INPUT = 1;
+  //@ShortText: "Output"
+  AI_GUARDRAIL_TYPE_OUTPUT = 2;
+  //@ShortText: "Content Policy"
+  AI_GUARDRAIL_TYPE_CONTENT_POLICY = 3;
+  //@ShortText: "Prompt Injection"
+  AI_GUARDRAIL_TYPE_PROMPT_INJECTION = 4;
+  //@ShortText: "PII Filter"
+  AI_GUARDRAIL_TYPE_PII_FILTER = 5;
+  //@ShortText: "Data Leakage"
+  AI_GUARDRAIL_TYPE_DATA_LEAKAGE = 6;
+  //@ShortText: "Hallucination Detection"
+  AI_GUARDRAIL_TYPE_HALLUCINATION = 7;
+  //@ShortText: "Other"
+  AI_GUARDRAIL_TYPE_OTHER = 99;
+}
+
+// AI Guardrail Action
+enum AiGuardrailAction {
+  //@ShortText: "Unspecified"
+  AI_GUARDRAIL_ACTION_UNSPECIFIED = 0;
+  //@ShortText: "Allow"
+  AI_GUARDRAIL_ACTION_ALLOW = 1;
+  //@ShortText: "Block"
+  AI_GUARDRAIL_ACTION_BLOCK = 2;
+  //@ShortText: "Modify"
+  AI_GUARDRAIL_ACTION_MODIFY = 3;
+  //@ShortText: "Warn"
+  AI_GUARDRAIL_ACTION_WARN = 4;
+  //@ShortText: "Log Only"
+  AI_GUARDRAIL_ACTION_LOG_ONLY = 5;
+  //@ShortText: "Other"
+  AI_GUARDRAIL_ACTION_OTHER = 99;
+}
+
+// AI Invocation Status
+enum AiInvocationStatus {
+  //@ShortText: "Unspecified"
+  AI_INVOCATION_STATUS_UNSPECIFIED = 0;
+  //@ShortText: "Success"
+  AI_INVOCATION_STATUS_SUCCESS = 1;
+  //@ShortText: "Failed"
+  AI_INVOCATION_STATUS_FAILED = 2;
+  //@ShortText: "Timeout"
+  AI_INVOCATION_STATUS_TIMEOUT = 3;
+  //@ShortText: "Rate Limited"
+  AI_INVOCATION_STATUS_RATE_LIMITED = 4;
+  //@ShortText: "Cancelled"
+  AI_INVOCATION_STATUS_CANCELLED = 5;
+  //@ShortText: "Pending"
+  AI_INVOCATION_STATUS_PENDING = 6;
+  //@ShortText: "Other"
+  AI_INVOCATION_STATUS_OTHER = 99;
+}
+
+// AI Retrieval Type (for RAG and knowledge retrieval)
+enum AiRetrievalType {
+  //@ShortText: "Unspecified"
+  AI_RETRIEVAL_TYPE_UNSPECIFIED = 0;
+  //@ShortText: "Vector Search"
+  AI_RETRIEVAL_TYPE_VECTOR_SEARCH = 1;
+  //@ShortText: "Keyword Search"
+  AI_RETRIEVAL_TYPE_KEYWORD_SEARCH = 2;
+  //@ShortText: "Hybrid Search"
+  AI_RETRIEVAL_TYPE_HYBRID_SEARCH = 3;
+  //@ShortText: "Knowledge Graph"
+  AI_RETRIEVAL_TYPE_KNOWLEDGE_GRAPH = 4;
+  //@ShortText: "Memory Context"
+  AI_RETRIEVAL_TYPE_MEMORY_CONTEXT = 5;
+  //@ShortText: "Document Retrieval"
+  AI_RETRIEVAL_TYPE_DOCUMENT = 6;
+  //@ShortText: "Other"
+  AI_RETRIEVAL_TYPE_OTHER = 99;
+}
+
+// AI Feedback Rating
+enum AiFeedbackRating {
+  //@ShortText: "Unspecified"
+  AI_FEEDBACK_RATING_UNSPECIFIED = 0;
+  //@ShortText: "Positive"
+  AI_FEEDBACK_RATING_POSITIVE = 1;
+  //@ShortText: "Negative"
+  AI_FEEDBACK_RATING_NEGATIVE = 2;
+  //@ShortText: "Neutral"
+  AI_FEEDBACK_RATING_NEUTRAL = 3;
+  //@ShortText: "Correction"
+  AI_FEEDBACK_RATING_CORRECTION = 4;
+  //@ShortText: "Other"
+  AI_FEEDBACK_RATING_OTHER = 99;
+}
+
+// AI Tool Call Disposition (for authorization decisions)
+enum AiToolCallDisposition {
+  //@ShortText: "Unspecified"
+  AI_TOOL_CALL_DISPOSITION_UNSPECIFIED = 0;
+  //@ShortText: "Allowed"
+  AI_TOOL_CALL_DISPOSITION_ALLOWED = 1;
+  //@ShortText: "Denied"
+  AI_TOOL_CALL_DISPOSITION_DENIED = 2;
+  //@ShortText: "Modified"
+  AI_TOOL_CALL_DISPOSITION_MODIFIED = 3;
+  //@ShortText: "Pending Approval"
+  AI_TOOL_CALL_DISPOSITION_PENDING_APPROVAL = 4;
+  //@ShortText: "Other"
+  AI_TOOL_CALL_DISPOSITION_OTHER = 99;
+}
+
+// AI Model identification
+// Aligned with OCSF ai_model object
+// https://schema.ocsf.io/1.10.0-dev/objects/ai_model
+message AiModel {
+  // AI service provider or organization name (e.g., "SAP", "OpenAI", "Anthropic", "Google")
+  string ai_provider = 1 [(buf.validate.field).required = true];
+  // Human-readable model name (e.g., "joule-v1", "gpt-4o", "claude-3-sonnet")
+  string name = 2;
+  // Model's unique identifier
+  string uid = 3;
+  // Model version identifier (e.g., "2024-05-13", "v2.1.0")
+  string version = 4;
+}
+
+// AI Agent identification
+// Aligned with OCSF ai_agent object
+// https://schema.ocsf.io/1.10.0-dev/objects/ai_agent
+message AiAgent {
+  // Stable logical identifier for the agent (e.g., ORD ID)
+  string uid = 1;
+  // Human-readable agent designation
+  string name = 2;
+  // Identifier for a specific running instance or session
+  string instance_uid = 3;
+  // Agent framework type (string representation)
+  string type = 4;
+  // Normalized framework identifier
+  AiAgentType type_id = 5;
+  // Agent's code or configuration revision number
+  string version = 6;
+  // The AI model backing this agent
+  AiModel ai_model = 7;
+}
+
+// Message/Conversation context for AI interactions
+// Aligned with OCSF message_context object
+// https://schema.ocsf.io/1.10.0-dev/objects/message_context
+message AiMessageContext {
+  // Unique identifier for message correlation (conversation ID)
+  string uid = 1;
+  // Conversation name, session name, or thread identifier
+  string name = 2;
+  // The AI's functional role in this interaction
+  AiRole ai_role_id = 3;
+  // Verbatim input instruction to the model (may contain sensitive data)
+  string prompt_text = 4;
+  // Model-generated response content (may contain sensitive data)
+  string response_text = 5;
+  // Input token count
+  int32 prompt_tokens = 6;
+  // Response/completion token count
+  int32 completion_tokens = 7;
+  // Combined token usage (prompt + completion)
+  int32 total_tokens = 8;
+}
+
+// AI Delegation context for authorization tracking
+// Aligned with OCSF delegation object
+// Links events to authorization contexts under delegated authority
+message AiDelegation {
+  // The delegating entity (user or agent that granted authority)
+  string delegator_id = 1;
+  // The entity receiving delegated authority
+  string delegate_id = 2;
+  // Scope or permissions of the delegation
+  repeated string scopes = 3;
+  // Expiration time of the delegation
+  google.protobuf.Timestamp expires_at = 4;
+  // Delegation chain (for multi-hop delegations)
+  repeated string delegation_chain = 5;
+}
+
 // Common Fields
 // contains information that are attached to all events.
 message Common {
   //timestamp of the event
   google.protobuf.Timestamp timestamp = 1; // Required format: 2023-10-23T10:00:00.000Z
-  //IP Adress of the source in IPv4 or IPv6
+  //IP Address of the source in IPv4 or IPv6
   repeated string source_ip = 2; // IPv4 or IPv6
   //contains the local user ID, which is used in case of impersonation
   string user_impersonated_id = 3;
   //contains the local user ID, who caused the audit log event
-  string user_initiator_id = 4;
+  string user_initiator_id = 4 [(buf.validate.field).required = true];
+  //Identifier of the app e.g. App-GUID, FIORI-ID etc.
   string app_id = 5;
   //tenant ID of the source
   string tenant_id = 6;
+  //contains the identifier of the respective user session like SAP-Passport
   string user_session_context_id = 7;
   map<string, string> app_context = 8;
+  //contains the global user ID, who caused the audit log event
+  string user_global_id = 9;
+  //contains the global user ID of the impersonated user
+  string user_impersonated_global_id = 10;
+  //Extended user context for User Initiator
+  UserContext user_initiator_context = 11;
+  //Extended user context for Impersonated User
+  UserContext user_impersonated_context = 12;
+  //OpenTelemetry trace context for correlation with distributed traces
+  TraceContext trace_context = 13;
 }
 
 /* AuditlogClear
@@ -33,7 +308,7 @@ message Common {
  *   @EventDocumentation: "The Audit log has been deleted and is no longer available. The number of events has been deleted."
  */
 message AuditlogClear {
-  Common common = 1;
+  Common common = 1 [(buf.validate.field).required = true];
   int32 number_of_events = 2;
 }
 
@@ -45,7 +320,7 @@ message AuditlogClear {
  *   @EventDocumentation: "The Audit log has been disabled"
  */
 message AuditlogDisable {
-  Common common = 1;
+  Common common = 1 [(buf.validate.field).required = true];
 }
 
 /* AuditlogEnable
@@ -56,7 +331,7 @@ message AuditlogDisable {
  *   @EventDocumentation: "The Audit log has been enabled"
  */
 message AuditlogEnable {
-  Common common = 1;
+  Common common = 1 [(buf.validate.field).required = true];
 }
 
 /* AuthnPrivilegeToGroupAdd
@@ -67,70 +342,54 @@ message AuditlogEnable {
  *   @EventDocumentation: "A new privilege has been added to a user group. This privilege grants members of that group access to objects and the ability to perform operations that they are otherwise not permitted to do."
  */
 message AuthnPrivilegeToGroupAdd {
-  Common common = 1;
-  string group = 2 [
-    (buf.validate.field).string.min_len = 1
-  ];
-  string privilege = 3 [
-    (buf.validate.field).string.min_len = 1
-  ];
+  Common common = 1 [(buf.validate.field).required = true];
+  string group = 2 [(buf.validate.field).required = true];
+  string privilege = 3 [(buf.validate.field).required = true];
   string object_type = 4;
   string object_id = 5;
 }
 
 /* AuthnPrivilegeToGroupDelete
- *   @EventShortText: "An privilege has been deleted from a group"
+ *   @EventShortText: "A privilege has been deleted from a group"
  *   @EventCode: "AE-0005"
  *   @EventCategoryCode: "EVENT_CATEGORY_CODE_IAM"
  *   @EventMessageText: "Privilege ${privilege} (Type: ${object_type}, ID: ${object_id}) has been deleted from group ${group}"
  *   @EventDocumentation: "A new privilege has been deleted from the specified user group. Deleting privileges from a group disallows its members from accessing objects and performing actions they were previously permitted to do."
  */
 message AuthnPrivilegeToGroupDelete {
-  Common common = 1;
-  string group = 2 [
-    (buf.validate.field).string.min_len = 1
-  ];
-  string privilege = 3 [
-    (buf.validate.field).string.min_len = 1
-  ];
+  Common common = 1 [(buf.validate.field).required = true];
+  string group = 2 [(buf.validate.field).required = true];
+  string privilege = 3 [(buf.validate.field).required = true];
   string object_type = 4;
   string object_id = 5;
 }
 
 /* AuthnPrivilegeToRoleAdd
- *   @EventShortText: "An privilege has been added to a role"
+ *   @EventShortText: "A privilege has been added to a role"
  *   @EventCode: "AE-0006"
  *   @EventCategoryCode: "EVENT_CATEGORY_CODE_IAM"
  *   @EventMessageText: "Privilege ${privilege} (Type: ${object_type}, ID: ${object_id}) has been added to role ${role}"
  *   @EventDocumentation: "A new privilege has been added to the role. This privilege grants users assigned to that role access objects and the ability to perform operations."
  */
 message AuthnPrivilegeToRoleAdd {
-  Common common = 1;
-  string privilege = 2 [
-    (buf.validate.field).string.min_len = 1
-  ];
-  string role = 3 [
-    (buf.validate.field).string.min_len = 1
-  ];
+  Common common = 1 [(buf.validate.field).required = true];
+  string privilege = 2 [(buf.validate.field).required = true];
+  string role = 3 [(buf.validate.field).required = true];
   string object_type = 4;
   string object_id = 5;
 }
 
 /* AuthnPrivilegeToRoleDelete
- *   @EventShortText: "An privilege has been deleted from a role"
+ *   @EventShortText: "A privilege has been deleted from a role"
  *   @EventCode: "AE-0007"
  *   @EventCategoryCode: "EVENT_CATEGORY_CODE_IAM"
  *   @EventMessageText: "Privilege ${privilege} (Type: ${object_type}, ID: ${object_id}) has been deleted from role ${role}"
  *   @EventDocumentation: "A privilege has been deleted from the role. As a result, users assigned to that role no longer have access to the privileges and cannot perform the associated operations."
  */
 message AuthnPrivilegeToRoleDelete {
-  Common common = 1 ;
-  string privilege = 2 [
-    (buf.validate.field).string.min_len = 1
-  ];
-  string role = 3 [
-    (buf.validate.field).string.min_len = 1
-  ];
+  Common common = 1 [(buf.validate.field).required = true];
+  string privilege = 2 [(buf.validate.field).required = true];
+  string role = 3 [(buf.validate.field).required = true];
   string object_type = 4;
   string object_id = 5;
 }
@@ -143,33 +402,25 @@ message AuthnPrivilegeToRoleDelete {
  *   @EventDocumentation: "A user has been added access to specific objects and operations by a privilege."
  */
 message AuthnPrivilegeToUserAdd {
-  Common common = 1 ;
-  string privilege = 2 [
-    (buf.validate.field).string.min_len = 1
-  ];
-  string user = 3 [
-    (buf.validate.field).string.min_len = 1
-  ];
+  Common common = 1 [(buf.validate.field).required = true];
+  string privilege = 2 [(buf.validate.field).required = true];
+  string user = 3 [(buf.validate.field).required = true];
   string object_type = 4;
   string object_id = 5;
   UserType user_type = 6;
 }
 
 /* AuthnPrivilegeToUserDelete
- *   @EventShortText: "An privilege has been removed from a user"
+ *   @EventShortText: "A privilege has been removed from a user"
  *   @EventCode: "AE-0009"
  *   @EventCategoryCode: "EVENT_CATEGORY_CODE_IAM"
  *   @EventMessageText: "Privilege ${privilege} (Type: ${object_type}, ID: ${object_id}) has been deleted from user ${user} (User Type: ${user_type})"
  *   @EventDocumentation: "A user’s privileges have been deleted, preventing them from accessing the assigned objects and performing the corresponding operations."
  */
 message AuthnPrivilegeToUserDelete {
-  Common common = 1 ;
-  string privilege = 2 [
-    (buf.validate.field).string.min_len = 1
-  ];
-  string user = 3 [
-    (buf.validate.field).string.min_len = 1
-  ];
+  Common common = 1 [(buf.validate.field).required = true];
+  string privilege = 2 [(buf.validate.field).required = true];
+  string user = 3 [(buf.validate.field).required = true];
   string object_type = 4;
   string object_id = 5;
   UserType user_type = 6;
@@ -183,13 +434,9 @@ message AuthnPrivilegeToUserDelete {
  *   @EventDocumentation: "A new role has been added to a user group. Now, members of the group can access the assigned objects and perform the corresponding operations."
  */
 message AuthnRoleToGroupAdd {
-  Common common = 1;
-  string group = 2 [
-    (buf.validate.field).string.min_len = 1
-  ];
-  string role = 3 [
-    (buf.validate.field).string.min_len = 1
-  ];
+  Common common = 1 [(buf.validate.field).required = true];
+  string group = 2 [(buf.validate.field).required = true];
+  string role = 3 [(buf.validate.field).required = true];
 }
 
 /* AuthnRoleToGroupDelete
@@ -200,13 +447,9 @@ message AuthnRoleToGroupAdd {
  *   @EventDocumentation: "A user group has been stripped of a new role, resulting in members losing access to the assigned objects and the ability to perform the associated operations."
  */
 message AuthnRoleToGroupDelete {
-  Common common = 1;
-  string group = 2 [
-    (buf.validate.field).string.min_len = 1
-  ];
-  string role = 3 [
-    (buf.validate.field).string.min_len = 1
-  ];
+  Common common = 1 [(buf.validate.field).required = true];
+  string group = 2 [(buf.validate.field).required = true];
+  string role = 3 [(buf.validate.field).required = true];
 }
 
 /* AuthnRoleToUserAdd
@@ -217,13 +460,9 @@ message AuthnRoleToGroupDelete {
  *   @EventDocumentation: "A new role has been added to a user. Now, the user can access the assigned objects and perform the corresponding operations."
  */
 message AuthnRoleToUserAdd {
-  Common common = 1;
-  string role = 2 [
-    (buf.validate.field).string.min_len = 1
-  ];
-  string user = 3 [
-    (buf.validate.field).string.min_len = 1
-  ];
+  Common common = 1 [(buf.validate.field).required = true];
+  string role = 2 [(buf.validate.field).required = true];
+  string user = 3 [(buf.validate.field).required = true];
   UserType user_type = 4;
 }
 
@@ -235,13 +474,9 @@ message AuthnRoleToUserAdd {
  *   @EventDocumentation: "A user has been stripped of a role, resulting in user losing access to the assigned objects and the ability to perform the associated operations."
  */
 message AuthnRoleToUserDelete {
-  Common common = 1;
-  string role = 2 [
-    (buf.validate.field).string.min_len = 1
-  ];
-  string user = 3 [
-    (buf.validate.field).string.min_len = 1
-  ];
+  Common common = 1 [(buf.validate.field).required = true];
+  string role = 2 [(buf.validate.field).required = true];
+  string user = 3 [(buf.validate.field).required = true];
   UserType user_type = 4;
 }
 
@@ -253,13 +488,9 @@ message AuthnRoleToUserDelete {
  *   @EventDocumentation: "A user has been assigned to a user group."
  */
 message AuthnUserToGroupAdd {
-  Common common = 1 ;
-  string group = 2 [
-    (buf.validate.field).string.min_len = 1
-  ];
-  string user = 3 [
-    (buf.validate.field).string.min_len = 1
-  ];
+  Common common = 1 [(buf.validate.field).required = true];
+  string group = 2 [(buf.validate.field).required = true];
+  string user = 3 [(buf.validate.field).required = true];
   UserType user_type = 4;
 }
 
@@ -271,15 +502,9 @@ message AuthnUserToGroupAdd {
  *   @EventDocumentation: "A user has been deleted from mentioned user group."
  */
 message AuthnUserToGroupDelete {
-  Common common = 1 ;
-  string group = 2 [
-    (buf.validate.field).string.min_len = 1
-
-  ];
-  string user = 3 [
-    (buf.validate.field).string.min_len = 1
-
-  ];
+  Common common = 1 [(buf.validate.field).required = true];
+  string group = 2 [(buf.validate.field).required = true];
+  string user = 3 [(buf.validate.field).required = true];
   UserType user_type = 4;
 }
 
@@ -291,13 +516,10 @@ message AuthnUserToGroupDelete {
  *   @EventDocumentation: "A new configuration has been created for a named property that belongs to an object type with an identifier. This event type of log is being used to record any configuration changes that may be relevant for security or compliance reasons."
  */
 message ConfigurationAdd {
-  Common common = 1 ;
-  google.protobuf.Value value = 2 ;
-  string property_name = 3 [
-    (buf.validate.field).string.min_len = 1
-
-  ];
-  string object_type = 4 [(buf.validate.field).string.max_len = 20];
+  Common common = 1 [(buf.validate.field).required = true];
+  google.protobuf.Value value = 2 [(buf.validate.field).required = true];
+  string property_name = 3 [(buf.validate.field).required = true];
+  string object_type = 4;
   string object_id = 5;
 }
 
@@ -309,14 +531,11 @@ message ConfigurationAdd {
  *   @EventDocumentation: "An existing configuration has been changed for a named property that belongs to an object type with an identifier. This event type of log is being used to record any configuration changes that may be relevant for security or compliance reasons."
  */
 message ConfigurationChange {
-  Common common = 1 ;
-  google.protobuf.Value new_value = 2 ;
-  google.protobuf.Value old_value = 3 ;
-  string property_name = 4 [
-    (buf.validate.field).string.min_len = 1
-
-  ];
-  string object_type = 5 [(buf.validate.field).string.max_len = 20];
+  Common common = 1 [(buf.validate.field).required = true];
+  google.protobuf.Value new_value = 2 [(buf.validate.field).required = true];
+  google.protobuf.Value old_value = 3 [(buf.validate.field).required = true];
+  string property_name = 4 [(buf.validate.field).required = true];
+  string object_type = 5;
   string object_id = 6;
 }
 
@@ -328,13 +547,10 @@ message ConfigurationChange {
  *   @EventDocumentation: "A configuration has been deleted for a named property that belongs to an object type with an identifier. This event type of log is being used to record any configuration changes that may be relevant for security or compliance reasons."
  */
 message ConfigurationDelete {
-  Common common = 1 ;
-  google.protobuf.Value value = 2 ;
-  string property_name = 3 [
-    (buf.validate.field).string.min_len = 1
-
-  ];
-  string object_type = 4 [(buf.validate.field).string.max_len = 20];
+  Common common = 1 [(buf.validate.field).required = true];
+  google.protobuf.Value value = 2 [(buf.validate.field).required = true];
+  string property_name = 3 [(buf.validate.field).required = true];
+  string object_type = 4;
   string object_id = 5;
 }
 
@@ -346,12 +562,9 @@ message ConfigurationDelete {
  *   @EventDocumentation: "A credential of a specific type has been successfully created."
  */
 message CredentialCreate {
-  Common common = 1 ;
-  string credential_id = 2 [
-    (buf.validate.field).string.min_len = 1
-
-  ];
-  CredentialType credential_type = 3 ;
+  Common common = 1 [(buf.validate.field).required = true];
+  string credential_id = 2 [(buf.validate.field).required = true];
+  CredentialType credential_type = 3 [(buf.validate.field).required = true];
 }
 
 /* CredentialDelete
@@ -362,12 +575,9 @@ message CredentialCreate {
  *   @EventDocumentation: "A credential of a specific type has been deleted."
  */
 message CredentialDelete {
-  Common common = 1 ;
-  string credential_id = 2 [
-    (buf.validate.field).string.min_len = 1
-
-  ];
-  CredentialType credential_type = 3 ;
+  Common common = 1 [(buf.validate.field).required = true];
+  string credential_id = 2 [(buf.validate.field).required = true];
+  CredentialType credential_type = 3 [(buf.validate.field).required = true];
 }
 
 /* CredentialExpiration
@@ -378,12 +588,9 @@ message CredentialDelete {
  *   @EventDocumentation: "A credential of a specific type has been expired at a specific time."
  */
 message CredentialExpiration {
-  Common common = 1 ;
-  string credential_id = 2 [
-    (buf.validate.field).string.min_len = 1
-
-  ];
-  CredentialType credential_type = 3 ;
+  Common common = 1 [(buf.validate.field).required = true];
+  string credential_id = 2 [(buf.validate.field).required = true];
+  CredentialType credential_type = 3 [(buf.validate.field).required = true];
   google.protobuf.Timestamp expiration_date = 4;
 }
 
@@ -391,16 +598,13 @@ message CredentialExpiration {
  *   @EventShortText: "A credential has been revoked"
  *   @EventCode: "AE-0022"
  *   @EventCategoryCode: "EVENT_CATEGORY_CODE_SEC_UNSPECIFIED"
- *   @EventMessageText: "A credential with ID ${credential_id} of type ${credential_type} has been revoked (Revokation date: ${revokation_date})"
+ *   @EventMessageText: "A credential with ID ${credential_id} of type ${credential_type} has been revoked (Revocation date: ${revokation_date})"
  *   @EventDocumentation: "A credential of a specific type has been invalidated at a specific time."
  */
 message CredentialRevokation {
-  Common common = 1 ;
-  string credential_id = 2 [
-    (buf.validate.field).string.min_len = 1
-
-  ];
-  CredentialType credential_type = 3 ;
+  Common common = 1 [(buf.validate.field).required = true];
+  string credential_id = 2 [(buf.validate.field).required = true];
+  CredentialType credential_type = 3 [(buf.validate.field).required = true];
   google.protobuf.Timestamp revokation_date = 4;
 }
 
@@ -412,17 +616,11 @@ message CredentialRevokation {
  *   @EventDocumentation: "A security-relevant DataModel has been modified. A DataModel is a representation of a real-world scenario about which data is to be collected and stored in a database. It depicts the data flow and logical relationships between various data elements."
  */
 message DataModelChange {
-  Common common = 1 ;
-  string model_id = 2 [
-    (buf.validate.field).string.min_len = 1
-
-  ];
-  google.protobuf.Value new_value = 3 ;
-  google.protobuf.Value old_value = 4 ;
-  string property_name = 5 [
-    (buf.validate.field).string.min_len = 1
-
-  ];
+  Common common = 1 [(buf.validate.field).required = true];
+  string model_id = 2 [(buf.validate.field).required = true];
+  google.protobuf.Value new_value = 3 [(buf.validate.field).required = true];
+  google.protobuf.Value old_value = 4 [(buf.validate.field).required = true];
+  string property_name = 5 [(buf.validate.field).required = true];
 }
 
 /* DataModelCreate
@@ -433,11 +631,8 @@ message DataModelChange {
  *   @EventDocumentation: "A security-relevant DataModel has been created. A DataModel is a representation of a real-world scenario about which data is to be collected and stored in a database. It depicts the data flow and logical relationships between various data elements."
  */
 message DataModelCreate {
-  Common common = 1 ;
-  string model_id = 2 [
-    (buf.validate.field).string.min_len = 1
-
-  ];
+  Common common = 1 [(buf.validate.field).required = true];
+  string model_id = 2 [(buf.validate.field).required = true];
 }
 
 /* DataModelDelete
@@ -448,11 +643,8 @@ message DataModelCreate {
  *   @EventDocumentation: "A security-relevant DataModel has been deleted. A DataModel is a representation of a real-world scenario about which data is to be collected and stored in a database. It depicts the data flow and logical relationships between various data elements."
  */
 message DataModelDelete {
-  Common common = 1 ;
-  string model_id = 2 [
-    (buf.validate.field).string.min_len = 1
-
-  ];
+  Common common = 1 [(buf.validate.field).required = true];
+  string model_id = 2 [(buf.validate.field).required = true];
 }
 
 /* DataAccess
@@ -463,27 +655,12 @@ message DataModelDelete {
  *   @EventDocumentation: "A security-relevant property has been read through the designated channel."
  */
 message DataAccess {
-  Common common = 1 ;
-  string channel_type = 2 [
-    (buf.validate.field).string.min_len = 1
-
-  ];
-  string channel_id = 3 [
-    (buf.validate.field).string.min_len = 1
-
-  ];
-  string object_type = 4 [
-    (buf.validate.field).string.min_len = 1
-
-  ];
-  string object_id = 5 [
-    (buf.validate.field).string.min_len = 1
-
-  ];
-  string attribute = 6 [
-    (buf.validate.field).string.min_len = 1
-
-  ];
+  Common common = 1 [(buf.validate.field).required = true];
+  string channel_type = 2 [(buf.validate.field).required = true];
+  string channel_id = 3 [(buf.validate.field).required = true];
+  string object_type = 4 [(buf.validate.field).required = true];
+  string object_id = 5 [(buf.validate.field).required = true];
+  string attribute = 6 [(buf.validate.field).required = true];
   google.protobuf.Value value = 7;
   string attachment_type = 8 [deprecated = true];
   string attachment_id = 9 [deprecated = true];
@@ -497,19 +674,10 @@ message DataAccess {
  *   @EventDocumentation: "A security-relevant property has been created."
  */
 message DataCreate {
-  Common common = 1 ;
-  string object_type = 2 [
-    (buf.validate.field).string.min_len = 1
-
-  ];
-  string object_id = 3 [
-    (buf.validate.field).string.min_len = 1
-
-  ];
-  string attribute = 4 [
-    (buf.validate.field).string.min_len = 1
-
-  ];
+  Common common = 1 [(buf.validate.field).required = true];
+  string object_type = 2 [(buf.validate.field).required = true];
+  string object_id = 3 [(buf.validate.field).required = true];
+  string attribute = 4 [(buf.validate.field).required = true];
   google.protobuf.Value value = 5;
 }
 
@@ -521,19 +689,10 @@ message DataCreate {
  *   @EventDocumentation: "A security-relevant property has been deleted."
  */
 message DataDelete {
-  Common common = 1 ;
-  string object_type = 2 [
-    (buf.validate.field).string.min_len = 1
-
-  ];
-  string object_id = 3 [
-    (buf.validate.field).string.min_len = 1
-
-  ];
-  string attribute = 4 [
-    (buf.validate.field).string.min_len = 1
-
-  ];
+  Common common = 1 [(buf.validate.field).required = true];
+  string object_type = 2 [(buf.validate.field).required = true];
+  string object_id = 3 [(buf.validate.field).required = true];
+  string attribute = 4 [(buf.validate.field).required = true];
   google.protobuf.Value value = 5;
 }
 
@@ -545,19 +704,10 @@ message DataDelete {
  *   @EventDocumentation: "A security-relevant property has been changed."
  */
 message DataModification {
-  Common common = 1 ;
-  string object_type = 2 [
-    (buf.validate.field).string.min_len = 1
-
-  ];
-  string object_id = 3 [
-    (buf.validate.field).string.min_len = 1
-
-  ];
-  string attribute = 4 [
-    (buf.validate.field).string.min_len = 1
-
-  ];
+  Common common = 1 [(buf.validate.field).required = true];
+  string object_type = 2 [(buf.validate.field).required = true];
+  string object_id = 3 [(buf.validate.field).required = true];
+  string attribute = 4 [(buf.validate.field).required = true];
   google.protobuf.Value new_value = 5;
   google.protobuf.Value old_value = 6;
 }
@@ -570,24 +720,12 @@ message DataModification {
  *   @EventDocumentation: "A security-relevant data has been exported to a designated URI"
  */
 message DataExport {
-  Common common = 1 ;
-  DataExportChannelType channel_type = 2 ;
-  string channel_id = 3 [
-    (buf.validate.field).string.min_len = 1
-
-  ];
-  string object_type = 4 [
-    (buf.validate.field).string.min_len = 1
-
-  ];
-  string object_id = 5 [
-    (buf.validate.field).string.min_len = 1
-
-  ];
-  string destination_uri = 6 [
-    (buf.validate.field).string.min_len = 1
-
-  ];
+  Common common = 1 [(buf.validate.field).required = true];
+  DataExportChannelType channel_type = 2 [(buf.validate.field).required = true];
+  string channel_id = 3 [(buf.validate.field).required = true];
+  string object_type = 4 [(buf.validate.field).required = true];
+  string object_id = 5 [(buf.validate.field).required = true];
+  string destination_uri = 6 [(buf.validate.field).required = true];
 }
 
 /* DppDataAccess
@@ -598,35 +736,14 @@ message DataExport {
  *   @EventDocumentation: "Data relevant to the Data Protection and Privacy guidelines or similar purposes has been accessed. Data protection is closely linked to numerous legal requirements and privacy concerns."
  */
 message DppDataAccess {
-  Common common = 1 ;
-  string channel_type = 2 [
-    (buf.validate.field).string.min_len = 1
-
-  ];
-  string channel_id = 3 [
-    (buf.validate.field).string.min_len = 1
-
-  ];
-  string data_subject_type = 4 [
-    (buf.validate.field).string.min_len = 1
-
-  ];
-  string data_subject_id = 5 [
-    (buf.validate.field).string.min_len = 1
-
-  ];
-  string object_type = 6 [
-    (buf.validate.field).string.min_len = 1
-
-  ];
-  string object_id = 7 [
-    (buf.validate.field).string.min_len = 1
-
-  ];
-  string attribute = 8 [
-    (buf.validate.field).string.min_len = 1
-
-  ];
+  Common common = 1 [(buf.validate.field).required = true];
+  string channel_type = 2 [(buf.validate.field).required = true];
+  string channel_id = 3 [(buf.validate.field).required = true];
+  string data_subject_type = 4 [(buf.validate.field).required = true];
+  string data_subject_id = 5 [(buf.validate.field).required = true];
+  string object_type = 6 [(buf.validate.field).required = true];
+  string object_id = 7 [(buf.validate.field).required = true];
+  string attribute = 8 [(buf.validate.field).required = true];
   google.protobuf.Value value = 9;
   string attachment_type = 10 [deprecated = true];
   string attachment_id = 11 [deprecated = true];
@@ -640,27 +757,12 @@ message DppDataAccess {
  *   @EventDocumentation: "Data relevant to the Data Protection and Privacy guidelines or similar purposes has been created. Data protection is closely linked to numerous legal requirements and privacy concerns."
  */
 message DppDataCreate {
-  Common common = 1 ;
-  string data_subject_type = 2 [
-    (buf.validate.field).string.min_len = 1
-
-  ];
-  string data_subject_id = 3 [
-    (buf.validate.field).string.min_len = 1
-
-  ];
-  string object_type = 4 [
-    (buf.validate.field).string.min_len = 1
-
-  ];
-  string object_id = 5 [
-    (buf.validate.field).string.min_len = 1
-
-  ];
-  string attribute = 6 [
-    (buf.validate.field).string.min_len = 1
-
-  ];
+  Common common = 1 [(buf.validate.field).required = true];
+  string data_subject_type = 2 [(buf.validate.field).required = true];
+  string data_subject_id = 3 [(buf.validate.field).required = true];
+  string object_type = 4 [(buf.validate.field).required = true];
+  string object_id = 5 [(buf.validate.field).required = true];
+  string attribute = 6 [(buf.validate.field).required = true];
   google.protobuf.Value value = 7;
 }
 
@@ -672,27 +774,12 @@ message DppDataCreate {
  *   @EventDocumentation: "Data relevant to the Data Protection and Privacy guidelines or similar purposes has been deleted. Data protection is closely linked to numerous legal requirements and privacy concerns."
  */
 message DppDataDelete {
-  Common common = 1 ;
-  string data_subject_type = 2 [
-    (buf.validate.field).string.min_len = 1
-
-  ];
-  string data_subject_id = 3 [
-    (buf.validate.field).string.min_len = 1
-
-  ];
-  string object_type = 4 [
-    (buf.validate.field).string.min_len = 1
-
-  ];
-  string object_id = 5 [
-    (buf.validate.field).string.min_len = 1
-
-  ];
-  string attribute = 6 [
-    (buf.validate.field).string.min_len = 1
-
-  ];
+  Common common = 1 [(buf.validate.field).required = true];
+  string data_subject_type = 2 [(buf.validate.field).required = true];
+  string data_subject_id = 3 [(buf.validate.field).required = true];
+  string object_type = 4 [(buf.validate.field).required = true];
+  string object_id = 5 [(buf.validate.field).required = true];
+  string attribute = 6 [(buf.validate.field).required = true];
   google.protobuf.Value value = 7;
 }
 
@@ -704,27 +791,12 @@ message DppDataDelete {
  *   @EventDocumentation: "Data relevant to the Data Protection and Privacy guidelines or similar purposes has been modified. Data protection is closely linked to numerous legal requirements and privacy concerns."
  */
 message DppDataModification {
-  Common common = 1 ;
-  string data_subject_type = 2 [
-    (buf.validate.field).string.min_len = 1
-
-  ];
-  string data_subject_id = 3 [
-    (buf.validate.field).string.min_len = 1
-
-  ];
-  string object_type = 4 [
-    (buf.validate.field).string.min_len = 1
-
-  ];
-  string object_id = 5 [
-    (buf.validate.field).string.min_len = 1
-
-  ];
-  string attribute = 6 [
-    (buf.validate.field).string.min_len = 1
-
-  ];
+  Common common = 1 [(buf.validate.field).required = true];
+  string data_subject_type = 2 [(buf.validate.field).required = true];
+  string data_subject_id = 3 [(buf.validate.field).required = true];
+  string object_type = 4 [(buf.validate.field).required = true];
+  string object_id = 5 [(buf.validate.field).required = true];
+  string attribute = 6 [(buf.validate.field).required = true];
   google.protobuf.Value new_value = 7;
   google.protobuf.Value old_value = 8;
 }
@@ -737,17 +809,11 @@ message DppDataModification {
  *   @EventDocumentation: "A named property of a job definition has been updated. Background jobs are automated tasks that run in the background without any user interaction. They are scheduled to run at specific times and are useful for executing time-consuming and repetitive tasks such as data archiving, batch processing, and report generation."
  */
 message JobChange {
-  Common common = 1 ;
-  string job_id = 2 [
-    (buf.validate.field).string.min_len = 1
-
-  ];
-  google.protobuf.Value new_value = 3 ;
-  google.protobuf.Value old_value = 4 ;
-  string property_name = 5 [
-    (buf.validate.field).string.min_len = 1
-
-  ];
+  Common common = 1 [(buf.validate.field).required = true];
+  string job_id = 2 [(buf.validate.field).required = true];
+  google.protobuf.Value new_value = 3 [(buf.validate.field).required = true];
+  google.protobuf.Value old_value = 4 [(buf.validate.field).required = true];
+  string property_name = 5 [(buf.validate.field).required = true];
 }
 
 /* JobCreate
@@ -758,11 +824,8 @@ message JobChange {
  *   @EventDocumentation: "A job with the specified ID has been created. Background jobs are automated tasks that run in the background without any user interaction. They are scheduled to run at specific times and are useful for executing time-consuming and repetitive tasks such as data archiving, batch processing, and report generation."
  */
 message JobCreate {
-  Common common = 1 ;
-  string job_id = 2 [
-    (buf.validate.field).string.min_len = 1
-
-  ];
+  Common common = 1 [(buf.validate.field).required = true];
+  string job_id = 2 [(buf.validate.field).required = true];
 }
 
 /* JobDelete
@@ -773,11 +836,8 @@ message JobCreate {
  *   @EventDocumentation: "A job with the specified ID has been deleted. Background jobs are automated tasks that run in the background without any user interaction. They are scheduled to run at specific times and are useful for executing time-consuming and repetitive tasks such as data archiving, batch processing, and report generation."
  */
 message JobDelete {
-  Common common = 1 ;
-  string job_id = 2 [
-    (buf.validate.field).string.min_len = 1
-
-  ];
+  Common common = 1 [(buf.validate.field).required = true];
+  string job_id = 2 [(buf.validate.field).required = true];
 }
 
 /* JobStatusChange
@@ -788,17 +848,11 @@ message JobDelete {
  *   @EventDocumentation: "A job status has changed by changing a named property. Background jobs are automated tasks that run in the background without any user interaction. They are scheduled to run at specific times and are useful for executing time-consuming and repetitive tasks such as data archiving, batch processing, and report generation."
  */
 message JobStatusChange {
-  Common common = 1 ;
-  string job_id = 2 [
-    (buf.validate.field).string.min_len = 1
-
-  ];
-  google.protobuf.Value new_value = 3 ;
-  google.protobuf.Value old_value = 4 ;
-  string property_name = 5 [
-    (buf.validate.field).string.min_len = 1
-
-  ];
+  Common common = 1 [(buf.validate.field).required = true];
+  string job_id = 2 [(buf.validate.field).required = true];
+  google.protobuf.Value new_value = 3 [(buf.validate.field).required = true];
+  google.protobuf.Value old_value = 4 [(buf.validate.field).required = true];
+  string property_name = 5 [(buf.validate.field).required = true];
 }
 
 /* MaliciousRequestDetected
@@ -809,14 +863,11 @@ message JobStatusChange {
  *   @EventDocumentation: "A Malicious Request is a well-crafted and harmful request sent by a hacker to an authenticated user. This request contains the necessary parameters to execute valid actions on a web application without the user’s knowledge."
  */
 message MaliciousRequestDetected {
-  Common common = 1 ;
-  string parameter = 2 [
-    (buf.validate.field).string.min_len = 1
-
-  ];
+  Common common = 1 [(buf.validate.field).required = true];
+  string parameter = 2 [(buf.validate.field).required = true];
   string expected_value = 3;
   string received_value = 4;
-  MaliciousBehavior behavior = 5 ;
+  MaliciousBehavior behavior = 5 [(buf.validate.field).required = true];
 }
 
 /* PasswordChange
@@ -827,11 +878,8 @@ message MaliciousRequestDetected {
  *   @EventDocumentation: "Password of the mentioned user has been changed."
  */
 message PasswordChange {
-  Common common = 1 ;
-  string user_id = 2 [
-    (buf.validate.field).string.min_len = 1
-
-  ];
+  Common common = 1 [(buf.validate.field).required = true];
+  string user_id = 2 [(buf.validate.field).required = true];
 }
 
 /* PasswordExpiration
@@ -842,11 +890,8 @@ message PasswordChange {
  *   @EventDocumentation: "Password of the mentioned user has expired."
  */
 message PasswordExpiration {
-  Common common = 1 ;
-  string user_id = 2 [
-    (buf.validate.field).string.min_len = 1
-
-  ];
+  Common common = 1 [(buf.validate.field).required = true];
+  string user_id = 2 [(buf.validate.field).required = true];
 }
 
 /* PasswordReset
@@ -857,11 +902,8 @@ message PasswordExpiration {
  *   @EventDocumentation: "Password of the mentioned user has been reset."
  */
 message PasswordReset {
-  Common common = 1 ;
-  string user_id = 2 [
-    (buf.validate.field).string.min_len = 1
-
-  ];
+  Common common = 1 [(buf.validate.field).required = true];
+  string user_id = 2 [(buf.validate.field).required = true];
 }
 
 /*  TenantModification
@@ -872,17 +914,11 @@ message PasswordReset {
  *   @EventDocumentation: "A property of a tenant was changed."
  */
 message TenantModification {
-  Common common = 1 ;
-  google.protobuf.Value new_value = 2 ;
-  google.protobuf.Value old_value = 3 ;
-  string property_name = 4 [
-    (buf.validate.field).string.min_len = 1
-
-  ];
-  string tenant_id = 5 [
-    (buf.validate.field).string.min_len = 1
-
-  ];
+  Common common = 1 [(buf.validate.field).required = true];
+  google.protobuf.Value new_value = 2 [(buf.validate.field).required = true];
+  google.protobuf.Value old_value = 3 [(buf.validate.field).required = true];
+  string property_name = 4 [(buf.validate.field).required = true];
+  string tenant_id = 5 [(buf.validate.field).required = true];
 }
 
 /*  TenantOffboarding
@@ -893,11 +929,8 @@ message TenantModification {
  *   @EventDocumentation: "The tenant has been terminated from the service."
  */
 message TenantOffboarding {
-  Common common = 1 ;
-  string tenant_id = 2 [
-    (buf.validate.field).string.min_len = 1
-
-  ];
+  Common common = 1 [(buf.validate.field).required = true];
+  string tenant_id = 2 [(buf.validate.field).required = true];
 }
 
 /*  TenantOnboarding
@@ -908,11 +941,8 @@ message TenantOffboarding {
  *   @EventDocumentation: "The tenant has been created"
  */
 message TenantOnboarding {
-  Common common = 1 ;
-  string tenant_id = 2 [
-    (buf.validate.field).string.min_len = 1
-
-  ];
+  Common common = 1 [(buf.validate.field).required = true];
+  string tenant_id = 2 [(buf.validate.field).required = true];
 }
 
 /* UnauthenticatedRequest
@@ -923,18 +953,18 @@ message TenantOnboarding {
  *   @EventDocumentation: "An unauthenticated request (in the sense of an HTTP status code 401) has been performed"
  */
 message UnauthenticatedRequest {
-  Common common = 1 ;
+  Common common = 1 [(buf.validate.field).required = true];
 }
 
 /* UnauthorizedRequest
- *   @EventShortText: "Unauthenticated request has been performed"
+ *   @EventShortText: "Unauthorized request has been performed"
  *   @EventCode: "AE-0047"
  *   @EventCategoryCode: "EVENT_CATEGORY_CODE_SEC_UNSPECIFIED"
  *   @EventMessageText: "An unauthorized request of type ${unauthorized_type} has been performed"
- *   @EventDocumentation: "An unauthenticated request (in the sense of an HTTP status code 401) has been performed"
+ *   @EventDocumentation: "An unauthorized request (in the sense of an HTTP status code 403) has been performed"
  */
 message UnauthorizedRequest {
-  Common common = 1 ;
+  Common common = 1 [(buf.validate.field).required = true];
   string unauthorized_type = 2;
 }
 
@@ -946,11 +976,8 @@ message UnauthorizedRequest {
  *   @EventDocumentation: "A specific user has been activated"
  */
 message UserActivate {
-  Common common = 1 ;
-  string user_id = 2 [
-    (buf.validate.field).string.min_len = 1
-
-  ];
+  Common common = 1 [(buf.validate.field).required = true];
+  string user_id = 2 [(buf.validate.field).required = true];
   UserType user_type = 3;
 }
 
@@ -962,11 +989,8 @@ message UserActivate {
  *   @EventDocumentation: "A specific user has been blocked"
  */
 message UserBlock {
-  Common common = 1 ;
-  string user_id = 2 [
-    (buf.validate.field).string.min_len = 1
-
-  ];
+  Common common = 1 [(buf.validate.field).required = true];
+  string user_id = 2 [(buf.validate.field).required = true];
   UserType user_type = 3;
 }
 
@@ -978,11 +1002,8 @@ message UserBlock {
  *   @EventDocumentation: "A specific user has been created"
  */
 message UserCreate {
-  Common common = 1 ;
-  string user_id = 2 [
-    (buf.validate.field).string.min_len = 1
-
-  ];
+  Common common = 1 [(buf.validate.field).required = true];
+  string user_id = 2 [(buf.validate.field).required = true];
   UserType user_type = 3;
 }
 
@@ -994,17 +1015,11 @@ message UserCreate {
  *   @EventDocumentation: "User's master data has been modified. A specific property of user has been changed"
  */
 message UserDataModification {
-  Common common = 1 ;
-  google.protobuf.Value new_value = 2 ;
-  google.protobuf.Value old_value = 3 ;
-  string property_name = 4 [
-    (buf.validate.field).string.min_len = 1
-
-  ];
-  string user_id = 5 [
-    (buf.validate.field).string.min_len = 1
-
-  ];
+  Common common = 1 [(buf.validate.field).required = true];
+  google.protobuf.Value new_value = 2 [(buf.validate.field).required = true];
+  google.protobuf.Value old_value = 3 [(buf.validate.field).required = true];
+  string property_name = 4 [(buf.validate.field).required = true];
+  string user_id = 5 [(buf.validate.field).required = true];
   UserType user_type = 6;
 }
 
@@ -1016,11 +1031,8 @@ message UserDataModification {
  *   @EventDocumentation: "A specific user has been deleted"
  */
 message UserDelete {
-  Common common = 1 ;
-  string user_id = 2 [
-    (buf.validate.field).string.min_len = 1
-
-  ];
+  Common common = 1 [(buf.validate.field).required = true];
+  string user_id = 2 [(buf.validate.field).required = true];
   UserType user_type = 3;
 }
 
@@ -1032,16 +1044,10 @@ message UserDelete {
  *   @EventDocumentation: "Impersonation session has been started. User impersonation enables initiating user to access and operate as if they were logged in as that impersonated user. User A receives the authorizations of user B, user A is the Initiator and user B the Impersonated"
  */
 message UserImpersonationStart {
-  Common common = 1 ;
-  string user_initiator_id = 2 [
-    (buf.validate.field).string.min_len = 1
-
-  ];
+  Common common = 1 [(buf.validate.field).required = true];
+  string user_initiator_id = 2 [(buf.validate.field).required = true];
   UserType user_initiator_type = 3;
-  string user_impersonated_id = 4 [
-    (buf.validate.field).string.min_len = 1
-
-  ];
+  string user_impersonated_id = 4 [(buf.validate.field).required = true];
   UserType user_impersonated_type = 5;
   string context = 6 [(buf.validate.field).string.min_len = 1];
 }
@@ -1054,16 +1060,10 @@ message UserImpersonationStart {
  *   @EventDocumentation: "Impersonation session has been finished. User impersonation enables initiating user to access and operate as if they were logged in as that impersonated user. User A receives the authorizations of user B, user A is the Initiator and user B the Impersonated."
  */
 message UserImpersonationFinish {
-  Common common = 1 ;
-  string user_initiator_id = 2 [
-    (buf.validate.field).string.min_len = 1
-
-  ];
+  Common common = 1 [(buf.validate.field).required = true];
+  string user_initiator_id = 2 [(buf.validate.field).required = true];
   UserType user_initiator_type = 3;
-  string user_impersonated_id = 4 [
-    (buf.validate.field).string.min_len = 1
-
-  ];
+  string user_impersonated_id = 4 [(buf.validate.field).required = true];
   UserType user_impersonated_type = 5;
   string context = 6 [(buf.validate.field).string.min_len = 1];
 }
@@ -1076,11 +1076,8 @@ message UserImpersonationFinish {
  *   @EventDocumentation: "A specific user has been locked"
  */
 message UserLock {
-  Common common = 1 ;
-  string user_id = 2 [
-    (buf.validate.field).string.min_len = 1
-
-  ];
+  Common common = 1 [(buf.validate.field).required = true];
+  string user_id = 2 [(buf.validate.field).required = true];
   UserType user_type = 3;
 }
 
@@ -1092,11 +1089,8 @@ message UserLock {
  *   @EventDocumentation: "A specific user has been unlocked"
  */
 message UserUnlock {
-  Common common = 1 ;
-  string user_id = 2 [
-    (buf.validate.field).string.min_len = 1
-
-  ];
+  Common common = 1 [(buf.validate.field).required = true];
+  string user_id = 2 [(buf.validate.field).required = true];
   UserType user_type = 3;
 }
 
@@ -1108,11 +1102,8 @@ message UserUnlock {
  *   @EventDocumentation: "A specific user has been verified."
  */
 message UserVerify {
-  Common common = 1 ;
-  string user_id = 2 [
-    (buf.validate.field).string.min_len = 1
-
-  ];
+  Common common = 1 [(buf.validate.field).required = true];
+  string user_id = 2 [(buf.validate.field).required = true];
   UserType user_type = 3;
 }
 
@@ -1124,9 +1115,9 @@ message UserVerify {
  *   @EventDocumentation: "The user could not be logged on to the system"
  */
 message UserLoginFailure {
-  Common common = 1 ;
-  FailureReason failure_reason = 2 ;
-  LoginMethod method = 3 ;
+  Common common = 1 [(buf.validate.field).required = true];
+  FailureReason failure_reason = 2 [(buf.validate.field).required = true];
+  LoginMethod method = 3 [(buf.validate.field).required = true];
   bool is_admin = 4;
   MfaType mfa_type = 5;
   UserType user_type = 6;
@@ -1141,11 +1132,11 @@ message UserLoginFailure {
  *   @EventDocumentation: "The user has logged onto the system successfully."
  */
 message UserLoginSuccess {
-  Common common = 1 ;
+  Common common = 1 [(buf.validate.field).required = true];
   bool is_admin = 2;
-  LoginMethod method = 3 ;
-  MfaType mfa_type = 4 ;
-  UserType user_type = 5 ;
+  LoginMethod method = 3 [(buf.validate.field).required = true];
+  MfaType mfa_type = 4 [(buf.validate.field).required = true];
+  UserType user_type = 5 [(buf.validate.field).required = true];
   LoginProtocol login_protocol = 6;
 }
 
@@ -1154,11 +1145,11 @@ message UserLoginSuccess {
  *   @EventCode: "AE-0060"
  *   @EventCategoryCode: "EVENT_CATEGORY_CODE_SEC_UNSPECIFIED"
  *   @EventMessageText: "User logged off (Type: ${logoff_type}, Protocol: ${login_protocol})"
- *   @EventDocumentation: "The logged off."
+ *   @EventDocumentation: "The user logged off."
  */
 message UserLogoff {
-  Common common = 1 ;
-  LogoffType logoff_type = 2 ;
+  Common common = 1 [(buf.validate.field).required = true];
+  LogoffType logoff_type = 2 [(buf.validate.field).required = true];
   LoginProtocol login_protocol = 3;
 }
 
@@ -1170,8 +1161,8 @@ message UserLogoff {
  *   @EventDocumentation: "Custom event-type used for security related events that are not part of the Audit Log Event Catalog."
  */
 message ZzzCustomEvent {
-  Common common = 1 ;
-  google.protobuf.Value custom = 2 ;
+  Common common = 1 [(buf.validate.field).required = true];
+  google.protobuf.Value custom = 2 [(buf.validate.field).required = true];
 }
 
 /* CMKOnboarding
@@ -1182,9 +1173,9 @@ message ZzzCustomEvent {
  *   @EventDocumentation: "A System has been onboarded to a Customer Managed Key within an SAP Key Management Service Tenant."
  */
 message CMKOnboarding {
-  Common common = 1 ;
-  string system_id = 2 ;
-  string cmk_id = 3 ;
+  Common common = 1 [(buf.validate.field).required = true];
+  string system_id = 2 [(buf.validate.field).required = true];
+  string cmk_id = 3 [(buf.validate.field).required = true];
 }
 
 /* CMKOffboarding
@@ -1192,26 +1183,27 @@ message CMKOnboarding {
  *   @EventCode: "AE-0063"
  *   @EventCategoryCode: "EVENT_CATEGORY_CODE_SEC_UNSPECIFIED"
  *   @EventMessageText: "System ${system_id} has been offboarded from Customer Managed Key ${cmk_id} in KMS Tenant ${tenant_id}"
- *   @EventDocumentation: "A System has been offboarded from a Customer Managed Key within as SAP Key Management Service Tenant."
+ *   @EventDocumentation: "A System has been offboarded from a Customer Managed Key within a SAP Key Management Service Tenant."
  */
 message CMKOffboarding {
-  Common common = 1 ;
-  string system_id = 2 ;
-  string cmk_id = 3 ;
+  Common common = 1 [(buf.validate.field).required = true];
+  string system_id = 2 [(buf.validate.field).required = true];
+  string cmk_id = 3 [(buf.validate.field).required = true];
 }
 
 /* CMKSwitch
- *   @EventShortText: "System has switched CMKs within SAP KMS"
- *   @EventCode: "AE-0064"
- *   @EventCategoryCode: "EVENT_CATEGORY_CODE_SEC_UNSPECIFIED"
- *   @EventMessageText: "System ${system_id} has been switched from Customer Managed Key ${cmk_id_old} to Customer Managed Key ${cmk_id_new} in KMS Tenant ${tenant_id}"
- *   @EventDocumentation: "A System has been switched from a Customer Managed Key within as SAP Key Management Service Tenant."
- */
+   *   @EventShortText: "System has switched CMKs within SAP KMS"
+   *   @EventCode: "AE-0064"
+   *   @EventCategoryCode: "EVENT_CATEGORY_CODE_SEC_UNSPECIFIED"
+   *   @EventMessageText: "System ${system_id} has been switched from Customer Managed Key ${cmk_id_old} to Customer Managed Key ${cmk_id_new} in KMS Tenant ${tenant_id}"
+   *   @EventDocumentation: "A System has been switched from one Customer Managed Key to another within a SAP Key Management Service Tenant."
+
+*/
 message CMKSwitch {
-  Common common = 1 ;
-  string system_id = 2 ;
-  string cmk_id_old = 3 ;
-  string cmk_id_new = 4 ;
+  Common common = 1 [(buf.validate.field).required = true];
+  string system_id = 2 [(buf.validate.field).required = true];
+  string cmk_id_old = 3 [(buf.validate.field).required = true];
+  string cmk_id_new = 4 [(buf.validate.field).required = true];
 }
 
 /* CMKTenantModification
@@ -1222,10 +1214,10 @@ message CMKSwitch {
  *   @EventDocumentation: "A Tenant has been modified as a result of a customer action within the SAP Key Management Service (e.g. System Onboarding, System Offboarding or Key Revocation)"
  */
 message CMKTenantModification {
-  Common common = 1 ;
-  string system_id = 2 ;
-  string cmk_id = 3 ;
-  CMKAction cmk_action = 4 ;
+  Common common = 1 [(buf.validate.field).required = true];
+  string system_id = 2 [(buf.validate.field).required = true];
+  string cmk_id = 3 [(buf.validate.field).required = true];
+  CMKAction cmk_action = 4 [(buf.validate.field).required = true];
 }
 
 /* CMKCreate
@@ -1236,9 +1228,9 @@ message CMKTenantModification {
  *   @EventDocumentation: "Customer Managed Key has been created in SAP KMS. SAP Key Management Service is a kernel service that provides key management infrastructure for SAP cloud applications and services to support encryption with customer-specific encryption keys (CSEK) or with customer-managed keys (CMK)."
  */
 message CMKCreate {
-  Common common = 1 ;
-  string cmk_id = 2 ;
-  string kms_system_id = 3 ;
+  Common common = 1 [(buf.validate.field).required = true];
+  string cmk_id = 2 [(buf.validate.field).required = true];
+  string kms_system_id = 3 [(buf.validate.field).required = true];
 }
 
 /* CMKDelete
@@ -1249,9 +1241,9 @@ message CMKCreate {
  *   @EventDocumentation: "Customer Managed Key has been deleted in SAP KMS. SAP Key Management Service is a kernel service that provides key management infrastructure for SAP cloud applications and services to support encryption with customer-specific encryption keys (CSEK) or with customer-managed keys (CMK)."
  */
 message CMKDelete {
-  Common common = 1 ;
-  string cmk_id = 2 ;
-  string kms_system_id = 3 ;
+  Common common = 1 [(buf.validate.field).required = true];
+  string cmk_id = 2 [(buf.validate.field).required = true];
+  string kms_system_id = 3 [(buf.validate.field).required = true];
 }
 
 /* CMKRestore
@@ -1262,9 +1254,9 @@ message CMKDelete {
  *   @EventDocumentation: "Customer Managed Key has been restored in SAP KMS. SAP Key Management Service is a kernel service that provides key management infrastructure for SAP cloud applications and services to support encryption with customer-specific encryption keys (CSEK) or with customer-managed keys (CMK)."
  */
 message CMKRestore {
-  Common common = 1 ;
-  string cmk_id = 2 ;
-  string kms_system_id = 3 ;
+  Common common = 1 [(buf.validate.field).required = true];
+  string cmk_id = 2 [(buf.validate.field).required = true];
+  string kms_system_id = 3 [(buf.validate.field).required = true];
 }
 
 /* CMKDisable
@@ -1275,9 +1267,9 @@ message CMKRestore {
  *   @EventDocumentation: "Customer Managed Key has been disabled in SAP KMS. SAP Key Management Service is a kernel service that provides key management infrastructure for SAP cloud applications and services to support encryption with customer-specific encryption keys (CSEK) or with customer-managed keys (CMK)."
  */
 message CMKDisable {
-  Common common = 1 ;
-  string cmk_id = 2 ;
-  string kms_system_id = 3 ;
+  Common common = 1 [(buf.validate.field).required = true];
+  string cmk_id = 2 [(buf.validate.field).required = true];
+  string kms_system_id = 3 [(buf.validate.field).required = true];
 }
 
 /* CMKEnable
@@ -1288,9 +1280,9 @@ message CMKDisable {
  *   @EventDocumentation: "Customer Managed Key has been enabled in SAP KMS. SAP Key Management Service is a kernel service that provides key management infrastructure for SAP cloud applications and services to support encryption with customer-specific encryption keys (CSEK) or with customer-managed keys (CMK)."
  */
 message CMKEnable {
-  Common common = 1 ;
-  string cmk_id = 2 ;
-  string kms_system_id = 3 ;
+  Common common = 1 [(buf.validate.field).required = true];
+  string cmk_id = 2 [(buf.validate.field).required = true];
+  string kms_system_id = 3 [(buf.validate.field).required = true];
 }
 
 /* CMKRotate
@@ -1298,11 +1290,11 @@ message CMKEnable {
  *   @EventCode: "AE-0071"
  *   @EventCategoryCode: "EVENT_CATEGORY_CODE_SEC_UNSPECIFIED"
  *   @EventMessageText: "Customer Managed Key ${cmk_id} has been rotated"
- *   @EventDocumentation: "Customer Managed Key has rotated in SAP KMS. SAP Key Management Service is a kernel service that provides key management infrastructure for SAP cloud applications and services to support encryption with customer-specific encryption keys (CSEK) or with customer-managed keys (CMK)."
+ *   @EventDocumentation: "Customer Managed Key has been rotated in SAP KMS. SAP Key Management Service is a kernel service that provides key management infrastructure for SAP cloud applications and services to support encryption with customer-specific encryption keys (CSEK) or with customer-managed keys (CMK)."
  */
 message CMKRotate {
-  Common common = 1 ;
-  string cmk_id = 2 ;
+  Common common = 1 [(buf.validate.field).required = true];
+  string cmk_id = 2 [(buf.validate.field).required = true];
 }
 
 /* KeyCreate
@@ -1313,11 +1305,11 @@ message CMKRotate {
  *   @EventDocumentation: "A key identified by its Key ID has been created. The key was assigned to a system referenced by a Customer Managed Key."
  */
 message KeyCreate {
-  Common common = 1 ;
-  KeyType key_type = 2 ;
-  string key_id = 3 ;
-  string system_id = 4 ;
-  string cmk_id = 5 ;
+  Common common = 1 [(buf.validate.field).required = true];
+  KeyType key_type = 2 [(buf.validate.field).required = true];
+  string key_id = 3 [(buf.validate.field).required = true];
+  string system_id = 4 [(buf.validate.field).required = true];
+  string cmk_id = 5 [(buf.validate.field).required = true];
 }
 
 /* KeyDelete
@@ -1328,11 +1320,11 @@ message KeyCreate {
  *   @EventDocumentation: "A key identified by its Key ID has been deleted. The key was assigned to a system referenced by a Customer Managed Key. Reasons for deleting  a key are: consumer-controlled key termination"
  */
 message KeyDelete {
-  Common common = 1 ;
-  KeyType key_type = 2 ;
-  string key_id = 3 ;
-  string system_id = 4 ;
-  string cmk_id = 5 ;
+  Common common = 1 [(buf.validate.field).required = true];
+  KeyType key_type = 2 [(buf.validate.field).required = true];
+  string key_id = 3 [(buf.validate.field).required = true];
+  string system_id = 4 [(buf.validate.field).required = true];
+  string cmk_id = 5 [(buf.validate.field).required = true];
 }
 
 /* KeyRestore
@@ -1343,11 +1335,11 @@ message KeyDelete {
  *   @EventDocumentation: "A key identified by its Key ID has been restored. The key was assigned to a system referenced by a Customer Managed Key. Reasons for restoring are e.g. restore from backup"
  */
 message KeyRestore {
-  Common common = 1 ;
-  KeyType key_type = 2 ;
-  string key_id = 3 ;
-  string system_id = 4 ;
-  string cmk_id = 5 ;
+  Common common = 1 [(buf.validate.field).required = true];
+  KeyType key_type = 2 [(buf.validate.field).required = true];
+  string key_id = 3 [(buf.validate.field).required = true];
+  string system_id = 4 [(buf.validate.field).required = true];
+  string cmk_id = 5 [(buf.validate.field).required = true];
 }
 
 /* KeyPurge
@@ -1358,11 +1350,11 @@ message KeyRestore {
  *   @EventDocumentation: "A key identified by its Key ID has been purged. The key was assigned to a system referenced by a Customer Managed Key. Reasons for purging a key from memory are: mainly Customer Managed Key revocation"
  */
 message KeyPurge {
-  Common common = 1 ;
-  KeyType key_type = 2 ;
-  string key_id = 3 ;
-  string system_id = 4 ;
-  string cmk_id = 5 ;
+  Common common = 1 [(buf.validate.field).required = true];
+  KeyType key_type = 2 [(buf.validate.field).required = true];
+  string key_id = 3 [(buf.validate.field).required = true];
+  string system_id = 4 [(buf.validate.field).required = true];
+  string cmk_id = 5 [(buf.validate.field).required = true];
 }
 
 /* KeyRotate
@@ -1373,11 +1365,11 @@ message KeyPurge {
  *   @EventDocumentation: "A key identified by its Key ID has been rotated. The key was assigned to a system referenced by a Customer Managed Key. Reasons for rotating a key are: scheduled internal key rotation, Customer Managed Key rotation"
  */
 message KeyRotate {
-  Common common = 1 ;
-  KeyType key_type = 2 ;
-  string key_id = 3 ;
-  string system_id = 4 ;
-  string cmk_id = 5 ;
+  Common common = 1 [(buf.validate.field).required = true];
+  KeyType key_type = 2 [(buf.validate.field).required = true];
+  string key_id = 3 [(buf.validate.field).required = true];
+  string system_id = 4 [(buf.validate.field).required = true];
+  string cmk_id = 5 [(buf.validate.field).required = true];
 }
 
 /* KeyEnable
@@ -1388,11 +1380,11 @@ message KeyRotate {
  *   @EventDocumentation: "A key identified by its Key ID has been enabled. The key was assigned to a system referenced by a Customer Managed Key. Reasons for enabling a key are: Customer Managed Key restore, consumer-side key management"
  */
 message KeyEnable {
-  Common common = 1 ;
-  KeyType key_type = 2 ;
-  string key_id = 3 ;
-  string system_id = 4 ;
-  string cmk_id = 5 ;
+  Common common = 1 [(buf.validate.field).required = true];
+  KeyType key_type = 2 [(buf.validate.field).required = true];
+  string key_id = 3 [(buf.validate.field).required = true];
+  string system_id = 4 [(buf.validate.field).required = true];
+  string cmk_id = 5 [(buf.validate.field).required = true];
 }
 
 /* KeyDisable
@@ -1403,11 +1395,11 @@ message KeyEnable {
  *   @EventDocumentation: "A key identified by its Key ID has been disabled. The key was assigned to a system referenced by a Customer Managed Key. Reasons for disabling a key are: Customer Managed Key restore, consumer-side key management"
  */
 message KeyDisable {
-  Common common = 1 ;
-  KeyType key_type = 2 ;
-  string key_id = 3 ;
-  string system_id = 4 ;
-  string cmk_id = 5 ;
+  Common common = 1 [(buf.validate.field).required = true];
+  KeyType key_type = 2 [(buf.validate.field).required = true];
+  string key_id = 3 [(buf.validate.field).required = true];
+  string system_id = 4 [(buf.validate.field).required = true];
+  string cmk_id = 5 [(buf.validate.field).required = true];
 }
 
 /* KeySuspend
@@ -1418,11 +1410,11 @@ message KeyDisable {
  *   @EventDocumentation: "A key identified by its Key ID has been suspended. The key was assigned to a system referenced by a Customer Managed Key. Reasons for suspending of a key are: Customer Managed Key restore, consumer-side key management"
  */
 message KeySuspend {
-  Common common = 1 ;
-  KeyType key_type = 2 ;
-  string key_id = 3 ;
-  string system_id = 4 ;
-  string cmk_id = 5 ;
+  Common common = 1 [(buf.validate.field).required = true];
+  KeyType key_type = 2 [(buf.validate.field).required = true];
+  string key_id = 3 [(buf.validate.field).required = true];
+  string system_id = 4 [(buf.validate.field).required = true];
+  string cmk_id = 5 [(buf.validate.field).required = true];
 }
 
 /* KeyOnboardKeyChain
@@ -1433,11 +1425,11 @@ message KeySuspend {
  *   @EventDocumentation: "A key identified by its Key ID has been onboarded to keychain. The key was assigned to a system referenced by a Customer Managed Key. Reasons for onboarding a key are: Customer Managed Key restore, consumer-side key management"
  */
 message KeyOnboardKeyChain {
-  Common common = 1 ;
-  KeyType key_type = 2 ;
-  string key_id = 3 ;
-  string system_id = 4 ;
-  string cmk_id = 5 ;
+  Common common = 1 [(buf.validate.field).required = true];
+  KeyType key_type = 2 [(buf.validate.field).required = true];
+  string key_id = 3 [(buf.validate.field).required = true];
+  string system_id = 4 [(buf.validate.field).required = true];
+  string cmk_id = 5 [(buf.validate.field).required = true];
 }
 
 /* CMKDrop
@@ -1448,9 +1440,9 @@ message KeyOnboardKeyChain {
  *   @EventDocumentation: "Metadata of Customer Managed Key have been dropped in SAP KMS. SAP Key Management Service is a kernel service that provides key management infrastructure for SAP cloud applications and services to support encryption with customer-specific encryption keys (CSEK) or with customer-managed keys (CMK)."
  */
 message CMKDrop {
-  Common common = 1 ;
-  string cmk_id = 2 ;
-  string kms_system_id = 3 ;
+  Common common = 1 [(buf.validate.field).required = true];
+  string cmk_id = 2 [(buf.validate.field).required = true];
+  string kms_system_id = 3 [(buf.validate.field).required = true];
 }
 
 /* CMKSuspend
@@ -1461,9 +1453,9 @@ message CMKDrop {
  *   @EventDocumentation: "Customer Managed Key has been suspended in SAP KMS. SAP Key Management Service is a kernel service that provides key management infrastructure for SAP cloud applications and services to support encryption with customer-specific encryption keys (CSEK) or with customer-managed keys (CMK)."
  */
 message CMKSuspend {
-  Common common = 1 ;
-  string cmk_id = 2 ;
-  string kms_system_id = 3 ;
+  Common common = 1 [(buf.validate.field).required = true];
+  string cmk_id = 2 [(buf.validate.field).required = true];
+  string kms_system_id = 3 [(buf.validate.field).required = true];
 }
 
 /* VirusFinding
@@ -1474,10 +1466,10 @@ message CMKSuspend {
  *   @EventDocumentation: "During a scan of the aforementioned file, a virus was detected. The channel provides insights into the manner in which the virus was identified, particularly during upload processes and routine scans."
  */
 message VirusFinding {
-  Common common = 1 ;
-  string virus_name = 2 ;
-  string file_name = 3 ;
-  VirusChannel virus_channel = 4 ;
+  Common common = 1 [(buf.validate.field).required = true];
+  string virus_name = 2 [(buf.validate.field).required = true];
+  string file_name = 3 [(buf.validate.field).required = true];
+  VirusChannel virus_channel = 4 [(buf.validate.field).required = true];
 }
 
 /* CMKUnavailable
@@ -1488,9 +1480,9 @@ message VirusFinding {
  *   @EventDocumentation: "Customer Managed Key has become unavailable for SAP Key Management Service. SAP Key Management Service is a kernel service that provides key management infrastructure for SAP cloud applications and services to support encryption with customer-specific encryption keys (CSEK) or with customer-managed keys (CMK)."
  */
 message CMKUnavailable {
-  Common common = 1 ;
-  string cmk_id = 2 ;
-  string kms_system_id = 3 ;
+  Common common = 1 [(buf.validate.field).required = true];
+  string cmk_id = 2 [(buf.validate.field).required = true];
+  string kms_system_id = 3 [(buf.validate.field).required = true];
 }
 
 /* CMKAvailable
@@ -1501,9 +1493,9 @@ message CMKUnavailable {
  *   @EventDocumentation: "Customer Managed Key has become available for SAP Key Management Service. SAP Key Management Service is a kernel service that provides key management infrastructure for SAP cloud applications and services to support encryption with customer-specific encryption keys (CSEK) or with customer-managed keys (CMK)."
  */
 message CMKAvailable {
-  Common common = 1 ;
-  string cmk_id = 2 ;
-  string kms_system_id = 3 ;
+  Common common = 1 [(buf.validate.field).required = true];
+  string cmk_id = 2 [(buf.validate.field).required = true];
+  string kms_system_id = 3 [(buf.validate.field).required = true];
 }
 
 /* CMKDetach
@@ -1514,10 +1506,454 @@ message CMKAvailable {
  *   @EventDocumentation: "Customer Managed Key has been detached from System in SAP Key Management Service. SAP Key Management Service is a kernel service that provides key management infrastructure for SAP cloud applications and services to support encryption with customer-specific encryption keys (CSEK) or with customer-managed keys (CMK)."
  */
 message CMKDetach {
-  Common common = 1 ;
-  string cmk_id = 2 ;
-  string kms_system_id = 3 ;
-  string system_id = 4 ;
+  Common common = 1 [(buf.validate.field).required = true];
+  string cmk_id = 2 [(buf.validate.field).required = true];
+  string kms_system_id = 3 [(buf.validate.field).required = true];
+  string system_id = 4 [(buf.validate.field).required = true];
+}
+
+// ============================================================================
+// Autonomous AI Events
+// Events for auditing activities in autonomous/agentic scenarios.
+// These events can be used by any component in the SAP Autonomous Suite
+// (e.g., Agent Gateway, Joule, custom agents, orchestrators).
+// Aligned with OCSF 1.10.0-dev AI Operation Profile.
+// ============================================================================
+
+// --- Session Events ---
+
+/* AiSessionStart
+ *   @EventShortText: "AI session started"
+ *   @EventCode: "AE-0087"
+ *   @EventCategoryCode: "EVENT_CATEGORY_CODE_SEC_UNSPECIFIED"
+ *   @EventMessageText: "AI session ${session_id} started for agent ${ai_agent.name}"
+ *   @EventDocumentation: "An AI session has been initiated. This event marks the beginning of an interaction session with an AI system, capturing authentication context and the AI agent/model involved."
+ */
+message AiSessionStart {
+  Common common = 1 [(buf.validate.field).required = true];
+  // Unique identifier for this session
+  string session_id = 2 [(buf.validate.field).required = true];
+  // The AI agent handling this session
+  AiAgent ai_agent = 3;
+  // The AI model used (if no agent, direct model invocation)
+  AiModel ai_model = 4;
+  // Delegation context if operating under delegated authority
+  AiDelegation delegation = 5;
+}
+
+/* AiSessionEnd
+ *   @EventShortText: "AI session ended"
+ *   @EventCode: "AE-0088"
+ *   @EventCategoryCode: "EVENT_CATEGORY_CODE_SEC_UNSPECIFIED"
+ *   @EventMessageText: "AI session ${session_id} ended (Reason: ${end_reason})"
+ *   @EventDocumentation: "An AI session has been terminated. This event marks the end of an interaction session, capturing the reason for termination and final session metrics."
+ */
+message AiSessionEnd {
+  Common common = 1 [(buf.validate.field).required = true];
+  // Unique identifier for this session
+  string session_id = 2 [(buf.validate.field).required = true];
+  // Reason for session termination
+  AiSessionEndReason end_reason = 3;
+  // Total tokens consumed in this session
+  int32 total_tokens = 4;
+  // Session duration in milliseconds
+  int64 duration_ms = 5;
+}
+
+// --- Prompt Events ---
+
+/* AiPromptReceived
+ *   @EventShortText: "AI prompt received"
+ *   @EventCode: "AE-0089"
+ *   @EventCategoryCode: "EVENT_CATEGORY_CODE_SEC_UNSPECIFIED"
+ *   @EventMessageText: "AI prompt received in session ${session_id}"
+ *   @EventDocumentation: "A prompt/request has been received by the AI system. This event captures the incoming user or system request before processing."
+ */
+message AiPromptReceived {
+  Common common = 1 [(buf.validate.field).required = true];
+  // Session identifier
+  string session_id = 2;
+  // Message context with prompt details
+  AiMessageContext message_context = 3;
+  // The AI agent receiving the prompt
+  AiAgent ai_agent = 4;
+}
+
+/* AiGuardrailTriggered
+ *   @EventShortText: "AI guardrail triggered"
+ *   @EventCode: "AE-0090"
+ *   @EventCategoryCode: "EVENT_CATEGORY_CODE_SEC_UNSPECIFIED"
+ *   @EventMessageText: "AI guardrail ${guardrail_name} triggered (Type: ${guardrail_type}, Action: ${action_taken})"
+ *   @EventDocumentation: "An AI guardrail has been triggered during input validation or output filtering. Guardrails protect against harmful, inappropriate, or policy-violating content."
+ */
+message AiGuardrailTriggered {
+  Common common = 1 [(buf.validate.field).required = true];
+  // Session identifier
+  string session_id = 2;
+  // Name of the guardrail that was triggered
+  string guardrail_name = 3 [(buf.validate.field).required = true];
+  // Type of guardrail (input, output, content, policy)
+  AiGuardrailType guardrail_type = 4 [(buf.validate.field).required = true];
+  // Action taken by the guardrail
+  AiGuardrailAction action_taken = 5 [(buf.validate.field).required = true];
+  // Category of violation detected
+  string violation_category = 6;
+  // Message context when guardrail was triggered
+  AiMessageContext message_context = 7;
+}
+
+// --- Orchestration Events ---
+
+/* AiModelInvocation
+ *   @EventShortText: "AI model invoked"
+ *   @EventCode: "AE-0091"
+ *   @EventCategoryCode: "EVENT_CATEGORY_CODE_SEC_UNSPECIFIED"
+ *   @EventMessageText: "AI model ${ai_model.name} invoked by ${ai_agent.name}"
+ *   @EventDocumentation: "An AI model has been invoked. This event captures LLM calls including the model identity, token usage, and latency metrics."
+ */
+message AiModelInvocation {
+  Common common = 1 [(buf.validate.field).required = true];
+  // Session identifier
+  string session_id = 2;
+  // The AI model being invoked
+  AiModel ai_model = 3 [(buf.validate.field).required = true];
+  // The AI agent making the invocation (if applicable)
+  AiAgent ai_agent = 4;
+  // Message context with token counts
+  AiMessageContext message_context = 5;
+  // Invocation latency in milliseconds
+  int64 latency_ms = 6;
+  // Model invocation status
+  AiInvocationStatus status = 7;
+  // Error message if status is failed
+  string error_message = 8;
+}
+
+/* AiSkillSelected
+ *   @EventShortText: "AI skill selected"
+ *   @EventCode: "AE-0092"
+ *   @EventCategoryCode: "EVENT_CATEGORY_CODE_SEC_UNSPECIFIED"
+ *   @EventMessageText: "AI skill ${skill_name} selected for execution"
+ *   @EventDocumentation: "An AI skill or capability has been selected for execution based on intent routing. Skills represent specialized capabilities that the AI system can invoke."
+ */
+message AiSkillSelected {
+  Common common = 1 [(buf.validate.field).required = true];
+  // Session identifier
+  string session_id = 2;
+  // Name of the selected skill
+  string skill_name = 3 [(buf.validate.field).required = true];
+  // Unique identifier of the skill
+  string skill_id = 4;
+  // Confidence score for skill selection (0.0 to 1.0)
+  float confidence_score = 5;
+  // The AI agent making the selection
+  AiAgent ai_agent = 6;
+  // Alternative skills that were considered
+  repeated string alternatives_considered = 7;
+}
+
+/* AiAgentDelegated
+ *   @EventShortText: "AI agent delegated"
+ *   @EventCode: "AE-0093"
+ *   @EventCategoryCode: "EVENT_CATEGORY_CODE_SEC_UNSPECIFIED"
+ *   @EventMessageText: "Task delegated from ${source_agent.name} to ${target_agent.name}"
+ *   @EventDocumentation: "A task or responsibility has been delegated from one AI agent to another. This event tracks the chain of delegation in multi-agent systems."
+ */
+message AiAgentDelegated {
+  Common common = 1 [(buf.validate.field).required = true];
+  // Session identifier
+  string session_id = 2;
+  // The agent delegating the task
+  AiAgent source_agent = 3 [(buf.validate.field).required = true];
+  // The agent receiving the delegation
+  AiAgent target_agent = 4 [(buf.validate.field).required = true];
+  // Delegation context with scopes and permissions
+  AiDelegation delegation = 5;
+  // The task being delegated
+  string task_description = 6;
+}
+
+// --- Execution Events ---
+
+/* AiMcpToolCall
+ *   @EventShortText: "MCP tool called"
+ *   @EventCode: "AE-0094"
+ *   @EventCategoryCode: "EVENT_CATEGORY_CODE_SEC_UNSPECIFIED"
+ *   @EventMessageText: "MCP tool ${tool_name} called on server ${target_mcp_server_id}"
+ *   @EventDocumentation: "A tool has been invoked via the Model Context Protocol (MCP). MCP tools provide capabilities to interact with external systems, APIs, and services in a standardized way."
+ */
+message AiMcpToolCall {
+  Common common = 1 [(buf.validate.field).required = true];
+  // Session identifier
+  string session_id = 2;
+  // The name of the tool being called
+  string tool_name = 3 [(buf.validate.field).required = true];
+  // The id of the target MCP server
+  string target_mcp_server_id = 4 [(buf.validate.field).required = true];
+  // The AI agent making the tool call
+  AiAgent ai_agent = 5;
+  // Tool call status
+  AiInvocationStatus status = 6;
+  // Latency in milliseconds
+  int64 latency_ms = 7;
+  // Error message if failed
+  string error_message = 8;
+}
+
+/* AiDirectApiAccess
+ *   @EventShortText: "Direct API access"
+ *   @EventCode: "AE-0095"
+ *   @EventCategoryCode: "EVENT_CATEGORY_CODE_SEC_UNSPECIFIED"
+ *   @EventMessageText: "Direct API access to ${target_api_id}"
+ *   @EventDocumentation: "An API has been accessed directly without going through the MCP protocol. This event tracks direct API integrations used in autonomous scenarios."
+ */
+message AiDirectApiAccess {
+  Common common = 1 [(buf.validate.field).required = true];
+  // Session identifier
+  string session_id = 2;
+  // The id of the target API
+  string target_api_id = 3 [(buf.validate.field).required = true];
+  // The AI agent making the API call
+  AiAgent ai_agent = 4;
+  // HTTP method used
+  string http_method = 5;
+  // API call status
+  AiInvocationStatus status = 6;
+  // HTTP response status code
+  int32 response_status_code = 7;
+  // Latency in milliseconds
+  int64 latency_ms = 8;
+}
+
+/* AiDataRetrieval
+ *   @EventShortText: "AI data retrieval"
+ *   @EventCode: "AE-0096"
+ *   @EventCategoryCode: "EVENT_CATEGORY_CODE_RAL"
+ *   @EventMessageText: "AI data retrieval from ${data_source_id} (Type: ${retrieval_type})"
+ *   @EventDocumentation: "Data has been retrieved from a knowledge base or data source for AI processing. This includes RAG (Retrieval-Augmented Generation) queries and other knowledge retrieval operations."
+ */
+message AiDataRetrieval {
+  Common common = 1 [(buf.validate.field).required = true];
+  // Session identifier
+  string session_id = 2;
+  // Identifier of the data source
+  string data_source_id = 3 [(buf.validate.field).required = true];
+  // Type of data source (vector_db, knowledge_base, document_store, etc.)
+  string data_source_type = 4;
+  // Type of retrieval operation
+  AiRetrievalType retrieval_type = 5;
+  // Number of results retrieved
+  int32 results_count = 6;
+  // The AI agent performing the retrieval
+  AiAgent ai_agent = 7;
+  // Query latency in milliseconds
+  int64 latency_ms = 8;
+}
+
+// --- Response Events ---
+
+/* AiResponseGenerated
+ *   @EventShortText: "AI response generated"
+ *   @EventCode: "AE-0097"
+ *   @EventCategoryCode: "EVENT_CATEGORY_CODE_SEC_UNSPECIFIED"
+ *   @EventMessageText: "AI response generated in session ${session_id}"
+ *   @EventDocumentation: "An AI response has been generated and delivered. This event captures the final output of an AI interaction including token usage and response metadata."
+ */
+message AiResponseGenerated {
+  Common common = 1 [(buf.validate.field).required = true];
+  // Session identifier
+  string session_id = 2;
+  // Message context with response details and token counts
+  AiMessageContext message_context = 3;
+  // The AI agent that generated the response
+  AiAgent ai_agent = 4;
+  // The AI model that generated the response
+  AiModel ai_model = 5;
+  // Total processing latency in milliseconds
+  int64 latency_ms = 6;
+}
+
+/* AiUserFeedback
+ *   @EventShortText: "AI user feedback"
+ *   @EventCode: "AE-0098"
+ *   @EventCategoryCode: "EVENT_CATEGORY_CODE_SEC_UNSPECIFIED"
+ *   @EventMessageText: "User feedback received for session ${session_id} (Rating: ${feedback_rating})"
+ *   @EventDocumentation: "User feedback has been received for an AI interaction. This includes explicit feedback like thumbs up/down, ratings, or corrections."
+ */
+message AiUserFeedback {
+  Common common = 1 [(buf.validate.field).required = true];
+  // Session identifier
+  string session_id = 2;
+  // Feedback rating (positive, negative, neutral)
+  AiFeedbackRating feedback_rating = 3;
+  // Numeric score if applicable (e.g., 1-5 stars)
+  int32 feedback_score = 4;
+  // Feedback category (accuracy, helpfulness, safety, etc.)
+  string feedback_category = 5;
+  // Free-text feedback comment
+  string feedback_comment = 6;
+  // Reference to the message being rated
+  string message_uid = 7;
+}
+
+// --- Task/Agent Communication Events ---
+
+/* AiMessageSent
+ *   @EventShortText: "Message sent to agent"
+ *   @EventCode: "AE-0099"
+ *   @EventCategoryCode: "EVENT_CATEGORY_CODE_SEC_UNSPECIFIED"
+ *   @EventMessageText: "Message sent to agent ${target_agent.name} (Task: ${a2a_task_id})"
+ *   @EventDocumentation: "A message has been sent to an AI agent. This event is written when communication occurs between agents or when a user/system sends a message to an agent."
+ */
+message AiMessageSent {
+  Common common = 1 [(buf.validate.field).required = true];
+  // The target agent receiving the message
+  AiAgent target_agent = 2 [(buf.validate.field).required = true];
+  // The source agent sending the message (if agent-to-agent)
+  AiAgent source_agent = 3;
+  // The id of the task to which the message belongs (A2A protocol)
+  string a2a_task_id = 4;
+  // The context id of the task
+  string a2a_context_id = 5;
+  // Message context with content and role
+  AiMessageContext message_context = 6;
+}
+
+/* AiTaskCreated
+ *   @EventShortText: "AI task created"
+ *   @EventCode: "AE-0100"
+ *   @EventCategoryCode: "EVENT_CATEGORY_CODE_SEC_UNSPECIFIED"
+ *   @EventMessageText: "AI task ${a2a_task_id} created (Context: ${a2a_context_id})"
+ *   @EventDocumentation: "A new task has been created in an AI/autonomous workflow. Tasks represent units of work that can be tracked and managed across agent interactions."
+ */
+message AiTaskCreated {
+  Common common = 1 [(buf.validate.field).required = true];
+  // The id of the created task (A2A protocol)
+  string a2a_task_id = 2 [(buf.validate.field).required = true];
+  // The context id of the task
+  string a2a_context_id = 3;
+  // The AI agent creating the task
+  AiAgent ai_agent = 4;
+  // Message context with task details
+  AiMessageContext message_context = 5;
+}
+
+/* AiTaskUpdated
+ *   @EventShortText: "AI task updated"
+ *   @EventCode: "AE-0101"
+ *   @EventCategoryCode: "EVENT_CATEGORY_CODE_SEC_UNSPECIFIED"
+ *   @EventMessageText: "AI task ${a2a_task_id} updated (Update Type: ${update_type})"
+ *   @EventDocumentation: "An existing AI task has been updated. Updates can include status changes, artifact updates, or requests for additional input."
+ */
+message AiTaskUpdated {
+  Common common = 1 [(buf.validate.field).required = true];
+  // The id of the task being updated (A2A protocol)
+  string a2a_task_id = 2 [(buf.validate.field).required = true];
+  // The context id of the task
+  string a2a_context_id = 3;
+  // The type of update performed on the task
+  AiTaskUpdateType update_type = 4 [(buf.validate.field).required = true];
+  // The AI agent performing the update
+  AiAgent ai_agent = 5;
+  // Message context with update details
+  AiMessageContext message_context = 6;
+}
+
+/* AiTaskAccessed
+ *   @EventShortText: "AI task accessed"
+ *   @EventCode: "AE-0102"
+ *   @EventCategoryCode: "EVENT_CATEGORY_CODE_RAL"
+ *   @EventMessageText: "AI task ${a2a_task_id} has been accessed"
+ *   @EventDocumentation: "An AI task has been read/accessed. This event is logged when task information is retrieved for monitoring, debugging, or continuation of workflows."
+ */
+message AiTaskAccessed {
+  Common common = 1 [(buf.validate.field).required = true];
+  // The id of the accessed task (A2A protocol)
+  string a2a_task_id = 2 [(buf.validate.field).required = true];
+  // The context id of the task
+  string a2a_context_id = 3;
+  // The AI agent or entity accessing the task
+  AiAgent ai_agent = 4;
+}
+
+/* AiPushNotificationSent
+ *   @EventShortText: "AI push notification sent"
+ *   @EventCode: "AE-0103"
+ *   @EventCategoryCode: "EVENT_CATEGORY_CODE_SEC_UNSPECIFIED"
+ *   @EventMessageText: "AI push notification sent for task ${a2a_task_id} to ${push_notification_url}"
+ *   @EventDocumentation: "A push notification has been sent to a configured callback URL for an AI task. Used to notify external systems about task events."
+ */
+message AiPushNotificationSent {
+  Common common = 1 [(buf.validate.field).required = true];
+  // The URL where the push notification was sent
+  string push_notification_url = 2 [(buf.validate.field).required = true];
+  // The id of the task (A2A protocol)
+  string a2a_task_id = 3 [(buf.validate.field).required = true];
+  // The context id of the task
+  string a2a_context_id = 4;
+  // The AI agent sending the notification
+  AiAgent ai_agent = 5;
+  // HTTP response status code from the endpoint
+  int32 response_status = 6;
+}
+
+// --- Human-in-the-Loop Events ---
+
+/* UserImpersonationRequested
+ *   @EventShortText: "User impersonation requested"
+ *   @EventCode: "AE-0104"
+ *   @EventCategoryCode: "EVENT_CATEGORY_CODE_SEC_UNSPECIFIED"
+ *   @EventMessageText: "User ${user_initiator_id} requested impersonation for user ${user_impersonated_id}"
+ *   @EventDocumentation: "A request for permission elevation via impersonation has been initiated. This event is logged when an agent or system requests to act on behalf of another user."
+ */
+message UserImpersonationRequested {
+  Common common = 1 [(buf.validate.field).required = true];
+  string user_initiator_id = 2 [(buf.validate.field).required = true];
+  UserType user_initiator_type = 3;
+  string user_impersonated_id = 4 [(buf.validate.field).required = true];
+  UserType user_impersonated_type = 5;
+  string context = 6 [(buf.validate.field).string.min_len = 1];
+  // The AI agent requesting impersonation
+  AiAgent ai_agent = 7;
+}
+
+/* UserImpersonationDeclined
+ *   @EventShortText: "User impersonation declined"
+ *   @EventCode: "AE-0105"
+ *   @EventCategoryCode: "EVENT_CATEGORY_CODE_SEC_UNSPECIFIED"
+ *   @EventMessageText: "User ${user_initiator_id} was declined impersonation for user ${user_impersonated_id}"
+ *   @EventDocumentation: "A request for permission elevation via impersonation has been declined by the user."
+ */
+message UserImpersonationDeclined {
+  Common common = 1 [(buf.validate.field).required = true];
+  string user_initiator_id = 2 [(buf.validate.field).required = true];
+  UserType user_initiator_type = 3;
+  string user_impersonated_id = 4 [(buf.validate.field).required = true];
+  UserType user_impersonated_type = 5;
+  string context = 6 [(buf.validate.field).string.min_len = 1];
+  // The AI agent whose request was declined
+  AiAgent ai_agent = 7;
+}
+
+/* AiUserInputRequested
+ *   @EventShortText: "User input requested"
+ *   @EventCode: "AE-0106"
+ *   @EventCategoryCode: "EVENT_CATEGORY_CODE_SEC_UNSPECIFIED"
+ *   @EventMessageText: "User input requested from ${requested_from_user_id} for AI task ${a2a_task_id}"
+ *   @EventDocumentation: "Additional input from a user has been requested for an AI task. This event represents a human-in-the-loop interaction."
+ */
+message AiUserInputRequested {
+  Common common = 1 [(buf.validate.field).required = true];
+  // The user from whom input is being requested
+  string requested_from_user_id = 2 [(buf.validate.field).required = true];
+  // The id of the task requiring user input (A2A protocol)
+  string a2a_task_id = 3 [(buf.validate.field).required = true];
+  // The context id of the task
+  string a2a_context_id = 4;
+  // The AI agent requesting input
+  AiAgent ai_agent = 5;
+  // Message context describing what input is needed
+  AiMessageContext message_context = 6;
 }
 
 enum CredentialType {
@@ -1545,7 +1981,7 @@ enum FailureReason {
   FAILURE_REASON_USER_LOCKED = 4;
   //@ShortText: "User blocked"
   FAILURE_REASON_USER_BLOCKED = 5;
-  //@ShortText: "User not verified
+  //@ShortText: "User not verified"
   FAILURE_REASON_USER_UNVERIFIED = 6;
   //@ShortText: "User expired"
   FAILURE_REASON_USER_EXPIRED = 7;
@@ -1613,7 +2049,7 @@ enum LoginMethod {
   LOGIN_METHOD_OAUTH2 = 14;
   //@ShortText: "Reentrance Ticket"
   LOGIN_METHOD_REENTRANCE_TICKET = 15;
-  //@ShortText: Http security session"
+  //@ShortText: "Http security session"
   LOGIN_METHOD_HTTP_SESSION = 16;
   //@ShortText: "Assertion Ticket"
   LOGIN_METHOD_ASSERTION_TICKET = 17;
@@ -1681,6 +2117,10 @@ enum UserType {
   USER_TYPE_BUSINESS_USER = 1;
   //@ShortText: "Technical User"
   USER_TYPE_TECHNICAL_USER = 2;
+  //@ShortText: "SAP Support User"
+  USER_TYPE_SAP_SUPPORT_USER = 3;
+  //@ShortText: "AI Agent"
+  USER_TYPE_AI_AGENT = 4;
 }
 
 // DataExportChannelType
@@ -1751,6 +2191,18 @@ enum VirusChannel {
   VIRUS_CHANNEL_UPLOAD = 1;
   //@ShortText: "Directory/Table scan"
   VIRUS_CHANNEL_SCAN = 2;
+}
+
+// AI Task Update Types
+enum AiTaskUpdateType {
+  //@ShortText: "Unspecified"
+  AI_TASK_UPDATE_TYPE_UNSPECIFIED = 0;
+  //@ShortText: "Status Update"
+  AI_TASK_UPDATE_TYPE_STATUS = 1;
+  //@ShortText: "Artifact Update"
+  AI_TASK_UPDATE_TYPE_ARTIFACT = 2;
+  //@ShortText: "Input Required"
+  AI_TASK_UPDATE_TYPE_INPUT_REQUIRED = 3;
 }
 
 //Login Protocol

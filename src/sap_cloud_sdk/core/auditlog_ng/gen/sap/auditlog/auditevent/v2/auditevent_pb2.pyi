@@ -12,6 +12,98 @@ from typing import ClassVar as _ClassVar, Optional as _Optional, Union as _Union
 
 DESCRIPTOR: _descriptor.FileDescriptor
 
+class AiRole(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
+    __slots__ = ()
+    AI_ROLE_UNSPECIFIED: _ClassVar[AiRole]
+    AI_ROLE_USER: _ClassVar[AiRole]
+    AI_ROLE_ASSISTANT: _ClassVar[AiRole]
+    AI_ROLE_TOOL: _ClassVar[AiRole]
+    AI_ROLE_AGENT: _ClassVar[AiRole]
+    AI_ROLE_ORCHESTRATOR: _ClassVar[AiRole]
+    AI_ROLE_RETRIEVER: _ClassVar[AiRole]
+    AI_ROLE_OTHER: _ClassVar[AiRole]
+
+class AiAgentType(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
+    __slots__ = ()
+    AI_AGENT_TYPE_UNSPECIFIED: _ClassVar[AiAgentType]
+    AI_AGENT_TYPE_CONVERSATIONAL: _ClassVar[AiAgentType]
+    AI_AGENT_TYPE_AUTONOMOUS: _ClassVar[AiAgentType]
+    AI_AGENT_TYPE_RETRIEVAL: _ClassVar[AiAgentType]
+    AI_AGENT_TYPE_MULTI_AGENT: _ClassVar[AiAgentType]
+    AI_AGENT_TYPE_OTHER: _ClassVar[AiAgentType]
+
+class AiSessionEndReason(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
+    __slots__ = ()
+    AI_SESSION_END_REASON_UNSPECIFIED: _ClassVar[AiSessionEndReason]
+    AI_SESSION_END_REASON_NORMAL: _ClassVar[AiSessionEndReason]
+    AI_SESSION_END_REASON_TIMEOUT: _ClassVar[AiSessionEndReason]
+    AI_SESSION_END_REASON_USER_TERMINATED: _ClassVar[AiSessionEndReason]
+    AI_SESSION_END_REASON_ERROR: _ClassVar[AiSessionEndReason]
+    AI_SESSION_END_REASON_POLICY_VIOLATION: _ClassVar[AiSessionEndReason]
+    AI_SESSION_END_REASON_OTHER: _ClassVar[AiSessionEndReason]
+
+class AiGuardrailType(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
+    __slots__ = ()
+    AI_GUARDRAIL_TYPE_UNSPECIFIED: _ClassVar[AiGuardrailType]
+    AI_GUARDRAIL_TYPE_INPUT: _ClassVar[AiGuardrailType]
+    AI_GUARDRAIL_TYPE_OUTPUT: _ClassVar[AiGuardrailType]
+    AI_GUARDRAIL_TYPE_CONTENT_POLICY: _ClassVar[AiGuardrailType]
+    AI_GUARDRAIL_TYPE_PROMPT_INJECTION: _ClassVar[AiGuardrailType]
+    AI_GUARDRAIL_TYPE_PII_FILTER: _ClassVar[AiGuardrailType]
+    AI_GUARDRAIL_TYPE_DATA_LEAKAGE: _ClassVar[AiGuardrailType]
+    AI_GUARDRAIL_TYPE_HALLUCINATION: _ClassVar[AiGuardrailType]
+    AI_GUARDRAIL_TYPE_OTHER: _ClassVar[AiGuardrailType]
+
+class AiGuardrailAction(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
+    __slots__ = ()
+    AI_GUARDRAIL_ACTION_UNSPECIFIED: _ClassVar[AiGuardrailAction]
+    AI_GUARDRAIL_ACTION_ALLOW: _ClassVar[AiGuardrailAction]
+    AI_GUARDRAIL_ACTION_BLOCK: _ClassVar[AiGuardrailAction]
+    AI_GUARDRAIL_ACTION_MODIFY: _ClassVar[AiGuardrailAction]
+    AI_GUARDRAIL_ACTION_WARN: _ClassVar[AiGuardrailAction]
+    AI_GUARDRAIL_ACTION_LOG_ONLY: _ClassVar[AiGuardrailAction]
+    AI_GUARDRAIL_ACTION_OTHER: _ClassVar[AiGuardrailAction]
+
+class AiInvocationStatus(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
+    __slots__ = ()
+    AI_INVOCATION_STATUS_UNSPECIFIED: _ClassVar[AiInvocationStatus]
+    AI_INVOCATION_STATUS_SUCCESS: _ClassVar[AiInvocationStatus]
+    AI_INVOCATION_STATUS_FAILED: _ClassVar[AiInvocationStatus]
+    AI_INVOCATION_STATUS_TIMEOUT: _ClassVar[AiInvocationStatus]
+    AI_INVOCATION_STATUS_RATE_LIMITED: _ClassVar[AiInvocationStatus]
+    AI_INVOCATION_STATUS_CANCELLED: _ClassVar[AiInvocationStatus]
+    AI_INVOCATION_STATUS_PENDING: _ClassVar[AiInvocationStatus]
+    AI_INVOCATION_STATUS_OTHER: _ClassVar[AiInvocationStatus]
+
+class AiRetrievalType(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
+    __slots__ = ()
+    AI_RETRIEVAL_TYPE_UNSPECIFIED: _ClassVar[AiRetrievalType]
+    AI_RETRIEVAL_TYPE_VECTOR_SEARCH: _ClassVar[AiRetrievalType]
+    AI_RETRIEVAL_TYPE_KEYWORD_SEARCH: _ClassVar[AiRetrievalType]
+    AI_RETRIEVAL_TYPE_HYBRID_SEARCH: _ClassVar[AiRetrievalType]
+    AI_RETRIEVAL_TYPE_KNOWLEDGE_GRAPH: _ClassVar[AiRetrievalType]
+    AI_RETRIEVAL_TYPE_MEMORY_CONTEXT: _ClassVar[AiRetrievalType]
+    AI_RETRIEVAL_TYPE_DOCUMENT: _ClassVar[AiRetrievalType]
+    AI_RETRIEVAL_TYPE_OTHER: _ClassVar[AiRetrievalType]
+
+class AiFeedbackRating(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
+    __slots__ = ()
+    AI_FEEDBACK_RATING_UNSPECIFIED: _ClassVar[AiFeedbackRating]
+    AI_FEEDBACK_RATING_POSITIVE: _ClassVar[AiFeedbackRating]
+    AI_FEEDBACK_RATING_NEGATIVE: _ClassVar[AiFeedbackRating]
+    AI_FEEDBACK_RATING_NEUTRAL: _ClassVar[AiFeedbackRating]
+    AI_FEEDBACK_RATING_CORRECTION: _ClassVar[AiFeedbackRating]
+    AI_FEEDBACK_RATING_OTHER: _ClassVar[AiFeedbackRating]
+
+class AiToolCallDisposition(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
+    __slots__ = ()
+    AI_TOOL_CALL_DISPOSITION_UNSPECIFIED: _ClassVar[AiToolCallDisposition]
+    AI_TOOL_CALL_DISPOSITION_ALLOWED: _ClassVar[AiToolCallDisposition]
+    AI_TOOL_CALL_DISPOSITION_DENIED: _ClassVar[AiToolCallDisposition]
+    AI_TOOL_CALL_DISPOSITION_MODIFIED: _ClassVar[AiToolCallDisposition]
+    AI_TOOL_CALL_DISPOSITION_PENDING_APPROVAL: _ClassVar[AiToolCallDisposition]
+    AI_TOOL_CALL_DISPOSITION_OTHER: _ClassVar[AiToolCallDisposition]
+
 class CredentialType(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     __slots__ = ()
     CREDENTIAL_TYPE_UNSPECIFIED: _ClassVar[CredentialType]
@@ -100,6 +192,8 @@ class UserType(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     USER_TYPE_UNSPECIFIED: _ClassVar[UserType]
     USER_TYPE_BUSINESS_USER: _ClassVar[UserType]
     USER_TYPE_TECHNICAL_USER: _ClassVar[UserType]
+    USER_TYPE_SAP_SUPPORT_USER: _ClassVar[UserType]
+    USER_TYPE_AI_AGENT: _ClassVar[UserType]
 
 class DataExportChannelType(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     __slots__ = ()
@@ -141,12 +235,84 @@ class VirusChannel(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     VIRUS_CHANNEL_UPLOAD: _ClassVar[VirusChannel]
     VIRUS_CHANNEL_SCAN: _ClassVar[VirusChannel]
 
+class AiTaskUpdateType(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
+    __slots__ = ()
+    AI_TASK_UPDATE_TYPE_UNSPECIFIED: _ClassVar[AiTaskUpdateType]
+    AI_TASK_UPDATE_TYPE_STATUS: _ClassVar[AiTaskUpdateType]
+    AI_TASK_UPDATE_TYPE_ARTIFACT: _ClassVar[AiTaskUpdateType]
+    AI_TASK_UPDATE_TYPE_INPUT_REQUIRED: _ClassVar[AiTaskUpdateType]
+
 class LoginProtocol(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     __slots__ = ()
     LOGIN_PROTOCOL_UNSPECIFIED: _ClassVar[LoginProtocol]
     LOGIN_PROTOCOL_SAML2: _ClassVar[LoginProtocol]
     LOGIN_PROTOCOL_OIDC: _ClassVar[LoginProtocol]
     LOGIN_PROTOCOL_HTTP: _ClassVar[LoginProtocol]
+AI_ROLE_UNSPECIFIED: AiRole
+AI_ROLE_USER: AiRole
+AI_ROLE_ASSISTANT: AiRole
+AI_ROLE_TOOL: AiRole
+AI_ROLE_AGENT: AiRole
+AI_ROLE_ORCHESTRATOR: AiRole
+AI_ROLE_RETRIEVER: AiRole
+AI_ROLE_OTHER: AiRole
+AI_AGENT_TYPE_UNSPECIFIED: AiAgentType
+AI_AGENT_TYPE_CONVERSATIONAL: AiAgentType
+AI_AGENT_TYPE_AUTONOMOUS: AiAgentType
+AI_AGENT_TYPE_RETRIEVAL: AiAgentType
+AI_AGENT_TYPE_MULTI_AGENT: AiAgentType
+AI_AGENT_TYPE_OTHER: AiAgentType
+AI_SESSION_END_REASON_UNSPECIFIED: AiSessionEndReason
+AI_SESSION_END_REASON_NORMAL: AiSessionEndReason
+AI_SESSION_END_REASON_TIMEOUT: AiSessionEndReason
+AI_SESSION_END_REASON_USER_TERMINATED: AiSessionEndReason
+AI_SESSION_END_REASON_ERROR: AiSessionEndReason
+AI_SESSION_END_REASON_POLICY_VIOLATION: AiSessionEndReason
+AI_SESSION_END_REASON_OTHER: AiSessionEndReason
+AI_GUARDRAIL_TYPE_UNSPECIFIED: AiGuardrailType
+AI_GUARDRAIL_TYPE_INPUT: AiGuardrailType
+AI_GUARDRAIL_TYPE_OUTPUT: AiGuardrailType
+AI_GUARDRAIL_TYPE_CONTENT_POLICY: AiGuardrailType
+AI_GUARDRAIL_TYPE_PROMPT_INJECTION: AiGuardrailType
+AI_GUARDRAIL_TYPE_PII_FILTER: AiGuardrailType
+AI_GUARDRAIL_TYPE_DATA_LEAKAGE: AiGuardrailType
+AI_GUARDRAIL_TYPE_HALLUCINATION: AiGuardrailType
+AI_GUARDRAIL_TYPE_OTHER: AiGuardrailType
+AI_GUARDRAIL_ACTION_UNSPECIFIED: AiGuardrailAction
+AI_GUARDRAIL_ACTION_ALLOW: AiGuardrailAction
+AI_GUARDRAIL_ACTION_BLOCK: AiGuardrailAction
+AI_GUARDRAIL_ACTION_MODIFY: AiGuardrailAction
+AI_GUARDRAIL_ACTION_WARN: AiGuardrailAction
+AI_GUARDRAIL_ACTION_LOG_ONLY: AiGuardrailAction
+AI_GUARDRAIL_ACTION_OTHER: AiGuardrailAction
+AI_INVOCATION_STATUS_UNSPECIFIED: AiInvocationStatus
+AI_INVOCATION_STATUS_SUCCESS: AiInvocationStatus
+AI_INVOCATION_STATUS_FAILED: AiInvocationStatus
+AI_INVOCATION_STATUS_TIMEOUT: AiInvocationStatus
+AI_INVOCATION_STATUS_RATE_LIMITED: AiInvocationStatus
+AI_INVOCATION_STATUS_CANCELLED: AiInvocationStatus
+AI_INVOCATION_STATUS_PENDING: AiInvocationStatus
+AI_INVOCATION_STATUS_OTHER: AiInvocationStatus
+AI_RETRIEVAL_TYPE_UNSPECIFIED: AiRetrievalType
+AI_RETRIEVAL_TYPE_VECTOR_SEARCH: AiRetrievalType
+AI_RETRIEVAL_TYPE_KEYWORD_SEARCH: AiRetrievalType
+AI_RETRIEVAL_TYPE_HYBRID_SEARCH: AiRetrievalType
+AI_RETRIEVAL_TYPE_KNOWLEDGE_GRAPH: AiRetrievalType
+AI_RETRIEVAL_TYPE_MEMORY_CONTEXT: AiRetrievalType
+AI_RETRIEVAL_TYPE_DOCUMENT: AiRetrievalType
+AI_RETRIEVAL_TYPE_OTHER: AiRetrievalType
+AI_FEEDBACK_RATING_UNSPECIFIED: AiFeedbackRating
+AI_FEEDBACK_RATING_POSITIVE: AiFeedbackRating
+AI_FEEDBACK_RATING_NEGATIVE: AiFeedbackRating
+AI_FEEDBACK_RATING_NEUTRAL: AiFeedbackRating
+AI_FEEDBACK_RATING_CORRECTION: AiFeedbackRating
+AI_FEEDBACK_RATING_OTHER: AiFeedbackRating
+AI_TOOL_CALL_DISPOSITION_UNSPECIFIED: AiToolCallDisposition
+AI_TOOL_CALL_DISPOSITION_ALLOWED: AiToolCallDisposition
+AI_TOOL_CALL_DISPOSITION_DENIED: AiToolCallDisposition
+AI_TOOL_CALL_DISPOSITION_MODIFIED: AiToolCallDisposition
+AI_TOOL_CALL_DISPOSITION_PENDING_APPROVAL: AiToolCallDisposition
+AI_TOOL_CALL_DISPOSITION_OTHER: AiToolCallDisposition
 CREDENTIAL_TYPE_UNSPECIFIED: CredentialType
 CREDENTIAL_TYPE_X509_CERTIFICATE: CredentialType
 CREDENTIAL_TYPE_KEY: CredentialType
@@ -215,6 +381,8 @@ MFA_TYPE_EMAIL: MfaType
 USER_TYPE_UNSPECIFIED: UserType
 USER_TYPE_BUSINESS_USER: UserType
 USER_TYPE_TECHNICAL_USER: UserType
+USER_TYPE_SAP_SUPPORT_USER: UserType
+USER_TYPE_AI_AGENT: UserType
 DATA_EXPORT_CHANNEL_TYPE_UNSPECIFIED: DataExportChannelType
 DATA_EXPORT_CHANNEL_TYPE_DOWNLOAD: DataExportChannelType
 DATA_EXPORT_CHANNEL_TYPE_API_ACCESS: DataExportChannelType
@@ -240,13 +408,104 @@ KEY_TYPE_KEK: KeyType
 VIRUS_CHANNEL_UNSPECIFIED: VirusChannel
 VIRUS_CHANNEL_UPLOAD: VirusChannel
 VIRUS_CHANNEL_SCAN: VirusChannel
+AI_TASK_UPDATE_TYPE_UNSPECIFIED: AiTaskUpdateType
+AI_TASK_UPDATE_TYPE_STATUS: AiTaskUpdateType
+AI_TASK_UPDATE_TYPE_ARTIFACT: AiTaskUpdateType
+AI_TASK_UPDATE_TYPE_INPUT_REQUIRED: AiTaskUpdateType
 LOGIN_PROTOCOL_UNSPECIFIED: LoginProtocol
 LOGIN_PROTOCOL_SAML2: LoginProtocol
 LOGIN_PROTOCOL_OIDC: LoginProtocol
 LOGIN_PROTOCOL_HTTP: LoginProtocol
 
+class UserContext(_message.Message):
+    __slots__ = ("type", "attributes")
+    class AttributesEntry(_message.Message):
+        __slots__ = ("key", "value")
+        KEY_FIELD_NUMBER: _ClassVar[int]
+        VALUE_FIELD_NUMBER: _ClassVar[int]
+        key: str
+        value: str
+        def __init__(self, key: _Optional[str] = ..., value: _Optional[str] = ...) -> None: ...
+    TYPE_FIELD_NUMBER: _ClassVar[int]
+    ATTRIBUTES_FIELD_NUMBER: _ClassVar[int]
+    type: UserType
+    attributes: _containers.ScalarMap[str, str]
+    def __init__(self, type: _Optional[_Union[UserType, str]] = ..., attributes: _Optional[_Mapping[str, str]] = ...) -> None: ...
+
+class TraceContext(_message.Message):
+    __slots__ = ("trace_id", "span_id")
+    TRACE_ID_FIELD_NUMBER: _ClassVar[int]
+    SPAN_ID_FIELD_NUMBER: _ClassVar[int]
+    trace_id: str
+    span_id: str
+    def __init__(self, trace_id: _Optional[str] = ..., span_id: _Optional[str] = ...) -> None: ...
+
+class AiModel(_message.Message):
+    __slots__ = ("ai_provider", "name", "uid", "version")
+    AI_PROVIDER_FIELD_NUMBER: _ClassVar[int]
+    NAME_FIELD_NUMBER: _ClassVar[int]
+    UID_FIELD_NUMBER: _ClassVar[int]
+    VERSION_FIELD_NUMBER: _ClassVar[int]
+    ai_provider: str
+    name: str
+    uid: str
+    version: str
+    def __init__(self, ai_provider: _Optional[str] = ..., name: _Optional[str] = ..., uid: _Optional[str] = ..., version: _Optional[str] = ...) -> None: ...
+
+class AiAgent(_message.Message):
+    __slots__ = ("uid", "name", "instance_uid", "type", "type_id", "version", "ai_model")
+    UID_FIELD_NUMBER: _ClassVar[int]
+    NAME_FIELD_NUMBER: _ClassVar[int]
+    INSTANCE_UID_FIELD_NUMBER: _ClassVar[int]
+    TYPE_FIELD_NUMBER: _ClassVar[int]
+    TYPE_ID_FIELD_NUMBER: _ClassVar[int]
+    VERSION_FIELD_NUMBER: _ClassVar[int]
+    AI_MODEL_FIELD_NUMBER: _ClassVar[int]
+    uid: str
+    name: str
+    instance_uid: str
+    type: str
+    type_id: AiAgentType
+    version: str
+    ai_model: AiModel
+    def __init__(self, uid: _Optional[str] = ..., name: _Optional[str] = ..., instance_uid: _Optional[str] = ..., type: _Optional[str] = ..., type_id: _Optional[_Union[AiAgentType, str]] = ..., version: _Optional[str] = ..., ai_model: _Optional[_Union[AiModel, _Mapping]] = ...) -> None: ...
+
+class AiMessageContext(_message.Message):
+    __slots__ = ("uid", "name", "ai_role_id", "prompt_text", "response_text", "prompt_tokens", "completion_tokens", "total_tokens")
+    UID_FIELD_NUMBER: _ClassVar[int]
+    NAME_FIELD_NUMBER: _ClassVar[int]
+    AI_ROLE_ID_FIELD_NUMBER: _ClassVar[int]
+    PROMPT_TEXT_FIELD_NUMBER: _ClassVar[int]
+    RESPONSE_TEXT_FIELD_NUMBER: _ClassVar[int]
+    PROMPT_TOKENS_FIELD_NUMBER: _ClassVar[int]
+    COMPLETION_TOKENS_FIELD_NUMBER: _ClassVar[int]
+    TOTAL_TOKENS_FIELD_NUMBER: _ClassVar[int]
+    uid: str
+    name: str
+    ai_role_id: AiRole
+    prompt_text: str
+    response_text: str
+    prompt_tokens: int
+    completion_tokens: int
+    total_tokens: int
+    def __init__(self, uid: _Optional[str] = ..., name: _Optional[str] = ..., ai_role_id: _Optional[_Union[AiRole, str]] = ..., prompt_text: _Optional[str] = ..., response_text: _Optional[str] = ..., prompt_tokens: _Optional[int] = ..., completion_tokens: _Optional[int] = ..., total_tokens: _Optional[int] = ...) -> None: ...
+
+class AiDelegation(_message.Message):
+    __slots__ = ("delegator_id", "delegate_id", "scopes", "expires_at", "delegation_chain")
+    DELEGATOR_ID_FIELD_NUMBER: _ClassVar[int]
+    DELEGATE_ID_FIELD_NUMBER: _ClassVar[int]
+    SCOPES_FIELD_NUMBER: _ClassVar[int]
+    EXPIRES_AT_FIELD_NUMBER: _ClassVar[int]
+    DELEGATION_CHAIN_FIELD_NUMBER: _ClassVar[int]
+    delegator_id: str
+    delegate_id: str
+    scopes: _containers.RepeatedScalarFieldContainer[str]
+    expires_at: _timestamp_pb2.Timestamp
+    delegation_chain: _containers.RepeatedScalarFieldContainer[str]
+    def __init__(self, delegator_id: _Optional[str] = ..., delegate_id: _Optional[str] = ..., scopes: _Optional[_Iterable[str]] = ..., expires_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., delegation_chain: _Optional[_Iterable[str]] = ...) -> None: ...
+
 class Common(_message.Message):
-    __slots__ = ("timestamp", "source_ip", "user_impersonated_id", "user_initiator_id", "app_id", "tenant_id", "user_session_context_id", "app_context")
+    __slots__ = ("timestamp", "source_ip", "user_impersonated_id", "user_initiator_id", "app_id", "tenant_id", "user_session_context_id", "app_context", "user_global_id", "user_impersonated_global_id", "user_initiator_context", "user_impersonated_context", "trace_context")
     class AppContextEntry(_message.Message):
         __slots__ = ("key", "value")
         KEY_FIELD_NUMBER: _ClassVar[int]
@@ -262,6 +521,11 @@ class Common(_message.Message):
     TENANT_ID_FIELD_NUMBER: _ClassVar[int]
     USER_SESSION_CONTEXT_ID_FIELD_NUMBER: _ClassVar[int]
     APP_CONTEXT_FIELD_NUMBER: _ClassVar[int]
+    USER_GLOBAL_ID_FIELD_NUMBER: _ClassVar[int]
+    USER_IMPERSONATED_GLOBAL_ID_FIELD_NUMBER: _ClassVar[int]
+    USER_INITIATOR_CONTEXT_FIELD_NUMBER: _ClassVar[int]
+    USER_IMPERSONATED_CONTEXT_FIELD_NUMBER: _ClassVar[int]
+    TRACE_CONTEXT_FIELD_NUMBER: _ClassVar[int]
     timestamp: _timestamp_pb2.Timestamp
     source_ip: _containers.RepeatedScalarFieldContainer[str]
     user_impersonated_id: str
@@ -270,7 +534,12 @@ class Common(_message.Message):
     tenant_id: str
     user_session_context_id: str
     app_context: _containers.ScalarMap[str, str]
-    def __init__(self, timestamp: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., source_ip: _Optional[_Iterable[str]] = ..., user_impersonated_id: _Optional[str] = ..., user_initiator_id: _Optional[str] = ..., app_id: _Optional[str] = ..., tenant_id: _Optional[str] = ..., user_session_context_id: _Optional[str] = ..., app_context: _Optional[_Mapping[str, str]] = ...) -> None: ...
+    user_global_id: str
+    user_impersonated_global_id: str
+    user_initiator_context: UserContext
+    user_impersonated_context: UserContext
+    trace_context: TraceContext
+    def __init__(self, timestamp: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., source_ip: _Optional[_Iterable[str]] = ..., user_impersonated_id: _Optional[str] = ..., user_initiator_id: _Optional[str] = ..., app_id: _Optional[str] = ..., tenant_id: _Optional[str] = ..., user_session_context_id: _Optional[str] = ..., app_context: _Optional[_Mapping[str, str]] = ..., user_global_id: _Optional[str] = ..., user_impersonated_global_id: _Optional[str] = ..., user_initiator_context: _Optional[_Union[UserContext, _Mapping]] = ..., user_impersonated_context: _Optional[_Union[UserContext, _Mapping]] = ..., trace_context: _Optional[_Union[TraceContext, _Mapping]] = ...) -> None: ...
 
 class AuditlogClear(_message.Message):
     __slots__ = ("common", "number_of_events")
@@ -1317,3 +1586,335 @@ class CMKDetach(_message.Message):
     kms_system_id: str
     system_id: str
     def __init__(self, common: _Optional[_Union[Common, _Mapping]] = ..., cmk_id: _Optional[str] = ..., kms_system_id: _Optional[str] = ..., system_id: _Optional[str] = ...) -> None: ...
+
+class AiSessionStart(_message.Message):
+    __slots__ = ("common", "session_id", "ai_agent", "ai_model", "delegation")
+    COMMON_FIELD_NUMBER: _ClassVar[int]
+    SESSION_ID_FIELD_NUMBER: _ClassVar[int]
+    AI_AGENT_FIELD_NUMBER: _ClassVar[int]
+    AI_MODEL_FIELD_NUMBER: _ClassVar[int]
+    DELEGATION_FIELD_NUMBER: _ClassVar[int]
+    common: Common
+    session_id: str
+    ai_agent: AiAgent
+    ai_model: AiModel
+    delegation: AiDelegation
+    def __init__(self, common: _Optional[_Union[Common, _Mapping]] = ..., session_id: _Optional[str] = ..., ai_agent: _Optional[_Union[AiAgent, _Mapping]] = ..., ai_model: _Optional[_Union[AiModel, _Mapping]] = ..., delegation: _Optional[_Union[AiDelegation, _Mapping]] = ...) -> None: ...
+
+class AiSessionEnd(_message.Message):
+    __slots__ = ("common", "session_id", "end_reason", "total_tokens", "duration_ms")
+    COMMON_FIELD_NUMBER: _ClassVar[int]
+    SESSION_ID_FIELD_NUMBER: _ClassVar[int]
+    END_REASON_FIELD_NUMBER: _ClassVar[int]
+    TOTAL_TOKENS_FIELD_NUMBER: _ClassVar[int]
+    DURATION_MS_FIELD_NUMBER: _ClassVar[int]
+    common: Common
+    session_id: str
+    end_reason: AiSessionEndReason
+    total_tokens: int
+    duration_ms: int
+    def __init__(self, common: _Optional[_Union[Common, _Mapping]] = ..., session_id: _Optional[str] = ..., end_reason: _Optional[_Union[AiSessionEndReason, str]] = ..., total_tokens: _Optional[int] = ..., duration_ms: _Optional[int] = ...) -> None: ...
+
+class AiPromptReceived(_message.Message):
+    __slots__ = ("common", "session_id", "message_context", "ai_agent")
+    COMMON_FIELD_NUMBER: _ClassVar[int]
+    SESSION_ID_FIELD_NUMBER: _ClassVar[int]
+    MESSAGE_CONTEXT_FIELD_NUMBER: _ClassVar[int]
+    AI_AGENT_FIELD_NUMBER: _ClassVar[int]
+    common: Common
+    session_id: str
+    message_context: AiMessageContext
+    ai_agent: AiAgent
+    def __init__(self, common: _Optional[_Union[Common, _Mapping]] = ..., session_id: _Optional[str] = ..., message_context: _Optional[_Union[AiMessageContext, _Mapping]] = ..., ai_agent: _Optional[_Union[AiAgent, _Mapping]] = ...) -> None: ...
+
+class AiGuardrailTriggered(_message.Message):
+    __slots__ = ("common", "session_id", "guardrail_name", "guardrail_type", "action_taken", "violation_category", "message_context")
+    COMMON_FIELD_NUMBER: _ClassVar[int]
+    SESSION_ID_FIELD_NUMBER: _ClassVar[int]
+    GUARDRAIL_NAME_FIELD_NUMBER: _ClassVar[int]
+    GUARDRAIL_TYPE_FIELD_NUMBER: _ClassVar[int]
+    ACTION_TAKEN_FIELD_NUMBER: _ClassVar[int]
+    VIOLATION_CATEGORY_FIELD_NUMBER: _ClassVar[int]
+    MESSAGE_CONTEXT_FIELD_NUMBER: _ClassVar[int]
+    common: Common
+    session_id: str
+    guardrail_name: str
+    guardrail_type: AiGuardrailType
+    action_taken: AiGuardrailAction
+    violation_category: str
+    message_context: AiMessageContext
+    def __init__(self, common: _Optional[_Union[Common, _Mapping]] = ..., session_id: _Optional[str] = ..., guardrail_name: _Optional[str] = ..., guardrail_type: _Optional[_Union[AiGuardrailType, str]] = ..., action_taken: _Optional[_Union[AiGuardrailAction, str]] = ..., violation_category: _Optional[str] = ..., message_context: _Optional[_Union[AiMessageContext, _Mapping]] = ...) -> None: ...
+
+class AiModelInvocation(_message.Message):
+    __slots__ = ("common", "session_id", "ai_model", "ai_agent", "message_context", "latency_ms", "status", "error_message")
+    COMMON_FIELD_NUMBER: _ClassVar[int]
+    SESSION_ID_FIELD_NUMBER: _ClassVar[int]
+    AI_MODEL_FIELD_NUMBER: _ClassVar[int]
+    AI_AGENT_FIELD_NUMBER: _ClassVar[int]
+    MESSAGE_CONTEXT_FIELD_NUMBER: _ClassVar[int]
+    LATENCY_MS_FIELD_NUMBER: _ClassVar[int]
+    STATUS_FIELD_NUMBER: _ClassVar[int]
+    ERROR_MESSAGE_FIELD_NUMBER: _ClassVar[int]
+    common: Common
+    session_id: str
+    ai_model: AiModel
+    ai_agent: AiAgent
+    message_context: AiMessageContext
+    latency_ms: int
+    status: AiInvocationStatus
+    error_message: str
+    def __init__(self, common: _Optional[_Union[Common, _Mapping]] = ..., session_id: _Optional[str] = ..., ai_model: _Optional[_Union[AiModel, _Mapping]] = ..., ai_agent: _Optional[_Union[AiAgent, _Mapping]] = ..., message_context: _Optional[_Union[AiMessageContext, _Mapping]] = ..., latency_ms: _Optional[int] = ..., status: _Optional[_Union[AiInvocationStatus, str]] = ..., error_message: _Optional[str] = ...) -> None: ...
+
+class AiSkillSelected(_message.Message):
+    __slots__ = ("common", "session_id", "skill_name", "skill_id", "confidence_score", "ai_agent", "alternatives_considered")
+    COMMON_FIELD_NUMBER: _ClassVar[int]
+    SESSION_ID_FIELD_NUMBER: _ClassVar[int]
+    SKILL_NAME_FIELD_NUMBER: _ClassVar[int]
+    SKILL_ID_FIELD_NUMBER: _ClassVar[int]
+    CONFIDENCE_SCORE_FIELD_NUMBER: _ClassVar[int]
+    AI_AGENT_FIELD_NUMBER: _ClassVar[int]
+    ALTERNATIVES_CONSIDERED_FIELD_NUMBER: _ClassVar[int]
+    common: Common
+    session_id: str
+    skill_name: str
+    skill_id: str
+    confidence_score: float
+    ai_agent: AiAgent
+    alternatives_considered: _containers.RepeatedScalarFieldContainer[str]
+    def __init__(self, common: _Optional[_Union[Common, _Mapping]] = ..., session_id: _Optional[str] = ..., skill_name: _Optional[str] = ..., skill_id: _Optional[str] = ..., confidence_score: _Optional[float] = ..., ai_agent: _Optional[_Union[AiAgent, _Mapping]] = ..., alternatives_considered: _Optional[_Iterable[str]] = ...) -> None: ...
+
+class AiAgentDelegated(_message.Message):
+    __slots__ = ("common", "session_id", "source_agent", "target_agent", "delegation", "task_description")
+    COMMON_FIELD_NUMBER: _ClassVar[int]
+    SESSION_ID_FIELD_NUMBER: _ClassVar[int]
+    SOURCE_AGENT_FIELD_NUMBER: _ClassVar[int]
+    TARGET_AGENT_FIELD_NUMBER: _ClassVar[int]
+    DELEGATION_FIELD_NUMBER: _ClassVar[int]
+    TASK_DESCRIPTION_FIELD_NUMBER: _ClassVar[int]
+    common: Common
+    session_id: str
+    source_agent: AiAgent
+    target_agent: AiAgent
+    delegation: AiDelegation
+    task_description: str
+    def __init__(self, common: _Optional[_Union[Common, _Mapping]] = ..., session_id: _Optional[str] = ..., source_agent: _Optional[_Union[AiAgent, _Mapping]] = ..., target_agent: _Optional[_Union[AiAgent, _Mapping]] = ..., delegation: _Optional[_Union[AiDelegation, _Mapping]] = ..., task_description: _Optional[str] = ...) -> None: ...
+
+class AiMcpToolCall(_message.Message):
+    __slots__ = ("common", "session_id", "tool_name", "target_mcp_server_id", "ai_agent", "status", "latency_ms", "error_message")
+    COMMON_FIELD_NUMBER: _ClassVar[int]
+    SESSION_ID_FIELD_NUMBER: _ClassVar[int]
+    TOOL_NAME_FIELD_NUMBER: _ClassVar[int]
+    TARGET_MCP_SERVER_ID_FIELD_NUMBER: _ClassVar[int]
+    AI_AGENT_FIELD_NUMBER: _ClassVar[int]
+    STATUS_FIELD_NUMBER: _ClassVar[int]
+    LATENCY_MS_FIELD_NUMBER: _ClassVar[int]
+    ERROR_MESSAGE_FIELD_NUMBER: _ClassVar[int]
+    common: Common
+    session_id: str
+    tool_name: str
+    target_mcp_server_id: str
+    ai_agent: AiAgent
+    status: AiInvocationStatus
+    latency_ms: int
+    error_message: str
+    def __init__(self, common: _Optional[_Union[Common, _Mapping]] = ..., session_id: _Optional[str] = ..., tool_name: _Optional[str] = ..., target_mcp_server_id: _Optional[str] = ..., ai_agent: _Optional[_Union[AiAgent, _Mapping]] = ..., status: _Optional[_Union[AiInvocationStatus, str]] = ..., latency_ms: _Optional[int] = ..., error_message: _Optional[str] = ...) -> None: ...
+
+class AiDirectApiAccess(_message.Message):
+    __slots__ = ("common", "session_id", "target_api_id", "ai_agent", "http_method", "status", "response_status_code", "latency_ms")
+    COMMON_FIELD_NUMBER: _ClassVar[int]
+    SESSION_ID_FIELD_NUMBER: _ClassVar[int]
+    TARGET_API_ID_FIELD_NUMBER: _ClassVar[int]
+    AI_AGENT_FIELD_NUMBER: _ClassVar[int]
+    HTTP_METHOD_FIELD_NUMBER: _ClassVar[int]
+    STATUS_FIELD_NUMBER: _ClassVar[int]
+    RESPONSE_STATUS_CODE_FIELD_NUMBER: _ClassVar[int]
+    LATENCY_MS_FIELD_NUMBER: _ClassVar[int]
+    common: Common
+    session_id: str
+    target_api_id: str
+    ai_agent: AiAgent
+    http_method: str
+    status: AiInvocationStatus
+    response_status_code: int
+    latency_ms: int
+    def __init__(self, common: _Optional[_Union[Common, _Mapping]] = ..., session_id: _Optional[str] = ..., target_api_id: _Optional[str] = ..., ai_agent: _Optional[_Union[AiAgent, _Mapping]] = ..., http_method: _Optional[str] = ..., status: _Optional[_Union[AiInvocationStatus, str]] = ..., response_status_code: _Optional[int] = ..., latency_ms: _Optional[int] = ...) -> None: ...
+
+class AiDataRetrieval(_message.Message):
+    __slots__ = ("common", "session_id", "data_source_id", "data_source_type", "retrieval_type", "results_count", "ai_agent", "latency_ms")
+    COMMON_FIELD_NUMBER: _ClassVar[int]
+    SESSION_ID_FIELD_NUMBER: _ClassVar[int]
+    DATA_SOURCE_ID_FIELD_NUMBER: _ClassVar[int]
+    DATA_SOURCE_TYPE_FIELD_NUMBER: _ClassVar[int]
+    RETRIEVAL_TYPE_FIELD_NUMBER: _ClassVar[int]
+    RESULTS_COUNT_FIELD_NUMBER: _ClassVar[int]
+    AI_AGENT_FIELD_NUMBER: _ClassVar[int]
+    LATENCY_MS_FIELD_NUMBER: _ClassVar[int]
+    common: Common
+    session_id: str
+    data_source_id: str
+    data_source_type: str
+    retrieval_type: AiRetrievalType
+    results_count: int
+    ai_agent: AiAgent
+    latency_ms: int
+    def __init__(self, common: _Optional[_Union[Common, _Mapping]] = ..., session_id: _Optional[str] = ..., data_source_id: _Optional[str] = ..., data_source_type: _Optional[str] = ..., retrieval_type: _Optional[_Union[AiRetrievalType, str]] = ..., results_count: _Optional[int] = ..., ai_agent: _Optional[_Union[AiAgent, _Mapping]] = ..., latency_ms: _Optional[int] = ...) -> None: ...
+
+class AiResponseGenerated(_message.Message):
+    __slots__ = ("common", "session_id", "message_context", "ai_agent", "ai_model", "latency_ms")
+    COMMON_FIELD_NUMBER: _ClassVar[int]
+    SESSION_ID_FIELD_NUMBER: _ClassVar[int]
+    MESSAGE_CONTEXT_FIELD_NUMBER: _ClassVar[int]
+    AI_AGENT_FIELD_NUMBER: _ClassVar[int]
+    AI_MODEL_FIELD_NUMBER: _ClassVar[int]
+    LATENCY_MS_FIELD_NUMBER: _ClassVar[int]
+    common: Common
+    session_id: str
+    message_context: AiMessageContext
+    ai_agent: AiAgent
+    ai_model: AiModel
+    latency_ms: int
+    def __init__(self, common: _Optional[_Union[Common, _Mapping]] = ..., session_id: _Optional[str] = ..., message_context: _Optional[_Union[AiMessageContext, _Mapping]] = ..., ai_agent: _Optional[_Union[AiAgent, _Mapping]] = ..., ai_model: _Optional[_Union[AiModel, _Mapping]] = ..., latency_ms: _Optional[int] = ...) -> None: ...
+
+class AiUserFeedback(_message.Message):
+    __slots__ = ("common", "session_id", "feedback_rating", "feedback_score", "feedback_category", "feedback_comment", "message_uid")
+    COMMON_FIELD_NUMBER: _ClassVar[int]
+    SESSION_ID_FIELD_NUMBER: _ClassVar[int]
+    FEEDBACK_RATING_FIELD_NUMBER: _ClassVar[int]
+    FEEDBACK_SCORE_FIELD_NUMBER: _ClassVar[int]
+    FEEDBACK_CATEGORY_FIELD_NUMBER: _ClassVar[int]
+    FEEDBACK_COMMENT_FIELD_NUMBER: _ClassVar[int]
+    MESSAGE_UID_FIELD_NUMBER: _ClassVar[int]
+    common: Common
+    session_id: str
+    feedback_rating: AiFeedbackRating
+    feedback_score: int
+    feedback_category: str
+    feedback_comment: str
+    message_uid: str
+    def __init__(self, common: _Optional[_Union[Common, _Mapping]] = ..., session_id: _Optional[str] = ..., feedback_rating: _Optional[_Union[AiFeedbackRating, str]] = ..., feedback_score: _Optional[int] = ..., feedback_category: _Optional[str] = ..., feedback_comment: _Optional[str] = ..., message_uid: _Optional[str] = ...) -> None: ...
+
+class AiMessageSent(_message.Message):
+    __slots__ = ("common", "target_agent", "source_agent", "a2a_task_id", "a2a_context_id", "message_context")
+    COMMON_FIELD_NUMBER: _ClassVar[int]
+    TARGET_AGENT_FIELD_NUMBER: _ClassVar[int]
+    SOURCE_AGENT_FIELD_NUMBER: _ClassVar[int]
+    A2A_TASK_ID_FIELD_NUMBER: _ClassVar[int]
+    A2A_CONTEXT_ID_FIELD_NUMBER: _ClassVar[int]
+    MESSAGE_CONTEXT_FIELD_NUMBER: _ClassVar[int]
+    common: Common
+    target_agent: AiAgent
+    source_agent: AiAgent
+    a2a_task_id: str
+    a2a_context_id: str
+    message_context: AiMessageContext
+    def __init__(self, common: _Optional[_Union[Common, _Mapping]] = ..., target_agent: _Optional[_Union[AiAgent, _Mapping]] = ..., source_agent: _Optional[_Union[AiAgent, _Mapping]] = ..., a2a_task_id: _Optional[str] = ..., a2a_context_id: _Optional[str] = ..., message_context: _Optional[_Union[AiMessageContext, _Mapping]] = ...) -> None: ...
+
+class AiTaskCreated(_message.Message):
+    __slots__ = ("common", "a2a_task_id", "a2a_context_id", "ai_agent", "message_context")
+    COMMON_FIELD_NUMBER: _ClassVar[int]
+    A2A_TASK_ID_FIELD_NUMBER: _ClassVar[int]
+    A2A_CONTEXT_ID_FIELD_NUMBER: _ClassVar[int]
+    AI_AGENT_FIELD_NUMBER: _ClassVar[int]
+    MESSAGE_CONTEXT_FIELD_NUMBER: _ClassVar[int]
+    common: Common
+    a2a_task_id: str
+    a2a_context_id: str
+    ai_agent: AiAgent
+    message_context: AiMessageContext
+    def __init__(self, common: _Optional[_Union[Common, _Mapping]] = ..., a2a_task_id: _Optional[str] = ..., a2a_context_id: _Optional[str] = ..., ai_agent: _Optional[_Union[AiAgent, _Mapping]] = ..., message_context: _Optional[_Union[AiMessageContext, _Mapping]] = ...) -> None: ...
+
+class AiTaskUpdated(_message.Message):
+    __slots__ = ("common", "a2a_task_id", "a2a_context_id", "update_type", "ai_agent", "message_context")
+    COMMON_FIELD_NUMBER: _ClassVar[int]
+    A2A_TASK_ID_FIELD_NUMBER: _ClassVar[int]
+    A2A_CONTEXT_ID_FIELD_NUMBER: _ClassVar[int]
+    UPDATE_TYPE_FIELD_NUMBER: _ClassVar[int]
+    AI_AGENT_FIELD_NUMBER: _ClassVar[int]
+    MESSAGE_CONTEXT_FIELD_NUMBER: _ClassVar[int]
+    common: Common
+    a2a_task_id: str
+    a2a_context_id: str
+    update_type: AiTaskUpdateType
+    ai_agent: AiAgent
+    message_context: AiMessageContext
+    def __init__(self, common: _Optional[_Union[Common, _Mapping]] = ..., a2a_task_id: _Optional[str] = ..., a2a_context_id: _Optional[str] = ..., update_type: _Optional[_Union[AiTaskUpdateType, str]] = ..., ai_agent: _Optional[_Union[AiAgent, _Mapping]] = ..., message_context: _Optional[_Union[AiMessageContext, _Mapping]] = ...) -> None: ...
+
+class AiTaskAccessed(_message.Message):
+    __slots__ = ("common", "a2a_task_id", "a2a_context_id", "ai_agent")
+    COMMON_FIELD_NUMBER: _ClassVar[int]
+    A2A_TASK_ID_FIELD_NUMBER: _ClassVar[int]
+    A2A_CONTEXT_ID_FIELD_NUMBER: _ClassVar[int]
+    AI_AGENT_FIELD_NUMBER: _ClassVar[int]
+    common: Common
+    a2a_task_id: str
+    a2a_context_id: str
+    ai_agent: AiAgent
+    def __init__(self, common: _Optional[_Union[Common, _Mapping]] = ..., a2a_task_id: _Optional[str] = ..., a2a_context_id: _Optional[str] = ..., ai_agent: _Optional[_Union[AiAgent, _Mapping]] = ...) -> None: ...
+
+class AiPushNotificationSent(_message.Message):
+    __slots__ = ("common", "push_notification_url", "a2a_task_id", "a2a_context_id", "ai_agent", "response_status")
+    COMMON_FIELD_NUMBER: _ClassVar[int]
+    PUSH_NOTIFICATION_URL_FIELD_NUMBER: _ClassVar[int]
+    A2A_TASK_ID_FIELD_NUMBER: _ClassVar[int]
+    A2A_CONTEXT_ID_FIELD_NUMBER: _ClassVar[int]
+    AI_AGENT_FIELD_NUMBER: _ClassVar[int]
+    RESPONSE_STATUS_FIELD_NUMBER: _ClassVar[int]
+    common: Common
+    push_notification_url: str
+    a2a_task_id: str
+    a2a_context_id: str
+    ai_agent: AiAgent
+    response_status: int
+    def __init__(self, common: _Optional[_Union[Common, _Mapping]] = ..., push_notification_url: _Optional[str] = ..., a2a_task_id: _Optional[str] = ..., a2a_context_id: _Optional[str] = ..., ai_agent: _Optional[_Union[AiAgent, _Mapping]] = ..., response_status: _Optional[int] = ...) -> None: ...
+
+class UserImpersonationRequested(_message.Message):
+    __slots__ = ("common", "user_initiator_id", "user_initiator_type", "user_impersonated_id", "user_impersonated_type", "context", "ai_agent")
+    COMMON_FIELD_NUMBER: _ClassVar[int]
+    USER_INITIATOR_ID_FIELD_NUMBER: _ClassVar[int]
+    USER_INITIATOR_TYPE_FIELD_NUMBER: _ClassVar[int]
+    USER_IMPERSONATED_ID_FIELD_NUMBER: _ClassVar[int]
+    USER_IMPERSONATED_TYPE_FIELD_NUMBER: _ClassVar[int]
+    CONTEXT_FIELD_NUMBER: _ClassVar[int]
+    AI_AGENT_FIELD_NUMBER: _ClassVar[int]
+    common: Common
+    user_initiator_id: str
+    user_initiator_type: UserType
+    user_impersonated_id: str
+    user_impersonated_type: UserType
+    context: str
+    ai_agent: AiAgent
+    def __init__(self, common: _Optional[_Union[Common, _Mapping]] = ..., user_initiator_id: _Optional[str] = ..., user_initiator_type: _Optional[_Union[UserType, str]] = ..., user_impersonated_id: _Optional[str] = ..., user_impersonated_type: _Optional[_Union[UserType, str]] = ..., context: _Optional[str] = ..., ai_agent: _Optional[_Union[AiAgent, _Mapping]] = ...) -> None: ...
+
+class UserImpersonationDeclined(_message.Message):
+    __slots__ = ("common", "user_initiator_id", "user_initiator_type", "user_impersonated_id", "user_impersonated_type", "context", "ai_agent")
+    COMMON_FIELD_NUMBER: _ClassVar[int]
+    USER_INITIATOR_ID_FIELD_NUMBER: _ClassVar[int]
+    USER_INITIATOR_TYPE_FIELD_NUMBER: _ClassVar[int]
+    USER_IMPERSONATED_ID_FIELD_NUMBER: _ClassVar[int]
+    USER_IMPERSONATED_TYPE_FIELD_NUMBER: _ClassVar[int]
+    CONTEXT_FIELD_NUMBER: _ClassVar[int]
+    AI_AGENT_FIELD_NUMBER: _ClassVar[int]
+    common: Common
+    user_initiator_id: str
+    user_initiator_type: UserType
+    user_impersonated_id: str
+    user_impersonated_type: UserType
+    context: str
+    ai_agent: AiAgent
+    def __init__(self, common: _Optional[_Union[Common, _Mapping]] = ..., user_initiator_id: _Optional[str] = ..., user_initiator_type: _Optional[_Union[UserType, str]] = ..., user_impersonated_id: _Optional[str] = ..., user_impersonated_type: _Optional[_Union[UserType, str]] = ..., context: _Optional[str] = ..., ai_agent: _Optional[_Union[AiAgent, _Mapping]] = ...) -> None: ...
+
+class AiUserInputRequested(_message.Message):
+    __slots__ = ("common", "requested_from_user_id", "a2a_task_id", "a2a_context_id", "ai_agent", "message_context")
+    COMMON_FIELD_NUMBER: _ClassVar[int]
+    REQUESTED_FROM_USER_ID_FIELD_NUMBER: _ClassVar[int]
+    A2A_TASK_ID_FIELD_NUMBER: _ClassVar[int]
+    A2A_CONTEXT_ID_FIELD_NUMBER: _ClassVar[int]
+    AI_AGENT_FIELD_NUMBER: _ClassVar[int]
+    MESSAGE_CONTEXT_FIELD_NUMBER: _ClassVar[int]
+    common: Common
+    requested_from_user_id: str
+    a2a_task_id: str
+    a2a_context_id: str
+    ai_agent: AiAgent
+    message_context: AiMessageContext
+    def __init__(self, common: _Optional[_Union[Common, _Mapping]] = ..., requested_from_user_id: _Optional[str] = ..., a2a_task_id: _Optional[str] = ..., a2a_context_id: _Optional[str] = ..., ai_agent: _Optional[_Union[AiAgent, _Mapping]] = ..., message_context: _Optional[_Union[AiMessageContext, _Mapping]] = ...) -> None: ...

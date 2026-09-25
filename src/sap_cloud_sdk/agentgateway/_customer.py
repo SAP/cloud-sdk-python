@@ -21,6 +21,8 @@ import ssl
 import tempfile
 import uuid
 
+import anyio
+
 import httpx
 from mcp import ClientSession
 from mcp.client.streamable_http import streamable_http_client
@@ -664,16 +666,17 @@ async def _list_server_tools(
             *_,
         ):
             async with ClientSession(read, write) as session:
-                init_result = await session.initialize()
+                with anyio.fail_after(timeout):
+                    init_result = await session.initialize()
 
-                server_name = mcp_server_name(init_result)
-                if not server_name:
-                    raise AgentGatewaySDKError(
-                        f"MCP server at '{url}' did not provide its server name "
-                        "(serverInfo/server_info). This is required by the MCP protocol."
-                    )
+                    server_name = mcp_server_name(init_result)
+                    if not server_name:
+                        raise AgentGatewaySDKError(
+                            f"MCP server at '{url}' did not provide its server name "
+                            "(serverInfo/server_info). This is required by the MCP protocol."
+                        )
 
-                result = await session.list_tools()
+                    result = await session.list_tools()
                 tools = result.tools or []
 
                 return [

@@ -19,7 +19,10 @@
             "hookType": "BEFORE",
             "deploymentType": "N8N",
             "n8nWorkflowConfig": {
-                "workflowId": "wf-currency-conversion-001",
+                "ordId": "sap.n8nwfrt:apiResource:invoice-po-solution_currency-conversion.convertCurrency:v1",
+                "cardOrdId": "sap.n8nwfrt:apiResource:invoice-po-solution_currency-conversion.convertCurrency_mcp:v1",
+                "toolName": "convertCurrency",
+                "globalTenantId": "tenant-example-001",
                 "method": "POST"
             },
             "timeout": 30,
@@ -35,7 +38,10 @@
             "hookType": "AFTER",
             "deploymentType": "N8N",
             "n8nWorkflowConfig": {
-                "workflowId": "wf-trigger-email-notification-001",
+                "ordId": "sap.n8nwfrt:apiResource:invoice-po-solution_notify.sendEmailNotification:v1",
+                "cardOrdId": "sap.n8nwfrt:apiResource:invoice-po-solution_notify.sendEmailNotification_mcp:v1",
+                "toolName": "sendEmailNotification",
+                "globalTenantId": "tenant-example-001",
                 "method": "POST"
             },
             "timeout": 30,

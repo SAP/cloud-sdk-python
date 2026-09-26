@@ -1,11 +1,11 @@
-"""SAP Ariba Output Management Service SDK for Python."""
+"""SAP Ariba Agent Output Tools SDK for Python."""
 
 import logging
 import os
 from typing import Optional
 
-from .client import OutputManagementClient
-from ._service_client import OutputManagementServiceClient
+from .client import AgentOutputToolsClient
+from ._service_client import AgentOutputToolsServiceClient
 from ._models import (
     OutputRequest,
     OutputRequestBuilder,
@@ -21,7 +21,7 @@ from ._models import (
 from .config import DestinationCredentialConfig
 from .constants import FileFormat, Channel
 from .exceptions import (
-    OutputManagementException,
+    AgentOutputToolsException,
     AuthenticationException,
     ValidationException,
     NetworkException,
@@ -37,9 +37,9 @@ def create_client(
     destination_name: Optional[str] = None,
     access_strategy: Optional[str] = None,
     instance: Optional[str] = None,
-) -> OutputManagementClient:
+) -> AgentOutputToolsClient:
     """
-    Create an Output Management client with configuration from environment or parameters.
+    Create an Agent Output Tools client with configuration from environment or parameters.
 
     This is the recommended factory function for creating clients. It follows the SDK's
     standard pattern of reading configuration from environment variables with optional overrides.
@@ -60,7 +60,7 @@ def create_client(
             CLOUD_SDK_OMS_INSTANCE environment variable or defaults to "default".
 
     Returns:
-        Configured OutputManagementClient instance
+        Configured AgentOutputToolsClient instance
 
     Raises:
         ValidationException: If destination_name is not provided and not found in environment
@@ -68,7 +68,7 @@ def create_client(
 
     Example:
         ```python
-        from sap_cloud_sdk.outputmanagement import create_client, DestinationCredentialConfig
+        from sap_cloud_sdk.agentoutputtools import create_client, DestinationCredentialConfig
 
         # Using environment variables
         client = create_client()
@@ -100,7 +100,7 @@ def create_client(
     if destination_credential_config is not None:
         destination_config = destination_credential_config
         logger.info(
-            f"Creating Output Management client with provided DestinationCredentialConfig: "
+            f"Creating Agent Output Tools client with provided DestinationCredentialConfig: "
             f"destination '{destination_config.destination_name}'"
         )
     else:
@@ -120,7 +120,7 @@ def create_client(
             )
 
         logger.info(
-            f"Creating Output Management client with destination '{dest_name}', "
+            f"Creating Agent Output Tools client with destination '{dest_name}', "
             f"access_strategy '{access_strat}', instance '{inst}'"
         )
 
@@ -139,19 +139,19 @@ def create_client(
     logger.info(f"Retrieved destination base URL: {base_url}")
 
     # Create service client directly
-    service_client = OutputManagementServiceClient(
+    service_client = AgentOutputToolsServiceClient(
         base_url=base_url,
         destination=http_destination,
         destination_instance=destination_config.instance or "default",
     )
 
-    # Wrap it in the unified OutputManagementClient
-    return OutputManagementClient(service_client)
+    # Wrap it in the unified Agent Output Tools client
+    return AgentOutputToolsClient(service_client)
 
 
 __all__ = [
     # Main client and factory function
-    "OutputManagementClient",
+    "AgentOutputToolsClient",
     "create_client",
     # Models
     "OutputRequest",
@@ -170,7 +170,7 @@ __all__ = [
     "FileFormat",
     "Channel",
     # Exceptions
-    "OutputManagementException",
+    "AgentOutputToolsException",
     "AuthenticationException",
     "ValidationException",
     "NetworkException",

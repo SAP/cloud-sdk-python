@@ -1,10 +1,10 @@
-"""Exception classes for the Output Management SDK."""
+"""Exception classes for the Agent Output Tools SDK."""
 
 from typing import Optional, Dict, Any
 
 
-class OutputManagementException(Exception):
-    """Base exception for Output Management SDK."""
+class AgentOutputToolsException(Exception):
+    """Base exception for Agent Output Tools SDK."""
 
     def __init__(
         self,
@@ -37,31 +37,31 @@ class OutputManagementException(Exception):
         return " | ".join(parts)
 
 
-class AuthenticationException(OutputManagementException):
+class AuthenticationException(AgentOutputToolsException):
     """Exception for authentication failures."""
 
     pass
 
 
-class ValidationException(OutputManagementException):
+class ValidationException(AgentOutputToolsException):
     """Exception for validation failures."""
 
     pass
 
 
-class NetworkException(OutputManagementException):
+class NetworkException(AgentOutputToolsException):
     """Exception for network-related errors."""
 
     pass
 
 
-class DestinationNotFoundException(OutputManagementException):
+class DestinationNotFoundException(AgentOutputToolsException):
     """Exception for destination not found errors."""
 
     pass
 
 
-class DestinationAccessException(OutputManagementException):
+class DestinationAccessException(AgentOutputToolsException):
     """Exception for destination access errors."""
 
     pass

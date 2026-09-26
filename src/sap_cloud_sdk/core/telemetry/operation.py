@@ -314,9 +314,9 @@ class Operation(str, Enum):
     AGENT_MEMORY_UPDATE_RETENTION_CONFIG = "update_retention_config"
 
     # Output Management Operations
-    OUTPUT_MANAGEMENT_SEND_EMAIL = "send_email"
-    OUTPUT_MANAGEMENT_SEND_EMAIL_WITH_MCP = "send_email_with_mcp"
-    OUTPUT_MANAGEMENT_SEND_OUTPUT_REQUEST = "send_output_request"
+    AGENT_OUTPUT_TOOLS_SEND_EMAIL = "send_email"
+    AGENT_OUTPUT_TOOLS_SEND_EMAIL_WITH_MCP = "send_email_with_mcp"
+    AGENT_OUTPUT_TOOLS_SEND_OUTPUT_REQUEST = "send_output_request"
 
     def __str__(self) -> str:
         return self.value

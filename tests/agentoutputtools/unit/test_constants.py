@@ -1,9 +1,9 @@
 # SPDX-FileCopyrightText: 2024 SAP SE or an SAP affiliate company
 # SPDX-License-Identifier: Apache-2.0
 
-"""Unit tests for output management constants."""
+"""Unit tests for agent output tools constants."""
 
-from sap_cloud_sdk.outputmanagement.constants import (
+from sap_cloud_sdk.agentoutputtools.constants import (
     Constants,
     FileFormat,
     Channel,
@@ -11,7 +11,7 @@ from sap_cloud_sdk.outputmanagement.constants import (
 
 
 class TestConstants:
-    """Test output management constants."""
+    """Test agent output tools constants."""
 
     def test_api_output_control_exists(self):
         """Test API output control constant exists."""

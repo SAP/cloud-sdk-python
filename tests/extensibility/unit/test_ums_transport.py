@@ -191,8 +191,8 @@ class TestUmsTransportGetExtCapImpl:
 
             transport.get_extension_capability_implementation()
 
-        # Verify the URL
-        call_args = mock_client.post.call_args
+        # Verify the URL and GraphQL body of the first (capability) call
+        call_args = mock_client.post.call_args_list[0]
         assert call_args[0][0] == "https://ums.example.com/graphql"
 
         # Verify the GraphQL body
@@ -476,7 +476,7 @@ class TestUmsTransportTenant:
 
             transport.get_extension_capability_implementation(tenant="my-subscriber")
 
-        json_body = mock_client.post.call_args[1]["json"]
+        json_body = mock_client.post.call_args_list[0][1]["json"]
         agent_filter = json_body["variables"]["filters"]["agent"]
         assert agent_filter["ordIdEquals"] == AGENT_ORD_ID
         assert agent_filter["uclSystemInstance"] == {

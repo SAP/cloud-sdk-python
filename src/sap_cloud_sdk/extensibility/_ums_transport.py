@@ -111,6 +111,20 @@ query GetExtCapImplementations($filters: EXTHUB__ExtCapImplementationFilterInput
     % _GRAPHQL_QUERY_FRAGMENT
 )
 
+_GRAPHQL_AGENT_EXT_VERSION_QUERY = """\
+query GetAgentExtMetadata($metaFilters: EXTHUB__AgentExtensionMetadataFilterInput) {
+  EXTHUB__AgentExtensionMetadataInstances(
+    filters: $metaFilters
+    first: 1
+  ) {
+    edges {
+      node {
+        agentExtensionVersion
+      }
+    }
+  }
+}"""
+
 _GRAPHQL_HEADERS: dict[str, str] = {
     "Content-Type": "application/json",
     "Accept": "application/json",
@@ -365,12 +379,14 @@ def _build_source_mapping(
 def _transform_ums_response(
     data: Dict[str, Any],
     capability_id: str,
+    agent_ext_version: Optional[str] = None,
 ) -> ExtensionCapabilityImplementation:
     """Transform a UMS GraphQL response into an :class:`ExtensionCapabilityImplementation`.
 
     Args:
         data: The ``data`` portion of the GraphQL JSON response.
         capability_id: The requested capability ID to filter by.
+        agent_ext_version: Agent extension version from ``AgentExtensionMetadata``.
 
     Returns:
         A populated ``ExtensionCapabilityImplementation``.
@@ -434,6 +450,7 @@ def _transform_ums_response(
         hooks=hooks,
         source=source,
         joule_studio_gsid=joule_studio_gsid,
+        agent_ext_version=agent_ext_version,
     )
 
 
@@ -480,7 +497,7 @@ class UmsTransport:
         )
         self._cache: collections.OrderedDict[
             tuple[str, str],
-            tuple[float, List[Dict[str, Any]]],
+            tuple[float, List[Dict[str, Any]], Optional[str]],
         ] = collections.OrderedDict()
         self._cache_lock = threading.Lock()
 
@@ -534,7 +551,7 @@ class UmsTransport:
             with self._cache_lock:
                 cached = self._cache.get(cache_key)
                 if cached is not None:
-                    ts, cached_edges = cached
+                    ts, cached_edges, cached_agent_ext_version = cached
                     if (time.monotonic() - ts) < _CACHE_TTL_SECONDS:
                         logger.debug(
                             "UMS cache hit for tenant=%s capability_id=%s",
@@ -548,7 +565,9 @@ class UmsTransport:
                                 "edges": all_edges
                             },
                         }
-                        return _transform_ums_response(combined_data, capability_id)
+                        return _transform_ums_response(
+                            combined_data, capability_id, cached_agent_ext_version
+                        )
                     logger.debug(
                         "UMS cache expired for tenant=%s capability_id=%s",
                         tenant,
@@ -638,6 +657,7 @@ class UmsTransport:
 
         # 5. Send paginated requests with mTLS --------------------------
         all_edges = []
+        agent_ext_version: Optional[str] = None
         cursor: Optional[str] = None
         try:
             with tempfile.NamedTemporaryFile(suffix=".pem") as cert_file:
@@ -645,6 +665,7 @@ class UmsTransport:
                 cert_file.flush()
 
                 with httpx.Client(cert=cert_file.name) as client:
+                    # 5a. Paginated ExtCapImplementation query ---------------
                     for _ in range(_MAX_PAGES):
                         if cursor is not None:
                             query = _GRAPHQL_QUERY_WITH_CURSOR
@@ -706,6 +727,34 @@ class UmsTransport:
                             break
                         cursor = page_info.get("cursor")
 
+                    # 5b. Separate query for agentExtensionVersion ----------
+                    try:
+                        meta_body = {
+                            "query": _GRAPHQL_AGENT_EXT_VERSION_QUERY,
+                            "variables": {"metaFilters": {"agent": agent_filter}},
+                        }
+                        meta_response = client.post(
+                            url,
+                            json=meta_body,
+                            headers=request_headers,
+                        )
+                        meta_response.raise_for_status()
+                        meta_body_parsed = meta_response.json()
+                        meta_data = meta_body_parsed.get("data") or {}
+                        meta_edges = meta_data.get(
+                            "EXTHUB__AgentExtensionMetadataInstances", {}
+                        ).get("edges", [])
+                        if meta_edges:
+                            meta_node = (meta_edges[0] or {}).get("node") or {}
+                            agent_ext_version = (
+                                meta_node.get("agentExtensionVersion") or None
+                            )
+                    except Exception:
+                        logger.warning(
+                            "Failed to fetch AgentExtensionMetadata; agent_ext_version will be None",
+                            exc_info=True,
+                        )
+
         except TransportError:
             raise
         except Exception as exc:
@@ -718,7 +767,7 @@ class UmsTransport:
             # Evict expired entries first.
             expired_keys = [
                 k
-                for k, (ts, _) in self._cache.items()
+                for k, (ts, _, _v) in self._cache.items()
                 if (now - ts) >= _CACHE_TTL_SECONDS
             ]
             for k in expired_keys:
@@ -728,12 +777,14 @@ class UmsTransport:
             while len(self._cache) >= _CACHE_MAX_SIZE:
                 self._cache.popitem(last=False)
 
-            self._cache[cache_key] = (now, all_edges)
+            self._cache[cache_key] = (now, all_edges, agent_ext_version)
 
         # 8. Transform -----------------------------------------------------------
         combined_data: Dict[str, Any] = {
             "EXTHUB__ExtCapImplementationInstances": {"edges": all_edges},
         }
-        result = _transform_ums_response(combined_data, capability_id)
+        result = _transform_ums_response(
+            combined_data, capability_id, agent_ext_version
+        )
 
         return result

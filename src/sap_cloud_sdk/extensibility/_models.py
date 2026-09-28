@@ -659,6 +659,9 @@ class ExtensionCapabilityImplementation:
         joule_studio_gsid: Global solution ID of Joule Studio. Set when a
             single Joule Studio extension contributes to this capability;
             empty string otherwise.
+        agent_ext_version: The agent's current extension version counter
+            (e.g., ``"5"``). ``None`` when no extensions are deployed or
+            ``AgentExtensionMetadata`` is not yet populated in UMS.
     """
 
     capability_id: str
@@ -668,6 +671,7 @@ class ExtensionCapabilityImplementation:
     hooks: List[Hook] = field(default_factory=list)
     source: Optional[ExtensionSourceMapping] = None
     joule_studio_gsid: str = ""
+    agent_ext_version: Optional[str] = None
 
     @classmethod
     def from_dict(cls, obj: Dict[str, Any]) -> ExtensionCapabilityImplementation:

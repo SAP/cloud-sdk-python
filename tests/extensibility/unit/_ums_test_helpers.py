@@ -233,6 +233,24 @@ UMS_RESPONSE_EMPTY_INSTRUCTION = {
     }
 }
 
+UMS_META_EMPTY = {
+    "data": {
+        "EXTHUB__AgentExtensionMetadataInstances": {
+            "edges": []
+        }
+    }
+}
+
+UMS_META_WITH_VERSION = {
+    "data": {
+        "EXTHUB__AgentExtensionMetadataInstances": {
+            "edges": [
+                {"node": {"agentExtensionVersion": "5"}}
+            ]
+        }
+    }
+}
+
 UMS_RESPONSE_DIFFERENT_CAPABILITY = {
     "data": {
         "EXTHUB__ExtCapImplementationInstances": {

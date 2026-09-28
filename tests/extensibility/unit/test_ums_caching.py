@@ -18,6 +18,7 @@ from tests.extensibility.unit._ums_test_helpers import (
     UMS_RESPONSE_SINGLE,
     UMS_RESPONSE_MULTIPLE,
     UMS_RESPONSE_DIFFERENT_CAPABILITY,
+    UMS_META_EMPTY,
     _make_config,
     _make_dest,
     _make_httpx_response,
@@ -55,7 +56,14 @@ class TestUmsTransportCache:
         """Second call with same capability_id returns cached result without HTTP."""
         transport, _ = self._make_transport()
         response = _make_httpx_response(UMS_RESPONSE_SINGLE)
-        patcher, mock_client = self._patch_httpx(response)
+        meta_response = _make_httpx_response(UMS_META_EMPTY)
+
+        patcher = patch("sap_cloud_sdk.extensibility._ums_transport.httpx.Client")
+        mock_client_cls = patcher.start()
+        mock_client = MagicMock()
+        mock_client_cls.return_value.__enter__ = MagicMock(return_value=mock_client)
+        mock_client_cls.return_value.__exit__ = MagicMock(return_value=False)
+        mock_client.post.side_effect = [response, meta_response]
 
         try:
             result1 = transport.get_extension_capability_implementation()
@@ -63,8 +71,8 @@ class TestUmsTransportCache:
         finally:
             patcher.stop()
 
-        # Only one HTTP call should have been made
-        assert mock_client.post.call_count == 1
+        # Two HTTP calls for the first transport call (ext cap + metadata), zero for the cache hit
+        assert mock_client.post.call_count == 2
         # Both results should be equal (not identical, since we transform on each read)
         assert result1 == result2
         assert result1.extension_names == ["ServiceNow Extension"]
@@ -85,8 +93,8 @@ class TestUmsTransportCache:
         finally:
             patcher.stop()
 
-        # Two HTTP calls -- one per distinct capability_id
-        assert mock_client.post.call_count == 2
+        # Four HTTP calls -- two per distinct capability_id (ext cap + metadata each)
+        assert mock_client.post.call_count == 4
         assert result1.capability_id == "default"
         assert result2.capability_id == "onboarding"
 
@@ -101,18 +109,18 @@ class TestUmsTransportCache:
         mock_time.monotonic.return_value = 0.0
         try:
             result1 = transport.get_extension_capability_implementation()
-            assert mock_client.post.call_count == 1
+            assert mock_client.post.call_count == 2
 
             # Second call at t=599 (within TTL) -- should be cached
             mock_time.monotonic.return_value = 599.0
             result2 = transport.get_extension_capability_implementation()
-            assert mock_client.post.call_count == 1
+            assert mock_client.post.call_count == 2
             assert result2 == result1
 
             # Third call at t=601 (past TTL) -- should fetch fresh
             mock_time.monotonic.return_value = 601.0
             transport.get_extension_capability_implementation()
-            assert mock_client.post.call_count == 2
+            assert mock_client.post.call_count == 4
         finally:
             patcher.stop()
 
@@ -125,11 +133,11 @@ class TestUmsTransportCache:
         try:
             # Populate cache
             transport.get_extension_capability_implementation()
-            assert mock_client.post.call_count == 1
+            assert mock_client.post.call_count == 2
 
             # skip_cache=True should bypass
             transport.get_extension_capability_implementation(skip_cache=True)
-            assert mock_client.post.call_count == 2
+            assert mock_client.post.call_count == 4
         finally:
             patcher.stop()
 
@@ -139,14 +147,20 @@ class TestUmsTransportCache:
 
         response1 = _make_httpx_response(UMS_RESPONSE_SINGLE)
         response2 = _make_httpx_response(UMS_RESPONSE_MULTIPLE)
+        meta_response = _make_httpx_response(UMS_META_EMPTY)
 
         patcher = patch("sap_cloud_sdk.extensibility._ums_transport.httpx.Client")
         mock_client_cls = patcher.start()
         mock_client = MagicMock()
         mock_client_cls.return_value.__enter__ = MagicMock(return_value=mock_client)
         mock_client_cls.return_value.__exit__ = MagicMock(return_value=False)
-        # First call returns SINGLE, second (skip_cache) returns MULTIPLE
-        mock_client.post.side_effect = [response1, response2]
+        # Each transport call = ext cap POST + metadata POST
+        mock_client.post.side_effect = [
+            response1,
+            meta_response,
+            response2,
+            meta_response,
+        ]
 
         try:
             # Populate cache with SINGLE
@@ -160,8 +174,8 @@ class TestUmsTransportCache:
             # Normal call should now return the MULTIPLE result from cache
             result3 = transport.get_extension_capability_implementation()
             assert result3 == result2
-            # Only 2 HTTP calls total (the third was a cache hit)
-            assert mock_client.post.call_count == 2
+            # Only 4 HTTP calls total (the third was a cache hit)
+            assert mock_client.post.call_count == 4
         finally:
             patcher.stop()
 
@@ -170,13 +184,15 @@ class TestUmsTransportCache:
         transport, dest_client = self._make_transport()
         error_response = _make_httpx_response({"error": "fail"}, status_code=500)
         success_response = _make_httpx_response(UMS_RESPONSE_SINGLE)
+        meta_response = _make_httpx_response(UMS_META_EMPTY)
 
         patcher = patch("sap_cloud_sdk.extensibility._ums_transport.httpx.Client")
         mock_client_cls = patcher.start()
         mock_client = MagicMock()
         mock_client_cls.return_value.__enter__ = MagicMock(return_value=mock_client)
         mock_client_cls.return_value.__exit__ = MagicMock(return_value=False)
-        mock_client.post.side_effect = [error_response, success_response]
+        # First ext cap call fails (no metadata call); second succeeds + metadata
+        mock_client.post.side_effect = [error_response, success_response, meta_response]
 
         try:
             # First call fails
@@ -186,7 +202,7 @@ class TestUmsTransportCache:
             # Cache should be empty, so second call makes a real HTTP request
             result = transport.get_extension_capability_implementation()
             assert result.extension_names == ["ServiceNow Extension"]
-            assert mock_client.post.call_count == 2
+            assert mock_client.post.call_count == 3
         finally:
             patcher.stop()
 
@@ -200,13 +216,19 @@ class TestUmsTransportCache:
 
         response1 = _make_httpx_response(UMS_RESPONSE_SINGLE)
         response2 = _make_httpx_response(UMS_RESPONSE_MULTIPLE)
+        meta_response = _make_httpx_response(UMS_META_EMPTY)
 
         patcher = patch("sap_cloud_sdk.extensibility._ums_transport.httpx.Client")
         mock_client_cls = patcher.start()
         mock_client = MagicMock()
         mock_client_cls.return_value.__enter__ = MagicMock(return_value=mock_client)
         mock_client_cls.return_value.__exit__ = MagicMock(return_value=False)
-        mock_client.post.side_effect = [response1, response2]
+        mock_client.post.side_effect = [
+            response1,
+            meta_response,
+            response2,
+            meta_response,
+        ]
 
         try:
             result_a = transport.get_extension_capability_implementation(
@@ -218,8 +240,8 @@ class TestUmsTransportCache:
         finally:
             patcher.stop()
 
-        # Two HTTP calls -- one per tenant
-        assert mock_client.post.call_count == 2
+        # Four HTTP calls -- two per tenant (ext cap + metadata each)
+        assert mock_client.post.call_count == 4
         assert result_a.extension_names == ["ServiceNow Extension"]
         assert result_b.extension_names == ["ServiceNow Extension", "Jira Extension"]
 
@@ -239,7 +261,7 @@ class TestUmsTransportCache:
         finally:
             patcher.stop()
 
-        assert mock_client.post.call_count == 1
+        assert mock_client.post.call_count == 2
         assert result1 == result2
 
     def test_different_tenants_are_separate_cache_keys(self):
@@ -248,13 +270,19 @@ class TestUmsTransportCache:
 
         response1 = _make_httpx_response(UMS_RESPONSE_SINGLE)
         response2 = _make_httpx_response(UMS_RESPONSE_MULTIPLE)
+        meta_response = _make_httpx_response(UMS_META_EMPTY)
 
         patcher = patch("sap_cloud_sdk.extensibility._ums_transport.httpx.Client")
         mock_client_cls = patcher.start()
         mock_client = MagicMock()
         mock_client_cls.return_value.__enter__ = MagicMock(return_value=mock_client)
         mock_client_cls.return_value.__exit__ = MagicMock(return_value=False)
-        mock_client.post.side_effect = [response1, response2]
+        mock_client.post.side_effect = [
+            response1,
+            meta_response,
+            response2,
+            meta_response,
+        ]
 
         try:
             result_a = transport.get_extension_capability_implementation(
@@ -266,7 +294,7 @@ class TestUmsTransportCache:
         finally:
             patcher.stop()
 
-        assert mock_client.post.call_count == 2
+        assert mock_client.post.call_count == 4
         assert result_a is not result_b
 
     def test_cache_max_size_constant(self):

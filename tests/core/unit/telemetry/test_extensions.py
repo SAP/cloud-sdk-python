@@ -20,12 +20,14 @@ from sap_cloud_sdk.core.telemetry.extensions import (
     ATTR_EXTENSION_URL,
     ATTR_SOLUTION_ID,
     ATTR_JOULE_STUDIO_GSID,
+    ATTR_AGENT_EXT_VERSION,
     ATTR_SUMMARY_TOTAL_OPERATION_COUNT,
     ATTR_SUMMARY_TOTAL_DURATION_MS,
     ATTR_SUMMARY_TOOL_CALL_COUNT,
     ATTR_SUMMARY_HOOK_CALL_COUNT,
     ATTR_SUMMARY_HAS_INSTRUCTION,
     ATTR_SUMMARY_JOULE_STUDIO_GSID,
+    ATTR_SUMMARY_AGENT_EXT_VERSION,
     resolve_source_info,
     build_extension_span_attributes,
     reset_tool_call_metrics,
@@ -131,6 +133,7 @@ class TestExtensionContext:
                             extension_url="https://ext.example.com",
                             solution_id="sol-789",
                             joule_studio_gsid="gsid-test-123",
+                            agent_ext_version="5",
                         ):
                             pass
 
@@ -144,6 +147,7 @@ class TestExtensionContext:
         assert captured_baggage[ATTR_EXTENSION_URL] == "https://ext.example.com"
         assert captured_baggage[ATTR_SOLUTION_ID] == "sol-789"
         assert captured_baggage[ATTR_JOULE_STUDIO_GSID] == "gsid-test-123"
+        assert captured_baggage[ATTR_AGENT_EXT_VERSION] == "5"
 
     def test_extension_context_defaults_for_new_params(self):
         """Test extension_context uses defaults when new params are omitted."""
@@ -182,6 +186,7 @@ class TestExtensionContext:
         assert ATTR_EXTENSION_URL not in captured_baggage
         assert ATTR_SOLUTION_ID not in captured_baggage
         assert ATTR_JOULE_STUDIO_GSID not in captured_baggage
+        assert ATTR_AGENT_EXT_VERSION not in captured_baggage
 
     def test_extension_context_hook_type(self):
         """Test extension_context with hook extension type."""
@@ -573,6 +578,7 @@ class TestExtensionContextIntegration:
             extension_url="https://ext.example.com",
             solution_id="sol-789",
             joule_studio_gsid="gsid-789",
+            agent_ext_version="3",
         ):
             result_during = get_extension_context()
             assert result_during is not None
@@ -586,6 +592,7 @@ class TestExtensionContextIntegration:
             assert result_during["extension_url"] == "https://ext.example.com"
             assert result_during["solution_id"] == "sol-789"
             assert result_during["joule_studio_gsid"] == "gsid-789"
+            assert result_during["agent_ext_version"] == "3"
 
         result_after = get_extension_context()
         assert result_after is None
@@ -650,6 +657,7 @@ class TestExtensionContextIntegration:
             assert result["extension_url"] == ""
             assert result["solution_id"] == ""
             assert result["joule_studio_gsid"] == ""
+            assert result["agent_ext_version"] == ""
 
 
 # ---------------------------------------------------------------------------
@@ -1106,6 +1114,37 @@ class TestEmitExtensionsSummarySpan:
             attrs = mock_tracer.start_span.call_args[1]["attributes"]
             assert ATTR_SUMMARY_JOULE_STUDIO_GSID not in attrs
 
+    def test_agent_ext_version_included_when_provided(self):
+        with patch("sap_cloud_sdk.core.telemetry.extensions._tracer") as mock_tracer:
+            mock_span = MagicMock()
+            mock_tracer.start_span.return_value = mock_span
+
+            emit_extensions_summary_span(
+                tool_call_count=1,
+                hook_call_count=0,
+                has_instruction=False,
+                total_duration_ms=100.0,
+                agent_ext_version="5",
+            )
+
+            attrs = mock_tracer.start_span.call_args[1]["attributes"]
+            assert attrs[ATTR_SUMMARY_AGENT_EXT_VERSION] == "5"
+
+    def test_agent_ext_version_omitted_when_empty(self):
+        with patch("sap_cloud_sdk.core.telemetry.extensions._tracer") as mock_tracer:
+            mock_span = MagicMock()
+            mock_tracer.start_span.return_value = mock_span
+
+            emit_extensions_summary_span(
+                tool_call_count=1,
+                hook_call_count=0,
+                has_instruction=False,
+                total_duration_ms=100.0,
+            )
+
+            attrs = mock_tracer.start_span.call_args[1]["attributes"]
+            assert ATTR_SUMMARY_AGENT_EXT_VERSION not in attrs
+
 
 # ---------------------------------------------------------------------------
 # ExtensionContextLogFilter
@@ -1129,6 +1168,7 @@ class TestExtensionContextLogFilter:
             extension_url="https://ext.example.com",
             solution_id="sol-42",
             joule_studio_gsid="gsid-42",
+            agent_ext_version="7",
         ):
             result = filt.filter(record)
 
@@ -1143,6 +1183,7 @@ class TestExtensionContextLogFilter:
         assert getattr(record, "ext_extension_url") == "https://ext.example.com"
         assert getattr(record, "ext_solution_id") == "sol-42"
         assert getattr(record, "ext_joule_studio_gsid") == "gsid-42"
+        assert getattr(record, "ext_agent_ext_version") == "7"
 
     def test_no_attributes_outside_context(self):
         filt = ExtensionContextLogFilter()
@@ -1179,3 +1220,30 @@ class TestExtensionContextLogFilter:
         assert getattr(record, "ext_extension_url") == ""
         assert getattr(record, "ext_solution_id") == ""
         assert getattr(record, "ext_joule_studio_gsid") == ""
+        assert getattr(record, "ext_agent_ext_version") == ""
+
+    def test_agent_ext_version_set_in_log_record(self):
+        """When agent_ext_version is provided, ext_agent_ext_version is stamped on the record."""
+        filt = ExtensionContextLogFilter()
+        record = logging.LogRecord("test", logging.INFO, "", 0, "msg", (), None)
+
+        with extension_context(
+            "cap",
+            "ext",
+            ExtensionType.TOOL,
+            agent_ext_version="42",
+        ):
+            filt.filter(record)
+
+        assert getattr(record, "ext_agent_ext_version") == "42"
+
+    def test_agent_ext_version_empty_when_not_set(self):
+        """When agent_ext_version is omitted, ext_agent_ext_version is empty string on the record."""
+        filt = ExtensionContextLogFilter()
+        record = logging.LogRecord("test", logging.INFO, "", 0, "msg", (), None)
+
+        with extension_context("cap", "ext", ExtensionType.TOOL):
+            filt.filter(record)
+
+        assert getattr(record, "ext_agent_ext_version") == ""
+        assert getattr(record, "ext_agent_ext_version") == ""

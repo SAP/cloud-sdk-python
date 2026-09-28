@@ -47,6 +47,7 @@ ATTR_EXTENSION_ITEM_NAME = "sap.extension.extension.item.name"
 ATTR_EXTENSION_URL = "sap.extension.extensionUrl"
 ATTR_SOLUTION_ID = "sap.extension.solution_id"
 ATTR_JOULE_STUDIO_GSID = "sap.extension.joule_studio_gsid"
+ATTR_AGENT_EXT_VERSION = "sap.extension.agentExtVersion"
 
 
 class ExtensionType(str, Enum):
@@ -74,6 +75,7 @@ def extension_context(
     extension_url: str = "",
     solution_id: str = "",
     joule_studio_gsid: str = "",
+    agent_ext_version: str = "",
 ) -> Generator[None, None, None]:
     """Set extension context in OTel baggage for propagation.
 
@@ -93,6 +95,7 @@ def extension_context(
     - ``sap.extension.extensionUrl``: The extension URL (when provided)
     - ``sap.extension.solution_id``: The solution ID (when provided)
     - ``sap.extension.joule_studio_gsid``: The global solution ID of Joule Studio (when provided)
+    - ``sap.extension.agentExtVersion``: The agent extension version counter (when provided)
 
     Args:
         capability_id: The capability ID for the extension
@@ -106,6 +109,9 @@ def extension_context(
         extension_url: The build extension URL (empty string if not available).
         solution_id: The solution ID (empty string if not available).
         joule_studio_gsid: The global solution ID of Joule Studio (empty string if not available).
+        agent_ext_version: The agent extension version counter from UMS
+            ``AgentExtensionMetadata`` (e.g. ``"5"``). Empty string if not
+            available; the baggage key is omitted in that case.
 
     Yields:
         None. The context is active for the duration of the with block.
@@ -126,6 +132,7 @@ def extension_context(
             item_name="create_ticket",
             solution_id="my-solution-42",
             joule_studio_gsid="gsid-value",
+            agent_ext_version="5",
         ):
             result = await mcp_client.call_tool("create_ticket", args)
         ```
@@ -149,6 +156,10 @@ def extension_context(
     if joule_studio_gsid:
         ctx = baggage.set_baggage(
             ATTR_JOULE_STUDIO_GSID, joule_studio_gsid, context=ctx
+        )
+    if agent_ext_version:
+        ctx = baggage.set_baggage(
+            ATTR_AGENT_EXT_VERSION, agent_ext_version, context=ctx
         )
 
     token = attach(ctx)
@@ -178,6 +189,7 @@ def get_extension_context() -> dict[str, Any] | None:
         - ``extension_url``: The extension URL (empty string if not set)
         - ``solution_id``: The solution ID (empty string if not set)
         - ``joule_studio_gsid``: The global solution ID of Joule Studio (empty string if not set)
+        - ``agent_ext_version``: The agent extension version counter (empty string if not set)
 
         Returns ``None`` if not in an extension context.
 
@@ -205,6 +217,7 @@ def get_extension_context() -> dict[str, Any] | None:
         "extension_url": baggage.get_baggage(ATTR_EXTENSION_URL) or "",
         "solution_id": baggage.get_baggage(ATTR_SOLUTION_ID) or "",
         "joule_studio_gsid": baggage.get_baggage(ATTR_JOULE_STUDIO_GSID) or "",
+        "agent_ext_version": baggage.get_baggage(ATTR_AGENT_EXT_VERSION) or "",
     }
 
 
@@ -220,6 +233,7 @@ ATTR_SUMMARY_HAS_INSTRUCTION = "sap.extension.summary.hasInstruction"
 ATTR_SUMMARY_JOULE_STUDIO_GSID = "sap.extension.joule_studio_gsid"
 ATTR_SUMMARY_IS_EXTENSION = "sap.extension.isExtension"
 ATTR_SUMMARY_SOLUTION_ID = "sap.extension.solutionId"
+ATTR_SUMMARY_AGENT_EXT_VERSION = "sap.extension.agentExtVersion"
 
 # ---------------------------------------------------------------------------
 # Private state
@@ -242,6 +256,7 @@ _BAGGAGE_LOG_FIELDS = [
     (ATTR_EXTENSION_URL, "ext_extension_url"),
     (ATTR_SOLUTION_ID, "ext_solution_id"),
     (ATTR_JOULE_STUDIO_GSID, "ext_joule_studio_gsid"),
+    (ATTR_AGENT_EXT_VERSION, "ext_agent_ext_version"),
 ]
 
 
@@ -318,6 +333,7 @@ def build_extension_span_attributes(
     extension_url: str = "",
     solution_id: str = "",
     joule_studio_gsid: str = "",
+    agent_ext_version: str = "",
 ) -> dict[str, Any]:
     """Build the full set of ``sap.extension.*`` span attributes.
 
@@ -331,6 +347,7 @@ def build_extension_span_attributes(
         extension_url: Build extension URL (empty string if not available).
         solution_id: Solution ID (empty string if not available).
         joule_studio_gsid: Global solution ID (empty string if not available).
+        agent_ext_version: Agent extension version from UMS (empty string if not available).
 
     Returns:
         Dict with all ``sap.extension.*`` attribute keys.
@@ -350,6 +367,8 @@ def build_extension_span_attributes(
         attrs[ATTR_SOLUTION_ID] = solution_id
     if joule_studio_gsid:
         attrs[ATTR_JOULE_STUDIO_GSID] = joule_studio_gsid
+    if agent_ext_version:
+        attrs[ATTR_AGENT_EXT_VERSION] = agent_ext_version
     return attrs
 
 
@@ -440,13 +459,13 @@ async def call_extension_tool(
     args: dict[str, Any],
     capability: str = "default",
     source_mapping: dict[str, Any] | None = None,
+    agent_ext_version: str = "",
 ) -> Any:
     """Call an MCP tool with telemetry instrumentation.
 
     Wraps the tool call with ``extension_context`` (sets OTel baggage for
     downstream propagation) and creates an explicit tracer span with all
-    seven ``sap.extension.*`` attributes so the call is visible in
-    agent-side traces.
+    ``sap.extension.*`` attributes so the call is visible in agent-side traces.
 
     Args:
         mcp_client: The MCP client session connected to the tool's server.
@@ -461,6 +480,8 @@ async def call_extension_tool(
             objects (from ``ext_impl.source.tools``).  Keys must match the
             *tool_name* values passed to this function.
             See :class:`~sap_cloud_sdk.extensibility.ExtensionSourceMapping`.
+        agent_ext_version: Agent extension version from UMS AgentExtensionMetadata
+            (pass ``ext_impl.agent_ext_version``; empty string if not available).
 
     Returns:
         The tool's response from the MCP server.
@@ -487,6 +508,7 @@ async def call_extension_tool(
         extension_url=resolved_url,
         solution_id=resolved_solution_id,
         joule_studio_gsid=resolved_joule_studio_gsid,
+        agent_ext_version=agent_ext_version,
     )
 
     t0 = time.monotonic()
@@ -502,6 +524,7 @@ async def call_extension_tool(
                 extension_url=resolved_url,
                 solution_id=resolved_solution_id,
                 joule_studio_gsid=resolved_joule_studio_gsid,
+                agent_ext_version=agent_ext_version,
             ),
             _tracer.start_as_current_span(
                 f"extension_tool {tool_name}",
@@ -529,13 +552,13 @@ async def call_extension_hook(
     capability: str = "default",
     source_mapping: dict[str, Any] | None = None,
     hook_id: str = "",
+    agent_ext_version: str = "",
 ) -> Any:
     """Call an extension hook with telemetry instrumentation.
 
     Wraps the hook call with ``extension_context`` (sets OTel baggage for
     downstream propagation) and creates an explicit tracer span with all
-    seven ``sap.extension.*`` attributes so the call is visible in
-    agent-side traces.
+    ``sap.extension.*`` attributes so the call is visible in agent-side traces.
 
     Args:
         extensibility_client: The extensibility client.  Must have an async
@@ -550,6 +573,8 @@ async def call_extension_hook(
             objects (from ``ext_impl.source.hooks``).
         hook_id: The unique hook ``id`` (UUID), used as lookup key in
             *source_mapping*.
+        agent_ext_version: Agent extension version from UMS AgentExtensionMetadata
+            (pass ``ext_impl.agent_ext_version``; empty string if not available).
 
     Returns:
         The hook's response.
@@ -575,6 +600,7 @@ async def call_extension_hook(
         extension_url=resolved_url,
         solution_id=resolved_solution_id,
         joule_studio_gsid=resolved_joule_studio_gsid,
+        agent_ext_version=agent_ext_version,
     )
 
     t0 = time.monotonic()
@@ -590,6 +616,7 @@ async def call_extension_hook(
                 extension_url=resolved_url,
                 solution_id=resolved_solution_id,
                 joule_studio_gsid=resolved_joule_studio_gsid,
+                agent_ext_version=agent_ext_version,
             ),
             _tracer.start_as_current_span(
                 f"extension_hook {item_name}",
@@ -617,6 +644,7 @@ def emit_extensions_summary_span(
     total_duration_ms: float,
     joule_studio_gsid: str = "",
     solution_id: str = "",
+    agent_ext_version: str = "",
 ) -> None:
     """Emit a sibling summary span with aggregate extension metrics.
 
@@ -642,6 +670,8 @@ def emit_extensions_summary_span(
             if not available).
         solution_id: Solution ID of the contributing extension (empty string
             if not available).
+        agent_ext_version: Agent extension version from UMS AgentExtensionMetadata
+            (empty string if not available).
     """
     total = tool_call_count + hook_call_count + (1 if has_instruction else 0)
     attrs = {
@@ -656,6 +686,8 @@ def emit_extensions_summary_span(
         attrs[ATTR_SUMMARY_JOULE_STUDIO_GSID] = joule_studio_gsid
     if solution_id:
         attrs[ATTR_SUMMARY_SOLUTION_ID] = solution_id
+    if agent_ext_version:
+        attrs[ATTR_SUMMARY_AGENT_EXT_VERSION] = agent_ext_version
     span = _tracer.start_span("agent_extensions_summary", attributes=attrs)
     span.end()
 

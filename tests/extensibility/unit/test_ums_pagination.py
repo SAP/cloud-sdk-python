@@ -16,6 +16,7 @@ from tests.extensibility.unit._ums_test_helpers import (
     AGENT_ORD_ID,
     UMS_RESPONSE_SINGLE,
     UMS_RESPONSE_EMPTY,
+    UMS_META_EMPTY,
     _make_config,
     _make_dest,
     _make_httpx_response,
@@ -40,7 +41,7 @@ class TestUmsTransportPagination:
         return transport, mock_dest_client.return_value
 
     def test_single_page_no_next(self):
-        """A response with hasNextPage=False results in one HTTP call."""
+        """A response with hasNextPage=False results in two HTTP calls (ext cap + metadata)."""
         transport, _ = self._make_transport()
         response = _make_httpx_response(UMS_RESPONSE_SINGLE)
 
@@ -50,11 +51,14 @@ class TestUmsTransportPagination:
             mock_client = MagicMock()
             mock_client_cls.return_value.__enter__ = MagicMock(return_value=mock_client)
             mock_client_cls.return_value.__exit__ = MagicMock(return_value=False)
-            mock_client.post.return_value = response
+            mock_client.post.side_effect = [
+                response,
+                _make_httpx_response(UMS_META_EMPTY),
+            ]
 
             result = transport.get_extension_capability_implementation()
 
-        assert mock_client.post.call_count == 1
+        assert mock_client.post.call_count == 2
         assert result.extension_names == ["ServiceNow Extension"]
         assert len(result.mcp_servers) == 1
 
@@ -144,12 +148,16 @@ class TestUmsTransportPagination:
             mock_client = MagicMock()
             mock_client_cls.return_value.__enter__ = MagicMock(return_value=mock_client)
             mock_client_cls.return_value.__exit__ = MagicMock(return_value=False)
-            mock_client.post.side_effect = [page1_response, page2_response]
+            mock_client.post.side_effect = [
+                page1_response,
+                page2_response,
+                _make_httpx_response(UMS_META_EMPTY),
+            ]
 
             result = transport.get_extension_capability_implementation()
 
-        # Two HTTP calls
-        assert mock_client.post.call_count == 2
+        # Three HTTP calls: two pages + one metadata query
+        assert mock_client.post.call_count == 3
 
         # Both extensions are merged
         assert result.extension_names == ["Extension A", "Extension B"]
@@ -214,7 +222,11 @@ class TestUmsTransportPagination:
             mock_client = MagicMock()
             mock_client_cls.return_value.__enter__ = MagicMock(return_value=mock_client)
             mock_client_cls.return_value.__exit__ = MagicMock(return_value=False)
-            mock_client.post.side_effect = [page1_response, page2_response]
+            mock_client.post.side_effect = [
+                page1_response,
+                page2_response,
+                _make_httpx_response(UMS_META_EMPTY),
+            ]
 
             original_post = mock_client.post
 
@@ -228,13 +240,17 @@ class TestUmsTransportPagination:
 
             transport.get_extension_capability_implementation()
 
-        assert len(captured_vars) == 2
+        assert len(captured_vars) == 3
 
         # First call: no 'after' variable (uses _GRAPHQL_QUERY without $after)
         assert "after" not in captured_vars[0]
 
         # Second call: after="abc123" (uses _GRAPHQL_QUERY_WITH_CURSOR)
         assert captured_vars[1]["after"] == "abc123"
+
+        # Third call: metadata query — uses metaFilters, no 'filters' key
+        assert "metaFilters" in captured_vars[2]
+        assert "after" not in captured_vars[2]
 
     def test_empty_first_page_no_further_requests(self):
         """Empty edges with hasNextPage=False stops after one request."""
@@ -251,7 +267,7 @@ class TestUmsTransportPagination:
 
             result = transport.get_extension_capability_implementation()
 
-        assert mock_client.post.call_count == 1
+        assert mock_client.post.call_count == 2
         assert result.extension_names == []
         assert result.mcp_servers == []
 
@@ -336,7 +352,7 @@ class TestUmsTransportPagination:
 
             result = transport.get_extension_capability_implementation()
 
-        assert mock_client.post.call_count == 1
+        assert mock_client.post.call_count == 2
         assert result.extension_names == ["Ext"]
 
     def test_max_pages_constant(self):

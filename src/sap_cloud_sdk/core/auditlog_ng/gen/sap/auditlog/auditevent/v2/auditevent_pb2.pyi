@@ -104,6 +104,23 @@ class AiToolCallDisposition(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     AI_TOOL_CALL_DISPOSITION_PENDING_APPROVAL: _ClassVar[AiToolCallDisposition]
     AI_TOOL_CALL_DISPOSITION_OTHER: _ClassVar[AiToolCallDisposition]
 
+class AiMemoryActivityType(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
+    __slots__ = ()
+    AI_MEMORY_ACTIVITY_TYPE_UNSPECIFIED: _ClassVar[AiMemoryActivityType]
+    AI_MEMORY_ACTIVITY_TYPE_READ: _ClassVar[AiMemoryActivityType]
+    AI_MEMORY_ACTIVITY_TYPE_UPDATE: _ClassVar[AiMemoryActivityType]
+    AI_MEMORY_ACTIVITY_TYPE_QUERY: _ClassVar[AiMemoryActivityType]
+    AI_MEMORY_ACTIVITY_TYPE_WRITE: _ClassVar[AiMemoryActivityType]
+    AI_MEMORY_ACTIVITY_TYPE_DELETE: _ClassVar[AiMemoryActivityType]
+
+class AiMemoryScope(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
+    __slots__ = ()
+    AI_MEMORY_SCOPE_UNSPECIFIED: _ClassVar[AiMemoryScope]
+    AI_MEMORY_SCOPE_SESSION: _ClassVar[AiMemoryScope]
+    AI_MEMORY_SCOPE_USER: _ClassVar[AiMemoryScope]
+    AI_MEMORY_SCOPE_AGENT: _ClassVar[AiMemoryScope]
+    AI_MEMORY_SCOPE_GLOBAL: _ClassVar[AiMemoryScope]
+
 class CredentialType(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     __slots__ = ()
     CREDENTIAL_TYPE_UNSPECIFIED: _ClassVar[CredentialType]
@@ -313,6 +330,17 @@ AI_TOOL_CALL_DISPOSITION_DENIED: AiToolCallDisposition
 AI_TOOL_CALL_DISPOSITION_MODIFIED: AiToolCallDisposition
 AI_TOOL_CALL_DISPOSITION_PENDING_APPROVAL: AiToolCallDisposition
 AI_TOOL_CALL_DISPOSITION_OTHER: AiToolCallDisposition
+AI_MEMORY_ACTIVITY_TYPE_UNSPECIFIED: AiMemoryActivityType
+AI_MEMORY_ACTIVITY_TYPE_READ: AiMemoryActivityType
+AI_MEMORY_ACTIVITY_TYPE_UPDATE: AiMemoryActivityType
+AI_MEMORY_ACTIVITY_TYPE_QUERY: AiMemoryActivityType
+AI_MEMORY_ACTIVITY_TYPE_WRITE: AiMemoryActivityType
+AI_MEMORY_ACTIVITY_TYPE_DELETE: AiMemoryActivityType
+AI_MEMORY_SCOPE_UNSPECIFIED: AiMemoryScope
+AI_MEMORY_SCOPE_SESSION: AiMemoryScope
+AI_MEMORY_SCOPE_USER: AiMemoryScope
+AI_MEMORY_SCOPE_AGENT: AiMemoryScope
+AI_MEMORY_SCOPE_GLOBAL: AiMemoryScope
 CREDENTIAL_TYPE_UNSPECIFIED: CredentialType
 CREDENTIAL_TYPE_X509_CERTIFICATE: CredentialType
 CREDENTIAL_TYPE_KEY: CredentialType
@@ -439,70 +467,6 @@ class TraceContext(_message.Message):
     trace_id: str
     span_id: str
     def __init__(self, trace_id: _Optional[str] = ..., span_id: _Optional[str] = ...) -> None: ...
-
-class AiModel(_message.Message):
-    __slots__ = ("ai_provider", "name", "uid", "version")
-    AI_PROVIDER_FIELD_NUMBER: _ClassVar[int]
-    NAME_FIELD_NUMBER: _ClassVar[int]
-    UID_FIELD_NUMBER: _ClassVar[int]
-    VERSION_FIELD_NUMBER: _ClassVar[int]
-    ai_provider: str
-    name: str
-    uid: str
-    version: str
-    def __init__(self, ai_provider: _Optional[str] = ..., name: _Optional[str] = ..., uid: _Optional[str] = ..., version: _Optional[str] = ...) -> None: ...
-
-class AiAgent(_message.Message):
-    __slots__ = ("uid", "name", "instance_uid", "type", "type_id", "version", "ai_model")
-    UID_FIELD_NUMBER: _ClassVar[int]
-    NAME_FIELD_NUMBER: _ClassVar[int]
-    INSTANCE_UID_FIELD_NUMBER: _ClassVar[int]
-    TYPE_FIELD_NUMBER: _ClassVar[int]
-    TYPE_ID_FIELD_NUMBER: _ClassVar[int]
-    VERSION_FIELD_NUMBER: _ClassVar[int]
-    AI_MODEL_FIELD_NUMBER: _ClassVar[int]
-    uid: str
-    name: str
-    instance_uid: str
-    type: str
-    type_id: AiAgentType
-    version: str
-    ai_model: AiModel
-    def __init__(self, uid: _Optional[str] = ..., name: _Optional[str] = ..., instance_uid: _Optional[str] = ..., type: _Optional[str] = ..., type_id: _Optional[_Union[AiAgentType, str]] = ..., version: _Optional[str] = ..., ai_model: _Optional[_Union[AiModel, _Mapping]] = ...) -> None: ...
-
-class AiMessageContext(_message.Message):
-    __slots__ = ("uid", "name", "ai_role_id", "prompt_text", "response_text", "prompt_tokens", "completion_tokens", "total_tokens")
-    UID_FIELD_NUMBER: _ClassVar[int]
-    NAME_FIELD_NUMBER: _ClassVar[int]
-    AI_ROLE_ID_FIELD_NUMBER: _ClassVar[int]
-    PROMPT_TEXT_FIELD_NUMBER: _ClassVar[int]
-    RESPONSE_TEXT_FIELD_NUMBER: _ClassVar[int]
-    PROMPT_TOKENS_FIELD_NUMBER: _ClassVar[int]
-    COMPLETION_TOKENS_FIELD_NUMBER: _ClassVar[int]
-    TOTAL_TOKENS_FIELD_NUMBER: _ClassVar[int]
-    uid: str
-    name: str
-    ai_role_id: AiRole
-    prompt_text: str
-    response_text: str
-    prompt_tokens: int
-    completion_tokens: int
-    total_tokens: int
-    def __init__(self, uid: _Optional[str] = ..., name: _Optional[str] = ..., ai_role_id: _Optional[_Union[AiRole, str]] = ..., prompt_text: _Optional[str] = ..., response_text: _Optional[str] = ..., prompt_tokens: _Optional[int] = ..., completion_tokens: _Optional[int] = ..., total_tokens: _Optional[int] = ...) -> None: ...
-
-class AiDelegation(_message.Message):
-    __slots__ = ("delegator_id", "delegate_id", "scopes", "expires_at", "delegation_chain")
-    DELEGATOR_ID_FIELD_NUMBER: _ClassVar[int]
-    DELEGATE_ID_FIELD_NUMBER: _ClassVar[int]
-    SCOPES_FIELD_NUMBER: _ClassVar[int]
-    EXPIRES_AT_FIELD_NUMBER: _ClassVar[int]
-    DELEGATION_CHAIN_FIELD_NUMBER: _ClassVar[int]
-    delegator_id: str
-    delegate_id: str
-    scopes: _containers.RepeatedScalarFieldContainer[str]
-    expires_at: _timestamp_pb2.Timestamp
-    delegation_chain: _containers.RepeatedScalarFieldContainer[str]
-    def __init__(self, delegator_id: _Optional[str] = ..., delegate_id: _Optional[str] = ..., scopes: _Optional[_Iterable[str]] = ..., expires_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., delegation_chain: _Optional[_Iterable[str]] = ...) -> None: ...
 
 class Common(_message.Message):
     __slots__ = ("timestamp", "source_ip", "user_impersonated_id", "user_initiator_id", "app_id", "tenant_id", "user_session_context_id", "app_context", "user_global_id", "user_impersonated_global_id", "user_initiator_context", "user_impersonated_context", "trace_context")
@@ -1587,6 +1551,70 @@ class CMKDetach(_message.Message):
     system_id: str
     def __init__(self, common: _Optional[_Union[Common, _Mapping]] = ..., cmk_id: _Optional[str] = ..., kms_system_id: _Optional[str] = ..., system_id: _Optional[str] = ...) -> None: ...
 
+class AiModel(_message.Message):
+    __slots__ = ("ai_provider", "name", "uid", "version")
+    AI_PROVIDER_FIELD_NUMBER: _ClassVar[int]
+    NAME_FIELD_NUMBER: _ClassVar[int]
+    UID_FIELD_NUMBER: _ClassVar[int]
+    VERSION_FIELD_NUMBER: _ClassVar[int]
+    ai_provider: str
+    name: str
+    uid: str
+    version: str
+    def __init__(self, ai_provider: _Optional[str] = ..., name: _Optional[str] = ..., uid: _Optional[str] = ..., version: _Optional[str] = ...) -> None: ...
+
+class AiAgent(_message.Message):
+    __slots__ = ("uid", "name", "instance_uid", "type", "type_id", "version", "ai_model")
+    UID_FIELD_NUMBER: _ClassVar[int]
+    NAME_FIELD_NUMBER: _ClassVar[int]
+    INSTANCE_UID_FIELD_NUMBER: _ClassVar[int]
+    TYPE_FIELD_NUMBER: _ClassVar[int]
+    TYPE_ID_FIELD_NUMBER: _ClassVar[int]
+    VERSION_FIELD_NUMBER: _ClassVar[int]
+    AI_MODEL_FIELD_NUMBER: _ClassVar[int]
+    uid: str
+    name: str
+    instance_uid: str
+    type: str
+    type_id: AiAgentType
+    version: str
+    ai_model: AiModel
+    def __init__(self, uid: _Optional[str] = ..., name: _Optional[str] = ..., instance_uid: _Optional[str] = ..., type: _Optional[str] = ..., type_id: _Optional[_Union[AiAgentType, str]] = ..., version: _Optional[str] = ..., ai_model: _Optional[_Union[AiModel, _Mapping]] = ...) -> None: ...
+
+class AiMessageContext(_message.Message):
+    __slots__ = ("uid", "name", "ai_role_id", "prompt_text", "response_text", "prompt_tokens", "completion_tokens", "total_tokens")
+    UID_FIELD_NUMBER: _ClassVar[int]
+    NAME_FIELD_NUMBER: _ClassVar[int]
+    AI_ROLE_ID_FIELD_NUMBER: _ClassVar[int]
+    PROMPT_TEXT_FIELD_NUMBER: _ClassVar[int]
+    RESPONSE_TEXT_FIELD_NUMBER: _ClassVar[int]
+    PROMPT_TOKENS_FIELD_NUMBER: _ClassVar[int]
+    COMPLETION_TOKENS_FIELD_NUMBER: _ClassVar[int]
+    TOTAL_TOKENS_FIELD_NUMBER: _ClassVar[int]
+    uid: str
+    name: str
+    ai_role_id: AiRole
+    prompt_text: str
+    response_text: str
+    prompt_tokens: int
+    completion_tokens: int
+    total_tokens: int
+    def __init__(self, uid: _Optional[str] = ..., name: _Optional[str] = ..., ai_role_id: _Optional[_Union[AiRole, str]] = ..., prompt_text: _Optional[str] = ..., response_text: _Optional[str] = ..., prompt_tokens: _Optional[int] = ..., completion_tokens: _Optional[int] = ..., total_tokens: _Optional[int] = ...) -> None: ...
+
+class AiDelegation(_message.Message):
+    __slots__ = ("delegator_id", "delegate_id", "scopes", "expires_at", "delegation_chain")
+    DELEGATOR_ID_FIELD_NUMBER: _ClassVar[int]
+    DELEGATE_ID_FIELD_NUMBER: _ClassVar[int]
+    SCOPES_FIELD_NUMBER: _ClassVar[int]
+    EXPIRES_AT_FIELD_NUMBER: _ClassVar[int]
+    DELEGATION_CHAIN_FIELD_NUMBER: _ClassVar[int]
+    delegator_id: str
+    delegate_id: str
+    scopes: _containers.RepeatedScalarFieldContainer[str]
+    expires_at: _timestamp_pb2.Timestamp
+    delegation_chain: _containers.RepeatedScalarFieldContainer[str]
+    def __init__(self, delegator_id: _Optional[str] = ..., delegate_id: _Optional[str] = ..., scopes: _Optional[_Iterable[str]] = ..., expires_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., delegation_chain: _Optional[_Iterable[str]] = ...) -> None: ...
+
 class AiSessionStart(_message.Message):
     __slots__ = ("common", "session_id", "ai_agent", "ai_model", "delegation")
     COMMON_FIELD_NUMBER: _ClassVar[int]
@@ -1602,18 +1630,18 @@ class AiSessionStart(_message.Message):
     def __init__(self, common: _Optional[_Union[Common, _Mapping]] = ..., session_id: _Optional[str] = ..., ai_agent: _Optional[_Union[AiAgent, _Mapping]] = ..., ai_model: _Optional[_Union[AiModel, _Mapping]] = ..., delegation: _Optional[_Union[AiDelegation, _Mapping]] = ...) -> None: ...
 
 class AiSessionEnd(_message.Message):
-    __slots__ = ("common", "session_id", "end_reason", "total_tokens", "duration_ms")
+    __slots__ = ("common", "session_id", "end_reason", "total_tokens", "turn_count")
     COMMON_FIELD_NUMBER: _ClassVar[int]
     SESSION_ID_FIELD_NUMBER: _ClassVar[int]
     END_REASON_FIELD_NUMBER: _ClassVar[int]
     TOTAL_TOKENS_FIELD_NUMBER: _ClassVar[int]
-    DURATION_MS_FIELD_NUMBER: _ClassVar[int]
+    TURN_COUNT_FIELD_NUMBER: _ClassVar[int]
     common: Common
     session_id: str
     end_reason: AiSessionEndReason
     total_tokens: int
-    duration_ms: int
-    def __init__(self, common: _Optional[_Union[Common, _Mapping]] = ..., session_id: _Optional[str] = ..., end_reason: _Optional[_Union[AiSessionEndReason, str]] = ..., total_tokens: _Optional[int] = ..., duration_ms: _Optional[int] = ...) -> None: ...
+    turn_count: int
+    def __init__(self, common: _Optional[_Union[Common, _Mapping]] = ..., session_id: _Optional[str] = ..., end_reason: _Optional[_Union[AiSessionEndReason, str]] = ..., total_tokens: _Optional[int] = ..., turn_count: _Optional[int] = ...) -> None: ...
 
 class AiPromptReceived(_message.Message):
     __slots__ = ("common", "session_id", "message_context", "ai_agent")
@@ -1646,13 +1674,12 @@ class AiGuardrailTriggered(_message.Message):
     def __init__(self, common: _Optional[_Union[Common, _Mapping]] = ..., session_id: _Optional[str] = ..., guardrail_name: _Optional[str] = ..., guardrail_type: _Optional[_Union[AiGuardrailType, str]] = ..., action_taken: _Optional[_Union[AiGuardrailAction, str]] = ..., violation_category: _Optional[str] = ..., message_context: _Optional[_Union[AiMessageContext, _Mapping]] = ...) -> None: ...
 
 class AiModelInvocation(_message.Message):
-    __slots__ = ("common", "session_id", "ai_model", "ai_agent", "message_context", "latency_ms", "status", "error_message")
+    __slots__ = ("common", "session_id", "ai_model", "ai_agent", "message_context", "status", "error_message")
     COMMON_FIELD_NUMBER: _ClassVar[int]
     SESSION_ID_FIELD_NUMBER: _ClassVar[int]
     AI_MODEL_FIELD_NUMBER: _ClassVar[int]
     AI_AGENT_FIELD_NUMBER: _ClassVar[int]
     MESSAGE_CONTEXT_FIELD_NUMBER: _ClassVar[int]
-    LATENCY_MS_FIELD_NUMBER: _ClassVar[int]
     STATUS_FIELD_NUMBER: _ClassVar[int]
     ERROR_MESSAGE_FIELD_NUMBER: _ClassVar[int]
     common: Common
@@ -1660,10 +1687,9 @@ class AiModelInvocation(_message.Message):
     ai_model: AiModel
     ai_agent: AiAgent
     message_context: AiMessageContext
-    latency_ms: int
     status: AiInvocationStatus
     error_message: str
-    def __init__(self, common: _Optional[_Union[Common, _Mapping]] = ..., session_id: _Optional[str] = ..., ai_model: _Optional[_Union[AiModel, _Mapping]] = ..., ai_agent: _Optional[_Union[AiAgent, _Mapping]] = ..., message_context: _Optional[_Union[AiMessageContext, _Mapping]] = ..., latency_ms: _Optional[int] = ..., status: _Optional[_Union[AiInvocationStatus, str]] = ..., error_message: _Optional[str] = ...) -> None: ...
+    def __init__(self, common: _Optional[_Union[Common, _Mapping]] = ..., session_id: _Optional[str] = ..., ai_model: _Optional[_Union[AiModel, _Mapping]] = ..., ai_agent: _Optional[_Union[AiAgent, _Mapping]] = ..., message_context: _Optional[_Union[AiMessageContext, _Mapping]] = ..., status: _Optional[_Union[AiInvocationStatus, str]] = ..., error_message: _Optional[str] = ...) -> None: ...
 
 class AiSkillSelected(_message.Message):
     __slots__ = ("common", "session_id", "skill_name", "skill_id", "confidence_score", "ai_agent", "alternatives_considered")
@@ -1700,14 +1726,13 @@ class AiAgentDelegated(_message.Message):
     def __init__(self, common: _Optional[_Union[Common, _Mapping]] = ..., session_id: _Optional[str] = ..., source_agent: _Optional[_Union[AiAgent, _Mapping]] = ..., target_agent: _Optional[_Union[AiAgent, _Mapping]] = ..., delegation: _Optional[_Union[AiDelegation, _Mapping]] = ..., task_description: _Optional[str] = ...) -> None: ...
 
 class AiMcpToolCall(_message.Message):
-    __slots__ = ("common", "session_id", "tool_name", "target_mcp_server_id", "ai_agent", "status", "latency_ms", "error_message")
+    __slots__ = ("common", "session_id", "tool_name", "target_mcp_server_id", "ai_agent", "status", "error_message")
     COMMON_FIELD_NUMBER: _ClassVar[int]
     SESSION_ID_FIELD_NUMBER: _ClassVar[int]
     TOOL_NAME_FIELD_NUMBER: _ClassVar[int]
     TARGET_MCP_SERVER_ID_FIELD_NUMBER: _ClassVar[int]
     AI_AGENT_FIELD_NUMBER: _ClassVar[int]
     STATUS_FIELD_NUMBER: _ClassVar[int]
-    LATENCY_MS_FIELD_NUMBER: _ClassVar[int]
     ERROR_MESSAGE_FIELD_NUMBER: _ClassVar[int]
     common: Common
     session_id: str
@@ -1715,12 +1740,11 @@ class AiMcpToolCall(_message.Message):
     target_mcp_server_id: str
     ai_agent: AiAgent
     status: AiInvocationStatus
-    latency_ms: int
     error_message: str
-    def __init__(self, common: _Optional[_Union[Common, _Mapping]] = ..., session_id: _Optional[str] = ..., tool_name: _Optional[str] = ..., target_mcp_server_id: _Optional[str] = ..., ai_agent: _Optional[_Union[AiAgent, _Mapping]] = ..., status: _Optional[_Union[AiInvocationStatus, str]] = ..., latency_ms: _Optional[int] = ..., error_message: _Optional[str] = ...) -> None: ...
+    def __init__(self, common: _Optional[_Union[Common, _Mapping]] = ..., session_id: _Optional[str] = ..., tool_name: _Optional[str] = ..., target_mcp_server_id: _Optional[str] = ..., ai_agent: _Optional[_Union[AiAgent, _Mapping]] = ..., status: _Optional[_Union[AiInvocationStatus, str]] = ..., error_message: _Optional[str] = ...) -> None: ...
 
 class AiDirectApiAccess(_message.Message):
-    __slots__ = ("common", "session_id", "target_api_id", "ai_agent", "http_method", "status", "response_status_code", "latency_ms")
+    __slots__ = ("common", "session_id", "target_api_id", "ai_agent", "http_method", "status", "response_status_code")
     COMMON_FIELD_NUMBER: _ClassVar[int]
     SESSION_ID_FIELD_NUMBER: _ClassVar[int]
     TARGET_API_ID_FIELD_NUMBER: _ClassVar[int]
@@ -1728,7 +1752,6 @@ class AiDirectApiAccess(_message.Message):
     HTTP_METHOD_FIELD_NUMBER: _ClassVar[int]
     STATUS_FIELD_NUMBER: _ClassVar[int]
     RESPONSE_STATUS_CODE_FIELD_NUMBER: _ClassVar[int]
-    LATENCY_MS_FIELD_NUMBER: _ClassVar[int]
     common: Common
     session_id: str
     target_api_id: str
@@ -1736,11 +1759,10 @@ class AiDirectApiAccess(_message.Message):
     http_method: str
     status: AiInvocationStatus
     response_status_code: int
-    latency_ms: int
-    def __init__(self, common: _Optional[_Union[Common, _Mapping]] = ..., session_id: _Optional[str] = ..., target_api_id: _Optional[str] = ..., ai_agent: _Optional[_Union[AiAgent, _Mapping]] = ..., http_method: _Optional[str] = ..., status: _Optional[_Union[AiInvocationStatus, str]] = ..., response_status_code: _Optional[int] = ..., latency_ms: _Optional[int] = ...) -> None: ...
+    def __init__(self, common: _Optional[_Union[Common, _Mapping]] = ..., session_id: _Optional[str] = ..., target_api_id: _Optional[str] = ..., ai_agent: _Optional[_Union[AiAgent, _Mapping]] = ..., http_method: _Optional[str] = ..., status: _Optional[_Union[AiInvocationStatus, str]] = ..., response_status_code: _Optional[int] = ...) -> None: ...
 
 class AiDataRetrieval(_message.Message):
-    __slots__ = ("common", "session_id", "data_source_id", "data_source_type", "retrieval_type", "results_count", "ai_agent", "latency_ms")
+    __slots__ = ("common", "session_id", "data_source_id", "data_source_type", "retrieval_type", "results_count", "ai_agent")
     COMMON_FIELD_NUMBER: _ClassVar[int]
     SESSION_ID_FIELD_NUMBER: _ClassVar[int]
     DATA_SOURCE_ID_FIELD_NUMBER: _ClassVar[int]
@@ -1748,7 +1770,6 @@ class AiDataRetrieval(_message.Message):
     RETRIEVAL_TYPE_FIELD_NUMBER: _ClassVar[int]
     RESULTS_COUNT_FIELD_NUMBER: _ClassVar[int]
     AI_AGENT_FIELD_NUMBER: _ClassVar[int]
-    LATENCY_MS_FIELD_NUMBER: _ClassVar[int]
     common: Common
     session_id: str
     data_source_id: str
@@ -1756,24 +1777,21 @@ class AiDataRetrieval(_message.Message):
     retrieval_type: AiRetrievalType
     results_count: int
     ai_agent: AiAgent
-    latency_ms: int
-    def __init__(self, common: _Optional[_Union[Common, _Mapping]] = ..., session_id: _Optional[str] = ..., data_source_id: _Optional[str] = ..., data_source_type: _Optional[str] = ..., retrieval_type: _Optional[_Union[AiRetrievalType, str]] = ..., results_count: _Optional[int] = ..., ai_agent: _Optional[_Union[AiAgent, _Mapping]] = ..., latency_ms: _Optional[int] = ...) -> None: ...
+    def __init__(self, common: _Optional[_Union[Common, _Mapping]] = ..., session_id: _Optional[str] = ..., data_source_id: _Optional[str] = ..., data_source_type: _Optional[str] = ..., retrieval_type: _Optional[_Union[AiRetrievalType, str]] = ..., results_count: _Optional[int] = ..., ai_agent: _Optional[_Union[AiAgent, _Mapping]] = ...) -> None: ...
 
 class AiResponseGenerated(_message.Message):
-    __slots__ = ("common", "session_id", "message_context", "ai_agent", "ai_model", "latency_ms")
+    __slots__ = ("common", "session_id", "message_context", "ai_agent", "ai_model")
     COMMON_FIELD_NUMBER: _ClassVar[int]
     SESSION_ID_FIELD_NUMBER: _ClassVar[int]
     MESSAGE_CONTEXT_FIELD_NUMBER: _ClassVar[int]
     AI_AGENT_FIELD_NUMBER: _ClassVar[int]
     AI_MODEL_FIELD_NUMBER: _ClassVar[int]
-    LATENCY_MS_FIELD_NUMBER: _ClassVar[int]
     common: Common
     session_id: str
     message_context: AiMessageContext
     ai_agent: AiAgent
     ai_model: AiModel
-    latency_ms: int
-    def __init__(self, common: _Optional[_Union[Common, _Mapping]] = ..., session_id: _Optional[str] = ..., message_context: _Optional[_Union[AiMessageContext, _Mapping]] = ..., ai_agent: _Optional[_Union[AiAgent, _Mapping]] = ..., ai_model: _Optional[_Union[AiModel, _Mapping]] = ..., latency_ms: _Optional[int] = ...) -> None: ...
+    def __init__(self, common: _Optional[_Union[Common, _Mapping]] = ..., session_id: _Optional[str] = ..., message_context: _Optional[_Union[AiMessageContext, _Mapping]] = ..., ai_agent: _Optional[_Union[AiAgent, _Mapping]] = ..., ai_model: _Optional[_Union[AiModel, _Mapping]] = ...) -> None: ...
 
 class AiUserFeedback(_message.Message):
     __slots__ = ("common", "session_id", "feedback_rating", "feedback_score", "feedback_category", "feedback_comment", "message_uid")
@@ -1918,3 +1936,65 @@ class AiUserInputRequested(_message.Message):
     ai_agent: AiAgent
     message_context: AiMessageContext
     def __init__(self, common: _Optional[_Union[Common, _Mapping]] = ..., requested_from_user_id: _Optional[str] = ..., a2a_task_id: _Optional[str] = ..., a2a_context_id: _Optional[str] = ..., ai_agent: _Optional[_Union[AiAgent, _Mapping]] = ..., message_context: _Optional[_Union[AiMessageContext, _Mapping]] = ...) -> None: ...
+
+class AiTurnStart(_message.Message):
+    __slots__ = ("common", "session_id", "turn_id", "turn_number", "ai_agent", "message_context")
+    COMMON_FIELD_NUMBER: _ClassVar[int]
+    SESSION_ID_FIELD_NUMBER: _ClassVar[int]
+    TURN_ID_FIELD_NUMBER: _ClassVar[int]
+    TURN_NUMBER_FIELD_NUMBER: _ClassVar[int]
+    AI_AGENT_FIELD_NUMBER: _ClassVar[int]
+    MESSAGE_CONTEXT_FIELD_NUMBER: _ClassVar[int]
+    common: Common
+    session_id: str
+    turn_id: str
+    turn_number: int
+    ai_agent: AiAgent
+    message_context: AiMessageContext
+    def __init__(self, common: _Optional[_Union[Common, _Mapping]] = ..., session_id: _Optional[str] = ..., turn_id: _Optional[str] = ..., turn_number: _Optional[int] = ..., ai_agent: _Optional[_Union[AiAgent, _Mapping]] = ..., message_context: _Optional[_Union[AiMessageContext, _Mapping]] = ...) -> None: ...
+
+class AiTurnEnd(_message.Message):
+    __slots__ = ("common", "session_id", "turn_id", "turn_number", "status", "prompt_tokens", "completion_tokens", "total_tokens", "message_context", "error_message")
+    COMMON_FIELD_NUMBER: _ClassVar[int]
+    SESSION_ID_FIELD_NUMBER: _ClassVar[int]
+    TURN_ID_FIELD_NUMBER: _ClassVar[int]
+    TURN_NUMBER_FIELD_NUMBER: _ClassVar[int]
+    STATUS_FIELD_NUMBER: _ClassVar[int]
+    PROMPT_TOKENS_FIELD_NUMBER: _ClassVar[int]
+    COMPLETION_TOKENS_FIELD_NUMBER: _ClassVar[int]
+    TOTAL_TOKENS_FIELD_NUMBER: _ClassVar[int]
+    MESSAGE_CONTEXT_FIELD_NUMBER: _ClassVar[int]
+    ERROR_MESSAGE_FIELD_NUMBER: _ClassVar[int]
+    common: Common
+    session_id: str
+    turn_id: str
+    turn_number: int
+    status: AiInvocationStatus
+    prompt_tokens: int
+    completion_tokens: int
+    total_tokens: int
+    message_context: AiMessageContext
+    error_message: str
+    def __init__(self, common: _Optional[_Union[Common, _Mapping]] = ..., session_id: _Optional[str] = ..., turn_id: _Optional[str] = ..., turn_number: _Optional[int] = ..., status: _Optional[_Union[AiInvocationStatus, str]] = ..., prompt_tokens: _Optional[int] = ..., completion_tokens: _Optional[int] = ..., total_tokens: _Optional[int] = ..., message_context: _Optional[_Union[AiMessageContext, _Mapping]] = ..., error_message: _Optional[str] = ...) -> None: ...
+
+class AiMemoryAccess(_message.Message):
+    __slots__ = ("common", "session_id", "activity_type", "memory_scope", "memory_store_id", "ai_agent", "memory_key", "records_count", "status")
+    COMMON_FIELD_NUMBER: _ClassVar[int]
+    SESSION_ID_FIELD_NUMBER: _ClassVar[int]
+    ACTIVITY_TYPE_FIELD_NUMBER: _ClassVar[int]
+    MEMORY_SCOPE_FIELD_NUMBER: _ClassVar[int]
+    MEMORY_STORE_ID_FIELD_NUMBER: _ClassVar[int]
+    AI_AGENT_FIELD_NUMBER: _ClassVar[int]
+    MEMORY_KEY_FIELD_NUMBER: _ClassVar[int]
+    RECORDS_COUNT_FIELD_NUMBER: _ClassVar[int]
+    STATUS_FIELD_NUMBER: _ClassVar[int]
+    common: Common
+    session_id: str
+    activity_type: AiMemoryActivityType
+    memory_scope: AiMemoryScope
+    memory_store_id: str
+    ai_agent: AiAgent
+    memory_key: str
+    records_count: int
+    status: AiInvocationStatus
+    def __init__(self, common: _Optional[_Union[Common, _Mapping]] = ..., session_id: _Optional[str] = ..., activity_type: _Optional[_Union[AiMemoryActivityType, str]] = ..., memory_scope: _Optional[_Union[AiMemoryScope, str]] = ..., memory_store_id: _Optional[str] = ..., ai_agent: _Optional[_Union[AiAgent, _Mapping]] = ..., memory_key: _Optional[str] = ..., records_count: _Optional[int] = ..., status: _Optional[_Union[AiInvocationStatus, str]] = ...) -> None: ...

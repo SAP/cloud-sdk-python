@@ -7,12 +7,36 @@ custom tool naming, argument schemas, or framework integrations.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Callable
+from typing import TYPE_CHECKING, Any, Callable
+
+from pydantic import Field, create_model
 
 from sap_cloud_sdk.agentgateway._models import MCPTool
 
 if TYPE_CHECKING:
     from langchain_core.tools import StructuredTool
+
+_JSON_TYPE_MAP: dict[str, type] = {
+    "string": str,
+    "integer": int,
+    "number": float,
+    "boolean": bool,
+    "array": list,
+    "object": dict,
+}
+
+
+def _resolve_type(json_type: Any) -> tuple[type, bool]:
+    """Return (python_type, is_nullable) from a JSON Schema ``type`` value.
+
+    Handles both the plain-string form (``"integer"``) and the array form
+    (``["integer", "null"]``).  Unknown or missing types map to ``Any``.
+    """
+    if isinstance(json_type, list):
+        nullable = "null" in json_type
+        scalar = next((t for t in json_type if t != "null"), None)
+        return _JSON_TYPE_MAP.get(scalar, Any), nullable
+    return _JSON_TYPE_MAP.get(json_type, Any), False
 
 
 def mcp_tool_to_langchain(
@@ -67,9 +91,22 @@ def mcp_tool_to_langchain(
             "Install it with: pip install sap-cloud-sdk[langchain]"
         ) from None
 
+    # Build args schema from input_schema.
+    # Pydantic v2 rejects field names starting with '_' (OData CSDL §15.2 allows them).
+    # Strip leading underscores for the Pydantic model and restore originals before
+    # forwarding to call_tool via name_map.
+    properties = mcp_tool.input_schema.get("properties", {})
+    required = set(mcp_tool.input_schema.get("required", []))
+    # safe_name -> original_name; identity for names that need no renaming
+    name_map: dict[str, str] = {k.lstrip("_") or k: k for k in properties}
+
     async def run(**kwargs) -> str:
+        # Translate safe names back to original OData names before forwarding.
+        restored = {name_map.get(k, k): v for k, v in kwargs.items()}
         resolved = (
-            {k: v for k, v in kwargs.items() if v is not None} if omit_none else kwargs
+            {k: v for k, v in restored.items() if v is not None}
+            if omit_none
+            else restored
         )
         return await call_tool(
             mcp_tool,
@@ -77,10 +114,16 @@ def mcp_tool_to_langchain(
             **resolved,
         )
 
-    # Pass the JSON Schema dict directly to avoid Pydantic v2's private-attribute
-    # convention, which silently drops field names starting with '_'. OData CSDL §15.2
-    # explicitly allows '_' as a valid first character in identifiers.
-    args_schema = mcp_tool.input_schema if mcp_tool.input_schema.get("properties") else None
+    fields: dict[str, Any] = {}
+    for safe, orig in name_map.items():
+        v = properties[orig]
+        py_type, type_nullable = _resolve_type(v.get("type"))
+        optional = orig not in required
+        if optional or type_nullable:
+            fields[safe] = (py_type | None, Field(default=None))
+        else:
+            fields[safe] = (py_type, ...)
+    args_schema = create_model(f"{mcp_tool.name}_args", **fields) if fields else None
 
     return StructuredTool.from_function(
         coroutine=run,

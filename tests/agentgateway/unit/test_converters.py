@@ -2,17 +2,9 @@
 
 import pytest
 from unittest.mock import AsyncMock
-from pydantic import BaseModel
 
 from sap_cloud_sdk.agentgateway import MCPTool
 from sap_cloud_sdk.agentgateway.converters import mcp_tool_to_langchain
-
-
-def _schema_fields(lc_tool):
-    """Narrow args_schema to BaseModel and return model_fields."""
-    schema = lc_tool.args_schema
-    assert isinstance(schema, type) and issubclass(schema, BaseModel)
-    return schema.model_fields
 
 
 def _make_tool(*, required=("eventid",), optional=("showdeclinedreason", "datafetchmode")):
@@ -37,32 +29,30 @@ class TestMcpToolToLangchainStructure:
         assert lc_tool.description == "Gets all supplier bids for the specified event"
         assert lc_tool.coroutine is not None
 
-    def test_args_schema_is_pydantic_model_with_all_properties(self):
-        """args_schema is a Pydantic BaseModel that includes every property from input_schema."""
+    def test_args_schema_is_the_input_schema_dict(self):
+        """args_schema must be the raw JSON Schema dict from the MCPTool."""
+        tool = _make_tool()
+        lc_tool = mcp_tool_to_langchain(tool, AsyncMock(return_value="ok"), lambda: "token")
+
+        assert lc_tool.args_schema is tool.input_schema
+
+    def test_args_schema_preserves_all_properties(self):
+        """All property names from input_schema survive in args_schema unchanged."""
         lc_tool = mcp_tool_to_langchain(_make_tool(), AsyncMock(return_value="ok"), lambda: "token")
 
-        assert lc_tool.args_schema is not None
-        fields = _schema_fields(lc_tool)
-        assert "eventid" in fields
-        assert "showdeclinedreason" in fields
-        assert "datafetchmode" in fields
+        props = lc_tool.args_schema["properties"]
+        assert "eventid" in props
+        assert "showdeclinedreason" in props
+        assert "datafetchmode" in props
 
-    def test_required_fields_are_required_in_args_schema(self):
-        """Fields listed in 'required' must be required in the Pydantic model."""
+    def test_args_schema_preserves_required(self):
+        """The 'required' list is preserved verbatim in args_schema."""
         lc_tool = mcp_tool_to_langchain(_make_tool(), AsyncMock(return_value="ok"), lambda: "token")
 
-        assert _schema_fields(lc_tool)["eventid"].is_required()
-
-    def test_optional_fields_are_not_required_in_args_schema(self):
-        """Fields absent from 'required' must be optional in the Pydantic model."""
-        lc_tool = mcp_tool_to_langchain(_make_tool(), AsyncMock(return_value="ok"), lambda: "token")
-
-        fields = _schema_fields(lc_tool)
-        assert not fields["showdeclinedreason"].is_required()
-        assert not fields["datafetchmode"].is_required()
+        assert "eventid" in lc_tool.args_schema["required"]
 
     def test_empty_input_schema_produces_valid_tool(self):
-        """MCPTool with no properties at all still produces a usable StructuredTool."""
+        """MCPTool with no properties still produces a usable StructuredTool."""
         tool = MCPTool(
             name="simple_tool",
             server_name="server",
@@ -73,10 +63,9 @@ class TestMcpToolToLangchainStructure:
         lc_tool = mcp_tool_to_langchain(tool, AsyncMock(return_value="ok"), lambda: "token")
 
         assert lc_tool.name == "simple_tool"
-        assert lc_tool.args_schema is not None
 
-    def test_input_schema_without_properties_key(self):
-        """MCPTool with a type-only schema (no 'properties' key) produces a valid tool."""
+    def test_input_schema_without_properties_key_produces_valid_tool(self):
+        """MCPTool with a type-only schema (no 'properties' key) still produces a usable tool."""
         tool = MCPTool(
             name="typed_tool",
             server_name="server",
@@ -86,150 +75,66 @@ class TestMcpToolToLangchainStructure:
         )
         lc_tool = mcp_tool_to_langchain(tool, AsyncMock(return_value="ok"), lambda: "token")
 
-        assert lc_tool.args_schema is not None
+        assert lc_tool.name == "typed_tool"
 
 
-class TestMcpToolToLangchainTypeMapping:
-    """Tests that JSON Schema types are mapped to the correct Python types."""
+class TestMcpToolToLangchainUnderscoredParams:
+    """OData CSDL §15.2 allows '_'-prefixed identifiers.
 
-    def _tool_with_types(self, properties: dict, required: list[str] | None = None) -> MCPTool:
+    With a dict-based args_schema, Pydantic's private-attribute convention is
+    bypassed entirely — underscore names reach the LLM and call_tool unchanged.
+    """
+
+    def _tool_with_underscore_params(self):
         return MCPTool(
-            name="typed_tool",
-            server_name="server",
-            description="desc",
+            name="get_variant_config",
+            server_name="s4hana",
+            description="Get variant configuration",
             input_schema={
                 "type": "object",
-                "required": required or [],
-                "properties": properties,
+                "required": ["_VariantConfiguration"],
+                "properties": {
+                    "_VariantConfiguration": {"type": "string"},
+                    "_Product": {"type": "string"},
+                    "NormalParam": {"type": "string"},
+                },
             },
             url="https://example.com/mcp",
         )
 
-    def test_string_type_maps_to_str(self):
+    def test_underscored_params_present_in_schema_unchanged(self):
+        """'_VariantConfiguration' and '_Product' must appear as-is in args_schema."""
         lc_tool = mcp_tool_to_langchain(
-            self._tool_with_types({"name": {"type": "string"}}, required=["name"]),
-            AsyncMock(),
-            lambda: "token",
+            self._tool_with_underscore_params(), AsyncMock(return_value="ok"), lambda: "token"
         )
-        assert _schema_fields(lc_tool)["name"].annotation is str
+        props = lc_tool.args_schema["properties"]
+        assert "_VariantConfiguration" in props
+        assert "_Product" in props
 
-    def test_integer_type_maps_to_int(self):
+    def test_underscored_required_param_in_required_list(self):
         lc_tool = mcp_tool_to_langchain(
-            self._tool_with_types({"limit": {"type": "integer"}}, required=["limit"]),
-            AsyncMock(),
-            lambda: "token",
+            self._tool_with_underscore_params(), AsyncMock(return_value="ok"), lambda: "token"
         )
-        assert _schema_fields(lc_tool)["limit"].annotation is int
+        assert "_VariantConfiguration" in lc_tool.args_schema["required"]
 
-    def test_number_type_maps_to_float(self):
+    def test_non_underscored_param_unaffected(self):
         lc_tool = mcp_tool_to_langchain(
-            self._tool_with_types({"ratio": {"type": "number"}}, required=["ratio"]),
-            AsyncMock(),
-            lambda: "token",
+            self._tool_with_underscore_params(), AsyncMock(return_value="ok"), lambda: "token"
         )
-        assert _schema_fields(lc_tool)["ratio"].annotation is float
+        assert "NormalParam" in lc_tool.args_schema["properties"]
 
-    def test_boolean_type_maps_to_bool(self):
+    @pytest.mark.asyncio
+    async def test_underscored_param_forwarded_to_call_tool_unchanged(self):
+        """call_tool must receive '_VariantConfiguration' exactly as the LLM supplied it."""
+        call_tool = AsyncMock(return_value="ok")
         lc_tool = mcp_tool_to_langchain(
-            self._tool_with_types({"active": {"type": "boolean"}}, required=["active"]),
-            AsyncMock(),
-            lambda: "token",
+            self._tool_with_underscore_params(), call_tool, lambda: "token"
         )
-        assert _schema_fields(lc_tool)["active"].annotation is bool
 
-    def test_array_type_maps_to_list(self):
-        lc_tool = mcp_tool_to_langchain(
-            self._tool_with_types({"tags": {"type": "array"}}, required=["tags"]),
-            AsyncMock(),
-            lambda: "token",
-        )
-        assert _schema_fields(lc_tool)["tags"].annotation is list
+        await lc_tool.arun({"_VariantConfiguration": "VC001"})
 
-    def test_object_type_maps_to_dict(self):
-        lc_tool = mcp_tool_to_langchain(
-            self._tool_with_types({"meta": {"type": "object"}}, required=["meta"]),
-            AsyncMock(),
-            lambda: "token",
-        )
-        assert _schema_fields(lc_tool)["meta"].annotation is dict
-
-    def test_unknown_type_maps_to_any(self):
-        from typing import Any
-        lc_tool = mcp_tool_to_langchain(
-            self._tool_with_types({"data": {"type": "unknown"}}, required=["data"]),
-            AsyncMock(),
-            lambda: "token",
-        )
-        assert _schema_fields(lc_tool)["data"].annotation is Any
-
-    def test_missing_type_maps_to_any(self):
-        from typing import Any
-        lc_tool = mcp_tool_to_langchain(
-            self._tool_with_types({"data": {}}, required=["data"]),
-            AsyncMock(),
-            lambda: "token",
-        )
-        assert _schema_fields(lc_tool)["data"].annotation is Any
-
-    def test_optional_non_string_field_is_nullable(self):
-        lc_tool = mcp_tool_to_langchain(
-            self._tool_with_types({"limit": {"type": "integer"}}),
-            AsyncMock(),
-            lambda: "token",
-        )
-        field = _schema_fields(lc_tool)["limit"]
-        assert not field.is_required()
-        # annotation should be int | None
-        import types as _types
-        assert isinstance(field.annotation, _types.UnionType)
-        assert int in field.annotation.__args__
-        assert type(None) in field.annotation.__args__
-
-    def test_array_type_integer_null_maps_to_int(self):
-        lc_tool = mcp_tool_to_langchain(
-            self._tool_with_types({"limit": {"type": ["integer", "null"]}}, required=["limit"]),
-            AsyncMock(),
-            lambda: "token",
-        )
-        field = _schema_fields(lc_tool)["limit"]
-        import types as _types
-        assert isinstance(field.annotation, _types.UnionType)
-        assert int in field.annotation.__args__
-        assert type(None) in field.annotation.__args__
-
-    def test_array_type_number_null_maps_to_float(self):
-        lc_tool = mcp_tool_to_langchain(
-            self._tool_with_types({"ratio": {"type": ["number", "null"]}}, required=["ratio"]),
-            AsyncMock(),
-            lambda: "token",
-        )
-        field = _schema_fields(lc_tool)["ratio"]
-        import types as _types
-        assert isinstance(field.annotation, _types.UnionType)
-        assert float in field.annotation.__args__
-        assert type(None) in field.annotation.__args__
-
-    def test_array_type_multiple_scalars_uses_first_non_null(self):
-        # e.g. {"type": ["number", "string", "null"]} — pick "number"
-        lc_tool = mcp_tool_to_langchain(
-            self._tool_with_types({"val": {"type": ["number", "string", "null"]}}, required=["val"]),
-            AsyncMock(),
-            lambda: "token",
-        )
-        field = _schema_fields(lc_tool)["val"]
-        import types as _types
-        assert isinstance(field.annotation, _types.UnionType)
-        assert float in field.annotation.__args__
-        assert type(None) in field.annotation.__args__
-
-    def test_array_type_without_null_is_not_nullable(self):
-        lc_tool = mcp_tool_to_langchain(
-            self._tool_with_types({"count": {"type": ["integer"]}}, required=["count"]),
-            AsyncMock(),
-            lambda: "token",
-        )
-        field = _schema_fields(lc_tool)["count"]
-        assert field.annotation is int
+        kwargs = call_tool.call_args.kwargs
+        assert kwargs["_VariantConfiguration"] == "VC001"
 
 
 class TestMcpToolToLangchainInvocation:

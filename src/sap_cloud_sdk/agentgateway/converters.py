@@ -7,36 +7,12 @@ custom tool naming, argument schemas, or framework integrations.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Callable
-
-from pydantic import Field, create_model
+from typing import TYPE_CHECKING, Callable
 
 from sap_cloud_sdk.agentgateway._models import MCPTool
 
 if TYPE_CHECKING:
     from langchain_core.tools import StructuredTool
-
-_JSON_TYPE_MAP: dict[str, type] = {
-    "string": str,
-    "integer": int,
-    "number": float,
-    "boolean": bool,
-    "array": list,
-    "object": dict,
-}
-
-
-def _resolve_type(json_type: Any) -> tuple[type, bool]:
-    """Return (python_type, is_nullable) from a JSON Schema ``type`` value.
-
-    Handles both the plain-string form (``"integer"``) and the array form
-    (``["integer", "null"]``).  Unknown or missing types map to ``Any``.
-    """
-    if isinstance(json_type, list):
-        nullable = "null" in json_type
-        scalar = next((t for t in json_type if t != "null"), None)
-        return _JSON_TYPE_MAP.get(scalar, Any), nullable
-    return _JSON_TYPE_MAP.get(json_type, Any), False
 
 
 def mcp_tool_to_langchain(
@@ -101,18 +77,10 @@ def mcp_tool_to_langchain(
             **resolved,
         )
 
-    # Build args schema from input_schema
-    properties = mcp_tool.input_schema.get("properties", {})
-    required = set(mcp_tool.input_schema.get("required", []))
-    fields: dict[str, Any] = {}
-    for k, v in properties.items():
-        py_type, type_nullable = _resolve_type(v.get("type"))
-        optional = k not in required
-        if optional or type_nullable:
-            fields[k] = (py_type | None, Field(default=None))
-        else:
-            fields[k] = (py_type, ...)
-    args_schema = create_model(f"{mcp_tool.name}_args", **fields) if fields else None
+    # Pass the JSON Schema dict directly to avoid Pydantic v2's private-attribute
+    # convention, which silently drops field names starting with '_'. OData CSDL §15.2
+    # explicitly allows '_' as a valid first character in identifiers.
+    args_schema = mcp_tool.input_schema if mcp_tool.input_schema.get("properties") else None
 
     return StructuredTool.from_function(
         coroutine=run,

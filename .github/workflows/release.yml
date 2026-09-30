@@ -166,21 +166,21 @@ jobs:
         env:
           BODY: ${{ github.event.issue.body }}
         run: |
-          NOTES=$(echo "$BODY" \
+          # Extract Release Notes section into temp file
+          echo "$BODY" \
             | awk '/^### Release Notes/{found=1; next} found && /^### (Version|Bump Type|Branch|Breaking Changes)/{exit} found{print}' \
-            | sed '/^[[:space:]]*$/d; 1s/^[[:space:]]*//')
+            | sed '/^[[:space:]]*$/d' \
+            > /tmp/release_notes.md
 
+          # Append Breaking Changes section if present and non-empty
           BREAKING=$(echo "$BODY" \
-            | awk '/^### Breaking Changes/{found=1; next} found && /^###/{exit} found{print}')
+            | awk '/^### Breaking Changes/{found=1; next} found && /^###/{exit} found{print}' \
+            | sed '/^[[:space:]]*$/d')
 
           if [[ -n "$BREAKING" && "$BREAKING" != *"_None_"* ]]; then
-            NOTES="${NOTES}
-
-${BREAKING}"
+            printf '\n%s\n' "$BREAKING" >> /tmp/release_notes.md
           fi
 
-          # Write to a file to avoid shell quoting issues with multiline strings
-          echo "$NOTES" > /tmp/release_notes.md
           echo "notes_file=/tmp/release_notes.md" >> "$GITHUB_OUTPUT"
 
       # ── 12. Create the GitHub Release ───────────────────────────────────────

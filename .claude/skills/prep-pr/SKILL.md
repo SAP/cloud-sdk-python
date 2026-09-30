@@ -1,21 +1,21 @@
 ---
 name: prep-pr
-description: Fill in the pull request template for the current branch. Reads the diff against main, infers description, type of change, testing steps, breaking changes, and checklist state, then either creates a new PR or edits the body of an existing one. Use when you are ready to open or update a PR and want the template filled from the actual changes.
+description: Fill in the pull request template for the current branch. The branch is already the post-merge integration branch (main, or a release/hotfix branch). Diffs from the last released tag that is an ancestor of HEAD to HEAD, infers description, type of change, testing steps, breaking changes, and checklist state, then either creates a new PR or edits the body of an existing one.
 tools: Bash, Read
 compatibility: gh CLI ≥ 2.0, git, GitHub access to SAP/cloud-sdk-python
 ---
 
 # PR Prep: SAP Cloud SDK for Python
 
-Fills in `.github/pull_request_template.md` from the diff of the current branch against `main`, then creates or updates the GitHub PR.
+Fills in `.github/pull_request_template.md` from the diff between the most recent released tag that is an ancestor of HEAD and HEAD itself, then creates or updates the GitHub PR.
 
-Run from the root of the `cloud-sdk-python` repository on the branch you want to open a PR for.
+**Context:** this skill runs on the integration branch after changes are already merged — e.g. `main` after a feature PR merged, or `release-0.56.x` after a hotfix merged. The version in `pyproject.toml` may already reflect the new (unreleased) version; the diff baseline is therefore the previous release tag, not the current version.
 
 ---
 
 ## Phase 1: Pre-flight
 
-Run in parallel:
+Run all checks **in parallel**:
 
 ```bash
 # 1a. Current branch name
@@ -26,34 +26,52 @@ git ls-remote --heads origin $(git rev-parse --abbrev-ref HEAD)
 
 # 1c. Check if a PR already exists for this branch
 gh pr list --repo SAP/cloud-sdk-python --head $(git rev-parse --abbrev-ref HEAD) \
-  --json number,title,url,state --jq '.[0] // empty'
+  --json number,title,url,state,baseRefName --jq '.[0] // empty'
+
+# 1d. Find the most recent semver tag that is an ancestor of HEAD
+git describe --tags --match "v[0-9]*.[0-9]*.[0-9]*" --abbrev=0 HEAD
 ```
 
 **Fail fast** if `1b` returns empty — the branch is not on origin. Tell the user:
 > "Push the branch first (`git push -u origin HEAD`), then re-run `/prep-pr`." Stop.
 
+**If `1d` fails** (no tag found in local history): fetch tags and retry:
+
+```bash
+git fetch --tags origin
+git describe --tags --match "v[0-9]*.[0-9]*.[0-9]*" --abbrev=0 HEAD
+```
+
+If it still fails, tell the user:
+> "No semver release tag found in the history of this branch. Cannot determine the diff baseline. Create a tag for the previous release first, then re-run `/prep-pr`." Stop.
+
 Capture:
 - `CURRENT_BRANCH` — from 1a
-- `EXISTING_PR` — from 1c (number + url, or empty if none)
+- `EXISTING_PR` — from 1c (number, url, baseRefName — or empty if none)
+- `BASE_TAG` — from 1d (e.g. `v0.56.1`) — the diff baseline
+- `BASE_BRANCH` — the branch this PR targets:
+  - If `EXISTING_PR` is present: use `EXISTING_PR.baseRefName`
+  - Else if `CURRENT_BRANCH` matches `release-*` or `hotfix/*`: default to `main` and note it in the summary for the author to verify (a hotfix branch may also need a PR to a release branch)
+  - Otherwise: `main`
 
 ---
 
 ## Phase 2: Gather the diff
 
-Run in parallel:
+Using `BASE_TAG` from Phase 1, run in parallel:
 
 ```bash
-# Commit log since main
-git log main...HEAD --pretty=format:"%H %s" --reverse
+# Commits since the last release tag
+git log {BASE_TAG}..HEAD --pretty=format:"%H %s" --reverse
 
 # Full diff for content analysis
-git diff main...HEAD
+git diff {BASE_TAG}..HEAD
 
 # Changed file paths only
-git diff main...HEAD --name-only
+git diff {BASE_TAG}..HEAD --name-only
 ```
 
-If the log is empty, tell the user: "No commits ahead of `main`. Nothing to open a PR for." Stop.
+If the log is empty, tell the user: "No commits since tag `{BASE_TAG}`. Nothing to open a PR for." Stop.
 
 ---
 
@@ -168,19 +186,19 @@ Closes #<issue_number>
 ### If no existing PR (`EXISTING_PR` is empty):
 
 Propose a PR title using the Conventional Commit format derived from the dominant change type:
-- Single `feat` commit or all feat: use that commit's subject as the title
-- Mixed commits: synthesise a title like `feat(scope): add X and fix Y`
 - Single commit: use its subject directly
+- All same type: synthesise from the dominant commit subject
+- Mixed commits: synthesise a title like `feat(scope): add X and fix Y`
 
-Show the user the proposed title and body. Ask:
-> "Ready to create the PR with this title and body? Reply `yes`, `no`, or provide an alternate title."
+Show the user the proposed title, base branch, diff baseline tag, and body. Ask:
+> "Ready to create the PR targeting `{BASE_BRANCH}` (diff from `{BASE_TAG}`) with this title and body? Reply `yes`, `no`, or provide an alternate title."
 
 On confirmation, run:
 
 ```bash
 gh pr create \
   --repo SAP/cloud-sdk-python \
-  --base main \
+  --base {BASE_BRANCH} \
   --head {CURRENT_BRANCH} \
   --title "{PROPOSED_TITLE}" \
   --body "{PR_BODY}"
@@ -189,7 +207,7 @@ gh pr create \
 ### If PR already exists (`EXISTING_PR` has a number):
 
 Show the user the proposed body and ask:
-> "PR #{NUMBER} already exists ({URL}). Update its body with this content? Reply `yes` or `no`."
+> "PR #{NUMBER} already exists ({URL}), targeting `{BASE_BRANCH}`. Update its body with this content? Reply `yes` or `no`."
 
 On confirmation, run:
 
@@ -209,13 +227,15 @@ After creating or updating the PR, print:
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   PR Ready
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  PR:      #{NUMBER} — {URL}
-  Branch:  {CURRENT_BRANCH} → main
-  Action:  created | updated
+  PR:        #{NUMBER} — {URL}
+  Branch:    {CURRENT_BRANCH} → {BASE_BRANCH}
+  Diff from: {BASE_TAG}
+  Action:    created | updated
 
   Items needing manual attention:
   - <list any checklist boxes left unchecked and why>
   - <issue number if not found automatically>
+  - <note if BASE_BRANCH was defaulted — author should verify>
   - <any other gaps>
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ```

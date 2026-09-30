@@ -1,21 +1,127 @@
-name: Publish Package to PyPI
+name: Release
 
 on:
-  release:
-    types: [published]
+  issues:
+    types: [labeled]
 
 jobs:
-  publish:
-    permissions:
-      contents: read
-      id-token: write
-    name: Publish Package to PyPI
+  release:
+    name: Release
+    if: >
+      github.event.label.name == 'status: tests passed' &&
+      contains(github.event.issue.labels.*.name, 'release')
     runs-on: ubuntu-latest
     environment: 'pypi:sap-cloud-sdk'
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+    permissions:
+      contents: write
+      issues: write
+      id-token: write
 
+    steps:
+      # ── 1. Parse the release issue body ─────────────────────────────────────
+      - name: Parse release issue
+        id: issue
+        env:
+          BODY: ${{ github.event.issue.body }}
+        run: |
+          parse_field() {
+            local heading="$1"
+            # Extract the text between "### <heading>" and the next "###" or end-of-body
+            echo "$BODY" \
+              | awk "/^### ${heading}/{found=1; next} found && /^###/{exit} found{print}" \
+              | sed '/^[[:space:]]*$/d' \
+              | head -1 \
+              | xargs
+          }
+
+          VERSION=$(parse_field "Version")
+          BRANCH=$(parse_field "Branch")
+          BUMP_TYPE=$(parse_field "Bump Type")
+
+          if [[ -z "$VERSION" || -z "$BRANCH" ]]; then
+            echo "ERROR: Could not parse Version or Branch from the release issue body."
+            echo "Issue body:"
+            echo "$BODY"
+            exit 1
+          fi
+
+          echo "version=$VERSION"     >> "$GITHUB_OUTPUT"
+          echo "branch=$BRANCH"       >> "$GITHUB_OUTPUT"
+          echo "bump_type=$BUMP_TYPE" >> "$GITHUB_OUTPUT"
+          echo "tag=v${VERSION}"      >> "$GITHUB_OUTPUT"
+
+          echo "Parsed — version: $VERSION, branch: $BRANCH, bump_type: $BUMP_TYPE"
+
+      # ── 2. Validate version format ───────────────────────────────────────────
+      - name: Validate version string
+        run: |
+          pip install packaging -q
+          python3 -c "
+          from packaging.version import Version, InvalidVersion
+          try:
+              v = Version('${{ steps.issue.outputs.version }}')
+              print(f'Version is valid PEP 440: {v}')
+          except InvalidVersion as e:
+              print(f'ERROR: {e}')
+              raise SystemExit(1)
+          "
+
+      # ── 3. Mark issue as in-progress ────────────────────────────────────────
+      - name: Update issue — release in progress
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh issue edit ${{ github.event.issue.number }} \
+            --repo "${{ github.repository }}" \
+            --remove-label "status: tests passed" \
+            --add-label "status: releasing"
+          gh issue comment ${{ github.event.issue.number }} \
+            --repo "${{ github.repository }}" \
+            --body "🚀 Release workflow started for **v${{ steps.issue.outputs.version }}** from branch \`${{ steps.issue.outputs.branch }}\`."
+
+      # ── 4. Checkout the release branch ──────────────────────────────────────
+      - name: Checkout release branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.issue.outputs.branch }}
+          fetch-depth: 0
+          token: ${{ github.token }}
+
+      # ── 5. Validate the version bump is an increase ─────────────────────────
+      - name: Validate version bump
+        run: |
+          pip install packaging -q
+          CURRENT=$(grep '^version = ' pyproject.toml | cut -d'"' -f2)
+          python .github/scripts/check_version_bump.py "$CURRENT" "${{ steps.issue.outputs.version }}"
+
+      # ── 6. Bump version in pyproject.toml and commit ────────────────────────
+      - name: Bump version in pyproject.toml
+        run: |
+          pip install toml -q
+          python - <<'PYEOF'
+          import toml
+          data = toml.load('pyproject.toml')
+          data['project']['version'] = '${{ steps.issue.outputs.version }}'
+          with open('pyproject.toml', 'w') as f:
+              toml.dump(data, f)
+          PYEOF
+          echo "Updated pyproject.toml → ${{ steps.issue.outputs.version }}"
+
+      - name: Commit version bump
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add pyproject.toml
+          git commit -m "chore(release): bump version to ${{ steps.issue.outputs.version }}"
+          git push origin ${{ steps.issue.outputs.branch }}
+
+      # ── 7. Create and push the tag ───────────────────────────────────────────
+      - name: Create and push tag
+        run: |
+          git tag "${{ steps.issue.outputs.tag }}" -m "Release ${{ steps.issue.outputs.tag }}"
+          git push origin "${{ steps.issue.outputs.tag }}"
+
+      # ── 8. Build the distribution ────────────────────────────────────────────
       - name: Set up Python
         uses: actions/setup-python@v6
         with:
@@ -26,43 +132,123 @@ jobs:
         with:
           enable-cache: true
 
-      - name: Read package name and version from pyproject.toml
-        id: metadata
-        run: |
-          python -m pip install toml packaging
-          PKG_NAME=$(python -c "import toml; print(toml.load('pyproject.toml')['project']['name'])")
-          VERSION=$(python -c "import toml; print(toml.load('pyproject.toml')['project']['version'])")
-          echo "Publishing $PKG_NAME version $VERSION to PyPI"
-          echo "name=$PKG_NAME" >> $GITHUB_OUTPUT
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-
-      - name: Validate pre-release status
-        env:
-          PACKAGE_VERSION: ${{ steps.metadata.outputs.version }}
-          RELEASE_IS_PRERELEASE: ${{ github.event.release.prerelease }}
-        run: |
-          python .github/scripts/validate_prerelease.py \
-            "$PACKAGE_VERSION" "$RELEASE_IS_PRERELEASE"
-
-      - name: Check if version already exists on PyPI
-        run: |
-          PKG_NAME="${{ steps.metadata.outputs.name }}"
-          VERSION="${{ steps.metadata.outputs.version }}"
-
-          echo "Checking if $PKG_NAME version $VERSION exists on PyPI..."
-
-          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "https://pypi.org/pypi/$PKG_NAME/$VERSION/json")
-
-          if [ "$HTTP_STATUS" = "200" ]; then
-            echo "ERROR: Version $VERSION of $PKG_NAME already exists on PyPI!"
-            echo "Please increment the version in pyproject.toml before publishing."
-            exit 1
-          else
-            echo "Version $VERSION is available for upload to PyPI"
-          fi
-
       - name: Build release distribution
         run: uv build
 
+      - name: Verify build artifacts
+        run: |
+          wheel_count=$(ls -1 dist/*.whl 2>/dev/null | wc -l)
+          tar_count=$(ls -1 dist/*.tar.gz 2>/dev/null | wc -l)
+          [[ "$wheel_count" -ge 1 && "$tar_count" -ge 1 ]] || \
+            { echo "ERROR: Missing build artifacts (wheels: $wheel_count, sdists: $tar_count)"; exit 1; }
+          echo "Build artifacts: $wheel_count wheel(s), $tar_count sdist(s)"
+          ls -lh dist/
+
+      # ── 9. Guard: confirm version is not already on PyPI ─────────────────────
+      - name: Check version does not already exist on PyPI
+        run: |
+          PKG_NAME=$(python3 -c "import toml; print(toml.load('pyproject.toml')['project']['name'])")
+          VERSION="${{ steps.issue.outputs.version }}"
+          HTTP=$(curl -s -o /dev/null -w "%{http_code}" "https://pypi.org/pypi/$PKG_NAME/$VERSION/json")
+          if [[ "$HTTP" == "200" ]]; then
+            echo "ERROR: $PKG_NAME $VERSION already exists on PyPI."
+            exit 1
+          fi
+          echo "$PKG_NAME $VERSION is not yet on PyPI — proceeding."
+
+      # ── 10. Publish to PyPI (OIDC trusted publishing) ──────────────────────
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@v1.14.2
+
+      # ── 11. Extract release notes from the issue body ──────────────────────
+      - name: Extract release notes
+        id: notes
+        env:
+          BODY: ${{ github.event.issue.body }}
+        run: |
+          NOTES=$(echo "$BODY" \
+            | awk '/^### Release Notes/{found=1; next} found && /^### (Version|Bump Type|Branch|Breaking Changes)/{exit} found{print}' \
+            | sed '/^[[:space:]]*$/d; 1s/^[[:space:]]*//')
+
+          BREAKING=$(echo "$BODY" \
+            | awk '/^### Breaking Changes/{found=1; next} found && /^###/{exit} found{print}')
+
+          if [[ -n "$BREAKING" && "$BREAKING" != *"_None_"* ]]; then
+            NOTES="${NOTES}
+
+${BREAKING}"
+          fi
+
+          # Write to a file to avoid shell quoting issues with multiline strings
+          echo "$NOTES" > /tmp/release_notes.md
+          echo "notes_file=/tmp/release_notes.md" >> "$GITHUB_OUTPUT"
+
+      # ── 12. Create the GitHub Release ───────────────────────────────────────
+      - name: Create GitHub Release
+        id: gh_release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          IS_PRERELEASE=$(python3 -c "
+          from packaging.version import Version
+          v = Version('${{ steps.issue.outputs.version }}')
+          print('true' if v.is_prerelease else 'false')
+          ")
+
+          RELEASE_URL=$(gh release create "${{ steps.issue.outputs.tag }}" \
+            --repo "${{ github.repository }}" \
+            --title "v${{ steps.issue.outputs.version }}" \
+            --notes-file "${{ steps.notes.outputs.notes_file }}" \
+            $([ "$IS_PRERELEASE" = "true" ] && echo "--prerelease") \
+            dist/*.whl dist/*.tar.gz)
+
+          echo "release_url=$RELEASE_URL" >> "$GITHUB_OUTPUT"
+          echo "GitHub Release created: $RELEASE_URL"
+
+      # ── 13. Close the release issue ─────────────────────────────────────────
+      - name: Close release issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.issue.outputs.version }}
+          TAG: ${{ steps.issue.outputs.tag }}
+          RELEASE_URL: ${{ steps.gh_release.outputs.release_url }}
+        run: |
+          PKG_NAME=$(python3 -c "import toml; print(toml.load('pyproject.toml')['project']['name'])")
+          PYPI_URL="https://pypi.org/project/${PKG_NAME}/${VERSION}/"
+
+          gh issue edit "${{ github.event.issue.number }}" \
+            --repo "${{ github.repository }}" \
+            --remove-label "status: releasing" \
+            --add-label "status: released"
+
+          gh issue comment "${{ github.event.issue.number }}" \
+            --repo "${{ github.repository }}" \
+            --body "$(cat <<EOF
+          ✅ **Release v${VERSION} published successfully.**
+
+          | | |
+          |---|---|
+          | **PyPI** | ${PYPI_URL} |
+          | **GitHub Release** | ${RELEASE_URL} |
+          | **Tag** | \`${TAG}\` |
+          | **Branch** | \`${{ steps.issue.outputs.branch }}\` |
+          EOF
+          )"
+
+          gh issue close "${{ github.event.issue.number }}" \
+            --repo "${{ github.repository }}" \
+            --comment "Closing — package is live on PyPI."
+
+      # ── 14. Handle failure ──────────────────────────────────────────────────
+      - name: Mark issue failed on error
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh issue edit "${{ github.event.issue.number }}" \
+            --repo "${{ github.repository }}" \
+            --remove-label "status: releasing" \
+            --add-label "status: release failed"
+          gh issue comment "${{ github.event.issue.number }}" \
+            --repo "${{ github.repository }}" \
+            --body "❌ **Release workflow failed.** Check the [workflow run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}) for details. The tag may need to be deleted before retrying."

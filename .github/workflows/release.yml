@@ -87,13 +87,53 @@ jobs:
           fetch-depth: 0
           token: ${{ github.token }}
 
-      # ── 5. Validate the version bump is an increase ─────────────────────────
+      # ── 5. Set up Python and uv (shared by integration tests and build) ──────
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
+
+      # ── 6. Run integration tests ─────────────────────────────────────────────
+      - name: Install dependencies
+        if: ${{ !contains(github.event.issue.labels.*.name, 'skip-integration-tests') }}
+        run: uv sync --dev
+
+      - name: Set up integration test environment
+        if: ${{ !contains(github.event.issue.labels.*.name, 'skip-integration-tests') }}
+        run: |
+          echo '${{ toJSON(secrets) }}' \
+            | jq -r 'to_entries[]
+                | select(.key | startswith("CLOUD_SDK_CFG_") or startswith("AICORE_"))
+                | "\(.key)=\(.value)"' \
+            | while read line; do
+                echo "$line" >> $GITHUB_ENV
+                echo "Set secret: $(echo "$line" | cut -d= -f1)"
+              done
+          echo '${{ toJSON(vars) }}' \
+            | jq -r 'to_entries[]
+                | select(.key | startswith("CLOUD_SDK_CFG_") or startswith("AICORE_"))
+                | "\(.key)=\(.value)"' \
+            | while read line; do
+                echo "$line" >> $GITHUB_ENV
+                echo "Set variable: $(echo "$line" | cut -d= -f1)"
+              done
+
+      - name: Run integration tests
+        if: ${{ !contains(github.event.issue.labels.*.name, 'skip-integration-tests') }}
+        run: uv run pytest tests/*/integration/ -v --tb=short
+
+      # ── 7. Validate the version bump is an increase ─────────────────────────
       - name: Validate version bump
         run: |
           CURRENT=$(grep '^version = ' pyproject.toml | cut -d'"' -f2)
           python .github/scripts/check_version_bump.py "$CURRENT" "${{ steps.issue.outputs.version }}"
 
-      # ── 6. Bump version in pyproject.toml and commit ────────────────────────
+      # ── 8. Bump version in pyproject.toml and commit ────────────────────────
       - name: Bump version in pyproject.toml
         run: |
           CURRENT=$(grep '^version = ' pyproject.toml | cut -d'"' -f2)
@@ -109,23 +149,13 @@ jobs:
           git commit -m "chore(release): bump version to ${{ steps.issue.outputs.version }}"
           git push origin ${{ steps.issue.outputs.branch }}
 
-      # ── 7. Create and push the tag ───────────────────────────────────────────
+      # ── 9. Create and push the tag ───────────────────────────────────────────
       - name: Create and push tag
         run: |
           git tag "${{ steps.issue.outputs.tag }}" -m "Release ${{ steps.issue.outputs.tag }}"
           git push origin "${{ steps.issue.outputs.tag }}"
 
-      # ── 8. Build the distribution ────────────────────────────────────────────
-      - name: Set up Python
-        uses: actions/setup-python@v6
-        with:
-          python-version: "3.11"
-
-      - name: Install uv
-        uses: astral-sh/setup-uv@v4
-        with:
-          enable-cache: true
-
+      # ── 10. Build the distribution ───────────────────────────────────────────
       - name: Build release distribution
         run: uv build
 
@@ -138,7 +168,7 @@ jobs:
           echo "Build artifacts: $wheel_count wheel(s), $tar_count sdist(s)"
           ls -lh dist/
 
-      # ── 9. Extract release notes from the issue body ───────────────────────
+      # ── 11. Extract release notes from the issue body ───────────────────────
       - name: Extract release notes
         id: notes
         env:
@@ -161,7 +191,7 @@ jobs:
 
           echo "notes_file=/tmp/release_notes.md" >> "$GITHUB_OUTPUT"
 
-      # ── 10. Create the GitHub Release ───────────────────────────────────────
+      # ── 12. Create the GitHub Release ───────────────────────────────────────
       - name: Create GitHub Release
         id: gh_release
         env:
@@ -183,7 +213,7 @@ jobs:
           echo "release_url=$RELEASE_URL" >> "$GITHUB_OUTPUT"
           echo "GitHub Release created: $RELEASE_URL"
 
-      # ── 11. Guard: confirm version is not already on PyPI ───────────────────
+      # ── 13. Guard: confirm version is not already on PyPI ───────────────────
       - name: Check version does not already exist on PyPI
         run: |
           PKG_NAME=$(python3 -c "import toml; print(toml.load('pyproject.toml')['project']['name'])")
@@ -195,11 +225,11 @@ jobs:
           fi
           echo "$PKG_NAME $VERSION is not yet on PyPI — proceeding."
 
-      # ── 12. Publish to PyPI (OIDC trusted publishing) ───────────────────────
+      # ── 14. Publish to PyPI (OIDC trusted publishing) ───────────────────────
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@v1.14.2
 
-      # ── 13. Close the release issue ─────────────────────────────────────────
+      # ── 15. Close the release issue ─────────────────────────────────────────
       - name: Close release issue
         env:
           GH_TOKEN: ${{ github.token }}
@@ -233,7 +263,7 @@ jobs:
             --repo "${{ github.repository }}" \
             --comment "Closing — package is live on PyPI."
 
-      # ── 14. Handle failure ──────────────────────────────────────────────────
+      # ── 16. Handle failure ──────────────────────────────────────────────────
       - name: Mark issue failed on error
         if: failure()
         env:

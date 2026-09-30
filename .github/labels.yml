@@ -13,7 +13,11 @@
 #                              └──→ tests failed  (terminal failure)
 #                                                 └──→ release failed (terminal failure)
 
-- name: "status: pending tests"
+- name: "skip-integration-tests"
+  color: "E4E669"
+  description: "Add to a release issue to skip the integration test step in the release workflow. Use only when tests are known-good or infra is unavailable."
+
+
   color: "FBCA04"
   description: "Release issue created; waiting for the automation test repo to pick it up."
 

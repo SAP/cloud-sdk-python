@@ -37,12 +37,13 @@ Automation test repo detects the issue, runs tests against the branch
                 │
                 ▼
         Release workflow triggers automatically
-          1. Bumps pyproject.toml, commits, pushes to the branch
-          2. Creates and pushes the git tag (vX.Y.Z)
-          3. Builds the distribution (uv build)
-          4. Creates the GitHub Release with release notes and artifacts
-          5. Publishes to PyPI via OIDC trusted publishing
-          6. Closes the release issue (status: released)
+          1. Runs integration tests against the branch
+          2. Bumps pyproject.toml, commits, pushes to the branch
+          3. Creates and pushes the git tag (vX.Y.Z)
+          4. Builds the distribution (uv build)
+          5. Creates the GitHub Release with release notes and artifacts
+          6. Publishes to PyPI via OIDC trusted publishing
+          7. Closes the release issue (status: released)
         │
         ▼
 Merge the branch into main (the version bump commit is already on it)
@@ -96,7 +97,7 @@ Once the issue is created, the automation test repo detects it (via the `status:
 
 When the label changes to `status: tests passed`, the `Release` workflow triggers automatically and:
 
-1. Parses the version and branch from the issue body
+1. Runs the full integration test suite against the branch (skippable — see below)
 2. Bumps `version` in `pyproject.toml`, commits `chore(release): bump version to X.Y.Z`, and pushes to the branch
 3. Creates and pushes the annotated git tag `vX.Y.Z`
 4. Builds the distribution with `uv build`
@@ -148,7 +149,7 @@ Check the failed workflow run linked in the issue comment. Common causes:
 | Tag already exists | Delete the tag (`git push origin :refs/tags/vX.Y.Z`) and re-trigger |
 | Build failed | Fix the source, push to the branch, then force-release (see below) |
 
-### Force a release (bypass tests)
+### Force a release (bypass automation tests)
 
 If you need to publish without waiting for the automation test repo (e.g. for a critical hotfix already validated manually):
 
@@ -157,6 +158,15 @@ If you need to publish without waiting for the automation test repo (e.g. for a 
 3. Add the label `status: tests passed`
 
 The release workflow triggers immediately.
+
+### Skip integration tests in the release workflow
+
+If the release workflow's own integration test step needs to be bypassed (e.g. test infrastructure is temporarily unavailable):
+
+1. Add the label `skip-integration-tests` to the release issue
+2. Then add `status: tests passed` (or re-trigger if it is already set)
+
+The integration test steps are skipped; all other steps — version bump, tag, build, GitHub Release, PyPI publish — run as normal. Remove `skip-integration-tests` after the release to keep the label state clean.
 
 ---
 

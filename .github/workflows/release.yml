@@ -74,7 +74,7 @@ jobs:
           gh issue edit ${{ github.event.issue.number }} \
             --repo "${{ github.repository }}" \
             --remove-label "status: tests passed" \
-            --add-label "status: releasing"
+            --add-label "status: releasing" || true
           gh issue comment ${{ github.event.issue.number }} \
             --repo "${{ github.repository }}" \
             --body "🚀 Release workflow started for **v${{ steps.issue.outputs.version }}** from branch \`${{ steps.issue.outputs.branch }}\`."
@@ -90,21 +90,15 @@ jobs:
       # ── 5. Validate the version bump is an increase ─────────────────────────
       - name: Validate version bump
         run: |
-          pip install packaging -q
           CURRENT=$(grep '^version = ' pyproject.toml | cut -d'"' -f2)
           python .github/scripts/check_version_bump.py "$CURRENT" "${{ steps.issue.outputs.version }}"
 
       # ── 6. Bump version in pyproject.toml and commit ────────────────────────
       - name: Bump version in pyproject.toml
         run: |
-          pip install toml -q
-          python - <<'PYEOF'
-          import toml
-          data = toml.load('pyproject.toml')
-          data['project']['version'] = '${{ steps.issue.outputs.version }}'
-          with open('pyproject.toml', 'w') as f:
-              toml.dump(data, f)
-          PYEOF
+          CURRENT=$(grep '^version = ' pyproject.toml | cut -d'"' -f2)
+          sed -i "s/^version = \"${CURRENT}\"/version = \"${{ steps.issue.outputs.version }}\"/" pyproject.toml
+          grep '^version = ' pyproject.toml
           echo "Updated pyproject.toml → ${{ steps.issue.outputs.version }}"
 
       - name: Commit version bump
@@ -219,7 +213,7 @@ jobs:
           gh issue edit "${{ github.event.issue.number }}" \
             --repo "${{ github.repository }}" \
             --remove-label "status: releasing" \
-            --add-label "status: released"
+            --add-label "status: released" || true
 
           gh issue comment "${{ github.event.issue.number }}" \
             --repo "${{ github.repository }}" \
@@ -248,7 +242,7 @@ jobs:
           gh issue edit "${{ github.event.issue.number }}" \
             --repo "${{ github.repository }}" \
             --remove-label "status: releasing" \
-            --add-label "status: release failed"
+            --add-label "status: release failed" || true
           gh issue comment "${{ github.event.issue.number }}" \
             --repo "${{ github.repository }}" \
             --body "❌ **Release workflow failed.** Check the [workflow run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}) for details. The tag may need to be deleted before retrying."

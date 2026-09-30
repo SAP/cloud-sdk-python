@@ -63,9 +63,8 @@ body:
     id: breaking_changes
     attributes:
       label: Breaking Changes
-      description: "List breaking changes and migration steps, or leave blank if none."
+      description: "List breaking changes and migration steps. Leave blank if there are none — the release workflow handles an empty value correctly."
       placeholder: |
-        ### Breaking Changes
         > ⚠️ Important: migration steps for users upgrading from the previous version.
         - **[Breaking Change]**: ...
     validations:

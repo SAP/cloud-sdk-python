@@ -13,10 +13,18 @@ The version in `pyproject.toml` is **managed automatically** by the release work
 ## Release Pipeline Overview
 
 ```
-Developer runs /release-prep on the integration branch
+Developer works on a feature/hotfix branch
         │
         ▼
-Skill proposes version + release notes → creates GitHub Release Issue
+Run /prep-pr to fill in the PR template, open or update the PR
+        │
+        ▼
+PR is reviewed and approved
+        │
+        ▼
+Run /release-prep on the feature/hotfix branch
+  Diffs branch against latest tag → proposes version + release notes
+  Creates GitHub Release Issue with the branch name embedded
   Labels: release + status: pending tests
         │
         ▼
@@ -29,38 +37,45 @@ Automation test repo detects the issue, runs tests against the branch
                 │
                 ▼
         Release workflow triggers automatically
-          1. Bumps pyproject.toml, commits, pushes to branch
+          1. Bumps pyproject.toml, commits, pushes to the branch
           2. Creates and pushes the git tag (vX.Y.Z)
           3. Builds the distribution (uv build)
           4. Creates the GitHub Release with release notes and artifacts
           5. Publishes to PyPI via OIDC trusted publishing
           6. Closes the release issue (status: released)
+        │
+        ▼
+Merge the branch into main (the version bump commit is already on it)
 ```
 
 ---
 
-## Step 1 — Merge your changes
+## Step 1 — Prepare and open your PR
 
-Merge all PRs for this release into the integration branch (`main` for regular releases, a `release-X.Y.x` branch for hotfixes). The integration branch must be pushed to origin before proceeding.
+On your feature or hotfix branch, run `/prep-pr` to fill in the PR template from the diff, then get it reviewed and approved. Do **not** merge yet.
+
+```
+/prep-pr
+```
 
 ---
 
-## Step 2 — Run `/release-prep`
+## Step 2 — Run `/release-prep` on the same branch
 
-From the root of the repository, on the integration branch:
+Before merging, while still on the feature/hotfix branch, run:
 
 ```
 /release-prep
 ```
 
 The skill will:
-1. Find the latest release tag (`git describe`) and diff from there to `HEAD`
+1. Find the latest release tag and diff from there to `HEAD` on the current branch
 2. Classify commits by Conventional Commit type and propose a SemVer bump
 3. Generate structured release notes
 4. Show a preview and ask you to confirm or override the version
-5. Create the GitHub Release Issue with the correct labels
+5. Create the GitHub Release Issue referencing this branch, with labels `release` + `status: pending tests`
 
-> If the proposed version or release notes need adjustments, type a version override or `no` to cancel and edit manually.
+> The version in `pyproject.toml` is **not** touched at this point — the release workflow owns that step.
 
 ---
 
@@ -94,6 +109,12 @@ Monitor progress in the **Actions** tab. On success the package is available at:
 ```
 https://pypi.org/project/sap-cloud-sdk/X.Y.Z/
 ```
+
+---
+
+## Step 5 — Merge the branch
+
+Once the release workflow completes, the branch has the `chore(release): bump version to X.Y.Z` commit on it. Merge (or complete the PR merge) into `main` so the version bump lands on the main branch.
 
 ---
 

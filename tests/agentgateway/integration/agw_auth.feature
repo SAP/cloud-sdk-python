@@ -59,3 +59,11 @@ Feature: Agent Gateway Auth Integration
   Scenario: Get IAS client ID returns a non-empty string
     When I call get_ias_client_id
     Then the ias_client_id should be a non-empty string
+
+  Scenario: Convert MCP tools to LangChain StructuredTools
+    Given I have a valid user token
+    When I call list_mcp_tools
+    And I convert all tools to LangChain StructuredTools
+    Then every tool should have a non-empty name and description
+    And every tool should have a Pydantic args_schema
+    And every tool should preserve metadata fields from input_schema

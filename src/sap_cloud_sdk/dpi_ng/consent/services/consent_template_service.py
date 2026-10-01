@@ -1,0 +1,424 @@
+"""Service client for consentTemplateExternalServices."""
+
+from __future__ import annotations
+
+import logging
+from typing import Any
+
+from sap_cloud_sdk.core.telemetry import Module, Operation, record_metrics
+
+from ..client import _ConsentODataClient
+from ._query import _apply_query
+
+logger = logging.getLogger(__name__)
+
+_SVC = "consentTemplateExternalServices"
+
+
+class ConsentTemplateService:
+    """Client for consentTemplateExternalServices - CRUD on templates and related entities."""
+
+    def __init__(
+        self,
+        client: _ConsentODataClient,
+        *,
+        _telemetry_source: Module | None = None,
+    ) -> None:
+        """Bind entity classes from the consentTemplateExternalServices endpoint."""
+        logger.info("Invoked ConsentTemplateService.__init__")
+        self._client = client
+        self._telemetry_source = _telemetry_source
+        (
+            self.ConsentTemplate,
+            self.ConsentTemplateText,
+            self.TemplateThirdPartyPersData,
+        ) = client.get_entity_classes(_SVC)
+        logger.info("Exiting ConsentTemplateService.__init__")
+
+    # ------ consentTemplates ------
+
+    @record_metrics(Module.DPI_NG, Operation.DPI_NG_CONSENT_LIST_TEMPLATES)
+    def list_templates(self, **query: Any) -> list[Any]:
+        """Return all consent template records, optionally filtered and paged via OData query kwargs.
+
+        Args:
+            **query: OData query options forwarded to the service (e.g. ``filter``,
+                ``top``, ``skip``, ``orderby``).
+
+        Returns:
+            list of ConsentTemplate objects matching the query.
+
+        Raises:
+            ODataError: If the OData service returns an unexpected error response.
+        """
+        logger.info("Invoked ConsentTemplateService.list_templates")
+        result = _apply_query(
+            self._client.query(_SVC, self.ConsentTemplate), query
+        ).all()
+        logger.info("Exiting ConsentTemplateService.list_templates")
+        return result
+
+    @record_metrics(Module.DPI_NG, Operation.DPI_NG_CONSENT_GET_TEMPLATE)
+    def get_template(self, template_id: str) -> Any:
+        """Return a single ConsentTemplate entity by its UUID.
+
+        Args:
+            template_id: UUID of the ConsentTemplate to retrieve.
+
+        Returns:
+            The matching ConsentTemplate object.
+
+        Raises:
+            NotFoundError: If no ConsentTemplate with the given ID exists.
+            ODataError: If the OData service returns an unexpected error response.
+        """
+        logger.info("Invoked ConsentTemplateService.get_template")
+        result = self._client.query(_SVC, self.ConsentTemplate).get(template_id)
+        logger.info("Exiting ConsentTemplateService.get_template")
+        return result
+
+    @record_metrics(Module.DPI_NG, Operation.DPI_NG_CONSENT_CREATE_TEMPLATE)
+    def create_template(self, body: dict[str, Any]) -> Any:
+        """Create a new ConsentTemplate entity and return it.
+
+        Args:
+            body: Dictionary of field names and values for the new ConsentTemplate.
+
+        Returns:
+            The newly created ConsentTemplate object with server-assigned fields populated.
+
+        Raises:
+            ValidationError: If the request body fails server-side validation.
+            ODataError: If the OData service returns an unexpected error response.
+        """
+        logger.info("Invoked ConsentTemplateService.create_template")
+        entity = self.ConsentTemplate()
+        for k, v in body.items():
+            setattr(entity, k, v)
+        self._client.save(entity)
+        logger.info("Exiting ConsentTemplateService.create_template")
+        return entity
+
+    @record_metrics(Module.DPI_NG, Operation.DPI_NG_CONSENT_UPDATE_TEMPLATE)
+    def update_template(self, template_id: str, body: dict[str, Any]) -> Any:
+        """Fetch a ConsentTemplate by ID, apply field updates, and PATCH it to the service.
+
+        Args:
+            template_id: UUID of the ConsentTemplate to update.
+            body: Dictionary of field names and values to apply.
+
+        Returns:
+            The updated ConsentTemplate object.
+
+        Raises:
+            NotFoundError: If no ConsentTemplate with the given ID exists.
+            ValidationError: If the updated fields fail server-side validation.
+            ODataError: If the OData service returns an unexpected error response.
+        """
+        logger.info("Invoked ConsentTemplateService.update_template")
+        entity = self._client.query(_SVC, self.ConsentTemplate).get(template_id)
+        self._client._apply_body(entity, body)
+        self._client.save(entity)
+        logger.info("Exiting ConsentTemplateService.update_template")
+        return entity
+
+    @record_metrics(Module.DPI_NG, Operation.DPI_NG_CONSENT_DELETE_TEMPLATE)
+    def delete_template(self, template_id: str) -> None:
+        """Delete a ConsentTemplate entity by its UUID.
+
+        Args:
+            template_id: UUID of the ConsentTemplate to delete.
+
+        Raises:
+            NotFoundError: If no ConsentTemplate with the given ID exists.
+            ODataError: If the OData service returns an unexpected error response.
+        """
+        logger.info("Invoked ConsentTemplateService.delete_template")
+        entity = self._client.query(_SVC, self.ConsentTemplate).get(template_id)
+        self._client.delete_entity(entity)
+        logger.info("Exiting ConsentTemplateService.delete_template")
+
+    # ------ lifecycle actions ------
+
+    @record_metrics(Module.DPI_NG, Operation.DPI_NG_CONSENT_SET_TEMPLATE_ACTIVE)
+    def set_template_active(self, template_id: str) -> Any:
+        """Activate a consent template and return the refreshed entity.
+
+        Args:
+            template_id: UUID of the ConsentTemplate to activate.
+
+        Returns:
+            The refreshed ConsentTemplate object with its status set to active.
+
+        Raises:
+            NotFoundError: If no ConsentTemplate with the given ID exists.
+            ODataError: If the OData service returns an unexpected error response.
+        """
+        logger.info("Invoked ConsentTemplateService.set_template_active")
+        self._client.call_action(
+            _SVC,
+            "consentTemplateSetConsentTemplateToActive",
+            {"templateId": template_id},
+        )
+        result = self.get_template(template_id)
+        logger.info("Exiting ConsentTemplateService.set_template_active")
+        return result
+
+    @record_metrics(Module.DPI_NG, Operation.DPI_NG_CONSENT_SET_TEMPLATE_INACTIVE)
+    def set_template_inactive(self, template_id: str) -> Any:
+        """Deactivate a consent template and return the refreshed entity.
+
+        Args:
+            template_id: UUID of the ConsentTemplate to deactivate.
+
+        Returns:
+            The refreshed ConsentTemplate object with its status set to inactive.
+
+        Raises:
+            NotFoundError: If no ConsentTemplate with the given ID exists.
+            ODataError: If the OData service returns an unexpected error response.
+        """
+        logger.info("Invoked ConsentTemplateService.set_template_inactive")
+        self._client.call_action(
+            _SVC,
+            "consentTemplateSetConsentTemplateToInactive",
+            {"templateId": template_id},
+        )
+        result = self.get_template(template_id)
+        logger.info("Exiting ConsentTemplateService.set_template_inactive")
+        return result
+
+    # ------ consentTemplateTexts ------
+
+    @record_metrics(Module.DPI_NG, Operation.DPI_NG_CONSENT_LIST_TEMPLATE_TEXTS)
+    def list_template_texts(self, **query: Any) -> list[Any]:
+        """Return all consent template text records, optionally filtered and paged via OData query kwargs.
+
+        Args:
+            **query: OData query options forwarded to the service (e.g. ``filter``,
+                ``top``, ``skip``, ``orderby``).
+
+        Returns:
+            list of ConsentTemplateText objects matching the query.
+
+        Raises:
+            ODataError: If the OData service returns an unexpected error response.
+        """
+        logger.info("Invoked ConsentTemplateService.list_template_texts")
+        result = _apply_query(
+            self._client.query(_SVC, self.ConsentTemplateText), query
+        ).all()
+        logger.info("Exiting ConsentTemplateService.list_template_texts")
+        return result
+
+    @record_metrics(Module.DPI_NG, Operation.DPI_NG_CONSENT_GET_TEMPLATE_TEXT)
+    def get_template_text(self, template_text_id: str) -> Any:
+        """Return a single ConsentTemplateText entity by its ID.
+
+        Args:
+            template_text_id: UUID of the ConsentTemplateText to retrieve.
+
+        Returns:
+            The matching ConsentTemplateText object.
+
+        Raises:
+            NotFoundError: If no ConsentTemplateText with the given ID exists.
+            ODataError: If the OData service returns an unexpected error response.
+        """
+        logger.info("Invoked ConsentTemplateService.get_template_text")
+        result = self._client.query(_SVC, self.ConsentTemplateText).get(
+            template_text_id
+        )
+        logger.info("Exiting ConsentTemplateService.get_template_text")
+        return result
+
+    @record_metrics(Module.DPI_NG, Operation.DPI_NG_CONSENT_CREATE_TEMPLATE_TEXT)
+    def create_template_text(self, body: dict[str, Any]) -> Any:
+        """Create a new ConsentTemplateText entity and return it.
+
+        Args:
+            body: Dictionary of field names and values for the new ConsentTemplateText.
+                Must include ``templateId``, ``typeCode``, and ``languageCode`` (BCP-47) as the composite key.
+
+        Returns:
+            The newly created ConsentTemplateText object with server-assigned fields populated.
+
+        Raises:
+            ValidationError: If the request body fails server-side validation.
+            ODataError: If the OData service returns an unexpected error response.
+        """
+        logger.info("Invoked ConsentTemplateService.create_template_text")
+        entity = self.ConsentTemplateText()
+        for k, v in body.items():
+            setattr(entity, k, v)
+        self._client.save(entity)
+        logger.info("Exiting ConsentTemplateService.create_template_text")
+        return entity
+
+    @record_metrics(Module.DPI_NG, Operation.DPI_NG_CONSENT_UPDATE_TEMPLATE_TEXT)
+    def update_template_text(self, template_text_id: str, body: dict[str, Any]) -> Any:
+        """Fetch a ConsentTemplateText by its ID, apply field updates, and PATCH it to the service.
+
+        Args:
+            template_text_id: UUID of the ConsentTemplateText to update.
+            body: Dictionary of field names and values to apply.
+
+        Returns:
+            The updated ConsentTemplateText object.
+
+        Raises:
+            NotFoundError: If no ConsentTemplateText with the given ID exists.
+            ValidationError: If the updated fields fail server-side validation.
+            ODataError: If the OData service returns an unexpected error response.
+        """
+        logger.info("Invoked ConsentTemplateService.update_template_text")
+        entity = self._client.query(_SVC, self.ConsentTemplateText).get(
+            template_text_id
+        )
+        self._client._apply_body(entity, body)
+        self._client.save(entity)
+        logger.info("Exiting ConsentTemplateService.update_template_text")
+        return entity
+
+    @record_metrics(Module.DPI_NG, Operation.DPI_NG_CONSENT_DELETE_TEMPLATE_TEXT)
+    def delete_template_text(self, template_text_id: str) -> None:
+        """Delete a ConsentTemplateText entity by its ID.
+
+        Args:
+            template_text_id: UUID of the ConsentTemplateText to delete.
+
+        Raises:
+            NotFoundError: If no ConsentTemplateText with the given ID exists.
+            ODataError: If the OData service returns an unexpected error response.
+        """
+        logger.info("Invoked ConsentTemplateService.delete_template_text")
+        entity = self._client.query(_SVC, self.ConsentTemplateText).get(
+            template_text_id
+        )
+        self._client.delete_entity(entity)
+        logger.info("Exiting ConsentTemplateService.delete_template_text")
+
+    # ------ templateThirdPartyPersDatas ------
+
+    @record_metrics(Module.DPI_NG, Operation.DPI_NG_CONSENT_LIST_THIRD_PARTY_PERS_DATA)
+    def list_third_party_pers_data(self, **query: Any) -> list[Any]:
+        """Return all template third-party personal data records, optionally filtered and paged via OData query kwargs.
+
+        Args:
+            **query: OData query options forwarded to the service (e.g. ``filter``,
+                ``top``, ``skip``, ``orderby``).
+
+        Returns:
+            list of TemplateThirdPartyPersData objects matching the query.
+
+        Raises:
+            ODataError: If the OData service returns an unexpected error response.
+        """
+        logger.info("Invoked ConsentTemplateService.list_third_party_pers_data")
+        result = _apply_query(
+            self._client.query(_SVC, self.TemplateThirdPartyPersData), query
+        ).all()
+        logger.info("Exiting ConsentTemplateService.list_third_party_pers_data")
+        return result
+
+    @record_metrics(Module.DPI_NG, Operation.DPI_NG_CONSENT_GET_THIRD_PARTY_PERS_DATA)
+    def get_third_party_pers_data(
+        self, third_party_assignment_id: str, template_id: str
+    ) -> Any:
+        """Return a single TemplateThirdPartyPersData entity by its composite key.
+
+        Args:
+            third_party_assignment_id: UUID of the ThirdPartyAssignment (primary key).
+            template_id: UUID of the parent ConsentTemplate (primary key).
+
+        Returns:
+            The matching TemplateThirdPartyPersData object.
+
+        Raises:
+            NotFoundError: If no TemplateThirdPartyPersData for the given composite key exists.
+            ODataError: If the OData service returns an unexpected error response.
+        """
+        logger.info("Invoked ConsentTemplateService.get_third_party_pers_data")
+        result = self._client.query(_SVC, self.TemplateThirdPartyPersData).get(
+            thirdPartyAssignmentId=third_party_assignment_id, templateId=template_id
+        )
+        logger.info("Exiting ConsentTemplateService.get_third_party_pers_data")
+        return result
+
+    @record_metrics(
+        Module.DPI_NG, Operation.DPI_NG_CONSENT_CREATE_THIRD_PARTY_PERS_DATA
+    )
+    def create_third_party_pers_data(self, body: dict[str, Any]) -> Any:
+        """Create a new TemplateThirdPartyPersData entity and return it.
+
+        Args:
+            body: Dictionary of field names and values for the new TemplateThirdPartyPersData.
+                Must include ``templateId`` and ``thirdPartyId`` as the composite key.
+
+        Returns:
+            The newly created TemplateThirdPartyPersData object with server-assigned fields populated.
+
+        Raises:
+            ValidationError: If the request body fails server-side validation.
+            ODataError: If the OData service returns an unexpected error response.
+        """
+        logger.info("Invoked ConsentTemplateService.create_third_party_pers_data")
+        entity = self.TemplateThirdPartyPersData()
+        for k, v in body.items():
+            setattr(entity, k, v)
+        self._client.save(entity)
+        logger.info("Exiting ConsentTemplateService.create_third_party_pers_data")
+        return entity
+
+    @record_metrics(
+        Module.DPI_NG, Operation.DPI_NG_CONSENT_UPDATE_THIRD_PARTY_PERS_DATA
+    )
+    def update_third_party_pers_data(
+        self, third_party_assignment_id: str, template_id: str, body: dict[str, Any]
+    ) -> Any:
+        """Fetch a TemplateThirdPartyPersData by composite key, apply field updates, and PATCH it to the service.
+
+        Args:
+            third_party_assignment_id: UUID of the ThirdPartyAssignment (primary key).
+            template_id: UUID of the parent ConsentTemplate (primary key).
+            body: Dictionary of field names and values to apply.
+
+        Returns:
+            The updated TemplateThirdPartyPersData object.
+
+        Raises:
+            NotFoundError: If no TemplateThirdPartyPersData for the given composite key exists.
+            ValidationError: If the updated fields fail server-side validation.
+            ODataError: If the OData service returns an unexpected error response.
+        """
+        logger.info("Invoked ConsentTemplateService.update_third_party_pers_data")
+        entity = self._client.query(_SVC, self.TemplateThirdPartyPersData).get(
+            thirdPartyAssignmentId=third_party_assignment_id, templateId=template_id
+        )
+        self._client._apply_body(entity, body)
+        self._client.save(entity)
+        logger.info("Exiting ConsentTemplateService.update_third_party_pers_data")
+        return entity
+
+    @record_metrics(
+        Module.DPI_NG, Operation.DPI_NG_CONSENT_DELETE_THIRD_PARTY_PERS_DATA
+    )
+    def delete_third_party_pers_data(
+        self, third_party_assignment_id: str, template_id: str
+    ) -> None:
+        """Delete a TemplateThirdPartyPersData entity by its composite key.
+
+        Args:
+            third_party_assignment_id: UUID of the ThirdPartyAssignment (primary key).
+            template_id: UUID of the parent ConsentTemplate (primary key).
+
+        Raises:
+            NotFoundError: If no TemplateThirdPartyPersData for the given composite key exists.
+            ODataError: If the OData service returns an unexpected error response.
+        """
+        logger.info("Invoked ConsentTemplateService.delete_third_party_pers_data")
+        entity = self._client.query(_SVC, self.TemplateThirdPartyPersData).get(
+            thirdPartyAssignmentId=third_party_assignment_id, templateId=template_id
+        )
+        self._client.delete_entity(entity)
+        logger.info("Exiting ConsentTemplateService.delete_third_party_pers_data")

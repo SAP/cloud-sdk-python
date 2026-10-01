@@ -1,22 +1,29 @@
 version: 2
 updates:
-  # Python pip dependencies - security updates only
-  # Regular version updates are disabled because we use compatible release
-  # constraints (~=) in pyproject.toml to pin patch versions.
-  # Dependabot Security Updates (enabled in repo settings) bypass these rules.
+  # Python pip dependencies
+  # Non-major (minor + patch) version updates are batched into one grouped PR;
+  # majors are left ungrouped so each breaking bump lands in its own PR for
+  # review. Security updates (enabled in repo settings) come as a separate
+  # grouped PR of their own
   - package-ecosystem: "pip"
     directory: "/"
     schedule:
       interval: "weekly"
       day: "monday"
       time: "09:00"
-    # Ignore all regular version updates - security updates still come through
-    ignore:
-      - dependency-name: "*"
+    groups:
+      version-minor-patch:
+        patterns:
+          - "*"
         update-types:
-          - "version-update:semver-major"
-          - "version-update:semver-minor"
-          - "version-update:semver-patch"
+          - "minor"
+          - "patch"
+      security:
+        applies-to: security-updates
+        patterns:
+          - "*"
+    labels:
+      - "dependencies"
     # Commit message configuration
     commit-message:
       prefix: "chore"
@@ -39,6 +46,11 @@ updates:
     labels:
       - "dependencies"
       - "github-actions"
+    # Batch all Actions bumps (including majors) into one PR
+    groups:
+      github-actions:
+        patterns:
+          - "*"
     commit-message:
       prefix: "chore"
       include: "scope"

@@ -117,6 +117,7 @@ class DestinationCredentialConfig(BaseModel):
             if destination is None:
                 raise ValueError(f"Destination '{self.destination_name}' not found")
             logger.info(f"Retrieved destination '{self.destination_name}'")
+        assert isinstance(destination, Destination)
         return destination
 
     def get_base_url(self) -> str:

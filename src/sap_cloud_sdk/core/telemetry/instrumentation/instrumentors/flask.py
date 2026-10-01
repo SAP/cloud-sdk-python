@@ -1,7 +1,7 @@
 from opentelemetry.instrumentation.flask import FlaskInstrumentor
 
 from sap_cloud_sdk.core.telemetry.instrumentation.base import LibraryInstrumentor
-from sap_cloud_sdk.core.telemetry.instrumentation._registry import register
+from sap_cloud_sdk.core.telemetry.instrumentation._registry import Library, register
 
 _instrumentor = FlaskInstrumentor()
 
@@ -9,7 +9,7 @@ _instrumentor = FlaskInstrumentor()
 class FlaskInstrumentorWrapper(LibraryInstrumentor):
     """Instruments Flask with OTel spans for inbound HTTP requests and baggage extraction."""
 
-    library_name = "flask"
+    library_name = Library.FLASK
 
     def is_instrumented(self) -> bool:
         return _instrumentor.is_instrumented_by_opentelemetry

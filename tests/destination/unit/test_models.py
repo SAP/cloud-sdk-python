@@ -293,6 +293,39 @@ class TestDestinationModel:
         assert dest.get_headers()["Authorization"] == "Bearer eyJ123"
 
 
+class TestAuthTokenModel:
+    """Tests for AuthToken dataclass."""
+
+    def test_from_dict_valid(self):
+        """Parse a valid auth token dict."""
+        token = AuthToken.from_dict({
+            "type": "Bearer",
+            "value": "eyJ123",
+            "http_header": {"key": "Authorization", "value": "Bearer eyJ123"},
+        })
+        assert token.type == "Bearer"
+        assert token.value == "eyJ123"
+        assert token.error is None
+
+    def test_from_dict_with_error_field(self):
+        """Raise DestinationOperationError with the Destination Service error message."""
+        with pytest.raises(
+            DestinationOperationError,
+            match="No consumed apis matching provided resource parameter found.",
+        ):
+            AuthToken.from_dict({
+                "type": "",
+                "value": "",
+                "error": "No consumed apis matching provided resource parameter found.",
+                "expires_in": "0",
+            })
+
+    def test_from_dict_missing_fields_without_error_raises(self):
+        """Raise DestinationOperationError when required fields are missing and no error is set."""
+        with pytest.raises(DestinationOperationError, match="missing required fields"):
+            AuthToken.from_dict({"type": "", "value": "", "http_header": {}})
+
+
 class TestFragmentModel:
     """Tests for Fragment dataclass."""
 

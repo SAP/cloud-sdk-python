@@ -21,9 +21,10 @@ from sap_cloud_sdk.dms.model import (
     QueryResultPage,
     _prop_val,
 )
-from sap_cloud_sdk.dms._auth import Auth
 from sap_cloud_sdk.dms._http import HttpInvoker
+from sap_cloud_sdk.core.protocol.http import XsuaaAuthProvider
 from sap_cloud_sdk.core.telemetry import Module, Operation, record_metrics
+from typing import Callable
 
 logger = logging.getLogger(__name__)
 
@@ -86,7 +87,7 @@ class DMSClient:
 
     def __init__(
         self,
-        credentials: DMSCredentials,
+        credentials: Union[DMSCredentials, Callable[[], DMSCredentials]],
         connect_timeout: Optional[int] = None,
         read_timeout: Optional[int] = None,
     ) -> None:
@@ -98,14 +99,20 @@ class DMSClient:
             authentication and handles environment detection.
 
         Args:
-            credentials: OAuth2 credentials and service URI for the DMS instance.
+            credentials: OAuth2 credentials (or a factory returning them) for the DMS instance.
             connect_timeout: TCP connection timeout in seconds. Defaults to 10.
             read_timeout: Response read timeout in seconds. Defaults to 30.
         """
-        auth = Auth(credentials)
+        factory: Callable[[], DMSCredentials]
+        if callable(credentials) and not isinstance(credentials, DMSCredentials):
+            factory = credentials
+        else:
+            factory = lambda: credentials  # type: ignore[return-value]
+        auth_provider = XsuaaAuthProvider(factory)
+        base_url = factory().uri
         self._http: HttpInvoker = HttpInvoker(
-            auth=auth,
-            base_url=credentials.uri,
+            auth_provider=auth_provider,
+            base_url=base_url,
             connect_timeout=connect_timeout,
             read_timeout=read_timeout,
         )

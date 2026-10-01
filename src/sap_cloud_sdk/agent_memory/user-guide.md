@@ -179,9 +179,8 @@ across create, read, and search calls is the implementer's responsibility.
 
   > [!WARNING]
   > `PROVIDER` strategy provides **no tenant isolation**, the provider token grants access to data in the provider subaccount. Only use this strategy for provider-owned operations (e.g., admin tasks, shared datasets). Never use it to serve subscriber-specific data.
+
 - **Further reading:** N/A
-
-
 
 ## Semantic Search: A Brief Primer
 
@@ -838,6 +837,12 @@ The `uaa` key must contain a JSON string with the XSUAA credentials:
   "url": "https://subdomain.authentication.region.hana.ondemand.com"
 }
 ```
+
+## Binding Rotation
+
+The client handles BTP credential rotation automatically. See the [HTTP Client guide](../core/protocol/http/user-guide.md) for details.
+
+---
 
 ## LangGraph Checkpointer
 

@@ -9,7 +9,7 @@ from sap_cloud_sdk.agentgateway.converters import mcp_tool_to_langchain
 
 
 def _schema_fields(lc_tool):
-    """Narrow args_schema to BaseModel and return model_fields."""
+    """Return model_fields from the args_schema Pydantic model."""
     schema = lc_tool.args_schema
     assert isinstance(schema, type) and issubclass(schema, BaseModel)
     return schema.model_fields
@@ -155,6 +155,7 @@ class TestMcpToolToLangchainTypeMapping:
 
     def test_unknown_type_maps_to_any(self):
         from typing import Any
+
         lc_tool = mcp_tool_to_langchain(
             self._tool_with_types({"data": {"type": "unknown"}}, required=["data"]),
             AsyncMock(),
@@ -164,6 +165,7 @@ class TestMcpToolToLangchainTypeMapping:
 
     def test_missing_type_maps_to_any(self):
         from typing import Any
+
         lc_tool = mcp_tool_to_langchain(
             self._tool_with_types({"data": {}}, required=["data"]),
             AsyncMock(),
@@ -181,6 +183,7 @@ class TestMcpToolToLangchainTypeMapping:
         assert not field.is_required()
         # annotation should be int | None
         import types as _types
+
         assert isinstance(field.annotation, _types.UnionType)
         assert int in field.annotation.__args__
         assert type(None) in field.annotation.__args__
@@ -193,6 +196,7 @@ class TestMcpToolToLangchainTypeMapping:
         )
         field = _schema_fields(lc_tool)["limit"]
         import types as _types
+
         assert isinstance(field.annotation, _types.UnionType)
         assert int in field.annotation.__args__
         assert type(None) in field.annotation.__args__
@@ -205,6 +209,7 @@ class TestMcpToolToLangchainTypeMapping:
         )
         field = _schema_fields(lc_tool)["ratio"]
         import types as _types
+
         assert isinstance(field.annotation, _types.UnionType)
         assert float in field.annotation.__args__
         assert type(None) in field.annotation.__args__
@@ -212,12 +217,15 @@ class TestMcpToolToLangchainTypeMapping:
     def test_array_type_multiple_scalars_uses_first_non_null(self):
         # e.g. {"type": ["number", "string", "null"]} — pick "number"
         lc_tool = mcp_tool_to_langchain(
-            self._tool_with_types({"val": {"type": ["number", "string", "null"]}}, required=["val"]),
+            self._tool_with_types(
+                {"val": {"type": ["number", "string", "null"]}}, required=["val"]
+            ),
             AsyncMock(),
             lambda: "token",
         )
         field = _schema_fields(lc_tool)["val"]
         import types as _types
+
         assert isinstance(field.annotation, _types.UnionType)
         assert float in field.annotation.__args__
         assert type(None) in field.annotation.__args__
@@ -230,6 +238,82 @@ class TestMcpToolToLangchainTypeMapping:
         )
         field = _schema_fields(lc_tool)["count"]
         assert field.annotation is int
+
+
+class TestMcpToolToLangchainUnderscoredParams:
+    """OData CSDL §15.2 allows '_'-prefixed identifiers; Pydantic v2 rejects them.
+
+    The converter strips leading underscores for the Pydantic model and restores
+    originals before forwarding to call_tool via an internal name_map.
+    """
+
+    def _tool_with_underscore_params(self):
+        return MCPTool(
+            name="get_variant_config",
+            server_name="s4hana",
+            description="Get variant configuration",
+            input_schema={
+                "type": "object",
+                "required": ["_VariantConfiguration"],
+                "properties": {
+                    "_VariantConfiguration": {"type": "string"},
+                    "_Product": {"type": "string"},
+                    "NormalParam": {"type": "string"},
+                },
+            },
+            url="https://example.com/mcp",
+        )
+
+    def test_underscored_required_param_present_in_schema(self):
+        """'_VariantConfiguration' must appear in the args schema (stripped to safe name)."""
+        lc_tool = mcp_tool_to_langchain(
+            self._tool_with_underscore_params(), AsyncMock(return_value="ok"), lambda: "token"
+        )
+        fields = _schema_fields(lc_tool)
+        assert "VariantConfiguration" in fields
+        assert fields["VariantConfiguration"].is_required()
+
+    def test_underscored_optional_param_present_in_schema(self):
+        lc_tool = mcp_tool_to_langchain(
+            self._tool_with_underscore_params(), AsyncMock(return_value="ok"), lambda: "token"
+        )
+        fields = _schema_fields(lc_tool)
+        assert "Product" in fields
+        assert not fields["Product"].is_required()
+
+    def test_non_underscored_param_unaffected(self):
+        lc_tool = mcp_tool_to_langchain(
+            self._tool_with_underscore_params(), AsyncMock(return_value="ok"), lambda: "token"
+        )
+        assert "NormalParam" in _schema_fields(lc_tool)
+
+    @pytest.mark.asyncio
+    async def test_original_underscore_name_restored_on_invocation(self):
+        """call_tool must receive '_VariantConfiguration', not 'VariantConfiguration'."""
+        call_tool = AsyncMock(return_value="ok")
+        lc_tool = mcp_tool_to_langchain(
+            self._tool_with_underscore_params(), call_tool, lambda: "token"
+        )
+
+        await lc_tool.arun({"VariantConfiguration": "VC001"})
+
+        kwargs = call_tool.call_args.kwargs
+        assert "_VariantConfiguration" in kwargs
+        assert kwargs["_VariantConfiguration"] == "VC001"
+        assert "VariantConfiguration" not in kwargs
+
+    @pytest.mark.asyncio
+    async def test_optional_underscore_param_restored_when_supplied(self):
+        call_tool = AsyncMock(return_value="ok")
+        lc_tool = mcp_tool_to_langchain(
+            self._tool_with_underscore_params(), call_tool, lambda: "token"
+        )
+
+        await lc_tool.arun({"VariantConfiguration": "VC001", "Product": "P001"})
+
+        kwargs = call_tool.call_args.kwargs
+        assert kwargs.get("_Product") == "P001"
+        assert "Product" not in kwargs
 
 
 class TestMcpToolToLangchainInvocation:

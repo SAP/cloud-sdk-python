@@ -19,7 +19,6 @@ from sap_cloud_sdk.core.telemetry.constants import (
     ATTR_SOURCE,
     ATTR_DEPRECATED,
 )
-from sap_cloud_sdk.core.telemetry.module import Module
 
 logger = logging.getLogger(__name__)
 
@@ -94,7 +93,7 @@ def get_propagated_attributes() -> Dict[str, Any]:
 
 
 def record_request_metric(
-    module: Module, source: Optional[Module], operation: str, deprecated: bool = False
+    module: str, source: Optional[str], operation: str, deprecated: bool = False
 ) -> None:
     """Record a request metric for an SDK operation.
 
@@ -120,7 +119,7 @@ def record_request_metric(
 
 
 def record_error_metric(
-    module: Module, source: Optional[Module], operation: str, deprecated: bool = False
+    module: str, source: Optional[str], operation: str, deprecated: bool = False
 ) -> None:
     """Record an error metric for an SDK operation.
 
@@ -146,7 +145,7 @@ def record_error_metric(
 
 
 def default_attributes(
-    module: Module, source: Optional[Module], operation: str, deprecated: bool = False
+    module: str, source: Optional[str], operation: str, deprecated: bool = False
 ) -> Dict[str, Any]:
     """Get default attributes for an SDK operation.
 

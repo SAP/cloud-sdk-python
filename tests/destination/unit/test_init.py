@@ -20,15 +20,15 @@ from sap_cloud_sdk.destination.exceptions import ClientCreationError
 from sap_cloud_sdk.core.telemetry import Module
 
 _NO_MOCK_FILE = patch("sap_cloud_sdk.destination.os.path.isfile", new=lambda _: False)
+_BUILD_HTTP = "sap_cloud_sdk.destination._build_destination_http"
 
 
 class TestCreateClient:
     """Tests for create_client cloud mode."""
 
     @_NO_MOCK_FILE
-    @patch("sap_cloud_sdk.destination.TokenProvider")
-    @patch("sap_cloud_sdk.destination.DestinationHttp")
-    def test_create_client_with_explicit_config(self, mock_http, mock_token_provider):
+    @patch(_BUILD_HTTP)
+    def test_create_client_with_explicit_config(self, mock_build_http):
         config = DestinationConfig(
             url="https://destination.example.com",
             token_url="https://auth.example.com/oauth/token",
@@ -36,69 +36,49 @@ class TestCreateClient:
             client_secret="test-secret",
             identityzone="provider-zone"
         )
-        mock_token_provider.return_value = Mock()
-        mock_http.return_value = Mock()
+        mock_build_http.return_value = Mock()
         client = create_client(config=config)
         assert isinstance(client, DestinationClient)
-        mock_token_provider.assert_called_once_with(config)
-        mock_http.assert_called_once_with(config=config, token_provider=mock_token_provider.return_value)
+        mock_build_http.assert_called_once_with(None, config)
 
     @_NO_MOCK_FILE
-    @patch("sap_cloud_sdk.destination.load_from_env_or_mount")
-    @patch("sap_cloud_sdk.destination.TokenProvider")
-    @patch("sap_cloud_sdk.destination.DestinationHttp")
-    def test_create_client_cloud_mode_default(self, mock_http, mock_token_provider, mock_load_config):
-        mock_config = Mock(spec=DestinationConfig)
-        mock_load_config.return_value = mock_config
-        mock_token_provider.return_value = Mock()
-        mock_http.return_value = Mock()
+    @patch(_BUILD_HTTP)
+    def test_create_client_cloud_mode_default(self, mock_build_http):
+        mock_build_http.return_value = Mock()
         client = create_client()
         assert isinstance(client, DestinationClient)
-        mock_load_config.assert_called_once_with(None)
-        mock_token_provider.assert_called_once_with(mock_config)
-        mock_http.assert_called_once_with(config=mock_config, token_provider=mock_token_provider.return_value)
+        mock_build_http.assert_called_once_with(None, None)
 
     @_NO_MOCK_FILE
-    @patch("sap_cloud_sdk.destination.load_from_env_or_mount")
-    @patch("sap_cloud_sdk.destination.TokenProvider")
-    @patch("sap_cloud_sdk.destination.DestinationHttp")
-    def test_create_client_cloud_mode_with_instance_name(self, mock_http, mock_token_provider, mock_load_config):
-        mock_config = Mock(spec=DestinationConfig)
-        mock_load_config.return_value = mock_config
-        mock_token_provider.return_value = Mock()
-        mock_http.return_value = Mock()
+    @patch(_BUILD_HTTP)
+    def test_create_client_cloud_mode_with_instance_name(self, mock_build_http):
+        mock_build_http.return_value = Mock()
         client = create_client(instance="custom-instance")
         assert isinstance(client, DestinationClient)
-        mock_load_config.assert_called_once_with("custom-instance")
+        mock_build_http.assert_called_once_with("custom-instance", None)
 
     @_NO_MOCK_FILE
-    @patch("sap_cloud_sdk.destination.load_from_env_or_mount")
-    def test_create_client_config_error(self, mock_load_config):
-        mock_load_config.side_effect = Exception("Config loading failed")
+    @patch(_BUILD_HTTP)
+    def test_create_client_config_error(self, mock_build_http):
+        mock_build_http.side_effect = Exception("Config loading failed")
         with pytest.raises(ClientCreationError) as exc_info:
             create_client()
         assert "failed to create destination client" in str(exc_info.value)
         assert "Config loading failed" in str(exc_info.value)
 
     @_NO_MOCK_FILE
-    @patch("sap_cloud_sdk.destination.load_from_env_or_mount")
-    @patch("sap_cloud_sdk.destination.TokenProvider")
-    def test_create_client_token_provider_error(self, mock_token_provider, mock_load_config):
-        mock_load_config.return_value = Mock(spec=DestinationConfig)
-        mock_token_provider.side_effect = Exception("Token provider failed")
+    @patch(_BUILD_HTTP)
+    def test_create_client_token_provider_error(self, mock_build_http):
+        mock_build_http.side_effect = Exception("Token provider failed")
         with pytest.raises(ClientCreationError) as exc_info:
             create_client()
         assert "failed to create destination client" in str(exc_info.value)
         assert "Token provider failed" in str(exc_info.value)
 
     @_NO_MOCK_FILE
-    @patch("sap_cloud_sdk.destination.load_from_env_or_mount")
-    @patch("sap_cloud_sdk.destination.TokenProvider")
-    @patch("sap_cloud_sdk.destination.DestinationHttp")
-    def test_create_client_http_error(self, mock_http, mock_token_provider, mock_load_config):
-        mock_load_config.return_value = Mock(spec=DestinationConfig)
-        mock_token_provider.return_value = Mock()
-        mock_http.side_effect = Exception("HTTP client failed")
+    @patch(_BUILD_HTTP)
+    def test_create_client_http_error(self, mock_build_http):
+        mock_build_http.side_effect = Exception("HTTP client failed")
         with pytest.raises(ClientCreationError) as exc_info:
             create_client()
         assert "failed to create destination client" in str(exc_info.value)
@@ -125,14 +105,10 @@ class TestCreateClientLocalMode:
         assert "local" in mock_logger.warning.call_args[0][0].lower()
         assert "production" in mock_logger.warning.call_args[0][0].lower()
 
-    @patch("sap_cloud_sdk.destination.TokenProvider")
-    @patch("sap_cloud_sdk.destination.DestinationHttp")
-    @patch("sap_cloud_sdk.destination.load_from_env_or_mount")
+    @patch(_BUILD_HTTP)
     @patch("sap_cloud_sdk.destination.os.path.isfile", new=lambda _: False)
-    def test_falls_through_to_cloud_when_no_mock_file(self, mock_load_config, mock_http, mock_tp):
-        mock_load_config.return_value = Mock(spec=DestinationConfig)
-        mock_tp.return_value = Mock()
-        mock_http.return_value = Mock()
+    def test_falls_through_to_cloud_when_no_mock_file(self, mock_build_http):
+        mock_build_http.return_value = Mock()
         client = create_client()
         assert isinstance(client, DestinationClient)
 
@@ -141,24 +117,16 @@ class TestCreateFragmentClient:
     """Tests for create_fragment_client cloud mode."""
 
     @_NO_MOCK_FILE
-    @patch("sap_cloud_sdk.destination.load_from_env_or_mount")
-    @patch("sap_cloud_sdk.destination.TokenProvider")
-    @patch("sap_cloud_sdk.destination.DestinationHttp")
-    def test_create_fragment_client_default(self, mock_http, mock_token_provider, mock_load_config):
-        mock_config = Mock(spec=DestinationConfig)
-        mock_load_config.return_value = mock_config
-        mock_token_provider.return_value = Mock()
-        mock_http.return_value = Mock()
+    @patch(_BUILD_HTTP)
+    def test_create_fragment_client_default(self, mock_build_http):
+        mock_build_http.return_value = Mock()
         client = create_fragment_client()
         assert isinstance(client, FragmentClient)
-        mock_load_config.assert_called_once_with(None)
-        mock_token_provider.assert_called_once_with(mock_config)
-        mock_http.assert_called_once_with(config=mock_config, token_provider=mock_token_provider.return_value)
+        mock_build_http.assert_called_once_with(None, None)
 
     @_NO_MOCK_FILE
-    @patch("sap_cloud_sdk.destination.TokenProvider")
-    @patch("sap_cloud_sdk.destination.DestinationHttp")
-    def test_create_fragment_client_with_explicit_config(self, mock_http, mock_token_provider):
+    @patch(_BUILD_HTTP)
+    def test_create_fragment_client_with_explicit_config(self, mock_build_http):
         config = DestinationConfig(
             url="https://destination.example.com",
             token_url="https://auth.example.com/oauth/token",
@@ -166,54 +134,41 @@ class TestCreateFragmentClient:
             client_secret="test-secret",
             identityzone="provider-zone"
         )
-        mock_token_provider.return_value = Mock()
-        mock_http.return_value = Mock()
+        mock_build_http.return_value = Mock()
         client = create_fragment_client(config=config)
         assert isinstance(client, FragmentClient)
-        mock_token_provider.assert_called_once_with(config)
-        mock_http.assert_called_once_with(config=config, token_provider=mock_token_provider.return_value)
+        mock_build_http.assert_called_once_with(None, config)
 
     @_NO_MOCK_FILE
-    @patch("sap_cloud_sdk.destination.load_from_env_or_mount")
-    @patch("sap_cloud_sdk.destination.TokenProvider")
-    @patch("sap_cloud_sdk.destination.DestinationHttp")
-    def test_create_fragment_client_with_instance_name(self, mock_http, mock_token_provider, mock_load_config):
-        mock_config = Mock(spec=DestinationConfig)
-        mock_load_config.return_value = mock_config
-        mock_token_provider.return_value = Mock()
-        mock_http.return_value = Mock()
+    @patch(_BUILD_HTTP)
+    def test_create_fragment_client_with_instance_name(self, mock_build_http):
+        mock_build_http.return_value = Mock()
         client = create_fragment_client(instance="custom-instance")
         assert isinstance(client, FragmentClient)
-        mock_load_config.assert_called_once_with("custom-instance")
+        mock_build_http.assert_called_once_with("custom-instance", None)
 
     @_NO_MOCK_FILE
-    @patch("sap_cloud_sdk.destination.load_from_env_or_mount")
-    def test_create_fragment_client_config_error(self, mock_load_config):
-        mock_load_config.side_effect = Exception("Config loading failed")
+    @patch(_BUILD_HTTP)
+    def test_create_fragment_client_config_error(self, mock_build_http):
+        mock_build_http.side_effect = Exception("Config loading failed")
         with pytest.raises(ClientCreationError) as exc_info:
             create_fragment_client()
         assert "failed to create fragment client" in str(exc_info.value)
         assert "Config loading failed" in str(exc_info.value)
 
     @_NO_MOCK_FILE
-    @patch("sap_cloud_sdk.destination.load_from_env_or_mount")
-    @patch("sap_cloud_sdk.destination.TokenProvider")
-    def test_create_fragment_client_token_provider_error(self, mock_token_provider, mock_load_config):
-        mock_load_config.return_value = Mock(spec=DestinationConfig)
-        mock_token_provider.side_effect = Exception("Token provider failed")
+    @patch(_BUILD_HTTP)
+    def test_create_fragment_client_token_provider_error(self, mock_build_http):
+        mock_build_http.side_effect = Exception("Token provider failed")
         with pytest.raises(ClientCreationError) as exc_info:
             create_fragment_client()
         assert "failed to create fragment client" in str(exc_info.value)
         assert "Token provider failed" in str(exc_info.value)
 
     @_NO_MOCK_FILE
-    @patch("sap_cloud_sdk.destination.load_from_env_or_mount")
-    @patch("sap_cloud_sdk.destination.TokenProvider")
-    @patch("sap_cloud_sdk.destination.DestinationHttp")
-    def test_create_fragment_client_http_error(self, mock_http, mock_token_provider, mock_load_config):
-        mock_load_config.return_value = Mock(spec=DestinationConfig)
-        mock_token_provider.return_value = Mock()
-        mock_http.side_effect = Exception("HTTP client failed")
+    @patch(_BUILD_HTTP)
+    def test_create_fragment_client_http_error(self, mock_build_http):
+        mock_build_http.side_effect = Exception("HTTP client failed")
         with pytest.raises(ClientCreationError) as exc_info:
             create_fragment_client()
         assert "failed to create fragment client" in str(exc_info.value)
@@ -240,14 +195,10 @@ class TestCreateFragmentClientLocalMode:
         assert "local" in mock_logger.warning.call_args[0][0].lower()
         assert "production" in mock_logger.warning.call_args[0][0].lower()
 
-    @patch("sap_cloud_sdk.destination.TokenProvider")
-    @patch("sap_cloud_sdk.destination.DestinationHttp")
-    @patch("sap_cloud_sdk.destination.load_from_env_or_mount")
+    @patch(_BUILD_HTTP)
     @patch("sap_cloud_sdk.destination.os.path.isfile", new=lambda _: False)
-    def test_falls_through_to_cloud_when_no_mock_file(self, mock_load_config, mock_http, mock_tp):
-        mock_load_config.return_value = Mock(spec=DestinationConfig)
-        mock_tp.return_value = Mock()
-        mock_http.return_value = Mock()
+    def test_falls_through_to_cloud_when_no_mock_file(self, mock_build_http):
+        mock_build_http.return_value = Mock()
         client = create_fragment_client()
         assert isinstance(client, FragmentClient)
 
@@ -256,9 +207,8 @@ class TestCreateCertificateClient:
     """Tests for create_certificate_client cloud mode."""
 
     @_NO_MOCK_FILE
-    @patch("sap_cloud_sdk.destination.TokenProvider")
-    @patch("sap_cloud_sdk.destination.DestinationHttp")
-    def test_create_certificate_client_with_explicit_config(self, mock_http, mock_token_provider):
+    @patch(_BUILD_HTTP)
+    def test_create_certificate_client_with_explicit_config(self, mock_build_http):
         config = DestinationConfig(
             url="https://destination.example.com",
             token_url="https://auth.example.com/oauth/token",
@@ -266,69 +216,49 @@ class TestCreateCertificateClient:
             client_secret="test-secret",
             identityzone="provider-zone"
         )
-        mock_token_provider.return_value = Mock()
-        mock_http.return_value = Mock()
+        mock_build_http.return_value = Mock()
         client = create_certificate_client(config=config)
         assert isinstance(client, CertificateClient)
-        mock_token_provider.assert_called_once_with(config)
-        mock_http.assert_called_once_with(config=config, token_provider=mock_token_provider.return_value)
+        mock_build_http.assert_called_once_with(None, config)
 
     @_NO_MOCK_FILE
-    @patch("sap_cloud_sdk.destination.load_from_env_or_mount")
-    @patch("sap_cloud_sdk.destination.TokenProvider")
-    @patch("sap_cloud_sdk.destination.DestinationHttp")
-    def test_create_certificate_client_cloud_mode_default(self, mock_http, mock_token_provider, mock_load_config):
-        mock_config = Mock(spec=DestinationConfig)
-        mock_load_config.return_value = mock_config
-        mock_token_provider.return_value = Mock()
-        mock_http.return_value = Mock()
+    @patch(_BUILD_HTTP)
+    def test_create_certificate_client_cloud_mode_default(self, mock_build_http):
+        mock_build_http.return_value = Mock()
         client = create_certificate_client()
         assert isinstance(client, CertificateClient)
-        mock_load_config.assert_called_once_with(None)
-        mock_token_provider.assert_called_once_with(mock_config)
-        mock_http.assert_called_once_with(config=mock_config, token_provider=mock_token_provider.return_value)
+        mock_build_http.assert_called_once_with(None, None)
 
     @_NO_MOCK_FILE
-    @patch("sap_cloud_sdk.destination.load_from_env_or_mount")
-    @patch("sap_cloud_sdk.destination.TokenProvider")
-    @patch("sap_cloud_sdk.destination.DestinationHttp")
-    def test_create_certificate_client_cloud_mode_with_instance_name(self, mock_http, mock_token_provider, mock_load_config):
-        mock_config = Mock(spec=DestinationConfig)
-        mock_load_config.return_value = mock_config
-        mock_token_provider.return_value = Mock()
-        mock_http.return_value = Mock()
+    @patch(_BUILD_HTTP)
+    def test_create_certificate_client_cloud_mode_with_instance_name(self, mock_build_http):
+        mock_build_http.return_value = Mock()
         client = create_certificate_client(instance="custom-instance")
         assert isinstance(client, CertificateClient)
-        mock_load_config.assert_called_once_with("custom-instance")
+        mock_build_http.assert_called_once_with("custom-instance", None)
 
     @_NO_MOCK_FILE
-    @patch("sap_cloud_sdk.destination.load_from_env_or_mount")
-    def test_create_certificate_client_config_error(self, mock_load_config):
-        mock_load_config.side_effect = Exception("Config loading failed")
+    @patch(_BUILD_HTTP)
+    def test_create_certificate_client_config_error(self, mock_build_http):
+        mock_build_http.side_effect = Exception("Config loading failed")
         with pytest.raises(ClientCreationError) as exc_info:
             create_certificate_client()
         assert "failed to create certificate client" in str(exc_info.value)
         assert "Config loading failed" in str(exc_info.value)
 
     @_NO_MOCK_FILE
-    @patch("sap_cloud_sdk.destination.load_from_env_or_mount")
-    @patch("sap_cloud_sdk.destination.TokenProvider")
-    def test_create_certificate_client_token_provider_error(self, mock_token_provider, mock_load_config):
-        mock_load_config.return_value = Mock(spec=DestinationConfig)
-        mock_token_provider.side_effect = Exception("Token provider failed")
+    @patch(_BUILD_HTTP)
+    def test_create_certificate_client_token_provider_error(self, mock_build_http):
+        mock_build_http.side_effect = Exception("Token provider failed")
         with pytest.raises(ClientCreationError) as exc_info:
             create_certificate_client()
         assert "failed to create certificate client" in str(exc_info.value)
         assert "Token provider failed" in str(exc_info.value)
 
     @_NO_MOCK_FILE
-    @patch("sap_cloud_sdk.destination.load_from_env_or_mount")
-    @patch("sap_cloud_sdk.destination.TokenProvider")
-    @patch("sap_cloud_sdk.destination.DestinationHttp")
-    def test_create_certificate_client_http_error(self, mock_http, mock_token_provider, mock_load_config):
-        mock_load_config.return_value = Mock(spec=DestinationConfig)
-        mock_token_provider.return_value = Mock()
-        mock_http.side_effect = Exception("HTTP client failed")
+    @patch(_BUILD_HTTP)
+    def test_create_certificate_client_http_error(self, mock_build_http):
+        mock_build_http.side_effect = Exception("HTTP client failed")
         with pytest.raises(ClientCreationError) as exc_info:
             create_certificate_client()
         assert "failed to create certificate client" in str(exc_info.value)
@@ -355,14 +285,10 @@ class TestCreateCertificateClientLocalMode:
         assert "local" in mock_logger.warning.call_args[0][0].lower()
         assert "production" in mock_logger.warning.call_args[0][0].lower()
 
-    @patch("sap_cloud_sdk.destination.TokenProvider")
-    @patch("sap_cloud_sdk.destination.DestinationHttp")
-    @patch("sap_cloud_sdk.destination.load_from_env_or_mount")
+    @patch(_BUILD_HTTP)
     @patch("sap_cloud_sdk.destination.os.path.isfile", new=lambda _: False)
-    def test_falls_through_to_cloud_when_no_mock_file(self, mock_load_config, mock_http, mock_tp):
-        mock_load_config.return_value = Mock(spec=DestinationConfig)
-        mock_tp.return_value = Mock()
-        mock_http.return_value = Mock()
+    def test_falls_through_to_cloud_when_no_mock_file(self, mock_build_http):
+        mock_build_http.return_value = Mock()
         client = create_certificate_client()
         assert isinstance(client, CertificateClient)
 
@@ -371,19 +297,15 @@ class TestCreateClientTelemetrySource:
     """Verify _telemetry_source kwarg is stored on the client."""
 
     @_NO_MOCK_FILE
-    @patch("sap_cloud_sdk.destination.load_from_env_or_mount")
-    @patch("sap_cloud_sdk.destination.TokenProvider")
-    @patch("sap_cloud_sdk.destination.DestinationHttp")
-    def test_default_source_is_none(self, mock_http, mock_tp, mock_load_config):
-        mock_load_config.return_value = Mock(spec=DestinationConfig)
+    @patch(_BUILD_HTTP)
+    def test_default_source_is_none(self, mock_build_http):
+        mock_build_http.return_value = Mock()
         assert create_client()._telemetry_source is None
 
     @_NO_MOCK_FILE
-    @patch("sap_cloud_sdk.destination.load_from_env_or_mount")
-    @patch("sap_cloud_sdk.destination.TokenProvider")
-    @patch("sap_cloud_sdk.destination.DestinationHttp")
-    def test_explicit_source_is_stored(self, mock_http, mock_tp, mock_load_config):
-        mock_load_config.return_value = Mock(spec=DestinationConfig)
+    @patch(_BUILD_HTTP)
+    def test_explicit_source_is_stored(self, mock_build_http):
+        mock_build_http.return_value = Mock()
         client = create_client(_telemetry_source=Module.AGENTGATEWAY)
         assert client._telemetry_source is Module.AGENTGATEWAY
 
@@ -392,19 +314,15 @@ class TestCreateFragmentClientTelemetrySource:
     """Verify _telemetry_source kwarg is stored on the fragment client."""
 
     @_NO_MOCK_FILE
-    @patch("sap_cloud_sdk.destination.load_from_env_or_mount")
-    @patch("sap_cloud_sdk.destination.TokenProvider")
-    @patch("sap_cloud_sdk.destination.DestinationHttp")
-    def test_default_source_is_none(self, mock_http, mock_tp, mock_load_config):
-        mock_load_config.return_value = Mock(spec=DestinationConfig)
+    @patch(_BUILD_HTTP)
+    def test_default_source_is_none(self, mock_build_http):
+        mock_build_http.return_value = Mock()
         assert create_fragment_client()._telemetry_source is None
 
     @_NO_MOCK_FILE
-    @patch("sap_cloud_sdk.destination.load_from_env_or_mount")
-    @patch("sap_cloud_sdk.destination.TokenProvider")
-    @patch("sap_cloud_sdk.destination.DestinationHttp")
-    def test_explicit_source_is_stored(self, mock_http, mock_tp, mock_load_config):
-        mock_load_config.return_value = Mock(spec=DestinationConfig)
+    @patch(_BUILD_HTTP)
+    def test_explicit_source_is_stored(self, mock_build_http):
+        mock_build_http.return_value = Mock()
         client = create_fragment_client(_telemetry_source=Module.AGENTGATEWAY)
         assert client._telemetry_source is Module.AGENTGATEWAY
 
@@ -413,18 +331,14 @@ class TestCreateCertificateClientTelemetrySource:
     """Verify _telemetry_source kwarg is stored on the certificate client."""
 
     @_NO_MOCK_FILE
-    @patch("sap_cloud_sdk.destination.load_from_env_or_mount")
-    @patch("sap_cloud_sdk.destination.TokenProvider")
-    @patch("sap_cloud_sdk.destination.DestinationHttp")
-    def test_default_source_is_none(self, mock_http, mock_tp, mock_load_config):
-        mock_load_config.return_value = Mock(spec=DestinationConfig)
+    @patch(_BUILD_HTTP)
+    def test_default_source_is_none(self, mock_build_http):
+        mock_build_http.return_value = Mock()
         assert create_certificate_client()._telemetry_source is None
 
     @_NO_MOCK_FILE
-    @patch("sap_cloud_sdk.destination.load_from_env_or_mount")
-    @patch("sap_cloud_sdk.destination.TokenProvider")
-    @patch("sap_cloud_sdk.destination.DestinationHttp")
-    def test_explicit_source_is_stored(self, mock_http, mock_tp, mock_load_config):
-        mock_load_config.return_value = Mock(spec=DestinationConfig)
+    @patch(_BUILD_HTTP)
+    def test_explicit_source_is_stored(self, mock_build_http):
+        mock_build_http.return_value = Mock()
         client = create_certificate_client(_telemetry_source=Module.DATA_ANONYMIZATION)
         assert client._telemetry_source is Module.DATA_ANONYMIZATION

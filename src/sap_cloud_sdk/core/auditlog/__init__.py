@@ -18,7 +18,7 @@ from typing import Optional
 
 from sap_cloud_sdk.core.telemetry import Module
 from sap_cloud_sdk.core.auditlog.client import AuditLogClient
-from sap_cloud_sdk.core.auditlog._http_transport import HttpTransport
+from sap_cloud_sdk.core.auditlog._transport import HttpTransport
 from sap_cloud_sdk.core.auditlog.models import (
     SecurityEvent,
     DataAccessEvent,
@@ -33,7 +33,7 @@ from sap_cloud_sdk.core.auditlog.models import (
     ChangeAttribute,
     DeletedAttribute,
 )
-from sap_cloud_sdk.core.auditlog.config import AuditLogConfig, _load_config_from_env
+from sap_cloud_sdk.core.auditlog.config import AuditLogConfig, _make_config_factory
 from sap_cloud_sdk.core.auditlog.exceptions import (
     AuditLogError,
     ClientCreationError,
@@ -67,7 +67,7 @@ def create_client(
             transport = HttpTransport(config)
             return AuditLogClient(transport, _telemetry_source=_telemetry_source)
 
-        transport = HttpTransport(_load_config_from_env())
+        transport = HttpTransport(_make_config_factory())
         return AuditLogClient(transport, _telemetry_source=_telemetry_source)
 
     except Exception as e:

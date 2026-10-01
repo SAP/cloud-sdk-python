@@ -37,11 +37,15 @@ from sap_cloud_sdk.core.telemetry.extensions import (
     ATTR_EXTENSION_ITEM_NAME,
     ATTR_EXTENSION_URL,
     ATTR_SOLUTION_ID,
+    ATTR_JOULE_STUDIO_GSID,
     ATTR_SUMMARY_TOTAL_OPERATION_COUNT,
     ATTR_SUMMARY_TOTAL_DURATION_MS,
     ATTR_SUMMARY_TOOL_CALL_COUNT,
     ATTR_SUMMARY_HOOK_CALL_COUNT,
     ATTR_SUMMARY_HAS_INSTRUCTION,
+    ATTR_SUMMARY_JOULE_STUDIO_GSID,
+    ATTR_SUMMARY_IS_EXTENSION,
+    ATTR_SUMMARY_SOLUTION_ID,
     resolve_source_info,
     build_extension_span_attributes,
     reset_tool_call_metrics,
@@ -56,6 +60,10 @@ from sap_cloud_sdk.core.telemetry.extensions import (
     ExtensionContextLogFilter,
 )
 from sap_cloud_sdk.core.telemetry.middleware import TelemetryMiddleware
+from sap_cloud_sdk.core.telemetry.instrumentation._registry import (
+    Library,
+    get_instrumented_libraries,
+)
 
 __all__ = [
     "Module",
@@ -85,11 +93,15 @@ __all__ = [
     "ATTR_EXTENSION_ITEM_NAME",
     "ATTR_EXTENSION_URL",
     "ATTR_SOLUTION_ID",
+    "ATTR_JOULE_STUDIO_GSID",
     "ATTR_SUMMARY_TOTAL_OPERATION_COUNT",
     "ATTR_SUMMARY_TOTAL_DURATION_MS",
     "ATTR_SUMMARY_TOOL_CALL_COUNT",
     "ATTR_SUMMARY_HOOK_CALL_COUNT",
     "ATTR_SUMMARY_HAS_INSTRUCTION",
+    "ATTR_SUMMARY_JOULE_STUDIO_GSID",
+    "ATTR_SUMMARY_IS_EXTENSION",
+    "ATTR_SUMMARY_SOLUTION_ID",
     "resolve_source_info",
     "build_extension_span_attributes",
     "reset_tool_call_metrics",
@@ -103,6 +115,8 @@ __all__ = [
     "emit_extensions_summary_span",
     "ExtensionContextLogFilter",
     "TelemetryMiddleware",
+    "Library",
+    "get_instrumented_libraries",
 ]
 
 try:

@@ -180,16 +180,18 @@ class HttpTransport(Transport):
         """Submit a multipart request with either a file path or in-memory bytes."""
         file_handle: Optional[BinaryIO] = None
         try:
+            file_data: BinaryIO | bytes
             if request.file_path is not None:
                 file_handle = open(request.file_path, "rb")
-                file_value = file_handle
+                file_data = file_handle
             else:
-                file_value = request.file_content
+                assert request.file_content is not None
+                file_data = request.file_content
 
             files = {
                 "file": (
                     request.resolved_file_name(),
-                    file_value,
+                    file_data,
                 )
             }
 

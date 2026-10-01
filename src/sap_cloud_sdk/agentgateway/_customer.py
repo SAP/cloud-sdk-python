@@ -13,6 +13,7 @@ Authentication flow (TRANSPARENT mode):
 - Gateway handles mTLS externally, SDK uses standard HTTPS
 """
 
+import asyncio
 import json
 import logging
 import os
@@ -24,18 +25,34 @@ import httpx
 from mcp import ClientSession
 from mcp.client.streamable_http import streamable_http_client
 
+from sap_cloud_sdk.agentgateway.config import DEFAULT_MAX_CONCURRENT_TASKS
+
+try:
+    from mcp.shared.exceptions import McpError
+except ImportError:
+    from mcp.shared.exceptions import MCPError as McpError  # type: ignore[no-redef]  # ty: ignore[unresolved-import]
+
+from sap_cloud_sdk.agentgateway._compat import (
+    mcp_input_schema,
+    mcp_is_error,
+    mcp_server_name,
+)
 from sap_cloud_sdk.agentgateway._dependencies_resolver import (
     EnvironmentDependenciesResolver,
     IntegrationDependenciesResolver,
 )
 from sap_cloud_sdk.agentgateway._models import (
+    JsonRpcError,
     CustomerCredentials,
     IntegrationDependency,
     MCPTool,
     MCPToolFilter,
 )
 from sap_cloud_sdk.agentgateway._token_cache import _TokenCache
-from sap_cloud_sdk.agentgateway.exceptions import AgentGatewaySDKError
+from sap_cloud_sdk.agentgateway.exceptions import (
+    AgentGatewaySDKError,
+    AgentGatewayServerError,
+)
 from sap_cloud_sdk.core.secret_resolver import resolve_base_mount
 
 logger = logging.getLogger(__name__)
@@ -631,7 +648,8 @@ async def _list_server_tools(
         List of MCPTool objects from this server.
 
     Raises:
-        AgentGatewaySDKError: If server does not provide server_info.name.
+        AgentGatewaySDKError: If server does not provide a server name
+            (serverInfo/server_info).
     """
     async with httpx.AsyncClient(
         headers={
@@ -648,28 +666,25 @@ async def _list_server_tools(
             async with ClientSession(read, write) as session:
                 init_result = await session.initialize()
 
-                if not (
-                    init_result
-                    and init_result.server_info
-                    and init_result.server_info.name
-                ):
+                server_name = mcp_server_name(init_result)
+                if not server_name:
                     raise AgentGatewaySDKError(
-                        f"MCP server at '{url}' did not provide server_info.name. "
-                        "This is required by the MCP protocol."
+                        f"MCP server at '{url}' did not provide its server name "
+                        "(serverInfo/server_info). This is required by the MCP protocol."
                     )
 
-                server_name = init_result.server_info.name
                 result = await session.list_tools()
+                tools = result.tools or []
 
                 return [
                     MCPTool(
                         name=t.name,
                         server_name=server_name,
                         description=t.description or "",
-                        input_schema=t.inputSchema or {},
+                        input_schema=mcp_input_schema(t),
                         url=url,
                     )
-                    for t in result.tools
+                    for t in tools
                 ]
 
 
@@ -680,15 +695,42 @@ def _log_mcp_server_error(ord_id: str, exc: BaseException) -> None:
             _log_mcp_server_error(ord_id, inner)
         return
     if isinstance(exc, httpx.HTTPStatusError):
+        try:
+            body = exc.response.text
+        except httpx.ResponseNotRead:
+            body = None
+        rpc_error = JsonRpcError.parse(body) if body else None
+        if rpc_error:
+            logger.error(
+                "Failed to load tools from %s — %s returned HTTP %d [JSON-RPC %d]: %s",
+                ord_id,
+                exc.request.url,
+                exc.response.status_code,
+                rpc_error.code,
+                rpc_error.message,
+            )
+        else:
+            logger.error(
+                "Failed to load tools from %s — %s returned HTTP %d: %s",
+                ord_id,
+                exc.request.url,
+                exc.response.status_code,
+                body[:500] if body else "(response body not available)",
+            )
+    elif isinstance(exc, McpError):
         logger.error(
-            "Failed to load tools from %s (HTTP %d): %s",
+            "Failed to load tools from %s — JSON-RPC %d: %s",
             ord_id,
-            exc.response.status_code,
-            exc.response.text[:500],
+            exc.error.code,
+            exc.error.message,
         )
     else:
-        logger.exception(
-            "Failed to load tools from %s — skipping", ord_id, exc_info=exc
+        logger.error(
+            "Failed to load tools from %s — %s: %s",
+            ord_id,
+            type(exc).__name__,
+            exc,
+            exc_info=exc,
         )
 
 
@@ -697,6 +739,7 @@ async def get_mcp_tools_customer(
     system_token: str,
     timeout: float,
     filter: MCPToolFilter | None = None,
+    max_concurrent_tasks: int = DEFAULT_MAX_CONCURRENT_TASKS,
 ) -> list[MCPTool]:
     """List all MCP tools from servers defined in credentials.
 
@@ -709,10 +752,13 @@ async def get_mcp_tools_customer(
         timeout: HTTP timeout in seconds for MCP server calls.
         filter: Optional MCPToolFilter narrowing results by tool name or ORD ID.
             If None or empty, all tools are included.
+        max_concurrent_tasks: Maximum number of server fetches that run
+            concurrently. Defaults to 15.
 
     Returns:
         List of MCPTool objects from all servers.
     """
+    start_time = asyncio.get_event_loop().time()
     f = filter or MCPToolFilter()
     dependencies = credentials.integration_dependencies
 
@@ -728,9 +774,10 @@ async def get_mcp_tools_customer(
 
     logger.info("Discovering tools from %d MCP server(s)", len(dependencies))
 
-    tools: list[MCPTool] = []
+    # Fetch all servers concurrently; isolate per-server failures
+    semaphore = asyncio.Semaphore(max_concurrent_tasks)
 
-    for dep in dependencies:
+    async def _guarded(dep: IntegrationDependency) -> list[MCPTool]:
         url = _build_mcp_url(credentials.gateway_url, dep.ord_id, dep.global_tenant_id)
         logger.debug(
             "Discovering tools from %s (ord_id=%s, gt_id=%s)",
@@ -738,21 +785,33 @@ async def get_mcp_tools_customer(
             dep.ord_id,
             dep.global_tenant_id,
         )
+        async with semaphore:
+            return await _list_server_tools(url, system_token, timeout)
 
-        try:
-            server_tools = await _list_server_tools(url, system_token, timeout)
-            tools.extend(server_tools)
-            logger.debug("Loaded %d tool(s) from %s", len(server_tools), dep.ord_id)
-        except Exception as exc:
-            _log_mcp_server_error(dep.ord_id, exc)
+    results = await asyncio.gather(
+        *(_guarded(dep) for dep in dependencies),
+        return_exceptions=True,
+    )
+
+    tools: list[MCPTool] = []
+    for dep, result in zip(dependencies, results):
+        if isinstance(result, BaseException):
+            _log_mcp_server_error(dep.ord_id, result)
+        else:
+            tools.extend(result)
+            logger.debug("Loaded %d tool(s) from %s", len(result), dep.ord_id)
 
     # Post-fetch filter: tool names are only known after fetching
     if f.names:
         names_set = set(f.names)
         tools = [t for t in tools if t.name in names_set]
 
+    elapsed = asyncio.get_event_loop().time() - start_time
     logger.info(
-        "Loaded %d MCP tool(s) from %d server(s)", len(tools), len(dependencies)
+        "Loaded %d MCP tool(s) from %d server(s) in %.2fs",
+        len(tools),
+        len(dependencies),
+        elapsed,
     )
     return tools
 
@@ -795,14 +854,22 @@ async def call_mcp_tool_customer(
                 await session.initialize()
                 result = await session.call_tool(tool.name, kwargs)
 
+                if result is None:
+                    raise AgentGatewayServerError(
+                        f"Tool '{tool.name}' on '{tool.url}' returned None"
+                    )
                 if not result.content:
-                    logger.warning("Tool '%s' returned empty content", tool.name)
+                    logger.warning(
+                        "Tool '%s' on '%s' returned empty content", tool.name, tool.url
+                    )
                     return ""
 
                 first = result.content[0]
                 text = str(getattr(first, "text", ""))
 
-                if result.isError:
-                    logger.error("Tool '%s' returned an error: %s", tool.name, text)
+                if mcp_is_error(result):
+                    raise AgentGatewayServerError(
+                        f"Tool '{tool.name}' on '{tool.url}' returned an error: {text}"
+                    )
 
                 return text

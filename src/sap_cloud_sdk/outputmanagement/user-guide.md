@@ -68,9 +68,9 @@ response = client.send_email(
         "PurchaseOrder": {
             "orderId": "PO-12345",
             "vendor": "ACME Corp",
-            "total": 1500.00
+            "total": 1500.00,
         }
-    }
+    },
 )
 
 # Check the result
@@ -94,7 +94,7 @@ response = client.send_email(
     to=["user@example.com"],
     business_document={"Document": {"id": "123"}},
     cc=["manager@example.com"],  # Optional
-    template_language="en"  # Optional, default: "en"
+    template_language="en",  # Optional, default: "en"
 )
 ```
 
@@ -103,18 +103,13 @@ response = client.send_email(
 response = client.send_email(
     notification_template_key="INVOICE_NOTIFICATION",
     to=["customer@example.com"],
-    business_document={
-        "Invoice": {
-            "invoiceNumber": "INV-2024-001",
-            "amount": 5000.00
-        }
-    },
+    business_document={"Invoice": {"invoiceNumber": "INV-2024-001", "amount": 5000.00}},
     cc=["accounting@company.com"],
     template_language="en",
     attachment_urls=[
         "https://dms.example.com/browser/root?objectId=12345&cmisselector=content",
-        "https://dms.example.com/browser/root?objectId=67890&cmisselector=content"
-    ]
+        "https://dms.example.com/browser/root?objectId=67890&cmisselector=content",
+    ],
 )
 ```
 
@@ -128,7 +123,7 @@ output_request = client.create_output_request(
     business_document={"Document": {"id": "123"}},
     cc=["manager@example.com"],  # Optional
     template_language="en",  # Optional
-    attachment_urls=["https://dms.example.com/..."]  # Optional
+    attachment_urls=["https://dms.example.com/..."],  # Optional
 )
 
 # Inspect or modify the request
@@ -156,7 +151,7 @@ response = await client.send_email_with_mcp(
     notification_template_key="TEMPLATE_KEY",
     to_emails=["user@example.com"],
     business_document={"Document": {"id": "123"}},
-    mcp_tool=mcp_tool_instance
+    mcp_tool=mcp_tool_instance,
 )
 ```
 
@@ -167,17 +162,14 @@ response = await client.send_email_with_mcp(
     notification_template_key="CONTRACT_NOTIFICATION",
     to_emails=["legal@company.com"],
     business_document={
-        "Contract": {
-            "contractId": "CNT-2024-100",
-            "partyName": "Partner Corp"
-        }
+        "Contract": {"contractId": "CNT-2024-100", "partyName": "Partner Corp"}
     },
     cc_email="manager@company.com",
     attachment_urls=[
         "https://dms.example.com/browser/root?objectId=12345&cmisselector=content",
-        "https://dms.example.com/browser/root?objectId=67890&cmisselector=content"
+        "https://dms.example.com/browser/root?objectId=67890&cmisselector=content",
     ],
-    mcp_tool=mcp_tool_instance
+    mcp_tool=mcp_tool_instance,
 )
 ```
 
@@ -202,9 +194,9 @@ response = client.send_email(
             "orderId": "ORD-789",
             "customerName": "John Doe",
             "orderDate": "2024-01-15",
-            "totalAmount": 2500.00
+            "totalAmount": 2500.00,
         }
-    }
+    },
 )
 
 if response.error:
@@ -230,9 +222,9 @@ response = client.send_email(
         "Invoice": {
             "invoiceNumber": "INV-2024-001",
             "amount": 5000.00,
-            "dueDate": "2024-02-15"
+            "dueDate": "2024-02-15",
         }
-    }
+    },
 )
 ```
 
@@ -248,13 +240,8 @@ client = create_client(destination_name="ARIBA_OUTPUT_SERVICE")
 response = client.send_email(
     notification_template_key="WELCOME_EMAIL",
     to=["user@example.com"],
-    business_document={
-        "User": {
-            "userId": "U12345",
-            "name": "Jane Smith"
-        }
-    },
-    template_language="de"  # German template
+    business_document={"User": {"userId": "U12345", "name": "Jane Smith"}},
+    template_language="de",  # German template
 )
 ```
 
@@ -273,14 +260,11 @@ response = client.send_email(
     notification_template_key="CONTRACT_NOTIFICATION",
     to=["legal@company.com"],
     business_document={
-        "Contract": {
-            "contractId": "CNT-2024-100",
-            "partyName": "Partner Corp"
-        }
+        "Contract": {"contractId": "CNT-2024-100", "partyName": "Partner Corp"}
     },
     attachment_urls=[
         "https://dms.example.com/browser/root?objectId=12345&cmisselector=content"
-    ]
+    ],
 )
 ```
 
@@ -297,17 +281,13 @@ response = client.send_email(
     notification_template_key="REPORT_PACKAGE",
     to=["management@company.com"],
     business_document={
-        "Report": {
-            "reportId": "RPT-Q1-2024",
-            "quarter": "Q1",
-            "year": 2024
-        }
+        "Report": {"reportId": "RPT-Q1-2024", "quarter": "Q1", "year": 2024}
     },
     attachment_urls=[
         "https://dms.example.com/browser/root?objectId=12345&cmisselector=content",
         "https://dms.example.com/browser/root?objectId=67890&cmisselector=content",
-        "https://dms.example.com/browser/root?objectId=11111&cmisselector=content"
-    ]
+        "https://dms.example.com/browser/root?objectId=11111&cmisselector=content",
+    ],
 )
 ```
 
@@ -328,7 +308,7 @@ client = create_client()
 client = create_client(
     destination_name="ARIBA_OUTPUT_SERVICE",
     access_strategy="PROVIDER_ONLY",
-    instance="default"
+    instance="default",
 )
 ```
 
@@ -341,14 +321,12 @@ from sap_cloud_sdk.outputmanagement import create_client
 
 # Provider-only access (default)
 client = create_client(
-    destination_name="ARIBA_OUTPUT_SERVICE",
-    access_strategy="PROVIDER_ONLY"
+    destination_name="ARIBA_OUTPUT_SERVICE", access_strategy="PROVIDER_ONLY"
 )
 
 # Subscriber-only access
 client = create_client(
-    destination_name="ARIBA_OUTPUT_SERVICE",
-    access_strategy="SUBSCRIBER_ONLY"
+    destination_name="ARIBA_OUTPUT_SERVICE", access_strategy="SUBSCRIBER_ONLY"
 )
 ```
 
@@ -360,8 +338,7 @@ Specify a custom destination service instance:
 from sap_cloud_sdk.outputmanagement import create_client
 
 client = create_client(
-    destination_name="ARIBA_OUTPUT_SERVICE",
-    instance="my-custom-instance"
+    destination_name="ARIBA_OUTPUT_SERVICE", instance="my-custom-instance"
 )
 ```
 
@@ -378,15 +355,12 @@ client = create_client(destination_name="ARIBA_OUTPUT_SERVICE")
 output_request = client.create_output_request(
     notification_template_key="CUSTOM_NOTIFICATION",
     to=["recipient@example.com"],
-    business_document={
-        "CustomDocument": {
-            "id": "DOC-456",
-            "type": "Important"
-        }
-    },
+    business_document={"CustomDocument": {"id": "DOC-456", "type": "Important"}},
     cc=["supervisor@example.com"],
     template_language="en",
-    attachment_urls=["https://dms.example.com/browser/root?objectId=999&cmisselector=content"]
+    attachment_urls=[
+        "https://dms.example.com/browser/root?objectId=999&cmisselector=content"
+    ],
 )
 
 # Step 2: Inspect or modify the request if needed
@@ -411,7 +385,7 @@ client = create_client(destination_name="ARIBA_OUTPUT_SERVICE")
 response = client.send_email(
     notification_template_key="NOTIFICATION",
     to=["user@example.com"],
-    business_document={"Document": {"id": "123"}}
+    business_document={"Document": {"id": "123"}},
 )
 
 if response.error:
@@ -433,7 +407,7 @@ client = create_client(destination_name="ARIBA_OUTPUT_SERVICE")
 response = client.send_email(
     notification_template_key="",  # Invalid: empty template key
     to=[],  # Invalid: no recipients
-    business_document={}  # Invalid: empty document
+    business_document={},  # Invalid: empty document
 )
 
 if response.error:
@@ -456,7 +430,7 @@ try:
     response = client.send_email(
         notification_template_key="NOTIFICATION",
         to=["user@example.com"],
-        business_document={"Document": {"id": "123"}}
+        business_document={"Document": {"id": "123"}},
     )
 
     if response.error:
@@ -491,13 +465,15 @@ for order in orders:
     response = client.send_email(
         notification_template_key="ORDER_CONFIRMATION",
         to=[order.customer_email],
-        business_document={"Order": order.to_dict()}
+        business_document={"Order": order.to_dict()},
     )
 
     if response.error:
         print(f"Failed to send email for order {order.id}: {response.error.message}")
     else:
-        print(f"Email sent for order {order.id}, Request ID: {response.outputRequestId}")
+        print(
+            f"Email sent for order {order.id}, Request ID: {response.outputRequestId}"
+        )
 ```
 
 ### 2. Validate Input Before Sending
@@ -506,6 +482,7 @@ Validate your data before calling the API:
 
 ```python
 from sap_cloud_sdk.outputmanagement import create_client
+
 
 def send_order_confirmation(order):
     # Validate input
@@ -521,12 +498,7 @@ def send_order_confirmation(order):
     response = client.send_email(
         notification_template_key="ORDER_CONFIRMATION",
         to=[order.customer_email],
-        business_document={
-            "Order": {
-                "orderId": order.order_id,
-                "total": order.total
-            }
-        }
+        business_document={"Order": {"orderId": order.order_id, "total": order.total}},
     )
 
     return response
@@ -542,7 +514,7 @@ business_document = {
     "Invoice": {
         "invoiceNumber": "INV-2024-001",  # Clear identifier
         "customerId": "CUST-12345",
-        "amount": 1000.00
+        "amount": 1000.00,
     }
 }
 
@@ -550,7 +522,7 @@ business_document = {
 business_document = {
     "Invoice": {
         "id": "123",  # Too generic
-        "amount": 1000.00
+        "amount": 1000.00,
     }
 }
 ```
@@ -563,6 +535,7 @@ Always handle errors and provide meaningful feedback:
 from sap_cloud_sdk.outputmanagement import create_client
 import time
 
+
 def send_notification_with_retry(template_key, recipients, document, max_retries=3):
     client = create_client(destination_name="ARIBA_OUTPUT_SERVICE")
 
@@ -571,14 +544,14 @@ def send_notification_with_retry(template_key, recipients, document, max_retries
             response = client.send_email(
                 notification_template_key=template_key,
                 to=recipients,
-                business_document=document
+                business_document=document,
             )
 
             if response.error:
                 if response.error.code in ["NETWORK_ERROR", "SERVICE_UNAVAILABLE"]:
                     if attempt < max_retries - 1:
                         print(f"Retrying... (attempt {attempt + 1}/{max_retries})")
-                        time.sleep(2 ** attempt)  # Exponential backoff
+                        time.sleep(2**attempt)  # Exponential backoff
                         continue
 
                 print(f"Failed to send email: {response.error.message}")
@@ -588,8 +561,10 @@ def send_notification_with_retry(template_key, recipients, document, max_retries
 
         except Exception as e:
             if attempt < max_retries - 1:
-                print(f"Error occurred, retrying... (attempt {attempt + 1}/{max_retries})")
-                time.sleep(2 ** attempt)
+                print(
+                    f"Error occurred, retrying... (attempt {attempt + 1}/{max_retries})"
+                )
+                time.sleep(2**attempt)
                 continue
             raise
 
@@ -611,7 +586,7 @@ client = create_client(destination_name="ARIBA_OUTPUT_SERVICE")
 response = client.send_email(
     notification_template_key="NOTIFICATION",
     to=["user@example.com"],
-    business_document={"Document": {"id": "123"}}
+    business_document={"Document": {"id": "123"}},
 )
 
 if response.error:
@@ -647,7 +622,7 @@ from sap_cloud_sdk.outputmanagement import create_client
 client = create_client(
     destination_name="ARIBA_OUTPUT_SERVICE",
     access_strategy="PROVIDER_ONLY",
-    instance="default"
+    instance="default",
 )
 
 # Using environment variables
@@ -682,7 +657,7 @@ response = client.send_email(
     business_document={"Document": {"id": "123"}},
     cc=["manager@example.com"],
     template_language="en",
-    attachment_urls=["https://dms.example.com/..."]
+    attachment_urls=["https://dms.example.com/..."],
 )
 ```
 
@@ -710,7 +685,7 @@ output_request = client.create_output_request(
     notification_template_key="NOTIFICATION",
     to=["user@example.com"],
     business_document={"Document": {"id": "123"}},
-    cc=["manager@example.com"]
+    cc=["manager@example.com"],
 )
 ```
 
@@ -760,7 +735,7 @@ response = await client.send_email_with_mcp(
     notification_template_key="NOTIFICATION",
     to_emails=["user@example.com"],
     business_document={"Document": {"id": "123"}},
-    mcp_tool=mcp_tool_instance
+    mcp_tool=mcp_tool_instance,
 )
 ```
 
@@ -770,6 +745,7 @@ response = await client.send_email_with_mcp(
 
 ```python
 from sap_cloud_sdk.outputmanagement import create_client
+
 
 def send_order_confirmation(order):
     client = create_client(destination_name="ARIBA_OUTPUT_SERVICE")
@@ -788,12 +764,12 @@ def send_order_confirmation(order):
                     {
                         "productName": item.product_name,
                         "quantity": item.quantity,
-                        "price": float(item.price)
+                        "price": float(item.price),
                     }
                     for item in order.items
-                ]
+                ],
             }
-        }
+        },
     )
 
     return response
@@ -803,6 +779,7 @@ def send_order_confirmation(order):
 
 ```python
 from sap_cloud_sdk.outputmanagement import create_client
+
 
 def send_invoice_with_pdf(invoice, pdf_dms_url):
     client = create_client(destination_name="ARIBA_OUTPUT_SERVICE")
@@ -817,10 +794,10 @@ def send_invoice_with_pdf(invoice, pdf_dms_url):
                 "invoiceDate": invoice.date.isoformat(),
                 "dueDate": invoice.due_date.isoformat(),
                 "amount": float(invoice.amount),
-                "currency": invoice.currency
+                "currency": invoice.currency,
             }
         },
-        attachment_urls=[pdf_dms_url]
+        attachment_urls=[pdf_dms_url],
     )
 
     return response
@@ -830,6 +807,7 @@ def send_invoice_with_pdf(invoice, pdf_dms_url):
 
 ```python
 from sap_cloud_sdk.outputmanagement import create_client
+
 
 def send_bulk_notification(recipients, notification_data):
     client = create_client(destination_name="ARIBA_OUTPUT_SERVICE")
@@ -842,9 +820,9 @@ def send_bulk_notification(recipients, notification_data):
                 "notificationId": notification_data["id"],
                 "title": notification_data["title"],
                 "message": notification_data["message"],
-                "timestamp": notification_data["timestamp"]
+                "timestamp": notification_data["timestamp"],
             }
-        }
+        },
     )
 
     return response
@@ -901,7 +879,7 @@ from sap_cloud_sdk.outputmanagement import (
     ValidationException,
     NetworkException,
     DestinationNotFoundException,
-    DestinationAccessException
+    DestinationAccessException,
 )
 
 try:
@@ -910,7 +888,7 @@ try:
     response = client.send_email(
         notification_template_key="NOTIFICATION",
         to=["user@example.com"],
-        business_document={"Document": {"id": "123"}}
+        business_document={"Document": {"id": "123"}},
     )
 
     if response.error:

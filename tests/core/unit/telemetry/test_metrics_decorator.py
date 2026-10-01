@@ -324,3 +324,78 @@ class TestRecordMetricsDecorator:
             # Should use None for source since there's no self
             call_args = mock_metric.call_args[0]
             assert call_args[1] is None
+
+
+class TestRecordMetricsDecoratorPlainStrings:
+    """Test that record_metrics accepts plain strings for module and operation."""
+
+    def test_decorator_accepts_plain_string_module_and_operation(self):
+        """External packages can pass plain strings instead of enum values."""
+
+        class ExternalClient:
+            def __init__(self):
+                self._telemetry_source = None
+
+            @record_metrics("spii", "handle_tenant_mapping")
+            def handle(self):
+                return "ok"
+
+        client = ExternalClient()
+
+        with patch('sap_cloud_sdk.core.telemetry.metrics_decorator.record_request_metric') as mock_metric:
+            result = client.handle()
+
+            assert result == "ok"
+            mock_metric.assert_called_once_with("spii", None, "handle_tenant_mapping", False)
+
+    def test_decorator_accepts_plain_string_source_from_kwargs(self):
+        """Plain string _telemetry_source in kwargs is accepted."""
+
+        class ExternalClient:
+            @record_metrics("spii", "create_client")
+            def __init__(self, _telemetry_source=None):
+                self._telemetry_source = _telemetry_source
+
+        with patch('sap_cloud_sdk.core.telemetry.metrics_decorator.record_request_metric') as mock_metric:
+            ExternalClient(_telemetry_source="other_module")
+
+            mock_metric.assert_called_once_with("spii", "other_module", "create_client", False)
+
+    def test_decorator_accepts_plain_string_source_from_self(self):
+        """Plain string _telemetry_source on self is accepted."""
+
+        class ExternalClient:
+            def __init__(self):
+                self._telemetry_source = "other_module"
+
+            @record_metrics("spii", "handle_tenant_mapping")
+            def handle(self):
+                return "ok"
+
+        client = ExternalClient()
+
+        with patch('sap_cloud_sdk.core.telemetry.metrics_decorator.record_request_metric') as mock_metric:
+            client.handle()
+
+            call_args = mock_metric.call_args[0]
+            assert call_args[1] == "other_module"
+
+    def test_enum_values_still_work_unchanged(self):
+        """Existing enum usage continues to work after the change."""
+
+        class InternalClient:
+            def __init__(self):
+                self._telemetry_source = None
+
+            @record_metrics(Module.DESTINATION, Operation.DESTINATION_GET_DESTINATION)
+            def get_destination(self):
+                return "dest"
+
+        client = InternalClient()
+
+        with patch('sap_cloud_sdk.core.telemetry.metrics_decorator.record_request_metric') as mock_metric:
+            client.get_destination()
+
+            call_args = mock_metric.call_args[0]
+            assert call_args[0] == Module.DESTINATION
+            assert call_args[2] == Operation.DESTINATION_GET_DESTINATION

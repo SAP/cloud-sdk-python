@@ -4,6 +4,8 @@ import base64
 import json
 from unittest.mock import MagicMock, patch
 
+from sap_cloud_sdk.destination import Destination
+
 import httpx
 import pytest
 
@@ -300,7 +302,7 @@ def _make_config(**overrides):
 
 
 def _make_dest(url="https://ums.example.com", cert_content=_FAKE_PEM_B64):
-    dest = MagicMock()
+    dest = MagicMock(spec=Destination)
     dest.url = url
     if cert_content is not None:
         cert = MagicMock()

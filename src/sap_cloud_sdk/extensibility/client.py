@@ -199,6 +199,7 @@ class ExtensibilityClient:
                 tenant="1d2e1a41-a28b-431f-9e3f-42e9704bfa75",
             )
         """
+        logger.info("Fetching extension capabilities for tenant=%s", tenant)
         try:
             return self._transport.get_extension_capability_implementation(
                 capability_id=capability_id,
@@ -415,6 +416,7 @@ class ExtensibilityClient:
                 f"MCP tool '{_EXECUTE_WORKFLOW_TOOL_NAME}' on server '{_N8N_MCP_SERVER_NAME}' "
                 "not found via Agent Gateway."
             )
+        logger.info("Fetched n8n execute_tool: %s", _EXECUTE_WORKFLOW_TOOL_NAME)
 
         get_exec_tool = next(
             (
@@ -430,6 +432,7 @@ class ExtensibilityClient:
                 f"MCP tool '{_GET_EXECUTION_TOOL_NAME}' on server '{_N8N_MCP_SERVER_NAME}' "
                 "not found via Agent Gateway."
             )
+        logger.info("Fetched n8n get_exec_tool: %s", _GET_EXECUTION_TOOL_NAME)
 
         return execute_tool, get_exec_tool
 
@@ -455,6 +458,7 @@ class ExtensibilityClient:
                 },
             },
         }
+        logger.info("Executing workflow id=%s", hook.n8n_workflow_config.workflow_id)
         try:
             result_str = await agw_client.call_mcp_tool(
                 execute_tool,
@@ -480,6 +484,11 @@ class ExtensibilityClient:
             )
 
         execution_id = data.get("executionId")
+        logger.info(
+            "Workflow execution complete: execution_id=%s, status=%s",
+            execution_id,
+            status,
+        )
         return str(execution_id), status
 
     @staticmethod
@@ -511,6 +520,11 @@ class ExtensibilityClient:
     ) -> Optional[Message]:
         deadline = time.monotonic() + hook.timeout
         last_status = initial_status
+        logger.info(
+            "Polling for workflow %s execution result (timeout=%ss)",
+            hook.n8n_workflow_config.workflow_id,
+            hook.timeout,
+        )
 
         while time.monotonic() < deadline:
             await asyncio.sleep(_HOOK_POLL_INTERVAL)
@@ -541,6 +555,7 @@ class ExtensibilityClient:
             )
 
             if last_status == "success":
+                logger.info("Execution %s completed successfully", execution_id)
                 return self._extract_message(data)
 
             if last_status in _EXECUTION_TERMINAL_STATUSES:
@@ -615,11 +630,20 @@ class ExtensibilityClient:
         agw_client = create_agw_client(
             tenant_subdomain, _telemetry_source=Module.EXTENSIBILITY
         )
+        logger.info(
+            "AGW client created successfully for tenant_subdomain=%s", tenant_subdomain
+        )
         execute_tool, get_exec_tool = await self._discover_n8n_tools(
             agw_client, user_token
         )
+        logger.info("Discovered n8n tools")
         execution_id, status = await self._execute_workflow_via_agw(
             agw_client, execute_tool, hook, user_token, message, headers
+        )
+        logger.info(
+            "Workflow triggered: execution_id=%s, initial_status=%s",
+            execution_id,
+            status,
         )
         return await self._poll_hook_execution(
             agw_client, get_exec_tool, hook, execution_id, user_token, status

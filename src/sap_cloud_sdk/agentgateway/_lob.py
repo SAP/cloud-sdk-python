@@ -13,31 +13,45 @@ import uuid
 import httpx
 from mcp import ClientSession
 from mcp.client.streamable_http import streamable_http_client
+
+try:
+    from mcp.shared.exceptions import McpError
+except ImportError:
+    from mcp.shared.exceptions import MCPError as McpError  # type: ignore[no-redef]  # ty: ignore[unresolved-import]
+from sap_cloud_sdk.agentgateway.config import DEFAULT_MAX_CONCURRENT_TASKS
 from sap_cloud_sdk.destination import (
     create_client as create_destination_client,
     ConsumptionLevel,
     ConsumptionOptions,
+    Destination,
 )
 from sap_cloud_sdk.core.telemetry import Module
 
 from sap_cloud_sdk.agentgateway._fragments import (
     LABEL_KEY,
+    FragmentLabel,
     get_ias_fragment_name,
     get_ias_user_fragment_name,
-    list_mcp_fragments,
     list_a2a_fragments,
+    list_mcp_fragments,
+)
+from sap_cloud_sdk.agentgateway._compat import (
+    mcp_input_schema,
+    mcp_is_error,
+    mcp_server_name,
 )
 from sap_cloud_sdk.agentgateway._models import (
     Agent,
     AgentCard,
     AgentCardFilter,
-    FragmentLabel,
+    JsonRpcError,
     MCPTool,
     MCPToolFilter,
 )
 from sap_cloud_sdk.agentgateway._token_cache import _GatewayUrlCache, _TokenCache
 from sap_cloud_sdk.agentgateway.exceptions import (
     AgentGatewaySDKError,
+    AgentGatewayServerError,
     MCPServerNotFoundError,
 )
 
@@ -106,7 +120,7 @@ def _fetch_auth_token(
         tenant=tenant_subdomain,
     )
 
-    if not dest or not dest.auth_tokens:
+    if not dest or not isinstance(dest, Destination) or not dest.auth_tokens:
         raise MCPServerNotFoundError(
             f"No auth token returned for destination '{dest_name}'"
         )
@@ -149,9 +163,14 @@ def get_ias_client_id_lob() -> str:
         level=ConsumptionLevel.PROVIDER_SUBACCOUNT,
         options=ConsumptionOptions(skip_token_retrieval=True),
     )
-    if not dest:
+    if not dest or not isinstance(dest, Destination):
         raise AgentGatewaySDKError(f"IAS destination '{dest_name}' not found")
-    return dest.properties.get("clientId", "")
+    client_id = dest.properties.get("clientId", "")
+    if not client_id:
+        raise AgentGatewaySDKError(
+            f"IAS destination '{dest_name}' does not contain a 'clientId' property"
+        )
+    return client_id
 
 
 async def fetch_system_auth(
@@ -302,16 +321,41 @@ def _log_mcp_server_error(fragment_name: str, exc: BaseException) -> None:
             _log_mcp_server_error(fragment_name, inner)
         return
     if isinstance(exc, httpx.HTTPStatusError):
+        try:
+            body = exc.response.text
+        except httpx.ResponseNotRead:
+            body = None
+        rpc_error = JsonRpcError.parse(body) if body else None
+        if rpc_error:
+            logger.error(
+                "Failed to load tools from fragment '%s' — %s returned HTTP %d [JSON-RPC %d]: %s",
+                fragment_name,
+                exc.request.url,
+                exc.response.status_code,
+                rpc_error.code,
+                rpc_error.message,
+            )
+        else:
+            logger.error(
+                "Failed to load tools from fragment '%s' — %s returned HTTP %d: %s",
+                fragment_name,
+                exc.request.url,
+                exc.response.status_code,
+                body[:500] if body else "(response body not available)",
+            )
+    elif isinstance(exc, McpError):
         logger.error(
-            "Failed to load tools from fragment '%s' (HTTP %d): %s",
+            "Failed to load tools from fragment '%s' — JSON-RPC %d: %s",
             fragment_name,
-            exc.response.status_code,
-            exc.response.text[:500],
+            exc.error.code,
+            exc.error.message,
         )
     else:
-        logger.exception(
-            "Failed to load tools from fragment '%s' — skipping",
+        logger.error(
+            "Failed to load tools from fragment '%s' — %s: %s",
             fragment_name,
+            type(exc).__name__,
+            exc,
             exc_info=exc,
         )
 
@@ -343,24 +387,23 @@ async def list_server_tools(
         ):
             async with ClientSession(read, write) as session:
                 init_result = await session.initialize()
-                server_name = (
-                    init_result.server_info.name
-                    if init_result
-                    and init_result.server_info
-                    and init_result.server_info.name
-                    else fragment_name
-                )
+                server_name = mcp_server_name(init_result) or fragment_name
                 result = await session.list_tools()
+                tools = result.tools or []
+                if not tools:
+                    logger.info(
+                        "No tools returned by AGW for fragment '%s'", fragment_name
+                    )
                 return [
                     MCPTool(
                         name=t.name,
                         server_name=server_name,
                         description=t.description or "",
-                        input_schema=t.inputSchema or {},
+                        input_schema=mcp_input_schema(t),
                         url=dest_url,
                         fragment_name=fragment_name,
                     )
-                    for t in result.tools
+                    for t in tools
                 ]
 
 
@@ -369,6 +412,7 @@ async def get_mcp_tools_lob(
     system_token: str,
     timeout: float,
     filter: MCPToolFilter | None = None,
+    max_concurrent_tasks: int = DEFAULT_MAX_CONCURRENT_TASKS,
 ) -> list[MCPTool]:
     """List all MCP tools using LoB flow (destination-based).
 
@@ -378,24 +422,22 @@ async def get_mcp_tools_lob(
         tenant_subdomain: Tenant subdomain for multi-tenant lookup.
         system_token: Pre-fetched raw system token (from get_system_auth).
         timeout: HTTP timeout in seconds for MCP server calls.
-        filter: Optional MCPToolFilter narrowing results by tool name, ORD ID,
-            or GTID. If None or empty, all tools are included.
-            ``gtids`` filters fragments server-side via the Destination Service.
-            ``ord_ids`` filters before fetching.
-            ``names`` filters after fetching.
+        filter: Optional MCPToolFilter narrowing results by tool name or ORD ID.
+            If None or empty, all tools are included.
+        max_concurrent_tasks: Maximum number of fragment fetches that run
+            concurrently. Defaults to 15.
 
     Returns:
         List of MCPTool objects from all MCP servers.
     """
+    start_time = asyncio.get_event_loop().time()
     f = filter or MCPToolFilter()
     tools: list[MCPTool] = []
     loop = asyncio.get_running_loop()
 
     logger.info("Listing MCP fragments for tenant '%s'", tenant_subdomain)
 
-    fragments = await loop.run_in_executor(
-        None, list_mcp_fragments, tenant_subdomain, f.gtids or None
-    )
+    fragments = await loop.run_in_executor(None, list_mcp_fragments, tenant_subdomain)
 
     if not fragments:
         logger.debug(
@@ -415,35 +457,53 @@ async def get_mcp_tools_lob(
             in ord_ids_set
         ]
 
+    # Collect fragments that have a valid URL; skip and warn the rest up front
+    tasks: list[tuple[str, str]] = []
     for fragment in fragments:
         fragment_name = fragment.name
         mcp_url = fragment.properties.get("URL") or fragment.properties.get("url")
-
         if not mcp_url:
             logger.warning(
                 "Fragment '%s' has no URL property — skipping", fragment_name
             )
             continue
+        tasks.append((fragment_name, mcp_url))
 
-        try:
-            server_tools = await list_server_tools(
+    # Fetch all fragments concurrently; isolate per-fragment failures
+    semaphore = asyncio.Semaphore(max_concurrent_tasks)
+
+    async def _guarded_mcp(mcp_url: str, fragment_name: str) -> list[MCPTool]:
+        async with semaphore:
+            return await list_server_tools(
                 mcp_url, system_token, fragment_name, timeout
             )
-            tools.extend(server_tools)
+
+    results = await asyncio.gather(
+        *(_guarded_mcp(mcp_url, fragment_name) for fragment_name, mcp_url in tasks),
+        return_exceptions=True,
+    )
+
+    for (fragment_name, _), result in zip(tasks, results):
+        if isinstance(result, BaseException):
+            _log_mcp_server_error(fragment_name, result)
+        else:
+            tools.extend(result)
             logger.debug(
-                "Loaded %d tool(s) from fragment '%s'",
-                len(server_tools),
-                fragment_name,
+                "Loaded %d tool(s) from fragment '%s'", len(result), fragment_name
             )
-        except Exception as exc:
-            _log_mcp_server_error(fragment_name, exc)
 
     # Post-fetch filter: tool names are only known after fetching
     if f.names:
         names_set = set(f.names)
         tools = [t for t in tools if t.name in names_set]
 
-    logger.info("Loaded %d MCP tool(s) from %d fragment(s)", len(tools), len(fragments))
+    elapsed = asyncio.get_event_loop().time() - start_time
+    logger.info(
+        "Loaded %d MCP tool(s) from %d fragment(s) in %.2fs",
+        len(tools),
+        len(tasks),
+        elapsed,
+    )
     return tools
 
 
@@ -481,14 +541,22 @@ async def call_mcp_tool_lob(
             async with ClientSession(read, write) as session:
                 await session.initialize()
                 result = await session.call_tool(tool.name, kwargs)
+                if result is None:
+                    raise AgentGatewayServerError(
+                        f"Tool '{tool.name}' on '{tool.url}' returned None"
+                    )
                 if not result.content:
-                    logger.warning("Tool '%s' returned empty content", tool.name)
+                    logger.warning(
+                        "Tool '%s' on '%s' returned empty content", tool.name, tool.url
+                    )
                     return ""
                 first = result.content[0]
                 text = str(getattr(first, "text", ""))
 
-                if result.isError:
-                    logger.error("Tool '%s' returned an error: %s", tool.name, text)
+                if mcp_is_error(result):
+                    raise AgentGatewayServerError(
+                        f"Tool '{tool.name}' on '{tool.url}' returned an error: {text}"
+                    )
 
                 return text
 
@@ -567,6 +635,7 @@ async def get_agent_cards_lob(
     system_token: str,
     timeout: float,
     filter: AgentCardFilter | None = None,
+    max_concurrent_tasks: int = DEFAULT_MAX_CONCURRENT_TASKS,
 ) -> list[Agent]:
     """List A2A agents and their agent cards using LoB flow.
 
@@ -585,10 +654,13 @@ async def get_agent_cards_lob(
         timeout: HTTP timeout in seconds.
         filter: Optional AgentCardFilter narrowing results by agent card name
             or ORD ID. If None or empty, all A2A fragments are included.
+        max_concurrent_tasks: Maximum number of agent card fetches that run
+            concurrently. Defaults to 15.
 
     Returns:
         List of Agent objects, each containing ORD ID and fetched AgentCard.
     """
+    start_time = asyncio.get_event_loop().time()
     f = filter or AgentCardFilter()
     loop = asyncio.get_running_loop()
 
@@ -613,8 +685,8 @@ async def get_agent_cards_lob(
             in ord_ids_set
         ]
 
-    agents: list[Agent] = []
-
+    # Collect fragments that have a valid URL and extractable ORD ID; skip the rest
+    tasks: list[tuple[str, str, str]] = []
     for fragment in fragments:
         fragment_name = fragment.name
         props_lower = {k.lower(): v for k, v in fragment.properties.items()}
@@ -637,14 +709,32 @@ async def get_agent_cards_lob(
             )
             continue
 
-        try:
-            card = await _fetch_agent_card(fragment_url, system_token, timeout)
-            agents.append(Agent(ord_id=ord_id, agent_card=card))
-            logger.debug("Fetched agent card for fragment '%s'", fragment_name)
-        except Exception:
+        tasks.append((fragment_name, fragment_url, ord_id))
+
+    # Fetch all agent cards concurrently; isolate per-fragment failures
+    semaphore = asyncio.Semaphore(max_concurrent_tasks)
+
+    async def _guarded_card(fragment_url: str) -> AgentCard:
+        async with semaphore:
+            return await _fetch_agent_card(fragment_url, system_token, timeout)
+
+    card_results = await asyncio.gather(
+        *(_guarded_card(fragment_url) for _, fragment_url, _ in tasks),
+        return_exceptions=True,
+    )
+    elapsed = asyncio.get_event_loop().time() - start_time
+
+    agents: list[Agent] = []
+    for (fragment_name, _, ord_id), result in zip(tasks, card_results):
+        if isinstance(result, BaseException):
             logger.exception(
-                "Failed to fetch agent card for fragment '%s' — skipping", fragment_name
+                "Failed to fetch agent card for fragment '%s' — skipping",
+                fragment_name,
+                exc_info=result,
             )
+        else:
+            agents.append(Agent(ord_id=ord_id, agent_card=result))
+            logger.debug("Fetched agent card for fragment '%s'", fragment_name)
 
     # Post-fetch filter: agent card name is only known after fetching
     if f.agent_names:
@@ -652,6 +742,9 @@ async def get_agent_cards_lob(
         agents = [a for a in agents if a.agent_card.raw.get("name") in agent_names_set]
 
     logger.info(
-        "Fetched %d agent card(s) from %d A2A fragment(s)", len(agents), len(fragments)
+        "Fetched %d agent card(s) from %d A2A fragment(s) in %.2fs",
+        len(agents),
+        len(tasks),
+        elapsed,
     )
     return agents

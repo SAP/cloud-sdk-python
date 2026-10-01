@@ -21,16 +21,23 @@ Then read anywhere::
 from sap_cloud_sdk.core.runtime_context._context import (
     RuntimeContext,
     get_context,
+    is_feature_enabled,
 )
 from sap_cloud_sdk.core.runtime_context._envelope import RequestEnvelope
 from sap_cloud_sdk.core.runtime_context._keys import (
     ContextKey,
     DWC_SUBDOMAIN,
     DWC_TENANT,
+    FEATURE_TOGGLES,
     TRIGGER_TYPE,
 )
 from sap_cloud_sdk.core.runtime_context._protocol import ContextProvider
-from sap_cloud_sdk.core.runtime_context._registry import FrameworkAdapter, register
+from sap_cloud_sdk.core.runtime_context._registry import (
+    Adapter,
+    FrameworkAdapter,
+    get_attached_adapters,
+    register,
+)
 from sap_cloud_sdk.core.runtime_context.providers import (
     DWCContextProvider,
     IASContextProvider,
@@ -44,13 +51,16 @@ from sap_cloud_sdk.core.runtime_context.providers import (
 import sap_cloud_sdk.core.runtime_context.adapters  # noqa: F401
 
 __all__ = [
+    "Adapter",
     "APP_TENANT_ID",
     "ContextKey",
     "ContextProvider",
     "DWC_SUBDOMAIN",
     "DWC_TENANT",
     "DWCContextProvider",
+    "FEATURE_TOGGLES",
     "FrameworkAdapter",
+    "get_attached_adapters",
     "GLOBAL_TENANT_ID",
     "IASContextProvider",
     "RuntimeContext",
@@ -59,5 +69,6 @@ __all__ = [
     "TRIGGER_TYPE",
     "USER_ID",
     "get_context",
+    "is_feature_enabled",
     "register",
 ]

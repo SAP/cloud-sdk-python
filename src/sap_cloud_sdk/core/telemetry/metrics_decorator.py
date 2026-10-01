@@ -4,7 +4,6 @@ from functools import wraps
 from typing import Callable, Optional, TypeVar, ParamSpec
 
 from sap_cloud_sdk.core.telemetry import (
-    Module,
     record_request_metric,
     record_error_metric,
 )
@@ -14,7 +13,7 @@ R = TypeVar("R")
 
 
 def record_metrics(
-    module: Module, operation: str, deprecated: bool = False
+    module: str, operation: str, deprecated: bool = False
 ) -> Callable[[Callable[P, R]], Callable[P, R]]:
     """Decorator to automatically record request and error metrics for SDK operations.
 
@@ -64,12 +63,12 @@ def record_metrics(
         def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
             # Extract source from the client instance (self is the first argument)
             # or from constructor kwargs before self._telemetry_source exists.
-            source: Optional[Module] = None
+            source: Optional[str] = None
             if args:
                 source = getattr(args[0], "_telemetry_source", None)
             if source is None:
                 source_kwarg = kwargs.get("_telemetry_source")
-                if isinstance(source_kwarg, Module):
+                if isinstance(source_kwarg, str):
                     source = source_kwarg
 
             try:

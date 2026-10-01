@@ -15,6 +15,13 @@ def _schema_fields(lc_tool):
     return schema.model_fields
 
 
+def _json_schema(lc_tool) -> dict:
+    """Return model_json_schema() from the args_schema Pydantic model."""
+    schema = lc_tool.args_schema
+    assert isinstance(schema, type) and issubclass(schema, BaseModel)
+    return schema.model_json_schema()
+
+
 def _make_tool(*, required=("eventid",), optional=("showdeclinedreason", "datafetchmode")):
     properties = {k: {"type": "string"} for k in (*required, *optional)}
     return MCPTool(
@@ -385,7 +392,7 @@ class TestMcpToolToLangchainFieldMetadata:
             self._tool({"n": {"type": "string", "minLength": 2, "maxLength": 50}}, required=["n"]),
             AsyncMock(), lambda: "token",
         )
-        schema = lc_tool.args_schema.model_json_schema()
+        schema = _json_schema(lc_tool)
         assert schema["properties"]["n"]["minLength"] == 2
         assert schema["properties"]["n"]["maxLength"] == 50
 
@@ -394,7 +401,7 @@ class TestMcpToolToLangchainFieldMetadata:
             self._tool({"v": {"type": "integer", "minimum": 1, "maximum": 100}}, required=["v"]),
             AsyncMock(), lambda: "token",
         )
-        schema = lc_tool.args_schema.model_json_schema()
+        schema = _json_schema(lc_tool)
         assert schema["properties"]["v"]["minimum"] == 1
         assert schema["properties"]["v"]["maximum"] == 100
 
@@ -405,7 +412,7 @@ class TestMcpToolToLangchainFieldMetadata:
             self._tool({"c": {"type": "string", "enum": ["red", "green", "blue"]}}, required=["c"]),
             AsyncMock(), lambda: "token",
         )
-        schema = lc_tool.args_schema.model_json_schema()
+        schema = _json_schema(lc_tool)
         assert schema["properties"]["c"]["enum"] == ["red", "green", "blue"]
 
     def test_default_preserved_in_json_schema_extra(self):
@@ -413,7 +420,7 @@ class TestMcpToolToLangchainFieldMetadata:
             self._tool({"c": {"type": "string", "default": "active"}}, required=["c"]),
             AsyncMock(), lambda: "token",
         )
-        schema = lc_tool.args_schema.model_json_schema()
+        schema = _json_schema(lc_tool)
         assert schema["properties"]["c"]["default"] == "active"
 
     def test_example_preserved_in_json_schema_extra(self):
@@ -421,7 +428,7 @@ class TestMcpToolToLangchainFieldMetadata:
             self._tool({"c": {"type": "string", "example": "hello"}}, required=["c"]),
             AsyncMock(), lambda: "token",
         )
-        schema = lc_tool.args_schema.model_json_schema()
+        schema = _json_schema(lc_tool)
         assert schema["properties"]["c"]["example"] == "hello"
 
     def test_format_preserved_in_json_schema_extra(self):
@@ -429,7 +436,7 @@ class TestMcpToolToLangchainFieldMetadata:
             self._tool({"ts": {"type": "string", "format": "date-time"}}, required=["ts"]),
             AsyncMock(), lambda: "token",
         )
-        schema = lc_tool.args_schema.model_json_schema()
+        schema = _json_schema(lc_tool)
         assert schema["properties"]["ts"]["format"] == "date-time"
 
     def test_const_preserved_in_json_schema_extra(self):
@@ -437,7 +444,7 @@ class TestMcpToolToLangchainFieldMetadata:
             self._tool({"v": {"type": "string", "const": "fixed"}}, required=["v"]),
             AsyncMock(), lambda: "token",
         )
-        schema = lc_tool.args_schema.model_json_schema()
+        schema = _json_schema(lc_tool)
         assert schema["properties"]["v"]["const"] == "fixed"
 
     def test_multiple_extra_keys_coexist(self):
@@ -448,7 +455,7 @@ class TestMcpToolToLangchainFieldMetadata:
             ),
             AsyncMock(), lambda: "token",
         )
-        schema = lc_tool.args_schema.model_json_schema()
+        schema = _json_schema(lc_tool)
         assert schema["properties"]["s"]["enum"] == ["a", "b"]
         assert schema["properties"]["s"]["format"] == "uuid"
         assert schema["properties"]["s"]["example"] == "a"

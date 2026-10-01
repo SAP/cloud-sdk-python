@@ -316,6 +316,161 @@ class TestMcpToolToLangchainUnderscoredParams:
         assert "Product" not in kwargs
 
 
+class TestMcpToolToLangchainFieldMetadata:
+    """JSON Schema property metadata is forwarded to Pydantic Field.
+
+    Fields with a native Pydantic equivalent go there directly; everything
+    else is preserved via json_schema_extra so the LLM still sees them.
+    """
+
+    def _tool(self, properties: dict, required: list[str] | None = None) -> MCPTool:
+        return MCPTool(
+            name="meta_tool",
+            server_name="server",
+            description="desc",
+            input_schema={
+                "type": "object",
+                "required": required or [],
+                "properties": properties,
+            },
+            url="https://example.com/mcp",
+        )
+
+    # --- native Field kwargs ---
+
+    def test_description_preserved_on_required_field(self):
+        lc_tool = mcp_tool_to_langchain(
+            self._tool({"s": {"type": "string", "description": "The status"}}, required=["s"]),
+            AsyncMock(), lambda: "token",
+        )
+        assert _schema_fields(lc_tool)["s"].description == "The status"
+
+    def test_description_preserved_on_optional_field(self):
+        lc_tool = mcp_tool_to_langchain(
+            self._tool({"s": {"type": "string", "description": "The status"}}),
+            AsyncMock(), lambda: "token",
+        )
+        assert _schema_fields(lc_tool)["s"].description == "The status"
+
+    def test_title_preserved(self):
+        lc_tool = mcp_tool_to_langchain(
+            self._tool({"n": {"type": "string", "title": "OriginalName"}}, required=["n"]),
+            AsyncMock(), lambda: "token",
+        )
+        assert _schema_fields(lc_tool)["n"].title == "OriginalName"
+
+    def test_examples_preserved_as_native_field_kwarg(self):
+        lc_tool = mcp_tool_to_langchain(
+            self._tool({"n": {"type": "string", "examples": ["Alice", "Bob"]}}, required=["n"]),
+            AsyncMock(), lambda: "token",
+        )
+        assert _schema_fields(lc_tool)["n"].examples == ["Alice", "Bob"]
+
+    def test_deprecated_preserved(self):
+        lc_tool = mcp_tool_to_langchain(
+            self._tool({"n": {"type": "string", "deprecated": True}}, required=["n"]),
+            AsyncMock(), lambda: "token",
+        )
+        assert _schema_fields(lc_tool)["n"].deprecated is True
+
+    def test_pattern_preserved(self):
+        lc_tool = mcp_tool_to_langchain(
+            self._tool({"n": {"type": "string", "pattern": "^[a-z]+$"}}, required=["n"]),
+            AsyncMock(), lambda: "token",
+        )
+        assert _schema_fields(lc_tool)["n"].metadata  # pattern lives in metadata
+
+    def test_min_max_length_preserved(self):
+        lc_tool = mcp_tool_to_langchain(
+            self._tool({"n": {"type": "string", "minLength": 2, "maxLength": 50}}, required=["n"]),
+            AsyncMock(), lambda: "token",
+        )
+        schema = lc_tool.args_schema.model_json_schema()
+        assert schema["properties"]["n"]["minLength"] == 2
+        assert schema["properties"]["n"]["maxLength"] == 50
+
+    def test_minimum_maximum_preserved(self):
+        lc_tool = mcp_tool_to_langchain(
+            self._tool({"v": {"type": "integer", "minimum": 1, "maximum": 100}}, required=["v"]),
+            AsyncMock(), lambda: "token",
+        )
+        schema = lc_tool.args_schema.model_json_schema()
+        assert schema["properties"]["v"]["minimum"] == 1
+        assert schema["properties"]["v"]["maximum"] == 100
+
+    # --- json_schema_extra bucket ---
+
+    def test_enum_preserved_in_json_schema_extra(self):
+        lc_tool = mcp_tool_to_langchain(
+            self._tool({"c": {"type": "string", "enum": ["red", "green", "blue"]}}, required=["c"]),
+            AsyncMock(), lambda: "token",
+        )
+        schema = lc_tool.args_schema.model_json_schema()
+        assert schema["properties"]["c"]["enum"] == ["red", "green", "blue"]
+
+    def test_default_preserved_in_json_schema_extra(self):
+        lc_tool = mcp_tool_to_langchain(
+            self._tool({"c": {"type": "string", "default": "active"}}, required=["c"]),
+            AsyncMock(), lambda: "token",
+        )
+        schema = lc_tool.args_schema.model_json_schema()
+        assert schema["properties"]["c"]["default"] == "active"
+
+    def test_example_preserved_in_json_schema_extra(self):
+        lc_tool = mcp_tool_to_langchain(
+            self._tool({"c": {"type": "string", "example": "hello"}}, required=["c"]),
+            AsyncMock(), lambda: "token",
+        )
+        schema = lc_tool.args_schema.model_json_schema()
+        assert schema["properties"]["c"]["example"] == "hello"
+
+    def test_format_preserved_in_json_schema_extra(self):
+        lc_tool = mcp_tool_to_langchain(
+            self._tool({"ts": {"type": "string", "format": "date-time"}}, required=["ts"]),
+            AsyncMock(), lambda: "token",
+        )
+        schema = lc_tool.args_schema.model_json_schema()
+        assert schema["properties"]["ts"]["format"] == "date-time"
+
+    def test_const_preserved_in_json_schema_extra(self):
+        lc_tool = mcp_tool_to_langchain(
+            self._tool({"v": {"type": "string", "const": "fixed"}}, required=["v"]),
+            AsyncMock(), lambda: "token",
+        )
+        schema = lc_tool.args_schema.model_json_schema()
+        assert schema["properties"]["v"]["const"] == "fixed"
+
+    def test_multiple_extra_keys_coexist(self):
+        lc_tool = mcp_tool_to_langchain(
+            self._tool(
+                {"s": {"type": "string", "enum": ["a", "b"], "format": "uuid", "example": "a"}},
+                required=["s"],
+            ),
+            AsyncMock(), lambda: "token",
+        )
+        schema = lc_tool.args_schema.model_json_schema()
+        assert schema["properties"]["s"]["enum"] == ["a", "b"]
+        assert schema["properties"]["s"]["format"] == "uuid"
+        assert schema["properties"]["s"]["example"] == "a"
+
+    def test_missing_metadata_produces_no_extra(self):
+        lc_tool = mcp_tool_to_langchain(
+            self._tool({"id": {"type": "string"}}, required=["id"]),
+            AsyncMock(), lambda: "token",
+        )
+        field = _schema_fields(lc_tool)["id"]
+        assert field.description is None
+        assert field.json_schema_extra is None
+
+    def test_unknown_keys_are_silently_ignored(self):
+        """Keys not in either bucket (e.g. future JSON Schema extensions) must not raise."""
+        lc_tool = mcp_tool_to_langchain(
+            self._tool({"x": {"type": "string", "x-custom-ext": "value"}}, required=["x"]),
+            AsyncMock(), lambda: "token",
+        )
+        assert "x" in _schema_fields(lc_tool)
+
+
 class TestMcpToolToLangchainInvocation:
     """End-to-end invocation tests: verify what actually reaches call_tool."""
 

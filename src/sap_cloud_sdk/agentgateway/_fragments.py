@@ -4,18 +4,20 @@ Centralises all BTP Destination Service fragment operations:
 - Label constants for managed-runtime fragment types
 - Fragment listing by label (MCP, A2A, IAS)
 - IAS fragment name lookup for auth flows
+- Active integration listing for tenant context
 """
 
 import logging
-from enum import Enum
 
 from sap_cloud_sdk.destination import (
     create_fragment_client,
     Label,
     ListOptions,
 )
+from sap_cloud_sdk.destination._models import Level
 
 from sap_cloud_sdk.agentgateway.exceptions import MCPServerNotFoundError
+from sap_cloud_sdk.agentgateway._models import ConnectedSystem, FragmentLabel
 from sap_cloud_sdk.core.telemetry import Module
 
 logger = logging.getLogger(__name__)
@@ -23,40 +25,51 @@ logger = logging.getLogger(__name__)
 # Shared label key for all managed-runtime fragment types
 LABEL_KEY = "sap-managed-runtime-type"
 
+# Label keys for integration metadata stored on system fragments
+_LABEL_GTID = "sap-managed-runtime-gtid"
+_LABEL_ORD_ID = "sap-managed-runtime-ordid"
+_LABEL_SYSTEM_TYPE = "sap-managed-runtime-system-type"
+
 _DESTINATION_INSTANCE = "default"
 
 
-class FragmentLabel(str, Enum):
-    """Label values for the sap-managed-runtime-type fragment label key."""
-
-    MCP = "agw.mcp.server"
-    A2A = "agw.a2a.server"
-    IAS = "subscriber.ias"
-    IAS_USER = "subscriber.ias.user"
-
-
-def _list_fragments_by_label(label: FragmentLabel, tenant_subdomain: str) -> list:
+def _list_fragments_by_label(
+    label: FragmentLabel,
+    tenant_subdomain: str,
+    gtids: list[str] | None = None,
+) -> list:
+    filter_labels = [Label(key=LABEL_KEY, values=[label.value])]
+    if gtids:
+        filter_labels.append(Label(key=_LABEL_GTID, values=gtids))
     client = create_fragment_client(
         instance=_DESTINATION_INSTANCE,
         _telemetry_source=Module.AGENTGATEWAY,
     )
     return client.list_instance_fragments(
-        filter=ListOptions(filter_labels=[Label(key=LABEL_KEY, values=[label.value])]),
+        filter=ListOptions(filter_labels=filter_labels),
         tenant=tenant_subdomain,
     )
 
 
-def list_mcp_fragments(tenant_subdomain: str) -> list:
+def list_mcp_fragments(
+    tenant_subdomain: str,
+    gtids: list[str] | None = None,
+) -> list:
     """List destination fragments with MCP server label.
 
     Args:
         tenant_subdomain: Tenant subdomain for multi-tenant lookup.
+        gtids: Optional list of global tenant IDs of integrated
+            systems to filter by. When set, only fragments whose
+            ``sap-managed-runtime-gtid`` label matches one of these values are
+            returned (filter is applied server-side by the Destination Service).
 
     Returns:
-        List of fragments with sap-managed-runtime-type=agw.mcp.server label.
+        List of fragments with sap-managed-runtime-type=agw.mcp.server label
+        (and, if provided, matching one of the requested global tenant IDs).
     """
     logger.debug("Fetching MCP fragments for tenant '%s'", tenant_subdomain)
-    return _list_fragments_by_label(FragmentLabel.MCP, tenant_subdomain)
+    return _list_fragments_by_label(FragmentLabel.MCP, tenant_subdomain, gtids)
 
 
 def list_a2a_fragments(tenant_subdomain: str) -> list:
@@ -118,3 +131,72 @@ def get_ias_user_fragment_name(tenant_subdomain: str) -> str:
             f"for tenant '{tenant_subdomain}'"
         )
     return fragments[0].name
+
+
+def _list_active_integrations(tenant_subdomain: str) -> list[ConnectedSystem]:
+    """List all active backend system integrations for the given tenant.
+
+    Reads Destination Service instance fragments to discover active backend
+    system integrations for the given tenant. Each fragment represents a
+    connected backend system (e.g. SAP PCE, SAP S/4HANA).
+
+    Retrieves integration metadata from fragment labels:
+        - sap-managed-runtime-gtid: GTID of the connected partner system.
+        - sap-managed-runtime-system-type: Application namespace (e.g. "sap.pce").
+        - sap-managed-runtime-ordid: Sanitized ORD ID of the integration dependency.
+
+    Args:
+        tenant_subdomain: Subscriber tenant subdomain.
+
+    Returns:
+        List of ConnectedSystem dicts, each with keys:
+            - global_tenant_id: GTID of the connected partner system.
+            - system_type: Application namespace of the partner (e.g. "sap.pce").
+            - integration_dependency: ORD ID of the integration dependency fulfilled.
+        Returns empty list if no active integrations exist.
+    """
+    client = create_fragment_client(
+        instance=_DESTINATION_INSTANCE,
+        _telemetry_source=Module.AGENTGATEWAY,
+    )
+    fragments = client.list_instance_fragments(
+        filter=ListOptions(
+            filter_labels=[
+                Label(
+                    key=LABEL_KEY,
+                    values=[FragmentLabel.MCP.value],
+                )
+            ]
+        ),
+        tenant=tenant_subdomain,
+    )
+
+    result: list[ConnectedSystem] = []
+    for fragment in fragments:
+        labels = {
+            lbl.key: lbl.values[0] if lbl.values else None
+            for lbl in client.get_fragment_labels(
+                name=fragment.name,
+                level=Level.SERVICE_INSTANCE,
+                tenant=tenant_subdomain,
+            )
+        }
+        gtid = labels.get(_LABEL_GTID)
+        system_type = labels.get(_LABEL_SYSTEM_TYPE)
+        ord_id = labels.get(_LABEL_ORD_ID)
+
+        if not system_type:
+            logger.debug(
+                "Fragment '%s' is missing system_type label; system_type will be None in result",
+                fragment.name,
+            )
+
+        result.append(
+            ConnectedSystem(
+                global_tenant_id=gtid,
+                system_type=system_type,
+                integration_dependency=ord_id,
+            )
+        )
+
+    return result

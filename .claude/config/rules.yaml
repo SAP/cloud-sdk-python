@@ -1,0 +1,131 @@
+version: 2
+
+# =====================================================
+# rules.yaml — SDK Module Review rule catalog
+# All rules default to their tier here; may be overridden per-repo.
+# BLOCK_LOCKED rules cannot be softened or suppressed.
+# =====================================================
+
+baseline:
+  file: .claude/config/baseline.json
+  regenerate_with: orchestrate.sh --baseline
+
+tiers:
+  SHADOW:       { posts: false, blocks: false }
+  FLAG:         { posts: true,  blocks: false }
+  BLOCK:        { posts: true,  blocks: true }
+  BLOCK_LOCKED: { posts: true,  blocks: true, suppressible: false, downgradable: false }
+
+rules:
+  # -------- BREAKING FAMILY (all locked) --------
+  BREAKING-01:  { tier: BLOCK_LOCKED }
+  BREAKING-02:  { tier: BLOCK_LOCKED }
+  BREAKING-03:  { tier: FLAG }
+  BREAKING-04:  { tier: FLAG }
+
+  # -------- SECRETS (all locked) --------
+  SEC-01:       { tier: BLOCK_LOCKED }
+  SEC-02:       { tier: BLOCK_LOCKED }
+  SEC-03:       { tier: BLOCK_LOCKED }
+  SEC-04:       { tier: BLOCK_LOCKED }
+  SEC-05:       { tier: BLOCK_LOCKED }
+  SEC-06:       { tier: BLOCK_LOCKED }
+  SEC-07:       { tier: BLOCK_LOCKED }
+  SEC-08:       { tier: BLOCK_LOCKED }
+  SEC-10:       { tier: BLOCK_LOCKED }
+
+  # -------- LICENSE --------
+  LIC-01:       { tier: BLOCK, predicates: { not: reuse_toml_aggregate_present, diff_scope: file_in_added_set } }
+  LIC-02:       { tier: BLOCK, predicates: { not: reuse_toml_aggregate_present, diff_scope: file_in_added_set } }
+
+  # -------- DISCLOSURE --------
+  DIS-01:       { tier: BLOCK, profile: { public: BLOCK, internal: FLAG } }
+  DIS-02:       { tier: BLOCK, profile: { public: BLOCK, internal: PASS } }
+  DIS-06:       { tier: BLOCK_LOCKED }
+  DIS-07:       { tier: BLOCK }
+  DIS-08:       { tier: SHADOW }
+
+  # -------- HARDCODE --------
+  HC-01:        { tier: BLOCK }
+  HC-02:        { tier: BLOCK }
+  HC-03:        { tier: BLOCK_LOCKED }
+  HC-04:        { tier: FLAG }
+  HC-06:        { tier: FLAG }
+
+  # -------- TELEMETRY --------
+  PY-TEL-02:    { tier: BLOCK }
+  JV-TEL-02:    { tier: BLOCK }
+  PY-TEL-06:    { tier: BLOCK, predicates: { diff_scope: new_decorator_added } }
+  PY-TEL-08:    { tier: SHADOW }
+
+  # -------- DOCS --------
+  DC-01:        { tier: BLOCK }
+  DC-02:        { tier: BLOCK }
+  DC-11:        { tier: BLOCK }
+  DC-12:        { tier: BLOCK }
+  DC-13:        { tier: BLOCK }
+  DC-14:        { tier: BLOCK }
+
+  # -------- BDD --------
+  BDD-01:       { tier: BLOCK }
+  BDD-02:       { tier: BLOCK }
+
+  # -------- PATTERNS --------
+  PY-PT-01:     { tier: BLOCK, predicates: { module_shape: client } }
+  JV-PT-01:     { tier: BLOCK, predicates: { module_shape: client } }
+  PY-PT-03:     { tier: FLAG }
+  PY-PT-04:     { tier: FLAG }
+  PY-PT-08:     { tier: FLAG }
+  JV-PT-05:     { tier: FLAG }
+
+  # -------- VERSIONING --------
+  VER-01:       { tier: BLOCK, predicates: { commit_types_or_breaking: [feat, feat!, breaking] } }
+  VER-07:       { tier: FLAG }
+  PY-VER-08:    { tier: SHADOW }
+  PY-VER-09:    { tier: SHADOW }
+
+  # -------- ERRORS/LOGGING --------
+  EL-01:        { tier: FLAG }
+  EL-02:        { tier: FLAG }
+  EL-04:        { tier: BLOCK }
+  PY-EL-11:     { tier: SHADOW }
+
+  # -------- TESTING --------
+  TD-01:        { tier: FLAG }
+  TD-10:        { tier: BLOCK }
+  TD-checkbox:  { tier: FLAG }
+
+  # -------- HTTP --------
+  HTTP-01:      { tier: FLAG, predicates: { diff_scope: line_in_added_set } }
+
+  # -------- CONCURRENCY --------
+  CC-01:        { tier: FLAG }
+  JV-CC-05:     { tier: SHADOW }
+
+  # -------- DEPS --------
+  DEP-03:       { tier: FLAG }
+  DEP-04:       { tier: BLOCK_LOCKED }
+
+  # -------- COMMITS --------
+  COM-01:       { tier: BLOCK }
+
+  # -------- DELETION --------
+  DEL-01:       { tier: BLOCK }
+
+  # -------- CONSTANTS --------
+  PY-CON-01:    { tier: FLAG }
+
+  # -------- BINDING --------
+  BND-02:       { tier: BLOCK_LOCKED }
+  BND-04:       { tier: BLOCK }
+  BND-05:       { tier: BLOCK_LOCKED }
+
+  # -------- QUALITY GATE --------
+  QG-01:        { tier: FLAG }
+  QG-02:        { tier: FLAG }
+
+  # -------- PR SIZE (advisory, SHADOW during rollout) --------
+  PR-SIZE-01:   { tier: SHADOW }
+  PR-SIZE-02:   { tier: SHADOW }
+  PR-SIZE-03:   { tier: SHADOW }
+  PR-SIZE-05:   { tier: SHADOW }

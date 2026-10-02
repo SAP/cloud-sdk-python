@@ -27,7 +27,104 @@ print(claims.sub)               # OIDC subject identifier
 print(claims.email)             # user email (when email scope was requested)
 ```
 
-### Claims Reference
+---
+
+## Verified Claims (Security-Sensitive Consumers)
+
+`parse_token` is a low-level claim extractor — it does not authenticate the token. For security-sensitive consumers (telemetry identity, audit attribution) use the `TokenVerifier` / `VerifiedIASClaims` pattern to prove that a token was cryptographically verified before its claims are used.
+
+```python
+from sap_cloud_sdk.ias import VerifiedIASClaims, TokenVerifier
+```
+
+### `VerifiedIASClaims`
+
+A frozen dataclass wrapper around `IASClaims`. Its existence at runtime means "these claims came through a verifier." Create an instance **only** inside your verifier function, after a successful signature check.
+
+```python
+@dataclass(frozen=True)
+class VerifiedIASClaims:
+    claims: IASClaims
+```
+
+### `TokenVerifier`
+
+A type alias for the verifier callable contract:
+
+```python
+TokenVerifier = Callable[[str], VerifiedIASClaims]
+```
+
+The callable receives the raw `Authorization` header value (may include `"Bearer "`), **must raise** (fail closed) on any invalid token, and returns `VerifiedIASClaims` on success.
+
+### Implementing a JWKS-based verifier
+
+For apps deployed on SAP BTP where JWT signature verification is not already handled by the platform (e.g. Kyma Istio JWT `RequestAuthentication` policy), implement a real JWKS verifier using `PyJWKClient` from `PyJWT`:
+
+```python
+import jwt
+from jwt import PyJWKClient
+from sap_cloud_sdk.ias import parse_token, VerifiedIASClaims, IASTokenError
+
+
+def make_ias_verifier(jwks_url: str, issuer: str, audience: str):
+    """Build a token verifier backed by IAS JWKS key rotation.
+
+    Args:
+        jwks_url:  IAS JWKS endpoint, e.g. "https://<tenant>.accounts.ondemand.com/oauth2/certs"
+        issuer:    Expected token issuer, e.g. "https://<tenant>.accounts.ondemand.com"
+        audience:  Expected audience / client_id of this application
+
+    Returns:
+        A TokenVerifier callable.
+    """
+    jwk_client = PyJWKClient(jwks_url)  # caches keys; thread-safe
+
+    def verify(authorization: str) -> VerifiedIASClaims:
+        raw = authorization.removeprefix("Bearer ").removeprefix("bearer ").strip()
+        try:
+            signing_key = jwk_client.get_signing_key_from_jwt(raw)  # selects by kid
+            jwt.decode(
+                raw,
+                signing_key.key,
+                algorithms=["RS256", "ES256"],   # pin asymmetric algs; NEVER "none" or HS*
+                issuer=issuer,
+                audience=audience,
+                options={"require": ["exp", "iss", "aud"]},
+            )
+        except jwt.exceptions.PyJWTError as e:
+            raise IASTokenError(f"IAS token verification failed: {e}") from e
+        return VerifiedIASClaims(claims=parse_token(raw))
+
+    return verify
+```
+
+**Required validations:** `PyJWT` enforces signature via the JWKS key, `kid` selection via `PyJWKClient`, issuer (`iss`), audience (`aud`/`azp`), expiration (`exp`), and not-before (`nbf`). Do **not** accept `alg=none`, HS256/HS512 (symmetric), or tokens without `exp`/`iss`/`aud`.
+
+**Dependency note:** RSA/EC signature verification requires the `cryptography` package. Install it alongside `PyJWT`:
+
+```bash
+pip install "PyJWT[cryptography]"
+```
+
+### Platform pre-verified adapter
+
+For apps where the deployment platform (e.g. Kyma Istio `RequestAuthentication`, UCL mTLS) has already verified the JWT before the request reaches your app, you can use a thin adapter that trusts the platform verification and delegates claim extraction to `parse_token`:
+
+```python
+from sap_cloud_sdk.ias import parse_token, VerifiedIASClaims
+
+def platform_pre_verified(authorization: str) -> VerifiedIASClaims:
+    # Platform auth (e.g. Istio/UCL) verified the JWT before routing here.
+    # parse_token() is safe here as a claim extractor only.
+    return VerifiedIASClaims(claims=parse_token(authorization))
+```
+
+> **Important:** only use this adapter when you have confirmed that your deployment platform enforces JWT verification on every request that carries an `Authorization` header.
+
+---
+
+## Claims Reference
 
 All fields on `IASClaims` are `Optional` — claims absent from the token are `None`.
 

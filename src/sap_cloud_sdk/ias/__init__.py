@@ -12,11 +12,13 @@ Usage:
     print(claims.email)             # user email (when email scope requested)
 """
 
-from sap_cloud_sdk.ias._token import IASClaims, parse_token
+from sap_cloud_sdk.ias._token import IASClaims, TokenVerifier, VerifiedIASClaims, parse_token
 from sap_cloud_sdk.ias.exceptions import IASTokenError
 
 __all__ = [
     "IASClaims",
-    "parse_token",
     "IASTokenError",
+    "TokenVerifier",
+    "VerifiedIASClaims",
+    "parse_token",
 ]

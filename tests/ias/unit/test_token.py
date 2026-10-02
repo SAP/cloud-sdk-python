@@ -3,7 +3,7 @@
 import pytest
 import jwt as pyjwt
 
-from sap_cloud_sdk.ias import parse_token, IASClaims, IASTokenError
+from sap_cloud_sdk.ias import IASClaims, IASTokenError, TokenVerifier, VerifiedIASClaims, parse_token
 
 
 def _make_token(payload: dict) -> str:
@@ -158,3 +158,31 @@ class TestParseToken:
         assert "sub" not in claims.custom_attributes
         assert "user_uuid" not in claims.custom_attributes
         assert claims.custom_attributes == {"unknown_claim": "yes"}
+
+
+class TestVerifiedIASClaims:
+    def test_wraps_ias_claims(self):
+        inner = IASClaims(sub="u1", app_tid="t1")
+        verified = VerifiedIASClaims(claims=inner)
+        assert verified.claims is inner
+
+    def test_claims_accessible_via_attribute(self):
+        inner = IASClaims(user_uuid="uid-123", sap_gtid="gtid-abc")
+        verified = VerifiedIASClaims(claims=inner)
+        assert verified.claims.user_uuid == "uid-123"
+        assert verified.claims.sap_gtid == "gtid-abc"
+
+    def test_is_frozen(self):
+        inner = IASClaims(sub="x")
+        verified = VerifiedIASClaims(claims=inner)
+        with pytest.raises((AttributeError, TypeError)):
+            verified.claims = IASClaims(sub="y")  # type: ignore[misc]
+
+    def test_token_verifier_type_is_callable(self):
+        def my_verifier(token: str) -> VerifiedIASClaims:
+            return VerifiedIASClaims(claims=IASClaims(sub="x"))
+
+        # TokenVerifier is a type alias — verify the callable protocol is satisfied
+        verifier: TokenVerifier = my_verifier
+        result = verifier("Bearer tok")
+        assert isinstance(result, VerifiedIASClaims)

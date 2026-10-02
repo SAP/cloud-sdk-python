@@ -267,20 +267,40 @@ auto_instrument(middlewares=[MyMiddleware(app=app)])
 
 ### Built-in: `StarletteIASTelemetryMiddleware`
 
-For Starlette/FastAPI apps with IAS authentication, the SDK ships a ready-to-use middleware that reads the `Authorization: Bearer <token>` header on each request, parses it as an IAS JWT, and injects:
+For Starlette/FastAPI apps with IAS authentication, the SDK ships a ready-to-use middleware that reads the `Authorization: Bearer <token>` header on each request and, after successful token verification, injects:
 - `sap.tenancy.tenant_id` from the `sap_gtid` claim
 - `user.id` from the `user_uuid` claim
 
-If the header is absent or the token cannot be parsed, no attributes are set and the request continues normally.
+The `x-sap-origin` header (trigger type) is always stamped when present, regardless of token verification outcome.
+
+#### `token_verifier` parameter
+
+A `token_verifier` callable is **required to enable identity attributes**. Without it, the middleware logs a one-time warning and stamps **no** `sap.tenancy.tenant_id` / `user.id`. This is a safe default — the app runs normally, but identity attributes are absent from spans until you supply a verifier.
 
 ```python
 from starlette.applications import Starlette
 from sap_cloud_sdk.core.telemetry import auto_instrument
 from sap_cloud_sdk.core.telemetry.middleware import StarletteIASTelemetryMiddleware
+from sap_cloud_sdk.ias import VerifiedIASClaims, parse_token
+
+# Option A: platform pre-verified (e.g. Kyma Istio / UCL already verified the JWT)
+def platform_pre_verified(authorization: str) -> VerifiedIASClaims:
+    return VerifiedIASClaims(claims=parse_token(authorization))
+
+# Option B: real JWKS verification (see the IAS user guide for the full implementation)
+# verifier = make_ias_verifier(jwks_url="https://<tenant>.accounts.ondemand.com/oauth2/certs",
+#                              issuer="https://<tenant>.accounts.ondemand.com",
+#                              audience="<your-client-id>")
 
 app = Starlette(...)
-auto_instrument(middlewares=[StarletteIASTelemetryMiddleware(app=app)])
+auto_instrument(middlewares=[
+    StarletteIASTelemetryMiddleware(app=app, token_verifier=platform_pre_verified)
+])
 ```
+
+If the verifier raises for any reason (bad signature, wrong issuer, expired token, etc.), identity attributes are silently omitted and the request continues normally.
+
+See the [IAS user guide](../../ias/user-guide.md#verified-claims-security-sensitive-consumers) for a full JWKS-based verifier implementation.
 
 ---
 

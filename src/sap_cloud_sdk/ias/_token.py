@@ -7,7 +7,7 @@ all standard IAS claims to a typed dataclass.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Callable, Dict, List, Optional, Union
 
 import jwt
 
@@ -100,6 +100,30 @@ class IASClaims:
     sub: Optional[str] = None
     user_uuid: Optional[str] = None
     custom_attributes: Dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class VerifiedIASClaims:
+    """Claims proven to originate from a successfully verified IAS JWT.
+
+    Construct this ONLY after verifying the token's signature, issuer,
+    audience, algorithm, and time constraints. Its presence is the SDK's
+    provenance marker for security-sensitive consumers such as telemetry
+    identity stamping.
+    """
+
+    claims: IASClaims
+
+
+TokenVerifier = Callable[[str], VerifiedIASClaims]
+"""Callable contract for IAS JWT verifiers.
+
+Receives the raw ``Authorization`` header value (may include the ``"Bearer "``
+prefix) and must raise (fail closed) on any invalid token — bad signature,
+wrong issuer/audience, expired, not-yet-valid, or unknown algorithm.
+
+Returns a :class:`VerifiedIASClaims` instance on success.
+"""
 
 
 def parse_token(token: str) -> IASClaims:

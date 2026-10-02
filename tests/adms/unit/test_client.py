@@ -140,6 +140,25 @@ class TestAdmsClientInit:
         assert user_client._http is mock_user_http
         assert client._http is mock_http
 
+    def test_with_user_jwt_empty_raises(self, mock_http):
+        # HASI2026203-276: facade guard fires before delegating to transport.
+        client = AdmsClient(mock_http)
+        with pytest.raises(ValueError, match="non-blank"):
+            client.with_user_jwt("")
+        mock_http.with_user_jwt.assert_not_called()
+
+    def test_with_user_jwt_whitespace_raises(self, mock_http):
+        client = AdmsClient(mock_http)
+        with pytest.raises(ValueError, match="non-blank"):
+            client.with_user_jwt("   ")
+        mock_http.with_user_jwt.assert_not_called()
+
+    def test_with_user_jwt_none_raises(self, mock_http):
+        client = AdmsClient(mock_http)
+        with pytest.raises(ValueError, match="non-blank"):
+            client.with_user_jwt(None)  # type: ignore[arg-type]
+        mock_http.with_user_jwt.assert_not_called()
+
 
 class TestCreateClientFactory:
     def test_raises_config_error_on_missing_binding(self):
@@ -219,6 +238,35 @@ class TestCreateClientFactory:
             client = create_client(user_jwt="user-jwt-123")
 
         assert client._http._user_jwt == "user-jwt-123"
+
+    def test_create_client_empty_user_jwt_raises(self):
+        # HASI2026203-276: factory guard must fire before binding resolution.
+        mock_config = AdmsConfig(
+            service_url="https://adm.example.com",
+            ias_url="https://ias.example.com",
+            client_id="cid",
+            client_secret="cs",
+        )
+        factory = MagicMock(return_value=mock_config)
+        with patch(
+            "sap_cloud_sdk.adms.client._make_config_factory", return_value=factory
+        ):
+            with pytest.raises(ValueError, match="non-blank"):
+                create_client(user_jwt="")
+
+    def test_create_client_whitespace_user_jwt_raises(self):
+        mock_config = AdmsConfig(
+            service_url="https://adm.example.com",
+            ias_url="https://ias.example.com",
+            client_id="cid",
+            client_secret="cs",
+        )
+        factory = MagicMock(return_value=mock_config)
+        with patch(
+            "sap_cloud_sdk.adms.client._make_config_factory", return_value=factory
+        ):
+            with pytest.raises(ValueError, match="non-blank"):
+                create_client(user_jwt="   ")
 
 
 # ── AsyncAdmsHttp ─────────────────────────────────────────────────────────────
@@ -481,6 +529,23 @@ class TestCreateAsyncClient:
             client = create_async_client(config=config)
         mock_make.assert_not_called()
         assert isinstance(client, AsyncAdmsClient)
+
+    def test_create_async_client_empty_user_jwt_raises(self, config):
+        # HASI2026203-276: async factory guard.
+        mock_factory = MagicMock(return_value=config)
+        with patch(
+            "sap_cloud_sdk.adms.client._make_config_factory", return_value=mock_factory
+        ):
+            with pytest.raises(ValueError, match="non-blank"):
+                create_async_client(user_jwt="")
+
+    def test_create_async_client_whitespace_user_jwt_raises(self, config):
+        mock_factory = MagicMock(return_value=config)
+        with patch(
+            "sap_cloud_sdk.adms.client._make_config_factory", return_value=mock_factory
+        ):
+            with pytest.raises(ValueError, match="non-blank"):
+                create_async_client(user_jwt="   ")
 
 
 # ── _AsyncDocumentApi ──────────────────────────────────────────────────────────

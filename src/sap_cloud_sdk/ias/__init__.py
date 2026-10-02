@@ -1,6 +1,6 @@
 """SAP Cloud SDK for Python - IAS module
 
-Utilities for parsing SAP Identity Authentication Service (IAS) JWT tokens.
+Utilities for parsing and verifying SAP Identity Authentication Service (IAS) JWT tokens.
 
 Usage:
     from sap_cloud_sdk.ias import parse_token, IASClaims
@@ -13,11 +13,14 @@ Usage:
 """
 
 from sap_cloud_sdk.ias._token import IASClaims, TokenVerifier, VerifiedIASClaims, parse_token
+from sap_cloud_sdk.ias._verifier import IASConfigError, IASVerifier
 from sap_cloud_sdk.ias.exceptions import IASTokenError
 
 __all__ = [
     "IASClaims",
+    "IASConfigError",
     "IASTokenError",
+    "IASVerifier",
     "TokenVerifier",
     "VerifiedIASClaims",
     "parse_token",

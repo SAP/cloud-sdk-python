@@ -10,7 +10,7 @@ from sap_cloud_sdk.core.telemetry.constants import (
     ATTR_USER_ID,
 )
 from sap_cloud_sdk.core.telemetry.middleware.base import TelemetryMiddleware
-from sap_cloud_sdk.ias import TokenVerifier, VerifiedIASClaims  # noqa: F401
+from sap_cloud_sdk.ias import IASConfigError, IASVerifier, TokenVerifier, VerifiedIASClaims  # noqa: F401
 
 try:
     from starlette.middleware.base import BaseHTTPMiddleware
@@ -47,18 +47,20 @@ class _IASMiddleware(BaseHTTPMiddleware):
 class StarletteIASTelemetryMiddleware(TelemetryMiddleware):
     """Starlette/FastAPI middleware that extracts verified IAS JWT claims as telemetry attributes.
 
-    Reads the ``Authorization: Bearer <token>`` header on each request, passes it through
-    the provided ``token_verifier``, and exposes the following as span attributes on success:
+    Reads the ``Authorization: Bearer <token>`` header on each request, verifies it using
+    a :class:`~sap_cloud_sdk.ias.IASVerifier`, and exposes the following as span attributes
+    on success:
       - ``sap.tenancy.tenant_id`` from the ``sap_gtid`` claim
       - ``user.id``               from the ``user_uuid`` claim
 
     The ``x-sap-origin`` header (trigger type, not JWT identity) is always stamped when
     present, regardless of token verification outcome.
 
-    If ``token_verifier`` is ``None`` (the default), **no identity attributes are stamped**
-    and a warning is logged once at construction. This is a safe default — the app runs
-    normally but ``sap.tenancy.tenant_id`` and ``user.id`` will be absent from spans until
-    a verifier is supplied. See the IAS user guide for how to implement a verifier.
+    **Auto-configuration (recommended):** when no ``token_verifier`` is supplied, the
+    middleware automatically creates an :class:`~sap_cloud_sdk.ias.IASVerifier` from the
+    SAP BTP Identity service binding (``VCAP_SERVICES`` on CF, or ``IAS_URL`` env var on
+    Kubernetes). If the binding is not found, identity attributes are disabled and a
+    WARNING is logged — the app still starts normally.
 
     If the verifier raises for any reason (bad signature, wrong issuer, expired token,
     unknown algorithm, etc.), the identity attributes are silently omitted and the request
@@ -69,39 +71,30 @@ class StarletteIASTelemetryMiddleware(TelemetryMiddleware):
 
     Args:
         app: The Starlette/FastAPI application instance.
-        token_verifier: A callable that receives the raw ``Authorization`` header value
-            and returns a :class:`~sap_cloud_sdk.ias.VerifiedIASClaims` on success, or
-            raises on any invalid token. If ``None``, identity attributes are disabled.
+        token_verifier: Optional. A callable that receives the raw ``Authorization`` header
+            value and returns :class:`~sap_cloud_sdk.ias.VerifiedIASClaims` on success, or
+            raises on any invalid token. When ``None`` (default), an
+            :class:`~sap_cloud_sdk.ias.IASVerifier` is auto-configured from the environment.
 
     Usage::
 
         from starlette.applications import Starlette
         from sap_cloud_sdk.core.telemetry import auto_instrument
         from sap_cloud_sdk.core.telemetry.middleware import StarletteIASTelemetryMiddleware
-        from sap_cloud_sdk.ias import VerifiedIASClaims, parse_token
-
-        def my_verifier(authorization: str) -> VerifiedIASClaims:
-            # Your platform (e.g. Kyma Istio) already verified the JWT.
-            # See the IAS user guide for a full JWKS-based verifier example.
-            return VerifiedIASClaims(claims=parse_token(authorization))
 
         app = Starlette(...)
-        auto_instrument(middlewares=[StarletteIASTelemetryMiddleware(app=app, token_verifier=my_verifier)])
+        # Auto-configures from IAS service binding — no extra config needed
+        auto_instrument(middlewares=[StarletteIASTelemetryMiddleware(app=app)])
     """
 
     def __init__(self, app: Any, token_verifier: Optional[TokenVerifier] = None) -> None:
         self.app = app
+        if token_verifier is None:
+            token_verifier = _auto_configure_verifier()
         self._token_verifier = token_verifier
         self._attrs_var: ContextVar[Dict[str, Any]] = ContextVar(
             f"ias_attrs_{id(self)}", default={}
         )
-        if token_verifier is None:
-            logger.warning(
-                "StarletteIASTelemetryMiddleware: no token_verifier supplied — "
-                "sap.tenancy.tenant_id and user.id will NOT be stamped on spans. "
-                "Supply a token_verifier to enable verified IAS identity attributes. "
-                "See the IAS user guide for a JWKS-based verifier example."
-            )
 
     def register(self) -> None:
         """Register the IAS JWT middleware with ``self.app``."""
@@ -154,3 +147,20 @@ def _extract_ias_attrs(
     if claims.user_uuid:
         attrs[ATTR_USER_ID] = claims.user_uuid
     return attrs
+
+
+def _auto_configure_verifier() -> Optional[TokenVerifier]:
+    """Try to build an IASVerifier from the environment; warn and return None if not possible."""
+    try:
+        verifier = IASVerifier.from_env()
+        logger.debug("StarletteIASTelemetryMiddleware: auto-configured IASVerifier from environment")
+        return verifier
+    except IASConfigError as exc:
+        logger.warning(
+            "StarletteIASTelemetryMiddleware: IAS service binding not found — "
+            "sap.tenancy.tenant_id and user.id will NOT be stamped on spans. "
+            "Bind an SAP Identity service instance or set IAS_URL to enable identity attributes. "
+            "Details: %s",
+            exc,
+        )
+        return None

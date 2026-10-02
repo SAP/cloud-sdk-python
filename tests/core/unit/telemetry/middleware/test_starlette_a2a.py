@@ -2,14 +2,15 @@
 
 import logging
 import pytest
-from unittest.mock import MagicMock, AsyncMock
+from unittest.mock import MagicMock, AsyncMock, patch
 
 from sap_cloud_sdk.core.telemetry.constants import ATTR_SAP_TRIGGER_TYPE, ATTR_SAP_TENANT_ID, ATTR_USER_ID
 from sap_cloud_sdk.core.telemetry.middleware.starlette_a2a import (
     StarletteIASTelemetryMiddleware,
+    _auto_configure_verifier,
     _extract_ias_attrs,
 )
-from sap_cloud_sdk.ias import IASClaims, IASTokenError, VerifiedIASClaims
+from sap_cloud_sdk.ias import IASClaims, IASConfigError, IASTokenError, IASVerifier, VerifiedIASClaims
 
 
 # ---------------------------------------------------------------------------
@@ -38,6 +39,39 @@ def _failing_verifier(exc=None):
     def verify(token: str) -> VerifiedIASClaims:
         raise (exc or IASTokenError("verification failed"))
     return verify
+
+
+# ---------------------------------------------------------------------------
+# _auto_configure_verifier
+# ---------------------------------------------------------------------------
+
+class TestAutoConfigureVerifier:
+    def test_returns_verifier_when_env_configured(self):
+        mock_verifier = MagicMock(spec=IASVerifier)
+        with patch("sap_cloud_sdk.core.telemetry.middleware.starlette_a2a.IASVerifier") as MockV:
+            MockV.from_env.return_value = mock_verifier
+            result = _auto_configure_verifier()
+        assert result is mock_verifier
+
+    def test_returns_none_when_config_missing(self):
+        with patch("sap_cloud_sdk.core.telemetry.middleware.starlette_a2a.IASVerifier") as MockV:
+            MockV.from_env.side_effect = IASConfigError("no binding found")
+            result = _auto_configure_verifier()
+        assert result is None
+
+    def test_logs_warning_when_config_missing(self, caplog):
+        with patch("sap_cloud_sdk.core.telemetry.middleware.starlette_a2a.IASVerifier") as MockV:
+            MockV.from_env.side_effect = IASConfigError("no IAS binding")
+            with caplog.at_level(logging.WARNING):
+                _auto_configure_verifier()
+        assert any("NOT be stamped" in r.message for r in caplog.records)
+
+    def test_no_warning_when_configured(self, caplog):
+        with patch("sap_cloud_sdk.core.telemetry.middleware.starlette_a2a.IASVerifier") as MockV:
+            MockV.from_env.return_value = MagicMock(spec=IASVerifier)
+            with caplog.at_level(logging.WARNING):
+                _auto_configure_verifier()
+        assert not any("NOT be stamped" in r.message for r in caplog.records)
 
 
 # ---------------------------------------------------------------------------
@@ -73,15 +107,38 @@ class TestStarletteIASTelemetryMiddleware:
             mw1._attrs_var.reset(t1)
             mw2._attrs_var.reset(t2)
 
-    def test_no_verifier_logs_warning(self, caplog):
-        with caplog.at_level(logging.WARNING):
-            StarletteIASTelemetryMiddleware(app=MagicMock(), token_verifier=None)
-        assert any("token_verifier" in r.message for r in caplog.records)
+    def test_auto_configure_called_when_no_verifier_given(self):
+        mock_verifier = MagicMock(spec=IASVerifier)
+        with patch("sap_cloud_sdk.core.telemetry.middleware.starlette_a2a.IASVerifier") as MockV:
+            MockV.from_env.return_value = mock_verifier
+            mw = StarletteIASTelemetryMiddleware(app=MagicMock())
+        assert mw._token_verifier is mock_verifier
 
-    def test_verifier_provided_no_warning(self, caplog):
+    def test_auto_configure_failure_sets_none_verifier(self):
+        with patch("sap_cloud_sdk.core.telemetry.middleware.starlette_a2a.IASVerifier") as MockV:
+            MockV.from_env.side_effect = IASConfigError("no binding")
+            mw = StarletteIASTelemetryMiddleware(app=MagicMock())
+        assert mw._token_verifier is None
+
+    def test_no_verifier_and_no_env_logs_warning(self, caplog):
+        with patch("sap_cloud_sdk.core.telemetry.middleware.starlette_a2a.IASVerifier") as MockV:
+            MockV.from_env.side_effect = IASConfigError("no binding")
+            with caplog.at_level(logging.WARNING):
+                StarletteIASTelemetryMiddleware(app=MagicMock())
+        assert any("NOT be stamped" in r.message for r in caplog.records)
+
+    def test_explicit_verifier_bypasses_auto_configure(self):
+        """When token_verifier is explicitly passed, IASVerifier.from_env must not be called."""
+        with patch("sap_cloud_sdk.core.telemetry.middleware.starlette_a2a.IASVerifier") as MockV:
+            explicit = _passing_verifier()
+            mw = StarletteIASTelemetryMiddleware(app=MagicMock(), token_verifier=explicit)
+        MockV.from_env.assert_not_called()
+        assert mw._token_verifier is explicit
+
+    def test_explicit_verifier_no_warning(self, caplog):
         with caplog.at_level(logging.WARNING):
             StarletteIASTelemetryMiddleware(app=MagicMock(), token_verifier=_passing_verifier())
-        assert not any("token_verifier" in r.message for r in caplog.records)
+        assert not any("NOT be stamped" in r.message for r in caplog.records)
 
 
 # ---------------------------------------------------------------------------

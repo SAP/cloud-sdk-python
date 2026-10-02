@@ -45,6 +45,12 @@ from sap_cloud_sdk.aicore import set_aicore_config
 set_aicore_config(instance_name="aicore-production")
 ```
 
+> **Security note:** `instance_name` is validated as a safe single path component
+> before any file is read. Traversal sequences (`../`), absolute paths (`/etc/…`),
+> UNC paths, embedded separators, NUL / control characters, and values exceeding
+> 255 characters raise `ValueError`. All standard BTP instance names such as
+> `aicore-instance` and `aicore-prod` are accepted unchanged.
+
 ---
 
 ## Routing Modes
@@ -627,6 +633,11 @@ If credentials from the wrong instance are loaded:
 # Explicitly specify the correct instance name
 set_aicore_config(instance_name="correct-instance-name")
 ```
+
+If you see a `ValueError: instance_name must be a single path component`, the
+value contains a path separator, traversal segment, or other disallowed
+character. Use a plain BTP instance name (letters, digits, hyphens, underscores,
+internal dots — no slashes or `..`).
 
 ---
 

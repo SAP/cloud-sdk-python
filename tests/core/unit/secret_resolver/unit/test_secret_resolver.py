@@ -255,3 +255,86 @@ class TestSecretResolver:
         assert config.username == "legacy_user"
         assert config.password == "legacy_pass"
         assert config.endpoint == "legacy_ep"
+
+
+# ---------------------------------------------------------------------------
+# Path-traversal security regression tests (HASI2026203-281)
+# ---------------------------------------------------------------------------
+
+BAD_INSTANCE_VALUES = [
+    "../default",           # relative traversal (the primary attack)
+    "../../etc",            # multi-hop traversal
+    "/etc/passwd",          # absolute POSIX path
+    "C:\\Windows",          # Windows-style absolute (backslash)
+    "C:/Windows",           # Windows-style absolute (forward slash)
+    "\\\\server\\share",    # UNC path
+    "foo/bar",              # embedded forward separator
+    "foo\\bar",             # embedded backslash
+    "foo\x00bar",           # NUL byte
+    "foo\x01bar",           # control character
+    ".",                    # dot component
+    "..",                   # parent component
+    "a" * 256,              # exceeds maximum length
+]
+
+BAD_MODULE_VALUES = ["../sibling", "/abs/path", "foo/bar", ".."]
+
+GOOD_VALUES = [
+    "default",
+    "hana-agent-memory",
+    "aicore-instance",
+    "my-tenant-us10",
+    "foo.bar",
+    "hr-advisor-destination-instance",
+]
+
+
+class TestPathComponentValidation:
+
+    @pytest.mark.parametrize("bad", BAD_INSTANCE_VALUES)
+    def test_bad_instance_raises_value_error(self, bad):
+        with pytest.raises(ValueError):
+            read_from_mount_and_fallback_to_env_var(
+                "/path", "VAR", "module", bad, SampleConfig()
+            )
+
+    @pytest.mark.parametrize("bad", BAD_MODULE_VALUES)
+    def test_bad_module_raises_value_error(self, bad):
+        with pytest.raises(ValueError):
+            read_from_mount_and_fallback_to_env_var(
+                "/path", "VAR", bad, "instance", SampleConfig()
+            )
+
+    @pytest.mark.parametrize("good", GOOD_VALUES)
+    def test_valid_identifier_passes_validation(self, good):
+        # Validation passes; RuntimeError expected because /nonexistent doesn't exist.
+        with pytest.raises(RuntimeError):
+            read_from_mount_and_fallback_to_env_var(
+                "/nonexistent", "VAR", "module", good, SampleConfig()
+            )
+
+    def test_rejected_value_reads_no_files_and_no_env_fallback(self, monkeypatch):
+        """A traversal value must never reach the filesystem or env-var strategy."""
+        opened = []
+        monkeypatch.setattr("builtins.open", lambda *a, **kw: opened.append(a))
+        monkeypatch.setenv("VAR_MODULE_X_USER", "leak")
+        with pytest.raises(ValueError):
+            read_from_mount_and_fallback_to_env_var(
+                "/path", "VAR", "module", "../x", SampleConfig()
+            )
+        assert opened == [], "bad instance must not open any file"
+
+    def test_symlink_escaping_base_is_rejected(self, tmp_path):
+        """A symlink pointing outside the trusted root must be rejected."""
+        base = tmp_path / "appfnd"
+        (base / "mod").mkdir(parents=True)
+        outside = tmp_path / "outside"
+        outside.mkdir()
+        (base / "mod" / "inst").symlink_to(outside, target_is_directory=True)
+        # "inst" is a valid single-component name, passes _validate_path_component,
+        # but _assert_within_base detects the symlink escapes and raises ValueError
+        # which is aggregated into RuntimeError by read_from_mount_and_fallback_to_env_var.
+        with pytest.raises(RuntimeError, match="escapes trusted root"):
+            read_from_mount_and_fallback_to_env_var(
+                str(base), "VAR", "mod", "inst", SampleConfig()
+            )

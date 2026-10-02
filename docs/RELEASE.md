@@ -1,86 +1,184 @@
 # Release and Deployment Guide
 
-This guide consolidates the full release and deployment process for the Cloud SDK for Python, including versioning policy, preparation steps, tagging, GitHub release notes, and artifact publication.
+This guide describes the automated release pipeline for the SAP Cloud SDK for Python.
 
 ## Versioning
 
-- We follow SemVer: MAJOR.MINOR.PATCH (see [SemVer](https://semver.org/))
+We follow SemVer: `MAJOR.MINOR.PATCH` (see [SemVer](https://semver.org/)) and PEP 440. Use `X.Y.ZrcN` for release candidates.
 
-## Prepare the Release
+The version in `pyproject.toml` is **managed automatically** by the release workflow — do not bump it manually.
 
-1. Create a feature branch from main
-   ```bash
-   git checkout main && git pull
-   git checkout -b branch-name
-   ```
+---
 
-2. Bump version
+## Release Pipeline Overview
 
-   - In `pyproject.toml`: set `project.version = "X.Y.Z"` (PEP 440; no leading 'v')
-   - Run `uv lock` so the project version in `uv.lock` matches
-   - Use `X.Y.Zrc1`, `X.Y.Zrc2`, and so on for release candidates
-
-3. Commit changes
-
-   ```bash
-   git add pyproject.toml uv.lock
-   git commit -m "feat: did something"
-   ```
-
-4. Push and open PR, get approval and merge
-
-   ```bash
-   git push -u origin branch-name
-   ```
-   - Merge commit message should follow Conventional Commits
-   - Example: `feat(): add xyz`
-   - See: [Conventional Commits](https://www.conventionalcommits.org/)
-
-### Release candidate cycle
-
-After the first release candidate (`X.Y.Zrc1`), that release line is feature-frozen. If a blocking issue requires a code change, publish and validate another release candidate (`X.Y.Zrc2`, `X.Y.Zrc3`, and so on) before the stable release.
-
-To promote the final release candidate, open a pull request that changes the version from `X.Y.ZrcN` to `X.Y.Z` and updates `uv.lock`. The stable release should otherwise contain the same code as the final release candidate.
-
-## Create and Publish GitHub Release
-
-5. Create GitHub release (this will automatically publish to PyPI)
-
-   - Go to the repository's **Releases** page
-   - Click **"Draft a new release"**
-   - Create or select the tag that exactly matches the project version with a leading `v`
-   - Target the merged release commit on `main`
-   - Fill in the release title: `vX.Y.Z - Month D, YYYY`
-   - For an RC, select **Set as a pre-release** and do not set it as latest
-   - Add release notes:
-     - Highlight key features and changes
-     - Include breaking changes (if any)
-     - Reference relevant issues/PRs
-   - Click **"Publish release"**
-
-6. Automated PyPI publication
-
-   - The [Publish Package to PyPI](../.github/workflows/release.yml) workflow will automatically trigger
-   - The workflow will:
-     - Extract version from `pyproject.toml`
-     - Check if version already exists on PyPI (prevents duplicates)
-     - Build the package with `uv build`
-     - Publish to PyPI using trusted publishing (OIDC)
-   - Monitor the workflow in the **Actions** tab to confirm successful publication
-   - Package will be available at: `https://pypi.org/project/sap-cloud-sdk/X.Y.Z/`
-
-> **Note:** The version in `pyproject.toml` must match the release tag (without the 'v' prefix). For example, tag `vX.Y.Z` requires `version = "X.Y.Z"` in `pyproject.toml`.
-
-## Install and Verify
-
-Install a specific release candidate explicitly:
-
-```bash
-pip install sap-cloud-sdk==1.0.0rc1
+```
+Developer works on a feature/hotfix branch
+        │
+        ▼
+Run /prep-pr to fill in the PR template, open or update the PR
+        │
+        ▼
+PR is reviewed and approved
+        │
+        ▼
+Run /release-prep on the feature/hotfix branch
+  Diffs branch against latest tag → proposes version + release notes
+  Creates GitHub Release Issue with the branch name embedded
+  Labels: release + status: pending tests
+        │
+        ▼
+Automation test repo detects the issue, runs tests against the branch
+  Labels during run: status: tests running
+        │
+        ├─── Tests fail → status: tests failed  (investigate and retry)
+        │
+        └─── Tests pass → status: tests passed
+                │
+                ▼
+        Release workflow triggers automatically
+          1. Runs integration tests against the branch
+          2. Bumps pyproject.toml, commits, pushes to the branch
+          3. Creates and pushes the git tag (vX.Y.Z)
+          4. Builds the distribution (uv build)
+          5. Creates the GitHub Release with release notes and artifacts
+          6. Publishes to PyPI via OIDC trusted publishing
+          7. Closes the release issue (status: released)
+        │
+        ▼
+Merge the branch into main (the version bump commit is already on it)
 ```
 
-Install the current stable release normally:
+---
+
+## Step 1 — Prepare and open your PR
+
+On your feature or hotfix branch, run `/prep-pr` to fill in the PR template from the diff, then get it reviewed and approved. Do **not** merge yet.
+
+```
+/prep-pr
+```
+
+---
+
+## Step 2 — Run `/release-prep` on the same branch
+
+Before merging, while still on the feature/hotfix branch, run:
+
+```
+/release-prep
+```
+
+The skill will:
+1. Find the latest release tag and diff from there to `HEAD` on the current branch
+2. Classify commits by Conventional Commit type and propose a SemVer bump
+3. Generate structured release notes
+4. Show a preview and ask you to confirm or override the version
+5. Create the GitHub Release Issue referencing this branch, with labels `release` + `status: pending tests`
+
+> The version in `pyproject.toml` is **not** touched at this point — the release workflow owns that step.
+
+---
+
+## Step 3 — Wait for automated tests
+
+Once the issue is created, the automation test repo detects it (via the `status: pending tests` label) and runs the integration test suite against the branch. You can track progress on the release issue — the label updates automatically:
+
+| Label | Meaning |
+|---|---|
+| `status: pending tests` | Waiting for the automation repo to pick up the issue |
+| `status: tests running` | Tests in progress |
+| `status: tests passed` | Tests passed — release workflow will trigger shortly |
+| `status: tests failed` | Tests failed — see [Handling failures](#handling-failures) |
+
+---
+
+## Step 4 — Automated release (no action required)
+
+When the label changes to `status: tests passed`, the `Release` workflow triggers automatically and:
+
+1. Runs the full integration test suite against the branch (skippable — see below)
+2. Bumps `version` in `pyproject.toml`, commits `chore(release): bump version to X.Y.Z`, and pushes to the branch
+3. Creates and pushes the annotated git tag `vX.Y.Z`
+4. Builds the distribution with `uv build`
+5. Creates the GitHub Release with the release notes and build artifacts attached
+6. Publishes to PyPI via OIDC trusted publishing
+7. Posts a comment on the issue with links to PyPI and the GitHub Release, then closes it
+
+Monitor progress in the **Actions** tab. On success the package is available at:
+
+```
+https://pypi.org/project/sap-cloud-sdk/X.Y.Z/
+```
+
+---
+
+## Step 5 — Merge the branch
+
+Once the release workflow completes, the branch has the `chore(release): bump version to X.Y.Z` commit on it. Merge (or complete the PR merge) into `main` so the version bump lands on the main branch.
+
+---
+
+## Release candidates
+
+To publish a release candidate, follow the same process with a version like `0.57.0rc1`. The skill will propose a pre-release version if all unreleased commits are on a feature-frozen RC branch.
+
+The GitHub Release is automatically marked as pre-release when the version is a PEP 440 pre-release. Install explicitly:
 
 ```bash
+pip install sap-cloud-sdk==0.57.0rc1
+```
+
+---
+
+## Handling failures
+
+### Tests failed (`status: tests failed`)
+
+Investigate the failures in the automation test repo. Fix the branch, then either:
+- Re-run `/release-prep` to create a new release issue, or
+- Manually remove `status: tests failed` and add `status: pending tests` to re-trigger the automation test run on the same issue
+
+### Release workflow failed (`status: release failed`)
+
+Check the failed workflow run linked in the issue comment. Common causes:
+
+| Symptom | Fix |
+|---|---|
+| Version already on PyPI | The version was already published — bump to the next patch and re-run `/release-prep` |
+| Tag already exists | Delete the tag (`git push origin :refs/tags/vX.Y.Z`) and re-trigger |
+| Build failed | Fix the source, push to the branch, then force-release (see below) |
+
+### Force a release (bypass automation tests)
+
+If you need to publish without waiting for the automation test repo (e.g. for a critical hotfix already validated manually):
+
+1. Open the release issue
+2. Remove any `status: *` label currently on it
+3. Add the label `status: tests passed`
+
+The release workflow triggers immediately.
+
+### Skip integration tests in the release workflow
+
+If the release workflow's own integration test step needs to be bypassed (e.g. test infrastructure is temporarily unavailable):
+
+1. Add the label `skip-integration-tests` to the release issue
+2. Then add `status: tests passed` (or re-trigger if it is already set)
+
+The integration test steps are skipped; all other steps — version bump, tag, build, GitHub Release, PyPI publish — run as normal. Remove `skip-integration-tests` after the release to keep the label state clean.
+
+---
+
+## Install
+
+```bash
+# Latest stable
 pip install sap-cloud-sdk
+
+# Specific version
+pip install sap-cloud-sdk==0.57.0
+
+# Release candidate
+pip install sap-cloud-sdk==0.57.0rc1
 ```

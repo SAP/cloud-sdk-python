@@ -61,7 +61,7 @@ for server in ext.mcp_servers:
         print("Approved tools:", server.tool_names)
 
 for hook in ext.hooks:
-    print(hook.id, hook.n8n_workflow_config.workflow_id)
+    print(hook.id, hook.n8n_workflow_config.tool_name)
 
 if ext.instruction:
     print("Extension instruction:", ext.instruction)
@@ -97,7 +97,7 @@ agent_extensions = build_extension_capabilities(capabilities)
 
 - **MCP Server**: A Model Context Protocol server contributed by an extension. Each server has an ORD ID and an optional allowlist of approved tool names.
 
-- **Hook**: A workflow to be executed before or after the agent execution. Each hook has a unique UUID `id`, a developer-facing `hook_id` (not guaranteed to be unique), and an `n8n_workflow_config` containing the workflow ID and HTTP method. Hook payloads and responses use the `Message` type from the `a2a.types` module for standardized agent-to-agent communication.
+- **Hook**: A workflow to be executed before or after the agent execution. Each hook has a unique UUID `id`, a developer-facing `hook_id` (not guaranteed to be unique), and an `n8n_workflow_config` containing the ORD IDs, tool name, global tenant ID, and HTTP method that identify the hook's MCP server and tool. Hook payloads and responses use the `Message` type from the `a2a.types` module for standardized agent-to-agent communication.
 
 - **UMS (Unified Metadata Service)**: The SAP backend service that manages agent extensions. The module communicates with it via GraphQL over mTLS, using the BTP Destination Service for URL and credential resolution.
 
@@ -161,7 +161,7 @@ def call_hook(
 - Raises `ExtensibilityError` if the workflow reaches a terminal failure status, times out, or n8n returns an application-level error.
 - The hook's `timeout` setting is used for the HTTP request timeout.
 - The hook HTTP method is taken from `hook.n8n_workflow_config.method`.
-- The workflow ID is taken from `hook.n8n_workflow_config.workflow_id`.
+- The workflow ID is taken from `hook.n8n_workflow_config.workflow_id` (legacy direct-HTTP path).
 
 ### `ExtensibilityClient.call_hook_agw()`
 
@@ -185,15 +185,18 @@ async def call_hook_agw(
 - `tenant_subdomain`: Tenant subdomain used to instantiate the Agent Gateway client. Pass `None` to use the default subdomain.
 - Returns the response data as a `Message` object, or `None` if no message is produced.
 - Raises `TransportError` if the AGW tool call itself fails (network error, etc.).
-- Raises `ExtensibilityError` if the n8n MCP tools are not found via AGW, the workflow reaches a terminal failure status, times out, or n8n returns an application-level error.
+- Raises `ExtensibilityError` if the hook MCP tool is not found via AGW, or the hook response does not conform to the A2A Message protocol.
 
 #### `N8nWorkflowConfig`
 
 ```python
 @dataclass
 class N8nWorkflowConfig:
-    workflow_id: str  # Workflow ID
-    method: HTTPMethod  # HTTP method used by webhook execution
+    ord_id: str          # ORD ID of the n8n API resource
+    card_ord_id: str     # ORD ID of the n8n MCP translation card (server identifier)
+    tool_name: str       # MCP tool name to call on the card server
+    global_tenant_id: str  # LWT global tenant ID for the workflow
+    method: HTTPMethod   # HTTP method used by webhook execution
 ```
 
 #### `HookConfig`
@@ -322,7 +325,7 @@ class Hook:
     type: HookType  # Hook type (BEFORE, AFTER)
     deployment_type: DeploymentType  # Deployment type (N8N, SERVERLESS)
     n8n_workflow_config: (
-        N8nWorkflowConfig  # Workflow config (workflow ID + HTTP method)
+        N8nWorkflowConfig  # Workflow config (ORD IDs, tool name, global tenant ID, HTTP method)
     )
     timeout: int  # Timeout in seconds
     execution_mode: ExecutionMode  # Execution mode (SYNC, ASYNC)
@@ -582,7 +585,7 @@ The `HTTPMethod` enum ensures type safety:
 - `HTTPMethod.PATCH` - Partially update data
 - `HTTPMethod.DELETE` - Delete or cancel an operation
 
-The workflow used for execution comes from `hook.n8n_workflow_config.workflow_id`.
+The hook tool name and server come from `hook.n8n_workflow_config.tool_name` and `hook.n8n_workflow_config.card_ord_id`.
 
 #### Synchronous Hook Execution
 
@@ -857,7 +860,10 @@ The JSON file uses the same schema as the extensibility backend response:
             "type": "BEFORE",
             "deploymentType": "N8N",
             "n8nWorkflowConfig": {
-                "workflowId": "wf-currency-conversion-001",
+                "ordId": "sap.n8nwfrt:apiResource:invoice-po-solution_currency-conversion.convertCurrency:v1",
+                "cardOrdId": "sap.n8nwfrt:apiResource:invoice-po-solution_currency-conversion.convertCurrency_mcp:v1",
+                "toolName": "convertCurrency",
+                "globalTenantId": "tenant-example-001",
                 "method": "POST"
             },
             "timeout": 30,

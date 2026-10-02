@@ -106,6 +106,39 @@ export DB_DATABASE_PRIMARY_PASSWORD="secret123"
 
 ---
 
+## Input Validation & Security
+
+Both `module` and `instance` are validated as **safe single-component path
+identifiers** before any filesystem path is assembled or any environment
+variable is consulted. A rejected value raises `ValueError` immediately and
+reads no files.
+
+**Allowed:** alphanumeric characters, hyphens, underscores, and internal dots.
+Examples: `"default"`, `"hana-agent-memory"`, `"aicore-instance"`,
+`"my-tenant-us10"`.
+
+**Rejected** (raises `ValueError`):
+
+| Pattern | Example |
+|---------|---------|
+| Path traversal | `"../default"`, `"../../etc"` |
+| Absolute POSIX path | `"/etc/passwd"` |
+| Windows absolute path | `"C:\\Windows"`, `"C:/Windows"` |
+| UNC path | `"\\\\server\\share"` |
+| Embedded path separator | `"foo/bar"`, `"foo\\bar"` |
+| Dot components | `"."`, `".."` |
+| NUL / control characters | `"foo\x00bar"` |
+| Exceeds 255 characters | `"a" * 256` |
+
+After component validation, the resolved canonical path is compared against the
+trusted root using `pathlib.Path.resolve()`. This defense-in-depth check
+prevents symlink-based escape even when component validation passes.
+
+**This protection is automatic** — no caller needs to pre-validate inputs. Every
+agent or application using the SDK is protected without any code change.
+
+---
+
 ## Usage Examples
 
 ### ObjectStore Configuration

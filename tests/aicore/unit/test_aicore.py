@@ -1052,3 +1052,77 @@ class TestSetAICoreConfigDestinationMode:
             mock_create.return_value.get_destination.return_value = dest
             set_aicore_config()
         mock_filter.assert_called_once()
+
+
+# ---------------------------------------------------------------------------
+# Path-traversal security regression tests (HASI2026203-281)
+# ---------------------------------------------------------------------------
+
+
+class TestAicoreInstanceValidation:
+    """Verify that _get_secret, _get_aicore_base_url, and _get_secret_dir_mtime
+    reject traversal/absolute instance_name values before touching the filesystem."""
+
+    from sap_cloud_sdk.aicore import _get_secret_dir_mtime
+
+    BAD_NAMES = [
+        "../default",
+        "../../etc",
+        "/etc/passwd",
+        "C:/Windows",
+        "\\\\server\\share",
+        "foo/bar",
+        "foo\x00bar",
+        ".",
+        "..",
+        "a/b",
+    ]
+
+    GOOD_NAMES = [
+        "aicore-instance",
+        "aicore-prod",
+        "my-instance",
+        "custom-aicore",
+    ]
+
+    @pytest.mark.parametrize("bad", BAD_NAMES)
+    def test_get_secret_rejects_traversal(self, bad):
+        with pytest.raises(ValueError):
+            _get_secret("ENV_VAR", instance_name=bad)
+
+    @pytest.mark.parametrize("bad", BAD_NAMES)
+    def test_get_aicore_base_url_rejects_traversal(self, bad):
+        with pytest.raises(ValueError):
+            _get_aicore_base_url(instance_name=bad)
+
+    @pytest.mark.parametrize("bad", BAD_NAMES)
+    def test_get_secret_dir_mtime_rejects_traversal(self, bad):
+        from sap_cloud_sdk.aicore import _get_secret_dir_mtime
+        with pytest.raises(ValueError):
+            _get_secret_dir_mtime(instance_name=bad)
+
+    @pytest.mark.parametrize("good", GOOD_NAMES)
+    def test_valid_instance_name_passes_get_secret(self, good):
+        with (
+            patch("os.path.exists", return_value=False),
+            patch.dict("os.environ", {}, clear=True),
+        ):
+            result = _get_secret("MISSING_VAR", instance_name=good)
+            assert result == ""
+
+    @pytest.mark.parametrize("good", GOOD_NAMES)
+    def test_valid_instance_name_passes_get_aicore_base_url(self, good):
+        with (
+            patch("os.path.exists", return_value=False),
+            patch.dict("os.environ", {}, clear=True),
+        ):
+            result = _get_aicore_base_url(instance_name=good)
+            assert result == ""
+
+    def test_get_secret_does_not_read_file_on_traversal(self):
+        """Rejected instance_name must not trigger any file access."""
+        opened = []
+        with patch("builtins.open", lambda *a, **kw: opened.append(a)):
+            with pytest.raises(ValueError):
+                _get_secret("ENV_VAR", instance_name="../default")
+        assert opened == [], "traversal must not open any file"

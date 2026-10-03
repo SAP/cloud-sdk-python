@@ -1,0 +1,221 @@
+# SAP Cloud SDK — CBC module
+
+Typed Python client for reading tenant-specific business configuration from
+SAP Central Business Configuration (CBC).
+
+## Concepts
+
+**Consumption version** — a snapshot of the business configuration for one app
+tenant at a point in time. An app tenant usually has one active version.
+
+**Configuration object** — a logical grouping of related configuration, e.g.
+`payment-config` or `agent-config`. Authored by the application or agent team
+and shipped as part of a reference content package.
+
+**Entity** — one slice of configuration within a config object. A config
+object has one or more related entities; each entity has a stable authored `id`
+(e.g. `payment-mode`) and a JSON schema defining its data shape.
+
+**Entity data** — the configuration content for an entity.
+
+## Setup
+
+`base_url` and `app_tenant_id` are supplied as callables, invoked on every
+request. In a multi-tenant agent both the CBC URL and the application tenant id
+vary per request (resolved from request-scoped context), so the client never
+binds them at construction time.
+
+```python
+from sap_cloud_sdk import cbc
+
+cbc_client = cbc.create_client(
+    base_url=lambda: resolve_cbc_url(),
+    app_tenant_id=lambda: resolve_app_tenant_id(),
+    ssl_context=ssl_ctx,
+)
+```
+
+Apps or agents running on the SAP application foundation platform can use `create_agent_client`
+instead — it supplies both resolvers and the mTLS context from the platform's
+provisioning conventions. See [Platform setup](#platform-setup).
+
+## Reading configuration
+
+### Fetch everything in one call
+
+```python
+# latest version resolved automatically
+config = cbc_client.get_configuration()
+
+# pin a specific version
+config = cbc_client.get_configuration(consumption_version="a0392d4f-72a9-...")
+
+# pick from the list
+versions = cbc_client.get_consumption_versions()
+cv = versions.latest()  # or versions.items[0], or your own selection logic
+config = cbc_client.get_configuration(consumption_version=cv.version)
+```
+
+### ConfigData structure
+
+```
+ConfigData
+├── consumption_version: str          # e.g. "a0392d4f-72a9-..."
+├── app_tenant_id: str
+└── config_objects: list[ConfigObject]
+    ├── ConfigObject
+    │   ├── config_object_id: str     # e.g. "payment-config"
+    │   └── entities: list[EntityData]
+    │       └── EntityData
+    │           ├── entity_id: str        # e.g. "payment-mode"
+    │           └── data: EntityContent   # .as_list() or .as_object()
+    └── ConfigObject
+        ├── config_object_id: str     # e.g. "agent-config"
+        └── entities: list[EntityData]
+            └── EntityData
+                ├── entity_id: str        # e.g. "contact"
+                └── data: EntityContent   # .as_list() or .as_object()
+```
+
+### Iterate all config objects and entities
+
+```python
+for co in config.config_objects:
+    for ed in co.entities:
+        print(f"{co.config_object_id}/{ed.entity_id}")
+```
+
+### Look up a specific entity
+
+```python
+# All entities for one config object
+payment = config.get_config_object("payment-config")  # ConfigObject | None
+if payment:
+    modes = payment.get_entity("payment-mode")  # EntityData | None
+    if modes:
+        for row in modes.data.as_list():
+            print(row["paymentModeCode"], row["name"])
+```
+
+`modes.data.as_list()` returns `list[dict]` and raises `ValueError` if the data is not a list.
+`modes.data.as_object()` returns `dict` and raises `ValueError` if the data is not a dict.
+
+If you don't know the shape in advance, check first with `modes.data.is_list()` /
+`modes.data.is_object()`, or call `modes.data.value()` to get the raw `list[dict] | dict`
+without any shape assertion:
+
+```python
+if modes.data.is_list():
+    rows = modes.data.as_list()
+else:
+    settings = modes.data.as_object()
+```
+
+```python
+# Shortcut — config object + entity in one step
+modes = config.get_entity_data("payment-config", "payment-mode")  # EntityData | None
+```
+
+```python
+# Unmarshal into your own class
+modes_list = [PaymentMode(**row) for row in modes.data.as_list()]
+policy = PolicyConfig(**policy_entity.data.as_object())
+```
+
+
+## Error handling
+
+| Exception | When |
+|---|---|
+| `CBCClientError` | 4xx from CBC (e.g. tenant not found) |
+| `CBCServerError` | 5xx from CBC |
+| `CBCNetworkError` | connection failure |
+| `CBCConfigError` | platform adapter cannot resolve the tenant mapping or certificate |
+
+```python
+from sap_cloud_sdk import cbc
+
+try:
+    config = cbc_client.get_configuration()
+except cbc.CBCClientError as e:
+    print(e.code, e.message)  # e.g. "NOT_FOUND", "Tenant unknown"
+except cbc.CBCNetworkError:
+    ...  # retry / circuit-break
+```
+
+## Platform setup
+
+Apps running on the SAP application platform can skip wiring the two resolvers by
+hand. `create_agent_client` supplies them from the platform's provisioning
+conventions: it reads the application tenant id and tenant subdomain from two
+SDK-owned `ContextVar`s, resolves the CBC URL from the tenant's Destination
+Fragment, and loads the mTLS certificate from the Destination Service.
+
+The two artifacts it depends on follow the platform convention:
+
+- the app's own provider-level **Destination**, holding the mTLS certificate;
+- the tenant-mapping **Fragment**, carrying the CBC URL (written by the platform
+  during tenant provisioning).
+
+Populate the two ContextVars from your request context — the SDK owns the vars,
+your app owns *how* they are filled (e.g. from the IAS JWT `app_tid` claim
+and the `dwc-subdomain` header, though the SDK does not mandate the source).
+
+```python
+from sap_cloud_sdk import cbc
+
+# once, at startup — the mTLS context is built here
+cbc_client = cbc.create_agent_client()
+
+# per request
+cbc.app_tenant_id_var.set(parse_token(bearer).app_tid)  # "5649a2cf-..."
+cbc.tenant_subdomain_var.set(request.headers["dwc-subdomain"])  # "subscriber-abc"
+```
+
+The CBC URL comes from the `cbcUrl` property of the tenant-mapping fragment. The
+adapter lists the `CBC_TenantMapping_*` fragments in the subscriber's subaccount
+and picks the one whose `appTenantId` property matches; the `cbcUrl` is used
+verbatim. The certificate is the app's own provider-level mTLS certificate,
+fetched once at startup.
+
+**Certificate rotation.** The mTLS certificate is loaded once when the client is
+built. Platform certificates are typically short-lived, so recreate the client —
+call `create_agent_client()` again — before the certificate expires to pick up
+the rotated certificate.
+
+### Platform env overrides
+
+Defaults cover the common case; override via env when needed:
+
+| Variable | Default | Description |
+|---|---|---|
+| `APPFND_CONHOS_LANDSCAPE` | (platform-provided) | Landscape used to derive the certificate name `sap-managed-runtime-ias-{landscape}.pem` |
+| `CLOUD_SDK_CBC_CERTIFICATE_NAME` | landscape-derived | Explicit certificate name, overriding the landscape derivation |
+| `CLOUD_SDK_CBC_DESTINATION_INSTANCE` | `default` | The `instance` passed to the destination `create_fragment_client` / `create_certificate_client` (used for secret resolution in cloud mode) |
+| `CLOUD_SDK_CBC_P12_PASSWORD` | (none) | Password for the certificate keystore, if encrypted |
+
+An explicit `ssl_context=` passed to `create_agent_client` short-circuits the
+certificate load entirely.
+
+## Using a test double
+
+`CBCClient` is a `Protocol` — implement it directly in tests:
+
+```python
+from sap_cloud_sdk import cbc
+
+
+class StubCBCClient:
+    def get_consumption_versions(self): ...
+    def get_configuration(self, consumption_version=None):
+        return cbc.ConfigData(
+            consumption_version="cv1",
+            app_tenant_id="app-t1",
+            config_objects=[],
+        )
+
+
+def test_my_service():
+    service = MyService(cbc_client=StubCBCClient())
+    ...
+```

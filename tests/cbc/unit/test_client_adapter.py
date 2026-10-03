@@ -117,6 +117,22 @@ class TestResolveBaseUrl:
             with pytest.raises(CBCConfigError, match="no 'cbcUrl'"):
                 _resolve_base_url("default")
 
+    def test_wraps_destination_error_as_config_error(self):
+        from sap_cloud_sdk.destination.exceptions import DestinationOperationError
+
+        tenant_subdomain_var.set("appfnd-subscriber")
+        app_tenant_id_var.set("app-t1")
+        fake_client = MagicMock()
+        fake_client.list_subaccount_fragments.side_effect = DestinationOperationError(
+            "failed to list subaccount fragments: token error"
+        )
+        with patch(
+            "sap_cloud_sdk.destination.create_fragment_client",
+            return_value=fake_client,
+        ):
+            with pytest.raises(CBCConfigError, match="Could not resolve the CBC URL"):
+                _resolve_base_url("default")
+
 
 # ---------------------------------------------------------------------------
 # _load_ssl_context
@@ -156,6 +172,22 @@ class TestLoadSslContext:
         ):
             with pytest.raises(CBCConfigError, match="not found"):
                 _load_ssl_context("default", "missing.pem", None)
+
+    def test_wraps_destination_error_as_config_error(self):
+        from sap_cloud_sdk.destination.exceptions import DestinationOperationError
+
+        fake_cert_client = MagicMock()
+        fake_cert_client.get_subaccount_certificate.side_effect = (
+            DestinationOperationError("token error")
+        )
+        with patch(
+            "sap_cloud_sdk.destination.create_certificate_client",
+            return_value=fake_cert_client,
+        ):
+            with pytest.raises(
+                CBCConfigError, match="Could not fetch the mTLS certificate"
+            ):
+                _load_ssl_context("default", "my-cert.pem", None)
 
 
 # ---------------------------------------------------------------------------

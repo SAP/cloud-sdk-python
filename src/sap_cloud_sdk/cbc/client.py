@@ -172,14 +172,16 @@ class DefaultClient:
             CBCServerError: On 5xx responses.
             CBCNetworkError: On connection failures.
         """
+        base_url = self._base_url()
         app_tenant_id = self._resolve_app_tenant_id()
         url = self._configurations_url(
+            base_url,
             f"/consumptionVersions?appTenantId={app_tenant_id}",
         )
         return ConsumptionVersions.model_validate(self._request("GET", url).json())
 
     def _get_configuration_objects(
-        self, app_tenant_id: str, consumption_version: str
+        self, base_url: str, app_tenant_id: str, consumption_version: str
     ) -> ConfigObjectList:
         """Return the config objects (with their entities) for the given version.
 
@@ -187,6 +189,7 @@ class DefaultClient:
         so no client-side grouping is needed.
 
         Args:
+            base_url: Resolved CBC service base URL for this operation.
             app_tenant_id: Application tenant identifier.
             consumption_version: Consumption version ID.
 
@@ -199,6 +202,7 @@ class DefaultClient:
             CBCNetworkError: On connection failures.
         """
         url = self._configurations_url(
+            base_url,
             f"/consumptionVersions/{consumption_version}/configurationObjects"
             f"?appTenantId={app_tenant_id}",
         )
@@ -229,6 +233,7 @@ class DefaultClient:
             CBCServerError: On 5xx responses.
             CBCNetworkError: On connection failures.
         """
+        base_url = self._base_url()
         app_tenant_id = self._resolve_app_tenant_id()
         if consumption_version is None:
             versions = self.get_consumption_versions()
@@ -239,12 +244,15 @@ class DefaultClient:
                 )
             consumption_version = latest.version
 
-        co_list = self._get_configuration_objects(app_tenant_id, consumption_version)
+        co_list = self._get_configuration_objects(
+            base_url, app_tenant_id, consumption_version
+        )
         config_objects = [
             ConfigObject(
                 config_object_id=entry.config_object_id,
                 entities=[
                     self._fetch_entity_data(
+                        base_url,
                         app_tenant_id,
                         consumption_version,
                         entry.config_object_id,
@@ -267,12 +275,14 @@ class DefaultClient:
 
     def _fetch_entity_data(
         self,
+        base_url: str,
         app_tenant_id: str,
         consumption_version: str,
         config_object_id: str,
         entity_id: str,
     ) -> EntityData:
         url = self._configurations_url(
+            base_url,
             f"/consumptionVersions/{consumption_version}/configurationObjects"
             f"/{config_object_id}/entities/{entity_id}/data"
             f"?appTenantId={app_tenant_id}",
@@ -291,8 +301,8 @@ class DefaultClient:
         resolved_id = api_meta.get("entityName") or entity_id
         return EntityData(entity_id=resolved_id, data=EntityContent(raw_data))
 
-    def _configurations_url(self, path: str = "") -> str:
-        base = self._base_url().rstrip("/")
+    def _configurations_url(self, base_url: str, path: str = "") -> str:
+        base = base_url.rstrip("/")
         return f"{base}{self._config.configurations_path}{path}"
 
     def _request(

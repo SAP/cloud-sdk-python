@@ -161,6 +161,7 @@ def _resolve_base_url(destination_instance: str) -> str:
             found, or the matched fragment has no ``cbcUrl`` property.
     """
     from sap_cloud_sdk.destination import create_fragment_client
+    from sap_cloud_sdk.destination.exceptions import DestinationError
 
     subdomain = tenant_subdomain_var.get()
     if not subdomain:
@@ -170,8 +171,14 @@ def _resolve_base_url(destination_instance: str) -> str:
         )
     app_tenant_id = _resolve_app_tenant_id()
 
-    client = create_fragment_client(instance=destination_instance)
-    fragments = client.list_subaccount_fragments(tenant=subdomain)
+    try:
+        client = create_fragment_client(instance=destination_instance)
+        fragments = client.list_subaccount_fragments(tenant=subdomain)
+    except DestinationError as exc:
+        raise CBCConfigError(
+            f"Could not resolve the CBC URL: listing tenant-mapping fragments "
+            f"failed for subdomain={subdomain!r} (appTenantId={app_tenant_id!r}): {exc}"
+        ) from exc
     fragment = next(
         (
             f
@@ -207,16 +214,23 @@ def _load_ssl_context(
         p12_password: Certificate keystore password, or ``None`` if unencrypted.
 
     Raises:
-        CBCConfigError: If the certificate is not found.
+        CBCConfigError: If the certificate cannot be fetched or is not found.
     """
     from sap_cloud_sdk.destination import AccessStrategy, create_certificate_client
     from sap_cloud_sdk.destination._cert_loader import _load_pem
+    from sap_cloud_sdk.destination.exceptions import DestinationError
 
-    cert = create_certificate_client(
-        instance=destination_instance
-    ).get_subaccount_certificate(
-        cert_name, access_strategy=AccessStrategy.PROVIDER_ONLY
-    )
+    try:
+        cert = create_certificate_client(
+            instance=destination_instance
+        ).get_subaccount_certificate(
+            cert_name, access_strategy=AccessStrategy.PROVIDER_ONLY
+        )
+    except DestinationError as exc:
+        raise CBCConfigError(
+            f"Could not fetch the mTLS certificate {cert_name!r} from Destination "
+            f"Service instance {destination_instance!r}: {exc}"
+        ) from exc
     if cert is None:
         raise CBCConfigError(
             f"Subaccount certificate {cert_name!r} not found in Destination "

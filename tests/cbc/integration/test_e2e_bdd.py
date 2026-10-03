@@ -3,16 +3,6 @@
 Run against a real or mock CBC server::
 
     CLOUD_SDK_CBC_URL=http://localhost:8001 \\
-    CLOUD_SDK_CBC_CBC_TENANT_ID=my-cbc-tenant \\
-    CLOUD_SDK_CBC_APP_TENANT_ID=my-app-tenant \\
-    pytest tests/cbc/integration
-
-Or against production (with mTLS)::
-
-    CLOUD_SDK_CBC_URL=https://cbc.example.ondemand.com \\
-    CLOUD_SDK_CBC_CERT_PATH=/run/secrets/tls.crt \\
-    CLOUD_SDK_CBC_KEY_PATH=/run/secrets/tls.key \\
-    CLOUD_SDK_CBC_CBC_TENANT_ID=my-cbc-tenant \\
     CLOUD_SDK_CBC_APP_TENANT_ID=my-app-tenant \\
     pytest tests/cbc/integration
 """
@@ -22,7 +12,7 @@ from __future__ import annotations
 import pytest
 from pytest_bdd import given, scenario, then, when
 
-from sap_cloud_sdk.cbc import ConfigData, ConsumptionVersions, TenantContext
+from sap_cloud_sdk.cbc import ConfigData, ConsumptionVersions
 from sap_cloud_sdk.cbc.client import DefaultClient
 
 pytestmark = pytest.mark.integration
@@ -70,7 +60,7 @@ def test_every_entity_has_id_and_data():
 
 
 @given("a configured CBC client and tenant context")
-def cbc_context(cbc_client: DefaultClient, cbc_tenant: TenantContext):
+def cbc_context(cbc_client: DefaultClient, cbc_app_tenant_id: str):
     pass
 
 
@@ -105,10 +95,10 @@ def assert_config_data_type(ctx: dict):
     assert config.consumption_version
 
 
-@then("the tenant_context should match the configured tenant")
-def assert_tenant_context(ctx: dict, cbc_tenant: TenantContext):
+@then("the app_tenant_id should match the configured tenant")
+def assert_app_tenant_id(ctx: dict, cbc_app_tenant_id: str):
     config: ConfigData = ctx["config"]
-    assert config.tenant_context == cbc_tenant
+    assert config.app_tenant_id == cbc_app_tenant_id
 
 
 @then("the result should contain at least one config object")

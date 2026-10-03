@@ -1,7 +1,8 @@
-"""Unit tests for DefaultClient and client_from_env."""
+"""Unit tests for DefaultClient and create_client."""
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import Any
 from unittest.mock import MagicMock
 
@@ -10,17 +11,12 @@ import json
 import pytest
 
 from sap_cloud_sdk.cbc.client import DefaultClient, create_client
-from sap_cloud_sdk.cbc.config import ENV_URL, ENV_CERT_PATH, ENV_KEY_PATH
 from sap_cloud_sdk.cbc.exceptions import (
     CBCClientError,
-    CBCConfigError,
     CBCNetworkError,
     CBCServerError,
 )
-from sap_cloud_sdk.cbc._models import (
-    ConfigData,
-    TenantContext,
-)
+from sap_cloud_sdk.cbc._models import ConfigData
 
 
 # ---------------------------------------------------------------------------
@@ -28,8 +24,8 @@ from sap_cloud_sdk.cbc._models import (
 # ---------------------------------------------------------------------------
 
 
-def _tenant(cbc: str = "cbc-tenant", app: str = "app-tenant") -> TenantContext:
-    return TenantContext(cbcTenantId=cbc, appTenantId=app)
+def _app_tid(value: str = "app-tenant") -> Callable[[], str]:
+    return lambda: value
 
 
 def _mock_response(
@@ -49,52 +45,43 @@ def _mock_response(
 
 def _make_client(
     base_url: str = "https://cbc.example.ondemand.com",
-    tenant: TenantContext | None = None,
+    app_tenant_id: Callable[[], str] | None = None,
 ) -> tuple[DefaultClient, MagicMock]:
     mock_http = MagicMock(spec=httpx.Client)
     client = DefaultClient(
-        base_url=base_url,
-        tenant_context=tenant or _tenant(),
+        base_url=lambda: base_url,
+        app_tenant_id=app_tenant_id or _app_tid(),
         http_client=mock_http,
     )
     return client, mock_http
 
 
 # ---------------------------------------------------------------------------
-# DefaultClient — tenant_context
+# DefaultClient — app_tenant_id callable
 # ---------------------------------------------------------------------------
 
 
-class TestTenantContext:
+class TestAppTenantIdCallable:
     def test_callable_is_invoked_on_each_call(self):
         call_count = 0
 
-        def tenant_fn() -> TenantContext:
+        def app_tenant_id_fn() -> str:
             nonlocal call_count
             call_count += 1
-            return _tenant()
+            return "app-tenant"
 
         mock_http = MagicMock(spec=httpx.Client)
         mock_http.request.return_value = _mock_response(
             json_body={"items": [{"version": "cv1"}]}
         )
         client = DefaultClient(
-            base_url="https://cbc.example.ondemand.com",
-            tenant_context=tenant_fn,
+            base_url=lambda: "https://cbc.example.ondemand.com",
+            app_tenant_id=app_tenant_id_fn,
             http_client=mock_http,
         )
         client.get_consumption_versions()
         client.get_consumption_versions()
         assert call_count == 2
-
-    def test_raises_when_no_tenant_context(self):
-        mock_http = MagicMock(spec=httpx.Client)
-        client = DefaultClient(
-            base_url="https://cbc.example.ondemand.com",
-            http_client=mock_http,
-        )
-        with pytest.raises(ValueError, match="tenant_context"):
-            client.get_consumption_versions()
 
 
 # ---------------------------------------------------------------------------
@@ -103,10 +90,13 @@ class TestTenantContext:
 
 
 class TestConfigurationsUrl:
-    def test_production_replaces_subdomain_with_tenant(self):
-        client, _ = _make_client("https://cbc.example.ondemand.com")
-        url = client._configurations_url(_tenant("my-tenant"), "/consumptionVersions")
-        assert url.startswith("https://my-tenant.")
+    def test_joins_base_url_and_path_verbatim(self):
+        client, _ = _make_client("https://my-tenant.cbc.example.ondemand.com")
+        url = client._configurations_url("/consumptionVersions")
+        assert url == (
+            "https://my-tenant.cbc.example.ondemand.com"
+            "/configuration/v1/consumptionVersions"
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -147,67 +137,98 @@ class TestGetConsumptionVersions:
 
 
 # ---------------------------------------------------------------------------
-# DefaultClient — _get_entities
+# DefaultClient — _get_configuration_objects
 # ---------------------------------------------------------------------------
 
 
-class TestGetEntities:
-    def test_returns_parsed_entities(self):
+class TestGetConfigurationObjects:
+    def test_returns_grouped_config_objects(self):
         client, mock_http = _make_client()
         mock_http.request.return_value = _mock_response(
             json_body={
                 "items": [
                     {
-                        "entityId": "i1",
-                        "entityName": "payment-mode",
                         "configurationObjectId": "payment-config",
-                    }
+                        "entities": [{"entityId": "payment-mode"}],
+                    },
+                    {
+                        "configurationObjectId": "agent-config",
+                        "entities": [
+                            {"entityId": "restaurant"},
+                            {"entityId": "contact"},
+                        ],
+                    },
                 ]
             }
         )
-        result = client._get_entities(_tenant(), "cv1")
-        assert len(result.items) == 1
-        assert result.items[0].internal_id == "i1"
+        result = client._get_configuration_objects("app-tenant", "cv1")
+        assert len(result.items) == 2
+        assert result.items[0].config_object_id == "payment-config"
+        assert [e.entity_id for e in result.items[1].entities] == [
+            "restaurant",
+            "contact",
+        ]
 
 
 # ---------------------------------------------------------------------------
-# DefaultClient — _get_entity_data
+# DefaultClient — _fetch_entity_data
 # ---------------------------------------------------------------------------
 
 
-class TestGetEntityData:
-    def test_returns_entity_data_with_entity_id(self):
-        client, mock_http = _make_client()
-        mock_http.request.return_value = _mock_response(
-            json_body={"items": [{"key": "value"}]}
-        )
-
-        result = client._get_entity_data(_tenant(), "cv1", "e1")
-        assert result.entity_id == "e1"
-        assert result.data.as_list() == [{"key": "value"}]
-
-    def test_uses_api_metadata_entity_name_when_present(self):
+class TestFetchEntityData:
+    def test_reads_array_content_items(self):
         client, mock_http = _make_client()
         mock_http.request.return_value = _mock_response(
             json_body={
                 "metadata": {
-                    "entityName": "rules",
-                    "configurationObjectId": "qualification-rules",
+                    "entityName": "restaurant",
+                    "configurationObjectId": "agent-config",
                 },
-                "items": [{"key": "value"}],
+                "contentShape": "ARRAY",
+                "content": {"items": [{"name": "CBS Bistro"}], "adaptedKeys": []},
             }
         )
+        result = client._fetch_entity_data(
+            "app-tenant", "cv1", "agent-config", "restaurant"
+        )
+        assert result.entity_id == "restaurant"
+        assert result.data.as_list() == [{"name": "CBS Bistro"}]
 
-        result = client._get_entity_data(_tenant(), "cv1", "e1")
-        assert result.entity_id == "rules"
-        assert result.data.as_list() == [{"key": "value"}]
-
-    def test_handles_flat_list_response(self):
+    def test_reads_object_content_item(self):
         client, mock_http = _make_client()
-        mock_http.request.return_value = _mock_response(json_body=[{"row": 1}])
+        mock_http.request.return_value = _mock_response(
+            json_body={
+                "metadata": {
+                    "entityName": "globalSettings",
+                    "configurationObjectId": "pmc-settings",
+                },
+                "contentShape": "OBJECT",
+                "content": {"item": {"maxRetries": 3, "timeoutSeconds": 30}},
+            }
+        )
+        result = client._fetch_entity_data(
+            "app-tenant", "cv1", "pmc-settings", "globalSettings"
+        )
+        assert result.entity_id == "globalSettings"
+        assert result.data.as_object() == {"maxRetries": 3, "timeoutSeconds": 30}
 
-        result = client._get_entity_data(_tenant(), "cv1", "e1")
-        assert result.data.as_list() == [{"row": 1}]
+    def test_defaults_to_empty_list_when_content_absent(self):
+        client, mock_http = _make_client()
+        mock_http.request.return_value = _mock_response(
+            json_body={"metadata": {"entityName": "policy"}, "contentShape": "ARRAY"}
+        )
+        result = client._fetch_entity_data(
+            "app-tenant", "cv1", "policy-config", "policy"
+        )
+        assert result.data.as_list() == []
+
+    def test_falls_back_to_path_entity_id_without_metadata(self):
+        client, mock_http = _make_client()
+        mock_http.request.return_value = _mock_response(
+            json_body={"contentShape": "ARRAY", "content": {"items": []}}
+        )
+        result = client._fetch_entity_data("app-tenant", "cv1", "agent-config", "hours")
+        assert result.entity_id == "hours"
 
 
 # ---------------------------------------------------------------------------
@@ -219,8 +240,8 @@ class TestGetConfiguration:
     def test_resolves_latest_version_when_none_given(self):
         client, mock_http = _make_client()
         versions_response = _mock_response(json_body={"items": [{"version": "v2"}]})
-        entities_response = _mock_response(json_body={"items": []})
-        mock_http.request.side_effect = [versions_response, entities_response]
+        config_objects_response = _mock_response(json_body={"items": []})
+        mock_http.request.side_effect = [versions_response, config_objects_response]
 
         result = client.get_configuration()
         assert isinstance(result, ConfigData)
@@ -235,24 +256,30 @@ class TestGetConfiguration:
 
     def test_uses_explicit_consumption_version(self):
         client, mock_http = _make_client()
-        entities_response = _mock_response(
+        config_objects_response = _mock_response(
             json_body={
                 "items": [
                     {
-                        "entityId": "i1",
-                        "entityName": "payment-mode",
                         "configurationObjectId": "payment-config",
+                        "entities": [{"entityId": "payment-mode"}],
                     }
                 ]
             }
         )
-        data_response = _mock_response(json_body={"items": [{"k": "v"}]})
-        mock_http.request.side_effect = [entities_response, data_response]
+        data_response = _mock_response(
+            json_body={
+                "metadata": {"entityName": "payment-mode"},
+                "contentShape": "ARRAY",
+                "content": {"items": [{"k": "v"}]},
+            }
+        )
+        mock_http.request.side_effect = [config_objects_response, data_response]
 
         result = client.get_configuration(consumption_version="cv1")
         assert len(result.config_objects) == 1
         assert result.config_objects[0].config_object_id == "payment-config"
         assert len(result.config_objects[0].entities) == 1
+        assert result.config_objects[0].entities[0].entity_id == "payment-mode"
 
 
 # ---------------------------------------------------------------------------
@@ -269,53 +296,25 @@ class TestDefaultClientContextManager:
 
 
 # ---------------------------------------------------------------------------
-# create_client / load_from_env
+# create_client
 # ---------------------------------------------------------------------------
 
 
 class TestCreateClient:
-    def test_raises_config_error_when_no_env_vars(self, monkeypatch):
-        monkeypatch.delenv(ENV_URL, raising=False)
-        monkeypatch.delenv(ENV_CERT_PATH, raising=False)
-        monkeypatch.delenv(ENV_KEY_PATH, raising=False)
-        with pytest.raises(CBCConfigError):
-            create_client()
-
-    def test_returns_client_for_loopback_url(self, monkeypatch):
-        monkeypatch.setenv(ENV_URL, "http://localhost:8001")
-        monkeypatch.delenv(ENV_CERT_PATH, raising=False)
-        monkeypatch.delenv(ENV_KEY_PATH, raising=False)
-        client = create_client()
+    def test_returns_default_client(self):
+        client = create_client(
+            base_url=lambda: "http://localhost:8001",
+            app_tenant_id=lambda: "app-t1",
+        )
         assert isinstance(client, DefaultClient)
 
-    def test_raises_config_error_for_incomplete_triplet(self, monkeypatch, tmp_path):
-        cert = tmp_path / "tls.crt"
-        cert.write_text("cert")
-        monkeypatch.setenv(ENV_CERT_PATH, str(cert))
-        monkeypatch.delenv(ENV_KEY_PATH, raising=False)
-        monkeypatch.delenv(ENV_URL, raising=False)
-        with pytest.raises(CBCConfigError, match="incomplete"):
-            create_client()
+    def test_passes_ssl_context_through(self):
+        import ssl
 
-    def test_raises_config_error_for_missing_cert_file(self, monkeypatch, tmp_path):
-        monkeypatch.setenv(ENV_CERT_PATH, str(tmp_path / "missing.crt"))
-        with pytest.raises(CBCConfigError, match="does not exist"):
-            create_client()
-
-    def test_returns_client_with_env_var_cert_triplet(self, monkeypatch, tmp_path):
-        cert = tmp_path / "tls.crt"
-        key = tmp_path / "tls.key"
-        cert.write_text("cert")
-        key.write_text("key")
-        monkeypatch.setenv(ENV_CERT_PATH, str(cert))
-        monkeypatch.setenv(ENV_KEY_PATH, str(key))
-        monkeypatch.setenv(ENV_URL, "https://cbc.example.ondemand.com")
-        client = create_client()
-        assert isinstance(client, DefaultClient)
-
-    def test_accepts_explicit_config(self):
-        from sap_cloud_sdk.cbc.config import CBCConfig
-
-        cfg = CBCConfig(base_url="http://localhost:9000")
-        client = create_client(config=cfg)
+        ctx = ssl.create_default_context()
+        client = create_client(
+            base_url=lambda: "https://cbc.example.ondemand.com",
+            app_tenant_id=lambda: "app-t1",
+            ssl_context=ctx,
+        )
         assert isinstance(client, DefaultClient)

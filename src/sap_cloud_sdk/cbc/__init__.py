@@ -8,12 +8,14 @@ SAP cloud applications and AI agents.
 
 Quick start::
 
-    from sap_cloud_sdk.cbc import create_client, TenantContext
+    from sap_cloud_sdk import cbc
 
-    client = create_client()
-    config = client.get_configuration(
-        TenantContext(cbcTenantId="my-cbc-tenant", appTenantId="my-app-tenant")
+    cbc_client = cbc.create_client(
+        base_url=lambda: resolve_cbc_url(),
+        app_tenant_id=lambda: resolve_app_tenant_id(),
+        ssl_context=ssl_ctx,
     )
+    config = cbc_client.get_configuration()
 
     # Access entity data
     payment = config.get_config_object("payment-config")
@@ -21,14 +23,10 @@ Quick start::
         for row in payment.get_entity("payment-mode").data.as_list():
             print(row)
 
-Local / mock server — no credentials needed::
-
-    from sap_cloud_sdk.cbc import DefaultClient, TenantContext
-
-    client = DefaultClient(base_url="http://localhost:8001")
-    config = client.get_configuration(
-        TenantContext(cbcTenantId="t1", appTenantId="app-t1")
-    )
+Apps running on the SAP application platform can use
+:func:`~sap_cloud_sdk.cbc.client_adapter.create_agent_client` instead, which supplies the
+two resolvers and the mTLS context from the platform's provisioning conventions
+— see the CBC user guide.
 """
 
 from __future__ import annotations
@@ -38,7 +36,12 @@ from sap_cloud_sdk.cbc.client import (
     DefaultClient,
     create_client,
 )
-from sap_cloud_sdk.cbc.config import CBCConfig
+from sap_cloud_sdk.cbc.client_adapter import (
+    CBC_FRAGMENT_PREFIX,
+    app_tenant_id_var,
+    create_agent_client,
+    tenant_subdomain_var,
+)
 from sap_cloud_sdk.cbc.exceptions import (
     CBCError,
     CBCClientError,
@@ -57,18 +60,20 @@ from sap_cloud_sdk.cbc._models import (
     EntityContent,
     EntityData,
     NNV,
-    TenantContext,
 )
 
 
 __all__ = [
     # factories
     "create_client",
+    "create_agent_client",
     # clients
     "CBCClient",
     "DefaultClient",
-    # config
-    "CBCConfig",
+    # platform adapter
+    "app_tenant_id_var",
+    "tenant_subdomain_var",
+    "CBC_FRAGMENT_PREFIX",
     # exceptions
     "CBCError",
     "CBCClientError",
@@ -77,8 +82,6 @@ __all__ = [
     "CBCNetworkError",
     "CBCServerError",
     "HttpContext",
-    # models — context
-    "TenantContext",
     # models — consumption versions
     "ConsumptionVersion",
     "ConsumptionVersions",

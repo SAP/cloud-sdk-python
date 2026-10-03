@@ -20,23 +20,6 @@ class _FrozenModel(BaseModel):
 
 
 # ---------------------------------------------------------------------------
-# Core context models
-# ---------------------------------------------------------------------------
-
-
-class TenantContext(_FrozenModel):
-    """Tenant identification required for all CBC API calls.
-
-    Attributes:
-        cbc_tenant_id: CBC tenant identifier (subdomain used in URL routing).
-        app_tenant_id: Application-level tenant identifier.
-    """
-
-    cbc_tenant_id: str = Field(alias="cbcTenantId", min_length=1)
-    app_tenant_id: str = Field(alias="appTenantId", min_length=1)
-
-
-# ---------------------------------------------------------------------------
 # Consumption version models
 # ---------------------------------------------------------------------------
 
@@ -102,34 +85,37 @@ class ConsumptionVersions(_FrozenModel):
 # ---------------------------------------------------------------------------
 
 
-class Entity(_FrozenModel):
-    """Metadata describing one entity within a consumption version.
-
-    A config object groups one or several related entities, each holding a
-    different slice of the configuration.  Use ``config_object_id`` and
-    ``entity_id`` together to locate the entity you need.
+class ConfigObjectEntity(_FrozenModel):
+    """One entity listed under a config object by the ``configurationObjects`` API.
 
     Attributes:
-        internal_id: CBC-internal opaque identifier (used in API path calls).
-        entity_id: Authored entity key (e.g. ``"payment-mode"``).
-        config_object_id: Configuration object this entity belongs to.
+        entity_id: Authored entity key (e.g. ``"payment-mode"``), used directly
+            in the entity-data URL path.
     """
 
-    # CBC API: "entityId" is the internal GUID used in URL paths;
-    # "entityName" is the authored key (e.g. "payment-mode").
-    internal_id: str = Field(alias="entityId")
-    entity_id: str | None = Field(default=None, alias="entityName")
-    config_object_id: str | None = Field(default=None, alias="configurationObjectId")
+    entity_id: str = Field(alias="entityId")
 
 
-class Entities(_FrozenModel):
-    """Collection of business configuration entities.
+class ConfigObjectEntry(_FrozenModel):
+    """One config object and its entities as returned by the API.
 
     Attributes:
-        items: List of :class:`Entity` objects.
+        config_object_id: Authored config object identifier (e.g. ``"payment-config"``).
+        entities: Entities belonging to this config object.
     """
 
-    items: list[Entity]
+    config_object_id: str = Field(alias="configurationObjectId")
+    entities: list[ConfigObjectEntity]
+
+
+class ConfigObjectList(_FrozenModel):
+    """Config objects for a consumption version, already grouped by the API.
+
+    Attributes:
+        items: List of :class:`ConfigObjectEntry` objects.
+    """
+
+    items: list[ConfigObjectEntry]
 
 
 class EntityContent:
@@ -140,6 +126,22 @@ class EntityContent:
 
     def __init__(self, raw: list[dict[str, Any]] | dict[str, Any]) -> None:
         self._raw = raw
+
+    def is_list(self) -> bool:
+        """Return ``True`` if the content is a list (``as_list()`` is safe to call)."""
+        return isinstance(self._raw, list)
+
+    def is_object(self) -> bool:
+        """Return ``True`` if the content is a dict (``as_object()`` is safe to call)."""
+        return isinstance(self._raw, dict)
+
+    def value(self) -> list[dict[str, Any]] | dict[str, Any]:
+        """Return the content as-is, without asserting its shape.
+
+        Use :meth:`as_list` / :meth:`as_object` when you expect a specific shape,
+        or :meth:`is_list` / :meth:`is_object` to check first.
+        """
+        return self._raw
 
     def as_list(self) -> list[dict[str, Any]]:
         """Return the content as a list of objects.
@@ -212,12 +214,12 @@ class ConfigData:
 
     Attributes:
         consumption_version: Version this data was fetched from.
-        tenant_context: Tenant this data belongs to.
+        app_tenant_id: Application tenant this data belongs to.
         config_objects: Configuration objects and their entity data.
     """
 
     consumption_version: str
-    tenant_context: TenantContext
+    app_tenant_id: str
     config_objects: list[ConfigObject]
 
     def get_config_object(self, config_object_id: str) -> ConfigObject | None:

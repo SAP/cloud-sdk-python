@@ -14,28 +14,7 @@ from sap_cloud_sdk.cbc._models import (
     ConsumptionVersions,
     EntityContent,
     EntityData,
-    TenantContext,
 )
-
-
-# ---------------------------------------------------------------------------
-# TenantContext
-# ---------------------------------------------------------------------------
-
-
-class TestTenantContext:
-    def test_accepts_camel_case_aliases(self):
-        ctx = TenantContext(cbcTenantId="cbc-1", appTenantId="app-1")
-        assert ctx.cbc_tenant_id == "cbc-1"
-        assert ctx.app_tenant_id == "app-1"
-
-    def test_accepts_snake_case_names(self):
-        ctx = TenantContext(cbc_tenant_id="cbc-1", app_tenant_id="app-1")
-        assert ctx.cbc_tenant_id == "cbc-1"
-
-    def test_rejects_empty_cbc_tenant_id(self):
-        with pytest.raises(Exception):
-            TenantContext(cbcTenantId="", appTenantId="app-1")
 
 
 # ---------------------------------------------------------------------------
@@ -116,6 +95,20 @@ class TestEntityContent:
         with pytest.raises(ValueError, match="as_list"):
             ec.as_object()
 
+    def test_is_list_and_is_object_for_list_content(self):
+        ec = EntityContent([{"k": "v"}])
+        assert ec.is_list() is True
+        assert ec.is_object() is False
+
+    def test_is_list_and_is_object_for_dict_content(self):
+        ec = EntityContent({"k": "v"})
+        assert ec.is_object() is True
+        assert ec.is_list() is False
+
+    def test_value_returns_raw_without_asserting_shape(self):
+        assert EntityContent([{"k": "v"}]).value() == [{"k": "v"}]
+        assert EntityContent({"k": "v"}).value() == {"k": "v"}
+
 
 # ---------------------------------------------------------------------------
 # ConfigData helpers
@@ -135,7 +128,7 @@ class TestConfigData:
     def _config(self, *config_objects: ConfigObject) -> ConfigData:
         return ConfigData(
             consumption_version="cv1",
-            tenant_context=TenantContext(cbcTenantId="t1", appTenantId="app-t1"),
+            app_tenant_id="app-t1",
             config_objects=list(config_objects),
         )
 

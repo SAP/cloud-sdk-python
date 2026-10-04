@@ -12,14 +12,14 @@ from sap_cloud_sdk.cbc.client_adapter import (
     ENV_CERT_NAME,
     ENV_DESTINATION_INSTANCE,
     ENV_LANDSCAPE,
-    _resolve_app_tenant_id,
-    _resolve_base_url,
-    _load_ssl_context,
     app_tenant_id_var,
     create_agent_client,
+    load_ssl_context,
+    resolve_app_tenant_id,
+    resolve_base_url,
     tenant_subdomain_var,
 )
-from sap_cloud_sdk.cbc.client import DefaultClient
+from sap_cloud_sdk.cbc.client import DefaultClient, create_client
 from sap_cloud_sdk.cbc.exceptions import CBCConfigError
 
 
@@ -31,22 +31,22 @@ def _reset_contextvars():
 
 
 # ---------------------------------------------------------------------------
-# _resolve_app_tenant_id
+# resolve_app_tenant_id
 # ---------------------------------------------------------------------------
 
 
 class TestResolveAppTenantId:
     def test_returns_contextvar_value(self):
         app_tenant_id_var.set("app-t1")
-        assert _resolve_app_tenant_id() == "app-t1"
+        assert resolve_app_tenant_id() == "app-t1"
 
     def test_raises_when_empty(self):
         with pytest.raises(CBCConfigError, match="cbc_app_tenant_id"):
-            _resolve_app_tenant_id()
+            resolve_app_tenant_id()
 
 
 # ---------------------------------------------------------------------------
-# _resolve_base_url
+# resolve_base_url
 # ---------------------------------------------------------------------------
 
 
@@ -70,7 +70,7 @@ class TestResolveBaseUrl:
             "sap_cloud_sdk.destination.create_fragment_client",
             return_value=fake_client,
         ):
-            url = _resolve_base_url("default")
+            url = resolve_base_url("default")
 
         assert url == "https://cbc.example.cloud.sap"
         fake_client.list_subaccount_fragments.assert_called_once_with(
@@ -80,12 +80,12 @@ class TestResolveBaseUrl:
     def test_raises_when_subdomain_empty(self):
         app_tenant_id_var.set("app-t1")
         with pytest.raises(CBCConfigError, match="cbc_tenant_subdomain"):
-            _resolve_base_url("default")
+            resolve_base_url("default")
 
     def test_raises_when_app_tenant_id_empty(self):
         tenant_subdomain_var.set("appfnd-subscriber")
         with pytest.raises(CBCConfigError, match="cbc_app_tenant_id"):
-            _resolve_base_url("default")
+            resolve_base_url("default")
 
     def test_raises_when_no_matching_fragment(self):
         tenant_subdomain_var.set("appfnd-subscriber")
@@ -100,7 +100,7 @@ class TestResolveBaseUrl:
             return_value=fake_client,
         ):
             with pytest.raises(CBCConfigError, match="No CBC mapping fragment"):
-                _resolve_base_url("default")
+                resolve_base_url("default")
 
     def test_raises_when_cbc_url_missing_from_fragment(self):
         tenant_subdomain_var.set("appfnd-subscriber")
@@ -115,7 +115,7 @@ class TestResolveBaseUrl:
             return_value=fake_client,
         ):
             with pytest.raises(CBCConfigError, match="no 'cbcUrl'"):
-                _resolve_base_url("default")
+                resolve_base_url("default")
 
     def test_wraps_destination_error_as_config_error(self):
         from sap_cloud_sdk.destination.exceptions import DestinationOperationError
@@ -131,11 +131,11 @@ class TestResolveBaseUrl:
             return_value=fake_client,
         ):
             with pytest.raises(CBCConfigError, match="Could not resolve the CBC URL"):
-                _resolve_base_url("default")
+                resolve_base_url("default")
 
 
 # ---------------------------------------------------------------------------
-# _load_ssl_context
+# load_ssl_context
 # ---------------------------------------------------------------------------
 
 
@@ -158,7 +158,7 @@ class TestLoadSslContext:
                 return_value=ctx,
             ) as load_pem,
         ):
-            result = _load_ssl_context("default", "my-cert.pem", b"secret")
+            result = load_ssl_context("default", "my-cert.pem", b"secret")
 
         assert result is ctx
         load_pem.assert_called_once_with("<pem>", b"secret", "my-cert.pem")
@@ -171,7 +171,7 @@ class TestLoadSslContext:
             return_value=fake_cert_client,
         ):
             with pytest.raises(CBCConfigError, match="not found"):
-                _load_ssl_context("default", "missing.pem", None)
+                load_ssl_context("default", "missing.pem", None)
 
     def test_wraps_destination_error_as_config_error(self):
         from sap_cloud_sdk.destination.exceptions import DestinationOperationError
@@ -187,7 +187,7 @@ class TestLoadSslContext:
             with pytest.raises(
                 CBCConfigError, match="Could not fetch the mTLS certificate"
             ):
-                _load_ssl_context("default", "my-cert.pem", None)
+                load_ssl_context("default", "my-cert.pem", None)
 
 
 # ---------------------------------------------------------------------------
@@ -196,31 +196,29 @@ class TestLoadSslContext:
 
 
 class TestCreateAgentClient:
-    def test_explicit_ssl_context_short_circuits_cert_load(self):
-        ctx = ssl.create_default_context()
-        with patch("sap_cloud_sdk.cbc.client_adapter._load_ssl_context") as load:
-            client = create_agent_client(ssl_context=ctx)
-        load.assert_not_called()
-        assert isinstance(client, DefaultClient)
-
     def test_builds_ssl_context_from_cert_default(self, monkeypatch):
         monkeypatch.setenv(ENV_LANDSCAPE, "cbc-fndtst-dev-eu12")
         with patch(
-            "sap_cloud_sdk.cbc.client_adapter._load_ssl_context",
+            "sap_cloud_sdk.cbc.client_adapter.load_ssl_context",
             return_value=ssl.create_default_context(),
         ) as load:
             client = create_agent_client()
-        load.assert_called_once()
-        instance_arg, cert_arg, _pw = load.call_args.args
-        assert instance_arg == "default"
-        assert cert_arg == "sap-managed-runtime-ias-cbc-fndtst-dev-eu12.pem"
+            # The adapter wires a factory that resolves the cert; the core
+            # invokes it once at construction to build the mTLS client.
+            load.assert_called_once()
+            instance_arg, cert_arg, _pw = load.call_args.args
+            assert instance_arg == "default"
+            assert cert_arg == "sap-managed-runtime-ias-cbc-fndtst-dev-eu12.pem"
+            # The factory is re-invokable (used again on a TLS failure to reload).
+            client._ssl_factory()
+            assert load.call_count == 2
         assert isinstance(client, DefaultClient)
 
     def test_env_overrides_apply(self, monkeypatch):
         monkeypatch.setenv(ENV_DESTINATION_INSTANCE, "cbc-instance")
         monkeypatch.setenv(ENV_CERT_NAME, "my-cert.pem")
         with patch(
-            "sap_cloud_sdk.cbc.client_adapter._load_ssl_context",
+            "sap_cloud_sdk.cbc.client_adapter.load_ssl_context",
             return_value=ssl.create_default_context(),
         ) as load:
             create_agent_client()
@@ -236,8 +234,12 @@ class TestCreateAgentClient:
 
     def test_wires_resolvers_into_client(self, monkeypatch):
         """The two ContextVars drive base_url + app_tenant_id at request time."""
-        ctx = ssl.create_default_context()
-        client = create_agent_client(ssl_context=ctx)
+        monkeypatch.setenv(ENV_CERT_NAME, "my-cert.pem")
+        with patch(
+            "sap_cloud_sdk.cbc.client_adapter.load_ssl_context",
+            return_value=ssl.create_default_context(),
+        ):
+            client = create_agent_client()
 
         app_tenant_id_var.set("app-t1")
         assert client._resolve_app_tenant_id() == "app-t1"
@@ -255,3 +257,20 @@ class TestCreateAgentClient:
             "sap_cloud_sdk.destination.create_fragment_client", return_value=fake_fc
         ):
             assert client._base_url() == "https://cbc.example.cloud.sap"
+
+
+# ---------------------------------------------------------------------------
+# Compose path — public resolvers + create_client (override one axis)
+# ---------------------------------------------------------------------------
+
+
+class TestComposeWithPublicResolvers:
+    def test_compose_core_with_public_resolvers(self):
+        """Advanced callers keep platform base_url + app_tenant_id but bring
+        their own mTLS context, composing the public resolvers with the core."""
+        client = create_client(
+            base_url=lambda: resolve_base_url("default"),
+            app_tenant_id=resolve_app_tenant_id,
+            ssl_context=lambda: ssl.create_default_context(),
+        )
+        assert isinstance(client, DefaultClient)

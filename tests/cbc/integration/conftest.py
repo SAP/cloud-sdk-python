@@ -56,8 +56,9 @@ def cbc_client() -> CBCClient:
     url = os.environ.get(ENV_URL)
     if not url:
         pytest.skip(f"CBC integration tests skipped — set {ENV_URL}.")
+    ctx = _build_ssl_context()
     return create_client(
         base_url=lambda: url,
         app_tenant_id=lambda: app_tid,
-        ssl_context=_build_ssl_context(),
+        ssl_context=(lambda: ctx) if ctx is not None else None,
     )

@@ -13,7 +13,7 @@ Quick start::
     cbc_client = cbc.create_client(
         base_url=lambda: resolve_cbc_url(),
         app_tenant_id=lambda: resolve_app_tenant_id(),
-        ssl_context=ssl_ctx,
+        ssl_context=lambda: build_ssl_ctx(),
     )
     config = cbc_client.get_configuration()
 
@@ -40,6 +40,9 @@ from sap_cloud_sdk.cbc.client_adapter import (
     CBC_FRAGMENT_PREFIX,
     app_tenant_id_var,
     create_agent_client,
+    load_ssl_context,
+    resolve_app_tenant_id,
+    resolve_base_url,
     tenant_subdomain_var,
 )
 from sap_cloud_sdk.cbc.exceptions import (
@@ -74,6 +77,10 @@ __all__ = [
     "app_tenant_id_var",
     "tenant_subdomain_var",
     "CBC_FRAGMENT_PREFIX",
+    # platform resolvers (compose with create_client to override one axis)
+    "resolve_base_url",
+    "resolve_app_tenant_id",
+    "load_ssl_context",
     # exceptions
     "CBCError",
     "CBCClientError",

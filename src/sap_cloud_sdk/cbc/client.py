@@ -114,7 +114,7 @@ class CBCClient(Protocol):
 
 
 @dataclass(frozen=True)
-class _ClientConfig:
+class _ApiPaths:
     """API path configuration for a :class:`DefaultClient` instance."""
 
     configurations_path: str
@@ -163,7 +163,7 @@ class DefaultClient:
     ) -> None:
         self._base_url = base_url
         self._app_tenant_id = app_tenant_id
-        self._config = _ClientConfig(
+        self._config = _ApiPaths(
             configurations_path="/configuration/v1",
         )
         self._ssl_factory = ssl_context

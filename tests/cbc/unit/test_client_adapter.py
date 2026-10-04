@@ -20,6 +20,7 @@ from sap_cloud_sdk.cbc.client_adapter import (
     tenant_subdomain_var,
 )
 from sap_cloud_sdk.cbc.client import DefaultClient, create_client
+from sap_cloud_sdk.cbc.config import CBCDestinationConfig
 from sap_cloud_sdk.cbc.exceptions import CBCConfigError
 
 
@@ -226,6 +227,38 @@ class TestCreateAgentClient:
         instance_arg, cert_arg, _pw = load.call_args.args
         assert instance_arg == "cbc-instance"
         assert cert_arg == "my-cert.pem"
+
+    def test_config_values_apply(self):
+        with patch(
+            "sap_cloud_sdk.cbc.client_adapter.load_ssl_context",
+            return_value=ssl.create_default_context(),
+        ) as load:
+            create_agent_client(
+                config=CBCDestinationConfig(
+                    destination_instance="cbc-instance",
+                    cbc_cert_name="my-cert.pem",
+                )
+            )
+        instance_arg, cert_arg, _pw = load.call_args.args
+        assert instance_arg == "cbc-instance"
+        assert cert_arg == "my-cert.pem"
+
+    def test_config_value_wins_over_env(self, monkeypatch):
+        monkeypatch.setenv(ENV_DESTINATION_INSTANCE, "from-env")
+        monkeypatch.setenv(ENV_CERT_NAME, "from-env.pem")
+        with patch(
+            "sap_cloud_sdk.cbc.client_adapter.load_ssl_context",
+            return_value=ssl.create_default_context(),
+        ) as load:
+            create_agent_client(
+                config=CBCDestinationConfig(
+                    destination_instance="from-config",
+                    cbc_cert_name="from-config.pem",
+                )
+            )
+        instance_arg, cert_arg, _pw = load.call_args.args
+        assert instance_arg == "from-config"
+        assert cert_arg == "from-config.pem"
 
     def test_raises_when_landscape_unset_and_no_cert_name(self, monkeypatch):
         monkeypatch.delenv(ENV_LANDSCAPE, raising=False)

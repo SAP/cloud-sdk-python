@@ -44,6 +44,7 @@ import ssl
 from contextvars import ContextVar
 
 from sap_cloud_sdk.cbc.client import CBCClient, create_client
+from sap_cloud_sdk.cbc.config import CBCDestinationConfig
 from sap_cloud_sdk.cbc.exceptions import CBCConfigError
 
 # ---------------------------------------------------------------------------
@@ -264,9 +265,7 @@ def load_ssl_context(
 
 def create_agent_client(
     *,
-    destination_instance: str | None = None,
-    cbc_cert_name: str | None = None,
-    p12_password: bytes | None = None,
+    config: CBCDestinationConfig | None = None,
 ) -> CBCClient:
     """Create a CBC client wired for the application platform.
 
@@ -281,15 +280,11 @@ def create_agent_client(
     use the generic :func:`~sap_cloud_sdk.cbc.client.create_client` directly.
 
     Args:
-        destination_instance: The ``instance`` passed to the destination
-            ``create_fragment_client`` / ``create_certificate_client`` (used for
-            secret resolution in cloud mode). Defaults to the
-            ``CLOUD_SDK_CBC_DESTINATION_INSTANCE`` env var, else ``"default"``.
-        cbc_cert_name: Name of the app's mTLS certificate. Defaults to the
-            ``CLOUD_SDK_CBC_CERTIFICATE_NAME`` env var, else derived from the
-            platform landscape (``APPFND_CONHOS_LANDSCAPE``).
-        p12_password: Certificate keystore password. Defaults to the
-            ``CLOUD_SDK_CBC_P12_PASSWORD`` env var, else ``None``.
+        config: Destination-Service inputs (which instance, certificate, and
+            keystore password to read). Each unset field falls back to its
+            ``CLOUD_SDK_CBC_*`` env var, then to a platform default — see
+            :class:`~sap_cloud_sdk.cbc.config.CBCDestinationConfig`. Omit it
+            entirely to rely on the env vars / defaults for everything.
 
     Returns:
         A configured CBC client.
@@ -299,14 +294,20 @@ def create_agent_client(
             request is made — if the certificate cannot be fetched, a ContextVar
             is empty, or the tenant-mapping fragment is missing.
     """
+    if config is None:
+        config = CBCDestinationConfig()
+
+    destination_instance = config.destination_instance
     if destination_instance is None:
         destination_instance = os.environ.get(ENV_DESTINATION_INSTANCE, "default")
 
     resolved_cert_name = (
-        cbc_cert_name or os.environ.get(ENV_CERT_NAME) or _default_cert_name()
+        config.cbc_cert_name or os.environ.get(ENV_CERT_NAME) or _default_cert_name()
     )
     resolved_password = (
-        p12_password if p12_password is not None else _cert_password_from_env()
+        config.p12_password
+        if config.p12_password is not None
+        else _cert_password_from_env()
     )
 
     return create_client(

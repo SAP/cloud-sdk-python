@@ -45,6 +45,9 @@ from sap_cloud_sdk.cbc.client_adapter import (
     resolve_base_url,
     tenant_subdomain_var,
 )
+from sap_cloud_sdk.cbc.config import (
+    CBCDestinationConfig,
+)
 from sap_cloud_sdk.cbc.exceptions import (
     CBCError,
     CBCClientError,
@@ -77,6 +80,7 @@ __all__ = [
     "app_tenant_id_var",
     "tenant_subdomain_var",
     "CBC_FRAGMENT_PREFIX",
+    "CBCDestinationConfig",
     # platform resolvers (compose with create_client to override one axis)
     "resolve_base_url",
     "resolve_app_tenant_id",

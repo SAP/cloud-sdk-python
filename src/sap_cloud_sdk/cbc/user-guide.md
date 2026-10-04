@@ -200,6 +200,19 @@ Defaults cover the common case; override via env when needed:
 | `CLOUD_SDK_CBC_DESTINATION_INSTANCE` | `default` | The `instance` passed to the destination `create_fragment_client` / `create_certificate_client` (used for secret resolution in cloud mode) |
 | `CLOUD_SDK_CBC_P12_PASSWORD` | (none) | Password for the certificate keystore, if encrypted |
 
+The same three fields can be set in code via `cbc.CBCDestinationConfig`, passed as
+`create_agent_client(config=...)`; a value set on the config wins over its env var,
+and any field left unset falls back to the env var, then the default.
+
+```python
+from sap_cloud_sdk import cbc
+
+cbc_client = cbc.create_agent_client(
+    config=cbc.CBCDestinationConfig(cbc_cert_name="my-cert.pem"),
+)
+```
+
+
 ### Overriding one axis
 
 `create_agent_client` is a fixed preset: it wires all three inputs — `base_url`,

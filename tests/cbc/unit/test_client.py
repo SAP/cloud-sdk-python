@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from typing import Any
+from typing import Any, cast
 from unittest.mock import MagicMock
 
 import httpx
@@ -435,7 +435,7 @@ class TestCertRotation:
         """
         built: list[MagicMock] = []
 
-        def build() -> MagicMock:
+        def build() -> httpx.Client:
             factory()  # exercise the ssl factory, same as the real _build_http_client
             mock = MagicMock(spec=httpx.Client)
             built.append(mock)
@@ -449,7 +449,7 @@ class TestCertRotation:
             http_client=initial,
             ssl_context=factory,
         )
-        client._build_http_client = build  # type: ignore[method-assign]
+        client._build_http_client = build  # ty: ignore[invalid-assignment]
         return client, built
 
     def test_reactive_success_rebuilds_and_retries(self):
@@ -465,12 +465,12 @@ class TestCertRotation:
         # the rebuilt client answers ok; wire it the moment it is created
         orig_build = client._build_http_client
 
-        def build_then_prime() -> MagicMock:
-            mock = orig_build()
+        def build_then_prime() -> httpx.Client:
+            mock = cast(MagicMock, orig_build())
             mock.request.return_value = ok
             return mock
 
-        client._build_http_client = build_then_prime  # type: ignore[method-assign]
+        client._build_http_client = build_then_prime  # ty: ignore[invalid-assignment]
 
         result = client.get_consumption_versions()
 
@@ -487,12 +487,12 @@ class TestCertRotation:
         built[0].request.side_effect = _tls_read_error()
         orig_build = client._build_http_client
 
-        def build_then_fail() -> MagicMock:
-            mock = orig_build()
+        def build_then_fail() -> httpx.Client:
+            mock = cast(MagicMock, orig_build())
             mock.request.side_effect = _tls_read_error()
             return mock
 
-        client._build_http_client = build_then_fail  # type: ignore[method-assign]
+        client._build_http_client = build_then_fail  # ty: ignore[invalid-assignment]
 
         with pytest.raises(CBCNetworkError):
             client.get_consumption_versions()

@@ -203,6 +203,7 @@ class TestCreateAgentClient:
             return_value=ssl.create_default_context(),
         ) as load:
             client = create_agent_client()
+            assert isinstance(client, DefaultClient)
             # The adapter wires a factory that resolves the cert; the core
             # invokes it once at construction to build the mTLS client.
             load.assert_called_once()
@@ -210,9 +211,9 @@ class TestCreateAgentClient:
             assert instance_arg == "default"
             assert cert_arg == "sap-managed-runtime-ias-cbc-fndtst-dev-eu12.pem"
             # The factory is re-invokable (used again on a TLS failure to reload).
+            assert client._ssl_factory is not None
             client._ssl_factory()
             assert load.call_count == 2
-        assert isinstance(client, DefaultClient)
 
     def test_env_overrides_apply(self, monkeypatch):
         monkeypatch.setenv(ENV_DESTINATION_INSTANCE, "cbc-instance")
@@ -240,6 +241,7 @@ class TestCreateAgentClient:
             return_value=ssl.create_default_context(),
         ):
             client = create_agent_client()
+        assert isinstance(client, DefaultClient)
 
         app_tenant_id_var.set("app-t1")
         assert client._resolve_app_tenant_id() == "app-t1"

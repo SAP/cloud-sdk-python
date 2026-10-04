@@ -31,9 +31,13 @@ from sap_cloud_sdk import cbc
 cbc_client = cbc.create_client(
     base_url=lambda: resolve_cbc_url(),
     app_tenant_id=lambda: resolve_app_tenant_id(),
-    ssl_context=ssl_ctx,
+    ssl_context=lambda: build_ssl_ctx(),
 )
 ```
+
+`ssl_context` is a callable returning a fresh `ssl.SSLContext`. It is resolved
+once when the client is built and re-invoked only if a request fails the TLS
+handshake, so a rotated certificate is picked up automatically on the next call.
 
 Apps or agents running on the SAP application foundation platform can use `create_agent_client`
 instead — it supplies both resolvers and the mTLS context from the platform's
@@ -176,12 +180,14 @@ The CBC URL comes from the `cbcUrl` property of the tenant-mapping fragment. The
 adapter lists the `CBC_TenantMapping_*` fragments in the subscriber's subaccount
 and picks the one whose `appTenantId` property matches; the `cbcUrl` is used
 verbatim. The certificate is the app's own provider-level mTLS certificate,
-fetched once at startup.
+fetched from the Destination Service.
 
-**Certificate rotation.** The mTLS certificate is loaded once when the client is
-built. Platform certificates are typically short-lived, so recreate the client —
-call `create_agent_client()` again — before the certificate expires to pick up
-the rotated certificate.
+**Certificate rotation.** The mTLS certificate is loaded from the Destination
+Service and reloaded automatically when a request fails the TLS handshake (as
+happens once a certificate has rotated or expired): the client rebuilds its
+mTLS context from a freshly-fetched certificate and retries the request once. A
+long-lived `create_agent_client()` singleton therefore recovers from rotation on
+its own — no need to recreate it.
 
 ### Platform env overrides
 
@@ -194,8 +200,30 @@ Defaults cover the common case; override via env when needed:
 | `CLOUD_SDK_CBC_DESTINATION_INSTANCE` | `default` | The `instance` passed to the destination `create_fragment_client` / `create_certificate_client` (used for secret resolution in cloud mode) |
 | `CLOUD_SDK_CBC_P12_PASSWORD` | (none) | Password for the certificate keystore, if encrypted |
 
-An explicit `ssl_context=` passed to `create_agent_client` short-circuits the
-certificate load entirely.
+### Overriding one axis
+
+`create_agent_client` is a fixed preset: it wires all three inputs — `base_url`,
+`app_tenant_id`, and the mTLS `ssl_context` — from the platform conventions. To
+keep *most* of that but override a single axis (say, supply your own mTLS context
+from a vault while keeping the fragment-based `base_url` and the ContextVar
+`app_tenant_id`), compose the generic `create_client` with the public platform
+resolvers:
+
+```python
+from sap_cloud_sdk import cbc
+
+client = cbc.create_client(
+    base_url=lambda: cbc.resolve_base_url("default"),
+    app_tenant_id=cbc.resolve_app_tenant_id,
+    ssl_context=lambda: my_ctx,  # your own mTLS, still reloaded on TLS failure
+)
+```
+
+`resolve_base_url(destination_instance)`, `resolve_app_tenant_id`, and
+`load_ssl_context(destination_instance, cert_name, p12_password)` are the same
+resolvers the preset uses; mix in your own callable for the axis you want to
+control. The `ssl_context` callable you pass still participates in the automatic
+reload-on-TLS-failure rotation described above.
 
 ## Using a test double
 

@@ -8,7 +8,7 @@ This module provides:
 - :func:`create_client` — Thin factory over :class:`DefaultClient`.
 
 ``base_url`` and ``app_tenant_id`` are supplied as callables, invoked on every
-request.  In a multi-tenant agent the CBC URL and the application tenant id both
+request. In a multi-tenant agent the CBC URL and the application tenant id both
 vary per request (resolved from request-scoped context), so the client never
 binds them at construction time.
 
@@ -19,7 +19,7 @@ Quick start::
     cbc_client = cbc.create_client(
         base_url=lambda: resolve_cbc_url(),
         app_tenant_id=lambda: resolve_app_tenant_id(),
-        ssl_context=ssl_ctx,
+        ssl_context=lambda: build_ssl_ctx(),
     )
     config = cbc_client.get_configuration()
 """
@@ -28,6 +28,7 @@ from __future__ import annotations
 
 import logging
 import ssl
+import threading
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any, Protocol
@@ -54,6 +55,26 @@ from sap_cloud_sdk.core.telemetry import Module, Operation, record_metrics
 logger = logging.getLogger(__name__)
 
 
+def _is_tls_failure(exc: BaseException) -> bool:
+    """Return ``True`` if an :class:`ssl.SSLError` appears in the cause chain.
+
+    An expired or rotated mTLS client certificate is rejected by the server at
+    the TLS handshake, which httpx surfaces as a transport error (e.g.
+    ``httpx.ReadError``) wrapping ``httpcore.ReadError`` wrapping
+    ``ssl.SSLError``. The ``ssl.SSLError`` is not the top-level type, so walk
+    the ``__cause__`` / ``__context__`` chain instead of checking ``isinstance``
+    on ``exc`` directly. ``seen`` guards against a cyclic chain.
+    """
+    seen: set[int] = set()
+    cur: BaseException | None = exc
+    while cur is not None and id(cur) not in seen:
+        seen.add(id(cur))
+        if isinstance(cur, ssl.SSLError):
+            return True
+        cur = cur.__cause__ or cur.__context__
+    return False
+
+
 # ---------------------------------------------------------------------------
 # Public Protocol (interface for type annotations and test doubles)
 # ---------------------------------------------------------------------------
@@ -70,7 +91,7 @@ class CBCClient(Protocol):
         """Return the available consumption versions for the configured tenant.
 
         A consumption version represents a snapshot of the business configuration
-        for an app tenant at a point in time.  Use this to discover the active
+        for an app tenant at a point in time. Use this to discover the active
         version ID when you don't already have it.
         """
         ...
@@ -112,21 +133,25 @@ class DefaultClient:
         cbc_client = cbc.create_client(
             base_url=lambda: resolve_cbc_url(),
             app_tenant_id=lambda: resolve_app_tenant_id(),
-            ssl_context=ssl_ctx,
+            ssl_context=lambda: build_ssl_ctx(),
         )
 
     Direct instantiation is supported for testing (inject a mock ``http_client``).
 
     Args:
-        base_url: Callable returning the CBC service base URL.  Invoked on every
+        base_url: Callable returning the CBC service base URL. Invoked on every
             request — in a multi-tenant agent the URL comes from a request-scoped
             Destination Fragment, so it is resolved per call.
         app_tenant_id: Callable returning the application tenant identifier.
             Invoked on every request and sent as the ``appTenantId`` query
             parameter.
         http_client: Optional pre-configured ``httpx.Client`` — takes full
-            precedence over ``ssl_context``.  Use for testing.
-        ssl_context: Optional pre-built :class:`ssl.SSLContext` with mTLS loaded.
+            precedence over ``ssl_context``. Use for testing.
+        ssl_context: Optional callable returning a freshly-built
+            :class:`ssl.SSLContext` with mTLS loaded. Resolved **once** at
+            construction, then re-invoked **only** on a TLS handshake failure to
+            pick up a rotated certificate (not per request). ``None`` for the
+            plain-HTTP / local-mock path.
     """
 
     def __init__(
@@ -134,18 +159,30 @@ class DefaultClient:
         base_url: Callable[[], str],
         app_tenant_id: Callable[[], str],
         http_client: httpx.Client | None = None,
-        ssl_context: ssl.SSLContext | None = None,
+        ssl_context: Callable[[], ssl.SSLContext] | None = None,
     ) -> None:
         self._base_url = base_url
         self._app_tenant_id = app_tenant_id
         self._config = _ClientConfig(
             configurations_path="/configuration/v1",
         )
-        self._client = http_client or httpx.Client(verify=ssl_context or True)
+        self._ssl_factory = ssl_context
+        self._lock = threading.Lock()
+        self._http_client = http_client or self._build_http_client()
+
+    def _build_http_client(self) -> httpx.Client:
+        """Build an ``httpx.Client``, resolving the SSL context from the factory.
+
+        ``verify`` is either the resolved mTLS :class:`ssl.SSLContext` or ``True``
+        (httpx's default CA bundle) — never ``False``, so TLS verification is
+        always on.
+        """
+        ctx = self._ssl_factory() if self._ssl_factory else None
+        return httpx.Client(verify=ctx if ctx is not None else True)
 
     def close(self) -> None:
         """Close the underlying HTTP client and release connections."""
-        self._client.close()
+        self._http_client.close()
 
     def __enter__(self) -> "DefaultClient":
         return self
@@ -172,8 +209,30 @@ class DefaultClient:
             CBCServerError: On 5xx responses.
             CBCNetworkError: On connection failures.
         """
-        base_url = self._base_url()
-        app_tenant_id = self._resolve_app_tenant_id()
+        return self._get_consumption_versions(
+            self._base_url(), self._resolve_app_tenant_id()
+        )
+
+    def _get_consumption_versions(
+        self, base_url: str, app_tenant_id: str
+    ) -> ConsumptionVersions:
+        """Return the consumption versions, using already-resolved request values.
+
+        Takes ``base_url`` / ``app_tenant_id`` as arguments so a caller that has
+        already resolved them (e.g. :meth:`get_configuration`) does not resolve
+        them a second time — resolution can hit the Destination Service, and a
+        second resolve could also disagree with the first if the request context
+        changed in between.
+
+        Args:
+            base_url: Resolved CBC service base URL for this operation.
+            app_tenant_id: Application tenant identifier.
+
+        Raises:
+            CBCClientError: On 4xx responses.
+            CBCServerError: On 5xx responses.
+            CBCNetworkError: On connection failures.
+        """
         url = self._configurations_url(
             base_url,
             f"/consumptionVersions?appTenantId={app_tenant_id}",
@@ -216,12 +275,12 @@ class DefaultClient:
         """Return the full business configuration for the configured tenant.
 
         Fetches the config objects and the data for every entity they contain, for
-        the specified consumption version.  When ``consumption_version`` is omitted,
+        the specified consumption version. When ``consumption_version`` is omitted,
         the latest version is resolved automatically via
         :meth:`get_consumption_versions`.
 
         Args:
-            consumption_version: Consumption version ID.  When ``None``, the
+            consumption_version: Consumption version ID. When ``None``, the
                 latest version is resolved via :meth:`get_consumption_versions`.
 
         Returns:
@@ -236,7 +295,7 @@ class DefaultClient:
         base_url = self._base_url()
         app_tenant_id = self._resolve_app_tenant_id()
         if consumption_version is None:
-            versions = self.get_consumption_versions()
+            versions = self._get_consumption_versions(base_url, app_tenant_id)
             latest = versions.latest()
             if latest is None:
                 raise CBCClientError(
@@ -313,20 +372,23 @@ class DefaultClient:
     ) -> httpx.Response:
         logger.debug("CBC %s %s", method, url)
         try:
-            response = self._client.request(
-                method=method,
-                url=url,
-                headers={},
-                json=body,
-                timeout=30.0,
-            )
+            response = self._send(method, url, body)
+        except httpx.TransportError as exc:
+            # A TLS handshake failure (e.g. an expired/rotated client cert) is
+            # recoverable: rebuild the client from a fresh SSL context once and
+            # retry this one request. Non-TLS transport errors and all other
+            # request errors fall through to the terminal handler below.
+            if self._ssl_factory is not None and _is_tls_failure(exc):
+                logger.info("CBC TLS failure; reloading certificate and retrying")
+                self._rebuild_http_client()
+                try:
+                    response = self._send(method, url, body)
+                except httpx.RequestError as retry_exc:
+                    raise self._network_error(method, url, retry_exc) from retry_exc
+            else:
+                raise self._network_error(method, url, exc) from exc
         except httpx.RequestError as exc:
-            raise CBCNetworkError(
-                f"Network error calling CBC: {exc}",
-                http_context=HttpContext(
-                    status_code=-1, request_method=method, request_url=url
-                ),
-            ) from exc
+            raise self._network_error(method, url, exc) from exc
 
         if response.status_code >= 400:
             ctx = HttpContext(
@@ -342,6 +404,48 @@ class DefaultClient:
 
         return response
 
+    def _send(
+        self, method: str, url: str, body: dict[str, Any] | None
+    ) -> httpx.Response:
+        """Perform one HTTP request via the underlying client.
+
+        A thin wrapper over ``self._http_client.request`` with no error translation —
+        callers map failures to CBC exceptions and own any retry logic.
+        """
+        return self._http_client.request(
+            method=method,
+            url=url,
+            headers={},
+            json=body,
+            timeout=30.0,
+        )
+
+    def _rebuild_http_client(self) -> None:
+        """Rebuild the HTTP client from a fresh SSL context, under a lock.
+
+        Called on a TLS failure to pick up a rotated certificate. Guards against
+        a thundering herd — if another thread already rebuilt while this one
+        waited on the lock, reuse that client instead of rebuilding again.
+
+        The new client is built into a local before it replaces ``self._http_client``,
+        so a failing factory (which raises :class:`CBCConfigError` — the cert
+        loader wraps every load-time failure) leaves ``self._http_client`` on the prior
+        working context and the error propagates to the caller.
+        """
+        with self._lock:
+            previous = self._http_client
+            new_client = self._build_http_client()
+            self._http_client = new_client
+            previous.close()
+
+    def _network_error(self, method: str, url: str, exc: Exception) -> CBCNetworkError:
+        return CBCNetworkError(
+            f"Network error calling CBC: {exc}",
+            http_context=HttpContext(
+                status_code=-1, request_method=method, request_url=url
+            ),
+        )
+
 
 # ---------------------------------------------------------------------------
 # Factory function
@@ -352,7 +456,7 @@ def create_client(
     *,
     base_url: Callable[[], str],
     app_tenant_id: Callable[[], str],
-    ssl_context: ssl.SSLContext | None = None,
+    ssl_context: Callable[[], ssl.SSLContext] | None = None,
 ) -> CBCClient:
     """Create a :class:`DefaultClient`.
 
@@ -360,7 +464,10 @@ def create_client(
         base_url: Callable returning the CBC service base URL, invoked per request.
         app_tenant_id: Callable returning the application tenant id, invoked per
             request and sent as the ``appTenantId`` query parameter.
-        ssl_context: Optional pre-built :class:`ssl.SSLContext` with mTLS loaded.
+        ssl_context: Optional callable returning a freshly-built
+            :class:`ssl.SSLContext` with mTLS loaded. Resolved once at
+            construction, then re-invoked only on a TLS handshake failure to
+            reload a rotated certificate.
 
     Returns:
         A configured :class:`DefaultClient`.

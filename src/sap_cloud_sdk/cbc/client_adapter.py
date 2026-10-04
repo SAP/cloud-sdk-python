@@ -21,9 +21,10 @@ header, though the SDK does not mandate the source. The SDK deliberately does
 not know *how* those values are obtained — authentication and the request
 pipeline stay with the app.
 
-The mTLS certificate is loaded **once** when the client is built. Platform
-certificates are typically short-lived, so recreate the client before the
-certificate expires to pick up the rotated certificate.
+The mTLS certificate is fetched from the Destination Service when the client is
+built, and **reloaded automatically** if a request later fails the TLS handshake
+(e.g. after the certificate rotates), so a long-lived client recovers without
+being recreated.
 
 Quick start::
 
@@ -105,7 +106,7 @@ def _default_cert_name() -> str:
     if not landscape:
         raise CBCConfigError(
             f"Cannot derive the CBC certificate name: {ENV_LANDSCAPE} is not set. "
-            f"Set it, or pass cbc_cert_name / ssl_context to create_agent_client()."
+            f"Set it, or pass cbc_cert_name to create_agent_client()."
         )
     return _CERT_NAME_TEMPLATE.format(landscape=landscape)
 
@@ -121,8 +122,14 @@ def _cert_password_from_env() -> bytes | None:
 # ---------------------------------------------------------------------------
 
 
-def _resolve_app_tenant_id() -> str:
+def resolve_app_tenant_id() -> str:
     """Return the application tenant id from :data:`app_tenant_id_var`.
+
+    Public platform resolver — the default :func:`create_agent_client` wires it
+    as the ``app_tenant_id`` callable. Also usable directly to compose
+    :func:`~sap_cloud_sdk.cbc.client.create_client` when overriding only *some*
+    of the platform defaults (e.g. keep this + :func:`resolve_base_url` but
+    supply your own ``ssl_context``).
 
     The application tenant id identifies the subscriber tenant to CBC — e.g. the
     subscriber's subaccount id, carried in the IAS JWT ``app_tid`` claim.
@@ -139,8 +146,14 @@ def _resolve_app_tenant_id() -> str:
     return app_tid
 
 
-def _resolve_base_url(destination_instance: str) -> str:
+def resolve_base_url(destination_instance: str) -> str:
     """Return the CBC base URL for the current tenant.
+
+    Public platform resolver — the default :func:`create_agent_client` wires it
+    (as ``lambda: resolve_base_url(destination_instance)``) into the
+    ``base_url`` callable. Also usable directly to compose
+    :func:`~sap_cloud_sdk.cbc.client.create_client` when overriding only *some*
+    of the platform defaults.
 
     Reads :data:`tenant_subdomain_var` and :data:`app_tenant_id_var`, lists the
     tenant-mapping Fragments in the subscriber's subaccount, finds the one whose
@@ -169,7 +182,7 @@ def _resolve_base_url(destination_instance: str) -> str:
             "cbc_tenant_subdomain ContextVar is empty — set tenant_subdomain_var "
             "from the dwc-subdomain header."
         )
-    app_tenant_id = _resolve_app_tenant_id()
+    app_tenant_id = resolve_app_tenant_id()
 
     try:
         client = create_fragment_client(instance=destination_instance)
@@ -201,10 +214,15 @@ def _resolve_base_url(destination_instance: str) -> str:
     return cbc_url  # cbcTid already baked in — used verbatim
 
 
-def _load_ssl_context(
+def load_ssl_context(
     destination_instance: str, cert_name: str, p12_password: bytes | None
 ) -> ssl.SSLContext:
     """Fetch the provider certificate and load it into an :class:`ssl.SSLContext`.
+
+    Public platform resolver — the default :func:`create_agent_client` wires it
+    (as ``lambda: load_ssl_context(...)``) into the ``ssl_context`` factory. Also
+    usable directly to compose :func:`~sap_cloud_sdk.cbc.client.create_client`
+    when overriding only *some* of the platform defaults.
 
     Args:
         destination_instance: The ``instance`` passed to the destination
@@ -246,7 +264,6 @@ def _load_ssl_context(
 
 def create_agent_client(
     *,
-    ssl_context: ssl.SSLContext | None = None,
     destination_instance: str | None = None,
     cbc_cert_name: str | None = None,
     p12_password: bytes | None = None,
@@ -255,15 +272,15 @@ def create_agent_client(
 
     Resolves ``base_url`` and ``app_tenant_id`` from the two SDK-owned
     ContextVars (:data:`app_tenant_id_var`, :data:`tenant_subdomain_var`) each
-    time a request is made, and loads the mTLS certificate once from the
-    Destination Service. Because the certificate is loaded once, recreate the
-    client before the certificate expires so it picks up the rotated
-    certificate.
+    time a request is made, and loads the mTLS certificate from the Destination
+    Service. The certificate is reloaded automatically on a TLS handshake
+    failure, so the client recovers from certificate rotation without being
+    recreated.
+
+    To inject a pre-built :class:`ssl.SSLContext` (startup injection or tests),
+    use the generic :func:`~sap_cloud_sdk.cbc.client.create_client` directly.
 
     Args:
-        ssl_context: Pre-built :class:`ssl.SSLContext`. When given, the
-            certificate load is skipped entirely (use for startup injection or
-            tests).
         destination_instance: The ``instance`` passed to the destination
             ``create_fragment_client`` / ``create_certificate_client`` (used for
             secret resolution in cloud mode). Defaults to the
@@ -278,27 +295,24 @@ def create_agent_client(
         A configured CBC client.
 
     Raises:
-        CBCConfigError: If the certificate cannot be resolved at construction
-            time (unless ``ssl_context`` is supplied), or — when a request is
-            made — if a ContextVar is empty or the tenant-mapping fragment is
-            missing.
+        CBCConfigError: If the certificate name cannot be resolved, or — when a
+            request is made — if the certificate cannot be fetched, a ContextVar
+            is empty, or the tenant-mapping fragment is missing.
     """
     if destination_instance is None:
         destination_instance = os.environ.get(ENV_DESTINATION_INSTANCE, "default")
 
-    if ssl_context is None:
-        resolved_cert_name = (
-            cbc_cert_name or os.environ.get(ENV_CERT_NAME) or _default_cert_name()
-        )
-        resolved_password = (
-            p12_password if p12_password is not None else _cert_password_from_env()
-        )
-        ssl_context = _load_ssl_context(
-            destination_instance, resolved_cert_name, resolved_password
-        )
+    resolved_cert_name = (
+        cbc_cert_name or os.environ.get(ENV_CERT_NAME) or _default_cert_name()
+    )
+    resolved_password = (
+        p12_password if p12_password is not None else _cert_password_from_env()
+    )
 
     return create_client(
-        base_url=lambda: _resolve_base_url(destination_instance),
-        app_tenant_id=_resolve_app_tenant_id,
-        ssl_context=ssl_context,
+        base_url=lambda: resolve_base_url(destination_instance),
+        app_tenant_id=resolve_app_tenant_id,
+        ssl_context=lambda: load_ssl_context(
+            destination_instance, resolved_cert_name, resolved_password
+        ),
     )

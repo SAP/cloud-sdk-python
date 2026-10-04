@@ -9,10 +9,12 @@ from unittest.mock import MagicMock
 import httpx
 import json
 import pytest
+import ssl
 
-from sap_cloud_sdk.cbc.client import DefaultClient, create_client
+from sap_cloud_sdk.cbc.client import DefaultClient, create_client, _is_tls_failure
 from sap_cloud_sdk.cbc.exceptions import (
     CBCClientError,
+    CBCConfigError,
     CBCNetworkError,
     CBCServerError,
 )
@@ -378,6 +380,178 @@ class TestCreateClient:
         client = create_client(
             base_url=lambda: "https://cbc.example.ondemand.com",
             app_tenant_id=lambda: "app-t1",
-            ssl_context=ctx,
+            ssl_context=lambda: ctx,
         )
         assert isinstance(client, DefaultClient)
+
+
+# ---------------------------------------------------------------------------
+# _is_tls_failure
+# ---------------------------------------------------------------------------
+
+
+def _tls_read_error() -> httpx.ReadError:
+    """A ReadError wrapping an ssl.SSLError, as httpx surfaces an expired cert.
+
+    Mirrors the empirically-observed shape: httpx.ReadError whose cause chain
+    reaches an ssl.SSLError (SSLV3_ALERT_CERTIFICATE_EXPIRED) a couple of levels
+    down.
+    """
+    ssl_err = ssl.SSLError("[SSL: SSLV3_ALERT_CERTIFICATE_EXPIRED] certificate expired")
+    read_err = httpx.ReadError("TLS handshake failed")
+    read_err.__cause__ = ssl_err
+    return read_err
+
+
+class TestIsTlsFailure:
+    def test_true_for_read_error_wrapping_ssl_error(self):
+        assert _is_tls_failure(_tls_read_error()) is True
+
+    def test_false_for_plain_connect_error(self):
+        assert _is_tls_failure(httpx.ConnectError("connection refused")) is False
+
+    def test_false_for_non_ssl_os_error(self):
+        err = httpx.ReadError("read failed")
+        err.__cause__ = OSError("broken pipe")
+        assert _is_tls_failure(err) is False
+
+
+# ---------------------------------------------------------------------------
+# DefaultClient — mTLS certificate rotation (reactive rebuild)
+# ---------------------------------------------------------------------------
+
+
+class TestCertRotation:
+    def _rotating_client(
+        self, factory: Callable[[], ssl.SSLContext]
+    ) -> tuple[DefaultClient, list[MagicMock]]:
+        """A DefaultClient whose _build_http_client hands out fresh mock http clients.
+
+        Each rebuild appends a new mock to the returned list, so a test can
+        assert how many times (and with what behaviour) the client was rebuilt.
+        The provided ``factory`` is wired as ``ssl_context`` so its invocation
+        count reflects each reactive rebuild (the initial mock below is injected
+        directly, bypassing the factory, as the real ``http_client`` seam does).
+        """
+        built: list[MagicMock] = []
+
+        def build() -> MagicMock:
+            factory()  # exercise the ssl factory, same as the real _build_http_client
+            mock = MagicMock(spec=httpx.Client)
+            built.append(mock)
+            return mock
+
+        initial = MagicMock(spec=httpx.Client)
+        built.append(initial)
+        client = DefaultClient(
+            base_url=lambda: "https://cbc.example.ondemand.com",
+            app_tenant_id=_app_tid(),
+            http_client=initial,
+            ssl_context=factory,
+        )
+        client._build_http_client = build  # type: ignore[method-assign]
+        return client, built
+
+    def test_reactive_success_rebuilds_and_retries(self):
+        calls = {"factory": 0}
+
+        def factory() -> ssl.SSLContext:
+            calls["factory"] += 1
+            return ssl.create_default_context()
+
+        client, built = self._rotating_client(factory)
+        ok = _mock_response(json_body={"items": [{"version": "cv1"}]})
+        built[0].request.side_effect = _tls_read_error()
+        # the rebuilt client answers ok; wire it the moment it is created
+        orig_build = client._build_http_client
+
+        def build_then_prime() -> MagicMock:
+            mock = orig_build()
+            mock.request.return_value = ok
+            return mock
+
+        client._build_http_client = build_then_prime  # type: ignore[method-assign]
+
+        result = client.get_consumption_versions()
+
+        assert len(built) == 2  # initial + one rebuild
+        assert calls["factory"] == 1  # factory invoked once, on the rebuild
+        built[1].request.assert_called_once()
+        assert result.items[0].version == "cv1"
+
+    def test_second_failure_propagates_after_one_rebuild(self):
+        def factory() -> ssl.SSLContext:
+            return ssl.create_default_context()
+
+        client, built = self._rotating_client(factory)
+        built[0].request.side_effect = _tls_read_error()
+        orig_build = client._build_http_client
+
+        def build_then_fail() -> MagicMock:
+            mock = orig_build()
+            mock.request.side_effect = _tls_read_error()
+            return mock
+
+        client._build_http_client = build_then_fail  # type: ignore[method-assign]
+
+        with pytest.raises(CBCNetworkError):
+            client.get_consumption_versions()
+
+        # exactly one rebuild → built[0] + built[1]; no third client
+        assert len(built) == 2
+        built[1].request.assert_called_once()
+
+    def test_non_tls_transport_error_does_not_rebuild(self):
+        def factory() -> ssl.SSLContext:
+            return ssl.create_default_context()
+
+        client, built = self._rotating_client(factory)
+        built[0].request.side_effect = httpx.ConnectError("connection refused")
+
+        with pytest.raises(CBCNetworkError):
+            client.get_consumption_versions()
+
+        # no rebuild — still only the initial mock
+        assert len(built) == 1
+
+    def test_no_factory_does_not_rebuild(self):
+        mock_http = MagicMock(spec=httpx.Client)
+        mock_http.request.side_effect = _tls_read_error()
+        client = DefaultClient(
+            base_url=lambda: "https://cbc.example.ondemand.com",
+            app_tenant_id=_app_tid(),
+            http_client=mock_http,
+            ssl_context=None,
+        )
+        with pytest.raises(CBCNetworkError):
+            client.get_consumption_versions()
+        # one attempt only, no rebuild path
+        mock_http.request.assert_called_once()
+
+    def test_rebuild_failure_propagates_and_keeps_client(self):
+        calls = {"factory": 0}
+
+        def factory() -> ssl.SSLContext:
+            calls["factory"] += 1
+            # The initial client is injected via http_client (factory not called
+            # at construction), so the first invocation is the reactive rebuild —
+            # which fails, as a rotated-but-unfetchable cert would.
+            raise CBCConfigError("could not fetch the mTLS certificate")
+
+        mock_http = MagicMock(spec=httpx.Client)
+        mock_http.request.side_effect = _tls_read_error()
+        client = DefaultClient(
+            base_url=lambda: "https://cbc.example.ondemand.com",
+            app_tenant_id=_app_tid(),
+            http_client=mock_http,
+            ssl_context=factory,
+        )
+        original = client._http_client
+
+        with pytest.raises(CBCConfigError, match="mTLS certificate"):
+            client.get_consumption_versions()
+
+        # factory invoked once on the failed rebuild; client left on the prior one
+        assert calls["factory"] == 1
+        assert client._http_client is original
+        mock_http.request.assert_called_once()

@@ -72,7 +72,7 @@ class TestModule:
         assert Module.DPI_NG in all_modules
         assert Module.EXTENSIBILITY in all_modules
         assert Module.OBJECTSTORE in all_modules
-        assert Module.OUTPUT_MANAGEMENT in all_modules
+        assert Module.AGENT_OUTPUT_TOOLS in all_modules
         assert Module.PRINT in all_modules
         assert Module.TELEMETRY in all_modules
 

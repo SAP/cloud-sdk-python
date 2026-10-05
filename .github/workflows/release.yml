@@ -15,6 +15,7 @@ jobs:
     permissions:
       contents: write
       issues: write
+      pull-requests: write
       id-token: write
 
     steps:
@@ -133,21 +134,28 @@ jobs:
           CURRENT=$(grep '^version = ' pyproject.toml | cut -d'"' -f2)
           python .github/scripts/check_version_bump.py "$CURRENT" "${{ steps.issue.outputs.version }}"
 
-      # ── 8. Bump version in pyproject.toml and commit ────────────────────────
-      - name: Bump version in pyproject.toml
+      # ── 8. Create release branch, bump version, commit, push ───────────────────
+      - name: Create release branch and bump version
+        id: release_branch
         run: |
+          RELEASE_BRANCH="release-action-${{ steps.issue.outputs.tag }}"
+
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          git checkout -b "$RELEASE_BRANCH"
+
           CURRENT=$(grep '^version = ' pyproject.toml | cut -d'"' -f2)
           sed -i "s/^version = \"${CURRENT}\"/version = \"${{ steps.issue.outputs.version }}\"/" pyproject.toml
           grep '^version = ' pyproject.toml
           echo "Updated pyproject.toml → ${{ steps.issue.outputs.version }}"
 
-      - name: Commit version bump
-        run: |
-          git config user.name  "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
           git add pyproject.toml
           git commit -m "chore(release): bump version to ${{ steps.issue.outputs.version }}"
-          git push origin ${{ steps.issue.outputs.branch }}
+          git push origin "$RELEASE_BRANCH"
+
+          echo "release_branch=$RELEASE_BRANCH" >> "$GITHUB_OUTPUT"
+          echo "Release branch pushed: $RELEASE_BRANCH"
 
       # ── 9. Create and push the tag ───────────────────────────────────────────
       - name: Create and push tag
@@ -191,7 +199,19 @@ jobs:
 
           echo "notes_file=/tmp/release_notes.md" >> "$GITHUB_OUTPUT"
 
-      # ── 12. Create the GitHub Release ───────────────────────────────────────
+      # ── 12. Guard: confirm version is not already on PyPI ───────────────────
+      - name: Check version does not already exist on PyPI
+        run: |
+          PKG_NAME=$(python3 -c "import toml; print(toml.load('pyproject.toml')['project']['name'])")
+          VERSION="${{ steps.issue.outputs.version }}"
+          HTTP=$(curl -s -o /dev/null -w "%{http_code}" "https://pypi.org/pypi/$PKG_NAME/$VERSION/json")
+          if [[ "$HTTP" == "200" ]]; then
+            echo "ERROR: $PKG_NAME $VERSION already exists on PyPI."
+            exit 1
+          fi
+          echo "$PKG_NAME $VERSION is not yet on PyPI — proceeding."
+
+      # ── 13. Create the GitHub Release ───────────────────────────────────────
       - name: Create GitHub Release
         id: gh_release
         env:
@@ -213,28 +233,45 @@ jobs:
           echo "release_url=$RELEASE_URL" >> "$GITHUB_OUTPUT"
           echo "GitHub Release created: $RELEASE_URL"
 
-      # ── 13. Guard: confirm version is not already on PyPI ───────────────────
-      - name: Check version does not already exist on PyPI
-        run: |
-          PKG_NAME=$(python3 -c "import toml; print(toml.load('pyproject.toml')['project']['name'])")
-          VERSION="${{ steps.issue.outputs.version }}"
-          HTTP=$(curl -s -o /dev/null -w "%{http_code}" "https://pypi.org/pypi/$PKG_NAME/$VERSION/json")
-          if [[ "$HTTP" == "200" ]]; then
-            echo "ERROR: $PKG_NAME $VERSION already exists on PyPI."
-            exit 1
-          fi
-          echo "$PKG_NAME $VERSION is not yet on PyPI — proceeding."
-
       # ── 14. Publish to PyPI (OIDC trusted publishing) ───────────────────────
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@v1.14.2
 
-      # ── 15. Close the release issue ─────────────────────────────────────────
+      # ── 15. Open PR to merge version bump into the source branch ────────────
+      - name: Open and auto-merge version bump PR
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.issue.outputs.version }}
+          TAG: ${{ steps.issue.outputs.tag }}
+          RELEASE_BRANCH: ${{ steps.release_branch.outputs.release_branch }}
+          TARGET_BRANCH: ${{ steps.issue.outputs.branch }}
+        run: |
+          PR_URL=$(gh pr create \
+            --repo "${{ github.repository }}" \
+            --base "$TARGET_BRANCH" \
+            --head "$RELEASE_BRANCH" \
+            --title "chore(release): bump version to ${VERSION}" \
+            --body "Automated version bump from the release workflow for [v${VERSION}](https://github.com/${{ github.repository }}/releases/tag/${TAG}). Merges automatically.")
+
+          echo "PR created: $PR_URL"
+
+          # Auto-merge using admin privileges (bypasses branch protection).
+          # Requires github-actions[bot] in the repo ruleset bypass list.
+          gh pr merge "$PR_URL" \
+            --repo "${{ github.repository }}" \
+            --squash \
+            --admin \
+            --delete-branch
+
+          echo "PR merged and release branch deleted."
+
+      # ── 16. Close the release issue ─────────────────────────────────────────
       - name: Close release issue
         env:
           GH_TOKEN: ${{ github.token }}
           VERSION: ${{ steps.issue.outputs.version }}
           TAG: ${{ steps.issue.outputs.tag }}
+          TARGET_BRANCH: ${{ steps.issue.outputs.branch }}
           RELEASE_URL: ${{ steps.gh_release.outputs.release_url }}
         run: |
           PKG_NAME=$(python3 -c "import toml; print(toml.load('pyproject.toml')['project']['name'])")
@@ -255,7 +292,7 @@ jobs:
           | **PyPI** | ${PYPI_URL} |
           | **GitHub Release** | ${RELEASE_URL} |
           | **Tag** | \`${TAG}\` |
-          | **Branch** | \`${{ steps.issue.outputs.branch }}\` |
+          | **Branch** | \`${TARGET_BRANCH}\` |
           EOF
           )"
 
@@ -263,7 +300,7 @@ jobs:
             --repo "${{ github.repository }}" \
             --comment "Closing — package is live on PyPI."
 
-      # ── 16. Handle failure ──────────────────────────────────────────────────
+      # ── 17. Handle failure ──────────────────────────────────────────────────
       - name: Mark issue failed on error
         if: failure()
         env:

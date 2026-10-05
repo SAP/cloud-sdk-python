@@ -8,6 +8,7 @@ on:
       - 'src/**/*.py'
       - 'tests/**/*.py'
       - 'pyproject.toml'
+      - 'uv.lock'
   push:
     branches: [main]
     paths:
@@ -15,12 +16,100 @@ on:
       - 'src/**/*.py'
       - 'tests/**/*.py'
       - 'pyproject.toml'
+      - 'uv.lock'
 
 jobs:
+  # ── Determine which integration test directories to run ──────────────────────
+  detect-scope:
+    name: Detect test scope
+    runs-on: ubuntu-latest
+    outputs:
+      run_all: ${{ steps.scope.outputs.run_all }}
+      test_paths: ${{ steps.scope.outputs.test_paths }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Compute scope
+        id: scope
+        env:
+          EVENT: ${{ github.event_name }}
+        run: |
+          # On push to main or workflow_dispatch → always run everything
+          if [[ "$EVENT" == "push" || "$EVENT" == "workflow_dispatch" ]]; then
+            echo "run_all=true"   >> "$GITHUB_OUTPUT"
+            echo "test_paths=tests/*/integration/" >> "$GITHUB_OUTPUT"
+            echo "Scope: full run (push/workflow_dispatch)"
+            exit 0
+          fi
+
+          # On pull_request → diff against the base branch
+          BASE_SHA="${{ github.event.pull_request.base.sha }}"
+          HEAD_SHA="${{ github.event.pull_request.head.sha }}"
+          CHANGED=$(git diff --name-only "$BASE_SHA" "$HEAD_SHA")
+
+          echo "Changed files:"
+          echo "$CHANGED"
+
+          # Global triggers: any of these → run everything
+          # core/ is foundational — changes there can affect any module
+          GLOBAL_PATTERNS=(
+            "pyproject.toml"
+            "uv.lock"
+            "src/sap_cloud_sdk/core/"
+            "tests/core/"
+          )
+
+          for pattern in "${GLOBAL_PATTERNS[@]}"; do
+            if echo "$CHANGED" | grep -q "^${pattern}"; then
+              echo "run_all=true" >> "$GITHUB_OUTPUT"
+              echo "test_paths=tests/*/integration/" >> "$GITHUB_OUTPUT"
+              echo "Scope: full run (global file changed: $pattern)"
+              exit 0
+            fi
+          done
+
+          # Modules that have integration test directories
+          MODULES_WITH_INTEGRATION=(
+            adms
+            agent_memory
+            agentgateway
+            aicore
+            destination
+            dms
+            dpi_ng
+            objectstore
+            outputmanagement
+          )
+
+          PATHS=()
+          for module in "${MODULES_WITH_INTEGRATION[@]}"; do
+            if echo "$CHANGED" | grep -qE "^(src/sap_cloud_sdk|tests)/${module}/"; then
+              PATHS+=("tests/${module}/integration/")
+              echo "Module affected: $module"
+            fi
+          done
+
+          if [[ ${#PATHS[@]} -eq 0 ]]; then
+            echo "run_all=false" >> "$GITHUB_OUTPUT"
+            echo "test_paths=" >> "$GITHUB_OUTPUT"
+            echo "Scope: no integration tests affected — skipping"
+          else
+            echo "run_all=false" >> "$GITHUB_OUTPUT"
+            echo "test_paths=${PATHS[*]}" >> "$GITHUB_OUTPUT"
+            echo "Scope: ${PATHS[*]}"
+          fi
+
+  # ── Run the integration tests ─────────────────────────────────────────────────
   integration-tests:
     name: Integration Tests
-    # Skip integration tests for PRs from forks (they don't have access to secrets)
-    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    needs: detect-scope
+    # Skip for fork PRs (no secrets), and skip when no integration tests are affected
+    if: >
+      (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) &&
+      needs.detect-scope.outputs.test_paths != ''
     runs-on: ${{ contains(github.server_url, 'github.com') && 'ubuntu-latest' || fromJSON('["self-hosted"]') }}
     permissions:
       contents: read
@@ -43,21 +132,27 @@ jobs:
         run: |
           echo "Setting up environment variables for integration tests..."
 
-          # Process GitHub secrets (all configuration stored as secrets)
-          echo '${{ toJSON(secrets) }}' | jq -r 'to_entries[] | select(.key | startswith("CLOUD_SDK_CFG_") or startswith("AICORE_")) | "\(.key)=\(.value)"' | while read line; do
-            echo "$line" >> $GITHUB_ENV
-            var_name=$(echo "$line" | cut -d= -f1)
-            echo "Set secret: $var_name"
-          done
+          echo '${{ toJSON(secrets) }}' \
+            | jq -r 'to_entries[]
+                | select(.key | startswith("CLOUD_SDK_CFG_") or startswith("AICORE_"))
+                | "\(.key)=\(.value)"' \
+            | while read line; do
+                echo "$line" >> $GITHUB_ENV
+                echo "Set secret: $(echo "$line" | cut -d= -f1)"
+              done
 
-          # Process GitHub variables (all configuration stored as variables)
-          echo '${{ toJSON(vars) }}' | jq -r 'to_entries[] | select(.key | startswith("CLOUD_SDK_CFG_") or startswith("AICORE_")) | "\(.key)=\(.value)"' | while read line; do
-            echo "$line" >> $GITHUB_ENV
-            var_name=$(echo "$line" | cut -d= -f1)
-            echo "Set variable: $var_name"
-          done
+          echo '${{ toJSON(vars) }}' \
+            | jq -r 'to_entries[]
+                | select(.key | startswith("CLOUD_SDK_CFG_") or startswith("AICORE_"))
+                | "\(.key)=\(.value)"' \
+            | while read line; do
+                echo "$line" >> $GITHUB_ENV
+                echo "Set variable: $(echo "$line" | cut -d= -f1)"
+              done
 
-          echo "Environment setup complete - automatically configured all CLOUD_SDK_CFG_* and AICORE_* environment variables and secrets"
+          echo "Environment setup complete"
 
       - name: Run integration tests
-        run: uv run pytest tests/*/integration/ -v --tb=short
+        env:
+          TEST_PATHS: ${{ needs.detect-scope.outputs.test_paths }}
+        run: uv run pytest $TEST_PATHS -v --tb=short

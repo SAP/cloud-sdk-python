@@ -55,3 +55,4 @@ class DestinationCertificateError(DestinationError):
     """Raised when a client certificate cannot be loaded or wired into the HTTP session."""
 
     pass
+

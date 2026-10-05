@@ -30,11 +30,11 @@ from sap_cloud_sdk.agentgateway._lob import (
     get_ias_client_id_lob,
     get_mcp_tools_lob,
 )
+from sap_cloud_sdk.agentgateway._fragments import ConnectedSystem
 from sap_cloud_sdk.agentgateway._models import (
     Agent,
     AgentCardFilter,
     AuthResult,
-    ConnectedSystem,
     MCPTool,
     MCPToolFilter,
 )

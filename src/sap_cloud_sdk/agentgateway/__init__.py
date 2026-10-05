@@ -52,14 +52,14 @@ Usage (Customer agent):
     ]
 """
 
+from sap_cloud_sdk.agentgateway._fragments import ConnectedSystem
 from sap_cloud_sdk.agentgateway._models import (
-    AuthResult,
-    ConnectedSystem,
-    MCPTool,
-    MCPToolFilter,
     Agent,
     AgentCard,
     AgentCardFilter,
+    AuthResult,
+    MCPTool,
+    MCPToolFilter,
 )
 from sap_cloud_sdk.agentgateway.config import ClientConfig
 from sap_cloud_sdk.agentgateway.agw_client import create_client, AgentGatewayClient

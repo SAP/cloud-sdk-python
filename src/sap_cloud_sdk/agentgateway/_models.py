@@ -2,32 +2,7 @@
 
 import json
 from dataclasses import dataclass, field
-from enum import Enum
-from typing import Any, Optional, TypedDict
-
-
-class FragmentLabel(str, Enum):
-    """Label values for the sap-managed-runtime-type fragment label key."""
-
-    MCP = "agw.mcp.server"
-    A2A = "agw.a2a.server"
-    IAS = "subscriber.ias"
-    IAS_USER = "subscriber.ias.user"
-
-
-class ConnectedSystem(TypedDict):
-    """Metadata for a connected backend system integration.
-
-    Attributes:
-        global_tenant_id: GTID of the connected partner system.
-        system_type: Application namespace of the partner (e.g. ``"sap.pce"``).
-            May be ``None`` for older integrations missing the label.
-        integration_dependency: ORD ID of the integration dependency fulfilled.
-    """
-
-    global_tenant_id: Optional[str]
-    system_type: Optional[str]
-    integration_dependency: Optional[str]
+from typing import Any
 
 
 @dataclass

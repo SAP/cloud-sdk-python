@@ -525,6 +525,7 @@ class TestListMcpTools:
                 "system-token",
                 60.0,
                 filter=MCPToolFilter(gtids=["gtid-a", "gtid-b"]),
+                max_concurrent_tasks=15,
             )
 
     @pytest.mark.asyncio
@@ -555,7 +556,7 @@ class TestListMcpTools:
             await agw_client.list_mcp_tools(filter=MCPToolFilter())
 
             mock_lob.assert_called_once_with(
-                "my-tenant", "system-token", 60.0, filter=MCPToolFilter()
+                "my-tenant", "system-token", 60.0, filter=MCPToolFilter(), max_concurrent_tasks=15
             )
 
     @pytest.mark.asyncio

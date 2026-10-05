@@ -8,6 +8,8 @@ Centralises all BTP Destination Service fragment operations:
 """
 
 import logging
+from enum import Enum
+from typing import Optional, TypedDict
 
 from sap_cloud_sdk.destination import (
     create_fragment_client,
@@ -17,10 +19,34 @@ from sap_cloud_sdk.destination import (
 from sap_cloud_sdk.destination._models import Level
 
 from sap_cloud_sdk.agentgateway.exceptions import MCPServerNotFoundError
-from sap_cloud_sdk.agentgateway._models import ConnectedSystem, FragmentLabel
 from sap_cloud_sdk.core.telemetry import Module
 
 logger = logging.getLogger(__name__)
+
+
+class FragmentLabel(str, Enum):
+    """Label values for the sap-managed-runtime-type fragment label key."""
+
+    MCP = "agw.mcp.server"
+    A2A = "agw.a2a.server"
+    IAS = "subscriber.ias"
+    IAS_USER = "subscriber.ias.user"
+
+
+class ConnectedSystem(TypedDict):
+    """Metadata for a connected backend system integration.
+
+    Attributes:
+        global_tenant_id: GTID of the connected partner system.
+        system_type: Application namespace of the partner (e.g. ``"sap.pce"``).
+            May be ``None`` for older integrations missing the label.
+        integration_dependency: ORD ID of the integration dependency fulfilled.
+    """
+
+    global_tenant_id: Optional[str]
+    system_type: Optional[str]
+    integration_dependency: Optional[str]
+
 
 # Shared label key for all managed-runtime fragment types
 LABEL_KEY = "sap-managed-runtime-type"

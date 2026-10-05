@@ -75,4 +75,3 @@ class TestDeriveTenantTokenUrl:
         url = "https://provider-zone/oauth/token"
         result = _derive_tenant_token_url(url, self.IZ, "tenant-123")
         assert result == url
-

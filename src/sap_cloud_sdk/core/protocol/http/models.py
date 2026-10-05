@@ -13,7 +13,10 @@ import requests
 from oauthlib.oauth2 import BackendApplicationClient
 from requests_oauthlib import OAuth2Session
 
-from sap_cloud_sdk.core._tenant import _validate_tenant_subdomain, _derive_tenant_token_url
+from sap_cloud_sdk.core._tenant import (
+    _validate_tenant_subdomain,
+    _derive_tenant_token_url,
+)
 
 logger = logging.getLogger(__name__)
 

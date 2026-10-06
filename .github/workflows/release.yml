@@ -114,8 +114,8 @@ jobs:
   integration-tests:
     name: Integration Tests
     needs: parse
-    if: ${{ !contains(github.event.issue.labels.*.name, 'skip-integration-tests') }}
-    runs-on: ubuntu-latest
+    if: ${{ github.event_name != 'pull_request' && !contains(github.event.issue.labels.*.name, 'skip-integration-tests') }}
+    runs-on: ${{ contains(github.server_url, 'github.com') && 'ubuntu-latest' || fromJSON('["self-hosted"]') }}
     permissions:
       contents: read
 
@@ -132,9 +132,7 @@ jobs:
           python-version: "3.11"
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v4
-        with:
-          enable-cache: true
+        uses: astral-sh/setup-uv@v3
 
       - name: Install dependencies
         run: uv sync --dev

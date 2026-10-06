@@ -58,7 +58,6 @@ jobs:
           GLOBAL_PATTERNS=(
             "pyproject.toml"
             "uv.lock"
-            ".github/workflows/integration-tests.yml"
             "src/sap_cloud_sdk/core/"
             "tests/core/"
           )

@@ -238,9 +238,16 @@ jobs:
         uses: pypa/gh-action-pypi-publish@v1.14.2
 
       # ── 15. Open PR to merge version bump into the source branch ────────────
+      - name: Generate bot token
+        id: bot_token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.CLOUD_SDK_BOT_APP_ID }}
+          private-key: ${{ secrets.CLOUD_SDK_BOT_PRIVATE_KEY }}
+
       - name: Open and auto-merge version bump PR
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ steps.bot_token.outputs.token }}
           VERSION: ${{ steps.issue.outputs.version }}
           TAG: ${{ steps.issue.outputs.tag }}
           RELEASE_BRANCH: ${{ steps.release_branch.outputs.release_branch }}
@@ -255,12 +262,10 @@ jobs:
 
           echo "PR created: $PR_URL"
 
-          # Auto-merge using admin privileges (bypasses branch protection).
-          # Requires github-actions[bot] in the repo ruleset bypass list.
+          # Bot has bypass rights in the ruleset — no --admin flag needed.
           gh pr merge "$PR_URL" \
             --repo "${{ github.repository }}" \
             --squash \
-            --admin \
             --delete-branch
 
           echo "PR merged and release branch deleted."

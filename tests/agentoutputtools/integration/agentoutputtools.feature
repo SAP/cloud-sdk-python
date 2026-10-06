@@ -1,13 +1,13 @@
 # SPDX-FileCopyrightText: 2024 SAP SE or an SAP affiliate company and Cloud SDK contributors
 # SPDX-License-Identifier: Apache-2.0
 
-Feature: Output Management Integration
+Feature: Agent Output Tools Integration
   As a developer using the SDK
   I want to send output requests and email notifications
-  So that I can trigger document generation and delivery through Output Management
+  So that I can trigger document generation and delivery through Agent Output Tools
 
   Background:
-    Given an Output Management client
+    Given an Agent Output Tools client
 
   # ==================== Basic Email Notification ====================
 

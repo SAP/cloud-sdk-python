@@ -1,29 +1,29 @@
 # SPDX-FileCopyrightText: 2024 SAP SE or an SAP affiliate company
 # SPDX-License-Identifier: Apache-2.0
 
-"""Unit tests for the output management client."""
+"""Unit tests for the agent output tools client."""
 
 from unittest.mock import Mock, patch
 
 import pytest
 
-from sap_cloud_sdk.outputmanagement import OutputManagementClient
-from sap_cloud_sdk.outputmanagement._service_client import OutputManagementServiceClient
-from sap_cloud_sdk.outputmanagement._models import OutputRequest, OutputResponse
+from sap_cloud_sdk.agentoutputtools import AgentOutputToolsClient
+from sap_cloud_sdk.agentoutputtools._service_client import AgentOutputToolsServiceClient
+from sap_cloud_sdk.agentoutputtools._models import OutputRequest, OutputResponse
 from sap_cloud_sdk.core.telemetry import Module, Operation
 
 
-class TestOutputManagementClient:
-    """Test suite for OutputManagementClient."""
+class TestAgentOutputToolsClient:
+    """Test suite for AgentOutputToolsClient."""
 
     def test_send_email_calls_service_client(self):
         """Test that send_email delegates to service client."""
-        mock_service_client = Mock(spec=OutputManagementServiceClient)
+        mock_service_client = Mock(spec=AgentOutputToolsServiceClient)
         mock_service_client.send_output_request.return_value = OutputResponse(
             outputRequestId="req-123"
         )
 
-        client = OutputManagementClient(service_client=mock_service_client)
+        client = AgentOutputToolsClient(service_client=mock_service_client)
 
         response = client.send_email(
             notification_template_key="TEST_TEMPLATE",
@@ -36,12 +36,12 @@ class TestOutputManagementClient:
 
     def test_send_output_request_calls_service_client(self):
         """Test that send_output_request delegates to service client."""
-        mock_service_client = Mock(spec=OutputManagementServiceClient)
+        mock_service_client = Mock(spec=AgentOutputToolsServiceClient)
         mock_service_client.send_output_request.return_value = OutputResponse(
             outputRequestId="req-456"
         )
 
-        client = OutputManagementClient(service_client=mock_service_client)
+        client = AgentOutputToolsClient(service_client=mock_service_client)
         output_request = Mock(spec=OutputRequest)
 
         response = client.send_output_request(output_request)
@@ -51,12 +51,12 @@ class TestOutputManagementClient:
 
     def test_send_email_records_request_metric(self):
         """Test that send_email records request metric."""
-        mock_service_client = Mock(spec=OutputManagementServiceClient)
+        mock_service_client = Mock(spec=AgentOutputToolsServiceClient)
         mock_service_client.send_output_request.return_value = OutputResponse(
             outputRequestId="req-123"
         )
 
-        client = OutputManagementClient(service_client=mock_service_client)
+        client = AgentOutputToolsClient(service_client=mock_service_client)
 
         with patch(
             "sap_cloud_sdk.core.telemetry.metrics_decorator.record_request_metric"
@@ -74,9 +74,9 @@ class TestOutputManagementClient:
             # First call is from send_output_request
             assert mock_metric.call_args_list[0] == (
                 (
-                    Module.OUTPUT_MANAGEMENT,
+                    Module.AGENT_OUTPUT_TOOLS,
                     None,
-                    Operation.OUTPUT_MANAGEMENT_SEND_OUTPUT_REQUEST,
+                    Operation.AGENT_OUTPUT_TOOLS_SEND_OUTPUT_REQUEST,
                     False,
                 ),
             )
@@ -84,9 +84,9 @@ class TestOutputManagementClient:
             # Second call is from send_email
             assert mock_metric.call_args_list[1] == (
                 (
-                    Module.OUTPUT_MANAGEMENT,
+                    Module.AGENT_OUTPUT_TOOLS,
                     None,
-                    Operation.OUTPUT_MANAGEMENT_SEND_EMAIL,
+                    Operation.AGENT_OUTPUT_TOOLS_SEND_EMAIL,
                     False,
                 ),
             )
@@ -95,12 +95,12 @@ class TestOutputManagementClient:
 
     def test_send_output_request_records_request_metric(self):
         """Test that send_output_request records request metric."""
-        mock_service_client = Mock(spec=OutputManagementServiceClient)
+        mock_service_client = Mock(spec=AgentOutputToolsServiceClient)
         mock_service_client.send_output_request.return_value = OutputResponse(
             outputRequestId="req-456"
         )
 
-        client = OutputManagementClient(service_client=mock_service_client)
+        client = AgentOutputToolsClient(service_client=mock_service_client)
         output_request = Mock(spec=OutputRequest)
 
         with patch(
@@ -109,9 +109,9 @@ class TestOutputManagementClient:
             response = client.send_output_request(output_request)
 
             mock_metric.assert_called_once_with(
-                Module.OUTPUT_MANAGEMENT,
+                Module.AGENT_OUTPUT_TOOLS,
                 None,
-                Operation.OUTPUT_MANAGEMENT_SEND_OUTPUT_REQUEST,
+                Operation.AGENT_OUTPUT_TOOLS_SEND_OUTPUT_REQUEST,
                 False,
             )
 
@@ -122,8 +122,8 @@ class TestOutputManagementClient:
         """Test that send_email_with_mcp records request metric."""
         from unittest.mock import AsyncMock
 
-        mock_service_client = Mock(spec=OutputManagementServiceClient)
-        client = OutputManagementClient(service_client=mock_service_client)
+        mock_service_client = Mock(spec=AgentOutputToolsServiceClient)
+        client = AgentOutputToolsClient(service_client=mock_service_client)
 
         # Mock MCP tool with AsyncMock for ainvoke
         mock_mcp_tool = Mock()
@@ -141,9 +141,9 @@ class TestOutputManagementClient:
             )
 
             mock_metric.assert_called_once_with(
-                Module.OUTPUT_MANAGEMENT,
+                Module.AGENT_OUTPUT_TOOLS,
                 None,
-                Operation.OUTPUT_MANAGEMENT_SEND_EMAIL_WITH_MCP,
+                Operation.AGENT_OUTPUT_TOOLS_SEND_EMAIL_WITH_MCP,
                 False,
             )
 
@@ -151,8 +151,8 @@ class TestOutputManagementClient:
 
     def test_send_email_with_validation_error_does_not_call_service(self):
         """Test that validation errors prevent service client calls."""
-        mock_service_client = Mock(spec=OutputManagementServiceClient)
-        client = OutputManagementClient(service_client=mock_service_client)
+        mock_service_client = Mock(spec=AgentOutputToolsServiceClient)
+        client = AgentOutputToolsClient(service_client=mock_service_client)
 
         response = client.send_email(
             notification_template_key="",  # Invalid: empty template key
@@ -166,8 +166,8 @@ class TestOutputManagementClient:
 
     def test_create_output_request_returns_valid_request(self):
         """Test that create_output_request creates a valid OutputRequest."""
-        mock_service_client = Mock(spec=OutputManagementServiceClient)
-        client = OutputManagementClient(service_client=mock_service_client)
+        mock_service_client = Mock(spec=AgentOutputToolsServiceClient)
+        client = AgentOutputToolsClient(service_client=mock_service_client)
 
         output_request = client.create_output_request(
             notification_template_key="TEST_TEMPLATE",

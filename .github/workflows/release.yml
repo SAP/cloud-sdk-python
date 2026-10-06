@@ -52,7 +52,7 @@ jobs:
             BUMP_TYPE="${{ github.event.inputs.bump_type }}"
           elif [[ "$EVENT_NAME" == "pull_request" ]]; then
             # Hardcoded test values — remove pull_request trigger before merging to main
-            VERSION="0.0.99"
+            VERSION="0.100.0"
             BRANCH="feature/release-process"
             BUMP_TYPE="minor"
           else

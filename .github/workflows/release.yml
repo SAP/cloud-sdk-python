@@ -3,11 +3,6 @@ name: Release
 on:
   issues:
     types: [labeled]
-  pull_request:
-    branches:
-      - main
-    paths:
-      - '.github/workflows/release.yml'
   workflow_dispatch:
     inputs:
       version:
@@ -27,7 +22,6 @@ jobs:
     name: Parse & Validate
     if: >
       github.event_name == 'workflow_dispatch' ||
-      github.event_name == 'pull_request' ||
       (github.event.label.name == 'status: tests passed' &&
       contains(github.event.issue.labels.*.name, 'release'))
     runs-on: ubuntu-latest
@@ -50,11 +44,6 @@ jobs:
             VERSION="${{ github.event.inputs.version }}"
             BRANCH="${{ github.event.inputs.branch }}"
             BUMP_TYPE="${{ github.event.inputs.bump_type }}"
-          elif [[ "$EVENT_NAME" == "pull_request" ]]; then
-            # Hardcoded test values — remove pull_request trigger before merging to main
-            VERSION="0.100.0"
-            BRANCH="feature/release-process"
-            BUMP_TYPE="minor"
           else
             parse_field() {
               local heading="$1"
@@ -114,7 +103,7 @@ jobs:
   integration-tests:
     name: Integration Tests
     needs: parse
-    if: ${{ github.event_name != 'pull_request' && !contains(github.event.issue.labels.*.name, 'skip-integration-tests') }}
+    if: ${{ !contains(github.event.issue.labels.*.name, 'skip-integration-tests') }}
     runs-on: ${{ contains(github.server_url, 'github.com') && 'ubuntu-latest' || fromJSON('["self-hosted"]') }}
     permissions:
       contents: read
@@ -249,8 +238,7 @@ jobs:
     needs: [parse, version-bump]
     if: needs.parse.result == 'success' && needs.version-bump.result == 'success'
     runs-on: ubuntu-latest
-    # TODO: restore environment before merging to main — needed for PyPI OIDC trusted publishing
-    # environment: 'pypi:sap-cloud-sdk'
+    environment: 'pypi:sap-cloud-sdk'
     permissions:
       contents: write
       id-token: write
@@ -270,9 +258,7 @@ jobs:
           python-version: "3.11"
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v4
-        with:
-          enable-cache: true
+        uses: astral-sh/setup-uv@v3
 
       - name: Build release distribution
         run: uv build
@@ -338,9 +324,8 @@ jobs:
           echo "release_url=$RELEASE_URL" >> "$GITHUB_OUTPUT"
           echo "GitHub Release created: $RELEASE_URL"
 
-      # TODO: uncomment before merging to main
-      # - name: Publish to PyPI
-      #   uses: pypa/gh-action-pypi-publish@v1.14.2
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@v1.14.2
 
   # ── 5. Close issue ────────────────────────────────────────────────────────
   close-issue:

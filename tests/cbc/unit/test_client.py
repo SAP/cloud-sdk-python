@@ -186,10 +186,6 @@ class TestFetchEntityData:
         client, mock_http = _make_client()
         mock_http.request.return_value = _mock_response(
             json_body={
-                "metadata": {
-                    "entityName": "tax-category",
-                    "configurationObjectId": "tax-config",
-                },
                 "contentShape": "ARRAY",
                 "content": {"items": [{"code": "STD"}], "adaptedKeys": []},
             }
@@ -208,10 +204,6 @@ class TestFetchEntityData:
         client, mock_http = _make_client()
         mock_http.request.return_value = _mock_response(
             json_body={
-                "metadata": {
-                    "entityName": "globalSettings",
-                    "configurationObjectId": "pmc-settings",
-                },
                 "contentShape": "OBJECT",
                 "content": {"item": {"maxRetries": 3, "timeoutSeconds": 30}},
             }
@@ -229,7 +221,7 @@ class TestFetchEntityData:
     def test_defaults_to_empty_list_when_content_absent(self):
         client, mock_http = _make_client()
         mock_http.request.return_value = _mock_response(
-            json_body={"metadata": {"entityName": "policy"}, "contentShape": "ARRAY"}
+            json_body={"contentShape": "ARRAY"}
         )
         result = client._fetch_entity_data(
             "https://cbc.example.ondemand.com",
@@ -239,20 +231,6 @@ class TestFetchEntityData:
             "policy",
         )
         assert result.data.as_list() == []
-
-    def test_falls_back_to_path_entity_id_without_metadata(self):
-        client, mock_http = _make_client()
-        mock_http.request.return_value = _mock_response(
-            json_body={"contentShape": "ARRAY", "content": {"items": []}}
-        )
-        result = client._fetch_entity_data(
-            "https://cbc.example.ondemand.com",
-            "app-tenant",
-            "cv1",
-            "tax-config",
-            "tax-rate",
-        )
-        assert result.entity_id == "tax-rate"
 
 
 # ---------------------------------------------------------------------------
@@ -292,7 +270,6 @@ class TestGetConfiguration:
         )
         data_response = _mock_response(
             json_body={
-                "metadata": {"entityName": "payment-mode"},
                 "contentShape": "ARRAY",
                 "content": {"items": [{"k": "v"}]},
             }

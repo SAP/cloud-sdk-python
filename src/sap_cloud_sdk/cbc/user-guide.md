@@ -69,16 +69,16 @@ ConfigData
 └── config_objects: list[ConfigObject]
     ├── ConfigObject
     │   ├── config_object_id: str     # e.g. "payment-config"
-    │   └── entities: list[EntityData]
-    │       └── EntityData
+    │   └── entities: list[ConfigEntity]
+    │       └── ConfigEntity
     │           ├── entity_id: str        # e.g. "payment-mode"
-    │           └── data: EntityContent   # .as_list() or .as_object()
+    │           └── data: EntityData   # .as_list() or .as_object()
     └── ConfigObject
         ├── config_object_id: str     # e.g. "agent-config"
-        └── entities: list[EntityData]
-            └── EntityData
+        └── entities: list[ConfigEntity]
+            └── ConfigEntity
                 ├── entity_id: str        # e.g. "contact"
-                └── data: EntityContent   # .as_list() or .as_object()
+                └── data: EntityData   # .as_list() or .as_object()
 ```
 
 ### Iterate all config objects and entities
@@ -95,7 +95,7 @@ for co in config.config_objects:
 # All entities for one config object
 payment = config.get_config_object("payment-config")  # ConfigObject | None
 if payment:
-    modes = payment.get_entity("payment-mode")  # EntityData | None
+    modes = payment.get_config_entity("payment-mode")  # ConfigEntity | None
     if modes:
         for row in modes.data.as_list():
             print(row["paymentModeCode"], row["name"])
@@ -117,7 +117,7 @@ else:
 
 ```python
 # Shortcut — config object + entity in one step
-modes = config.get_entity_data("payment-config", "payment-mode")  # EntityData | None
+modes = config.get_config_entity("payment-config", "payment-mode")  # ConfigEntity | None
 ```
 
 ```python

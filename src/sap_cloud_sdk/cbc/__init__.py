@@ -20,7 +20,7 @@ Quick start::
     # Access entity data
     payment = config.get_config_object("payment-config")
     if payment:
-        for row in payment.get_entity("payment-mode").data.as_list():
+        for row in payment.get_config_entity("payment-mode").data.as_list():
             print(row)
 
 Apps running on the SAP application platform can use
@@ -60,10 +60,10 @@ from sap_cloud_sdk.cbc.exceptions import (
 from sap_cloud_sdk.cbc._models import (
     ApiError,
     ConfigData,
+    ConfigEntity,
     ConfigObject,
     ConsumptionVersion,
     ConsumptionVersions,
-    EntityContent,
     EntityData,
     NNV,
 )
@@ -98,8 +98,8 @@ __all__ = [
     "ConsumptionVersions",
     "NNV",
     # models — entities
-    "EntityContent",
     "EntityData",
+    "ConfigEntity",
     "ConfigObject",
     # models — configuration
     "ConfigData",

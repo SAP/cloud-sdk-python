@@ -12,7 +12,7 @@ from sap_cloud_sdk.cbc._models import (
     ConfigObject,
     ConsumptionVersion,
     ConsumptionVersions,
-    EntityContent,
+    ConfigEntity,
     EntityData,
 )
 
@@ -72,42 +72,42 @@ class TestConsumptionVersionsLatest:
 
 
 # ---------------------------------------------------------------------------
-# EntityContent
+# EntityData
 # ---------------------------------------------------------------------------
 
 
-class TestEntityContent:
+class TestEntityData:
     def test_as_list_returns_list(self):
-        ec = EntityContent([{"k": "v"}])
+        ec = EntityData([{"k": "v"}])
         assert ec.as_list() == [{"k": "v"}]
 
     def test_as_list_raises_when_dict(self):
-        ec = EntityContent({"k": "v"})
+        ec = EntityData({"k": "v"})
         with pytest.raises(ValueError, match="as_object"):
             ec.as_list()
 
     def test_as_object_returns_dict(self):
-        ec = EntityContent({"k": "v"})
+        ec = EntityData({"k": "v"})
         assert ec.as_object() == {"k": "v"}
 
     def test_as_object_raises_when_list(self):
-        ec = EntityContent([{"k": "v"}])
+        ec = EntityData([{"k": "v"}])
         with pytest.raises(ValueError, match="as_list"):
             ec.as_object()
 
     def test_is_list_and_is_object_for_list_content(self):
-        ec = EntityContent([{"k": "v"}])
+        ec = EntityData([{"k": "v"}])
         assert ec.is_list() is True
         assert ec.is_object() is False
 
     def test_is_list_and_is_object_for_dict_content(self):
-        ec = EntityContent({"k": "v"})
+        ec = EntityData({"k": "v"})
         assert ec.is_object() is True
         assert ec.is_list() is False
 
     def test_value_returns_raw_without_asserting_shape(self):
-        assert EntityContent([{"k": "v"}]).value() == [{"k": "v"}]
-        assert EntityContent({"k": "v"}).value() == {"k": "v"}
+        assert EntityData([{"k": "v"}]).value() == [{"k": "v"}]
+        assert EntityData({"k": "v"}).value() == {"k": "v"}
 
 
 # ---------------------------------------------------------------------------
@@ -117,7 +117,7 @@ class TestEntityContent:
 
 class TestConfigData:
     def _entity_data(self, entity_id: str) -> EntityData:
-        return EntityData(entity_id=entity_id, data=EntityContent([]))
+        return ConfigEntity(entity_id=entity_id, data=EntityData([]))
 
     def _config_object(self, config_object_id: str, *entity_ids: str) -> ConfigObject:
         return ConfigObject(
@@ -145,17 +145,17 @@ class TestConfigData:
         config = self._config(self._config_object("ObjA", "E1"))
         assert config.get_config_object("Missing") is None
 
-    def test_get_entity_data_returns_match(self):
+    def test_get_config_entity_returns_match(self):
         config = self._config(
             self._config_object("ObjA", "E1", "E2"),
         )
-        result = config.get_entity_data("ObjA", "E2")
+        result = config.get_config_entity("ObjA", "E2")
         assert result is not None
         assert result.entity_id == "E2"
 
-    def test_get_entity_data_returns_none_when_missing(self):
+    def test_get_config_entity_returns_none_when_missing(self):
         config = self._config(self._config_object("ObjA", "E1"))
-        assert config.get_entity_data("ObjA", "Missing") is None
+        assert config.get_config_entity("ObjA", "Missing") is None
 
 
 # ---------------------------------------------------------------------------

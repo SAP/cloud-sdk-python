@@ -38,10 +38,10 @@ import httpx
 from sap_cloud_sdk.cbc._models import (
     ApiError,
     ConfigData,
+    ConfigEntity,
     ConfigObject,
     ConfigObjectList,
     ConsumptionVersions,
-    EntityContent,
     EntityData,
 )
 from sap_cloud_sdk.cbc.exceptions import (
@@ -339,7 +339,7 @@ class DefaultClient:
         consumption_version: str,
         config_object_id: str,
         entity_id: str,
-    ) -> EntityData:
+    ) -> ConfigEntity:
         url = self._configurations_url(
             base_url,
             f"/consumptionVersions/{consumption_version}/configurationObjects"
@@ -358,7 +358,7 @@ class DefaultClient:
             raw_data = content.get("items", [])
 
         resolved_id = api_meta.get("entityName") or entity_id
-        return EntityData(entity_id=resolved_id, data=EntityContent(raw_data))
+        return ConfigEntity(entity_id=resolved_id, data=EntityData(raw_data))
 
     def _configurations_url(self, base_url: str, path: str = "") -> str:
         base = base_url.rstrip("/")

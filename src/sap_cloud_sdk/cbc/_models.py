@@ -118,8 +118,8 @@ class ConfigObjectList(_FrozenModel):
     items: list[ConfigObjectEntry]
 
 
-class EntityContent:
-    """Configuration content for an entity.
+class EntityData:
+    """Configuration data for an entity.
 
     Wraps the raw API response data and enforces shape at access time.
     """
@@ -128,15 +128,15 @@ class EntityContent:
         self._raw = raw
 
     def is_list(self) -> bool:
-        """Return ``True`` if the content is a list (``as_list()`` is safe to call)."""
+        """Return ``True`` if the data is a list (``as_list()`` is safe to call)."""
         return isinstance(self._raw, list)
 
     def is_object(self) -> bool:
-        """Return ``True`` if the content is a dict (``as_object()`` is safe to call)."""
+        """Return ``True`` if the data is a dict (``as_object()`` is safe to call)."""
         return isinstance(self._raw, dict)
 
     def value(self) -> list[dict[str, Any]] | dict[str, Any]:
-        """Return the content as-is, without asserting its shape.
+        """Return the data as-is, without asserting its shape.
 
         Use :meth:`as_list` / :meth:`as_object` when you expect a specific shape,
         or :meth:`is_list` / :meth:`is_object` to check first.
@@ -144,10 +144,10 @@ class EntityContent:
         return self._raw
 
     def as_list(self) -> list[dict[str, Any]]:
-        """Return the content as a list of objects.
+        """Return the data as a list of objects.
 
         Raises:
-            ValueError: If the content is a dict, not a list.
+            ValueError: If the data is a dict, not a list.
         """
         if not isinstance(self._raw, list):
             raise ValueError(
@@ -156,10 +156,10 @@ class EntityContent:
         return self._raw
 
     def as_object(self) -> dict[str, Any]:
-        """Return the content as a dict.
+        """Return the data as a dict.
 
         Raises:
-            ValueError: If the content is a list, not a dict.
+            ValueError: If the data is a list, not a dict.
         """
         if not isinstance(self._raw, dict):
             raise ValueError(
@@ -168,20 +168,20 @@ class EntityContent:
         return self._raw
 
     def __repr__(self) -> str:
-        return f"EntityContent({self._raw!r})"
+        return f"EntityData({self._raw!r})"
 
 
 @dataclass
-class EntityData:
-    """Configuration content for a single entity.
+class ConfigEntity:
+    """A single entity within a config object.
 
     Attributes:
         entity_id: Authored entity identifier (e.g. ``"payment-mode"``).
-        data: Configuration content for this entity.
+        data: Configuration data for this entity.
     """
 
     entity_id: str
-    data: EntityContent
+    data: EntityData
 
 
 @dataclass
@@ -194,16 +194,16 @@ class ConfigObject:
     """
 
     config_object_id: str
-    entities: list[EntityData]
+    entities: list[ConfigEntity]
 
-    def get_entity(self, entity_id: str) -> EntityData | None:
-        """Return entity data for the given entity ID.
+    def get_config_entity(self, entity_id: str) -> ConfigEntity | None:
+        """Return the entity with the given entity ID.
 
         Args:
             entity_id: Authored entity identifier.
 
         Returns:
-            Matching :class:`EntityData`, or ``None`` if not found.
+            Matching :class:`ConfigEntity`, or ``None`` if not found.
         """
         return next((e for e in self.entities if e.entity_id == entity_id), None)
 
@@ -240,20 +240,20 @@ class ConfigData:
             None,
         )
 
-    def get_entity_data(
+    def get_config_entity(
         self, config_object_id: str, entity_id: str
-    ) -> EntityData | None:
-        """Return entity data for the given config object and entity.
+    ) -> ConfigEntity | None:
+        """Return the entity for the given config object and entity IDs.
 
         Args:
             config_object_id: Authored config object identifier.
             entity_id: Authored entity identifier.
 
         Returns:
-            Matching :class:`EntityData`, or ``None`` if not found.
+            Matching :class:`ConfigEntity`, or ``None`` if not found.
         """
         co = self.get_config_object(config_object_id)
-        return co.get_entity(entity_id) if co is not None else None
+        return co.get_config_entity(entity_id) if co is not None else None
 
 
 # ---------------------------------------------------------------------------

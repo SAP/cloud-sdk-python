@@ -3,15 +3,35 @@ name: Release
 on:
   issues:
     types: [labeled]
+  pull_request:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/release.yml'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (e.g. 0.2.0)'
+        required: true
+      branch:
+        description: 'Branch to release from'
+        required: true
+      bump_type:
+        description: 'Bump type (major/minor/patch)'
+        required: false
+        default: 'minor'
 
 jobs:
   release:
     name: Release
     if: >
-      github.event.label.name == 'status: tests passed' &&
-      contains(github.event.issue.labels.*.name, 'release')
+      github.event_name == 'workflow_dispatch' ||
+      github.event_name == 'pull_request' ||
+      (github.event.label.name == 'status: tests passed' &&
+      contains(github.event.issue.labels.*.name, 'release'))
     runs-on: ubuntu-latest
-    environment: 'pypi:sap-cloud-sdk'
+    # TODO: restore environment before merging to main — needed for PyPI OIDC trusted publishing
+    # environment: 'pypi:sap-cloud-sdk'
     permissions:
       contents: write
       issues: write
@@ -19,31 +39,42 @@ jobs:
       id-token: write
 
     steps:
-      # ── 1. Parse the release issue body ─────────────────────────────────────
+      # ── 1. Parse the release issue body (or workflow_dispatch inputs) ──────────
       - name: Parse release issue
         id: issue
         env:
           BODY: ${{ github.event.issue.body }}
+          EVENT_NAME: ${{ github.event_name }}
         run: |
-          parse_field() {
-            local heading="$1"
-            # Extract the text between "### <heading>" and the next "###" or end-of-body
-            echo "$BODY" \
-              | awk "/^### ${heading}/{found=1; next} found && /^###/{exit} found{print}" \
-              | sed '/^[[:space:]]*$/d' \
-              | head -1 \
-              | xargs
-          }
+          if [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
+            VERSION="${{ github.event.inputs.version }}"
+            BRANCH="${{ github.event.inputs.branch }}"
+            BUMP_TYPE="${{ github.event.inputs.bump_type }}"
+          elif [[ "$EVENT_NAME" == "pull_request" ]]; then
+            # Hardcoded test values — remove pull_request trigger before merging to main
+            VERSION="0.0.99"
+            BRANCH="feature/release-process"
+            BUMP_TYPE="minor"
+          else
+            parse_field() {
+              local heading="$1"
+              echo "$BODY" \
+                | awk "/^### ${heading}/{found=1; next} found && /^###/{exit} found{print}" \
+                | sed '/^[[:space:]]*$/d' \
+                | head -1 \
+                | xargs
+            }
 
-          VERSION=$(parse_field "Version")
-          BRANCH=$(parse_field "Branch")
-          BUMP_TYPE=$(parse_field "Bump Type")
+            VERSION=$(parse_field "Version")
+            BRANCH=$(parse_field "Branch")
+            BUMP_TYPE=$(parse_field "Bump Type")
 
-          if [[ -z "$VERSION" || -z "$BRANCH" ]]; then
-            echo "ERROR: Could not parse Version or Branch from the release issue body."
-            echo "Issue body:"
-            echo "$BODY"
-            exit 1
+            if [[ -z "$VERSION" || -z "$BRANCH" ]]; then
+              echo "ERROR: Could not parse Version or Branch from the release issue body."
+              echo "Issue body:"
+              echo "$BODY"
+              exit 1
+            fi
           fi
 
           echo "version=$VERSION"     >> "$GITHUB_OUTPUT"
@@ -69,6 +100,7 @@ jobs:
 
       # ── 3. Mark issue as in-progress ────────────────────────────────────────
       - name: Update issue — release in progress
+        if: github.event_name == 'issues'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -234,8 +266,8 @@ jobs:
           echo "GitHub Release created: $RELEASE_URL"
 
       # ── 14. Publish to PyPI (OIDC trusted publishing) ───────────────────────
-      - name: Publish to PyPI
-        uses: pypa/gh-action-pypi-publish@v1.14.2
+      # - name: Publish to PyPI
+      #   uses: pypa/gh-action-pypi-publish@v1.14.2
 
       # ── 15. Open PR to merge version bump into the source branch ────────────
       - name: Generate bot token
@@ -272,6 +304,7 @@ jobs:
 
       # ── 16. Close the release issue ─────────────────────────────────────────
       - name: Close release issue
+        if: github.event_name == 'issues'
         env:
           GH_TOKEN: ${{ github.token }}
           VERSION: ${{ steps.issue.outputs.version }}
@@ -307,7 +340,7 @@ jobs:
 
       # ── 17. Handle failure ──────────────────────────────────────────────────
       - name: Mark issue failed on error
-        if: failure()
+        if: failure() && github.event_name == 'issues'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |

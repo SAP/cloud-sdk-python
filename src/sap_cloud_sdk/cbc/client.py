@@ -348,7 +348,6 @@ class DefaultClient:
         )
         body = self._request("GET", url).json()
 
-        api_meta = body.get("metadata", {}) if isinstance(body, dict) else {}
         content = body.get("content", {}) if isinstance(body, dict) else {}
         shape = body.get("contentShape") if isinstance(body, dict) else None
         if shape == "OBJECT":
@@ -357,8 +356,7 @@ class DefaultClient:
             # ARRAY / UNSPECIFIED / absent — items may be absent or empty.
             raw_data = content.get("items", [])
 
-        resolved_id = api_meta.get("entityName") or entity_id
-        return ConfigEntity(entity_id=resolved_id, data=EntityData(raw_data))
+        return ConfigEntity(entity_id=entity_id, data=EntityData(raw_data))
 
     def _configurations_url(self, base_url: str, path: str = "") -> str:
         base = base_url.rstrip("/")

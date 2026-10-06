@@ -22,24 +22,24 @@ on:
         default: 'minor'
 
 jobs:
-  release:
-    name: Release
+  # ── 1. Parse inputs and validate version ──────────────────────────────────
+  parse:
+    name: Parse & Validate
     if: >
       github.event_name == 'workflow_dispatch' ||
       github.event_name == 'pull_request' ||
       (github.event.label.name == 'status: tests passed' &&
       contains(github.event.issue.labels.*.name, 'release'))
     runs-on: ubuntu-latest
-    # TODO: restore environment before merging to main — needed for PyPI OIDC trusted publishing
-    # environment: 'pypi:sap-cloud-sdk'
     permissions:
-      contents: write
       issues: write
-      pull-requests: write
-      id-token: write
+    outputs:
+      version:    ${{ steps.issue.outputs.version }}
+      branch:     ${{ steps.issue.outputs.branch }}
+      bump_type:  ${{ steps.issue.outputs.bump_type }}
+      tag:        ${{ steps.issue.outputs.tag }}
 
     steps:
-      # ── 1. Parse the release issue body (or workflow_dispatch inputs) ──────────
       - name: Parse release issue
         id: issue
         env:
@@ -84,7 +84,6 @@ jobs:
 
           echo "Parsed — version: $VERSION, branch: $BRANCH, bump_type: $BUMP_TYPE"
 
-      # ── 2. Validate version format ───────────────────────────────────────────
       - name: Validate version string
         run: |
           pip install packaging -q
@@ -98,7 +97,6 @@ jobs:
               raise SystemExit(1)
           "
 
-      # ── 3. Mark issue as in-progress ────────────────────────────────────────
       - name: Update issue — release in progress
         if: github.event_name == 'issues'
         env:
@@ -112,15 +110,22 @@ jobs:
             --repo "${{ github.repository }}" \
             --body "🚀 Release workflow started for **v${{ steps.issue.outputs.version }}** from branch \`${{ steps.issue.outputs.branch }}\`."
 
-      # ── 4. Checkout the release branch ──────────────────────────────────────
+  # ── 2. Integration tests ───────────────────────────────────────────────────
+  integration-tests:
+    name: Integration Tests
+    needs: parse
+    if: ${{ !contains(github.event.issue.labels.*.name, 'skip-integration-tests') }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
       - name: Checkout release branch
         uses: actions/checkout@v4
         with:
-          ref: ${{ steps.issue.outputs.branch }}
+          ref: ${{ needs.parse.outputs.branch }}
           fetch-depth: 0
-          token: ${{ github.token }}
 
-      # ── 5. Set up Python and uv (shared by integration tests and build) ──────
       - name: Set up Python
         uses: actions/setup-python@v6
         with:
@@ -131,13 +136,10 @@ jobs:
         with:
           enable-cache: true
 
-      # ── 6. Run integration tests ─────────────────────────────────────────────
       - name: Install dependencies
-        if: ${{ !contains(github.event.issue.labels.*.name, 'skip-integration-tests') }}
         run: uv sync --dev
 
       - name: Set up integration test environment
-        if: ${{ !contains(github.event.issue.labels.*.name, 'skip-integration-tests') }}
         run: |
           echo '${{ toJSON(secrets) }}' \
             | jq -r 'to_entries[]
@@ -157,20 +159,37 @@ jobs:
               done
 
       - name: Run integration tests
-        if: ${{ !contains(github.event.issue.labels.*.name, 'skip-integration-tests') }}
         run: uv run pytest tests/*/integration/ -v --tb=short
 
-      # ── 7. Validate the version bump is an increase ─────────────────────────
+  # ── 3. Version bump ────────────────────────────────────────────────────────
+  version-bump:
+    name: Version Bump
+    needs: [parse, integration-tests]
+    if: always() && needs.parse.result == 'success' && (needs.integration-tests.result == 'success' || needs.integration-tests.result == 'skipped')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    outputs:
+      release_branch: ${{ steps.release_branch.outputs.release_branch }}
+
+    steps:
+      - name: Checkout release branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.parse.outputs.branch }}
+          fetch-depth: 0
+          token: ${{ github.token }}
+
       - name: Validate version bump
         run: |
           CURRENT=$(grep '^version = ' pyproject.toml | cut -d'"' -f2)
-          python .github/scripts/check_version_bump.py "$CURRENT" "${{ steps.issue.outputs.version }}"
+          python .github/scripts/check_version_bump.py "$CURRENT" "${{ needs.parse.outputs.version }}"
 
-      # ── 8. Create release branch, bump version, commit, push ───────────────────
       - name: Create release branch and bump version
         id: release_branch
         run: |
-          RELEASE_BRANCH="release-action-${{ steps.issue.outputs.tag }}"
+          RELEASE_BRANCH="release-action-${{ needs.parse.outputs.tag }}"
 
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
@@ -178,98 +197,22 @@ jobs:
           git checkout -b "$RELEASE_BRANCH"
 
           CURRENT=$(grep '^version = ' pyproject.toml | cut -d'"' -f2)
-          sed -i "s/^version = \"${CURRENT}\"/version = \"${{ steps.issue.outputs.version }}\"/" pyproject.toml
+          sed -i "s/^version = \"${CURRENT}\"/version = \"${{ needs.parse.outputs.version }}\"/" pyproject.toml
           grep '^version = ' pyproject.toml
-          echo "Updated pyproject.toml → ${{ steps.issue.outputs.version }}"
+          echo "Updated pyproject.toml → ${{ needs.parse.outputs.version }}"
 
           git add pyproject.toml
-          git commit -m "chore(release): bump version to ${{ steps.issue.outputs.version }}"
+          git commit -m "chore(release): bump version to ${{ needs.parse.outputs.version }}"
           git push origin "$RELEASE_BRANCH"
 
           echo "release_branch=$RELEASE_BRANCH" >> "$GITHUB_OUTPUT"
           echo "Release branch pushed: $RELEASE_BRANCH"
 
-      # ── 9. Create and push the tag ───────────────────────────────────────────
       - name: Create and push tag
         run: |
-          git tag "${{ steps.issue.outputs.tag }}" -m "Release ${{ steps.issue.outputs.tag }}"
-          git push origin "${{ steps.issue.outputs.tag }}"
+          git tag "${{ needs.parse.outputs.tag }}" -m "Release ${{ needs.parse.outputs.tag }}"
+          git push origin "${{ needs.parse.outputs.tag }}"
 
-      # ── 10. Build the distribution ───────────────────────────────────────────
-      - name: Build release distribution
-        run: uv build
-
-      - name: Verify build artifacts
-        run: |
-          wheel_count=$(ls -1 dist/*.whl 2>/dev/null | wc -l)
-          tar_count=$(ls -1 dist/*.tar.gz 2>/dev/null | wc -l)
-          [[ "$wheel_count" -ge 1 && "$tar_count" -ge 1 ]] || \
-            { echo "ERROR: Missing build artifacts (wheels: $wheel_count, sdists: $tar_count)"; exit 1; }
-          echo "Build artifacts: $wheel_count wheel(s), $tar_count sdist(s)"
-          ls -lh dist/
-
-      # ── 11. Extract release notes from the issue body ───────────────────────
-      - name: Extract release notes
-        id: notes
-        env:
-          BODY: ${{ github.event.issue.body }}
-        run: |
-          # Extract Release Notes section into temp file
-          echo "$BODY" \
-            | awk '/^### Release Notes/{found=1; next} found && /^### (Version|Bump Type|Branch|Breaking Changes)/{exit} found{print}' \
-            | sed '/^[[:space:]]*$/d' \
-            > /tmp/release_notes.md
-
-          # Append Breaking Changes section if present and non-empty
-          BREAKING=$(echo "$BODY" \
-            | awk '/^### Breaking Changes/{found=1; next} found && /^###/{exit} found{print}' \
-            | sed '/^[[:space:]]*$/d')
-
-          if [[ -n "$BREAKING" && "$BREAKING" != *"_None_"* ]]; then
-            printf '\n%s\n' "$BREAKING" >> /tmp/release_notes.md
-          fi
-
-          echo "notes_file=/tmp/release_notes.md" >> "$GITHUB_OUTPUT"
-
-      # ── 12. Guard: confirm version is not already on PyPI ───────────────────
-      - name: Check version does not already exist on PyPI
-        run: |
-          PKG_NAME=$(python3 -c "import toml; print(toml.load('pyproject.toml')['project']['name'])")
-          VERSION="${{ steps.issue.outputs.version }}"
-          HTTP=$(curl -s -o /dev/null -w "%{http_code}" "https://pypi.org/pypi/$PKG_NAME/$VERSION/json")
-          if [[ "$HTTP" == "200" ]]; then
-            echo "ERROR: $PKG_NAME $VERSION already exists on PyPI."
-            exit 1
-          fi
-          echo "$PKG_NAME $VERSION is not yet on PyPI — proceeding."
-
-      # ── 13. Create the GitHub Release ───────────────────────────────────────
-      - name: Create GitHub Release
-        id: gh_release
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          IS_PRERELEASE=$(python3 -c "
-          from packaging.version import Version
-          v = Version('${{ steps.issue.outputs.version }}')
-          print('true' if v.is_prerelease else 'false')
-          ")
-
-          RELEASE_URL=$(gh release create "${{ steps.issue.outputs.tag }}" \
-            --repo "${{ github.repository }}" \
-            --title "v${{ steps.issue.outputs.version }}" \
-            --notes-file "${{ steps.notes.outputs.notes_file }}" \
-            $([ "$IS_PRERELEASE" = "true" ] && echo "--prerelease") \
-            dist/*.whl dist/*.tar.gz)
-
-          echo "release_url=$RELEASE_URL" >> "$GITHUB_OUTPUT"
-          echo "GitHub Release created: $RELEASE_URL"
-
-      # ── 14. Publish to PyPI (OIDC trusted publishing) ───────────────────────
-      # - name: Publish to PyPI
-      #   uses: pypa/gh-action-pypi-publish@v1.14.2
-
-      # ── 15. Open PR to merge version bump into the source branch ────────────
       - name: Generate bot token
         id: bot_token
         uses: actions/create-github-app-token@v1
@@ -280,10 +223,10 @@ jobs:
       - name: Open and auto-merge version bump PR
         env:
           GH_TOKEN: ${{ steps.bot_token.outputs.token }}
-          VERSION: ${{ steps.issue.outputs.version }}
-          TAG: ${{ steps.issue.outputs.tag }}
+          VERSION: ${{ needs.parse.outputs.version }}
+          TAG: ${{ needs.parse.outputs.tag }}
           RELEASE_BRANCH: ${{ steps.release_branch.outputs.release_branch }}
-          TARGET_BRANCH: ${{ steps.issue.outputs.branch }}
+          TARGET_BRANCH: ${{ needs.parse.outputs.branch }}
         run: |
           PR_URL=$(gh pr create \
             --repo "${{ github.repository }}" \
@@ -302,15 +245,129 @@ jobs:
 
           echo "PR merged and release branch deleted."
 
-      # ── 16. Close the release issue ─────────────────────────────────────────
-      - name: Close release issue
-        if: github.event_name == 'issues'
+  # ── 4. Publish ────────────────────────────────────────────────────────────
+  publish:
+    name: Publish
+    needs: [parse, version-bump]
+    if: needs.parse.result == 'success' && needs.version-bump.result == 'success'
+    runs-on: ubuntu-latest
+    # TODO: restore environment before merging to main — needed for PyPI OIDC trusted publishing
+    # environment: 'pypi:sap-cloud-sdk'
+    permissions:
+      contents: write
+      id-token: write
+    outputs:
+      release_url: ${{ steps.gh_release.outputs.release_url }}
+
+    steps:
+      - name: Checkout release branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.parse.outputs.branch }}
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
+
+      - name: Build release distribution
+        run: uv build
+
+      - name: Verify build artifacts
+        run: |
+          wheel_count=$(ls -1 dist/*.whl 2>/dev/null | wc -l)
+          tar_count=$(ls -1 dist/*.tar.gz 2>/dev/null | wc -l)
+          [[ "$wheel_count" -ge 1 && "$tar_count" -ge 1 ]] || \
+            { echo "ERROR: Missing build artifacts (wheels: $wheel_count, sdists: $tar_count)"; exit 1; }
+          echo "Build artifacts: $wheel_count wheel(s), $tar_count sdist(s)"
+          ls -lh dist/
+
+      - name: Extract release notes
+        id: notes
+        env:
+          BODY: ${{ github.event.issue.body }}
+        run: |
+          echo "$BODY" \
+            | awk '/^### Release Notes/{found=1; next} found && /^### (Version|Bump Type|Branch|Breaking Changes)/{exit} found{print}' \
+            | sed '/^[[:space:]]*$/d' \
+            > /tmp/release_notes.md
+
+          BREAKING=$(echo "$BODY" \
+            | awk '/^### Breaking Changes/{found=1; next} found && /^###/{exit} found{print}' \
+            | sed '/^[[:space:]]*$/d')
+
+          if [[ -n "$BREAKING" && "$BREAKING" != *"_None_"* ]]; then
+            printf '\n%s\n' "$BREAKING" >> /tmp/release_notes.md
+          fi
+
+          echo "notes_file=/tmp/release_notes.md" >> "$GITHUB_OUTPUT"
+
+      - name: Check version does not already exist on PyPI
+        run: |
+          PKG_NAME=$(python3 -c "import toml; print(toml.load('pyproject.toml')['project']['name'])")
+          VERSION="${{ needs.parse.outputs.version }}"
+          HTTP=$(curl -s -o /dev/null -w "%{http_code}" "https://pypi.org/pypi/$PKG_NAME/$VERSION/json")
+          if [[ "$HTTP" == "200" ]]; then
+            echo "ERROR: $PKG_NAME $VERSION already exists on PyPI."
+            exit 1
+          fi
+          echo "$PKG_NAME $VERSION is not yet on PyPI — proceeding."
+
+      - name: Create GitHub Release
+        id: gh_release
         env:
           GH_TOKEN: ${{ github.token }}
-          VERSION: ${{ steps.issue.outputs.version }}
-          TAG: ${{ steps.issue.outputs.tag }}
-          TARGET_BRANCH: ${{ steps.issue.outputs.branch }}
-          RELEASE_URL: ${{ steps.gh_release.outputs.release_url }}
+        run: |
+          IS_PRERELEASE=$(python3 -c "
+          from packaging.version import Version
+          v = Version('${{ needs.parse.outputs.version }}')
+          print('true' if v.is_prerelease else 'false')
+          ")
+
+          RELEASE_URL=$(gh release create "${{ needs.parse.outputs.tag }}" \
+            --repo "${{ github.repository }}" \
+            --title "v${{ needs.parse.outputs.version }}" \
+            --notes-file "${{ steps.notes.outputs.notes_file }}" \
+            $([ "$IS_PRERELEASE" = "true" ] && echo "--prerelease") \
+            dist/*.whl dist/*.tar.gz)
+
+          echo "release_url=$RELEASE_URL" >> "$GITHUB_OUTPUT"
+          echo "GitHub Release created: $RELEASE_URL"
+
+      # TODO: uncomment before merging to main
+      # - name: Publish to PyPI
+      #   uses: pypa/gh-action-pypi-publish@v1.14.2
+
+  # ── 5. Close issue ────────────────────────────────────────────────────────
+  close-issue:
+    name: Close Issue
+    needs: [parse, integration-tests, version-bump, publish]
+    if: always() && github.event_name == 'issues'
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+
+    steps:
+      - name: Checkout for package name
+        if: needs.publish.result == 'success'
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.parse.outputs.branch }}
+
+      - name: Close release issue — success
+        if: needs.publish.result == 'success'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.parse.outputs.version }}
+          TAG: ${{ needs.parse.outputs.tag }}
+          TARGET_BRANCH: ${{ needs.parse.outputs.branch }}
+          RELEASE_URL: ${{ needs.publish.outputs.release_url }}
         run: |
           PKG_NAME=$(python3 -c "import toml; print(toml.load('pyproject.toml')['project']['name'])")
           PYPI_URL="https://pypi.org/project/${PKG_NAME}/${VERSION}/"
@@ -338,9 +395,8 @@ jobs:
             --repo "${{ github.repository }}" \
             --comment "Closing — package is live on PyPI."
 
-      # ── 17. Handle failure ──────────────────────────────────────────────────
       - name: Mark issue failed on error
-        if: failure() && github.event_name == 'issues'
+        if: needs.parse.result == 'failure' || needs['integration-tests'].result == 'failure' || needs['version-bump'].result == 'failure' || needs.publish.result == 'failure'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |

@@ -116,7 +116,7 @@ class TestEntityData:
 
 
 class TestConfigData:
-    def _entity_data(self, entity_id: str) -> EntityData:
+    def _entity_data(self, entity_id: str) -> ConfigEntity:
         return ConfigEntity(entity_id=entity_id, data=EntityData([]))
 
     def _config_object(self, config_object_id: str, *entity_ids: str) -> ConfigObject:

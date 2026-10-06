@@ -2,21 +2,46 @@
 
 from __future__ import annotations
 
+import base64
+import json
 import logging
-from typing import IO, Optional, Union
+from typing import IO, Callable, Optional, Union
 
+from requests.exceptions import RequestException
+
+from sap_cloud_sdk.core.protocol.http import HttpClient, XsuaaAuthProvider
 from sap_cloud_sdk.core.telemetry import Module, Operation, record_metrics
-from sap_cloud_sdk.print._http import PrintHttp
+from sap_cloud_sdk.print.config import PrintConfig
 from sap_cloud_sdk.print.exceptions import HttpError, PrintOperationError
 from sap_cloud_sdk.print._models import PrintProfile, PrintQueue, PrintTask
 
-_QUEUES_PATH = "qm/api/v1/rest/queues"
-_DOCUMENTS_PATH = "dm/api/v1/rest/print-documents"
-_TASKS_PATH = "qm/api/v1/rest/print-tasks"
+_QUEUES_PATH = "/qm/api/v1/rest/queues"
+_DOCUMENTS_PATH = "/dm/api/v1/rest/print-documents"
+_TASKS_PATH = "/qm/api/v1/rest/print-tasks"
 
 _IF_NONE_MATCH = {"If-None-Match": "*"}
 
 logger = logging.getLogger(__name__)
+
+
+def _resolve_username(access_token: str, fallback_client_id: str) -> str:
+    """Decode the JWT access token and return the best available username.
+
+    Returns ``user_name`` claim (interactive flows), ``client_id`` claim
+    (technical-user flows), or ``fallback_client_id`` if decoding fails.
+    """
+    try:
+        payload_b64 = access_token.split(".")[1]
+        padding = 4 - len(payload_b64) % 4
+        if padding != 4:
+            payload_b64 += "=" * padding
+        claims = json.loads(base64.urlsafe_b64decode(payload_b64))
+        return str(
+            claims.get("user_name") or claims.get("client_id") or fallback_client_id
+        )
+    except Exception:
+        logger.debug("could not decode JWT claims, falling back to client_id")
+        return fallback_client_id
 
 
 class PrintClient:
@@ -51,10 +76,57 @@ class PrintClient:
     """
 
     def __init__(
-        self, http: PrintHttp, _telemetry_source: Optional[Module] = None
+        self,
+        http: HttpClient,
+        auth_provider: XsuaaAuthProvider,
+        config_factory: Callable[[], PrintConfig],
+        _telemetry_source: Optional[Module] = None,
     ) -> None:
         self._http = http
+        self._auth_provider = auth_provider
+        self._config_factory = config_factory
         self._telemetry_source = _telemetry_source
+
+    def get_username(self) -> str:
+        """Resolve the username from the current OAuth token (or fall back to client_id)."""
+        session = self._auth_provider.get_session()
+        return _resolve_username(
+            session.access_token or "",
+            self._config_factory().client_id,
+        )
+
+    def _request(self, method: str, path: str, **kwargs):
+        try:
+            resp = self._http.request(method, path, **kwargs)
+        except RequestException as e:
+            logger.error("request failed [%s %s]: %s", method, path, e)
+            raise HttpError(f"request failed: {e}") from e
+
+        if 200 <= resp.status_code < 300:
+            return resp
+
+        text: str = ""
+        try:
+            text = resp.text
+        except Exception:
+            text = "<failed to read response body>"
+
+        raise HttpError(
+            f"HTTP {resp.status_code} for {method} {path}",
+            status_code=resp.status_code,
+            response_text=text,
+        )
+
+    def get(self, path: str, *, params=None, headers=None):
+        return self._request("GET", path, params=params, headers=headers)
+
+    def put(self, path: str, *, json=None, headers=None):
+        return self._request("PUT", path, json=json, headers=headers)
+
+    def post(self, path: str, *, json=None, data=None, files=None, headers=None):
+        return self._request(
+            "POST", path, json=json, data=data, files=files, headers=headers
+        )
 
     @record_metrics(Module.PRINT, Operation.PRINT_LIST_QUEUES)
     def list_queues(self) -> list[PrintQueue]:
@@ -67,7 +139,7 @@ class PrintClient:
             PrintOperationError: If the request fails or the response cannot be parsed.
         """
         try:
-            resp = self._http.get(_QUEUES_PATH)
+            resp = self.get(_QUEUES_PATH)
             data = resp.json()
             return [PrintQueue.from_dict(item) for item in data]
         except HttpError as e:
@@ -91,7 +163,7 @@ class PrintClient:
             PrintOperationError: If the request fails.
         """
         try:
-            self._http.put(
+            self.put(
                 f"{_QUEUES_PATH}/{queue.qname}",
                 json=queue.to_dict(),
                 headers=_IF_NONE_MATCH,
@@ -119,7 +191,7 @@ class PrintClient:
             PrintOperationError: If the request fails or the response cannot be parsed.
         """
         try:
-            resp = self._http.get(f"{_QUEUES_PATH}/{qname}/profiles")
+            resp = self.get(f"{_QUEUES_PATH}/{qname}/profiles")
             data = resp.json()
             return [PrintProfile.from_dict(item) for item in data]
         except HttpError as e:
@@ -158,7 +230,7 @@ class PrintClient:
         """
         try:
             headers = {**_IF_NONE_MATCH, "scan": str(scan).lower()}
-            resp = self._http.post(
+            resp = self.post(
                 _DOCUMENTS_PATH,
                 files={"file": (filename, file)},
                 headers=headers,
@@ -186,9 +258,9 @@ class PrintClient:
             PrintOperationError: If the request fails.
         """
         if not task.username:
-            task.username = self._http.get_username()
+            task.username = self.get_username()
         try:
-            self._http.put(
+            self.put(
                 f"{_TASKS_PATH}/{task.item_id}",
                 json=task.to_body(),
                 headers=_IF_NONE_MATCH,

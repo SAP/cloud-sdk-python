@@ -17,12 +17,15 @@ Run against a live BTP tenant:
 import asyncio
 import os
 from typing import Optional
+from unittest.mock import AsyncMock
 
 import pytest
+from pydantic import BaseModel
 from pytest_bdd import scenarios, given, when, then, parsers
 
 from sap_cloud_sdk.agentgateway import AgentGatewayClient, AuthResult, AgentGatewaySDKError
 from sap_cloud_sdk.agentgateway._models import MCPTool
+from sap_cloud_sdk.agentgateway.converters import mcp_tool_to_langchain
 
 scenarios("agw_auth.feature")
 
@@ -52,6 +55,7 @@ class ScenarioContext:
         self.operation_error: Optional[Exception] = None
         self.user_token: Optional[str] = None
         self.tools: Optional[list[MCPTool]] = None
+        self.langchain_tools: Optional[list] = None
         self.tool_result: Optional[str] = None
         self.sample_mcp_tool_name: Optional[str] = None
         self.ias_client_id: Optional[str] = None
@@ -281,3 +285,71 @@ def ias_client_id_non_empty(context: ScenarioContext):
     assert context.ias_client_id is not None
     assert isinstance(context.ias_client_id, str)
     assert context.ias_client_id.strip(), "Expected a non-empty IAS client ID"
+
+
+# ==================== LANGCHAIN CONVERTER STEPS ====================
+
+
+@when("I convert all tools to LangChain StructuredTools")
+def convert_tools_to_langchain(context: ScenarioContext):
+    """Convert every MCPTool from list_mcp_tools to a LangChain StructuredTool."""
+    assert context.tools is not None, "call list_mcp_tools before converting"
+    token = context.user_token or ""
+    context.langchain_tools = [
+        mcp_tool_to_langchain(t, AsyncMock(return_value="ok"), lambda: token)
+        for t in context.tools
+    ]
+
+
+@then("every tool should have a non-empty name and description")
+def every_langchain_tool_has_name_and_description(context: ScenarioContext):
+    """Verify name and description survive the conversion."""
+    assert context.langchain_tools is not None
+    for lc_tool, mcp_tool in zip(context.langchain_tools, context.tools or []):
+        assert lc_tool.name == mcp_tool.name, (
+            f"name mismatch: LangChain={lc_tool.name!r}, MCPTool={mcp_tool.name!r}"
+        )
+        assert isinstance(lc_tool.description, str) and lc_tool.description.strip(), (
+            f"Tool '{lc_tool.name}' has empty description"
+        )
+
+
+@then("every tool should have a Pydantic args_schema")
+def every_langchain_tool_has_args_schema(context: ScenarioContext):
+    """Verify every converted tool has a Pydantic BaseModel as args_schema."""
+    assert context.langchain_tools is not None
+    for lc_tool in context.langchain_tools:
+        assert lc_tool.args_schema is not None, (
+            f"Tool '{lc_tool.name}' has no args_schema"
+        )
+        assert isinstance(lc_tool.args_schema, type) and issubclass(
+            lc_tool.args_schema, BaseModel
+        ), f"Tool '{lc_tool.name}' args_schema is not a Pydantic BaseModel"
+
+
+@then("every tool should preserve metadata fields from input_schema")
+def every_langchain_tool_preserves_metadata(context: ScenarioContext):
+    """Verify that description, title, examples, enum, and constraints from the
+    MCP input_schema appear in the converted Pydantic model_json_schema."""
+    assert context.langchain_tools is not None
+    assert context.tools is not None
+
+    CHECKED_KEYS = ("description", "title", "examples", "enum", "pattern",
+                    "maxLength", "minimum", "maximum", "format", "default")
+
+    for lc_tool, mcp_tool in zip(context.langchain_tools, context.tools):
+        assert isinstance(lc_tool.args_schema, type) and issubclass(lc_tool.args_schema, BaseModel)
+        out_props = lc_tool.args_schema.model_json_schema().get("properties", {})
+        in_props = mcp_tool.input_schema.get("properties", {})
+
+        for pname, pdef in in_props.items():
+            safe = pname.lstrip("_") or pname
+            assert safe in out_props, (
+                f"Tool '{mcp_tool.name}': parameter '{pname}' missing from converted schema"
+            )
+            out_str = str(out_props[safe])
+            for key in CHECKED_KEYS:
+                if key in pdef:
+                    assert f"'{key}'" in out_str or f'"{key}"' in out_str, (
+                        f"Tool '{mcp_tool.name}': '{pname}'.{key} dropped during conversion"
+                    )

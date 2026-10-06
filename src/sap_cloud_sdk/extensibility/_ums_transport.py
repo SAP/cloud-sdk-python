@@ -354,7 +354,19 @@ def _build_source_mapping(
                 if hook_id:
                     hook_map[hook_id] = source_info
 
-    return ExtensionSourceMapping(tools=tool_map, hooks=hook_map)
+            # Map instructions (use the extension instance id as the mapping key)
+            raw_instruction = cap_impl.get("instruction")
+            if raw_instruction and isinstance(raw_instruction, dict):
+                if raw_instruction.get("text"):
+                    instruction_key = node.get("id", "") or title
+                    if instruction_key:
+                        instruction_map[instruction_key] = source_info
+
+    return ExtensionSourceMapping(
+        tools=tool_map,
+        hooks=hook_map,
+        instructions=instruction_map,
+    )
 
 
 def _transform_ums_response(

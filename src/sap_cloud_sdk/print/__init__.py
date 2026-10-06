@@ -34,8 +34,7 @@ from sap_cloud_sdk.print._models import (
     PrintTask,
     PrintTaskMetadata,
 )
-from sap_cloud_sdk.print.config import load_from_env_or_mount, PrintConfig
-from sap_cloud_sdk.print._http import PrintHttp, TokenProvider
+from sap_cloud_sdk.print.config import PrintConfig, _make_config_factory
 from sap_cloud_sdk.print.client import PrintClient
 from sap_cloud_sdk.print.exceptions import (
     PrintError,
@@ -45,6 +44,7 @@ from sap_cloud_sdk.print.exceptions import (
     PrintOperationError,
 )
 
+from sap_cloud_sdk.core.protocol.http import HttpClient, XsuaaAuthProvider
 from sap_cloud_sdk.core.telemetry import (
     Module,
     Operation,
@@ -72,10 +72,24 @@ def create_client(
         ClientCreationError: If client creation fails.
     """
     try:
-        binding = config or load_from_env_or_mount(instance)
-        tp = TokenProvider(binding)
-        http = PrintHttp(config=binding, token_provider=tp)
-        return PrintClient(http, _telemetry_source=_telemetry_source)
+        if config is not None:
+            auth_provider = XsuaaAuthProvider(lambda: config)
+            return PrintClient(
+                http=HttpClient(config.url, auth_provider),
+                auth_provider=auth_provider,
+                config_factory=lambda: config,
+                _telemetry_source=_telemetry_source,
+            )
+        else:
+            factory = _make_config_factory(instance)
+            initial_config = factory()
+            auth_provider = XsuaaAuthProvider(factory)
+            return PrintClient(
+                http=HttpClient(initial_config.url, auth_provider),
+                auth_provider=auth_provider,
+                config_factory=factory,
+                _telemetry_source=_telemetry_source,
+            )
     except Exception as e:
         _record_error_metric(
             Module.PRINT,

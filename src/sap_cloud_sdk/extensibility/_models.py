@@ -866,3 +866,24 @@ class ExtensionCapabilityImplementation:
         if self.source and hook_id in self.source.hooks:
             return self.source.hooks[hook_id]
         return None
+
+    def get_source_info_for_instruction(
+        self, extension_id: str
+    ) -> Optional[ExtensionSourceInfo]:
+        """Look up the full source info for a specific instruction contributor.
+
+        Returns the :class:`ExtensionSourceInfo` containing extension name,
+        version, and ID for the extension that contributed an instruction
+        fragment.  Returns ``None`` when source mapping is not available or
+        the extension ID is not found.
+
+        Args:
+            extension_id: The extension instance ID used as the key in
+                ``source.instructions`` (e.g., ``"ext-instance-1"``).
+
+        Returns:
+            :class:`ExtensionSourceInfo` for the instruction contributor, or ``None``.
+        """
+        if self.source and extension_id in self.source.instructions:
+            return self.source.instructions[extension_id]
+        return None

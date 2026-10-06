@@ -24,25 +24,7 @@ from sap_cloud_sdk.adms.client import (
     AsyncAdmsClient,
     create_async_client,
 )
-from sap_cloud_sdk.adms.config import AdmsConfig, load_from_env_or_mount
 from sap_cloud_sdk.adms.exceptions import ConfigError
-
-
-# ---------------------------------------------------------------------------
-# Configuration fixture
-# ---------------------------------------------------------------------------
-
-
-@pytest.fixture(scope="session")
-def adms_config() -> AdmsConfig:
-    """Resolve AdmsConfig from env/secret-mount.
-
-    Skips the entire integration suite when required credentials are missing.
-    """
-    try:
-        return load_from_env_or_mount("default")
-    except ConfigError as exc:
-        pytest.skip(f"ADMS integration tests skipped — missing config: {exc}")
 
 
 # ---------------------------------------------------------------------------
@@ -51,15 +33,21 @@ def adms_config() -> AdmsConfig:
 
 
 @pytest.fixture(scope="session")
-def adms_client(adms_config: AdmsConfig) -> AdmsClient:
-    """Sync AdmsClient wired to the real ADM instance."""
-    return create_client(config=adms_config)
+def adms_client() -> AdmsClient:
+    """Sync AdmsClient wired to the real ADM instance via ConfigFactory."""
+    try:
+        return create_client()
+    except ConfigError as exc:
+        pytest.skip(f"ADMS integration tests skipped — missing config: {exc}")
 
 
 @pytest.fixture(scope="function")
-def async_adms_client(adms_config: AdmsConfig) -> AsyncAdmsClient:
-    """Async AdmsClient wired to the real ADM instance."""
-    return create_async_client(config=adms_config)
+def async_adms_client() -> AsyncAdmsClient:
+    """Async AdmsClient wired to the real ADM instance via ConfigFactory."""
+    try:
+        return create_async_client()
+    except ConfigError as exc:
+        pytest.skip(f"ADMS integration tests skipped — missing config: {exc}")
 
 
 # ---------------------------------------------------------------------------

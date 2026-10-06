@@ -1,11 +1,12 @@
-"""Unit tests for HttpInvoker (get, post_form, get_stream, header methods)."""
+"""Unit tests for HttpInvoker (get, post, put, delete, post_form, get_stream)."""
 
-from unittest.mock import Mock, patch
+from unittest.mock import Mock, patch, MagicMock
 
 import pytest
 import requests
 
 from sap_cloud_sdk.dms._http import HttpInvoker
+from sap_cloud_sdk.core.protocol.http import HttpMethod, XsuaaAuthProvider
 from sap_cloud_sdk.dms.exceptions import (
     DMSConflictException,
     DMSConnectionError,
@@ -16,47 +17,37 @@ from sap_cloud_sdk.dms.exceptions import (
 )
 
 
-@pytest.fixture
-def mock_auth():
-    auth = Mock()
-    auth.get_token.return_value = "test-token-123"
-    return auth
+def _make_response(status_code=200, json_data=None, text=""):
+    resp = Mock()
+    resp.status_code = status_code
+    resp.text = text
+    if json_data is not None:
+        resp.json.return_value = json_data
+    else:
+        resp.json.side_effect = ValueError("No JSON")
+    return resp
 
 
 @pytest.fixture
-def invoker(mock_auth):
-    return HttpInvoker(
-        auth=mock_auth,
-        base_url="https://api.example.com",
-        connect_timeout=5,
-        read_timeout=15,
-    )
+def mock_auth_provider():
+    return Mock(spec=XsuaaAuthProvider)
 
 
-# ---------------------------------------------------------------
-# Header helpers
-# ---------------------------------------------------------------
+@pytest.fixture
+def mock_http_client():
+    return Mock()
 
 
-class TestHeaders:
-    def test_auth_header(self, invoker):
-        headers = invoker._auth_header()
-        assert headers == {"Authorization": "Bearer test-token-123"}
-
-    def test_auth_header_with_tenant(self, invoker, mock_auth):
-        invoker._auth_header("tenant-sub")
-        mock_auth.get_token.assert_called_with("tenant-sub")
-
-    def test_default_headers(self, invoker):
-        headers = invoker._default_headers()
-        assert headers["Authorization"] == "Bearer test-token-123"
-        assert headers["Content-Type"] == "application/json"
-        assert headers["Accept"] == "application/json"
-
-    def test_merged_headers_applies_overrides(self, invoker):
-        merged = invoker._merged_headers(None, {"Accept": "text/xml"})
-        assert merged["Accept"] == "text/xml"
-        assert merged["Authorization"] == "Bearer test-token-123"
+@pytest.fixture
+def invoker(mock_auth_provider, mock_http_client):
+    with patch("sap_cloud_sdk.dms._http.HttpClient", return_value=mock_http_client):
+        inv = HttpInvoker(
+            auth_provider=mock_auth_provider,
+            base_url="https://api.example.com",
+            connect_timeout=5,
+            read_timeout=15,
+        )
+    return inv, mock_http_client
 
 
 # ---------------------------------------------------------------
@@ -65,125 +56,81 @@ class TestHeaders:
 
 
 class TestGet:
-    @patch("sap_cloud_sdk.dms._http.requests.get")
-    def test_get_basic(self, mock_get, invoker):
-        mock_resp = Mock()
-        mock_resp.status_code = 200
-        mock_resp.content = b'{"key": "val"}'
-        mock_resp.json.return_value = {"key": "val"}
-        mock_get.return_value = mock_resp
+    def test_get_basic(self, invoker):
+        inv, http = invoker
+        http.request.return_value = _make_response(200, {"key": "val"})
 
-        result = invoker.get("/rest/v2/repos")
+        result = inv.get("/rest/v2/repos")
 
-        mock_get.assert_called_once_with(
-            "https://api.example.com/rest/v2/repos",
-            headers={
-                "Authorization": "Bearer test-token-123",
-                "Content-Type": "application/json",
-                "Accept": "application/json",
-            },
-            params=None,
-            timeout=(5, 15),
-        )
-        assert result is mock_resp
+        http.request.assert_called_once()
+        call_args = http.request.call_args
+        assert call_args[0][0] == HttpMethod.GET
+        assert call_args[0][1] == "/rest/v2/repos"
+        assert result.status_code == 200
 
-    @patch("sap_cloud_sdk.dms._http.requests.get")
-    def test_get_with_params(self, mock_get, invoker):
-        mock_resp = Mock()
-        mock_resp.status_code = 200
-        mock_get.return_value = mock_resp
+    def test_get_with_params(self, invoker):
+        inv, http = invoker
+        http.request.return_value = _make_response(200)
 
-        result = invoker.get("/path", params={"objectId": "abc", "cmisselector": "acl"})
+        inv.get("/path", params={"objectId": "abc", "cmisselector": "acl"})
 
-        call_kwargs = mock_get.call_args[1]
+        call_kwargs = http.request.call_args[1]
         assert call_kwargs["params"] == {"objectId": "abc", "cmisselector": "acl"}
-        assert result is mock_resp
 
-    @patch("sap_cloud_sdk.dms._http.requests.get")
-    def test_get_with_custom_headers(self, mock_get, invoker):
-        mock_resp = Mock()
-        mock_resp.status_code = 200
-        mock_get.return_value = mock_resp
+    def test_get_with_tenant(self, invoker):
+        inv, http = invoker
+        http.request.return_value = _make_response(200)
 
-        invoker.get("/repos", headers={"Accept": "application/vnd.sap.sdm+json"})
+        inv.get("/path", tenant_subdomain="sub1")
 
-        call_kwargs = mock_get.call_args[1]
-        # Custom Accept should override default
-        assert call_kwargs["headers"]["Accept"] == "application/vnd.sap.sdm+json"
-        # Auth should still be present
-        assert call_kwargs["headers"]["Authorization"] == "Bearer test-token-123"
+        call_kwargs = http.request.call_args[1]
+        assert call_kwargs["tenant_subdomain"] == "sub1"
 
-    @patch("sap_cloud_sdk.dms._http.requests.get")
-    def test_get_with_tenant(self, mock_get, invoker, mock_auth):
-        mock_resp = Mock()
-        mock_resp.status_code = 200
-        mock_get.return_value = mock_resp
-
-        invoker.get("/path", tenant_subdomain="sub1")
-
-        mock_auth.get_token.assert_called_with("sub1")
-
-    @patch("sap_cloud_sdk.dms._http.requests.get")
-    def test_get_404_raises_not_found(self, mock_get, invoker):
-        mock_resp = Mock()
-        mock_resp.status_code = 404
-        mock_resp.text = "Not Found"
-        mock_resp.json.side_effect = ValueError("No JSON")
-        mock_get.return_value = mock_resp
+    def test_get_404_raises_not_found(self, invoker):
+        inv, http = invoker
+        http.request.return_value = _make_response(404, text="Not Found")
 
         with pytest.raises(DMSObjectNotFoundException) as exc_info:
-            invoker.get("/missing")
+            inv.get("/missing")
         assert exc_info.value.status_code == 404
 
-    @patch("sap_cloud_sdk.dms._http.requests.get")
-    def test_get_400_raises_invalid_argument(self, mock_get, invoker):
-        mock_resp = Mock()
-        mock_resp.status_code = 400
-        mock_resp.text = "Bad Request"
-        mock_resp.json.side_effect = ValueError("No JSON")
-        mock_get.return_value = mock_resp
+    def test_get_400_raises_invalid_argument(self, invoker):
+        inv, http = invoker
+        http.request.return_value = _make_response(400, text="Bad Request")
 
         with pytest.raises(DMSInvalidArgumentException) as exc_info:
-            invoker.get("/bad")
+            inv.get("/bad")
         assert exc_info.value.status_code == 400
 
-    @patch("sap_cloud_sdk.dms._http.requests.get")
-    def test_get_401_raises_permission_denied(self, mock_get, invoker):
-        mock_resp = Mock()
-        mock_resp.status_code = 401
-        mock_resp.text = "Unauthorized"
-        mock_resp.json.side_effect = ValueError("No JSON")
-        mock_get.return_value = mock_resp
+    def test_get_401_raises_permission_denied(self, invoker):
+        inv, http = invoker
+        http.request.return_value = _make_response(401, text="Unauthorized")
 
         with pytest.raises(DMSPermissionDeniedException) as exc_info:
-            invoker.get("/unauthorized")
+            inv.get("/unauthorized")
         assert exc_info.value.status_code == 401
 
-    @patch("sap_cloud_sdk.dms._http.requests.get")
-    def test_get_500_raises_runtime(self, mock_get, invoker):
-        mock_resp = Mock()
-        mock_resp.status_code = 500
-        mock_resp.text = "Internal Server Error"
-        mock_resp.json.side_effect = ValueError("No JSON")
-        mock_get.return_value = mock_resp
+    def test_get_500_raises_runtime(self, invoker):
+        inv, http = invoker
+        http.request.return_value = _make_response(500, text="Internal Server Error")
 
         with pytest.raises(DMSRuntimeException) as exc_info:
-            invoker.get("/error")
+            inv.get("/error")
         assert exc_info.value.status_code == 500
 
-    @patch("sap_cloud_sdk.dms._http.requests.get")
-    def test_get_connection_error(self, mock_get, invoker):
-        mock_get.side_effect = requests.exceptions.ConnectionError("refused")
+    def test_get_connection_error(self, invoker):
+        inv, http = invoker
+        http.request.side_effect = requests.exceptions.ConnectionError("refused")
 
         with pytest.raises(DMSConnectionError):
-            invoker.get("/unreachable")
+            inv.get("/unreachable")
 
-    @patch("sap_cloud_sdk.dms._http.requests.get")
-    def test_get_timeout_error(self, mock_get, invoker):
-        mock_get.side_effect = requests.exceptions.Timeout("timed out")
+    def test_get_timeout_error(self, invoker):
+        inv, http = invoker
+        http.request.side_effect = requests.exceptions.Timeout("timed out")
 
         with pytest.raises(DMSConnectionError):
-            invoker.get("/slow")
+            inv.get("/slow")
 
 
 # ---------------------------------------------------------------
@@ -192,73 +139,57 @@ class TestGet:
 
 
 class TestErrorMessageExtraction:
-    @patch("sap_cloud_sdk.dms._http.requests.get")
-    def test_400_extracts_json_message(self, mock_get, invoker):
-        mock_resp = Mock()
-        mock_resp.status_code = 400
-        mock_resp.text = '{"exception": "versioning", "message": "The object is not the latest version"}'
-        mock_resp.json.return_value = {
-            "exception": "versioning",
-            "message": "The object is not the latest version",
-        }
-        mock_get.return_value = mock_resp
-
-        with pytest.raises(DMSInvalidArgumentException) as exc_info:
-            invoker.get("/bad")
-        assert "The object is not the latest version" in str(exc_info.value)
-
-    @patch("sap_cloud_sdk.dms._http.requests.get")
-    def test_400_fallback_when_no_json(self, mock_get, invoker):
-        mock_resp = Mock()
-        mock_resp.status_code = 400
-        mock_resp.text = "Bad Request"
-        mock_resp.json.side_effect = ValueError("No JSON")
-        mock_get.return_value = mock_resp
-
-        with pytest.raises(DMSInvalidArgumentException) as exc_info:
-            invoker.get("/bad")
-        assert "Request contains invalid or disallowed parameters" in str(
-            exc_info.value
+    def test_400_extracts_json_message(self, invoker):
+        inv, http = invoker
+        http.request.return_value = _make_response(
+            400,
+            json_data={"exception": "versioning", "message": "The object is not the latest version"},
+            text='{"message": "The object is not the latest version"}',
         )
 
-    @patch("sap_cloud_sdk.dms._http.requests.get")
-    def test_404_extracts_json_message(self, mock_get, invoker):
-        mock_resp = Mock()
-        mock_resp.status_code = 404
-        mock_resp.text = '{"message": "Document abc-123 not found"}'
-        mock_resp.json.return_value = {"message": "Document abc-123 not found"}
-        mock_get.return_value = mock_resp
+        with pytest.raises(DMSInvalidArgumentException) as exc_info:
+            inv.get("/bad")
+        assert "The object is not the latest version" in str(exc_info.value)
+
+    def test_400_fallback_when_no_json(self, invoker):
+        inv, http = invoker
+        http.request.return_value = _make_response(400, text="Bad Request")
+
+        with pytest.raises(DMSInvalidArgumentException) as exc_info:
+            inv.get("/bad")
+        assert "Request contains invalid or disallowed parameters" in str(exc_info.value)
+
+    def test_404_extracts_json_message(self, invoker):
+        inv, http = invoker
+        http.request.return_value = _make_response(
+            404,
+            json_data={"message": "Document abc-123 not found"},
+            text='{"message": "Document abc-123 not found"}',
+        )
 
         with pytest.raises(DMSObjectNotFoundException) as exc_info:
-            invoker.get("/missing")
+            inv.get("/missing")
         assert "Document abc-123 not found" in str(exc_info.value)
 
-    @patch("sap_cloud_sdk.dms._http.requests.get")
-    def test_409_raises_conflict(self, mock_get, invoker):
-        mock_resp = Mock()
-        mock_resp.status_code = 409
-        mock_resp.text = '{"exception": "versioning", "message": "Object already exists with name test.txt"}'
-        mock_resp.json.return_value = {
-            "exception": "versioning",
-            "message": "Object already exists with name test.txt",
-        }
-        mock_get.return_value = mock_resp
+    def test_409_raises_conflict(self, invoker):
+        inv, http = invoker
+        http.request.return_value = _make_response(
+            409,
+            json_data={"message": "Object already exists with name test.txt"},
+            text='{"message": "Object already exists with name test.txt"}',
+        )
 
         with pytest.raises(DMSConflictException) as exc_info:
-            invoker.get("/conflict")
+            inv.get("/conflict")
         assert exc_info.value.status_code == 409
         assert "Object already exists with name test.txt" in str(exc_info.value)
 
-    @patch("sap_cloud_sdk.dms._http.requests.get")
-    def test_409_fallback_when_no_json(self, mock_get, invoker):
-        mock_resp = Mock()
-        mock_resp.status_code = 409
-        mock_resp.text = "Conflict"
-        mock_resp.json.side_effect = ValueError("No JSON")
-        mock_get.return_value = mock_resp
+    def test_409_fallback_when_no_json(self, invoker):
+        inv, http = invoker
+        http.request.return_value = _make_response(409, text="Conflict")
 
         with pytest.raises(DMSConflictException) as exc_info:
-            invoker.get("/conflict")
+            inv.get("/conflict")
         assert "conflicts with the current state" in str(exc_info.value)
 
 
@@ -268,96 +199,65 @@ class TestErrorMessageExtraction:
 
 
 class TestPostForm:
-    @patch("sap_cloud_sdk.dms._http.requests.post")
-    def test_post_form_basic(self, mock_post, invoker):
-        mock_resp = Mock()
-        mock_resp.status_code = 201
-        mock_resp.content = b'{"succinctProperties": {}}'
-        mock_resp.json.return_value = {"succinctProperties": {}}
-        mock_post.return_value = mock_resp
+    def test_post_form_basic(self, invoker):
+        inv, http = invoker
+        http.request.return_value = _make_response(201, {"succinctProperties": {}})
 
         form = {"cmisaction": "createFolder", "objectId": "root-id"}
-        result = invoker.post_form("/browser/repo1/root", data=form)
+        result = inv.post_form("/browser/repo1/root", data=form)
 
-        mock_post.assert_called_once_with(
-            "https://api.example.com/browser/repo1/root",
-            headers={"Authorization": "Bearer test-token-123"},
-            data=form,
-            files=None,
-            timeout=(5, 15),
-        )
-        assert result is mock_resp
+        http.request.assert_called_once()
+        call_args = http.request.call_args
+        assert call_args[0][0] == HttpMethod.POST
+        assert call_args[0][1] == "/browser/repo1/root"
+        call_kwargs = http.request.call_args[1]
+        assert call_kwargs["data"] == form
+        assert result.status_code == 201
 
-    @patch("sap_cloud_sdk.dms._http.requests.post")
-    def test_post_form_no_content_type_header(self, mock_post, invoker):
+    def test_post_form_no_content_type_header(self, invoker):
         """post_form must NOT set Content-Type — let requests handle it."""
-        mock_resp = Mock()
-        mock_resp.status_code = 201
-        mock_post.return_value = mock_resp
+        inv, http = invoker
+        http.request.return_value = _make_response(201)
 
-        invoker.post_form("/path", data={"key": "val"})
+        inv.post_form("/path", data={"key": "val"})
 
-        headers_sent = mock_post.call_args[1]["headers"]
+        headers_sent = http.request.call_args[1]["headers"]
         assert "Content-Type" not in headers_sent
 
-    @patch("sap_cloud_sdk.dms._http.requests.post")
-    def test_post_form_with_files(self, mock_post, invoker):
-        mock_resp = Mock()
-        mock_resp.status_code = 201
-        mock_post.return_value = mock_resp
+    def test_post_form_with_files(self, invoker):
+        inv, http = invoker
+        http.request.return_value = _make_response(201)
 
         files = {"media": ("test.pdf", b"content", "application/pdf")}
-        invoker.post_form("/path", data={"cmisaction": "createDocument"}, files=files)
+        inv.post_form("/path", data={"cmisaction": "createDocument"}, files=files)
 
-        call_kwargs = mock_post.call_args[1]
+        call_kwargs = http.request.call_args[1]
         assert call_kwargs["files"] == files
         assert call_kwargs["data"] == {"cmisaction": "createDocument"}
 
-    @patch("sap_cloud_sdk.dms._http.requests.post")
-    def test_post_form_with_tenant(self, mock_post, invoker, mock_auth):
-        mock_resp = Mock()
-        mock_resp.status_code = 201
-        mock_post.return_value = mock_resp
+    def test_post_form_with_tenant(self, invoker):
+        inv, http = invoker
+        http.request.return_value = _make_response(201)
 
-        invoker.post_form("/path", data={"a": "b"}, tenant_subdomain="tenant-x")
+        inv.post_form("/path", data={"a": "b"}, tenant_subdomain="tenant-x")
 
-        mock_auth.get_token.assert_called_with("tenant-x")
+        call_kwargs = http.request.call_args[1]
+        assert call_kwargs["tenant_subdomain"] == "tenant-x"
 
-    @patch("sap_cloud_sdk.dms._http.requests.post")
-    def test_post_form_500_raises_runtime(self, mock_post, invoker):
-        mock_resp = Mock()
-        mock_resp.status_code = 500
-        mock_resp.text = "Internal Server Error"
-        mock_resp.json.side_effect = ValueError("No JSON")
-        mock_post.return_value = mock_resp
+    def test_post_form_500_raises_runtime(self, invoker):
+        inv, http = invoker
+        http.request.return_value = _make_response(500, text="Internal Server Error")
 
         with pytest.raises(DMSRuntimeException) as exc_info:
-            invoker.post_form("/path", data={})
+            inv.post_form("/path", data={})
         assert exc_info.value.status_code == 500
 
-    @patch("sap_cloud_sdk.dms._http.requests.post")
-    def test_post_form_204_returns_response(self, mock_post, invoker):
-        mock_resp = Mock()
-        mock_resp.status_code = 204
-        mock_resp.content = b""
-        mock_post.return_value = mock_resp
+    def test_post_form_204_returns_response(self, invoker):
+        inv, http = invoker
+        http.request.return_value = _make_response(204)
 
-        result = invoker.post_form("/path", data={})
-        assert result is mock_resp
-
-
-# ---------------------------------------------------------------
-# Base URL stripping
-# ---------------------------------------------------------------
-
-
-class TestBaseUrl:
-    def test_trailing_slash_stripped(self, mock_auth):
-        inv = HttpInvoker(
-            auth=mock_auth,
-            base_url="https://api.example.com/",
-        )
-        assert inv._base_url == "https://api.example.com"
+        result = inv.post_form("/path", data={})
+        assert result.status_code == 204
 
 
 # ---------------------------------------------------------------
@@ -366,47 +266,38 @@ class TestBaseUrl:
 
 
 class TestGetStream:
-    @patch("sap_cloud_sdk.dms._http.requests.get")
-    def test_returns_raw_response(self, mock_get, invoker):
+    def test_returns_raw_response(self, invoker):
+        inv, http = invoker
         mock_resp = Mock()
         mock_resp.status_code = 200
         mock_resp.content = b"binary content"
-        mock_get.return_value = mock_resp
+        http.request.return_value = mock_resp
 
-        result = invoker.get_stream(
+        result = inv.get_stream(
             "/browser/repo1/root", params={"objectId": "d1", "cmisselector": "content"}
         )
 
         assert result is mock_resp
-        mock_get.assert_called_once()
-        call_kwargs = mock_get.call_args
-        assert call_kwargs[1]["stream"] is True
-        assert call_kwargs[1]["params"] == {"objectId": "d1", "cmisselector": "content"}
+        http.request.assert_called_once()
+        call_kwargs = http.request.call_args[1]
+        assert call_kwargs["stream"] is True
+        assert call_kwargs["params"] == {"objectId": "d1", "cmisselector": "content"}
 
-    @patch("sap_cloud_sdk.dms._http.requests.get")
-    def test_raises_on_error(self, mock_get, invoker):
-        mock_resp = Mock()
-        mock_resp.status_code = 404
-        mock_resp.text = "Not found"
-        mock_resp.json.side_effect = ValueError("No JSON")
-        mock_get.return_value = mock_resp
+    def test_raises_on_error(self, invoker):
+        inv, http = invoker
+        http.request.return_value = _make_response(404, text="Not found")
 
         with pytest.raises(DMSObjectNotFoundException) as exc_info:
-            invoker.get_stream(
+            inv.get_stream(
                 "/browser/repo1/root",
                 params={"objectId": "d1", "cmisselector": "content"},
             )
         assert exc_info.value.status_code == 404
 
-    @patch("sap_cloud_sdk.dms._http.requests.get")
-    def test_uses_auth_headers(self, mock_get, invoker):
-        mock_resp = Mock()
-        mock_resp.status_code = 200
-        mock_resp.content = b"data"
-        mock_get.return_value = mock_resp
+    def test_passes_tenant_subdomain(self, invoker):
+        inv, http = invoker
+        http.request.return_value = _make_response(200)
 
-        invoker.get_stream("/path")
+        inv.get_stream("/path", tenant_subdomain="sub1")
 
-        headers = mock_get.call_args[1]["headers"]
-        assert "Authorization" in headers
-        assert headers["Authorization"] == "Bearer test-token-123"
+        assert http.request.call_args[1]["tenant_subdomain"] == "sub1"

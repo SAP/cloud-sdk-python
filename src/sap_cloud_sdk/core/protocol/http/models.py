@@ -13,6 +13,8 @@ import requests
 from oauthlib.oauth2 import BackendApplicationClient
 from requests_oauthlib import OAuth2Session
 
+from sap_cloud_sdk.core._tenant import _validate_tenant_subdomain
+
 logger = logging.getLogger(__name__)
 
 _TOKEN_EXPIRY_BUFFER_SECONDS = 60
@@ -109,6 +111,7 @@ class XsuaaAuthProvider(AuthProvider):
             and identityzone is not None
             and token_url is not None
         ):
+            _validate_tenant_subdomain(tenant_subdomain)
             token_url = str(token_url).replace(str(identityzone), tenant_subdomain)
 
         client = BackendApplicationClient(client_id=str(self._config.client_id))

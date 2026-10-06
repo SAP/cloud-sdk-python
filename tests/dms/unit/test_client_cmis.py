@@ -107,7 +107,7 @@ def client():
         identityzone="test-zone",
     )
     with (
-        patch("sap_cloud_sdk.dms.client.Auth"),
+        patch("sap_cloud_sdk.dms.client.XsuaaAuthProvider"),
         patch("sap_cloud_sdk.dms.client.HttpInvoker") as mock_http_cls,
     ):
         mock_http = Mock()

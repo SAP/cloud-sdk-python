@@ -1,6 +1,7 @@
 """SAP Cloud SDK for Python - Object Store module
 
-The create_client() uses secret resolver to load credentials from mounts/env vars
+The create_client() uses ConfigFactory to load credentials from mounts/env vars
+with proactive rotation detection via mtime tracking.
 
 Usage:
     from sap_cloud_sdk.objectstore import create_client
@@ -19,7 +20,15 @@ from sap_cloud_sdk.objectstore.exceptions import (
 )
 from sap_cloud_sdk.objectstore._models import ObjectStoreBindingData, ObjectMetadata
 from sap_cloud_sdk.objectstore._s3 import ObjectStoreClient
-from sap_cloud_sdk.core.secret_resolver import read_from_mount_and_fallback_to_env_var
+
+
+def _make_static_factory(config: ObjectStoreBindingData):
+    """Wrap a fixed config in a no-op factory (no rotation tracking)."""
+
+    def _factory() -> ObjectStoreBindingData:
+        return config
+
+    return _factory
 
 
 def create_client(
@@ -28,13 +37,15 @@ def create_client(
     config: Optional[ObjectStoreBindingData] = None,
     disable_ssl: bool = False,
 ) -> ObjectStoreClient:
-    """Creates an ObjectStoreClient with automatic local/cloud detection.
-    Uses secret resolver to load credentials from mounted secrets or environment variables
+    """Create an ObjectStoreClient with automatic credential detection.
+
+    Credentials are loaded from a mounted volume or environment variables and
+    tracked for secret rotation via :class:`~sap_cloud_sdk.core.secret_resolver.ConfigFactory`.
 
     Args:
-        instance: Instance name for cloud mode secret resolution. Must be a non-empty string.
-        config: Optional explicit configuration. If provided, auto-detection is skipped
-                and this configuration is used directly.
+        instance: Instance name for secret resolution. Must be a non-empty string.
+        config: Optional explicit configuration. When provided, binding
+                discovery is skipped and rotation tracking is disabled.
         disable_ssl: Whether to disable SSL/TLS connections. Defaults to False.
 
     Returns:
@@ -47,20 +58,18 @@ def create_client(
     if not instance or not instance.strip():
         raise ValueError("instance parameter must be a non-empty string")
 
-    # Cloud mode: with explicit configuration
     if config is not None:
-        return ObjectStoreClient(config, disable_ssl=disable_ssl)
+        return ObjectStoreClient(_make_static_factory(config), disable_ssl=disable_ssl)
 
-    # Cloud mode: use secret resolver to load configuration
-    config = ObjectStoreBindingData()
-    read_from_mount_and_fallback_to_env_var(
-        base_volume_mount="/etc/secrets/appfnd",
-        base_var_name="CLOUD_SDK_CFG",
+    from sap_cloud_sdk.core.secret_resolver import ConfigFactory
+
+    factory: ConfigFactory[ObjectStoreBindingData] = ConfigFactory(
         module="objectstore",
         instance=instance,
-        target=config,
+        binding_cls=ObjectStoreBindingData,
+        extract=lambda b: b,
     )
-    return ObjectStoreClient(config, disable_ssl=disable_ssl)
+    return ObjectStoreClient(factory, disable_ssl=disable_ssl)
 
 
 __all__ = [

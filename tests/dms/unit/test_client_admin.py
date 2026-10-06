@@ -67,7 +67,7 @@ _CONFIG_RESPONSE = {
 
 @pytest.fixture
 def client():
-    with patch("sap_cloud_sdk.dms.client.Auth"):
+    with patch("sap_cloud_sdk.dms.client.XsuaaAuthProvider"):
         with patch("sap_cloud_sdk.dms.client.HttpInvoker") as MockHttp:
             mock_http = Mock()
             MockHttp.return_value = mock_http

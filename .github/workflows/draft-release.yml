@@ -1,0 +1,177 @@
+name: Draft Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: 'Branch to release from'
+        required: true
+        default: 'main'
+      version:
+        description: 'Version to release (e.g. 0.58.0) — leave blank for minor bump'
+        required: false
+        default: ''
+
+jobs:
+  draft-release:
+    name: Create Draft Release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.branch }}
+          fetch-depth: 0
+
+      - name: Compute version and generate release notes
+        id: release
+        env:
+          VERSION_INPUT: ${{ github.event.inputs.version }}
+        run: |
+          pip install packaging -q
+
+          # ── Current version from pyproject.toml ─────────────────────────────
+          CURRENT_VERSION=$(grep '^version = ' pyproject.toml | cut -d'"' -f2)
+          echo "Current version: $CURRENT_VERSION"
+
+          # ── Resolve target version ───────────────────────────────────────────
+          if [[ -n "$VERSION_INPUT" ]]; then
+            # Validate it is a valid PEP 440 version
+            python3 -c "
+          from packaging.version import Version, InvalidVersion
+          try:
+              Version('${VERSION_INPUT}')
+          except InvalidVersion as e:
+              print(f'ERROR: Invalid version: {e}')
+              raise SystemExit(1)
+          "
+            # Validate it is greater than current
+            IS_GREATER=$(python3 -c "
+          from packaging.version import Version
+          print('true' if Version('${VERSION_INPUT}') > Version('${CURRENT_VERSION}') else 'false')
+          ")
+            if [[ "$IS_GREATER" != "true" ]]; then
+              echo "ERROR: Requested version ${VERSION_INPUT} is not greater than current version ${CURRENT_VERSION}."
+              exit 1
+            fi
+            NEW_VERSION="$VERSION_INPUT"
+          else
+            # Default: minor bump
+            IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT_VERSION"
+            NEW_VERSION="${MAJOR}.$((MINOR + 1)).0"
+          fi
+
+          TAG="v${NEW_VERSION}"
+          echo "Version: $CURRENT_VERSION → $NEW_VERSION"
+
+          # ── Latest tag for commit log baseline ──────────────────────────────
+          LATEST_TAG=$(git tag --sort=-version:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+          if [[ -z "$LATEST_TAG" ]]; then
+            echo "No semver tag found — using initial commit as baseline."
+            BASELINE=$(git rev-list --max-parents=0 HEAD)
+          else
+            BASELINE="$LATEST_TAG"
+          fi
+
+          LOG=$(git log "$BASELINE"..HEAD --pretty=format:"%H %s" --reverse)
+
+          if [[ -z "$LOG" ]]; then
+            echo "ERROR: No commits since $BASELINE. Nothing to release."
+            exit 1
+          fi
+
+          echo "Commits since $BASELINE:"
+          echo "$LOG"
+
+          # ── Generate release notes ───────────────────────────────────────────
+          FEATURES=""
+          FIXES=""
+          IMPROVEMENTS=""
+          BREAKING=""
+
+          while IFS= read -r line; do
+            SHA="${line%% *}"
+            SHORT_SHA="${SHA:0:7}"
+            SUBJECT="${line#* }"
+
+            if echo "$SUBJECT" | grep -qE '(\w+)(\(.+\))?!:|BREAKING CHANGE'; then
+              SCOPE=$(echo "$SUBJECT" | sed -E 's/^[a-z]+\(([^)]+)\)!:.*/\1/' | sed -E 's/^[a-z]+!:.*//')
+              DESC=$(echo "$SUBJECT" | sed -E 's/^[a-z]+(\([^)]+\))?!: //')
+              if [[ -n "$SCOPE" ]]; then
+                BREAKING+="- **[$SCOPE]**: $DESC (commit $SHORT_SHA)"$'\n'
+              else
+                BREAKING+="- $DESC (commit $SHORT_SHA)"$'\n'
+              fi
+            elif echo "$SUBJECT" | grep -qE '^feat(\(.+\))?:'; then
+              SCOPE=$(echo "$SUBJECT" | sed -E 's/^feat\(([^)]+)\):.*/\1/')
+              DESC=$(echo "$SUBJECT" | sed -E 's/^feat(\([^)]+\))?: //')
+              if [[ "$SCOPE" != "$SUBJECT" ]]; then
+                FEATURES+="- **[$SCOPE]**: $DESC (commit $SHORT_SHA)"$'\n'
+              else
+                FEATURES+="- $DESC (commit $SHORT_SHA)"$'\n'
+              fi
+            elif echo "$SUBJECT" | grep -qE '^fix(\(.+\))?:'; then
+              SCOPE=$(echo "$SUBJECT" | sed -E 's/^fix\(([^)]+)\):.*/\1/')
+              DESC=$(echo "$SUBJECT" | sed -E 's/^fix(\([^)]+\))?: //')
+              if [[ "$SCOPE" != "$SUBJECT" ]]; then
+                FIXES+="- **[$SCOPE]**: $DESC (commit $SHORT_SHA)"$'\n'
+              else
+                FIXES+="- $DESC (commit $SHORT_SHA)"$'\n'
+              fi
+            elif echo "$SUBJECT" | grep -qE '^(refactor|perf|chore|docs|test|ci|style|build|revert)(\(.+\))?:'; then
+              SCOPE=$(echo "$SUBJECT" | sed -E 's/^[a-z]+\(([^)]+)\):.*/\1/')
+              DESC=$(echo "$SUBJECT" | sed -E 's/^[a-z]+(\([^)]+\))?: //')
+              if [[ "$SCOPE" != "$SUBJECT" ]]; then
+                IMPROVEMENTS+="- **[$SCOPE]**: $DESC (commit $SHORT_SHA)"$'\n'
+              else
+                IMPROVEMENTS+="- $DESC (commit $SHORT_SHA)"$'\n'
+              fi
+            fi
+          done <<< "$LOG"
+
+          # ── Build release notes markdown ─────────────────────────────────────
+          NOTES=""
+          if [[ -n "$BREAKING" ]]; then
+            NOTES+="### Breaking Changes"$'\n'
+            NOTES+="> ⚠️ **Important**: Review migration steps before upgrading from \`$BASELINE\`."$'\n'
+            NOTES+="$BREAKING"$'\n'
+          fi
+          if [[ -n "$FEATURES" ]]; then
+            NOTES+="### What's New"$'\n'
+            NOTES+="$FEATURES"$'\n'
+          fi
+          if [[ -n "$FIXES" ]]; then
+            NOTES+="### Bug Fixes"$'\n'
+            NOTES+="$FIXES"$'\n'
+          fi
+          if [[ -n "$IMPROVEMENTS" ]]; then
+            NOTES+="### Improvements"$'\n'
+            NOTES+="$IMPROVEMENTS"$'\n'
+          fi
+
+          printf '%s' "$NOTES" > /tmp/release_notes.md
+          echo "Release notes:"
+          cat /tmp/release_notes.md
+
+          echo "version=$NEW_VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG"             >> "$GITHUB_OUTPUT"
+
+      - name: Create draft GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.release.outputs.version }}
+          TAG: ${{ steps.release.outputs.tag }}
+          BRANCH: ${{ github.event.inputs.branch }}
+        run: |
+          gh release create "$TAG" \
+            --repo "${{ github.repository }}" \
+            --title "v${VERSION}" \
+            --notes-file /tmp/release_notes.md \
+            --draft \
+            --target "$BRANCH"
+
+          echo "Draft release created: $TAG (branch: $BRANCH)"
+          echo "Review and edit at: https://github.com/${{ github.repository }}/releases"

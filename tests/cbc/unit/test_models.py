@@ -149,13 +149,13 @@ class TestConfigData:
         config = self._config(
             self._config_object("ObjA", "E1", "E2"),
         )
-        result = config.get_config_entity("ObjA", "E2")
+        result = config.get_entity_data("ObjA", "E2")
         assert result is not None
-        assert result.entity_id == "E2"
+        assert isinstance(result, EntityData)
 
     def test_get_config_entity_returns_none_when_missing(self):
         config = self._config(self._config_object("ObjA", "E1"))
-        assert config.get_config_entity("ObjA", "Missing") is None
+        assert config.get_entity_data("ObjA", "Missing") is None
 
 
 # ---------------------------------------------------------------------------

@@ -196,16 +196,17 @@ class ConfigObject:
     config_object_id: str
     entities: list[ConfigEntity]
 
-    def get_config_entity(self, entity_id: str) -> ConfigEntity | None:
-        """Return the entity with the given entity ID.
+    def get_entity_data(self, entity_id: str) -> EntityData | None:
+        """Return the data for the entity with the given ID.
 
         Args:
             entity_id: Authored entity identifier.
 
         Returns:
-            Matching :class:`ConfigEntity`, or ``None`` if not found.
+            :class:`EntityData` for the matching entity, or ``None`` if not found.
         """
-        return next((e for e in self.entities if e.entity_id == entity_id), None)
+        entity = next((e for e in self.entities if e.entity_id == entity_id), None)
+        return entity.data if entity is not None else None
 
 
 @dataclass
@@ -240,20 +241,20 @@ class ConfigData:
             None,
         )
 
-    def get_config_entity(
+    def get_entity_data(
         self, config_object_id: str, entity_id: str
-    ) -> ConfigEntity | None:
-        """Return the entity for the given config object and entity IDs.
+    ) -> EntityData | None:
+        """Return the data for the given config object and entity IDs.
 
         Args:
             config_object_id: Authored config object identifier.
             entity_id: Authored entity identifier.
 
         Returns:
-            Matching :class:`ConfigEntity`, or ``None`` if not found.
+            :class:`EntityData` for the matching entity, or ``None`` if not found.
         """
         co = self.get_config_object(config_object_id)
-        return co.get_config_entity(entity_id) if co is not None else None
+        return co.get_entity_data(entity_id) if co is not None else None
 
 
 # ---------------------------------------------------------------------------

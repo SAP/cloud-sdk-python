@@ -20,7 +20,7 @@ Quick start::
     # Access entity data
     payment = config.get_config_object("payment-config")
     if payment:
-        for row in payment.get_config_entity("payment-mode").data.as_list():
+        for row in payment.get_entity_data("payment-mode").as_list():
             print(row)
 
 Apps running on the SAP application platform can use

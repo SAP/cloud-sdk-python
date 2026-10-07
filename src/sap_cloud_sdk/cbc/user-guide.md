@@ -92,38 +92,51 @@ for co in config.config_objects:
 ### Look up a specific entity
 
 ```python
-# All entities for one config object
-payment = config.get_config_object("payment-config")  # ConfigObject | None
-if payment:
-    modes = payment.get_config_entity("payment-mode")  # ConfigEntity | None
-    if modes:
-        for row in modes.data.as_list():
-            print(row["paymentModeCode"], row["name"])
+# From already-fetched ConfigData
+modes = config.get_entity_data("payment-config", "payment-mode")  # EntityData | None
+if modes:
+    for row in modes.as_list():
+        print(row["paymentModeCode"], row["name"])
 ```
 
-`modes.data.as_list()` returns `list[dict]` and raises `ValueError` if the data is not a list.
-`modes.data.as_object()` returns `dict` and raises `ValueError` if the data is not a dict.
+If you need all entities for one config object, use `get_config_object` to get the
+`ConfigObject` and iterate its `entities` list.
 
-If you don't know the shape in advance, check first with `modes.data.is_list()` /
-`modes.data.is_object()`, or call `modes.data.value()` to get the raw `list[dict] | dict`
+`modes.as_list()` returns `list[dict]` and raises `ValueError` if the data is not a list.
+`modes.as_object()` returns `dict` and raises `ValueError` if the data is not a dict.
+
+If you don't know the shape in advance, check first with `modes.is_list()` /
+`modes.is_object()`, or call `modes.value()` to get the raw `list[dict] | dict`
 without any shape assertion:
 
 ```python
-if modes.data.is_list():
-    rows = modes.data.as_list()
+if modes.is_list():
+    rows = modes.as_list()
 else:
-    settings = modes.data.as_object()
-```
-
-```python
-# Shortcut — config object + entity in one step
-modes = config.get_config_entity("payment-config", "payment-mode")  # ConfigEntity | None
+    settings = modes.as_object()
 ```
 
 ```python
 # Unmarshal into your own class
-modes_list = [PaymentMode(**row) for row in modes.data.as_list()]
-policy = PolicyConfig(**policy_entity.data.as_object())
+modes_list = [PaymentMode(**row) for row in modes.as_list()]
+policy = PolicyConfig(**policy_entity.as_object())
+```
+
+### Fetch a single entity directly
+
+When you only need one entity, use `get_entity_data` to avoid fetching all
+configuration objects and their entities:
+
+```python
+# One targeted HTTP call — no full config fetch
+modes = cbc_client.get_entity_data("payment-config", "payment-mode")
+for row in modes.as_list():
+    print(row["paymentModeCode"], row["name"])
+
+# Pin a specific version
+modes = cbc_client.get_entity_data(
+    "payment-config", "payment-mode", consumption_version="a0392d4f-..."
+)
 ```
 
 
@@ -181,6 +194,12 @@ adapter lists the `CBC_TenantMapping_*` fragments in the subscriber's subaccount
 and picks the one whose `appTenantId` property matches; the `cbcUrl` is used
 verbatim. The certificate is the app's own provider-level mTLS certificate,
 fetched from the Destination Service.
+
+**Performance note.** The fragment lookup (Destination Service HTTP call) runs
+on every `get_configuration()` call, because the CBC URL is resolved fresh each
+time via the `base_url` callable. For high-throughput agents making frequent CBC
+calls, consider caching the resolved URL at the application layer (e.g. per
+tenant, invalidated on `CBCClientError` with a not-found code).
 
 **Certificate rotation.** The mTLS certificate is loaded from the Destination
 Service and reloaded automatically when a request fails the TLS handshake (as

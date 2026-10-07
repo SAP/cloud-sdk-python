@@ -142,6 +142,7 @@ class Operation(str, Enum):
     # CBC Operations
     CBC_GET_CONSUMPTION_VERSIONS = "get_consumption_versions"
     CBC_GET_CONFIGURATION = "get_configuration"
+    CBC_GET_ENTITY_DATA = "get_entity_data"
 
     # Bootstrap Operations
     BOOTSTRAP = "bootstrap"

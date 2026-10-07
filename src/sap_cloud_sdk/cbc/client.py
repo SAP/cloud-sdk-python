@@ -107,6 +107,19 @@ class CBCClient(Protocol):
         """
         ...
 
+    def get_entity_data(
+        self,
+        config_object_id: str,
+        entity_id: str,
+        consumption_version: str | None = None,
+    ) -> EntityData:
+        """Return the data for a single entity without fetching all configuration.
+
+        When ``consumption_version`` is omitted, the latest version is resolved
+        automatically via :meth:`get_consumption_versions`.
+        """
+        ...
+
 
 # ---------------------------------------------------------------------------
 # Internal config dataclass
@@ -137,6 +150,18 @@ class DefaultClient:
         )
 
     Direct instantiation is supported for testing (inject a mock ``http_client``).
+
+    **Blocking I/O.** All public methods make synchronous HTTP calls via
+    ``httpx.Client``. In an async context, wrap calls with
+    ``asyncio.to_thread(client.get_configuration)`` to avoid blocking the event
+    loop.
+
+    **Thread safety.** Safe to share a single instance across threads and async
+    tasks. The internal ``httpx.Client`` is thread-safe. The only mutable state
+    is the cached ``ssl.SSLContext`` — the app's own provider-level mTLS
+    certificate, which is deployment/landscape-specific and shared across all
+    tenants. It is rebuilt under a lock on TLS handshake failure — concurrent
+    rebuilds are safe and at most one rebuild runs at a time.
 
     Args:
         base_url: Callable returning the CBC service base URL. Invoked on every
@@ -328,9 +353,47 @@ class DefaultClient:
             config_objects=config_objects,
         )
 
-    # ------------------------------------------------------------------
-    # Internal helpers
-    # ------------------------------------------------------------------
+    @record_metrics(Module.CBC, Operation.CBC_GET_ENTITY_DATA)
+    def get_entity_data(
+        self,
+        config_object_id: str,
+        entity_id: str,
+        consumption_version: str | None = None,
+    ) -> EntityData:
+        """Return the data for a single entity without fetching all configuration.
+
+        Makes a targeted HTTP call for the one entity, avoiding the per-entity
+        calls that :meth:`get_configuration` makes for every entity in every
+        config object.
+
+        Args:
+            config_object_id: Authored config object identifier (e.g. ``"payment-config"``).
+            entity_id: Authored entity identifier (e.g. ``"payment-mode"``).
+            consumption_version: Consumption version ID. When ``None``, the
+                latest version is resolved via :meth:`get_consumption_versions`.
+
+        Returns:
+            :class:`EntityData` for the entity.
+
+        Raises:
+            CBCClientError: On 4xx responses, or when no consumption version exists
+                for the tenant and ``consumption_version`` was not provided.
+            CBCServerError: On 5xx responses.
+            CBCNetworkError: On connection failures.
+        """
+        base_url = self._base_url()
+        app_tenant_id = self._resolve_app_tenant_id()
+        if consumption_version is None:
+            versions = self._get_consumption_versions(base_url, app_tenant_id)
+            latest = versions.latest()
+            if latest is None:
+                raise CBCClientError(
+                    f"CBC returned no consumption version for tenant={app_tenant_id!r}."
+                )
+            consumption_version = latest.version
+        return self._fetch_entity_data(
+            base_url, app_tenant_id, consumption_version, config_object_id, entity_id
+        ).data
 
     def _fetch_entity_data(
         self,

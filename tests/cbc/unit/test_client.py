@@ -18,7 +18,7 @@ from sap_cloud_sdk.cbc.exceptions import (
     CBCNetworkError,
     CBCServerError,
 )
-from sap_cloud_sdk.cbc._models import ConfigData
+from sap_cloud_sdk.cbc._models import ConfigData, EntityData
 
 
 # ---------------------------------------------------------------------------
@@ -322,6 +322,52 @@ class TestGetConfiguration:
 
         client.get_configuration(consumption_version="cv1")
         assert call_count == 1
+
+
+
+# ---------------------------------------------------------------------------
+# DefaultClient — get_entity_data
+# ---------------------------------------------------------------------------
+
+
+class TestGetEntityData:
+    def test_returns_entity_data_directly(self):
+        client, mock_http = _make_client()
+        versions_response = _mock_response(json_body={"items": [{"version": "v1"}]})
+        entity_response = _mock_response(
+            json_body={
+                "contentShape": "ARRAY",
+                "content": {"items": [{"code": "STD"}], "adaptedKeys": []},
+            }
+        )
+        mock_http.request.side_effect = [versions_response, entity_response]
+
+        result = client.get_entity_data("payment-config", "payment-mode")
+        assert isinstance(result, EntityData)
+        assert result.as_list() == [{"code": "STD"}]
+
+    def test_uses_pinned_version_without_resolving(self):
+        client, mock_http = _make_client()
+        mock_http.request.return_value = _mock_response(
+            json_body={
+                "contentShape": "OBJECT",
+                "content": {"item": {"key": "value"}},
+            }
+        )
+
+        result = client.get_entity_data(
+            "agent-config", "settings", consumption_version="v42"
+        )
+        assert isinstance(result, EntityData)
+        assert result.as_object() == {"key": "value"}
+        # Only one HTTP call — no version resolution
+        assert mock_http.request.call_count == 1
+
+    def test_raises_when_no_versions_exist(self):
+        client, mock_http = _make_client()
+        mock_http.request.return_value = _mock_response(json_body={"items": []})
+        with pytest.raises(CBCClientError, match="no consumption version"):
+            client.get_entity_data("payment-config", "payment-mode")
 
 
 # ---------------------------------------------------------------------------

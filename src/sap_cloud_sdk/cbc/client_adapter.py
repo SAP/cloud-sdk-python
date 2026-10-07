@@ -156,14 +156,10 @@ def resolve_base_url(destination_instance: str) -> str:
     :func:`~sap_cloud_sdk.cbc.client.create_client` when overriding only *some*
     of the platform defaults.
 
-    Reads :data:`tenant_subdomain_var` and :data:`app_tenant_id_var`, lists the
-    tenant-mapping Fragments in the subscriber's subaccount, finds the one whose
-    ``appTenantId`` property matches, and returns its ``cbcUrl`` verbatim.
-
-    The fragments are named ``CBC_TenantMapping_<cbcTenantId>``, so they cannot be
-    fetched directly by subdomain; the subaccount is listed and matched on the
-    ``appTenantId`` property instead. (Once the fragment is keyed by subdomain
-    upstream, this becomes a single direct ``get_subaccount_fragment`` lookup.)
+    Reads :data:`tenant_subdomain_var` and :data:`app_tenant_id_var`, fetches
+    the tenant-mapping Fragment for the subscriber's subdomain directly by name
+    (``CBC_TenantMapping_<subdomain>``), and returns its ``cbcUrl`` property
+    verbatim.
 
     Args:
         destination_instance: The ``instance`` passed to the destination
@@ -174,7 +170,7 @@ def resolve_base_url(destination_instance: str) -> str:
         CBCConfigError: If either ContextVar is empty, no matching fragment is
             found, or the matched fragment has no ``cbcUrl`` property.
     """
-    from sap_cloud_sdk.destination import create_fragment_client
+    from sap_cloud_sdk.destination import AccessStrategy, create_fragment_client
     from sap_cloud_sdk.destination.exceptions import DestinationError
 
     subdomain = tenant_subdomain_var.get()
@@ -185,34 +181,31 @@ def resolve_base_url(destination_instance: str) -> str:
         )
     app_tenant_id = resolve_app_tenant_id()
 
+    fragment_name = f"{CBC_FRAGMENT_PREFIX}{subdomain}"
     try:
         client = create_fragment_client(instance=destination_instance)
-        fragments = client.list_subaccount_fragments(tenant=subdomain)
+        fragment = client.get_subaccount_fragment(
+            fragment_name,
+            access_strategy=AccessStrategy.SUBSCRIBER_ONLY,
+            tenant=subdomain,
+        )
     except DestinationError as exc:
         raise CBCConfigError(
-            f"Could not resolve the CBC URL: listing tenant-mapping fragments "
-            f"failed for subdomain={subdomain!r} (appTenantId={app_tenant_id!r}): {exc}"
+            f"Could not resolve the CBC URL: fetching tenant-mapping fragment "
+            f"{fragment_name!r} failed for subdomain={subdomain!r} "
+            f"(appTenantId={app_tenant_id!r}): {exc}"
         ) from exc
-    fragment = next(
-        (
-            f
-            for f in fragments
-            if f.name.startswith(CBC_FRAGMENT_PREFIX)
-            and f.properties.get("appTenantId") == app_tenant_id
-        ),
-        None,
-    )
     if fragment is None:
         raise CBCConfigError(
-            f"No CBC mapping fragment for appTenantId={app_tenant_id!r} in "
-            f"subdomain={subdomain!r} (looked for {CBC_FRAGMENT_PREFIX}* fragments)."
+            f"No CBC mapping fragment for subdomain={subdomain!r} "
+            f"(appTenantId={app_tenant_id!r}): {fragment_name!r} not found."
         )
     cbc_url = fragment.properties.get("cbcUrl")
     if not cbc_url:
         raise CBCConfigError(
             f"CBC mapping fragment {fragment.name!r} has no 'cbcUrl' property."
         )
-    return cbc_url  # cbcTid already baked in — used verbatim
+    return cbc_url
 
 
 def load_ssl_context(

@@ -22,6 +22,7 @@ from sap_cloud_sdk.cbc.client_adapter import (
 from sap_cloud_sdk.cbc.client import DefaultClient, create_client
 from sap_cloud_sdk.cbc.config import CBCDestinationConfig
 from sap_cloud_sdk.cbc.exceptions import CBCConfigError
+from sap_cloud_sdk.destination import AccessStrategy
 
 
 @pytest.fixture(autouse=True)
@@ -55,17 +56,14 @@ class TestResolveBaseUrl:
     def test_resolve_base_url_with_matching_fragment_returns_cbc_url(self):
         tenant_subdomain_var.set("appfnd-subscriber")
         app_tenant_id_var.set("app-t1")
-        other = MagicMock()
-        other.name = f"{CBC_FRAGMENT_PREFIX}cbc-other"
-        other.properties = {"appTenantId": "app-other", "cbcUrl": "https://nope"}
         match = MagicMock()
-        match.name = f"{CBC_FRAGMENT_PREFIX}cbc-t1"
+        match.name = f"{CBC_FRAGMENT_PREFIX}appfnd-subscriber"
         match.properties = {
             "appTenantId": "app-t1",
             "cbcUrl": "https://cbc.example.cloud.sap",
         }
         fake_client = MagicMock()
-        fake_client.list_subaccount_fragments.return_value = [other, match]
+        fake_client.get_subaccount_fragment.return_value = match
 
         with patch(
             "sap_cloud_sdk.destination.create_fragment_client",
@@ -74,8 +72,10 @@ class TestResolveBaseUrl:
             url = resolve_base_url("default")
 
         assert url == "https://cbc.example.cloud.sap"
-        fake_client.list_subaccount_fragments.assert_called_once_with(
-            tenant="appfnd-subscriber"
+        fake_client.get_subaccount_fragment.assert_called_once_with(
+            f"{CBC_FRAGMENT_PREFIX}appfnd-subscriber",
+            access_strategy=AccessStrategy.SUBSCRIBER_ONLY,
+            tenant="appfnd-subscriber",
         )
 
     def test_resolve_base_url_with_empty_subdomain_raises_cbc_config_error(self):
@@ -91,11 +91,8 @@ class TestResolveBaseUrl:
     def test_resolve_base_url_with_no_matching_fragment_raises_cbc_config_error(self):
         tenant_subdomain_var.set("appfnd-subscriber")
         app_tenant_id_var.set("app-t1")
-        other = MagicMock()
-        other.name = f"{CBC_FRAGMENT_PREFIX}cbc-other"
-        other.properties = {"appTenantId": "app-other", "cbcUrl": "https://nope"}
         fake_client = MagicMock()
-        fake_client.list_subaccount_fragments.return_value = [other]
+        fake_client.get_subaccount_fragment.return_value = None
         with patch(
             "sap_cloud_sdk.destination.create_fragment_client",
             return_value=fake_client,
@@ -107,10 +104,10 @@ class TestResolveBaseUrl:
         tenant_subdomain_var.set("appfnd-subscriber")
         app_tenant_id_var.set("app-t1")
         match = MagicMock()
-        match.name = f"{CBC_FRAGMENT_PREFIX}cbc-t1"
+        match.name = f"{CBC_FRAGMENT_PREFIX}appfnd-subscriber"
         match.properties = {"appTenantId": "app-t1"}
         fake_client = MagicMock()
-        fake_client.list_subaccount_fragments.return_value = [match]
+        fake_client.get_subaccount_fragment.return_value = match
         with patch(
             "sap_cloud_sdk.destination.create_fragment_client",
             return_value=fake_client,
@@ -124,8 +121,8 @@ class TestResolveBaseUrl:
         tenant_subdomain_var.set("appfnd-subscriber")
         app_tenant_id_var.set("app-t1")
         fake_client = MagicMock()
-        fake_client.list_subaccount_fragments.side_effect = DestinationOperationError(
-            "failed to list subaccount fragments: token error"
+        fake_client.get_subaccount_fragment.side_effect = DestinationOperationError(
+            "failed to get fragment: token error"
         )
         with patch(
             "sap_cloud_sdk.destination.create_fragment_client",
@@ -281,13 +278,13 @@ class TestCreateAgentClient:
 
         tenant_subdomain_var.set("appfnd-subscriber")
         fragment = MagicMock()
-        fragment.name = f"{CBC_FRAGMENT_PREFIX}cbc-t1"
+        fragment.name = f"{CBC_FRAGMENT_PREFIX}appfnd-subscriber"
         fragment.properties = {
             "appTenantId": "app-t1",
             "cbcUrl": "https://cbc.example.cloud.sap",
         }
         fake_fc = MagicMock()
-        fake_fc.list_subaccount_fragments.return_value = [fragment]
+        fake_fc.get_subaccount_fragment.return_value = fragment
         with patch(
             "sap_cloud_sdk.destination.create_fragment_client", return_value=fake_fc
         ):

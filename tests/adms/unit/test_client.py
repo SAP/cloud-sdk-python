@@ -155,7 +155,7 @@ class TestAdmsClientInit:
     def test_with_user_jwt_none_raises(self, mock_http):
         client = AdmsClient(mock_http)
         with pytest.raises(ValueError, match="non-blank"):
-            client.with_user_jwt(None)  # type: ignore[arg-type]
+            client.with_user_jwt(None)  # ty: ignore[invalid-argument-type]
         mock_http.with_user_jwt.assert_not_called()
 
 

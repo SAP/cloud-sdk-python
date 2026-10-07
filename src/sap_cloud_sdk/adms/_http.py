@@ -46,6 +46,24 @@ _REQUEST_TIMEOUT_SECONDS = 30
 _RESPONSE_TEXT_TRUNCATION_LIMIT = 500
 
 
+def _require_non_blank_jwt(user_jwt: str | None) -> None:
+    """Enforce the OBO invariant: a user assertion must be a non-blank string.
+
+    Raises :class:`ValueError` for ``None``, empty, or whitespace-only input.
+    Callers that want service credentials must omit *user_jwt* (or pass
+    ``None``) at the constructor/factory level, which guards with
+    ``if user_jwt is not None``.
+
+    Blank/whitespace JWTs must never silently fall through to application
+    credentials — callers must always supply a real assertion for OBO mode.
+    """
+    if user_jwt is None or not user_jwt.strip():
+        raise ValueError(
+            "user_jwt must be a non-blank string for OBO mode; "
+            "omit it (or pass None) to use service credentials"
+        )
+
+
 def quote_odata_string_key(value: str) -> str:
     """Quote and escape a string value for use in an OData V4 entity key segment.
 
@@ -177,6 +195,8 @@ class AdmsHttp:
         self._token_fetcher = token_fetcher
         self._session = session or requests.Session()
         self._user_jwt = user_jwt
+        if user_jwt is not None:
+            _require_non_blank_jwt(user_jwt)
         self._csrf_tokens: dict[str, str] = {}
         # Guards the _csrf_tokens dict.  ``AdmsHttp`` is documented as safe to
         # share across threads (matching ``requests.Session``); without this
@@ -190,10 +210,16 @@ class AdmsHttp:
 
         Args:
             user_jwt: The user's OIDC or XSUAA JWT from the inbound request.
+                Must be a non-blank string — ``None`` and blank/whitespace raise
+                :class:`ValueError`.
 
         Returns:
             New :class:`AdmsHttp` for user-context calls.
+
+        Raises:
+            ValueError: If *user_jwt* is ``None``, empty, or whitespace-only.
         """
+        _require_non_blank_jwt(user_jwt)
         return AdmsHttp(
             config=self._config,
             token_fetcher=self._token_fetcher,
@@ -291,7 +317,7 @@ class AdmsHttp:
     # ------------------------------------------------------------------
 
     def _bearer_token(self) -> str:
-        if self._user_jwt:
+        if self._user_jwt is not None:
             return self._token_fetcher.exchange_token(self._user_jwt)
         return self._token_fetcher.get_token()
 
@@ -436,6 +462,8 @@ class AsyncAdmsHttp(AsyncHttpClient):
         self._config = config
         self._token_fetcher = token_fetcher
         self._user_jwt = user_jwt
+        if user_jwt is not None:
+            _require_non_blank_jwt(user_jwt)
         # Default to owning the underlying ``httpx.AsyncClient``.  Borrowed
         # instances created via :meth:`with_user_jwt` flip this to ``False``
         # so they share — and do *not* close — the parent's connection pool.
@@ -443,7 +471,7 @@ class AsyncAdmsHttp(AsyncHttpClient):
         _jwt = user_jwt  # capture for closure before super().__init__()
         get_token = (
             (lambda: token_fetcher.exchange_token(_jwt))
-            if _jwt
+            if _jwt is not None
             else token_fetcher.get_token
         )
         super().__init__(
@@ -646,10 +674,16 @@ class AsyncAdmsHttp(AsyncHttpClient):
 
         Args:
             user_jwt: The user's OIDC or XSUAA JWT from the inbound request.
+                Must be a non-blank string — ``None`` and blank/whitespace raise
+                :class:`ValueError`.
 
         Returns:
             New :class:`AsyncAdmsHttp` for user-context calls.
+
+        Raises:
+            ValueError: If *user_jwt* is ``None``, empty, or whitespace-only.
         """
+        _require_non_blank_jwt(user_jwt)
         borrowed = AsyncAdmsHttp(
             config=self._config,
             token_fetcher=self._token_fetcher,

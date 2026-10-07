@@ -37,11 +37,11 @@ def _reset_contextvars():
 
 
 class TestResolveAppTenantId:
-    def test_returns_contextvar_value(self):
+    def test_resolve_app_tenant_id_with_set_contextvar_returns_value(self):
         app_tenant_id_var.set("app-t1")
         assert resolve_app_tenant_id() == "app-t1"
 
-    def test_raises_when_empty(self):
+    def test_resolve_app_tenant_id_with_empty_contextvar_raises_cbc_config_error(self):
         with pytest.raises(CBCConfigError, match="cbc_app_tenant_id"):
             resolve_app_tenant_id()
 
@@ -52,7 +52,7 @@ class TestResolveAppTenantId:
 
 
 class TestResolveBaseUrl:
-    def test_reads_cbc_url_from_matching_fragment(self):
+    def test_resolve_base_url_with_matching_fragment_returns_cbc_url(self):
         tenant_subdomain_var.set("appfnd-subscriber")
         app_tenant_id_var.set("app-t1")
         other = MagicMock()
@@ -78,17 +78,17 @@ class TestResolveBaseUrl:
             tenant="appfnd-subscriber"
         )
 
-    def test_raises_when_subdomain_empty(self):
+    def test_resolve_base_url_with_empty_subdomain_raises_cbc_config_error(self):
         app_tenant_id_var.set("app-t1")
         with pytest.raises(CBCConfigError, match="cbc_tenant_subdomain"):
             resolve_base_url("default")
 
-    def test_raises_when_app_tenant_id_empty(self):
+    def test_resolve_base_url_with_empty_app_tenant_id_raises_cbc_config_error(self):
         tenant_subdomain_var.set("appfnd-subscriber")
         with pytest.raises(CBCConfigError, match="cbc_app_tenant_id"):
             resolve_base_url("default")
 
-    def test_raises_when_no_matching_fragment(self):
+    def test_resolve_base_url_with_no_matching_fragment_raises_cbc_config_error(self):
         tenant_subdomain_var.set("appfnd-subscriber")
         app_tenant_id_var.set("app-t1")
         other = MagicMock()
@@ -103,7 +103,7 @@ class TestResolveBaseUrl:
             with pytest.raises(CBCConfigError, match="No CBC mapping fragment"):
                 resolve_base_url("default")
 
-    def test_raises_when_cbc_url_missing_from_fragment(self):
+    def test_resolve_base_url_with_fragment_missing_cbc_url_raises_cbc_config_error(self):
         tenant_subdomain_var.set("appfnd-subscriber")
         app_tenant_id_var.set("app-t1")
         match = MagicMock()
@@ -118,7 +118,7 @@ class TestResolveBaseUrl:
             with pytest.raises(CBCConfigError, match="no 'cbcUrl'"):
                 resolve_base_url("default")
 
-    def test_wraps_destination_error_as_config_error(self):
+    def test_resolve_base_url_when_destination_raises_wraps_as_cbc_config_error(self):
         from sap_cloud_sdk.destination.exceptions import DestinationOperationError
 
         tenant_subdomain_var.set("appfnd-subscriber")
@@ -141,7 +141,7 @@ class TestResolveBaseUrl:
 
 
 class TestLoadSslContext:
-    def test_loads_cert_into_ssl_context(self):
+    def test_load_ssl_context_with_valid_cert_returns_ssl_context(self):
         ctx = ssl.create_default_context()
         cert = MagicMock()
         cert.content = "<pem>"
@@ -164,7 +164,7 @@ class TestLoadSslContext:
         assert result is ctx
         load_pem.assert_called_once_with("<pem>", b"secret", "my-cert.pem")
 
-    def test_raises_when_cert_not_found(self):
+    def test_load_ssl_context_when_cert_not_found_raises_cbc_config_error(self):
         fake_cert_client = MagicMock()
         fake_cert_client.get_subaccount_certificate.return_value = None
         with patch(
@@ -174,7 +174,7 @@ class TestLoadSslContext:
             with pytest.raises(CBCConfigError, match="not found"):
                 load_ssl_context("default", "missing.pem", None)
 
-    def test_wraps_destination_error_as_config_error(self):
+    def test_load_ssl_context_when_destination_raises_wraps_as_cbc_config_error(self):
         from sap_cloud_sdk.destination.exceptions import DestinationOperationError
 
         fake_cert_client = MagicMock()
@@ -197,7 +197,7 @@ class TestLoadSslContext:
 
 
 class TestCreateAgentClient:
-    def test_builds_ssl_context_from_cert_default(self, monkeypatch):
+    def test_create_agent_client_with_landscape_env_builds_ssl_context_from_cert(self, monkeypatch):
         monkeypatch.setenv(ENV_LANDSCAPE, "cbc-fndtst-dev-eu12")
         with patch(
             "sap_cloud_sdk.cbc.client_adapter.load_ssl_context",
@@ -216,7 +216,7 @@ class TestCreateAgentClient:
             client._ssl_factory()
             assert load.call_count == 2
 
-    def test_env_overrides_apply(self, monkeypatch):
+    def test_create_agent_client_with_env_overrides_applies_instance_and_cert_name(self, monkeypatch):
         monkeypatch.setenv(ENV_DESTINATION_INSTANCE, "cbc-instance")
         monkeypatch.setenv(ENV_CERT_NAME, "my-cert.pem")
         with patch(
@@ -228,7 +228,7 @@ class TestCreateAgentClient:
         assert instance_arg == "cbc-instance"
         assert cert_arg == "my-cert.pem"
 
-    def test_config_values_apply(self):
+    def test_create_agent_client_with_config_object_applies_instance_and_cert_name(self):
         with patch(
             "sap_cloud_sdk.cbc.client_adapter.load_ssl_context",
             return_value=ssl.create_default_context(),
@@ -243,7 +243,7 @@ class TestCreateAgentClient:
         assert instance_arg == "cbc-instance"
         assert cert_arg == "my-cert.pem"
 
-    def test_config_value_wins_over_env(self, monkeypatch):
+    def test_create_agent_client_with_config_and_env_set_config_value_wins(self, monkeypatch):
         monkeypatch.setenv(ENV_DESTINATION_INSTANCE, "from-env")
         monkeypatch.setenv(ENV_CERT_NAME, "from-env.pem")
         with patch(
@@ -260,13 +260,13 @@ class TestCreateAgentClient:
         assert instance_arg == "from-config"
         assert cert_arg == "from-config.pem"
 
-    def test_raises_when_landscape_unset_and_no_cert_name(self, monkeypatch):
+    def test_create_agent_client_without_landscape_or_cert_name_raises_cbc_config_error(self, monkeypatch):
         monkeypatch.delenv(ENV_LANDSCAPE, raising=False)
         monkeypatch.delenv(ENV_CERT_NAME, raising=False)
         with pytest.raises(CBCConfigError, match=ENV_LANDSCAPE):
             create_agent_client()
 
-    def test_wires_resolvers_into_client(self, monkeypatch):
+    def test_create_agent_client_with_contextvars_set_wires_resolvers_into_client(self, monkeypatch):
         """The two ContextVars drive base_url + app_tenant_id at request time."""
         monkeypatch.setenv(ENV_CERT_NAME, "my-cert.pem")
         with patch(
@@ -300,7 +300,7 @@ class TestCreateAgentClient:
 
 
 class TestComposeWithPublicResolvers:
-    def test_compose_core_with_public_resolvers(self):
+    def test_compose_core_with_public_resolvers_builds_valid_default_client(self):
         """Advanced callers keep platform base_url + app_tenant_id but bring
         their own mTLS context, composing the public resolvers with the core."""
         client = create_client(

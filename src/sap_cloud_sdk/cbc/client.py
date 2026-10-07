@@ -93,6 +93,14 @@ class CBCClient(Protocol):
         A consumption version represents a snapshot of the business configuration
         for an app tenant at a point in time. Use this to discover the active
         version ID when you don't already have it.
+
+        Returns:
+            :class:`ConsumptionVersions` containing the list of available versions.
+
+        Raises:
+            CBCClientError: On 4xx responses.
+            CBCServerError: On 5xx responses.
+            CBCNetworkError: On connection failures.
         """
         ...
 
@@ -104,6 +112,19 @@ class CBCClient(Protocol):
 
         When ``consumption_version`` is omitted, the latest version is resolved
         automatically via :meth:`get_consumption_versions`.
+
+        Args:
+            consumption_version: Consumption version ID. When ``None``, the
+                latest version is resolved automatically.
+
+        Returns:
+            :class:`ConfigData` containing all config objects and their entities.
+
+        Raises:
+            CBCClientError: On 4xx responses, or when no consumption version
+                exists for the tenant and ``consumption_version`` was not provided.
+            CBCServerError: On 5xx responses.
+            CBCNetworkError: On connection failures.
         """
         ...
 
@@ -117,6 +138,21 @@ class CBCClient(Protocol):
 
         When ``consumption_version`` is omitted, the latest version is resolved
         automatically via :meth:`get_consumption_versions`.
+
+        Args:
+            config_object_id: Authored config object identifier (e.g. ``"payment-config"``).
+            entity_id: Authored entity identifier (e.g. ``"payment-mode"``).
+            consumption_version: Consumption version ID. When ``None``, the
+                latest version is resolved automatically.
+
+        Returns:
+            :class:`EntityData` for the entity.
+
+        Raises:
+            CBCClientError: On 4xx responses, or when no consumption version
+                exists for the tenant and ``consumption_version`` was not provided.
+            CBCServerError: On 5xx responses.
+            CBCNetworkError: On connection failures.
         """
         ...
 

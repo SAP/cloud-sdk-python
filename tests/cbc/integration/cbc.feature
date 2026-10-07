@@ -28,3 +28,9 @@ Feature: CBC (Central Business Configuration) Integration
     When I call get_configuration
     Then every entity should have a non-empty entity_id
     And every entity data should be accessible as a list or object
+
+  # ── Single entity fetch ──────────────────────────────────────────────────────
+
+  Scenario: Fetch a single entity directly returns EntityData
+    When I call get_entity_data for the first entity in the first config object
+    Then the result should be EntityData accessible as a list or object

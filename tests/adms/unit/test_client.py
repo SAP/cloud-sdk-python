@@ -141,7 +141,6 @@ class TestAdmsClientInit:
         assert client._http is mock_http
 
     def test_with_user_jwt_empty_raises(self, mock_http):
-        facade guard fires before delegating to transport.
         client = AdmsClient(mock_http)
         with pytest.raises(ValueError, match="non-blank"):
             client.with_user_jwt("")
@@ -240,7 +239,6 @@ class TestCreateClientFactory:
         assert client._http._user_jwt == "user-jwt-123"
 
     def test_create_client_empty_user_jwt_raises(self):
-        factory guard must fire before binding resolution.
         mock_config = AdmsConfig(
             service_url="https://adm.example.com",
             ias_url="https://ias.example.com",
@@ -531,7 +529,6 @@ class TestCreateAsyncClient:
         assert isinstance(client, AsyncAdmsClient)
 
     def test_create_async_client_empty_user_jwt_raises(self, config):
-        async factory guard.
         mock_factory = MagicMock(return_value=config)
         with patch(
             "sap_cloud_sdk.adms.client._make_config_factory", return_value=mock_factory

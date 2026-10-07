@@ -264,7 +264,7 @@ class TestAdmsHttpOboInvariant:
         # with_user_jwt signals explicit OBO intent — None must also raise.
         http = AdmsHttp(config=config, token_fetcher=token_fetcher)
         with pytest.raises(ValueError, match="non-blank"):
-            http.with_user_jwt(None)  # type: ignore[arg-type]
+            http.with_user_jwt(None)  # ty: ignore[invalid-argument-type]
 
     def test_valid_jwt_calls_exchange_not_get(self, config, token_fetcher):
         session = MagicMock(spec=requests.Session)
@@ -356,7 +356,7 @@ class TestAdmsHttpOboInvariant:
             client=MagicMock(spec=httpx.AsyncClient),
         )
         with pytest.raises(ValueError, match="non-blank"):
-            http.with_user_jwt(None)  # type: ignore[arg-type]
+            http.with_user_jwt(None)  # ty: ignore[invalid-argument-type]
 
 
 class TestQuoteOdataStringKey:

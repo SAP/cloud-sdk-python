@@ -10,7 +10,11 @@ from sap_cloud_sdk.core.telemetry.constants import (
     ATTR_USER_ID,
 )
 from sap_cloud_sdk.core.telemetry.middleware.base import TelemetryMiddleware
-from sap_cloud_sdk.ias import IASConfigError, IASVerifier, TokenVerifier, VerifiedIASClaims  # noqa: F401
+from sap_cloud_sdk.ias import (
+    IASConfigError,
+    IASVerifier,
+    TokenVerifier,
+)  # noqa: F401
 from sap_cloud_sdk.ias import set_auth_context
 from sap_cloud_sdk.ias._token import IASClaims
 
@@ -92,7 +96,9 @@ class StarletteIASTelemetryMiddleware(TelemetryMiddleware):
         auto_instrument(middlewares=[StarletteIASTelemetryMiddleware(app=app)])
     """
 
-    def __init__(self, app: Any, token_verifier: Optional[TokenVerifier] = None) -> None:
+    def __init__(
+        self, app: Any, token_verifier: Optional[TokenVerifier] = None
+    ) -> None:
         self.app = app
         if token_verifier is None:
             token_verifier = _auto_configure_verifier()

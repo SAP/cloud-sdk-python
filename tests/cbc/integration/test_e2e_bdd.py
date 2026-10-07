@@ -12,7 +12,7 @@ from __future__ import annotations
 import pytest
 from pytest_bdd import given, scenario, then, when
 
-from sap_cloud_sdk.cbc import ConfigData, ConsumptionVersions
+from sap_cloud_sdk.cbc import ConfigData, ConsumptionVersions, EntityData
 from sap_cloud_sdk.cbc.client import DefaultClient
 
 pytestmark = pytest.mark.integration
@@ -53,6 +53,14 @@ def test_configuration_has_config_objects():
     "cbc.feature", "Every entity within each config object has an entity_id and data"
 )
 def test_every_entity_has_id_and_data():
+    pass
+
+
+@scenario(
+    "cbc.feature",
+    "Fetch a single entity directly returns EntityData",
+)
+def test_get_entity_data_returns_entity_data():
     pass
 
 
@@ -129,3 +137,25 @@ def assert_entity_data_accessible(ctx: dict):
             except ValueError:
                 result = raw.as_object()
                 assert result is not None
+
+
+@when("I call get_entity_data for the first entity in the first config object")
+def call_get_entity_data(ctx: dict, cbc_client: DefaultClient):
+    config: ConfigData = cbc_client.get_configuration()
+    assert config.config_objects, "no config objects — cannot test get_entity_data"
+    co = config.config_objects[0]
+    assert co.entities, f"no entities in {co.config_object_id!r}"
+    entity_id = co.entities[0].entity_id
+    ctx["entity_data"] = cbc_client.get_entity_data(co.config_object_id, entity_id)
+
+
+@then("the result should be EntityData accessible as a list or object")
+def assert_single_entity_data(ctx: dict):
+    data: EntityData = ctx["entity_data"]
+    assert isinstance(data, EntityData)
+    try:
+        result = data.as_list()
+        assert result is not None
+    except ValueError:
+        result = data.as_object()
+        assert result is not None

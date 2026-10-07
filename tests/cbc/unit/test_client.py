@@ -64,7 +64,7 @@ def _make_client(
 
 
 class TestAppTenantIdCallable:
-    def test_callable_is_invoked_on_each_call(self):
+    def test_app_tenant_id_callable_on_each_call_invokes_callable(self):
         call_count = 0
 
         def app_tenant_id_fn() -> str:
@@ -92,7 +92,7 @@ class TestAppTenantIdCallable:
 
 
 class TestConfigurationsUrl:
-    def test_joins_base_url_and_path_verbatim(self):
+    def test_configurations_url_with_base_and_suffix_joins_correctly(self):
         client, _ = _make_client("https://my-tenant.cbc.example.ondemand.com")
         url = client._configurations_url(
             "https://my-tenant.cbc.example.ondemand.com", "/consumptionVersions"
@@ -109,7 +109,7 @@ class TestConfigurationsUrl:
 
 
 class TestGetConsumptionVersions:
-    def test_returns_parsed_versions(self):
+    def test_get_consumption_versions_with_valid_response_returns_parsed_versions(self):
         client, mock_http = _make_client()
         mock_http.request.return_value = _mock_response(
             json_body={"items": [{"version": "cv1"}]}
@@ -118,7 +118,7 @@ class TestGetConsumptionVersions:
         assert len(result.items) == 1
         assert result.items[0].version == "cv1"
 
-    def test_raises_client_error_on_404(self):
+    def test_get_consumption_versions_on_404_raises_cbc_client_error(self):
         client, mock_http = _make_client()
         mock_http.request.return_value = _mock_response(
             status_code=404,
@@ -127,13 +127,13 @@ class TestGetConsumptionVersions:
         with pytest.raises(CBCClientError):
             client.get_consumption_versions()
 
-    def test_raises_server_error_on_500(self):
+    def test_get_consumption_versions_on_500_raises_cbc_server_error(self):
         client, mock_http = _make_client()
         mock_http.request.return_value = _mock_response(status_code=500, content=b"")
         with pytest.raises(CBCServerError):
             client.get_consumption_versions()
 
-    def test_raises_network_error_on_connection_failure(self):
+    def test_get_consumption_versions_on_connection_failure_raises_cbc_network_error(self):
         client, mock_http = _make_client()
         mock_http.request.side_effect = httpx.ConnectError("refused")
         with pytest.raises(CBCNetworkError):
@@ -146,7 +146,7 @@ class TestGetConsumptionVersions:
 
 
 class TestGetConfigurationObjects:
-    def test_returns_grouped_config_objects(self):
+    def test_get_configuration_objects_with_multiple_objects_returns_grouped_config_objects(self):
         client, mock_http = _make_client()
         mock_http.request.return_value = _mock_response(
             json_body={
@@ -182,7 +182,7 @@ class TestGetConfigurationObjects:
 
 
 class TestFetchEntityData:
-    def test_reads_array_content_items(self):
+    def test_fetch_entity_data_with_array_shape_returns_list_content(self):
         client, mock_http = _make_client()
         mock_http.request.return_value = _mock_response(
             json_body={
@@ -200,7 +200,7 @@ class TestFetchEntityData:
         assert result.entity_id == "tax-category"
         assert result.data.as_list() == [{"code": "STD"}]
 
-    def test_reads_object_content_item(self):
+    def test_fetch_entity_data_with_object_shape_returns_dict_content(self):
         client, mock_http = _make_client()
         mock_http.request.return_value = _mock_response(
             json_body={
@@ -218,7 +218,7 @@ class TestFetchEntityData:
         assert result.entity_id == "globalSettings"
         assert result.data.as_object() == {"maxRetries": 3, "timeoutSeconds": 30}
 
-    def test_defaults_to_empty_list_when_content_absent(self):
+    def test_fetch_entity_data_with_absent_content_defaults_to_empty_list(self):
         client, mock_http = _make_client()
         mock_http.request.return_value = _mock_response(
             json_body={"contentShape": "ARRAY"}
@@ -239,7 +239,7 @@ class TestFetchEntityData:
 
 
 class TestGetConfiguration:
-    def test_resolves_latest_version_when_none_given(self):
+    def test_get_configuration_without_version_resolves_latest_and_returns_config_data(self):
         client, mock_http = _make_client()
         versions_response = _mock_response(json_body={"items": [{"version": "v2"}]})
         config_objects_response = _mock_response(json_body={"items": []})
@@ -250,13 +250,13 @@ class TestGetConfiguration:
         assert result.consumption_version == "v2"
         assert result.config_objects == []
 
-    def test_raises_runtime_error_when_no_versions_exist(self):
+    def test_get_configuration_when_no_versions_exist_raises_cbc_client_error(self):
         client, mock_http = _make_client()
         mock_http.request.return_value = _mock_response(json_body={"items": []})
         with pytest.raises(CBCClientError, match="no consumption version"):
             client.get_configuration()
 
-    def test_uses_explicit_consumption_version(self):
+    def test_get_configuration_with_explicit_version_skips_version_resolution(self):
         client, mock_http = _make_client()
         config_objects_response = _mock_response(
             json_body={
@@ -282,7 +282,7 @@ class TestGetConfiguration:
         assert len(result.config_objects[0].entities) == 1
         assert result.config_objects[0].entities[0].entity_id == "payment-mode"
 
-    def test_resolves_base_url_once_per_call(self):
+    def test_get_configuration_with_multiple_entities_resolves_base_url_once(self):
         """One get_configuration resolves base_url once, not per HTTP request."""
         call_count = 0
 
@@ -331,7 +331,7 @@ class TestGetConfiguration:
 
 
 class TestGetEntityData:
-    def test_returns_entity_data_directly(self):
+    def test_get_entity_data_without_version_resolves_latest_and_returns_entity_data(self):
         client, mock_http = _make_client()
         versions_response = _mock_response(json_body={"items": [{"version": "v1"}]})
         entity_response = _mock_response(
@@ -346,7 +346,7 @@ class TestGetEntityData:
         assert isinstance(result, EntityData)
         assert result.as_list() == [{"code": "STD"}]
 
-    def test_uses_pinned_version_without_resolving(self):
+    def test_get_entity_data_with_pinned_version_skips_version_resolution(self):
         client, mock_http = _make_client()
         mock_http.request.return_value = _mock_response(
             json_body={
@@ -363,7 +363,7 @@ class TestGetEntityData:
         # Only one HTTP call — no version resolution
         assert mock_http.request.call_count == 1
 
-    def test_raises_when_no_versions_exist(self):
+    def test_get_entity_data_when_no_versions_exist_raises_cbc_client_error(self):
         client, mock_http = _make_client()
         mock_http.request.return_value = _mock_response(json_body={"items": []})
         with pytest.raises(CBCClientError, match="no consumption version"):
@@ -376,7 +376,7 @@ class TestGetEntityData:
 
 
 class TestDefaultClientContextManager:
-    def test_close_called_on_exit(self):
+    def test_context_manager_on_exit_closes_http_client(self):
         client, mock_http = _make_client()
         with client:
             pass
@@ -389,14 +389,14 @@ class TestDefaultClientContextManager:
 
 
 class TestCreateClient:
-    def test_returns_default_client(self):
+    def test_create_client_with_required_args_returns_default_client(self):
         client = create_client(
             base_url=lambda: "http://localhost:8001",
             app_tenant_id=lambda: "app-t1",
         )
         assert isinstance(client, DefaultClient)
 
-    def test_passes_ssl_context_through(self):
+    def test_create_client_with_ssl_context_passes_it_through_to_default_client(self):
         import ssl
 
         ctx = ssl.create_default_context()
@@ -427,13 +427,13 @@ def _tls_read_error() -> httpx.ReadError:
 
 
 class TestIsTlsFailure:
-    def test_true_for_read_error_wrapping_ssl_error(self):
+    def test_is_tls_failure_with_read_error_wrapping_ssl_error_returns_true(self):
         assert _is_tls_failure(_tls_read_error()) is True
 
-    def test_false_for_plain_connect_error(self):
+    def test_is_tls_failure_with_connect_error_returns_false(self):
         assert _is_tls_failure(httpx.ConnectError("connection refused")) is False
 
-    def test_false_for_non_ssl_os_error(self):
+    def test_is_tls_failure_with_non_ssl_os_error_returns_false(self):
         err = httpx.ReadError("read failed")
         err.__cause__ = OSError("broken pipe")
         assert _is_tls_failure(err) is False
@@ -475,7 +475,7 @@ class TestCertRotation:
         client._build_http_client = build  # ty: ignore[invalid-assignment]
         return client, built
 
-    def test_reactive_success_rebuilds_and_retries(self):
+    def test_cert_rotation_on_tls_failure_rebuilds_client_and_retries_successfully(self):
         calls = {"factory": 0}
 
         def factory() -> ssl.SSLContext:
@@ -502,7 +502,7 @@ class TestCertRotation:
         built[1].request.assert_called_once()
         assert result.items[0].version == "cv1"
 
-    def test_second_failure_propagates_after_one_rebuild(self):
+    def test_cert_rotation_on_second_tls_failure_after_rebuild_propagates_error(self):
         def factory() -> ssl.SSLContext:
             return ssl.create_default_context()
 
@@ -524,7 +524,7 @@ class TestCertRotation:
         assert len(built) == 2
         built[1].request.assert_called_once()
 
-    def test_non_tls_transport_error_does_not_rebuild(self):
+    def test_cert_rotation_on_non_tls_transport_error_does_not_rebuild_client(self):
         def factory() -> ssl.SSLContext:
             return ssl.create_default_context()
 
@@ -537,7 +537,7 @@ class TestCertRotation:
         # no rebuild — still only the initial mock
         assert len(built) == 1
 
-    def test_no_factory_does_not_rebuild(self):
+    def test_cert_rotation_without_ssl_factory_does_not_rebuild_client(self):
         mock_http = MagicMock(spec=httpx.Client)
         mock_http.request.side_effect = _tls_read_error()
         client = DefaultClient(
@@ -551,7 +551,7 @@ class TestCertRotation:
         # one attempt only, no rebuild path
         mock_http.request.assert_called_once()
 
-    def test_rebuild_failure_propagates_and_keeps_client(self):
+    def test_cert_rotation_when_factory_fails_propagates_error_and_retains_old_client(self):
         calls = {"factory": 0}
 
         def factory() -> ssl.SSLContext:

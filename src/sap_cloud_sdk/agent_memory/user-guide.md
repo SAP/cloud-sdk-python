@@ -182,13 +182,6 @@ across create, read, and search calls is the implementer's responsibility.
 
 - **Further reading:** N/A
 
-> **Security note (path safety):** When a per-tenant `instance` value is resolved
-> (e.g. from a JWT claim or HTTP header in a multitenant deployment), the SDK
-> validates it as a single-component identifier before building any filesystem path.
-> A crafted value such as `"../default"` cannot select another binding's credentials.
-> This protection is automatic for all SDK consumers — no extra validation is needed
-> in agent or application code.
-
 ## Semantic Search: A Brief Primer
 
 Texts with different words — or even different languages — can have the same meaning.

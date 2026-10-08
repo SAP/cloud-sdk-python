@@ -363,14 +363,11 @@ auto_instrument(middlewares=[MyMiddleware(app=app)])
 
 ### Built-in: `StarletteIASTelemetryMiddleware`
 
-For Starlette/FastAPI apps with IAS authentication, the SDK ships a ready-to-use middleware that
-reads the `Authorization: Bearer <token>` header on each request, **verifies** it as an IAS JWT
-using JWKS-backed signature verification, and injects:
+For Starlette/FastAPI apps with IAS authentication, the SDK ships a ready-to-use middleware that reads the `Authorization: Bearer <token>` header on each request, **verifies** it as an IAS JWT using JWKS-backed signature verification, and injects:
 - `sap.tenancy.tenant_id` from the `sap_gtid` claim
 - `user.id` from the `user_uuid` claim
 
-Identity attributes are stamped **only** when token verification succeeds. Forged or invalid tokens
-result in no identity attributes and an empty auth context — the request continues normally.
+Identity attributes are stamped **only** when token verification succeeds. Forged or invalid tokens result in no identity attributes and an empty auth context — the request continues normally.
 
 #### Zero-config (IAS service binding present)
 
@@ -406,8 +403,7 @@ Add an IAS service binding to restore them.
 
 #### Custom verifier (advanced)
 
-For scenarios where the token has already been verified upstream (e.g. Istio/Kyma mTLS), pass
-a custom `TokenVerifier` callable:
+For scenarios where the token has already been verified upstream (e.g. Istio/Kyma mTLS), pass a custom `TokenVerifier` callable:
 
 ```python
 from sap_cloud_sdk.ias import IASVerifier, TokenVerifier

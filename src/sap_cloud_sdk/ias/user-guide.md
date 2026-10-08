@@ -87,15 +87,11 @@ add_span_attribute("enduser.id", claims.scim_id or claims.sub or "")
 
 ## Verified Claims
 
-`parse_token` decodes the JWT without verifying its signature. For security-sensitive
-consumers — telemetry identity attributes, audit context — use `IASVerifier` to perform
-JWKS-backed signature verification before trusting the claims.
+`parse_token` decodes the JWT without verifying its signature. For security-sensitive consumers — telemetry identity attributes, audit context — use `IASVerifier` to perform JWKS-backed signature verification before trusting the claims.
 
 ### IASVerifier
 
-`IASVerifier` is a built-in verifier that fetches signing keys from the IAS JWKS endpoint and
-validates the token's signature, issuer, algorithm, and expiry. It auto-configures itself from
-the environment:
+`IASVerifier` is a built-in verifier that fetches signing keys from the IAS JWKS endpoint and validates the token's signature, issuer, algorithm, and expiry. It auto-configures itself from the environment:
 
 - **Cloud Foundry**: reads `VCAP_SERVICES` → `identity[0]` or `xsuaa[0]` credentials.
 - **Kubernetes / local**: reads `IAS_URL` (and optionally `IAS_CLIENT_ID`) environment variables.
@@ -118,15 +114,11 @@ verified = verifier("Bearer <token>")
 claims = verified.claims  # IASClaims, provably from IAS
 ```
 
-`IASVerifier` pins algorithms to `RS256` and `ES256` (asymmetric only), caches signing keys
-internally, and handles key rotation transparently.
+`IASVerifier` pins algorithms to `RS256` and `ES256` (asymmetric only), caches signing keys internally, and handles key rotation transparently.
 
 ### VerifiedIASClaims
 
-`VerifiedIASClaims` is a frozen dataclass that wraps `IASClaims`. Its presence is the SDK's
-provenance marker: an instance can only be obtained by calling a `TokenVerifier` that ran
-signature verification. Never construct it directly from `parse_token` output in security-
-sensitive code.
+`VerifiedIASClaims` is a frozen dataclass that wraps `IASClaims`. Its presence is the SDK's provenance marker: an instance can only be obtained by calling a `TokenVerifier` that ran signature verification. Never construct it directly from `parse_token` output in security-sensitive code.
 
 ```python
 from sap_cloud_sdk.ias import VerifiedIASClaims, IASClaims
@@ -137,9 +129,7 @@ claims: IASClaims = verified.claims  # access the underlying claims
 
 ### Zero-config with StarletteIASTelemetryMiddleware
 
-When an IAS service binding is present, `StarletteIASTelemetryMiddleware` auto-configures
-`IASVerifier.from_env()` and verifies every token before stamping span attributes or setting
-the auth context — no extra code required:
+When an IAS service binding is present, `StarletteIASTelemetryMiddleware` auto-configures `IASVerifier.from_env()` and verifies every token before stamping span attributes or setting the auth context — no extra code required:
 
 ```python
 from starlette.applications import Starlette
@@ -151,6 +141,4 @@ app = Starlette(...)
 auto_instrument(middlewares=[StarletteIASTelemetryMiddleware(app=app)])
 ```
 
-If no binding is found, a WARNING is logged at startup and identity attributes are not stamped
-until a binding is added. See [Telemetry user guide](../core/telemetry/user-guide.md#built-in-starletteiastelemetrymiddleware)
-for details.
+If no binding is found, a WARNING is logged at startup and identity attributes are not stamped until a binding is added. See [Telemetry user guide](../core/telemetry/user-guide.md#built-in-starletteiastelemetrymiddleware) for details.

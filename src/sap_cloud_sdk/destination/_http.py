@@ -36,9 +36,7 @@ def _request(
     # even if the client-layer validation is somehow bypassed.
     path_segments = normalized_path.split("/")
     if ".." in path_segments:
-        raise HttpError(
-            f"Path traversal detected: '..' segment in path {normalized_path!r}",
-        )
+        raise HttpError("Forbidden: path traversal detected")
     try:
         resp = http.request(
             method,

@@ -173,6 +173,7 @@ class CertificateClient:
         Raises:
             DestinationOperationError: If an HTTP error occurs or response parsing fails.
         """
+        validate_resource_name(name)
         try:
             return self._get_certificate(name=name, level=Level.SERVICE_INSTANCE)
         except HttpError as e:
@@ -207,6 +208,7 @@ class CertificateClient:
             DestinationOperationError: If tenant is missing for subscriber access strategies,
                                        on HTTP errors, or response parsing failures.
         """
+        validate_resource_name(name)
         try:
             return self._apply_access_strategy(
                 access_strategy=access_strategy,

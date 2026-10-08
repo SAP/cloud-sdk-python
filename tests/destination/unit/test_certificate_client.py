@@ -634,3 +634,17 @@ class TestCertificatePathTraversalGuard:
         with pytest.raises(ValueError):
             c.update_certificate(cert)
         http.request.assert_not_called()
+
+    @pytest.mark.parametrize("name", _ATTACK_NAMES)
+    def test_get_instance_certificate_rejects_traversal_names(self, client, name):
+        c, http = client
+        with pytest.raises(ValueError):
+            c.get_instance_certificate(name)
+        http.request.assert_not_called()
+
+    @pytest.mark.parametrize("name", _ATTACK_NAMES)
+    def test_get_subaccount_certificate_rejects_traversal_names(self, client, name):
+        c, http = client
+        with pytest.raises(ValueError):
+            c.get_subaccount_certificate(name)
+        http.request.assert_not_called()

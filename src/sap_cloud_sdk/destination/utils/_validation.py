@@ -50,9 +50,7 @@ def validate_resource_name(name: str) -> str:
         ValueError: If *name* does not match the allowlist grammar.
     """
     if not isinstance(name, str) or not _RESOURCE_NAME_RE.fullmatch(name):
-        raise ValueError(
-            f"Invalid resource name {name!r}: must match {_NAME_PATTERN}"
-        )
+        raise ValueError(f"Invalid resource name {name!r}: must match {_NAME_PATTERN}")
     return name
 
 

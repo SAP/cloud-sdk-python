@@ -162,6 +162,11 @@ client.patch_destination_labels(
   - SUBACCOUNT: Subscriber subaccount scope
   - INSTANCE: Subscriber service instance scope
 
+  **Shorthand syntax:** `get_destination` accepts the `ConsumptionLevel` value as an `@`-suffix
+  directly in the name string for backward compatibility
+  (`"my-dest@provider_subaccount"` is equivalent to passing `level=ConsumptionLevel.PROVIDER_SUBACCOUNT`).
+  The `level=` parameter form is the canonical and more explicit usage.
+
 - AccessStrategy (applies to subaccount reads):
   - SUBSCRIBER_ONLY: Only subscriber (tenant required)
   - PROVIDER_ONLY: Only provider (no tenant)
@@ -924,6 +929,48 @@ Entries with a `"tenant"` field are treated as subscriber-specific. Entries with
 - `DestinationOperationError`: general operation failures
 - `HttpError`: HTTP-related or local store read/write errors with `status_code` and `response_text` when applicable
 - `DestinationCertificateError`: raised when a client certificate cannot be loaded or wired into the HTTP session (unsupported format, wrong/missing KeyStorePassword, malformed content, cert/key mismatch)
+
+## Resource Name Validation
+
+All public methods that accept a resource `name` parameter validate it against the following grammar before any OAuth token is fetched or HTTP request is sent:
+
+```
+[A-Za-z0-9][A-Za-z0-9._\-]{0,199}
+```
+
+- The first character must be alphanumeric (prevents `.` / `..` path segments).
+- The remaining characters may be letters, digits, dot (`.`), underscore (`_`), or hyphen (`-`).
+- Maximum length: 200 characters.
+
+A `ValueError` is raised immediately for names that do not match — no network call is made:
+
+```python
+# Valid names — all accepted
+client.get_destination("my-destination")
+client.get_destination("MyDest.v2")
+client.get_destination("AuditLogV3_Destination")
+
+# Invalid names — ValueError raised before any HTTP call
+client.get_destination("../etc/passwd")   # path traversal
+client.get_destination("a/b")             # path separator
+client.get_destination("a%2Fb")           # encoded separator
+client.get_destination("a?query=1")       # query delimiter
+client.get_destination("")                # empty
+```
+
+### `get_destination` — ConsumptionLevel shorthand
+
+`get_destination` additionally accepts a `@ConsumptionLevel` suffix embedded in the name for backward compatibility:
+
+```python
+# Shorthand — still works, produces identical URL
+client.get_destination("my-dest@provider_subaccount")
+
+# Canonical form — explicit and preferred
+client.get_destination("my-dest", level=ConsumptionLevel.PROVIDER_SUBACCOUNT)
+```
+
+The SDK splits on `@`, validates the base name, and resolves the level automatically. If both the suffix and the `level=` parameter are provided with conflicting values, a `ValueError` is raised.
 
 ## Configuration
 

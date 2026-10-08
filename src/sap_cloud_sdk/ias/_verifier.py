@@ -3,11 +3,15 @@
 import json
 import logging
 import os
+from dataclasses import dataclass
 from typing import Optional
 
 import jwt
 from jwt import PyJWKClient
 
+from sap_cloud_sdk.core.secret_resolver.resolver import (
+    read_from_mount_and_fallback_to_env_var as _read_secret,
+)
 from sap_cloud_sdk.ias._token import VerifiedIASClaims, parse_token
 from sap_cloud_sdk.ias.exceptions import IASTokenError
 
@@ -15,6 +19,17 @@ logger = logging.getLogger(__name__)
 
 _ENV_IAS_URL = "IAS_URL"
 _ENV_IAS_CLIENT_ID = "IAS_CLIENT_ID"
+
+_SECRET_MOUNT_BASE = "/etc/secrets/appfnd"
+_ENV_VAR_BASE = "CLOUD_SDK_CFG"
+_SECRET_MODULE = "identity-service"
+_SECRET_DEFAULT_INSTANCE = "default"
+
+
+@dataclass
+class _IASBindingData:
+    url: str = ""
+    clientid: str = ""
 
 
 class IASConfigError(Exception):
@@ -76,7 +91,9 @@ class IASVerifier:
 
         1. ``VCAP_SERVICES`` (Cloud Foundry) —
            ``identity[0].credentials.{url, clientid}``
-        2. ``IAS_URL`` + ``IAS_CLIENT_ID`` environment variables (Kubernetes / manual)
+        2. Kubernetes volume mount — ``/etc/secrets/appfnd/identity-service/default/{url,clientid}``
+           (mounted automatically by the agent deployment template)
+        3. ``IAS_URL`` + ``IAS_CLIENT_ID`` environment variables (manual / legacy)
 
         Returns:
             A configured :class:`IASVerifier` instance.
@@ -103,6 +120,26 @@ class IASVerifier:
             except (json.JSONDecodeError, KeyError, IndexError, TypeError) as exc:
                 logger.debug("IASVerifier.from_env: VCAP_SERVICES parse error: %s", exc)
 
+        # Step 2 — Kubernetes volume mount (identity-service secret)
+        try:
+            binding = _IASBindingData()
+            _read_secret(
+                base_volume_mount=_SECRET_MOUNT_BASE,
+                base_var_name=_ENV_VAR_BASE,
+                module=_SECRET_MODULE,
+                instance=_SECRET_DEFAULT_INSTANCE,
+                target=binding,
+            )
+            if binding.url:
+                logger.debug(
+                    "IASVerifier.from_env: configured from Kubernetes secret mount (%s/%s)",
+                    _SECRET_MODULE,
+                    _SECRET_DEFAULT_INSTANCE,
+                )
+                return cls(ias_url=binding.url, client_id=binding.clientid or None)
+        except Exception as exc:
+            logger.debug("IASVerifier.from_env: secret mount lookup failed: %s", exc)
+
         ias_url = os.getenv(_ENV_IAS_URL)
         if ias_url:
             client_id = os.getenv(_ENV_IAS_CLIENT_ID) or None
@@ -111,9 +148,9 @@ class IASVerifier:
 
         raise IASConfigError(
             f"Cannot auto-configure IASVerifier: no IAS service binding found. "
-            f"Bind an SAP Identity service instance (sets VCAP_SERVICES on CF or "
-            f"a Kubernetes secret) or set {_ENV_IAS_URL} (and optionally "
-            f"{_ENV_IAS_CLIENT_ID}) manually."
+            f"Set VCAP_SERVICES (CF), mount the identity-service secret at "
+            f"{_SECRET_MOUNT_BASE}/{_SECRET_MODULE}/{_SECRET_DEFAULT_INSTANCE}/ (Kubernetes), "
+            f"or set {_ENV_IAS_URL} (and optionally {_ENV_IAS_CLIENT_ID}) manually."
         )
 
     def __call__(self, authorization: str) -> VerifiedIASClaims:

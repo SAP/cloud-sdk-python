@@ -94,7 +94,8 @@ add_span_attribute("enduser.id", claims.scim_id or claims.sub or "")
 `IASVerifier` is a built-in verifier that fetches signing keys from the IAS JWKS endpoint and validates the token's signature, issuer, algorithm, and expiry. It auto-configures itself from the environment:
 
 - **Cloud Foundry**: reads `VCAP_SERVICES` → `identity[0]` or `xsuaa[0]` credentials.
-- **Kubernetes / local**: reads `IAS_URL` (and optionally `IAS_CLIENT_ID`) environment variables.
+- **Kubernetes (managed runtime)**: reads the `identity-service` secret mounted at `/etc/secrets/appfnd/identity-service/default/` — mounted automatically by the agent deployment template, no `app.yaml` changes needed.
+- **Manual / local**: reads `IAS_URL` (and optionally `IAS_CLIENT_ID`) environment variables.
 
 ```python
 from sap_cloud_sdk.ias import IASVerifier, IASConfigError

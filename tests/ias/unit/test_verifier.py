@@ -86,6 +86,67 @@ class TestIASVerifierFromEnv:
             v = IASVerifier.from_env()
         assert v._ias_url == "https://vcap-ias.example.com"
 
+    def test_k8s_mount_success(self, monkeypatch):
+        monkeypatch.delenv("VCAP_SERVICES", raising=False)
+        monkeypatch.delenv("IAS_URL", raising=False)
+
+        def _fake_read_secret(base_volume_mount, base_var_name, module, instance, target):
+            target.url = "https://mount-ias.example.com"
+            target.clientid = "mount-client"
+
+        with patch("sap_cloud_sdk.ias._verifier._read_secret", side_effect=_fake_read_secret):
+            with patch("sap_cloud_sdk.ias._verifier.PyJWKClient"):
+                v = IASVerifier.from_env()
+        assert v._ias_url == "https://mount-ias.example.com"
+        assert v._client_id == "mount-client"
+
+    def test_k8s_mount_no_url_falls_through_to_env_var(self, monkeypatch):
+        monkeypatch.delenv("VCAP_SERVICES", raising=False)
+        monkeypatch.setenv("IAS_URL", "https://env-ias.example.com")
+
+        def _fake_read_secret(base_volume_mount, base_var_name, module, instance, target):
+            target.clientid = "mount-client"
+            # url stays ""
+
+        with patch("sap_cloud_sdk.ias._verifier._read_secret", side_effect=_fake_read_secret):
+            with patch("sap_cloud_sdk.ias._verifier.PyJWKClient"):
+                v = IASVerifier.from_env()
+        assert v._ias_url == "https://env-ias.example.com"
+
+    def test_k8s_mount_raises_falls_through_to_env_var(self, monkeypatch):
+        monkeypatch.delenv("VCAP_SERVICES", raising=False)
+        monkeypatch.setenv("IAS_URL", "https://env-ias.example.com")
+
+        with patch("sap_cloud_sdk.ias._verifier._read_secret", side_effect=RuntimeError("mount not found")):
+            with patch("sap_cloud_sdk.ias._verifier.PyJWKClient"):
+                v = IASVerifier.from_env()
+        assert v._ias_url == "https://env-ias.example.com"
+
+    def test_vcap_takes_precedence_over_mount(self, monkeypatch):
+        vcap = {"identity": [{"credentials": {"url": "https://vcap-ias.example.com", "clientid": "vc"}}]}
+        monkeypatch.setenv("VCAP_SERVICES", json.dumps(vcap))
+        monkeypatch.delenv("IAS_URL", raising=False)
+
+        def _fake_read_secret(base_volume_mount, base_var_name, module, instance, target):
+            target.url = "https://mount-ias.example.com"
+
+        with patch("sap_cloud_sdk.ias._verifier._read_secret", side_effect=_fake_read_secret):
+            with patch("sap_cloud_sdk.ias._verifier.PyJWKClient"):
+                v = IASVerifier.from_env()
+        assert v._ias_url == "https://vcap-ias.example.com"
+
+    def test_mount_takes_precedence_over_env_var(self, monkeypatch):
+        monkeypatch.delenv("VCAP_SERVICES", raising=False)
+        monkeypatch.setenv("IAS_URL", "https://env-ias.example.com")
+
+        def _fake_read_secret(base_volume_mount, base_var_name, module, instance, target):
+            target.url = "https://mount-ias.example.com"
+
+        with patch("sap_cloud_sdk.ias._verifier._read_secret", side_effect=_fake_read_secret):
+            with patch("sap_cloud_sdk.ias._verifier.PyJWKClient"):
+                v = IASVerifier.from_env()
+        assert v._ias_url == "https://mount-ias.example.com"
+
 
 class TestIASVerifierCall:
     def _make_verifier(self, ias_url="https://ias.example.com", client_id=None):

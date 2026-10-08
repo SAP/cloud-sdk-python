@@ -257,9 +257,14 @@ active = client.relations.activate_draft(activate_input)
 
 ## Multi-tenancy
 
-- **Supported:** No
+- **Supported:** Partial (ApplicationTenant operations only)
 - **Authentication:** IAS
-- **How to use:** Multi-tenancy is not supported by this service.
+- **How to use:** ADM is a single-tenant service for most operations. The
+  `ApplicationTenant` entity is an exception: create, list, get, and delete
+  operations accept an optional `subaccount_id` parameter, which is forwarded
+  as the `X-SubaccountId` header required by ADM for subaccount-scoped tenant
+  management. All other ADM APIs (documents, jobs, configuration) do not
+  support multi-tenancy.
 - **Further reading:** N/A
 
 ## Error Handling

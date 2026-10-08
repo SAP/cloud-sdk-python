@@ -210,3 +210,57 @@ class TestLoadConfigFromEnv:
         with patch("os.stat", side_effect=FileNotFoundError("no mount")):
             with pytest.raises(AgentMemoryConfigError, match="Failed to parse uaa JSON"):
                 _load_config_from_env()
+
+
+# ── Path-traversal regression (SECURITY) ─────────────────────────────────────
+
+BAD_INSTANCE_VALUES = [
+    "../default",
+    "../../etc",
+    "/etc/passwd",
+    "C:/Windows",
+    "\\\\server\\share",
+    "foo/bar",
+    "foo\x00bar",
+    ".",
+    "..",
+]
+
+GOOD_INSTANCE_VALUES = ["default", "my-tenant-us10", "hana-agent-memory-2"]
+
+
+class TestAgentMemoryPathTraversal:
+    """Regression tests: path-traversal in the instance name must be rejected
+    before any filesystem access, regardless of whether the mount exists."""
+
+    @pytest.mark.parametrize("bad", BAD_INSTANCE_VALUES)
+    def test_bad_instance_raises_on_factory_call(self, bad):
+        from sap_cloud_sdk.agent_memory.config import _make_config_factory
+
+        factory = _make_config_factory(bad)
+        with pytest.raises((ValueError, AgentMemoryConfigError)):
+            factory()
+
+    @pytest.mark.parametrize("bad", BAD_INSTANCE_VALUES)
+    def test_bad_instance_reads_no_files(self, bad, monkeypatch):
+        from sap_cloud_sdk.agent_memory.config import _make_config_factory
+
+        opened = []
+        monkeypatch.setattr("builtins.open", lambda *a, **kw: opened.append(a))
+        factory = _make_config_factory(bad)
+        try:
+            factory()
+        except (ValueError, AgentMemoryConfigError):
+            pass
+        assert opened == [], f"instance {bad!r} must not open any file"
+
+    @pytest.mark.parametrize("good", GOOD_INSTANCE_VALUES)
+    def test_valid_instance_passes_validation(self, good):
+        from sap_cloud_sdk.agent_memory.config import _make_config_factory
+
+        factory = _make_config_factory(good)
+        # Validation passes; the factory raises RuntimeError or AgentMemoryConfigError
+        # because there is no real mount or env in unit tests — that is expected.
+        # The important thing: no ValueError (which would mean good value was rejected).
+        with pytest.raises((RuntimeError, AgentMemoryConfigError)):
+            factory()

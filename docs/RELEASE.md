@@ -16,7 +16,7 @@ The version in `pyproject.toml` is **managed automatically** by the release work
 Merge to main (or any release branch)
         │
         ▼
-Run "Draft Release" workflow manually
+Run "Prepare Release" workflow manually
   Diffs branch against latest tag → generates release notes
   Creates a draft GitHub Release (vX.Y.Z) — tag created here
   Creates a release branch, bumps pyproject.toml, opens auto-merge PR
@@ -52,11 +52,11 @@ On your feature or hotfix branch, run `/prep-pr` to fill in the PR template from
 
 ---
 
-## Step 2 — Create a draft release
+## Step 2 — Prepare the release
 
-Once the branch is ready to release, trigger the **Draft Release** workflow from the Actions tab:
+Once the branch is ready to release, trigger the **Prepare Release** workflow from the Actions tab:
 
-**Actions → Draft Release → Run workflow**
+**Actions → Prepare Release → Run workflow**
 
 | Input | Required | Description |
 |---|---|---|
@@ -107,7 +107,7 @@ https://pypi.org/project/sap-cloud-sdk/X.Y.Z/
 
 ## Release candidates
 
-To publish a release candidate, trigger the **Draft Release** workflow with a version like `0.58.0rc1`. The GitHub Release is automatically marked as pre-release when the version is a PEP 440 pre-release string.
+To publish a release candidate, trigger the **Prepare Release** workflow with a version like `0.58.0rc1`. The GitHub Release is automatically marked as pre-release when the version is a PEP 440 pre-release string.
 
 Install explicitly:
 
@@ -131,7 +131,7 @@ Check the failed workflow run linked in the Actions tab. Common causes:
 |---|---|
 | Version already on PyPI | The version was already published — create a new draft with a higher version |
 | Tag already exists | Delete the tag (`git push origin :refs/tags/vX.Y.Z`) and re-publish the draft |
-| Build failed | Fix the source, push to the branch, delete the draft release, and re-run the Draft Release workflow |
+| Build failed | Fix the source, push to the branch, delete the draft release, and re-run the Prepare Release workflow |
 
 ---
 

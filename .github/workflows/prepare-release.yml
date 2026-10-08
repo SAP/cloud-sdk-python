@@ -1,4 +1,4 @@
-name: Draft Release
+name: Prepare Release
 
 on:
   workflow_dispatch:
@@ -13,8 +13,8 @@ on:
         default: ''
 
 jobs:
-  draft-release:
-    name: Create Draft Release
+  prepare-release:
+    name: Prepare Release
     runs-on: ubuntu-latest
     permissions:
       contents: write

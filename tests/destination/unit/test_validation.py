@@ -63,11 +63,11 @@ class TestValidateResourceName:
 
     def test_rejects_non_string_input(self):
         with pytest.raises(ValueError):
-            validate_resource_name(None)  # type: ignore[arg-type]
+            validate_resource_name(None)  # type: ignore[arg-type]  # ty: ignore[invalid-argument-type]
 
     def test_rejects_integer_input(self):
         with pytest.raises(ValueError):
-            validate_resource_name(42)  # type: ignore[arg-type]
+            validate_resource_name(42)  # type: ignore[arg-type]  # ty: ignore[invalid-argument-type]
 
     def test_error_message_includes_name(self):
         with pytest.raises(ValueError, match="Invalid resource name"):

@@ -100,7 +100,7 @@ add_span_attribute("enduser.id", claims.scim_id or claims.sub or "")
 ```python
 from sap_cloud_sdk.ias import IASVerifier, IASConfigError
 
-# Auto-configure from VCAP_SERVICES (CF) or IAS_URL (K8s)
+# Auto-configure from VCAP_SERVICES (CF), K8s secret mount, or IAS_URL env var
 try:
     verifier = IASVerifier.from_env()
 except IASConfigError:

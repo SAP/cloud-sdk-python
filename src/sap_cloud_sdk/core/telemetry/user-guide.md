@@ -374,9 +374,11 @@ result in no identity attributes and an empty auth context — the request conti
 
 #### Zero-config (IAS service binding present)
 
-When an `identity` or `xsuaa` service binding is available (`VCAP_SERVICES` on CF, `IAS_URL` env
-var on Kubernetes), `StarletteIASTelemetryMiddleware` auto-configures `IASVerifier` at construction
-with no extra code:
+When an IAS service binding is available, `StarletteIASTelemetryMiddleware` auto-configures `IASVerifier` at construction with no extra code. Lookup order:
+
+1. `VCAP_SERVICES` (Cloud Foundry)
+2. Kubernetes secret mount at `/etc/secrets/appfnd/identity-service/default/` — populated automatically by the agent deployment template, no `app.yaml` changes needed
+3. `IAS_URL` environment variable (manual / local)
 
 ```python
 from starlette.applications import Starlette
@@ -384,7 +386,6 @@ from sap_cloud_sdk.core.telemetry import auto_instrument
 from sap_cloud_sdk.core.telemetry.middleware import StarletteIASTelemetryMiddleware
 
 app = Starlette(...)
-# Auto-configures IASVerifier from VCAP_SERVICES (CF) or IAS_URL (K8s)
 auto_instrument(middlewares=[StarletteIASTelemetryMiddleware(app=app)])
 ```
 

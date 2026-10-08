@@ -131,11 +131,7 @@ class IASVerifier:
                 target=binding,
             )
             if binding.url:
-                logger.debug(
-                    "IASVerifier.from_env: configured from Kubernetes secret mount (%s/%s)",
-                    _SECRET_MODULE,
-                    _SECRET_DEFAULT_INSTANCE,
-                )
+                logger.debug("IASVerifier.from_env: configured from Kubernetes secret mount")
                 return cls(ias_url=binding.url, client_id=binding.clientid or None)
         except Exception as exc:
             logger.debug("IASVerifier.from_env: secret mount lookup failed: %s", exc)

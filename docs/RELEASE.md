@@ -18,7 +18,8 @@ Merge to main (or any release branch)
         ▼
 Run "Draft Release" workflow manually
   Diffs branch against latest tag → generates release notes
-  Creates a draft GitHub Release (vX.Y.Z)
+  Creates a draft GitHub Release (vX.Y.Z) — tag created here
+  Creates a release branch, bumps pyproject.toml, opens auto-merge PR
         │
         ▼
 Review and edit the draft release notes in GitHub
@@ -34,12 +35,9 @@ Automation test repo runs tests against the branch
                 ▼
         Release workflow runs automatically
           1. Runs integration tests against the branch
-          2. Creates a release branch, bumps pyproject.toml, commits, pushes
-          3. Opens a PR with the version bump and auto-merges it
-          4. Creates and pushes the git tag (vX.Y.Z)
-          5. Builds the distribution (uv build)
-          6. Uploads artifacts to the GitHub Release
-          7. Publishes to PyPI via OIDC trusted publishing
+          2. Builds the distribution (uv build)
+          3. Uploads artifacts to the GitHub Release
+          4. Publishes to PyPI via OIDC trusted publishing
 ```
 
 ---
@@ -69,7 +67,8 @@ The workflow will:
 1. Read the current version from `pyproject.toml` on the selected branch
 2. Compute the target version (or validate the one you provided)
 3. Diff commits since the last tag and generate structured release notes
-4. Create a **draft** GitHub Release at `vX.Y.Z` targeting the selected branch
+4. Create a **draft** GitHub Release at `vX.Y.Z` targeting the selected branch — the git tag is created at this point
+5. Open a version bump PR (`chore(release): bump version to X.Y.Z`) that auto-merges back into the branch
 
 ---
 
@@ -94,12 +93,9 @@ If tests fail, the draft remains unpublished. Fix the branch and re-trigger the 
 When the draft is published, the `Release` workflow triggers automatically and:
 
 1. Runs the full integration test suite against the branch (skippable — see Step 3)
-2. Validates the version is a valid increase over the current `pyproject.toml`
-3. Creates a `release-action-vX.Y.Z` branch, bumps `pyproject.toml`, and opens a PR that auto-merges back into the source branch
-4. Creates and pushes the annotated git tag `vX.Y.Z`
-5. Builds the distribution with `uv build`
-6. Uploads build artifacts (wheel + sdist) to the GitHub Release
-7. Publishes to PyPI via OIDC trusted publishing
+2. Builds the distribution with `uv build`
+3. Uploads build artifacts (wheel + sdist) to the GitHub Release
+4. Publishes to PyPI via OIDC trusted publishing
 
 Monitor progress in the **Actions** tab. On success the package is available at:
 

@@ -96,95 +96,11 @@ jobs:
       - name: Run integration tests
         run: uv run pytest tests/*/integration/ -v --tb=short
 
-  # ── 3. Version bump ────────────────────────────────────────────────────────
-  version-bump:
-    name: Version Bump
-    needs: [parse, integration-tests]
-    if: always() && needs.parse.result == 'success' && (needs.integration-tests.result == 'success' || needs.integration-tests.result == 'skipped')
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-      pull-requests: write
-    outputs:
-      release_branch: ${{ steps.release_branch.outputs.release_branch }}
-
-    steps:
-      - name: Checkout release branch
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ needs.parse.outputs.branch }}
-          fetch-depth: 0
-          token: ${{ github.token }}
-
-      - name: Validate version bump
-        run: |
-          CURRENT=$(grep '^version = ' pyproject.toml | cut -d'"' -f2)
-          python .github/scripts/check_version_bump.py "$CURRENT" "${{ needs.parse.outputs.version }}"
-
-      - name: Create release branch and bump version
-        id: release_branch
-        run: |
-          RELEASE_BRANCH="release-action-${{ needs.parse.outputs.tag }}"
-
-          git config user.name  "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-
-          git checkout -b "$RELEASE_BRANCH"
-
-          CURRENT=$(grep '^version = ' pyproject.toml | cut -d'"' -f2)
-          sed -i "s/^version = \"${CURRENT}\"/version = \"${{ needs.parse.outputs.version }}\"/" pyproject.toml
-          grep '^version = ' pyproject.toml
-          echo "Updated pyproject.toml → ${{ needs.parse.outputs.version }}"
-
-          git add pyproject.toml
-          git commit -m "chore(release): bump version to ${{ needs.parse.outputs.version }}"
-          git push origin "$RELEASE_BRANCH"
-
-          echo "release_branch=$RELEASE_BRANCH" >> "$GITHUB_OUTPUT"
-          echo "Release branch pushed: $RELEASE_BRANCH"
-
-      - name: Create and push tag
-        run: |
-          git tag "${{ needs.parse.outputs.tag }}" -m "Release ${{ needs.parse.outputs.tag }}"
-          git push origin "${{ needs.parse.outputs.tag }}"
-
-      - name: Generate bot token
-        id: bot_token
-        uses: actions/create-github-app-token@v1
-        with:
-          app-id: ${{ secrets.CLOUD_SDK_BOT_APP_ID }}
-          private-key: ${{ secrets.CLOUD_SDK_BOT_PRIVATE_KEY }}
-
-      - name: Open and auto-merge version bump PR
-        env:
-          GH_TOKEN: ${{ steps.bot_token.outputs.token }}
-          VERSION: ${{ needs.parse.outputs.version }}
-          TAG: ${{ needs.parse.outputs.tag }}
-          RELEASE_BRANCH: ${{ steps.release_branch.outputs.release_branch }}
-          TARGET_BRANCH: ${{ needs.parse.outputs.branch }}
-        run: |
-          PR_URL=$(gh pr create \
-            --repo "${{ github.repository }}" \
-            --base "$TARGET_BRANCH" \
-            --head "$RELEASE_BRANCH" \
-            --title "chore(release): bump version to ${VERSION}" \
-            --body "Automated version bump from the release workflow for [v${VERSION}](https://github.com/${{ github.repository }}/releases/tag/${TAG}). Merges automatically.")
-
-          echo "PR created: $PR_URL"
-
-          # Bot has bypass rights in the ruleset — no --admin flag needed.
-          gh pr merge "$PR_URL" \
-            --repo "${{ github.repository }}" \
-            --squash \
-            --delete-branch
-
-          echo "PR merged and release branch deleted."
-
-  # ── 4. Publish ────────────────────────────────────────────────────────────
+  # ── 3. Publish ────────────────────────────────────────────────────────────
   publish:
     name: Publish
-    needs: [parse, version-bump]
-    if: needs.parse.result == 'success' && needs.version-bump.result == 'success'
+    needs: [parse, integration-tests]
+    if: needs.parse.result == 'success' && (needs.integration-tests.result == 'success' || needs.integration-tests.result == 'skipped')
     runs-on: ubuntu-latest
     environment: 'pypi:sap-cloud-sdk'
     permissions:
@@ -244,11 +160,11 @@ jobs:
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@v1.14.2
 
-  # ── 5. Notify on failure ──────────────────────────────────────────────────
+  # ── 4. Notify on failure ──────────────────────────────────────────────────
   notify-failure:
     name: Notify Failure
-    needs: [parse, integration-tests, version-bump, publish]
-    if: always() && (needs.parse.result == 'failure' || needs['integration-tests'].result == 'failure' || needs['version-bump'].result == 'failure' || needs.publish.result == 'failure')
+    needs: [parse, integration-tests, publish]
+    if: always() && (needs.parse.result == 'failure' || needs['integration-tests'].result == 'failure' || needs.publish.result == 'failure')
     runs-on: ubuntu-latest
     permissions:
       contents: write

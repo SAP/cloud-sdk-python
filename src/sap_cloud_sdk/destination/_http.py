@@ -30,6 +30,13 @@ def _request(
         all_headers.update(headers)
 
     normalized_path = f"/{path.lstrip('/')}"
+
+    # Defense-in-depth: reject any path that contains a '..' segment so that
+    # a crafted path cannot escape the Destination Service's own URL space,
+    # even if the client-layer validation is somehow bypassed.
+    path_segments = normalized_path.split("/")
+    if ".." in path_segments:
+        raise HttpError("Forbidden: path traversal detected")
     try:
         resp = http.request(
             method,

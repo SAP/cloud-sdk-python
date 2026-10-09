@@ -42,6 +42,8 @@ Before submitting your PR, please review and check the following:
 - [ ] I have added type hints for all public APIs
 - [ ] My code does not contain sensitive information (credentials, tokens, etc.)
 - [ ] I have followed [Conventional Commits](https://www.conventionalcommits.org/) for commit messages
+- [ ] *(New modules only)* I have attached e2e evidence showing the module working against a real BTP service
+- [ ] *(Security-sensitive changes only)* I have run `/security-review` and addressed all ❌ findings
 
 ## Breaking Changes
 

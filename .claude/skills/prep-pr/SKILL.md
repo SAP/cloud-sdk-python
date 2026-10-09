@@ -118,30 +118,39 @@ For each checklist item, determine the most accurate state given what you can ob
 
 ---
 
-## Phase 3.6: Code Review
+## Phase 3.6: Code Review and Security Review
 
-Run the full `review-pr` skill against the current PR before building the PR body.
+Run both the `review-pr` and `security-review` skills against the current PR before building the PR body. Both can use the diff and file data already gathered in Phase 2 — no need to re-fetch.
 
-- Skip `review-pr` Phase 1 (PR identification) — you already have `EXISTING_PR.number` or the current branch from Phase 1 of this skill. Pass that directly into `review-pr` Phase 2.
+### Code review (`review-pr` Phases 2–4)
+
+- Skip `review-pr` Phase 1 — you already have `EXISTING_PR.number` or the current branch.
 - Run `review-pr` Phases 2–4 in full (gather data, evaluate all 23 criteria, produce the report).
-- Do **not** run `review-pr` Phase 5 (post review) — the review is for internal use here, not posted as a GitHub review comment.
+- Do **not** run `review-pr` Phase 5 (post review).
 
-After the review completes, carry the findings forward:
+### Security review (`security-review` Phases 2–4)
 
-1. **Checklist corrections** — for any ❌ finding that maps to a checklist item, override the evaluation from 3.5:
-   - B1 (sensitive data in code) → set `No sensitive information` to `[ ]`
+- Skip `security-review` Phase 1 — same PR already identified.
+- Run `security-review` Phases 2–4 in full (evaluate all 12 security criteria, produce the report).
+- Do **not** run `security-review` Phase 5 or 6.
+
+### Carry findings forward
+
+1. **Checklist corrections** — for any ❌ finding (from either review) that maps to a checklist item, override the evaluation from 3.5:
+   - B1 / S5 (sensitive data in code) → set `No sensitive information` to `[ ]`
    - C3 (type hints) → set `I have added type hints for all public APIs` to `[ ]`
    - E1 (tests missing) → set `I have added/updated automated tests` to `[ ]`
    - A2 (conventional commits) → set `I have followed Conventional Commits` to `[ ]`
    - C2 (version bump missing) → set `I have verified that my code follows the Code Guidelines` to `[ ]`
+   - S1/S2/S3/S4 (security validation missing) → set `I have verified that my code follows the Code Guidelines` to `[ ]`
 
-2. **PR body injection** — include all ❌ and ⚠️ findings in `## Additional Notes` under a **Code Review** sub-heading (see Phase 4 template). If the review is fully clean (all ✅ / ➖), omit the sub-heading entirely.
+2. **PR body injection** — include all ❌ and ⚠️ findings in `## Additional Notes` under separate **Code Review** and **Security Review** sub-headings (see Phase 4 template). Omit a sub-heading entirely if its review is fully clean (all ✅ / ➖).
 
 ---
 
 ## Phase 4: Build the PR body
 
-Fill in the template exactly as structured below. Remove the `## Breaking Changes` section entirely if no breaking changes were detected. Remove `## Additional Notes` only if there is no reviewer context to add **and** the Phase 3.6 code review is fully clean.
+Fill in the template exactly as structured below. Remove the `## Breaking Changes` section entirely if no breaking changes were detected. Remove `## Additional Notes` only if there is no reviewer context to add **and** both the Phase 3.6 code review and security review are fully clean.
 
 ```markdown
 > **Disclaimer:** Do not include SAP-internal or customer-specific information in this PR (e.g. internal system URLs, customer names, tenant IDs, or confidential configurations). This is a public repository.
@@ -192,7 +201,11 @@ Closes #<issue_number>
 
 ### Code Review
 
-<include ❌ and ⚠️ findings from Phase 3.6 here — remove this sub-heading if the review is fully clean>
+<include ❌ and ⚠️ findings from the review-pr run — remove this sub-heading if the code review is fully clean>
+
+### Security Review
+
+<include ❌ and ⚠️ findings from the security-review run — remove this sub-heading if the security review is fully clean>
 ```
 
 ---

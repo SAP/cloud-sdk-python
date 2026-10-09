@@ -94,7 +94,7 @@ Template requires: Description, Related Issue, Type of Change (one box ticked), 
 Empty or placeholder body → ❌.
 
 **A2: Conventional Commits**
-Every commit headline must match `type(scope): description`. Types: `feat`, `fix`, `chore`, `docs`, `refactor`, `test`, `ci`, `perf`, `style`, `build`, `revert`. PR title is also validated. Check `commit-validation` CI job. Quote failing commit titles.
+The **PR title** must match `type(scope): description`. Types: `feat`, `fix`, `chore`, `docs`, `refactor`, `test`, `ci`, `perf`, `style`, `build`, `revert`. Individual commit messages on the branch are not evaluated — PRs are squash-merged and the PR title becomes the commit message on `main`. Check the `commit-validation` CI job result for confirmation.
 
 **A3: Issue linked**
 PR body must contain `Closes #N`, `Fixes #N`, or `Resolves #N`.

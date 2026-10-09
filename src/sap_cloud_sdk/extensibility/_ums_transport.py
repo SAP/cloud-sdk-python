@@ -74,7 +74,7 @@ _GRAPHQL_QUERY_FRAGMENT = """\
             additions { type mcpConfig { globalTenantId ordId toolNames } }
           }
           hooks { id hookId type name onFailure timeout deploymentType canShortCircuit
-            n8nWorkflowConfig { workflowId method }
+            n8nWorkflowConfig { ordId cardOrdId toolName globalTenantId method }
           }
         }
       }
@@ -280,10 +280,11 @@ def _build_hook(raw: Dict[str, Any]) -> Optional[Hook]:
         return None
 
     n8n_config = raw.get("n8nWorkflowConfig") or {}
-    workflow_id = n8n_config.get("workflowId", "")
-    if not workflow_id:
+    tool_name = n8n_config.get("toolName", "")
+    card_ord_id = n8n_config.get("cardOrdId", "")
+    if not tool_name or not card_ord_id:
         logger.warning(
-            "Skipping hook with missing workflowId (hookId=%s)",
+            "Skipping hook with missing toolName or cardOrdId (hookId=%s)",
             raw.get("hookId"),
         )
         return None
@@ -295,7 +296,13 @@ def _build_hook(raw: Dict[str, Any]) -> Optional[Hook]:
     return Hook(
         id=raw.get("id", ""),
         hook_id=raw.get("hookId", ""),
-        n8n_workflow_config=N8nWorkflowConfig(workflow_id=workflow_id, method=method),
+        n8n_workflow_config=N8nWorkflowConfig(
+            ord_id=n8n_config.get("ordId", ""),
+            card_ord_id=n8n_config.get("cardOrdId", ""),
+            tool_name=tool_name,
+            global_tenant_id=n8n_config.get("globalTenantId", ""),
+            method=method,
+        ),
         name=raw.get("name", ""),
         type=hook_type,
         deployment_type=deployment_type,

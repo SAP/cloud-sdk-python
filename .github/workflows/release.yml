@@ -1,20 +1,67 @@
-name: Publish Package to PyPI
+name: Release
 
 on:
   release:
-    types: [published]
+    types: [released]
 
 jobs:
-  publish:
+  # ── 1. Parse release event ────────────────────────────────────────────────
+  parse:
+    name: Parse & Validate
+    runs-on: ubuntu-latest
+    permissions: {}
+    outputs:
+      version:  ${{ steps.release.outputs.version }}
+      branch:   ${{ steps.release.outputs.branch }}
+      tag:      ${{ steps.release.outputs.tag }}
+
+    steps:
+      - name: Parse release event
+        id: release
+        run: |
+          TAG="${{ github.event.release.tag_name }}"
+          VERSION="${TAG#v}"
+          BRANCH="${{ github.event.release.target_commitish }}"
+
+          if [[ -z "$VERSION" || -z "$BRANCH" ]]; then
+            echo "ERROR: Could not read version or branch from release event."
+            exit 1
+          fi
+
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "branch=$BRANCH"   >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG"         >> "$GITHUB_OUTPUT"
+
+          echo "Parsed — version: $VERSION, branch: $BRANCH, tag: $TAG"
+
+      - name: Validate version string
+        run: |
+          pip install packaging -q
+          python3 -c "
+          from packaging.version import Version, InvalidVersion
+          try:
+              v = Version('${{ steps.release.outputs.version }}')
+              print(f'Version is valid PEP 440: {v}')
+          except InvalidVersion as e:
+              print(f'ERROR: {e}')
+              raise SystemExit(1)
+          "
+
+  # ── 2. Integration tests ───────────────────────────────────────────────────
+  integration-tests:
+    name: Integration Tests
+    needs: parse
+    if: ${{ !contains(github.event.release.body, 'skip-integration-tests') }}
+    runs-on: ${{ contains(github.server_url, 'github.com') && 'ubuntu-latest' || fromJSON('["self-hosted"]') }}
     permissions:
       contents: read
-      id-token: write
-    name: Publish Package to PyPI
-    runs-on: ubuntu-latest
-    environment: 'pypi:sap-cloud-sdk'
+
     steps:
-      - name: Checkout repository
+      - name: Checkout release branch
         uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.parse.outputs.branch }}
+          fetch-depth: 0
 
       - name: Set up Python
         uses: actions/setup-python@v6
@@ -22,47 +69,114 @@ jobs:
           python-version: "3.11"
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v4
+        uses: astral-sh/setup-uv@v3
+
+      - name: Install dependencies
+        run: uv sync --dev
+
+      - name: Set up integration test environment
+        run: |
+          echo '${{ toJSON(secrets) }}' \
+            | jq -r 'to_entries[]
+                | select(.key | startswith("CLOUD_SDK_CFG_") or startswith("AICORE_"))
+                | "\(.key)=\(.value)"' \
+            | while read line; do
+                echo "$line" >> $GITHUB_ENV
+                echo "Set secret: $(echo "$line" | cut -d= -f1)"
+              done
+          echo '${{ toJSON(vars) }}' \
+            | jq -r 'to_entries[]
+                | select(.key | startswith("CLOUD_SDK_CFG_") or startswith("AICORE_"))
+                | "\(.key)=\(.value)"' \
+            | while read line; do
+                echo "$line" >> $GITHUB_ENV
+                echo "Set variable: $(echo "$line" | cut -d= -f1)"
+              done
+
+      - name: Run integration tests
+        run: uv run pytest tests/*/integration/ -v --tb=short
+
+  # ── 3. Publish ────────────────────────────────────────────────────────────
+  publish:
+    name: Publish
+    needs: [parse, integration-tests]
+    if: needs.parse.result == 'success' && (needs.integration-tests.result == 'success' || needs.integration-tests.result == 'skipped')
+    runs-on: ubuntu-latest
+    environment: 'pypi:sap-cloud-sdk'
+    permissions:
+      contents: write
+      id-token: write
+    outputs:
+      release_url: ${{ steps.gh_release.outputs.release_url }}
+
+    steps:
+      - name: Checkout release branch
+        uses: actions/checkout@v4
         with:
-          enable-cache: true
+          ref: ${{ needs.parse.outputs.branch }}
+          fetch-depth: 0
 
-      - name: Read package name and version from pyproject.toml
-        id: metadata
-        run: |
-          python -m pip install toml packaging
-          PKG_NAME=$(python -c "import toml; print(toml.load('pyproject.toml')['project']['name'])")
-          VERSION=$(python -c "import toml; print(toml.load('pyproject.toml')['project']['version'])")
-          echo "Publishing $PKG_NAME version $VERSION to PyPI"
-          echo "name=$PKG_NAME" >> $GITHUB_OUTPUT
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
 
-      - name: Validate pre-release status
-        env:
-          PACKAGE_VERSION: ${{ steps.metadata.outputs.version }}
-          RELEASE_IS_PRERELEASE: ${{ github.event.release.prerelease }}
-        run: |
-          python .github/scripts/validate_prerelease.py \
-            "$PACKAGE_VERSION" "$RELEASE_IS_PRERELEASE"
-
-      - name: Check if version already exists on PyPI
-        run: |
-          PKG_NAME="${{ steps.metadata.outputs.name }}"
-          VERSION="${{ steps.metadata.outputs.version }}"
-
-          echo "Checking if $PKG_NAME version $VERSION exists on PyPI..."
-
-          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "https://pypi.org/pypi/$PKG_NAME/$VERSION/json")
-
-          if [ "$HTTP_STATUS" = "200" ]; then
-            echo "ERROR: Version $VERSION of $PKG_NAME already exists on PyPI!"
-            echo "Please increment the version in pyproject.toml before publishing."
-            exit 1
-          else
-            echo "Version $VERSION is available for upload to PyPI"
-          fi
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
 
       - name: Build release distribution
         run: uv build
 
+      - name: Verify build artifacts
+        run: |
+          wheel_count=$(ls -1 dist/*.whl 2>/dev/null | wc -l)
+          tar_count=$(ls -1 dist/*.tar.gz 2>/dev/null | wc -l)
+          [[ "$wheel_count" -ge 1 && "$tar_count" -ge 1 ]] || \
+            { echo "ERROR: Missing build artifacts (wheels: $wheel_count, sdists: $tar_count)"; exit 1; }
+          echo "Build artifacts: $wheel_count wheel(s), $tar_count sdist(s)"
+          ls -lh dist/
+
+      - name: Check version does not already exist on PyPI
+        run: |
+          PKG_NAME=$(python3 -c "import toml; print(toml.load('pyproject.toml')['project']['name'])")
+          VERSION="${{ needs.parse.outputs.version }}"
+          HTTP=$(curl -s -o /dev/null -w "%{http_code}" "https://pypi.org/pypi/$PKG_NAME/$VERSION/json")
+          if [[ "$HTTP" == "200" ]]; then
+            echo "ERROR: $PKG_NAME $VERSION already exists on PyPI."
+            exit 1
+          fi
+          echo "$PKG_NAME $VERSION is not yet on PyPI — proceeding."
+
+      - name: Upload artifacts to GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release upload "${{ needs.parse.outputs.tag }}" \
+            --repo "${{ github.repository }}" \
+            dist/*.whl dist/*.tar.gz
+
+          echo "Artifacts uploaded to release ${{ needs.parse.outputs.tag }}"
+
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@v1.14.2
+
+  # ── 4. Notify on failure ──────────────────────────────────────────────────
+  notify-failure:
+    name: Notify Failure
+    needs: [parse, integration-tests, publish]
+    if: always() && (needs.parse.result == 'failure' || needs['integration-tests'].result == 'failure' || needs.publish.result == 'failure')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Comment on release — failure
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release edit "${{ github.event.release.tag_name }}" \
+            --repo "${{ github.repository }}" \
+            --notes "$(gh release view "${{ github.event.release.tag_name }}" --repo "${{ github.repository }}" --json body -q .body)
+
+          ---
+          ❌ **Release workflow failed.** Check the [workflow run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}) for details. The tag may need to be deleted before retrying."

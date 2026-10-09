@@ -4,7 +4,7 @@ This guide describes the automated release pipeline for the SAP Cloud SDK for Py
 
 ## Versioning
 
-We follow SemVer: `MAJOR.MINOR.PATCH` (see [SemVer](https://semver.org/)) and PEP 440. Use `X.Y.ZrcN` for release candidates.
+We follow SemVer: `MAJOR.MINOR.PATCH` (see [SemVer](https://semver.org/)) and PEP 440. See [Release candidates](#release-candidates) and [Hotfixes](#hotfixes) for those specific workflows.
 
 The version in `pyproject.toml` is **managed automatically** by the release workflow — do not bump it manually.
 
@@ -78,6 +78,8 @@ Go to **Releases** and open the draft. Review and edit the release notes as need
 
 To skip the integration test step in the release workflow, add the text `skip-integration-tests` anywhere in the release body.
 
+See [Integration Tests — CI Behavior](INTEGRATION_TESTS.md#ci-behavior) for details on how integration tests run across PRs, pushes to main, and the release workflow.
+
 ---
 
 ## Step 4 — Automated tests (handled by the automation repo)
@@ -107,13 +109,55 @@ https://pypi.org/project/sap-cloud-sdk/X.Y.Z/
 
 ## Release candidates
 
-To publish a release candidate, trigger the **Prepare Release** workflow with a version like `0.58.0rc1`. The GitHub Release is automatically marked as pre-release when the version is a PEP 440 pre-release string.
+Use a release candidate when you need external validation before committing to a stable version — breaking changes, large feature sets, or changes that need partner testing.
 
-Install explicitly:
+### When to use
 
-```bash
-pip install sap-cloud-sdk==0.58.0rc1
-```
+- The change is too risky to release directly as stable
+- You need early feedback from consumers before locking the API
+- A breaking change requires coordination with downstream teams
+
+### Process
+
+1. Create a branch from `main` for the feature or change (e.g. `feature/my-big-change`)
+2. Merge all related PRs into that branch
+3. Trigger **Prepare Release** with `branch=feature/my-big-change` and `version=X.Y.0rc1`
+   - The same pipeline runs as for a stable release: git tag `vX.Y.0rc1` is created, a draft GitHub Release is created (marked as pre-release), `pyproject.toml` is bumped via auto-merge PR, and once the automation repo publishes the draft, `release.yml` builds and publishes `X.Y.0rc1` to PyPI
+4. Share the RC with testers: `pip install sap-cloud-sdk==X.Y.0rc1`
+5. If fixes are needed, merge them into the branch and trigger again with `version=X.Y.0rc2` — the process repeats identically
+6. When the RC is validated, merge the branch into `main` first, then trigger **Prepare Release** from `main` with `version=X.Y.0` — the commit baseline ignores RC tags, so release notes cover the full RC period
+
+The GitHub Release is automatically marked as pre-release and will not appear as the latest stable release on GitHub or PyPI.
+
+### Version scheme
+
+Follow PEP 440: `X.Y.ZrcN` (e.g. `0.58.0rc1`, `0.58.0rc2`). Do not use SemVer-style `X.Y.Z-rc.N`.
+
+---
+
+## Hotfixes
+
+Use a hotfix when a critical bug in the last stable release must be shipped immediately and `main` already contains unreleased work you do not want to include.
+
+### Process
+
+1. Cut a hotfix branch from the stable tag being fixed:
+   ```bash
+   git checkout -b hotfix/X.Y.Z vX.Y.(Z-1)
+   ```
+2. Apply the fix on the hotfix branch, open a PR targeting `hotfix/X.Y.Z` (not `main`), get it reviewed and merged
+3. Trigger **Prepare Release** with `branch=hotfix/X.Y.Z` and `version=X.Y.Z` (patch bump)
+4. After the release is published, open a follow-up PR to cherry-pick the fix into `main`:
+   ```bash
+   git checkout main
+   git cherry-pick <fix-commit-sha>
+   ```
+
+> **Important:** the cherry-pick back to `main` is mandatory. Skipping it means the fix will be lost when the next minor release is cut from `main`.
+
+### Version scheme
+
+Hotfixes always increment the patch version of the last stable release: `X.Y.(Z+1)`. Never bump minor or major for a hotfix.
 
 ---
 
@@ -144,6 +188,9 @@ pip install sap-cloud-sdk
 # Specific version
 pip install sap-cloud-sdk==0.58.0
 
-# Release candidate
+# Release candidate (must be explicit — not installed by default)
 pip install sap-cloud-sdk==0.58.0rc1
+
+# Hotfix
+pip install sap-cloud-sdk==0.57.1
 ```

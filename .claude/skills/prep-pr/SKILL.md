@@ -146,6 +146,23 @@ Run both the `review-pr` and `security-review` skills against the current PR bef
 
 2. **PR body injection** — include all ❌ and ⚠️ findings in `## Additional Notes` under separate **Code Review** and **Security Review** sub-headings (see Phase 4 template). Omit a sub-heading entirely if its review is fully clean (all ✅ / ➖).
 
+3. **Apply the sdk-review label** — based on the combined verdict of both reviews, apply the label now (do not wait for Phase 5):
+
+   ```bash
+   # Remove any existing sdk-review labels
+   gh pr edit <number> --repo SAP/cloud-sdk-python \
+     --remove-label "sdk-review: ✅ passed" \
+     --remove-label "sdk-review: ❌ blocked" \
+     --remove-label "sdk-review: ⚠️ flagged" \
+     --remove-label "sdk-review: skipped" 2>/dev/null || true
+
+   # Add the verdict label
+   # any ❌ from either review → sdk-review: ❌ blocked
+   # any ⚠️ (no ❌)           → sdk-review: ⚠️ flagged
+   # all ✅ / ➖              → sdk-review: ✅ passed
+   gh pr edit <number> --repo SAP/cloud-sdk-python --add-label "<verdict-label>"
+   ```
+
 ---
 
 ## Phase 4: Build the PR body

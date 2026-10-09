@@ -193,6 +193,31 @@ CLOUD_SDK_CFG_OBJECTSTORE_DEFAULT_BUCKET=your-bucket-here
 CLOUD_SDK_CFG_OBJECTSTORE_DEFAULT_SSL_ENABLED=false
 ```
 
+## CI Behavior
+
+Integration tests run automatically in CI under three different contexts with different scopes:
+
+| Context | Trigger | Scope |
+|---|---|---|
+| Pull request | changes to `src/**` or `tests/**` | Affected modules only |
+| Push to `main` | any push | All modules |
+| Release workflow | draft release published | All modules |
+
+### Scope detection on pull requests
+
+On PRs, the `Detect test scope` job compares the changed files against the base branch and runs only the integration tests for affected modules. Some changes always trigger a full run regardless of which module changed:
+
+- `pyproject.toml` or `uv.lock`
+- anything under `src/sap_cloud_sdk/core/` or `tests/core/`
+
+If none of the above are touched and no module-specific files changed, the integration test job is skipped entirely.
+
+### Skipping integration tests on release
+
+If you need to publish a release without running the integration test suite (e.g. a docs-only release or when a known flaky test is blocking), add the text `skip-integration-tests` anywhere in the draft release body before publishing it.
+
+---
+
 ## Running Integration Tests
 
 ```bash

@@ -1,0 +1,62 @@
+name: Dependabot Auto-merge
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  auto-merge:
+    name: Auto-merge patch and minor updates
+    runs-on: ubuntu-latest
+    if: github.actor == 'dependabot[bot]'
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - name: Fetch Dependabot metadata
+        id: metadata
+        uses: dependabot/fetch-metadata@v2
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Generate bot token
+        id: bot_token
+        if: >
+          steps.metadata.outputs.update-type == 'version-update:semver-patch' ||
+          steps.metadata.outputs.update-type == 'version-update:semver-minor' ||
+          steps.metadata.outputs.dependency-type == 'direct:production' && steps.metadata.outputs.update-type == 'version-update:semver-patch'
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.CLOUD_SDK_BOT_APP_ID }}
+          private-key: ${{ secrets.CLOUD_SDK_BOT_PRIVATE_KEY }}
+
+      - name: Approve and enable auto-merge for patch and minor updates
+        if: >
+          steps.metadata.outputs.update-type == 'version-update:semver-patch' ||
+          steps.metadata.outputs.update-type == 'version-update:semver-minor'
+        env:
+          GH_TOKEN: ${{ steps.bot_token.outputs.token }}
+        run: |
+          gh pr review "${{ github.event.pull_request.number }}" \
+            --repo "${{ github.repository }}" \
+            --approve \
+            --body "Auto-approved: ${{ steps.metadata.outputs.update-type }} update."
+
+          gh pr merge "${{ github.event.pull_request.number }}" \
+            --repo "${{ github.repository }}" \
+            --auto \
+            --squash
+
+          echo "Auto-merge enabled for PR #${{ github.event.pull_request.number }} (${{ steps.metadata.outputs.update-type }})"
+
+      - name: Leave major updates for manual review
+        if: steps.metadata.outputs.update-type == 'version-update:semver-major'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh pr comment "${{ github.event.pull_request.number }}" \
+            --repo "${{ github.repository }}" \
+            --body "This is a **major** version update and requires manual review before merging."
+
+          echo "Major update — skipping auto-merge for PR #${{ github.event.pull_request.number }}"

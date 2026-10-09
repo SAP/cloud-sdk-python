@@ -54,7 +54,7 @@ LABEL_KEY = "sap-managed-runtime-type"
 # Label keys for integration metadata stored on system fragments
 _LABEL_GTID = "sap-managed-runtime-gtid"
 _LABEL_ORD_ID = "sap-managed-runtime-ordid"
-_LABEL_SYSTEM_TYPE = "sap-managed-runtime-system-type"
+_LABEL_SYSTEM_TYPE = "sap-managed-runtime-assigned-application-namespace"
 
 _DESTINATION_INSTANCE = "default"
 
@@ -168,7 +168,7 @@ def _list_active_integrations(tenant_subdomain: str) -> list[ConnectedSystem]:
 
     Retrieves integration metadata from fragment labels:
         - sap-managed-runtime-gtid: GTID of the connected partner system.
-        - sap-managed-runtime-system-type: Application namespace (e.g. "sap.pce").
+        - sap-managed-runtime-assigned-application-namespace: Application namespace (e.g. "sap.pce").
         - sap-managed-runtime-ordid: Sanitized ORD ID of the integration dependency.
 
     Args:

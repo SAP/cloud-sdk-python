@@ -1,49 +1,59 @@
 """S3 backend implementation for object store operations using MinIO client."""
 
 import io
-import logging
 import os
 import threading
-import warnings
-from datetime import datetime
-from http.client import HTTPResponse
-from typing import TYPE_CHECKING, Any, BinaryIO, Callable, List, TypeVar, cast
+from datetime import UTC, datetime
+from typing import Any, BinaryIO, Callable, List, TypeVar
 
 import minio.datatypes
 from minio import Minio
 from minio.error import S3Error
 
 from sap_cloud_sdk.core.telemetry import Module, Operation, record_metrics
-from sap_cloud_sdk.objectstore.exceptions import (
+from sap_cloud_sdk.object_storage.config import S3Config
+from sap_cloud_sdk.object_storage._models import ObjectMetadata
+from sap_cloud_sdk.object_storage._protocol import ObjectReader
+from sap_cloud_sdk.object_storage._validation import (
+    validate_object_name,
+    validate_prefix,
+    validate_put_from_bytes,
+    validate_put_from_file,
+    validate_put_object,
+)
+from sap_cloud_sdk.object_storage.exceptions import (
     ClientCreationError,
     ListObjectsError,
     ObjectNotFoundError,
     ObjectOperationError,
 )
-from sap_cloud_sdk.objectstore._models import ObjectStoreBindingData, ObjectMetadata
-from sap_cloud_sdk.objectstore.utils import _normalize_host
 
-if TYPE_CHECKING:
-    from sap_cloud_sdk.core.secret_resolver import ConfigFactory
+_S3_NOT_FOUND_CODES = {"NoSuchKey", "NoSuchObject"}
 
-logger = logging.getLogger(__name__)
-
-# Validation error message constants
-EMPTY_NAME_ERROR = "name must be a non-empty string"
-EMPTY_CONTENT_TYPE_ERROR = "content_type must be a non-empty string"
-EMPTY_FILE_PATH_ERROR = "file_path must be a non-empty string"
-INVALID_DATA_TYPE_ERROR = "data must be bytes"
-INVALID_STREAM_ERROR = "stream must be a readable binary stream"
-NEGATIVE_SIZE_ERROR = "size must be non-negative"
-INVALID_PREFIX_TYPE_ERROR = "prefix must be a string"
-
-# S3 error codes that indicate credential rejection (trigger reactive refresh)
+# S3 error codes that indicate credential rejection (trigger reactive refresh).
 _CREDENTIAL_ERROR_CODES = frozenset({"InvalidAccessKeyId", "SignatureDoesNotMatch"})
 
 _T = TypeVar("_T")
 
 
-class ObjectStoreClient:
+def _normalize_host(host: str) -> str:
+    """Normalize AWS S3 regional endpoints to standard format.
+
+    Converts s3-{region}.amazonaws.com to s3.{region}.amazonaws.com
+    to prevent Minio client from incorrectly transforming URLs.
+
+    Args:
+        host: The original host endpoint
+
+    Returns:
+        Normalized host endpoint
+    """
+    if host.startswith("s3-") and host.endswith(".amazonaws.com"):
+        return host.replace("s3-", "s3.", 1)
+    return host
+
+
+class S3Client:
     """S3-compatible object storage client with binding-rotation support.
 
     Provides a unified interface for object storage operations using the MinIO client library.
@@ -59,49 +69,39 @@ class ObjectStoreClient:
 
     def __init__(
         self,
-        config_factory: "ConfigFactory[ObjectStoreBindingData]",
-        *,
-        disable_ssl: bool = False,
+        config_factory: Callable[[], S3Config],
     ) -> None:
         """Initialize the object storage client.
 
         Args:
-            config_factory: Factory that re-reads S3 credentials on every call.
-                Must implement the :class:`~sap_cloud_sdk.core.secret_resolver.ConfigFactory`
-                protocol (callable + optional ``has_changed()``).
-            disable_ssl: Whether to disable SSL/TLS connections. Defaults to False.
+            config_factory: Factory that re-reads S3 configuration on every call.
+                A :class:`~sap_cloud_sdk.core.secret_resolver.ConfigFactory` enables
+                rotation tracking; a plain callable disables it.
 
         Raises:
             ClientCreationError: If client initialization fails.
         """
-        warnings.warn(
-            "sap_cloud_sdk.objectstore is deprecated and will be removed in a "
-            "future release. Use sap_cloud_sdk.object_storage, which also "
-            "supports Azure Blob Storage and Google Cloud Storage.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
         self._config_factory = config_factory
-        self._disable_ssl = disable_ssl
         self._lock = threading.Lock()
-        self._creds_config = config_factory()
+        self._config = config_factory()
         self._minio_client = self._create_minio_client()
 
     def _create_minio_client(self) -> Minio:
         """Create MinIO client from the current credentials config."""
         try:
             return Minio(
-                endpoint=_normalize_host(self._creds_config.host),
-                access_key=self._creds_config.access_key_id,
-                secret_key=self._creds_config.secret_access_key,
-                secure=not self._disable_ssl,
+                endpoint=_normalize_host(self._config.host),
+                access_key=self._config.access_key_id,
+                secret_key=self._config.secret_access_key,
+                secure=not self._config.disable_ssl,
             )
+
         except Exception as e:
-            raise ClientCreationError(f"Failed to create MinIO client: {e}") from e
+            raise ClientCreationError("Failed to create S3 object store client") from e
 
     def _refresh_credentials(self) -> None:
         """Re-read credentials and rebuild the MinIO client. Caller must hold ``_lock``."""
-        self._creds_config = self._config_factory()
+        self._config = self._config_factory()
         self._minio_client = self._create_minio_client()
 
     def _refresh_if_rotated(self) -> None:
@@ -128,11 +128,7 @@ class ObjectStoreClient:
                 return fn()
             raise
 
-    @record_metrics(
-        Module.OBJECTSTORE,
-        Operation.OBJECTSTORE_PUT_OBJECT_FROM_BYTES,
-        deprecated=True,
-    )
+    @record_metrics(Module.OBJECTSTORE, Operation.OBJECTSTORE_PUT_OBJECT_FROM_BYTES)
     def put_object_from_bytes(self, name: str, data: bytes, content_type: str) -> None:
         """Upload an object from bytes.
 
@@ -145,35 +141,22 @@ class ObjectStoreClient:
             ValueError: If any parameter is invalid
             ObjectOperationError: If the upload fails
         """
-        if not name:
-            raise ValueError(EMPTY_NAME_ERROR)
-        if not isinstance(data, bytes):
-            raise ValueError(INVALID_DATA_TYPE_ERROR)
-        if not content_type:
-            raise ValueError(EMPTY_CONTENT_TYPE_ERROR)
+        validate_put_from_bytes(name, data, content_type)
 
         try:
             self._execute_with_retry(
                 lambda: self._minio_client.put_object(
-                    bucket_name=self._creds_config.bucket,
+                    bucket_name=self._config.bucket,
                     object_name=name,
                     data=io.BytesIO(data),
                     length=len(data),
                     content_type=content_type,
                 )
             )
-        except S3Error as e:
-            raise ObjectOperationError(
-                f"Failed to upload object '{name}': {e.code} - {e.message}"
-            ) from e
         except Exception as e:
-            raise ObjectOperationError(f"Failed to upload object '{name}': {e}") from e
+            raise ObjectOperationError(f"Failed to upload object '{name}'") from e
 
-    @record_metrics(
-        Module.OBJECTSTORE,
-        Operation.OBJECTSTORE_PUT_OBJECT,
-        deprecated=True,
-    )
+    @record_metrics(Module.OBJECTSTORE, Operation.OBJECTSTORE_PUT_OBJECT)
     def put_object(
         self, name: str, stream: BinaryIO, size: int, content_type: str
     ) -> None:
@@ -189,37 +172,22 @@ class ObjectStoreClient:
             ValueError: If any parameter is invalid
             ObjectOperationError: If the upload fails
         """
-        if not name:
-            raise ValueError(EMPTY_NAME_ERROR)
-        if not hasattr(stream, "read"):
-            raise ValueError(INVALID_STREAM_ERROR)
-        if size < 0:
-            raise ValueError(NEGATIVE_SIZE_ERROR)
-        if not content_type:
-            raise ValueError(EMPTY_CONTENT_TYPE_ERROR)
+        validate_put_object(name, stream, size, content_type)
 
         try:
             self._execute_with_retry(
                 lambda: self._minio_client.put_object(
-                    bucket_name=self._creds_config.bucket,
+                    bucket_name=self._config.bucket,
                     object_name=name,
                     data=stream,
                     length=size,
                     content_type=content_type,
                 )
             )
-        except S3Error as e:
-            raise ObjectOperationError(
-                f"Failed to upload object '{name}': {e.code} - {e.message}"
-            ) from e
         except Exception as e:
-            raise ObjectOperationError(f"Failed to upload object '{name}': {e}") from e
+            raise ObjectOperationError(f"Failed to upload object '{name}'") from e
 
-    @record_metrics(
-        Module.OBJECTSTORE,
-        Operation.OBJECTSTORE_PUT_OBJECT_FROM_FILE,
-        deprecated=True,
-    )
+    @record_metrics(Module.OBJECTSTORE, Operation.OBJECTSTORE_PUT_OBJECT_FROM_FILE)
     def put_object_from_file(
         self, name: str, file_path: str, content_type: str
     ) -> None:
@@ -234,14 +202,10 @@ class ObjectStoreClient:
             ValueError: If any parameter is invalid
             ObjectOperationError: If the upload fails
         """
-        if not name:
-            raise ValueError(EMPTY_NAME_ERROR)
-        if not file_path:
-            raise ValueError(EMPTY_FILE_PATH_ERROR)
-        if not content_type:
-            raise ValueError(EMPTY_CONTENT_TYPE_ERROR)
+        validate_put_from_file(name, file_path, content_type)
 
         try:
+            # Check if file exists and get size
             if not os.path.isfile(file_path):
                 raise ObjectOperationError(f"File not found: {file_path}")
 
@@ -250,68 +214,50 @@ class ObjectStoreClient:
             with open(file_path, "rb") as file_stream:
                 self._execute_with_retry(
                     lambda: self._minio_client.put_object(
-                        bucket_name=self._creds_config.bucket,
+                        bucket_name=self._config.bucket,
                         object_name=name,
                         data=file_stream,
                         length=file_size,
                         content_type=content_type,
                     )
                 )
-        except S3Error as e:
-            raise ObjectOperationError(
-                f"Failed to upload object '{name}': {e.code} - {e.message}"
-            ) from e
+        except ObjectOperationError:
+            raise
         except Exception as e:
-            raise ObjectOperationError(f"Failed to upload object '{name}': {e}") from e
+            raise ObjectOperationError(f"Failed to upload object '{name}'") from e
 
-    @record_metrics(
-        Module.OBJECTSTORE,
-        Operation.OBJECTSTORE_GET_OBJECT,
-        deprecated=True,
-    )
-    def get_object(self, name: str) -> HTTPResponse:
+    @record_metrics(Module.OBJECTSTORE, Operation.OBJECTSTORE_GET_OBJECT)
+    def get_object(self, name: str) -> ObjectReader:
         """Download an object as a stream.
 
         Args:
             name: Name/key of the object to download
 
         Returns:
-            HTTPResponse stream of the object data
+            A readable binary stream of the object data
 
         Raises:
             ValueError: If name is invalid
             ObjectNotFoundError: If the object doesn't exist
             ObjectOperationError: If the download fails
         """
-        if not name:
-            raise ValueError(EMPTY_NAME_ERROR)
+        validate_object_name(name)
 
         try:
-            response = cast(
-                HTTPResponse,
-                self._execute_with_retry(
-                    lambda: self._minio_client.get_object(
-                        bucket_name=self._creds_config.bucket, object_name=name
-                    )
-                ),
+            response = self._execute_with_retry(
+                lambda: self._minio_client.get_object(
+                    bucket_name=self._config.bucket, object_name=name
+                )
             )
             return response
         except S3Error as e:
-            if e.code == "NoSuchKey":
+            if e.code in _S3_NOT_FOUND_CODES:
                 raise ObjectNotFoundError(f"Object '{name}' not found") from e
-            raise ObjectOperationError(
-                f"Failed to download object '{name}': {e.code} - {e.message}"
-            ) from e
+            raise ObjectOperationError(f"Failed to download object '{name}'") from e
         except Exception as e:
-            raise ObjectOperationError(
-                f"Failed to download object '{name}': {e}"
-            ) from e
+            raise ObjectOperationError(f"Failed to download object '{name}'") from e
 
-    @record_metrics(
-        Module.OBJECTSTORE,
-        Operation.OBJECTSTORE_DELETE_OBJECT,
-        deprecated=True,
-    )
+    @record_metrics(Module.OBJECTSTORE, Operation.OBJECTSTORE_DELETE_OBJECT)
     def delete_object(self, name: str) -> None:
         """Delete an object.
 
@@ -322,29 +268,22 @@ class ObjectStoreClient:
             ValueError: If name is invalid
             ObjectOperationError: If the deletion fails
         """
-        if not name:
-            raise ValueError(EMPTY_NAME_ERROR)
+        validate_object_name(name)
 
         try:
             self._execute_with_retry(
                 lambda: self._minio_client.remove_object(
-                    bucket_name=self._creds_config.bucket, object_name=name
+                    bucket_name=self._config.bucket, object_name=name
                 )
             )
         except S3Error as e:
-            if e.code != "NoSuchKey":
-                raise ObjectOperationError(
-                    f"Failed to delete object '{name}': {e.code} - {e.message}"
-                ) from e
-            # NoSuchKey is treated as a successful idempotent delete
+            if e.code not in _S3_NOT_FOUND_CODES:
+                raise ObjectOperationError(f"Failed to delete object '{name}'") from e
+            # For NoSuchKey, we still consider it successful (idempotent delete)
         except Exception as e:
-            raise ObjectOperationError(f"Failed to delete object '{name}': {e}") from e
+            raise ObjectOperationError(f"Failed to delete object '{name}'") from e
 
-    @record_metrics(
-        Module.OBJECTSTORE,
-        Operation.OBJECTSTORE_LIST_OBJECTS,
-        deprecated=True,
-    )
+    @record_metrics(Module.OBJECTSTORE, Operation.OBJECTSTORE_LIST_OBJECTS)
     def list_objects(self, prefix: str) -> List[ObjectMetadata]:
         """List objects with a given prefix.
 
@@ -358,22 +297,21 @@ class ObjectStoreClient:
             ValueError: If prefix is invalid
             ListObjectsError: If listing fails
         """
-        if not isinstance(prefix, str):
-            raise ValueError(INVALID_PREFIX_TYPE_ERROR)
+        validate_prefix(prefix)
 
         result = []
         try:
             objects = self._execute_with_retry(
                 lambda: self._minio_client.list_objects(
-                    bucket_name=self._creds_config.bucket, prefix=prefix
+                    bucket_name=self._config.bucket, prefix=prefix
                 )
             )
 
             for obj in objects:
                 metadata = ObjectMetadata(
                     key=obj.object_name,
-                    last_modified=obj.last_modified,
-                    etag=obj.etag,
+                    last_modified=obj.last_modified or datetime.min.replace(tzinfo=UTC),
+                    etag=(obj.etag or "").strip('"'),
                     size=obj.size,
                     storage_class=obj.storage_class,
                     owner=obj.owner_name,
@@ -381,20 +319,12 @@ class ObjectStoreClient:
                 result.append(metadata)
 
             return result
-        except S3Error as e:
-            raise ListObjectsError(
-                f"Failed to list objects with prefix '{prefix}': {e.code} - {e.message}"
-            ) from e
         except Exception as e:
             raise ListObjectsError(
-                f"Failed to list objects with prefix '{prefix}': {e}"
+                f"Failed to list objects with prefix '{prefix}'"
             ) from e
 
-    @record_metrics(
-        Module.OBJECTSTORE,
-        Operation.OBJECTSTORE_HEAD_OBJECT,
-        deprecated=True,
-    )
+    @record_metrics(Module.OBJECTSTORE, Operation.OBJECTSTORE_HEAD_OBJECT)
     def head_object(self, name: str) -> ObjectMetadata:
         """Get metadata for an object without downloading it.
 
@@ -409,40 +339,35 @@ class ObjectStoreClient:
             ObjectNotFoundError: If the object doesn't exist
             ObjectOperationError: If the operation fails
         """
-        if not name:
-            raise ValueError(EMPTY_NAME_ERROR)
+        validate_object_name(name)
 
         try:
             stat: minio.datatypes.Object = self._execute_with_retry(
                 lambda: self._minio_client.stat_object(
-                    bucket_name=self._creds_config.bucket, object_name=name
+                    bucket_name=self._config.bucket, object_name=name
                 )
             )
 
             return ObjectMetadata(
                 key=name,
-                last_modified=stat.last_modified or datetime.min,
-                etag=(stat.etag or "").strip('"'),
+                last_modified=stat.last_modified or datetime.min.replace(tzinfo=UTC),
+                etag=(stat.etag or "").strip('"'),  # Remove quotes from etag
                 size=stat.size or 0,
-                storage_class=None,
-                owner=None,
+                storage_class=None,  # stat_object doesn't provide storage class
+                owner=None,  # stat_object doesn't provide owner
             )
         except S3Error as e:
-            if e.code == "NoSuchKey":
+            if e.code in _S3_NOT_FOUND_CODES:
                 raise ObjectNotFoundError(f"Object '{name}' not found") from e
             raise ObjectOperationError(
-                f"Failed to get metadata for object '{name}': {e.code} - {e.message}"
+                f"Failed to get metadata for object '{name}'"
             ) from e
         except Exception as e:
             raise ObjectOperationError(
-                f"Failed to get metadata for object '{name}': {e}"
+                f"Failed to get metadata for object '{name}'"
             ) from e
 
-    @record_metrics(
-        Module.OBJECTSTORE,
-        Operation.OBJECTSTORE_OBJECT_EXISTS,
-        deprecated=True,
-    )
+    @record_metrics(Module.OBJECTSTORE, Operation.OBJECTSTORE_OBJECT_EXISTS)
     def object_exists(self, name: str) -> bool:
         """Check if an object exists.
 
@@ -456,15 +381,16 @@ class ObjectStoreClient:
             ValueError: If name is invalid
             ObjectOperationError: If the check fails
         """
-        if not name:
-            raise ValueError(EMPTY_NAME_ERROR)
+        validate_object_name(name)
 
         try:
             self.head_object(name)
             return True
         except ObjectNotFoundError:
             return False
+        except ObjectOperationError:
+            raise
         except Exception as e:
             raise ObjectOperationError(
-                f"Failed to check if object '{name}' exists: {e}"
+                f"Failed to check if object '{name}' exists"
             ) from e

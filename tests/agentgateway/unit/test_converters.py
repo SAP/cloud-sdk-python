@@ -1,5 +1,6 @@
 """Unit tests for MCP tool converters."""
 
+import json
 import pytest
 from unittest.mock import AsyncMock
 from pydantic import BaseModel
@@ -29,13 +30,19 @@ def _model(lc_tool) -> type[BaseModel]:
     return schema
 
 
-def _make_tool(*, required=("eventid",), optional=("showdeclinedreason", "datafetchmode")):
+def _make_tool(
+    *, required=("eventid",), optional=("showdeclinedreason", "datafetchmode")
+):
     properties = {k: {"type": "string"} for k in (*required, *optional)}
     return MCPTool(
         name="get_supplier_bid",
         server_name="ariba",
         description="Gets all supplier bids for the specified event",
-        input_schema={"type": "object", "required": list(required), "properties": properties},
+        input_schema={
+            "type": "object",
+            "required": list(required),
+            "properties": properties,
+        },
         url="https://example.com/mcp",
     )
 
@@ -45,7 +52,9 @@ class TestMcpToolToLangchainStructure:
 
     def test_tool_metadata_matches_mcp_tool(self):
         """name, description, and coroutine are taken from the MCPTool."""
-        lc_tool = mcp_tool_to_langchain(_make_tool(), AsyncMock(return_value="ok"), lambda: "token")
+        lc_tool = mcp_tool_to_langchain(
+            _make_tool(), AsyncMock(return_value="ok"), lambda: "token"
+        )
 
         assert lc_tool.name == "get_supplier_bid"
         assert lc_tool.description == "Gets all supplier bids for the specified event"
@@ -53,7 +62,9 @@ class TestMcpToolToLangchainStructure:
 
     def test_args_schema_is_pydantic_model_with_all_properties(self):
         """args_schema is a Pydantic BaseModel that includes every property from input_schema."""
-        lc_tool = mcp_tool_to_langchain(_make_tool(), AsyncMock(return_value="ok"), lambda: "token")
+        lc_tool = mcp_tool_to_langchain(
+            _make_tool(), AsyncMock(return_value="ok"), lambda: "token"
+        )
 
         assert lc_tool.args_schema is not None
         fields = _schema_fields(lc_tool)
@@ -63,13 +74,17 @@ class TestMcpToolToLangchainStructure:
 
     def test_required_fields_are_required_in_args_schema(self):
         """Fields listed in 'required' must be required in the Pydantic model."""
-        lc_tool = mcp_tool_to_langchain(_make_tool(), AsyncMock(return_value="ok"), lambda: "token")
+        lc_tool = mcp_tool_to_langchain(
+            _make_tool(), AsyncMock(return_value="ok"), lambda: "token"
+        )
 
         assert _schema_fields(lc_tool)["eventid"].is_required()
 
     def test_optional_fields_are_not_required_in_args_schema(self):
         """Fields absent from 'required' must be optional in the Pydantic model."""
-        lc_tool = mcp_tool_to_langchain(_make_tool(), AsyncMock(return_value="ok"), lambda: "token")
+        lc_tool = mcp_tool_to_langchain(
+            _make_tool(), AsyncMock(return_value="ok"), lambda: "token"
+        )
 
         fields = _schema_fields(lc_tool)
         assert not fields["showdeclinedreason"].is_required()
@@ -84,7 +99,9 @@ class TestMcpToolToLangchainStructure:
             input_schema={},
             url="https://example.com/mcp",
         )
-        lc_tool = mcp_tool_to_langchain(tool, AsyncMock(return_value="ok"), lambda: "token")
+        lc_tool = mcp_tool_to_langchain(
+            tool, AsyncMock(return_value="ok"), lambda: "token"
+        )
 
         assert lc_tool.name == "simple_tool"
         assert lc_tool.args_schema is not None
@@ -98,7 +115,9 @@ class TestMcpToolToLangchainStructure:
             input_schema={"type": "object"},
             url="https://example.com/mcp",
         )
-        lc_tool = mcp_tool_to_langchain(tool, AsyncMock(return_value="ok"), lambda: "token")
+        lc_tool = mcp_tool_to_langchain(
+            tool, AsyncMock(return_value="ok"), lambda: "token"
+        )
 
         assert lc_tool.args_schema is not None
 
@@ -106,7 +125,9 @@ class TestMcpToolToLangchainStructure:
 class TestMcpToolToLangchainTypeMapping:
     """Tests that JSON Schema types are mapped to the correct Python types."""
 
-    def _tool_with_types(self, properties: dict, required: list[str] | None = None) -> MCPTool:
+    def _tool_with_types(
+        self, properties: dict, required: list[str] | None = None
+    ) -> MCPTool:
         return MCPTool(
             name="typed_tool",
             server_name="server",
@@ -204,7 +225,9 @@ class TestMcpToolToLangchainTypeMapping:
 
     def test_array_type_integer_null_maps_to_int(self):
         lc_tool = mcp_tool_to_langchain(
-            self._tool_with_types({"limit": {"type": ["integer", "null"]}}, required=["limit"]),
+            self._tool_with_types(
+                {"limit": {"type": ["integer", "null"]}}, required=["limit"]
+            ),
             AsyncMock(),
             lambda: "token",
         )
@@ -217,7 +240,9 @@ class TestMcpToolToLangchainTypeMapping:
 
     def test_array_type_number_null_maps_to_float(self):
         lc_tool = mcp_tool_to_langchain(
-            self._tool_with_types({"ratio": {"type": ["number", "null"]}}, required=["ratio"]),
+            self._tool_with_types(
+                {"ratio": {"type": ["number", "null"]}}, required=["ratio"]
+            ),
             AsyncMock(),
             lambda: "token",
         )
@@ -281,7 +306,9 @@ class TestMcpToolToLangchainUnderscoredParams:
     def test_underscored_required_param_present_in_schema(self):
         """'_VariantConfiguration' must appear in the args schema (stripped to safe name)."""
         lc_tool = mcp_tool_to_langchain(
-            self._tool_with_underscore_params(), AsyncMock(return_value="ok"), lambda: "token"
+            self._tool_with_underscore_params(),
+            AsyncMock(return_value="ok"),
+            lambda: "token",
         )
         fields = _schema_fields(lc_tool)
         assert "VariantConfiguration" in fields
@@ -289,7 +316,9 @@ class TestMcpToolToLangchainUnderscoredParams:
 
     def test_underscored_optional_param_present_in_schema(self):
         lc_tool = mcp_tool_to_langchain(
-            self._tool_with_underscore_params(), AsyncMock(return_value="ok"), lambda: "token"
+            self._tool_with_underscore_params(),
+            AsyncMock(return_value="ok"),
+            lambda: "token",
         )
         fields = _schema_fields(lc_tool)
         assert "Product" in fields
@@ -297,7 +326,9 @@ class TestMcpToolToLangchainUnderscoredParams:
 
     def test_non_underscored_param_unaffected(self):
         lc_tool = mcp_tool_to_langchain(
-            self._tool_with_underscore_params(), AsyncMock(return_value="ok"), lambda: "token"
+            self._tool_with_underscore_params(),
+            AsyncMock(return_value="ok"),
+            lambda: "token",
         )
         assert "NormalParam" in _schema_fields(lc_tool)
 
@@ -354,50 +385,68 @@ class TestMcpToolToLangchainFieldMetadata:
 
     def test_description_preserved_on_required_field(self):
         lc_tool = mcp_tool_to_langchain(
-            self._tool({"s": {"type": "string", "description": "The status"}}, required=["s"]),
-            AsyncMock(), lambda: "token",
+            self._tool(
+                {"s": {"type": "string", "description": "The status"}}, required=["s"]
+            ),
+            AsyncMock(),
+            lambda: "token",
         )
         assert _schema_fields(lc_tool)["s"].description == "The status"
 
     def test_description_preserved_on_optional_field(self):
         lc_tool = mcp_tool_to_langchain(
             self._tool({"s": {"type": "string", "description": "The status"}}),
-            AsyncMock(), lambda: "token",
+            AsyncMock(),
+            lambda: "token",
         )
         assert _schema_fields(lc_tool)["s"].description == "The status"
 
     def test_title_preserved(self):
         lc_tool = mcp_tool_to_langchain(
-            self._tool({"n": {"type": "string", "title": "OriginalName"}}, required=["n"]),
-            AsyncMock(), lambda: "token",
+            self._tool(
+                {"n": {"type": "string", "title": "OriginalName"}}, required=["n"]
+            ),
+            AsyncMock(),
+            lambda: "token",
         )
         assert _schema_fields(lc_tool)["n"].title == "OriginalName"
 
     def test_examples_preserved_as_native_field_kwarg(self):
         lc_tool = mcp_tool_to_langchain(
-            self._tool({"n": {"type": "string", "examples": ["Alice", "Bob"]}}, required=["n"]),
-            AsyncMock(), lambda: "token",
+            self._tool(
+                {"n": {"type": "string", "examples": ["Alice", "Bob"]}}, required=["n"]
+            ),
+            AsyncMock(),
+            lambda: "token",
         )
         assert _schema_fields(lc_tool)["n"].examples == ["Alice", "Bob"]
 
     def test_deprecated_preserved(self):
         lc_tool = mcp_tool_to_langchain(
             self._tool({"n": {"type": "string", "deprecated": True}}, required=["n"]),
-            AsyncMock(), lambda: "token",
+            AsyncMock(),
+            lambda: "token",
         )
         assert _schema_fields(lc_tool)["n"].deprecated is True
 
     def test_pattern_preserved(self):
         lc_tool = mcp_tool_to_langchain(
-            self._tool({"n": {"type": "string", "pattern": "^[a-z]+$"}}, required=["n"]),
-            AsyncMock(), lambda: "token",
+            self._tool(
+                {"n": {"type": "string", "pattern": "^[a-z]+$"}}, required=["n"]
+            ),
+            AsyncMock(),
+            lambda: "token",
         )
         assert _schema_fields(lc_tool)["n"].metadata  # pattern lives in metadata
 
     def test_min_max_length_preserved(self):
         lc_tool = mcp_tool_to_langchain(
-            self._tool({"n": {"type": "string", "minLength": 2, "maxLength": 50}}, required=["n"]),
-            AsyncMock(), lambda: "token",
+            self._tool(
+                {"n": {"type": "string", "minLength": 2, "maxLength": 50}},
+                required=["n"],
+            ),
+            AsyncMock(),
+            lambda: "token",
         )
         schema = _json_schema(lc_tool)
         assert schema["properties"]["n"]["minLength"] == 2
@@ -405,8 +454,11 @@ class TestMcpToolToLangchainFieldMetadata:
 
     def test_minimum_maximum_preserved(self):
         lc_tool = mcp_tool_to_langchain(
-            self._tool({"v": {"type": "integer", "minimum": 1, "maximum": 100}}, required=["v"]),
-            AsyncMock(), lambda: "token",
+            self._tool(
+                {"v": {"type": "integer", "minimum": 1, "maximum": 100}}, required=["v"]
+            ),
+            AsyncMock(),
+            lambda: "token",
         )
         schema = _json_schema(lc_tool)
         assert schema["properties"]["v"]["minimum"] == 1
@@ -416,8 +468,12 @@ class TestMcpToolToLangchainFieldMetadata:
 
     def test_enum_preserved_in_json_schema_extra(self):
         lc_tool = mcp_tool_to_langchain(
-            self._tool({"c": {"type": "string", "enum": ["red", "green", "blue"]}}, required=["c"]),
-            AsyncMock(), lambda: "token",
+            self._tool(
+                {"c": {"type": "string", "enum": ["red", "green", "blue"]}},
+                required=["c"],
+            ),
+            AsyncMock(),
+            lambda: "token",
         )
         schema = _json_schema(lc_tool)
         assert schema["properties"]["c"]["enum"] == ["red", "green", "blue"]
@@ -425,7 +481,8 @@ class TestMcpToolToLangchainFieldMetadata:
     def test_default_preserved_in_json_schema_extra(self):
         lc_tool = mcp_tool_to_langchain(
             self._tool({"c": {"type": "string", "default": "active"}}, required=["c"]),
-            AsyncMock(), lambda: "token",
+            AsyncMock(),
+            lambda: "token",
         )
         schema = _json_schema(lc_tool)
         assert schema["properties"]["c"]["default"] == "active"
@@ -433,15 +490,19 @@ class TestMcpToolToLangchainFieldMetadata:
     def test_example_preserved_in_json_schema_extra(self):
         lc_tool = mcp_tool_to_langchain(
             self._tool({"c": {"type": "string", "example": "hello"}}, required=["c"]),
-            AsyncMock(), lambda: "token",
+            AsyncMock(),
+            lambda: "token",
         )
         schema = _json_schema(lc_tool)
         assert schema["properties"]["c"]["example"] == "hello"
 
     def test_format_preserved_in_json_schema_extra(self):
         lc_tool = mcp_tool_to_langchain(
-            self._tool({"ts": {"type": "string", "format": "date-time"}}, required=["ts"]),
-            AsyncMock(), lambda: "token",
+            self._tool(
+                {"ts": {"type": "string", "format": "date-time"}}, required=["ts"]
+            ),
+            AsyncMock(),
+            lambda: "token",
         )
         schema = _json_schema(lc_tool)
         assert schema["properties"]["ts"]["format"] == "date-time"
@@ -449,7 +510,8 @@ class TestMcpToolToLangchainFieldMetadata:
     def test_const_preserved_in_json_schema_extra(self):
         lc_tool = mcp_tool_to_langchain(
             self._tool({"v": {"type": "string", "const": "fixed"}}, required=["v"]),
-            AsyncMock(), lambda: "token",
+            AsyncMock(),
+            lambda: "token",
         )
         schema = _json_schema(lc_tool)
         assert schema["properties"]["v"]["const"] == "fixed"
@@ -457,10 +519,18 @@ class TestMcpToolToLangchainFieldMetadata:
     def test_multiple_extra_keys_coexist(self):
         lc_tool = mcp_tool_to_langchain(
             self._tool(
-                {"s": {"type": "string", "enum": ["a", "b"], "format": "uuid", "example": "a"}},
+                {
+                    "s": {
+                        "type": "string",
+                        "enum": ["a", "b"],
+                        "format": "uuid",
+                        "example": "a",
+                    }
+                },
                 required=["s"],
             ),
-            AsyncMock(), lambda: "token",
+            AsyncMock(),
+            lambda: "token",
         )
         schema = _json_schema(lc_tool)
         assert schema["properties"]["s"]["enum"] == ["a", "b"]
@@ -470,7 +540,8 @@ class TestMcpToolToLangchainFieldMetadata:
     def test_missing_metadata_produces_no_extra(self):
         lc_tool = mcp_tool_to_langchain(
             self._tool({"id": {"type": "string"}}, required=["id"]),
-            AsyncMock(), lambda: "token",
+            AsyncMock(),
+            lambda: "token",
         )
         field = _schema_fields(lc_tool)["id"]
         assert field.description is None
@@ -479,8 +550,11 @@ class TestMcpToolToLangchainFieldMetadata:
     def test_unknown_keys_are_silently_ignored(self):
         """Keys not in either bucket (e.g. future JSON Schema extensions) must not raise."""
         lc_tool = mcp_tool_to_langchain(
-            self._tool({"x": {"type": "string", "x-custom-ext": "value"}}, required=["x"]),
-            AsyncMock(), lambda: "token",
+            self._tool(
+                {"x": {"type": "string", "x-custom-ext": "value"}}, required=["x"]
+            ),
+            AsyncMock(),
+            lambda: "token",
         )
         assert "x" in _schema_fields(lc_tool)
 
@@ -517,7 +591,9 @@ class TestMcpToolToLangchainInvocation:
         call_tool = AsyncMock(return_value="ok")
         lc_tool = mcp_tool_to_langchain(_make_tool(), call_tool, lambda: "token")
 
-        await lc_tool.arun({"eventid": "E001", "showdeclinedreason": None, "datafetchmode": None})
+        await lc_tool.arun(
+            {"eventid": "E001", "showdeclinedreason": None, "datafetchmode": None}
+        )
 
         kwargs = call_tool.call_args.kwargs
         assert "showdeclinedreason" not in kwargs
@@ -537,7 +613,9 @@ class TestMcpToolToLangchainInvocation:
     async def test_none_values_forwarded_when_omit_none_false(self):
         """When omit_none=False, None values are forwarded to call_tool as-is."""
         call_tool = AsyncMock(return_value="ok")
-        lc_tool = mcp_tool_to_langchain(_make_tool(), call_tool, lambda: "token", omit_none=False)
+        lc_tool = mcp_tool_to_langchain(
+            _make_tool(), call_tool, lambda: "token", omit_none=False
+        )
 
         await lc_tool.arun({"eventid": "E001", "showdeclinedreason": None})
 
@@ -655,6 +733,7 @@ class TestRealAgentGatewayPayloadShapes:
         """maxLength is a native Field kwarg — Pydantic must enforce it at validation time."""
         lc_tool = mcp_tool_to_langchain(_sfodata_tool(), AsyncMock(), lambda: "tok")
         import pydantic
+
         with pytest.raises(pydantic.ValidationError, match="at most 100"):
             _model(lc_tool)(**{"userid": "x" * 101})
 
@@ -688,6 +767,7 @@ class TestRealAgentGatewayPayloadShapes:
         """pattern is a native Field kwarg — Pydantic must reject values that don't match."""
         lc_tool = mcp_tool_to_langchain(_sfodata_tool(), AsyncMock(), lambda: "tok")
         import pydantic
+
         with pytest.raises(pydantic.ValidationError, match="pattern"):
             _model(lc_tool)(**{"userid": "u1", "orderby": "!!!invalid!!!"})
 
@@ -707,6 +787,7 @@ class TestRealAgentGatewayPayloadShapes:
         """minimum is a native Field kwarg — Pydantic must reject values below it."""
         lc_tool = mcp_tool_to_langchain(_sfodata_tool(), AsyncMock(), lambda: "tok")
         import pydantic
+
         with pytest.raises(pydantic.ValidationError, match="greater than or equal"):
             _model(lc_tool)(**{"userid": "u1", "top": -1})
 
@@ -745,7 +826,15 @@ class TestRealAgentGatewayPayloadShapes:
         """Every property in the real payload schema must appear in the converted schema."""
         lc_tool = mcp_tool_to_langchain(_sfodata_tool(), AsyncMock(), lambda: "tok")
         props = self._props(lc_tool)
-        for param in ("userid", "filter", "orderby", "top", "skip", "expand", "inlinecount"):
+        for param in (
+            "userid",
+            "filter",
+            "orderby",
+            "top",
+            "skip",
+            "expand",
+            "inlinecount",
+        ):
             assert param in props, f"'{param}' missing from converted schema"
 
     # ── invocation: required param forwarded, optionals omitted when None ─
@@ -761,7 +850,9 @@ class TestRealAgentGatewayPayloadShapes:
         kwargs = call_tool.call_args.kwargs
         assert kwargs["userid"] == "user123"
         for opt in ("filter", "orderby", "top", "skip", "expand", "inlinecount"):
-            assert opt not in kwargs, f"optional '{opt}' must not be forwarded when None"
+            assert opt not in kwargs, (
+                f"optional '{opt}' must not be forwarded when None"
+            )
 
     @pytest.mark.asyncio
     async def test_invocation_with_optional_params(self):
@@ -777,3 +868,109 @@ class TestRealAgentGatewayPayloadShapes:
         assert kwargs["inlinecount"] == "allpages"
         assert "filter" not in kwargs
         assert "orderby" not in kwargs
+
+
+class TestOutputSchemaInDescription:
+    """The tool's outputSchema must reach the LLM via the StructuredTool description.
+
+    LangChain serializes only name/description/args_schema into the tool spec sent
+    to the model, so the output schema is folded into the description.
+    """
+
+    _OUTPUT_SCHEMA = {
+        "type": "object",
+        "properties": {
+            "value": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {"ID": {"type": "string"}},
+                },
+            }
+        },
+    }
+
+    def _tool_with_output_schema(self, output_schema):
+        return MCPTool(
+            name="list_disputes",
+            server_name="s4",
+            description="Retrieve disputes from SAP S/4HANA.",
+            input_schema={"type": "object", "properties": {}},
+            url="https://example.com/mcp",
+            output_schema=output_schema,
+        )
+
+    def test_output_schema_appended_to_description(self):
+        """A tool with an output_schema has the serialized schema in its description."""
+        lc_tool = mcp_tool_to_langchain(
+            self._tool_with_output_schema(self._OUTPUT_SCHEMA),
+            AsyncMock(return_value="ok"),
+            lambda: "token",
+        )
+
+        assert lc_tool.description.startswith("Retrieve disputes from SAP S/4HANA.")
+        assert "Output schema (JSON):" in lc_tool.description
+        # The full schema is present and parseable from the appended block.
+        _, _, rendered = lc_tool.description.partition("Output schema (JSON):\n")
+        assert json.loads(rendered) == self._OUTPUT_SCHEMA
+
+    def test_description_unchanged_without_output_schema(self):
+        """A tool with no output_schema keeps its original description verbatim."""
+        lc_tool = mcp_tool_to_langchain(
+            self._tool_with_output_schema(None),
+            AsyncMock(return_value="ok"),
+            lambda: "token",
+        )
+
+        assert lc_tool.description == "Retrieve disputes from SAP S/4HANA."
+        assert "Output schema" not in lc_tool.description
+
+    def test_empty_output_schema_treated_as_absent(self):
+        """An empty-dict output_schema is treated the same as None (no append)."""
+        lc_tool = mcp_tool_to_langchain(
+            self._tool_with_output_schema({}),
+            AsyncMock(return_value="ok"),
+            lambda: "token",
+        )
+
+        assert lc_tool.description == "Retrieve disputes from SAP S/4HANA."
+
+
+class TestMcpOutputSchemaCompat:
+    """mcp_output_schema reads output_schema/outputSchema across mcp versions."""
+
+    def test_reads_snake_case(self):
+        from sap_cloud_sdk.agentgateway._compat import mcp_output_schema
+
+        class Tool:
+            output_schema = {"type": "object"}
+
+        assert mcp_output_schema(Tool()) == {"type": "object"}
+
+    def test_reads_camel_case(self):
+        from sap_cloud_sdk.agentgateway._compat import mcp_output_schema
+
+        class Tool:
+            outputSchema = {"type": "object"}
+
+        assert mcp_output_schema(Tool()) == {"type": "object"}
+
+    def test_returns_none_when_absent(self):
+        from sap_cloud_sdk.agentgateway._compat import mcp_output_schema
+
+        class Tool:
+            pass
+
+        assert mcp_output_schema(Tool()) is None
+
+
+def test_mcptool_output_schema_defaults_to_none():
+    """MCPTool.output_schema is optional and defaults to None."""
+    tool = MCPTool(
+        name="t",
+        server_name="s",
+        description="d",
+        input_schema={},
+        url="https://example.com/mcp",
+    )
+    assert tool.output_schema is None

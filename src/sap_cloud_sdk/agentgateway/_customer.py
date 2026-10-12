@@ -35,6 +35,7 @@ except ImportError:
 from sap_cloud_sdk.agentgateway._compat import (
     mcp_input_schema,
     mcp_is_error,
+    mcp_output_schema,
     mcp_server_name,
 )
 from sap_cloud_sdk.agentgateway._dependencies_resolver import (
@@ -682,6 +683,7 @@ async def _list_server_tools(
                         server_name=server_name,
                         description=t.description or "",
                         input_schema=mcp_input_schema(t),
+                        output_schema=mcp_output_schema(t),
                         url=url,
                     )
                     for t in tools

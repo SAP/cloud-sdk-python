@@ -7,6 +7,7 @@ custom tool naming, argument schemas, or framework integrations.
 
 from __future__ import annotations
 
+import json
 from typing import TYPE_CHECKING, Any, Callable
 
 from pydantic import Field, create_model
@@ -62,6 +63,23 @@ _EXTRA_KEYS: frozenset[str] = frozenset(
         "allOf",
     }
 )
+
+
+def _augment_description_with_output_schema(
+    description: str, output_schema: dict[str, Any] | None
+) -> str:
+    """Append a tool's output schema to its description for the LLM.
+
+    LangChain only serializes a tool's name, description, and args schema into the
+    spec sent to the model; there is no field that carries an MCP ``outputSchema``.
+    So the only way the LLM can see the expected result shape is to fold it into
+    the description. Tools without an output schema are returned unchanged.
+    """
+    if not output_schema:
+        return description
+    rendered = json.dumps(output_schema, indent=2)
+    suffix = f"Output schema (JSON):\n{rendered}"
+    return f"{description}\n\n{suffix}" if description else suffix
 
 
 def _resolve_type(json_type: Any) -> tuple[type, bool]:
@@ -179,6 +197,8 @@ def mcp_tool_to_langchain(
     return StructuredTool.from_function(
         coroutine=run,
         name=mcp_tool.name,
-        description=mcp_tool.description,
+        description=_augment_description_with_output_schema(
+            mcp_tool.description, mcp_tool.output_schema
+        ),
         args_schema=args_schema,
     )

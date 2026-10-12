@@ -19,6 +19,20 @@ def mcp_input_schema(tool: Any) -> dict[str, Any]:
     return schema or {}
 
 
+def mcp_output_schema(tool: Any) -> dict[str, Any] | None:
+    """Return the tool's output schema across mcp 1.x/2.x, or None if absent.
+
+    MCP Builder tools advertise an ``outputSchema`` describing the shape of the
+    structured result. The mcp client exposes it as ``output_schema`` (snake) or
+    ``outputSchema`` (camel) depending on version. Returns None when the tool has
+    no output schema so callers can distinguish "no schema" from an empty one.
+    """
+    schema = getattr(tool, "output_schema", None)
+    if schema is None:
+        schema = getattr(tool, "outputSchema", None)
+    return schema or None
+
+
 def mcp_is_error(result: Any) -> bool:
     """Return the tool-call error flag across mcp 1.x/2.x, defaulting to False."""
     flag = getattr(result, "is_error", None)

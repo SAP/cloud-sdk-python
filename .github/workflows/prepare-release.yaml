@@ -38,28 +38,9 @@ jobs:
           echo "Current version: $CURRENT_VERSION"
 
           # ── Resolve target version ───────────────────────────────────────────
-          export CURRENT_VERSION
           if [[ -n "$VERSION_INPUT" ]]; then
-            # Validate it is a valid PEP 440 version
-            python3 -c "
-import os, sys
-from packaging.version import Version, InvalidVersion
-try:
-    Version(os.environ['VERSION_INPUT'])
-except InvalidVersion as e:
-    print(f'ERROR: Invalid version: {e}')
-    sys.exit(1)
-"
-            # Validate it is greater than current
-            IS_GREATER=$(python3 -c "
-import os
-from packaging.version import Version
-print('true' if Version(os.environ['VERSION_INPUT']) > Version(os.environ['CURRENT_VERSION']) else 'false')
-")
-            if [[ "$IS_GREATER" != "true" ]]; then
-              echo "ERROR: Requested version ${VERSION_INPUT} is not greater than current version ${CURRENT_VERSION}."
-              exit 1
-            fi
+            python3 .github/scripts/validate_version_input.py
+            python3 .github/scripts/check_version_bump.py "$CURRENT_VERSION" "$VERSION_INPUT"
             NEW_VERSION="$VERSION_INPUT"
           else
             # Default: minor bump
@@ -169,11 +150,7 @@ print('true' if Version(os.environ['VERSION_INPUT']) > Version(os.environ['CURRE
           TAG: ${{ steps.release.outputs.tag }}
           BRANCH: ${{ github.event.inputs.branch }}
         run: |
-          IS_PRERELEASE=$(python3 -c "
-import os
-from packaging.version import Version
-print('true' if Version(os.environ['VERSION']).is_prerelease else 'false')
-")
+          IS_PRERELEASE=$(python3 .github/scripts/check_prerelease.py)
 
           PRERELEASE_FLAG=""
           if [[ "$IS_PRERELEASE" == "true" ]]; then

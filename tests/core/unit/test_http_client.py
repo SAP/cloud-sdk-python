@@ -284,3 +284,25 @@ class TestXsuaaAuthProviderSubdomainValidation:
             provider._fetch_token("tenant-123")
         call_kwargs = mock_session.fetch_token.call_args[1]
         assert call_kwargs["token_url"] == "https://tenant-123.authentication.region/oauth/token"
+
+    def test_identityzone_in_path_is_not_replaced(self):
+        """str.replace would corrupt the URL if identityzone appears in the path too."""
+        cfg = MagicMock()
+        # token_url whose path also contains the identityzone value
+        cfg.token_url = "https://provider-zone.authentication.region/provider-zone/token"
+        cfg.identityzone = "provider-zone"
+        cfg.client_id = "cid"
+        cfg.client_secret = "csecret"
+        factory = MagicMock(return_value=cfg)
+        factory.has_changed = MagicMock(return_value=False)
+        provider = XsuaaAuthProvider(factory)
+
+        with patch("sap_cloud_sdk.core.protocol.http.models.OAuth2Session") as mock_oauth_cls:
+            mock_session = MagicMock()
+            mock_oauth_cls.return_value = mock_session
+            mock_session.fetch_token.return_value = {"access_token": "tok", "expires_in": 3600}
+            provider._fetch_token("tenant-abc")
+
+        call_kwargs = mock_session.fetch_token.call_args[1]
+        # Only the first hostname label must be replaced; path segment untouched
+        assert call_kwargs["token_url"] == "https://tenant-abc.authentication.region/provider-zone/token"

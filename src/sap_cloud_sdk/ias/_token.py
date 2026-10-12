@@ -7,7 +7,7 @@ all standard IAS claims to a typed dataclass.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Callable, Dict, List, Optional, Union
 
 import jwt
 
@@ -172,3 +172,21 @@ def parse_token(token: str) -> IASClaims:
             k: v for k, v in payload.items() if k not in _KNOWN_CLAIM_VALUES
         },
     )
+
+
+@dataclass(frozen=True)
+class VerifiedIASClaims:
+    """Claims proven to originate from a successfully verified IAS JWT.
+
+    Construct ONLY after verifying the token's signature, issuer, audience,
+    algorithm, and time constraints. Its presence is the SDK's provenance
+    marker for security-sensitive consumers such as the telemetry middleware
+    and AuditClient auto-fill.
+    """
+
+    claims: IASClaims
+
+
+# A verifier receives the raw Authorization header value (may include the
+# "Bearer " prefix) and MUST raise (fail closed) if the token is not valid.
+TokenVerifier = Callable[[str], VerifiedIASClaims]

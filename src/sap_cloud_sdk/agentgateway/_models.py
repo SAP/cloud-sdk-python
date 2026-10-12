@@ -41,7 +41,7 @@ class MCPTool:
 
     Attributes:
         name: Tool name on MCP server (used when calling the tool)
-        server_name: MCP server name from serverInfo.name
+        server_name: MCP server name from server_info.name
         description: Tool description
         input_schema: JSON schema for tool input parameters
         url: MCP endpoint URL
@@ -197,6 +197,9 @@ class MCPToolFilter:
             agents, or matched against IntegrationDependency.ord_id for
             customer agents). Applied before fetching, skipping non-matching
             fragments.
+        gtids: Global tenant IDs of the connected systems whose tools should be
+            listed. Only supported in the LoB flow; the Destination Service
+            filters fragments server-side. Ignored by the customer flow.
 
     Example:
         ```python
@@ -206,6 +209,7 @@ class MCPToolFilter:
             filter=MCPToolFilter(
                 names=["get-sales-order"],
                 ord_ids=["sap.s4:apiAccess:salesOrder:v1"],
+                gtids=["9e88a0c4-ab32-46d8-b1d3-07cbcac11831"],
             )
         )
         ```
@@ -213,3 +217,4 @@ class MCPToolFilter:
 
     names: list[str] = field(default_factory=list)
     ord_ids: list[str] = field(default_factory=list)
+    gtids: list[str] = field(default_factory=list)

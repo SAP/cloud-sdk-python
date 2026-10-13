@@ -13,6 +13,7 @@ from typing import TYPE_CHECKING, Any, Callable
 from pydantic import Field, create_model
 
 from sap_cloud_sdk.agentgateway._models import MCPTool
+from sap_cloud_sdk.agentgateway.exceptions import AgentGatewaySDKError
 
 if TYPE_CHECKING:
     from langchain_core.tools import StructuredTool
@@ -101,6 +102,7 @@ def mcp_tool_to_langchain(
     get_user_token: Callable[[], str],
     *,
     omit_none: bool = True,
+    handle_tool_error: bool | str | Callable[[Exception], str] | None = None,
 ) -> StructuredTool:
     """Convert MCPTool to LangChain StructuredTool.
 
@@ -113,6 +115,14 @@ def mcp_tool_to_langchain(
         get_user_token: Callable that returns the user's JWT token.
         omit_none: If True (default), optional parameters with a None value are not
             forwarded to call_tool. Set to False to forward None values explicitly.
+        handle_tool_error: Opt-in LangChain error handling. When set, tool-call failures
+            are surfaced to the LLM as a ToolException and LangChain converts them to an
+            error ToolMessage the model can see and self-correct on. Default (None) keeps
+            the previous behavior: the raw SDK exception propagates.
+            Recommended value is ``True`` (use the error message as the tool result). You
+            may also pass a ``str`` to show the LLM a fixed message instead, or a callable
+            ``(ToolException) -> str`` to compute the message. Passed through to
+            LangChain's ``StructuredTool.handle_tool_error``.
 
     Returns:
         LangChain StructuredTool that invokes the MCP tool.
@@ -140,7 +150,7 @@ def mcp_tool_to_langchain(
         ```
     """
     try:
-        from langchain_core.tools import StructuredTool
+        from langchain_core.tools import StructuredTool, ToolException
     except ImportError:
         raise ImportError(
             "langchain-core is required for mcp_tool_to_langchain. "
@@ -164,11 +174,23 @@ def mcp_tool_to_langchain(
             if omit_none
             else restored
         )
-        return await call_tool(
-            mcp_tool,
-            user_token=get_user_token,
-            **resolved,
-        )
+        if handle_tool_error is None:
+            # Default: unchanged behavior — let the raw SDK exception propagate.
+            return await call_tool(
+                mcp_tool,
+                user_token=get_user_token,
+                **resolved,
+            )
+        # Opt-in: surface Agent Gateway failures as a ToolException so LangChain's
+        # handle_tool_error can convert them to an error ToolMessage for the LLM.
+        try:
+            return await call_tool(
+                mcp_tool,
+                user_token=get_user_token,
+                **resolved,
+            )
+        except AgentGatewaySDKError as exc:
+            raise ToolException(str(exc)) from exc
 
     fields: dict[str, Any] = {}
     for safe, orig in name_map.items():
@@ -194,6 +216,8 @@ def mcp_tool_to_langchain(
             fields[safe] = (py_type, Field(..., **field_kwargs))
     args_schema = create_model(f"{mcp_tool.name}_args", **fields) if fields else None
 
+    # Pass handle_tool_error only when the caller opts in; otherwise omit the key so the
+    # tool keeps LangChain's default and existing behavior is byte-for-byte unchanged.
     return StructuredTool.from_function(
         coroutine=run,
         name=mcp_tool.name,
@@ -201,4 +225,9 @@ def mcp_tool_to_langchain(
             mcp_tool.description, mcp_tool.output_schema
         ),
         args_schema=args_schema,
+        **(
+            {"handle_tool_error": handle_tool_error}
+            if handle_tool_error is not None
+            else {}
+        ),
     )

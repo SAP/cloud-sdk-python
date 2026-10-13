@@ -974,3 +974,76 @@ def test_mcptool_output_schema_defaults_to_none():
         url="https://example.com/mcp",
     )
     assert tool.output_schema is None
+
+
+class TestHandleToolError:
+    """The opt-in handle_tool_error param + SDK-error -> ToolException translation."""
+
+    def _tool(self):
+        return MCPTool(
+            name="t",
+            server_name="s",
+            description="d",
+            input_schema={"type": "object", "properties": {}},
+            url="https://example.com/mcp",
+        )
+
+    def test_default_leaves_handle_tool_error_false_and_propagates_sdk_error(self):
+        """Without the param, behavior is unchanged: flag False, raw SDK error propagates."""
+        from sap_cloud_sdk.agentgateway.exceptions import AgentGatewayServerError
+
+        async def boom(*a, **k):
+            raise AgentGatewayServerError("tool blew up")
+
+        lc = mcp_tool_to_langchain(self._tool(), boom, lambda: "tok")
+        assert lc.handle_tool_error is False
+
+    @pytest.mark.asyncio
+    async def test_opt_in_translates_sdk_error_to_tool_message(self):
+        """With handle_tool_error=True, an SDK error becomes a handled ToolMessage string."""
+        from sap_cloud_sdk.agentgateway.exceptions import AgentGatewayServerError
+
+        async def boom(*a, **k):
+            raise AgentGatewayServerError("rate limit exceeded")
+
+        lc = mcp_tool_to_langchain(
+            self._tool(), boom, lambda: "tok", handle_tool_error=True
+        )
+        assert lc.handle_tool_error is True
+        out = await lc.ainvoke({})
+        # Handled: returned a string containing the message, not raised.
+        assert isinstance(out, str)
+        assert "rate limit exceeded" in out
+
+    @pytest.mark.asyncio
+    async def test_existing_tool_exception_passed_through_not_double_wrapped(self):
+        """A caller whose call_tool already raises ToolException is not re-wrapped."""
+        from langchain_core.tools import ToolException
+
+        async def already_tool_exc(*a, **k):
+            raise ToolException("caller-level failure")
+
+        lc = mcp_tool_to_langchain(
+            self._tool(), already_tool_exc, lambda: "tok", handle_tool_error=True
+        )
+        out = await lc.ainvoke({})
+        assert isinstance(out, str)
+        # Exactly the caller's message, with no extra SDK wrapping prefix.
+        assert out.strip() == "caller-level failure" or "caller-level failure" in out
+
+    @pytest.mark.asyncio
+    async def test_opt_in_with_false_keeps_raising(self):
+        """handle_tool_error=False is a valid explicit opt-in that still raises."""
+        from langchain_core.tools import ToolException
+        from sap_cloud_sdk.agentgateway.exceptions import AgentGatewayServerError
+
+        async def boom(*a, **k):
+            raise AgentGatewayServerError("still fails")
+
+        lc = mcp_tool_to_langchain(
+            self._tool(), boom, lambda: "tok", handle_tool_error=False
+        )
+        assert lc.handle_tool_error is False
+        # Translation still happens (ToolException raised), but flag False -> re-raised.
+        with pytest.raises(ToolException):
+            await lc.ainvoke({})

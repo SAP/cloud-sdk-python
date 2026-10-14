@@ -129,28 +129,43 @@ jobs:
         run: uv sync --dev
 
       - name: Set up integration test environment
+        env:
+          AICORE_CLIENT_ID: ${{ secrets.AICORE_CLIENT_ID }}
+          AICORE_CLIENT_SECRET: ${{ secrets.AICORE_CLIENT_SECRET }}
+          AICORE_FILTER_TEST_SELF_HARM_PROMPT: ${{ secrets.AICORE_FILTER_TEST_SELF_HARM_PROMPT }}
+          CLOUD_SDK_CFG_AGW_DEFAULT_LANDSCAPE: ${{ secrets.CLOUD_SDK_CFG_AGW_DEFAULT_LANDSCAPE }}
+          CLOUD_SDK_CFG_AGW_DEFAULT_TENANT_SUBDOMAIN: ${{ secrets.CLOUD_SDK_CFG_AGW_DEFAULT_TENANT_SUBDOMAIN }}
+          CLOUD_SDK_CFG_AUDITLOG_DEFAULT_UAA: ${{ secrets.CLOUD_SDK_CFG_AUDITLOG_DEFAULT_UAA }}
+          CLOUD_SDK_CFG_DESTINATION_DEFAULT_CLIENTID: ${{ secrets.CLOUD_SDK_CFG_DESTINATION_DEFAULT_CLIENTID }}
+          CLOUD_SDK_CFG_DESTINATION_DEFAULT_CLIENTSECRET: ${{ secrets.CLOUD_SDK_CFG_DESTINATION_DEFAULT_CLIENTSECRET }}
+          CLOUD_SDK_CFG_HANA_AGENT_MEMORY_DEFAULT_UAA: ${{ secrets.CLOUD_SDK_CFG_HANA_AGENT_MEMORY_DEFAULT_UAA }}
+          CLOUD_SDK_CFG_OBJECTSTORE_AZURE_SAS_TOKEN: ${{ secrets.CLOUD_SDK_CFG_OBJECTSTORE_AZURE_SAS_TOKEN }}
+          CLOUD_SDK_CFG_OBJECTSTORE_DEFAULT_ACCESS_KEY_ID: ${{ secrets.CLOUD_SDK_CFG_OBJECTSTORE_DEFAULT_ACCESS_KEY_ID }}
+          CLOUD_SDK_CFG_OBJECTSTORE_DEFAULT_SECRET_ACCESS_KEY: ${{ secrets.CLOUD_SDK_CFG_OBJECTSTORE_DEFAULT_SECRET_ACCESS_KEY }}
+          CLOUD_SDK_CFG_OBJECTSTORE_GCS_BASE64ENCODEDPRIVATEKEYDATA: ${{ secrets.CLOUD_SDK_CFG_OBJECTSTORE_GCS_BASE64ENCODEDPRIVATEKEYDATA }}
+          CLOUD_SDK_CFG_SDM_DEFAULT_UAA: ${{ secrets.CLOUD_SDK_CFG_SDM_DEFAULT_UAA }}
+          AICORE_AUTH_URL: ${{ vars.AICORE_AUTH_URL }}
+          AICORE_BASE_URL: ${{ vars.AICORE_BASE_URL }}
+          AICORE_FALLBACK_TEST_FALLBACK_MODEL: ${{ vars.AICORE_FALLBACK_TEST_FALLBACK_MODEL }}
+          AICORE_FALLBACK_TEST_PRIMARY_MODEL: ${{ vars.AICORE_FALLBACK_TEST_PRIMARY_MODEL }}
+          AICORE_FILTER_TEST_MODEL: ${{ vars.AICORE_FILTER_TEST_MODEL }}
+          AICORE_RESOURCE_GROUP: ${{ vars.AICORE_RESOURCE_GROUP }}
+          CLOUD_SDK_CFG_AUDITLOG_DEFAULT_URL: ${{ vars.CLOUD_SDK_CFG_AUDITLOG_DEFAULT_URL }}
+          CLOUD_SDK_CFG_DESTINATION_DEFAULT_IDENTITYZONE: ${{ vars.CLOUD_SDK_CFG_DESTINATION_DEFAULT_IDENTITYZONE }}
+          CLOUD_SDK_CFG_DESTINATION_DEFAULT_TENANT_SUBDOMAIN: ${{ vars.CLOUD_SDK_CFG_DESTINATION_DEFAULT_TENANT_SUBDOMAIN }}
+          CLOUD_SDK_CFG_DESTINATION_DEFAULT_URI: ${{ vars.CLOUD_SDK_CFG_DESTINATION_DEFAULT_URI }}
+          CLOUD_SDK_CFG_DESTINATION_DEFAULT_URL: ${{ vars.CLOUD_SDK_CFG_DESTINATION_DEFAULT_URL }}
+          CLOUD_SDK_CFG_HANA_AGENT_MEMORY_DEFAULT_APPLICATION_URL: ${{ vars.CLOUD_SDK_CFG_HANA_AGENT_MEMORY_DEFAULT_APPLICATION_URL }}
+          CLOUD_SDK_CFG_HANA_AGENT_MEMORY_DEFAULT_SUBSCRIBER_TENANT: ${{ vars.CLOUD_SDK_CFG_HANA_AGENT_MEMORY_DEFAULT_SUBSCRIBER_TENANT }}
+          CLOUD_SDK_CFG_OBJECTSTORE_AZURE_CONTAINER_NAME: ${{ vars.CLOUD_SDK_CFG_OBJECTSTORE_AZURE_CONTAINER_NAME }}
+          CLOUD_SDK_CFG_OBJECTSTORE_AZURE_CONTAINER_URI: ${{ vars.CLOUD_SDK_CFG_OBJECTSTORE_AZURE_CONTAINER_URI }}
+          CLOUD_SDK_CFG_OBJECTSTORE_DEFAULT_BUCKET: ${{ vars.CLOUD_SDK_CFG_OBJECTSTORE_DEFAULT_BUCKET }}
+          CLOUD_SDK_CFG_OBJECTSTORE_DEFAULT_HOST: ${{ vars.CLOUD_SDK_CFG_OBJECTSTORE_DEFAULT_HOST }}
+          CLOUD_SDK_CFG_OBJECTSTORE_GCS_BUCKET: ${{ vars.CLOUD_SDK_CFG_OBJECTSTORE_GCS_BUCKET }}
+          CLOUD_SDK_CFG_OBJECTSTORE_GCS_PROJECTID: ${{ vars.CLOUD_SDK_CFG_OBJECTSTORE_GCS_PROJECTID }}
+          CLOUD_SDK_CFG_SDM_DEFAULT_URI: ${{ vars.CLOUD_SDK_CFG_SDM_DEFAULT_URI }}
         run: |
-          echo "Setting up environment variables for integration tests..."
-
-          echo '${{ toJSON(secrets) }}' \
-            | jq -r 'to_entries[]
-                | select(.key | startswith("CLOUD_SDK_CFG_") or startswith("AICORE_"))
-                | "\(.key)=\(.value)"' \
-            | while read line; do
-                echo "$line" >> $GITHUB_ENV
-                echo "Set secret: $(echo "$line" | cut -d= -f1)"
-              done
-
-          echo '${{ toJSON(vars) }}' \
-            | jq -r 'to_entries[]
-                | select(.key | startswith("CLOUD_SDK_CFG_") or startswith("AICORE_"))
-                | "\(.key)=\(.value)"' \
-            | while read line; do
-                echo "$line" >> $GITHUB_ENV
-                echo "Set variable: $(echo "$line" | cut -d= -f1)"
-              done
-
-          echo "Environment setup complete"
+          echo "Integration test environment set up."
 
       - name: Run integration tests
         env:

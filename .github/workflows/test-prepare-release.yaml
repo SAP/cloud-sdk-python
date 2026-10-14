@@ -55,7 +55,7 @@ jobs:
           TAG="v${NEW_VERSION}"
           echo "Version: $CURRENT_VERSION → $NEW_VERSION"
 
-          LATEST_TAG=$(git tag --sort=-version:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+(rc[0-9]+)?$' | head -1)
+          LATEST_TAG=$(git tag --merged HEAD --sort=-version:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+(rc[0-9]+)?$' | head -1)
           if [[ -z "$LATEST_TAG" ]]; then
             echo "No semver tag found — using initial commit as baseline."
             BASELINE=$(git rev-list --max-parents=0 HEAD)

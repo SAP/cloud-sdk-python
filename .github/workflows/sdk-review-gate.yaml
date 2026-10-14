@@ -8,6 +8,7 @@ jobs:
   check-sdk-review:
     name: SDK review label present
     runs-on: ubuntu-latest
+    if: github.actor != 'dependabot[bot]'
     permissions:
       contents: read
       pull-requests: read

@@ -13,7 +13,7 @@ import pytest
 from pytest_bdd import given, scenario, then, when
 
 from sap_cloud_sdk.cbc import ConfigData, ConsumptionVersions, EntityData
-from sap_cloud_sdk.cbc.client import DefaultClient
+from sap_cloud_sdk.cbc.client import CBCClient
 
 pytestmark = pytest.mark.integration
 
@@ -68,17 +68,17 @@ def test_get_entity_data_returns_entity_data():
 
 
 @given("a configured CBC client and tenant context")
-def cbc_context(cbc_client: DefaultClient, cbc_app_tenant_id: str):
+def cbc_context(cbc_client: CBCClient, cbc_app_tenant_id: str):
     pass
 
 
 @when("I call get_consumption_versions")
-def call_get_consumption_versions(ctx: dict, cbc_client: DefaultClient):
+def call_get_consumption_versions(ctx: dict, cbc_client: CBCClient):
     ctx["versions"] = cbc_client.get_consumption_versions()
 
 
 @when("I call get_configuration")
-def call_get_configuration(ctx: dict, cbc_client: DefaultClient):
+def call_get_configuration(ctx: dict, cbc_client: CBCClient):
     ctx["config"] = cbc_client.get_configuration()
 
 
@@ -140,7 +140,7 @@ def assert_entity_data_accessible(ctx: dict):
 
 
 @when("I call get_entity_data for the first entity in the first config object")
-def call_get_entity_data(ctx: dict, cbc_client: DefaultClient):
+def call_get_entity_data(ctx: dict, cbc_client: CBCClient):
     config: ConfigData = cbc_client.get_configuration()
     assert config.config_objects, "no config objects — cannot test get_entity_data"
     co = config.config_objects[0]

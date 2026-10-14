@@ -10,11 +10,11 @@ Quick start::
 
     from sap_cloud_sdk import cbc
 
-    cbc_client = cbc.create_client(
-        base_url=lambda: resolve_cbc_url(),
-        app_tenant_id=lambda: resolve_app_tenant_id(),
-        ssl_context=lambda: build_ssl_ctx(),
-    )
+    # Infers everything from provisioning: the app tenant id and subdomain come
+    # from the SDK runtime context (wire bootstrap(app) once at startup), the CBC
+    # URL from the tenant-mapping Destination Fragment, and the mTLS certificate
+    # from the Destination Service.
+    cbc_client = cbc.create_client()
     config = cbc_client.get_configuration()
 
     # Access entity data
@@ -23,30 +23,18 @@ Quick start::
         for row in payment.get_entity_data("payment-mode").as_list():
             print(row)
 
-Apps running on the SAP application platform can use
-:func:`~sap_cloud_sdk.cbc.client_adapter.create_agent_client` instead, which supplies the
-two resolvers and the mTLS context from the platform's provisioning conventions
-— see the CBC user guide.
+To override any individual piece (e.g. for local development or tests), pass a
+:class:`~sap_cloud_sdk.cbc.config.CBCConfig` — see the CBC user guide.
 """
 
 from __future__ import annotations
 
 from sap_cloud_sdk.cbc.client import (
     CBCClient,
-    DefaultClient,
     create_client,
 )
-from sap_cloud_sdk.cbc.client_adapter import (
-    CBC_FRAGMENT_PREFIX,
-    app_tenant_id_var,
-    create_agent_client,
-    load_ssl_context,
-    resolve_app_tenant_id,
-    resolve_base_url,
-    tenant_subdomain_var,
-)
 from sap_cloud_sdk.cbc.config import (
-    CBCDestinationConfig,
+    CBCConfig,
 )
 from sap_cloud_sdk.cbc.exceptions import (
     CBCError,
@@ -70,21 +58,12 @@ from sap_cloud_sdk.cbc._models import (
 
 
 __all__ = [
-    # factories
+    # factory
     "create_client",
-    "create_agent_client",
-    # clients
+    # client
     "CBCClient",
-    "DefaultClient",
-    # platform adapter
-    "app_tenant_id_var",
-    "tenant_subdomain_var",
-    "CBC_FRAGMENT_PREFIX",
-    "CBCDestinationConfig",
-    # platform resolvers (compose with create_client to override one axis)
-    "resolve_base_url",
-    "resolve_app_tenant_id",
-    "load_ssl_context",
+    # configuration
+    "CBCConfig",
     # exceptions
     "CBCError",
     "CBCClientError",

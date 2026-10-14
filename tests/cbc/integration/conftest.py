@@ -19,7 +19,7 @@ import ssl
 
 import pytest
 
-from sap_cloud_sdk.cbc import CBCClient, create_client
+from sap_cloud_sdk.cbc import CBCClient, CBCConfig, create_client
 
 ENV_URL = "CLOUD_SDK_CBC_URL"
 ENV_APP_TENANT_ID = "CLOUD_SDK_CBC_APP_TENANT_ID"
@@ -58,7 +58,9 @@ def cbc_client() -> CBCClient:
         pytest.skip(f"CBC integration tests skipped — set {ENV_URL}.")
     ctx = _build_ssl_context()
     return create_client(
-        base_url=lambda: url,
-        app_tenant_id=lambda: app_tid,
-        ssl_context=(lambda: ctx) if ctx is not None else None,
+        CBCConfig(
+            base_url=url,
+            app_tenant_id=app_tid,
+            ssl_context=(lambda: ctx) if ctx is not None else None,
+        )
     )

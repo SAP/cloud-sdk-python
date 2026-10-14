@@ -1,37 +1,38 @@
-"""CBC client implementations for reading business configuration from CBC.
+"""CBC client for reading business configuration from CBC.
 
 This module provides:
 
-- :class:`CBCClient` — Protocol defining the client interface; use for type
-  annotations and test doubles.
-- :class:`DefaultClient` — Production client using mTLS against the CBC service.
-- :func:`create_client` — Thin factory over :class:`DefaultClient`.
+- :class:`CBCClient` — the CBC client; reads tenant-specific business
+  configuration from the CBC service over mTLS.
+- :func:`create_client` — the factory. Call it with no arguments to infer
+  everything from the application-platform provisioning conventions, or pass a
+  :class:`~sap_cloud_sdk.cbc.config.CBCConfig` to override individual pieces.
 
-``base_url`` and ``app_tenant_id`` are supplied as callables, invoked on every
-request. In a multi-tenant agent the CBC URL and the application tenant id both
-vary per request (resolved from request-scoped context), so the client never
-binds them at construction time.
+By default the client derives, per request, the CBC URL and the application
+tenant id from the SDK-wide runtime context
+(:mod:`sap_cloud_sdk.core.runtime_context`, populated once at startup by
+``bootstrap(app)``), and loads the app's provider-level mTLS certificate from
+the Destination Service. The certificate is reloaded automatically on a TLS
+handshake failure, so a long-lived client recovers from certificate rotation
+without being recreated.
 
 Quick start::
 
     from sap_cloud_sdk import cbc
 
-    cbc_client = cbc.create_client(
-        base_url=lambda: resolve_cbc_url(),
-        app_tenant_id=lambda: resolve_app_tenant_id(),
-        ssl_context=lambda: build_ssl_ctx(),
-    )
+    cbc_client = cbc.create_client()   # infer everything from provisioning
     config = cbc_client.get_configuration()
 """
 
 from __future__ import annotations
 
 import logging
+import os
 import ssl
 import threading
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any, Protocol
+from typing import Any
 
 import httpx
 
@@ -44,15 +45,55 @@ from sap_cloud_sdk.cbc._models import (
     ConsumptionVersions,
     EntityData,
 )
+from sap_cloud_sdk.cbc.config import CBCConfig
 from sap_cloud_sdk.cbc.exceptions import (
     CBCClientError,
+    CBCConfigError,
     CBCNetworkError,
     CBCServerError,
     HttpContext,
 )
+from sap_cloud_sdk.core.runtime_context import (
+    APP_TENANT_ID,
+    DWC_SUBDOMAIN,
+    get_context,
+)
 from sap_cloud_sdk.core.telemetry import Module, Operation, record_metrics
 
 logger = logging.getLogger(__name__)
+
+
+# ---------------------------------------------------------------------------
+# Platform provisioning conventions
+# ---------------------------------------------------------------------------
+# The fragment prefix and certificate name below follow the application-platform
+# convention; they are not arbitrary. Override via CBCConfig / env vars if your
+# setup differs.
+
+#: Prefix of the Destination Fragment that maps a subdomain to its CBC tenant
+#: (platform convention).
+CBC_FRAGMENT_PREFIX = "CBC_TenantMapping_"
+
+#: Template for the app's own provider-level mTLS certificate name
+#: (platform convention).
+_CERT_NAME_TEMPLATE = "sap-managed-runtime-ias-{landscape}.pem"
+
+# Env overrides — the defaults cover the common case; set these only to override.
+
+#: The ``instance`` passed to the destination ``create_fragment_client`` /
+#: ``create_certificate_client`` (used for secret resolution in cloud mode,
+#: defaults to "default"); it is not the individual destination / cert /
+#: fragment, which are selected by name.
+ENV_DESTINATION_INSTANCE = "CLOUD_SDK_CBC_DESTINATION_INSTANCE"
+
+#: Explicit certificate name, overriding the landscape-derived default.
+ENV_CERT_NAME = "CLOUD_SDK_CBC_CERTIFICATE_NAME"
+
+#: Password for the certificate keystore, if encrypted (default: none).
+ENV_P12_PASSWORD = "CLOUD_SDK_CBC_P12_PASSWORD"
+
+#: Platform landscape, used to derive the default certificate name.
+ENV_LANDSCAPE = "APPFND_CONHOS_LANDSCAPE"
 
 
 def _is_tls_failure(exc: BaseException) -> bool:
@@ -76,114 +117,28 @@ def _is_tls_failure(exc: BaseException) -> bool:
 
 
 # ---------------------------------------------------------------------------
-# Public Protocol (interface for type annotations and test doubles)
-# ---------------------------------------------------------------------------
-
-
-class CBCClient(Protocol):
-    """Interface for reading business configuration from CBC.
-
-    Implement this Protocol to substitute :class:`DefaultClient` with a test
-    double, offline stub, or alternative production client.
-    """
-
-    def get_consumption_versions(self) -> ConsumptionVersions:
-        """Return the available consumption versions for the configured tenant.
-
-        A consumption version represents a snapshot of the business configuration
-        for an app tenant at a point in time. Use this to discover the active
-        version ID when you don't already have it.
-
-        Returns:
-            :class:`ConsumptionVersions` containing the list of available versions.
-
-        Raises:
-            CBCClientError: On 4xx responses.
-            CBCServerError: On 5xx responses.
-            CBCNetworkError: On connection failures.
-        """
-        ...
-
-    def get_configuration(
-        self,
-        consumption_version: str | None = None,
-    ) -> ConfigData:
-        """Return the business configuration for all entities in one call.
-
-        When ``consumption_version`` is omitted, the latest version is resolved
-        automatically via :meth:`get_consumption_versions`.
-
-        Args:
-            consumption_version: Consumption version ID. When ``None``, the
-                latest version is resolved automatically.
-
-        Returns:
-            :class:`ConfigData` containing all config objects and their entities.
-
-        Raises:
-            CBCClientError: On 4xx responses, or when no consumption version
-                exists for the tenant and ``consumption_version`` was not provided.
-            CBCServerError: On 5xx responses.
-            CBCNetworkError: On connection failures.
-        """
-        ...
-
-    def get_entity_data(
-        self,
-        config_object_id: str,
-        entity_id: str,
-        consumption_version: str | None = None,
-    ) -> EntityData:
-        """Return the data for a single entity without fetching all configuration.
-
-        When ``consumption_version`` is omitted, the latest version is resolved
-        automatically via :meth:`get_consumption_versions`.
-
-        Args:
-            config_object_id: Authored config object identifier (e.g. ``"payment-config"``).
-            entity_id: Authored entity identifier (e.g. ``"payment-mode"``).
-            consumption_version: Consumption version ID. When ``None``, the
-                latest version is resolved automatically.
-
-        Returns:
-            :class:`EntityData` for the entity.
-
-        Raises:
-            CBCClientError: On 4xx responses, or when no consumption version
-                exists for the tenant and ``consumption_version`` was not provided.
-            CBCServerError: On 5xx responses.
-            CBCNetworkError: On connection failures.
-        """
-        ...
-
-
-# ---------------------------------------------------------------------------
 # Internal config dataclass
 # ---------------------------------------------------------------------------
 
 
 @dataclass(frozen=True)
 class _ApiPaths:
-    """API path configuration for a :class:`DefaultClient` instance."""
+    """API path configuration for a :class:`CBCClient` instance."""
 
     configurations_path: str
 
 
 # ---------------------------------------------------------------------------
-# DefaultClient
+# CBCClient
 # ---------------------------------------------------------------------------
 
 
-class DefaultClient:
-    """CBC client implementation.
+class CBCClient:
+    """Client for reading business configuration from CBC.
 
     Prefer :func:`create_client` over direct instantiation::
 
-        cbc_client = cbc.create_client(
-            base_url=lambda: resolve_cbc_url(),
-            app_tenant_id=lambda: resolve_app_tenant_id(),
-            ssl_context=lambda: build_ssl_ctx(),
-        )
+        cbc_client = cbc.create_client()
 
     Direct instantiation is supported for testing (inject a mock ``http_client``).
 
@@ -245,7 +200,7 @@ class DefaultClient:
         """Close the underlying HTTP client and release connections."""
         self._http_client.close()
 
-    def __enter__(self) -> "DefaultClient":
+    def __enter__(self) -> "CBCClient":
         return self
 
     def __exit__(self, *args: Any) -> None:
@@ -261,6 +216,10 @@ class DefaultClient:
     @record_metrics(Module.CBC, Operation.CBC_GET_CONSUMPTION_VERSIONS)
     def get_consumption_versions(self) -> ConsumptionVersions:
         """Return available consumption versions for the configured tenant.
+
+        A consumption version represents a snapshot of the business configuration
+        for an app tenant at a point in time. Use this to discover the active
+        version ID when you don't already have it.
 
         Returns:
             :class:`ConsumptionVersions` with all versions for the tenant.
@@ -545,31 +504,251 @@ class DefaultClient:
 
 
 # ---------------------------------------------------------------------------
+# Default platform resolvers
+# ---------------------------------------------------------------------------
+# These encode the SAP application-platform provisioning convention: the app
+# tenant id and subdomain come from the SDK-wide runtime context (populated at
+# startup by bootstrap(app)); the CBC URL comes from the tenant-mapping Fragment
+# written during provisioning; the mTLS certificate comes from the Destination
+# Service. create_client wires these in whenever CBCConfig leaves the matching
+# field unset.
+
+
+def _resolve_app_tenant_id() -> str:
+    """Return the application tenant id from the SDK runtime context.
+
+    Reads :data:`~sap_cloud_sdk.core.runtime_context.APP_TENANT_ID` (the IAS
+    ``app_tid`` claim, populated by ``bootstrap(app)``). The application tenant
+    id identifies the subscriber tenant to CBC and is sent as the ``appTenantId``
+    query parameter.
+
+    Raises:
+        CBCConfigError: If no app tenant id is present in the runtime context.
+    """
+    app_tid = get_context().get(APP_TENANT_ID)
+    if not app_tid:
+        raise CBCConfigError(
+            "No app tenant id in the runtime context — ensure bootstrap(app) is "
+            "wired so the IAS app_tid claim is populated, or override app_tenant_id "
+            "on CBCConfig."
+        )
+    return app_tid
+
+
+def _resolve_base_url(destination_instance: str) -> str:
+    """Return the CBC base URL for the current tenant.
+
+    Reads the subscriber subdomain from the SDK runtime context
+    (:data:`~sap_cloud_sdk.core.runtime_context.DWC_SUBDOMAIN`), fetches the
+    tenant-mapping Fragment for that subdomain directly by name
+    (``CBC_TenantMapping_<subdomain>``), and returns its ``cbcUrl`` property
+    verbatim.
+
+    Args:
+        destination_instance: The ``instance`` passed to the destination
+            ``create_fragment_client`` (selects which Destination Service binding
+            to read, used for secret resolution in cloud mode).
+
+    Raises:
+        CBCConfigError: If the subdomain is absent from the runtime context, no
+            matching fragment is found, or the matched fragment has no ``cbcUrl``
+            property.
+    """
+    from sap_cloud_sdk.destination import AccessStrategy, create_fragment_client
+    from sap_cloud_sdk.destination.exceptions import DestinationError
+
+    subdomain = get_context().get(DWC_SUBDOMAIN)
+    if not subdomain:
+        raise CBCConfigError(
+            "No subdomain in the runtime context — ensure bootstrap(app) is wired "
+            "so the dwc-subdomain is populated, or override base_url on CBCConfig."
+        )
+
+    fragment_name = f"{CBC_FRAGMENT_PREFIX}{subdomain}"
+    try:
+        client = create_fragment_client(instance=destination_instance)
+        fragment = client.get_subaccount_fragment(
+            fragment_name,
+            access_strategy=AccessStrategy.SUBSCRIBER_ONLY,
+            tenant=subdomain,
+        )
+    except DestinationError as exc:
+        raise CBCConfigError(
+            f"Could not resolve the CBC URL: fetching tenant-mapping fragment "
+            f"{fragment_name!r} failed for subdomain={subdomain!r}: {exc}"
+        ) from exc
+    if fragment is None:
+        raise CBCConfigError(
+            f"No CBC mapping fragment for subdomain={subdomain!r}: "
+            f"{fragment_name!r} not found."
+        )
+    cbc_url = fragment.properties.get("cbcUrl")
+    if not cbc_url:
+        raise CBCConfigError(
+            f"CBC mapping fragment {fragment.name!r} has no 'cbcUrl' property."
+        )
+    return cbc_url
+
+
+def _load_ssl_context(
+    destination_instance: str, cert_name: str, p12_password: bytes | None
+) -> ssl.SSLContext:
+    """Fetch the provider certificate and load it into an :class:`ssl.SSLContext`.
+
+    Args:
+        destination_instance: The ``instance`` passed to the destination
+            ``create_certificate_client`` (selects which Destination Service
+            binding to read, used for secret resolution in cloud mode).
+        cert_name: Name of the subaccount certificate to fetch.
+        p12_password: Certificate keystore password, or ``None`` if unencrypted.
+
+    Raises:
+        CBCConfigError: If the certificate cannot be fetched or is not found.
+    """
+    from sap_cloud_sdk.destination import AccessStrategy, create_certificate_client
+    from sap_cloud_sdk.destination._cert_loader import _load_pem
+    from sap_cloud_sdk.destination.exceptions import DestinationError
+
+    try:
+        cert = create_certificate_client(
+            instance=destination_instance
+        ).get_subaccount_certificate(
+            cert_name, access_strategy=AccessStrategy.PROVIDER_ONLY
+        )
+    except DestinationError as exc:
+        raise CBCConfigError(
+            f"Could not fetch the mTLS certificate {cert_name!r} from Destination "
+            f"Service instance {destination_instance!r}: {exc}"
+        ) from exc
+    if cert is None:
+        raise CBCConfigError(
+            f"Subaccount certificate {cert_name!r} not found in Destination "
+            f"Service instance {destination_instance!r}."
+        )
+    return _load_pem(cert.content, p12_password, cert.name)
+
+
+def _default_cert_name() -> str:
+    """Return the name of the app's provider-level mTLS certificate.
+
+    This is the certificate the app presents to CBC for the mTLS handshake; its
+    name follows the platform convention :data:`_CERT_NAME_TEMPLATE`, with the
+    landscape filled in from :data:`ENV_LANDSCAPE`.
+
+    Raises:
+        CBCConfigError: If :data:`ENV_LANDSCAPE` is not set, so the name cannot
+            be derived.
+    """
+    landscape = os.environ.get(ENV_LANDSCAPE)
+    if not landscape:
+        raise CBCConfigError(
+            f"Cannot derive the CBC certificate name: {ENV_LANDSCAPE} is not set. "
+            f"Set it, or pass cbc_cert_name on CBCConfig."
+        )
+    return _CERT_NAME_TEMPLATE.format(landscape=landscape)
+
+
+def _cert_password_from_env() -> bytes | None:
+    """Return the cert keystore password from :data:`ENV_P12_PASSWORD`, or ``None``."""
+    raw = os.environ.get(ENV_P12_PASSWORD)
+    return raw.encode() if raw else None
+
+
+def _as_callable(value: str | Callable[[], str]) -> Callable[[], str]:
+    """Return ``value`` as a callable — wrap a plain string in a lambda."""
+    if isinstance(value, str):
+        return lambda: value
+    return value
+
+
+# ---------------------------------------------------------------------------
 # Factory function
 # ---------------------------------------------------------------------------
 
 
-def create_client(
-    *,
-    base_url: Callable[[], str],
-    app_tenant_id: Callable[[], str],
-    ssl_context: Callable[[], ssl.SSLContext] | None = None,
-) -> CBCClient:
-    """Create a :class:`DefaultClient`.
+def create_client(config: CBCConfig | None = None) -> CBCClient:
+    """Create a CBC client.
+
+    Called with no arguments, the client infers everything from the SAP
+    application-platform provisioning conventions:
+
+    - ``app_tenant_id`` and the subscriber subdomain come from the SDK-wide
+      runtime context (populated once at startup by ``bootstrap(app)``);
+    - the CBC URL comes from the tenant-mapping Destination Fragment written
+      during provisioning;
+    - the mTLS certificate comes from the Destination Service, reloaded
+      automatically on a TLS handshake failure (certificate rotation).
+
+    Pass a :class:`~sap_cloud_sdk.cbc.config.CBCConfig` to override any individual
+    piece. Each override wins over its ``CLOUD_SDK_CBC_*`` env var, which in turn
+    falls back to the platform default. Note that the mTLS certificate loader is
+    the default **only** in pure provisioning mode: once ``base_url`` or
+    ``app_tenant_id`` is overridden (e.g. pointing at a local mock), an unset
+    ``ssl_context`` means plain HTTPS — set ``ssl_context`` explicitly if you still
+    need a client certificate.
 
     Args:
-        base_url: Callable returning the CBC service base URL, invoked per request.
-        app_tenant_id: Callable returning the application tenant id, invoked per
-            request and sent as the ``appTenantId`` query parameter.
-        ssl_context: Optional callable returning a freshly-built
-            :class:`ssl.SSLContext` with mTLS loaded. Resolved once at
-            construction, then re-invoked only on a TLS handshake failure to
-            reload a rotated certificate.
+        config: Optional overrides. Leave ``None`` to infer everything from
+            provisioning. Set ``base_url`` / ``app_tenant_id`` / ``ssl_context``
+            to bypass the corresponding default resolver; set
+            ``destination_instance`` / ``cbc_cert_name`` / ``p12_password`` to
+            steer the default certificate / fragment lookup. See
+            :class:`~sap_cloud_sdk.cbc.config.CBCConfig`.
 
     Returns:
-        A configured :class:`DefaultClient`.
+        A configured :class:`CBCClient`.
+
+    Raises:
+        CBCConfigError: If the certificate name cannot be resolved, or — when a
+            request is made — if the certificate cannot be fetched, the runtime
+            context is missing the tenant id / subdomain, or the tenant-mapping
+            fragment is missing.
     """
-    return DefaultClient(
+    if config is None:
+        config = CBCConfig()
+
+    destination_instance = config.destination_instance
+    if destination_instance is None:
+        destination_instance = os.environ.get(ENV_DESTINATION_INSTANCE, "default")
+
+    # app_tenant_id — explicit override else the runtime-context resolver.
+    if config.app_tenant_id is not None:
+        app_tenant_id = _as_callable(config.app_tenant_id)
+    else:
+        app_tenant_id = _resolve_app_tenant_id
+
+    # base_url — explicit override else the tenant-mapping fragment resolver.
+    if config.base_url is not None:
+        base_url = _as_callable(config.base_url)
+    else:
+        base_url = lambda: _resolve_base_url(destination_instance)  # noqa: E731
+
+    # ssl_context — explicit override else the Destination-Service cert loader.
+    # The mTLS loader is the default only in pure provisioning mode (neither
+    # base_url nor app_tenant_id overridden). Once a caller supplies either axis
+    # — e.g. pointing at a local mock — an unset ssl_context means plain HTTPS
+    # (public CA bundle, no client cert), so they are not forced to also set the
+    # platform landscape env or carry a certificate. The default loader resolves
+    # the certificate name/password lazily, inside the factory, consistent with
+    # the other default resolvers that only touch provisioning when invoked.
+    if config.ssl_context is not None:
+        ssl_context: Callable[[], ssl.SSLContext] | None = config.ssl_context
+    elif config.base_url is not None or config.app_tenant_id is not None:
+        ssl_context = None
+    else:
+        cfg_cert_name = config.cbc_cert_name
+        cfg_password = config.p12_password
+
+        def ssl_context() -> ssl.SSLContext:
+            cert_name = (
+                cfg_cert_name or os.environ.get(ENV_CERT_NAME) or _default_cert_name()
+            )
+            password = (
+                cfg_password if cfg_password is not None else _cert_password_from_env()
+            )
+            return _load_ssl_context(destination_instance, cert_name, password)
+
+    return CBCClient(
         base_url=base_url,
         app_tenant_id=app_tenant_id,
         ssl_context=ssl_context,

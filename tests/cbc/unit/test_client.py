@@ -1,4 +1,4 @@
-"""Unit tests for DefaultClient and create_client."""
+"""Unit tests for CBCClient and create_client."""
 
 from __future__ import annotations
 
@@ -11,7 +11,8 @@ import json
 import pytest
 import ssl
 
-from sap_cloud_sdk.cbc.client import DefaultClient, create_client, _is_tls_failure
+from sap_cloud_sdk.cbc.client import CBCClient, create_client, _is_tls_failure
+from sap_cloud_sdk.cbc.config import CBCConfig
 from sap_cloud_sdk.cbc.exceptions import (
     CBCClientError,
     CBCConfigError,
@@ -48,9 +49,9 @@ def _mock_response(
 def _make_client(
     base_url: str = "https://cbc.example.ondemand.com",
     app_tenant_id: Callable[[], str] | None = None,
-) -> tuple[DefaultClient, MagicMock]:
+) -> tuple[CBCClient, MagicMock]:
     mock_http = MagicMock(spec=httpx.Client)
-    client = DefaultClient(
+    client = CBCClient(
         base_url=lambda: base_url,
         app_tenant_id=app_tenant_id or _app_tid(),
         http_client=mock_http,
@@ -59,7 +60,7 @@ def _make_client(
 
 
 # ---------------------------------------------------------------------------
-# DefaultClient — app_tenant_id callable
+# CBCClient — app_tenant_id callable
 # ---------------------------------------------------------------------------
 
 
@@ -76,7 +77,7 @@ class TestAppTenantIdCallable:
         mock_http.request.return_value = _mock_response(
             json_body={"items": [{"version": "cv1"}]}
         )
-        client = DefaultClient(
+        client = CBCClient(
             base_url=lambda: "https://cbc.example.ondemand.com",
             app_tenant_id=app_tenant_id_fn,
             http_client=mock_http,
@@ -87,7 +88,7 @@ class TestAppTenantIdCallable:
 
 
 # ---------------------------------------------------------------------------
-# DefaultClient — URL building
+# CBCClient — URL building
 # ---------------------------------------------------------------------------
 
 
@@ -104,7 +105,7 @@ class TestConfigurationsUrl:
 
 
 # ---------------------------------------------------------------------------
-# DefaultClient — get_consumption_versions
+# CBCClient — get_consumption_versions
 # ---------------------------------------------------------------------------
 
 
@@ -141,7 +142,7 @@ class TestGetConsumptionVersions:
 
 
 # ---------------------------------------------------------------------------
-# DefaultClient — _get_configuration_objects
+# CBCClient — _get_configuration_objects
 # ---------------------------------------------------------------------------
 
 
@@ -177,7 +178,7 @@ class TestGetConfigurationObjects:
 
 
 # ---------------------------------------------------------------------------
-# DefaultClient — _fetch_entity_data
+# CBCClient — _fetch_entity_data
 # ---------------------------------------------------------------------------
 
 
@@ -234,7 +235,7 @@ class TestFetchEntityData:
 
 
 # ---------------------------------------------------------------------------
-# DefaultClient — get_configuration
+# CBCClient — get_configuration
 # ---------------------------------------------------------------------------
 
 
@@ -292,7 +293,7 @@ class TestGetConfiguration:
             return "https://cbc.example.ondemand.com"
 
         mock_http = MagicMock(spec=httpx.Client)
-        client = DefaultClient(
+        client = CBCClient(
             base_url=base_url_fn,
             app_tenant_id=_app_tid(),
             http_client=mock_http,
@@ -326,7 +327,7 @@ class TestGetConfiguration:
 
 
 # ---------------------------------------------------------------------------
-# DefaultClient — get_entity_data
+# CBCClient — get_entity_data
 # ---------------------------------------------------------------------------
 
 
@@ -371,11 +372,11 @@ class TestGetEntityData:
 
 
 # ---------------------------------------------------------------------------
-# DefaultClient — context manager
+# CBCClient — context manager
 # ---------------------------------------------------------------------------
 
 
-class TestDefaultClientContextManager:
+class TestCBCClientContextManager:
     def test_context_manager_on_exit_closes_http_client(self):
         client, mock_http = _make_client()
         with client:
@@ -384,28 +385,48 @@ class TestDefaultClientContextManager:
 
 
 # ---------------------------------------------------------------------------
-# create_client
+# create_client — override path (CBCConfig axes)
 # ---------------------------------------------------------------------------
 
 
 class TestCreateClient:
-    def test_create_client_with_required_args_returns_default_client(self):
+    def test_create_client_with_base_url_and_app_tenant_id_overrides_returns_client(self):
         client = create_client(
-            base_url=lambda: "http://localhost:8001",
-            app_tenant_id=lambda: "app-t1",
+            CBCConfig(
+                base_url="http://localhost:8001",
+                app_tenant_id="app-t1",
+            )
         )
-        assert isinstance(client, DefaultClient)
+        assert isinstance(client, CBCClient)
+        # String overrides are wrapped into callables and resolved per request.
+        assert client._base_url() == "http://localhost:8001"
+        assert client._resolve_app_tenant_id() == "app-t1"
 
-    def test_create_client_with_ssl_context_passes_it_through_to_default_client(self):
-        import ssl
+    def test_create_client_with_callable_overrides_are_invoked_per_request(self):
+        client = create_client(
+            CBCConfig(
+                base_url=lambda: "https://cbc.example.ondemand.com",
+                app_tenant_id=lambda: "app-t1",
+            )
+        )
+        assert isinstance(client, CBCClient)
+        assert client._base_url() == "https://cbc.example.ondemand.com"
+        assert client._resolve_app_tenant_id() == "app-t1"
 
+    def test_create_client_with_ssl_context_override_passes_it_through(self):
         ctx = ssl.create_default_context()
         client = create_client(
-            base_url=lambda: "https://cbc.example.ondemand.com",
-            app_tenant_id=lambda: "app-t1",
-            ssl_context=lambda: ctx,
+            CBCConfig(
+                base_url="https://cbc.example.ondemand.com",
+                app_tenant_id="app-t1",
+                ssl_context=lambda: ctx,
+            )
         )
-        assert isinstance(client, DefaultClient)
+        assert isinstance(client, CBCClient)
+        factory = client._ssl_factory
+        assert factory is not None
+        assert factory() is ctx
+
 
 
 # ---------------------------------------------------------------------------
@@ -440,15 +461,15 @@ class TestIsTlsFailure:
 
 
 # ---------------------------------------------------------------------------
-# DefaultClient — mTLS certificate rotation (reactive rebuild)
+# CBCClient — mTLS certificate rotation (reactive rebuild)
 # ---------------------------------------------------------------------------
 
 
 class TestCertRotation:
     def _rotating_client(
         self, factory: Callable[[], ssl.SSLContext]
-    ) -> tuple[DefaultClient, list[MagicMock]]:
-        """A DefaultClient whose _build_http_client hands out fresh mock http clients.
+    ) -> tuple[CBCClient, list[MagicMock]]:
+        """A CBCClient whose _build_http_client hands out fresh mock http clients.
 
         Each rebuild appends a new mock to the returned list, so a test can
         assert how many times (and with what behaviour) the client was rebuilt.
@@ -466,7 +487,7 @@ class TestCertRotation:
 
         initial = MagicMock(spec=httpx.Client)
         built.append(initial)
-        client = DefaultClient(
+        client = CBCClient(
             base_url=lambda: "https://cbc.example.ondemand.com",
             app_tenant_id=_app_tid(),
             http_client=initial,
@@ -540,7 +561,7 @@ class TestCertRotation:
     def test_cert_rotation_without_ssl_factory_does_not_rebuild_client(self):
         mock_http = MagicMock(spec=httpx.Client)
         mock_http.request.side_effect = _tls_read_error()
-        client = DefaultClient(
+        client = CBCClient(
             base_url=lambda: "https://cbc.example.ondemand.com",
             app_tenant_id=_app_tid(),
             http_client=mock_http,
@@ -563,7 +584,7 @@ class TestCertRotation:
 
         mock_http = MagicMock(spec=httpx.Client)
         mock_http.request.side_effect = _tls_read_error()
-        client = DefaultClient(
+        client = CBCClient(
             base_url=lambda: "https://cbc.example.ondemand.com",
             app_tenant_id=_app_tid(),
             http_client=mock_http,

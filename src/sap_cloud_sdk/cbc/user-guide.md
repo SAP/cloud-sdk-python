@@ -20,28 +20,28 @@ object has one or more related entities; each entity has a stable authored `id`
 
 ## Setup
 
-`base_url` and `app_tenant_id` are supplied as callables, invoked on every
-request. In a multi-tenant agent both the CBC URL and the application tenant id
-vary per request (resolved from request-scoped context), so the client never
-binds them at construction time.
+The recommended entry point is `create_client()` with no arguments. On the SAP
+application platform it infers everything from provisioning:
+
+- the application tenant id and the subscriber subdomain come from the SDK-wide
+  runtime context (wire `bootstrap(app)` once at startup — see below);
+- the CBC URL comes from the tenant-mapping Destination Fragment written during
+  provisioning;
+- the mTLS certificate comes from the Destination Service.
 
 ```python
 from sap_cloud_sdk import cbc
 
-cbc_client = cbc.create_client(
-    base_url=lambda: resolve_cbc_url(),
-    app_tenant_id=lambda: resolve_app_tenant_id(),
-    ssl_context=lambda: build_ssl_ctx(),
-)
+cbc_client = cbc.create_client()
+config = cbc_client.get_configuration()
 ```
 
-`ssl_context` is a callable returning a fresh `ssl.SSLContext`. It is resolved
-once when the client is built and re-invoked only if a request fails the TLS
-handshake, so a rotated certificate is picked up automatically on the next call.
+The mTLS context is resolved once when the client is built and re-invoked only if
+a request fails the TLS handshake, so a rotated certificate is picked up
+automatically on the next call.
 
-Apps or agents running on the SAP application foundation platform can use `create_agent_client`
-instead — it supplies both resolvers and the mTLS context from the platform's
-provisioning conventions. See [Platform setup](#platform-setup).
+To override any individual piece — for local development, tests, or a bespoke
+deployment — pass a `CBCConfig`. See [Overrides](#overrides).
 
 ## Reading configuration
 
@@ -147,7 +147,7 @@ modes = cbc_client.get_entity_data(
 | `CBCClientError` | 4xx from CBC (e.g. tenant not found) |
 | `CBCServerError` | 5xx from CBC |
 | `CBCNetworkError` | connection failure |
-| `CBCConfigError` | platform adapter cannot resolve the tenant mapping or certificate |
+| `CBCConfigError` | the client cannot resolve the tenant mapping or certificate from provisioning |
 
 ```python
 from sap_cloud_sdk import cbc
@@ -162,11 +162,10 @@ except cbc.CBCNetworkError:
 
 ## Platform setup
 
-Apps running on the SAP application platform can skip wiring the two resolvers by
-hand. `create_agent_client` supplies them from the platform's provisioning
-conventions: it reads the application tenant id and tenant subdomain from two
-SDK-owned `ContextVar`s, resolves the CBC URL from the tenant's Destination
-Fragment, and loads the mTLS certificate from the Destination Service.
+On the SAP application platform `create_client()` needs no arguments. It reads
+the application tenant id and the subscriber subdomain from the SDK-wide
+**runtime context**, resolves the CBC URL from the tenant's Destination Fragment,
+and loads the mTLS certificate from the Destination Service.
 
 The two artifacts it depends on follow the platform convention:
 
@@ -174,43 +173,46 @@ The two artifacts it depends on follow the platform convention:
 - the tenant-mapping **Fragment**, carrying the CBC URL (written by the platform
   during tenant provisioning).
 
-Populate the two ContextVars from your request context — the SDK owns the vars,
-your app owns *how* they are filled (e.g. from the IAS JWT `app_tid` claim
-and the `dwc-subdomain` header, though the SDK does not mandate the source).
+The runtime context is populated once at startup via `bootstrap(app)`; CBC then
+reads `APP_TENANT_ID` and `DWC_SUBDOMAIN` from it per request. You do not set any
+CBC-specific context by hand.
 
 ```python
-from sap_cloud_sdk import cbc
+from sap_cloud_sdk import bootstrap, cbc
+
+bootstrap(app)  # wires the runtime context (IAS app_tid, dwc-subdomain, …)
 
 # once, at startup — the mTLS context is built here
-cbc_client = cbc.create_agent_client()
+cbc_client = cbc.create_client()
 
-# per request
-cbc.app_tenant_id_var.set(parse_token(bearer).app_tid)  # "5649a2cf-..."
-cbc.tenant_subdomain_var.set(request.headers["dwc-subdomain"])  # "subscriber-abc"
+# per request: nothing CBC-specific to set — the runtime context already carries
+# the app tenant id and subdomain for the current request.
+config = cbc_client.get_configuration()
 ```
 
 The CBC URL comes from the `cbcUrl` property of the tenant-mapping fragment. The
-adapter lists the `CBC_TenantMapping_*` fragments in the subscriber's subaccount
-and picks the one whose `appTenantId` property matches; the `cbcUrl` is used
-verbatim. The certificate is the app's own provider-level mTLS certificate,
-fetched from the Destination Service.
+client fetches the `CBC_TenantMapping_<subdomain>` fragment for the subscriber's
+subdomain directly by name and uses its `cbcUrl` verbatim. The certificate is the
+app's own provider-level mTLS certificate, fetched from the Destination Service.
 
 **Performance note.** The fragment lookup (Destination Service HTTP call) runs
 on every `get_configuration()` call, because the CBC URL is resolved fresh each
-time via the `base_url` callable. For high-throughput agents making frequent CBC
-calls, consider caching the resolved URL at the application layer (e.g. per
-tenant, invalidated on `CBCClientError` with a not-found code).
+time. For high-throughput agents making frequent CBC calls, consider caching the
+resolved URL at the application layer (e.g. per tenant, invalidated on
+`CBCClientError` with a not-found code).
 
 **Certificate rotation.** The mTLS certificate is loaded from the Destination
 Service and reloaded automatically when a request fails the TLS handshake (as
 happens once a certificate has rotated or expired): the client rebuilds its
 mTLS context from a freshly-fetched certificate and retries the request once. A
-long-lived `create_agent_client()` singleton therefore recovers from rotation on
-its own — no need to recreate it.
+long-lived `create_client()` singleton therefore recovers from rotation on its
+own — no need to recreate it.
 
-### Platform env overrides
+## Overrides
 
-Defaults cover the common case; override via env when needed:
+`create_client` accepts an optional `CBCConfig`. Any field left unset is inferred
+from provisioning; a field you set wins over its `CLOUD_SDK_CBC_*` env var, which
+in turn falls back to the platform default.
 
 | Variable | Default | Description |
 |---|---|---|
@@ -219,47 +221,51 @@ Defaults cover the common case; override via env when needed:
 | `CLOUD_SDK_CBC_DESTINATION_INSTANCE` | `default` | The `instance` passed to the destination `create_fragment_client` / `create_certificate_client` (used for secret resolution in cloud mode) |
 | `CLOUD_SDK_CBC_P12_PASSWORD` | (none) | Password for the certificate keystore, if encrypted |
 
-The same three fields can be set in code via `cbc.CBCDestinationConfig`, passed as
-`create_agent_client(config=...)`; a value set on the config wins over its env var,
-and any field left unset falls back to the env var, then the default.
-
 ```python
 from sap_cloud_sdk import cbc
 
-cbc_client = cbc.create_agent_client(
-    config=cbc.CBCDestinationConfig(cbc_cert_name="my-cert.pem"),
+# steer the default certificate lookup
+cbc_client = cbc.create_client(
+    cbc.CBCConfig(cbc_cert_name="my-cert.pem"),
 )
 ```
 
-
-### Overriding one axis
-
-`create_agent_client` is a fixed preset: it wires all three inputs — `base_url`,
-`app_tenant_id`, and the mTLS `ssl_context` — from the platform conventions. To
-keep *most* of that but override a single axis (say, supply your own mTLS context
-from a vault while keeping the fragment-based `base_url` and the ContextVar
-`app_tenant_id`), compose the generic `create_client` with the public platform
-resolvers:
+`CBCConfig` also exposes three override hooks that replace a whole default
+resolver — `base_url`, `app_tenant_id` (each a string or a per-request callable),
+and `ssl_context`. Set only the axis you want to control:
 
 ```python
 from sap_cloud_sdk import cbc
 
+# e.g. supply your own mTLS context from a vault, keep provisioning for the rest
 client = cbc.create_client(
-    base_url=lambda: cbc.resolve_base_url("default"),
-    app_tenant_id=cbc.resolve_app_tenant_id,
-    ssl_context=lambda: my_ctx,  # your own mTLS, still reloaded on TLS failure
+    cbc.CBCConfig(ssl_context=lambda: my_ctx),
 )
 ```
 
-`resolve_base_url(destination_instance)`, `resolve_app_tenant_id`, and
-`load_ssl_context(destination_instance, cert_name, p12_password)` are the same
-resolvers the preset uses; mix in your own callable for the axis you want to
-control. The `ssl_context` callable you pass still participates in the automatic
+The `ssl_context` callable you pass still participates in the automatic
 reload-on-TLS-failure rotation described above.
+
+> **Note.** The mTLS loader is the default **only** in pure provisioning mode.
+> Once you override `base_url` or `app_tenant_id` (for example, to point at a
+> local mock), an unset `ssl_context` means plain HTTPS with the public CA bundle
+> — set `ssl_context` explicitly if you still need a client certificate.
+
+```python
+# local mock: plain HTTP, no certificate needed
+client = cbc.create_client(
+    cbc.CBCConfig(
+        base_url="http://localhost:8001",
+        app_tenant_id="my-app-tenant",
+    ),
+)
+```
 
 ## Using a test double
 
-`CBCClient` is a `Protocol` — implement it directly in tests:
+`create_client` returns a concrete `CBCClient`. For tests, inject a mock
+`httpx.Client` when constructing one directly, or substitute your own stub object
+that implements the three public methods:
 
 ```python
 from sap_cloud_sdk import cbc
@@ -273,6 +279,7 @@ class StubCBCClient:
             app_tenant_id="app-t1",
             config_objects=[],
         )
+    def get_entity_data(self, config_object_id, entity_id, consumption_version=None): ...
 
 
 def test_my_service():

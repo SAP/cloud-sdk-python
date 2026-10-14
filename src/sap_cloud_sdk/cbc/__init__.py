@@ -18,7 +18,7 @@ Quick start::
     config = cbc_client.get_configuration()
 
     # Access entity data
-    payment = config.get_config_object("payment-config")
+    payment = config.get_configuration_object("payment-config")
     if payment:
         for row in payment.get_entity_data("payment-mode").as_list():
             print(row)
@@ -47,13 +47,12 @@ from sap_cloud_sdk.cbc.exceptions import (
 )
 from sap_cloud_sdk.cbc._models import (
     ApiError,
-    ConfigData,
-    ConfigEntity,
-    ConfigObject,
+    ConfigurationData,
+    ConfigurationEntity,
+    ConfigurationObject,
     ConsumptionVersion,
     ConsumptionVersions,
     EntityData,
-    NNV,
 )
 
 
@@ -75,13 +74,12 @@ __all__ = [
     # models — consumption versions
     "ConsumptionVersion",
     "ConsumptionVersions",
-    "NNV",
     # models — entities
     "EntityData",
-    "ConfigEntity",
-    "ConfigObject",
+    "ConfigurationEntity",
+    "ConfigurationObject",
     # models — configuration
-    "ConfigData",
+    "ConfigurationData",
     # models — api error
     "ApiError",
 ]

@@ -38,10 +38,10 @@ import httpx
 
 from sap_cloud_sdk.cbc._models import (
     ApiError,
-    ConfigData,
-    ConfigEntity,
-    ConfigObject,
-    ConfigObjectList,
+    ConfigurationData,
+    ConfigurationEntity,
+    ConfigurationObject,
+    ConfigurationObjectList,
     ConsumptionVersions,
     EntityData,
 )
@@ -261,7 +261,7 @@ class CBCClient:
 
     def _get_configuration_objects(
         self, base_url: str, app_tenant_id: str, consumption_version: str
-    ) -> ConfigObjectList:
+    ) -> ConfigurationObjectList:
         """Return the config objects (with their entities) for the given version.
 
         The API returns config objects already grouped with their child entities,
@@ -273,7 +273,7 @@ class CBCClient:
             consumption_version: Consumption version ID.
 
         Returns:
-            :class:`ConfigObjectList` containing config objects and their entities.
+            :class:`ConfigurationObjectList` containing config objects and their entities.
 
         Raises:
             CBCClientError: On 4xx responses.
@@ -285,13 +285,13 @@ class CBCClient:
             f"/consumptionVersions/{consumption_version}/configurationObjects"
             f"?appTenantId={app_tenant_id}",
         )
-        return ConfigObjectList.model_validate(self._request("GET", url).json())
+        return ConfigurationObjectList.model_validate(self._request("GET", url).json())
 
     @record_metrics(Module.CBC, Operation.CBC_GET_CONFIGURATION)
     def get_configuration(
         self,
         consumption_version: str | None = None,
-    ) -> ConfigData:
+    ) -> ConfigurationData:
         """Return the full business configuration for the configured tenant.
 
         Fetches the config objects and the data for every entity they contain, for
@@ -304,7 +304,7 @@ class CBCClient:
                 latest version is resolved via :meth:`get_consumption_versions`.
 
         Returns:
-            :class:`ConfigData` containing all entity data for the version.
+            :class:`ConfigurationData` containing all entity data for the version.
 
         Raises:
             CBCClientError: On 4xx responses, or when no consumption version exists
@@ -326,15 +326,15 @@ class CBCClient:
         co_list = self._get_configuration_objects(
             base_url, app_tenant_id, consumption_version
         )
-        config_objects = [
-            ConfigObject(
-                config_object_id=entry.config_object_id,
+        configuration_objects = [
+            ConfigurationObject(
+                configuration_object_id=entry.configuration_object_id,
                 entities=[
                     self._fetch_entity_data(
                         base_url,
                         app_tenant_id,
                         consumption_version,
-                        entry.config_object_id,
+                        entry.configuration_object_id,
                         entity.entity_id,
                     )
                     for entity in entry.entities
@@ -342,16 +342,16 @@ class CBCClient:
             )
             for entry in co_list.items
         ]
-        return ConfigData(
+        return ConfigurationData(
             consumption_version=consumption_version,
             app_tenant_id=app_tenant_id,
-            config_objects=config_objects,
+            configuration_objects=configuration_objects,
         )
 
     @record_metrics(Module.CBC, Operation.CBC_GET_ENTITY_DATA)
     def get_entity_data(
         self,
-        config_object_id: str,
+        configuration_object_id: str,
         entity_id: str,
         consumption_version: str | None = None,
     ) -> EntityData:
@@ -362,7 +362,7 @@ class CBCClient:
         config object.
 
         Args:
-            config_object_id: Authored config object identifier (e.g. ``"payment-config"``).
+            configuration_object_id: Authored config object identifier (e.g. ``"payment-config"``).
             entity_id: Authored entity identifier (e.g. ``"payment-mode"``).
             consumption_version: Consumption version ID. When ``None``, the
                 latest version is resolved via :meth:`get_consumption_versions`.
@@ -387,7 +387,11 @@ class CBCClient:
                 )
             consumption_version = latest.version
         return self._fetch_entity_data(
-            base_url, app_tenant_id, consumption_version, config_object_id, entity_id
+            base_url,
+            app_tenant_id,
+            consumption_version,
+            configuration_object_id,
+            entity_id,
         ).data
 
     def _fetch_entity_data(
@@ -395,13 +399,13 @@ class CBCClient:
         base_url: str,
         app_tenant_id: str,
         consumption_version: str,
-        config_object_id: str,
+        configuration_object_id: str,
         entity_id: str,
-    ) -> ConfigEntity:
+    ) -> ConfigurationEntity:
         url = self._configurations_url(
             base_url,
             f"/consumptionVersions/{consumption_version}/configurationObjects"
-            f"/{config_object_id}/entities/{entity_id}/data"
+            f"/{configuration_object_id}/entities/{entity_id}/data"
             f"?appTenantId={app_tenant_id}",
         )
         body = self._request("GET", url).json()
@@ -414,7 +418,7 @@ class CBCClient:
             # ARRAY / UNSPECIFIED / absent — items may be absent or empty.
             raw_data = content.get("items", [])
 
-        return ConfigEntity(entity_id=entity_id, data=EntityData(raw_data))
+        return ConfigurationEntity(entity_id=entity_id, data=EntityData(raw_data))
 
     def _configurations_url(self, base_url: str, path: str = "") -> str:
         base = base_url.rstrip("/")

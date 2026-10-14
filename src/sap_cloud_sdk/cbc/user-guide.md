@@ -60,23 +60,23 @@ cv = versions.latest()  # or versions.items[0], or your own selection logic
 config = cbc_client.get_configuration(consumption_version=cv.version)
 ```
 
-### ConfigData structure
+### ConfigurationData structure
 
 ```
-ConfigData
+ConfigurationData
 ├── consumption_version: str          # e.g. "a0392d4f-72a9-..."
 ├── app_tenant_id: str
-└── config_objects: list[ConfigObject]
-    ├── ConfigObject
-    │   ├── config_object_id: str     # e.g. "payment-config"
-    │   └── entities: list[ConfigEntity]
-    │       └── ConfigEntity
+└── configuration_objects: list[ConfigurationObject]
+    ├── ConfigurationObject
+    │   ├── configuration_object_id: str     # e.g. "payment-config"
+    │   └── entities: list[ConfigurationEntity]
+    │       └── ConfigurationEntity
     │           ├── entity_id: str        # e.g. "payment-mode"
     │           └── data: EntityData   # .as_list() or .as_object()
-    └── ConfigObject
-        ├── config_object_id: str     # e.g. "agent-config"
-        └── entities: list[ConfigEntity]
-            └── ConfigEntity
+    └── ConfigurationObject
+        ├── configuration_object_id: str     # e.g. "agent-config"
+        └── entities: list[ConfigurationEntity]
+            └── ConfigurationEntity
                 ├── entity_id: str        # e.g. "contact"
                 └── data: EntityData   # .as_list() or .as_object()
 ```
@@ -84,23 +84,23 @@ ConfigData
 ### Iterate all config objects and entities
 
 ```python
-for co in config.config_objects:
+for co in config.configuration_objects:
     for ed in co.entities:
-        print(f"{co.config_object_id}/{ed.entity_id}")
+        print(f"{co.configuration_object_id}/{ed.entity_id}")
 ```
 
 ### Look up a specific entity
 
 ```python
-# From already-fetched ConfigData
+# From already-fetched ConfigurationData
 modes = config.get_entity_data("payment-config", "payment-mode")  # EntityData | None
 if modes:
     for row in modes.as_list():
         print(row["paymentModeCode"], row["name"])
 ```
 
-If you need all entities for one config object, use `get_config_object` to get the
-`ConfigObject` and iterate its `entities` list.
+If you need all entities for one config object, use `get_configuration_object` to get the
+`ConfigurationObject` and iterate its `entities` list.
 
 `modes.as_list()` returns `list[dict]` and raises `ValueError` if the data is not a list.
 `modes.as_object()` returns `dict` and raises `ValueError` if the data is not a dict.
@@ -274,12 +274,15 @@ from sap_cloud_sdk import cbc
 class StubCBCClient:
     def get_consumption_versions(self): ...
     def get_configuration(self, consumption_version=None):
-        return cbc.ConfigData(
+        return cbc.ConfigurationData(
             consumption_version="cv1",
             app_tenant_id="app-t1",
-            config_objects=[],
+            configuration_objects=[],
         )
-    def get_entity_data(self, config_object_id, entity_id, consumption_version=None): ...
+
+    def get_entity_data(
+        self, configuration_object_id, entity_id, consumption_version=None
+    ): ...
 
 
 def test_my_service():

@@ -19,7 +19,7 @@ from sap_cloud_sdk.cbc.exceptions import (
     CBCNetworkError,
     CBCServerError,
 )
-from sap_cloud_sdk.cbc._models import ConfigData, EntityData
+from sap_cloud_sdk.cbc._models import ConfigurationData, EntityData
 
 
 # ---------------------------------------------------------------------------
@@ -134,7 +134,9 @@ class TestGetConsumptionVersions:
         with pytest.raises(CBCServerError):
             client.get_consumption_versions()
 
-    def test_get_consumption_versions_on_connection_failure_raises_cbc_network_error(self):
+    def test_get_consumption_versions_on_connection_failure_raises_cbc_network_error(
+        self,
+    ):
         client, mock_http = _make_client()
         mock_http.request.side_effect = httpx.ConnectError("refused")
         with pytest.raises(CBCNetworkError):
@@ -147,7 +149,9 @@ class TestGetConsumptionVersions:
 
 
 class TestGetConfigurationObjects:
-    def test_get_configuration_objects_with_multiple_objects_returns_grouped_config_objects(self):
+    def test_get_configuration_objects_with_multiple_objects_returns_grouped_configuration_objects(
+        self,
+    ):
         client, mock_http = _make_client()
         mock_http.request.return_value = _mock_response(
             json_body={
@@ -170,7 +174,7 @@ class TestGetConfigurationObjects:
             "https://cbc.example.ondemand.com", "app-tenant", "cv1"
         )
         assert len(result.items) == 2
-        assert result.items[0].config_object_id == "payment-config"
+        assert result.items[0].configuration_object_id == "payment-config"
         assert [e.entity_id for e in result.items[1].entities] == [
             "tax-category",
             "tax-rate",
@@ -240,16 +244,21 @@ class TestFetchEntityData:
 
 
 class TestGetConfiguration:
-    def test_get_configuration_without_version_resolves_latest_and_returns_config_data(self):
+    def test_get_configuration_without_version_resolves_latest_and_returns_configuration_data(
+        self,
+    ):
         client, mock_http = _make_client()
         versions_response = _mock_response(json_body={"items": [{"version": "v2"}]})
-        config_objects_response = _mock_response(json_body={"items": []})
-        mock_http.request.side_effect = [versions_response, config_objects_response]
+        configuration_objects_response = _mock_response(json_body={"items": []})
+        mock_http.request.side_effect = [
+            versions_response,
+            configuration_objects_response,
+        ]
 
         result = client.get_configuration()
-        assert isinstance(result, ConfigData)
+        assert isinstance(result, ConfigurationData)
         assert result.consumption_version == "v2"
-        assert result.config_objects == []
+        assert result.configuration_objects == []
 
     def test_get_configuration_when_no_versions_exist_raises_cbc_client_error(self):
         client, mock_http = _make_client()
@@ -259,7 +268,7 @@ class TestGetConfiguration:
 
     def test_get_configuration_with_explicit_version_skips_version_resolution(self):
         client, mock_http = _make_client()
-        config_objects_response = _mock_response(
+        configuration_objects_response = _mock_response(
             json_body={
                 "items": [
                     {
@@ -275,13 +284,15 @@ class TestGetConfiguration:
                 "content": {"items": [{"k": "v"}]},
             }
         )
-        mock_http.request.side_effect = [config_objects_response, data_response]
+        mock_http.request.side_effect = [configuration_objects_response, data_response]
 
         result = client.get_configuration(consumption_version="cv1")
-        assert len(result.config_objects) == 1
-        assert result.config_objects[0].config_object_id == "payment-config"
-        assert len(result.config_objects[0].entities) == 1
-        assert result.config_objects[0].entities[0].entity_id == "payment-mode"
+        assert len(result.configuration_objects) == 1
+        assert (
+            result.configuration_objects[0].configuration_object_id == "payment-config"
+        )
+        assert len(result.configuration_objects[0].entities) == 1
+        assert result.configuration_objects[0].entities[0].entity_id == "payment-mode"
 
     def test_get_configuration_with_multiple_entities_resolves_base_url_once(self):
         """One get_configuration resolves base_url once, not per HTTP request."""
@@ -298,7 +309,7 @@ class TestGetConfiguration:
             app_tenant_id=_app_tid(),
             http_client=mock_http,
         )
-        config_objects_response = _mock_response(
+        configuration_objects_response = _mock_response(
             json_body={
                 "items": [
                     {
@@ -316,7 +327,7 @@ class TestGetConfiguration:
         )
         # config-objects + 2 entity-data requests = 3 HTTP calls, 1 base_url resolve
         mock_http.request.side_effect = [
-            config_objects_response,
+            configuration_objects_response,
             data_response,
             data_response,
         ]
@@ -325,14 +336,15 @@ class TestGetConfiguration:
         assert call_count == 1
 
 
-
 # ---------------------------------------------------------------------------
 # CBCClient — get_entity_data
 # ---------------------------------------------------------------------------
 
 
 class TestGetEntityData:
-    def test_get_entity_data_without_version_resolves_latest_and_returns_entity_data(self):
+    def test_get_entity_data_without_version_resolves_latest_and_returns_entity_data(
+        self,
+    ):
         client, mock_http = _make_client()
         versions_response = _mock_response(json_body={"items": [{"version": "v1"}]})
         entity_response = _mock_response(
@@ -390,7 +402,9 @@ class TestCBCClientContextManager:
 
 
 class TestCreateClient:
-    def test_create_client_with_base_url_and_app_tenant_id_overrides_returns_client(self):
+    def test_create_client_with_base_url_and_app_tenant_id_overrides_returns_client(
+        self,
+    ):
         client = create_client(
             CBCConfig(
                 base_url="http://localhost:8001",
@@ -426,7 +440,6 @@ class TestCreateClient:
         factory = client._ssl_factory
         assert factory is not None
         assert factory() is ctx
-
 
 
 # ---------------------------------------------------------------------------
@@ -496,7 +509,9 @@ class TestCertRotation:
         client._build_http_client = build  # ty: ignore[invalid-assignment]
         return client, built
 
-    def test_cert_rotation_on_tls_failure_rebuilds_client_and_retries_successfully(self):
+    def test_cert_rotation_on_tls_failure_rebuilds_client_and_retries_successfully(
+        self,
+    ):
         calls = {"factory": 0}
 
         def factory() -> ssl.SSLContext:
@@ -572,7 +587,9 @@ class TestCertRotation:
         # one attempt only, no rebuild path
         mock_http.request.assert_called_once()
 
-    def test_cert_rotation_when_factory_fails_propagates_error_and_retains_old_client(self):
+    def test_cert_rotation_when_factory_fails_propagates_error_and_retains_old_client(
+        self,
+    ):
         calls = {"factory": 0}
 
         def factory() -> ssl.SSLContext:

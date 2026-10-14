@@ -8,11 +8,11 @@ import pytest
 
 from sap_cloud_sdk.cbc._models import (
     ApiError,
-    ConfigData,
-    ConfigObject,
+    ConfigurationData,
+    ConfigurationObject,
     ConsumptionVersion,
     ConsumptionVersions,
-    ConfigEntity,
+    ConfigurationEntity,
     EntityData,
 )
 
@@ -111,43 +111,47 @@ class TestEntityData:
 
 
 # ---------------------------------------------------------------------------
-# ConfigData helpers
+# ConfigurationData helpers
 # ---------------------------------------------------------------------------
 
 
-class TestConfigData:
-    def _entity_data(self, entity_id: str) -> ConfigEntity:
-        return ConfigEntity(entity_id=entity_id, data=EntityData([{"id": entity_id}]))
+class TestConfigurationData:
+    def _entity_data(self, entity_id: str) -> ConfigurationEntity:
+        return ConfigurationEntity(
+            entity_id=entity_id, data=EntityData([{"id": entity_id}])
+        )
 
-    def _config_object(self, config_object_id: str, *entity_ids: str) -> ConfigObject:
-        return ConfigObject(
-            config_object_id=config_object_id,
+    def _configuration_object(
+        self, configuration_object_id: str, *entity_ids: str
+    ) -> ConfigurationObject:
+        return ConfigurationObject(
+            configuration_object_id=configuration_object_id,
             entities=[self._entity_data(eid) for eid in entity_ids],
         )
 
-    def _config(self, *config_objects: ConfigObject) -> ConfigData:
-        return ConfigData(
+    def _config(self, *configuration_objects: ConfigurationObject) -> ConfigurationData:
+        return ConfigurationData(
             consumption_version="cv1",
             app_tenant_id="app-t1",
-            config_objects=list(config_objects),
+            configuration_objects=list(configuration_objects),
         )
 
-    def test_get_config_object_with_matching_id_returns_config_object(self):
+    def test_get_configuration_object_with_matching_id_returns_configuration_object(self):
         config = self._config(
-            self._config_object("ObjA", "E1"),
-            self._config_object("ObjB", "E2"),
+            self._configuration_object("ObjA", "E1"),
+            self._configuration_object("ObjB", "E2"),
         )
-        result = config.get_config_object("ObjA")
+        result = config.get_configuration_object("ObjA")
         assert result is not None
-        assert result.config_object_id == "ObjA"
+        assert result.configuration_object_id == "ObjA"
 
-    def test_get_config_object_with_missing_id_returns_none(self):
-        config = self._config(self._config_object("ObjA", "E1"))
-        assert config.get_config_object("Missing") is None
+    def test_get_configuration_object_with_missing_id_returns_none(self):
+        config = self._config(self._configuration_object("ObjA", "E1"))
+        assert config.get_configuration_object("Missing") is None
 
     def test_get_entity_data_with_matching_ids_returns_correct_entity_data(self):
         config = self._config(
-            self._config_object("ObjA", "E1", "E2"),
+            self._configuration_object("ObjA", "E1", "E2"),
         )
         result = config.get_entity_data("ObjA", "E2")
         assert result is not None
@@ -155,7 +159,7 @@ class TestConfigData:
         assert result.as_list() == [{"id": "E2"}]
 
     def test_get_entity_data_with_missing_entity_id_returns_none(self):
-        config = self._config(self._config_object("ObjA", "E1"))
+        config = self._config(self._configuration_object("ObjA", "E1"))
         assert config.get_entity_data("ObjA", "Missing") is None
 
 

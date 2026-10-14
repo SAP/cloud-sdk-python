@@ -109,7 +109,9 @@ class TestResolveBaseUrl:
             with pytest.raises(CBCConfigError, match="No CBC mapping fragment"):
                 _resolve_base_url("default")
 
-    def test_resolve_base_url_with_fragment_missing_cbc_url_raises_cbc_config_error(self):
+    def test_resolve_base_url_with_fragment_missing_cbc_url_raises_cbc_config_error(
+        self,
+    ):
         _seed_context(app_tenant_id="app-t1", subdomain="appfnd-subscriber")
         match = MagicMock()
         match.name = f"{CBC_FRAGMENT_PREFIX}appfnd-subscriber"
@@ -201,7 +203,9 @@ class TestLoadSslContext:
 
 
 class TestCreateClientDefaults:
-    def test_default_wiring_with_landscape_env_builds_ssl_context_from_cert(self, monkeypatch):
+    def test_default_wiring_with_landscape_env_builds_ssl_context_from_cert(
+        self, monkeypatch
+    ):
         monkeypatch.setenv(ENV_LANDSCAPE, "cbc-fndtst-dev-eu12")
         with patch(
             "sap_cloud_sdk.cbc.client._load_ssl_context",
@@ -231,7 +235,7 @@ class TestCreateClientDefaults:
         assert instance_arg == "cbc-instance"
         assert cert_arg == "my-cert.pem"
 
-    def test_config_object_applies_instance_and_cert_name(self):
+    def test_configuration_object_applies_instance_and_cert_name(self):
         with patch(
             "sap_cloud_sdk.cbc.client._load_ssl_context",
             return_value=ssl.create_default_context(),

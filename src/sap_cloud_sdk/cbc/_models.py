@@ -24,17 +24,6 @@ class _FrozenModel(BaseModel):
 # ---------------------------------------------------------------------------
 
 
-class NNV(_FrozenModel):
-    """Namespace-Name-Version tuple identifying a reference content version."""
-
-    namespace: str
-    name: str
-    version: str
-
-    def __str__(self) -> str:
-        return f"{self.namespace}.{self.name}.{self.version}"
-
-
 class ConsumptionVersion(_FrozenModel):
     """A snapshot of the business configuration for an app tenant at a point in time.
 
@@ -42,13 +31,11 @@ class ConsumptionVersion(_FrozenModel):
         version: Version identifier.
         created_date: Creation timestamp.
         modified_date: Last modification timestamp.
-        ref_content: Reference content NNV this version is based on, if applicable.
     """
 
     version: str
     created_date: datetime | None = Field(default=None, alias="createdDate")
     modified_date: datetime | None = Field(default=None, alias="modifiedDate")
-    ref_content: NNV | None = Field(default=None, alias="referenceContentDetails")
 
 
 class ConsumptionVersions(_FrozenModel):
@@ -85,7 +72,7 @@ class ConsumptionVersions(_FrozenModel):
 # ---------------------------------------------------------------------------
 
 
-class ConfigObjectEntity(_FrozenModel):
+class ConfigurationObjectEntity(_FrozenModel):
     """One entity listed under a config object by the ``configurationObjects`` API.
 
     Attributes:
@@ -96,26 +83,26 @@ class ConfigObjectEntity(_FrozenModel):
     entity_id: str = Field(alias="entityId")
 
 
-class ConfigObjectEntry(_FrozenModel):
+class ConfigurationObjectEntry(_FrozenModel):
     """One config object and its entities as returned by the API.
 
     Attributes:
-        config_object_id: Authored config object identifier (e.g. ``"payment-config"``).
+        configuration_object_id: Authored config object identifier (e.g. ``"payment-config"``).
         entities: Entities belonging to this config object.
     """
 
-    config_object_id: str = Field(alias="configurationObjectId")
-    entities: list[ConfigObjectEntity]
+    configuration_object_id: str = Field(alias="configurationObjectId")
+    entities: list[ConfigurationObjectEntity]
 
 
-class ConfigObjectList(_FrozenModel):
+class ConfigurationObjectList(_FrozenModel):
     """Config objects for a consumption version, already grouped by the API.
 
     Attributes:
-        items: List of :class:`ConfigObjectEntry` objects.
+        items: List of :class:`ConfigurationObjectEntry` objects.
     """
 
-    items: list[ConfigObjectEntry]
+    items: list[ConfigurationObjectEntry]
 
 
 class EntityData:
@@ -172,7 +159,7 @@ class EntityData:
 
 
 @dataclass
-class ConfigEntity:
+class ConfigurationEntity:
     """A single entity within a config object.
 
     Attributes:
@@ -185,16 +172,16 @@ class ConfigEntity:
 
 
 @dataclass
-class ConfigObject:
+class ConfigurationObject:
     """A configuration object and its entities.
 
     Attributes:
-        config_object_id: Authored config object identifier (e.g. ``"payment-config"``).
+        configuration_object_id: Authored config object identifier (e.g. ``"payment-config"``).
         entities: Entity data for all entities in this config object.
     """
 
-    config_object_id: str
-    entities: list[ConfigEntity]
+    configuration_object_id: str
+    entities: list[ConfigurationEntity]
 
     def get_entity_data(self, entity_id: str) -> EntityData | None:
         """Return the data for the entity with the given ID.
@@ -210,50 +197,52 @@ class ConfigObject:
 
 
 @dataclass
-class ConfigData:
+class ConfigurationData:
     """Complete business configuration — all config objects for one consumption version.
 
     Attributes:
         consumption_version: Version this data was fetched from.
         app_tenant_id: Application tenant this data belongs to.
-        config_objects: Configuration objects and their entity data.
+        configuration_objects: Configuration objects and their entity data.
     """
 
     consumption_version: str
     app_tenant_id: str
-    config_objects: list[ConfigObject]
+    configuration_objects: list[ConfigurationObject]
 
-    def get_config_object(self, config_object_id: str) -> ConfigObject | None:
+    def get_configuration_object(
+        self, configuration_object_id: str
+    ) -> ConfigurationObject | None:
         """Return the config object with the given ID.
 
         Args:
-            config_object_id: Authored config object identifier.
+            configuration_object_id: Authored config object identifier.
 
         Returns:
-            Matching :class:`ConfigObject`, or ``None`` if not found.
+            Matching :class:`ConfigurationObject`, or ``None`` if not found.
         """
         return next(
             (
                 co
-                for co in self.config_objects
-                if co.config_object_id == config_object_id
+                for co in self.configuration_objects
+                if co.configuration_object_id == configuration_object_id
             ),
             None,
         )
 
     def get_entity_data(
-        self, config_object_id: str, entity_id: str
+        self, configuration_object_id: str, entity_id: str
     ) -> EntityData | None:
         """Return the data for the given config object and entity IDs.
 
         Args:
-            config_object_id: Authored config object identifier.
+            configuration_object_id: Authored config object identifier.
             entity_id: Authored entity identifier.
 
         Returns:
             :class:`EntityData` for the matching entity, or ``None`` if not found.
         """
-        co = self.get_config_object(config_object_id)
+        co = self.get_configuration_object(configuration_object_id)
         return co.get_entity_data(entity_id) if co is not None else None
 
 

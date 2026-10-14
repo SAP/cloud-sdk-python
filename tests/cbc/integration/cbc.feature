@@ -15,9 +15,9 @@ Feature: CBC (Central Business Configuration) Integration
 
   # ── Configuration ────────────────────────────────────────────────────────────
 
-  Scenario: Fetch full configuration returns ConfigData
+  Scenario: Fetch full configuration returns ConfigurationData
     When I call get_configuration
-    Then the result should be a ConfigData with a non-empty consumption_version
+    Then the result should be a ConfigurationData with a non-empty consumption_version
     And the app_tenant_id should match the configured tenant
 
   Scenario: Full configuration contains at least one config object

@@ -88,7 +88,5 @@ def cbc_client() -> CBCClient:
     if landscape:
         os.environ.setdefault("APPFND_CONHOS_LANDSCAPE", landscape)
 
-    set_context(
-        RuntimeContext({APP_TENANT_ID: app_tid, DWC_SUBDOMAIN: subdomain})
-    )
+    set_context(RuntimeContext({APP_TENANT_ID: app_tid, DWC_SUBDOMAIN: subdomain}))
     return create_client()

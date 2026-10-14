@@ -92,7 +92,7 @@ If tests fail, the draft remains unpublished. Fix the branch and re-trigger the 
 
 ## Step 5 — Automated release (no action required)
 
-When the draft is published, the `Release` workflow triggers automatically and:
+When the draft is published (or published as a pre-release for RCs), the `Release` workflow triggers automatically and:
 
 1. Runs the full integration test suite against the branch (skippable — see Step 3)
 2. Builds the distribution with `uv build`
@@ -122,10 +122,10 @@ Use a release candidate when you need external validation before committing to a
 1. Create a branch from `main` for the feature or change (e.g. `feature/my-big-change`)
 2. Merge all related PRs into that branch
 3. Trigger **Prepare Release** with `branch=feature/my-big-change` and `version=X.Y.0rc1`
-   - The same pipeline runs as for a stable release: git tag `vX.Y.0rc1` is created, a draft GitHub Release is created (marked as pre-release), `pyproject.toml` is bumped via auto-merge PR, and once the automation repo publishes the draft, `release.yml` builds and publishes `X.Y.0rc1` to PyPI
+   - The same pipeline runs as for a stable release: git tag `vX.Y.0rc1` is created, a draft GitHub Release is created (marked as pre-release), `pyproject.toml` is bumped via auto-merge PR, and once the automation repo publishes the draft, `release.yaml` builds and publishes `X.Y.0rc1` to PyPI
 4. Share the RC with testers: `pip install sap-cloud-sdk==X.Y.0rc1`
 5. If fixes are needed, merge them into the branch and trigger again with `version=X.Y.0rc2` — the process repeats identically
-6. When the RC is validated, merge the branch into `main` first, then trigger **Prepare Release** from `main` with `version=X.Y.0` — the commit baseline ignores RC tags, so release notes cover the full RC period
+6. When the RC is validated, merge the branch into `main` first, then trigger **Prepare Release** from `main` with `version=X.Y.0` — the commit baseline will be the last RC tag (`vX.Y.0rcN`), so release notes only cover changes since that RC
 
 The GitHub Release is automatically marked as pre-release and will not appear as the latest stable release on GitHub or PyPI.
 

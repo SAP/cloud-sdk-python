@@ -1128,6 +1128,7 @@ class TestCallMcpToolLob:
 
         mock_result = MagicMock()
         mock_result.content = []
+        mock_result.is_error = False
 
         with (
             patch("sap_cloud_sdk.agentgateway._lob.httpx.AsyncClient") as mock_http,
@@ -1222,8 +1223,138 @@ class TestCallMcpToolLob:
             mock_session_instance.call_tool = AsyncMock(return_value=mock_result)
             mock_session.return_value.__aenter__.return_value = mock_session_instance
 
+            with pytest.raises(AgentGatewayServerError) as exc_info:
+                await call_mcp_tool_lob(tool, "user-auth-token", 60.0)
+            # Message carries the tool name and backend detail, but not the internal URL.
+            message = str(exc_info.value)
+            assert "test-tool" in message
+            assert "change number test_sm doesn't exist" in message
+            assert tool.url not in message
+
+    @pytest.mark.asyncio
+    async def test_raises_server_error_with_code_on_mcp_error(self):
+        """A JSON-RPC protocol error (McpError) surfaces as AgentGatewayServerError
+        carrying the server message and error_code."""
+        from mcp.shared.exceptions import McpError
+        from mcp.types import ErrorData
+
+        tool = MCPTool(
+            name="test-tool",
+            server_name="test-server",
+            description="Test tool",
+            input_schema={},
+            url="https://example.com/mcp",
+            fragment_name="test-fragment",
+        )
+
+        with (
+            patch("sap_cloud_sdk.agentgateway._lob.httpx.AsyncClient") as mock_http,
+            patch(
+                "sap_cloud_sdk.agentgateway._lob.streamable_http_client"
+            ) as mock_stream,
+            patch("sap_cloud_sdk.agentgateway._lob.ClientSession") as mock_session,
+        ):
+            mock_http.return_value.__aenter__.return_value = AsyncMock()
+            mock_stream.return_value.__aenter__.return_value = (
+                AsyncMock(),
+                AsyncMock(),
+                None,
+            )
+            mock_session_instance = AsyncMock()
+            mock_session_instance.initialize = AsyncMock()
+            mock_session_instance.call_tool = AsyncMock(
+                side_effect=McpError(
+                    ErrorData(code=-32603, message="Internal Server Error")
+                )
+            )
+            mock_session.return_value.__aenter__.return_value = mock_session_instance
+
+            with pytest.raises(AgentGatewayServerError) as exc_info:
+                await call_mcp_tool_lob(tool, "user-auth-token", 60.0)
+            assert str(exc_info.value) == "Internal Server Error"
+            assert exc_info.value.error_code == -32603
+
+    @pytest.mark.asyncio
+    async def test_raises_server_error_on_grouped_mcp_error(self):
+        """A McpError wrapped in a BaseExceptionGroup (anyio task group) is still
+        surfaced as AgentGatewayServerError with the server message and code."""
+        from mcp.shared.exceptions import McpError
+        from mcp.types import ErrorData
+
+        tool = MCPTool(
+            name="test-tool",
+            server_name="test-server",
+            description="Test tool",
+            input_schema={},
+            url="https://example.com/mcp",
+            fragment_name="test-fragment",
+        )
+        grouped = BaseExceptionGroup(
+            "unhandled errors in a TaskGroup",
+            [McpError(ErrorData(code=-32602, message="Unknown tool: foo"))],
+        )
+
+        with (
+            patch("sap_cloud_sdk.agentgateway._lob.httpx.AsyncClient") as mock_http,
+            patch(
+                "sap_cloud_sdk.agentgateway._lob.streamable_http_client"
+            ) as mock_stream,
+            patch("sap_cloud_sdk.agentgateway._lob.ClientSession") as mock_session,
+        ):
+            mock_http.return_value.__aenter__.return_value = AsyncMock()
+            mock_stream.return_value.__aenter__.return_value = (
+                AsyncMock(),
+                AsyncMock(),
+                None,
+            )
+            mock_session_instance = AsyncMock()
+            mock_session_instance.initialize = AsyncMock()
+            mock_session_instance.call_tool = AsyncMock(side_effect=grouped)
+            mock_session.return_value.__aenter__.return_value = mock_session_instance
+
+            with pytest.raises(AgentGatewayServerError) as exc_info:
+                await call_mcp_tool_lob(tool, "user-auth-token", 60.0)
+            assert str(exc_info.value) == "Unknown tool: foo"
+            assert exc_info.value.error_code == -32602
+
+    @pytest.mark.asyncio
+    async def test_raises_on_is_error_even_with_empty_content(self):
+        """An isError result with empty content still raises (not swallowed as '')."""
+        tool = MCPTool(
+            name="test-tool",
+            server_name="test-server",
+            description="Test tool",
+            input_schema={},
+            url="https://example.com/mcp",
+            fragment_name="test-fragment",
+        )
+
+        mock_result = MagicMock()
+        mock_result.content = []
+        mock_result.is_error = True
+
+        with (
+            patch("sap_cloud_sdk.agentgateway._lob.httpx.AsyncClient") as mock_http,
+            patch(
+                "sap_cloud_sdk.agentgateway._lob.streamable_http_client"
+            ) as mock_stream,
+            patch("sap_cloud_sdk.agentgateway._lob.ClientSession") as mock_session,
+        ):
+            mock_http.return_value.__aenter__.return_value = AsyncMock()
+            mock_stream.return_value.__aenter__.return_value = (
+                AsyncMock(),
+                AsyncMock(),
+                None,
+            )
+            mock_session_instance = AsyncMock()
+            mock_session_instance.initialize = AsyncMock()
+            mock_session_instance.call_tool = AsyncMock(return_value=mock_result)
+            mock_session.return_value.__aenter__.return_value = mock_session_instance
+
             with pytest.raises(AgentGatewayServerError, match="returned an error"):
                 await call_mcp_tool_lob(tool, "user-auth-token", 60.0)
+
+
 # ============================================================
 
 

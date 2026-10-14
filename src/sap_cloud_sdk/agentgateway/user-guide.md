@@ -130,6 +130,19 @@ mcp_tool_to_langchain(
 )
 ```
 
+By default, a failed tool call raises the raw SDK exception, which propagates out of the agent. Set `handle_tool_error=True` to instead surface Agent Gateway failures to the LLM as a LangChain `ToolException`; LangChain converts it to an error `ToolMessage` the model can see and self-correct on, rather than crashing the agent loop:
+
+```python
+mcp_tool_to_langchain(
+    t,
+    agw_client.call_mcp_tool,
+    get_user_token=lambda: request.headers["Authorization"],
+    handle_tool_error=True,
+)
+```
+
+With `handle_tool_error=True`, a tool error such as `Tool 'recalc' on '<url>' returned an error: backend unavailable` is delivered to the model as a tool result instead of being raised. You may also pass a fixed `str` to show the LLM a constant message, or a callable `(ToolException) -> str` to compute one; both are forwarded to LangChain's `StructuredTool.handle_tool_error`.
+
 The converter maps each property's JSON Schema `"type"` to the corresponding Python type so Pydantic validates and forwards the correct native type to the MCP server:
 
 | JSON Schema type | Python type |

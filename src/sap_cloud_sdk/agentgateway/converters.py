@@ -175,7 +175,6 @@ def mcp_tool_to_langchain(
             else restored
         )
         if handle_tool_error is None:
-            # Default: unchanged behavior — let the raw SDK exception propagate.
             return await call_tool(
                 mcp_tool,
                 user_token=get_user_token,
@@ -216,8 +215,6 @@ def mcp_tool_to_langchain(
             fields[safe] = (py_type, Field(..., **field_kwargs))
     args_schema = create_model(f"{mcp_tool.name}_args", **fields) if fields else None
 
-    # Pass handle_tool_error only when the caller opts in; otherwise omit the key so the
-    # tool keeps LangChain's default and existing behavior is byte-for-byte unchanged.
     return StructuredTool.from_function(
         coroutine=run,
         name=mcp_tool.name,

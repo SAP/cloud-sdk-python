@@ -2,6 +2,11 @@
 
 from typing import Any
 
+try:
+    from mcp.shared.exceptions import McpError
+except ImportError:
+    from mcp.shared.exceptions import MCPError as McpError  # ty: ignore[unresolved-import]
+
 
 def mcp_server_name(init_result: Any) -> str | None:
     """Return ``serverInfo.name`` / ``server_info.name`` if present, else None."""
@@ -39,3 +44,23 @@ def mcp_is_error(result: Any) -> bool:
     if flag is None:
         flag = getattr(result, "isError", None)
     return bool(flag)
+
+
+def find_mcp_error(exc: BaseException) -> "McpError | None":
+    """Return the first ``McpError`` carried by ``exc``, or None.
+
+    A protocol error (JSON-RPC ``error``) raised by ``session.call_tool`` surfaces
+    either as a bare ``McpError`` or, because the mcp client runs inside anyio task
+    groups, wrapped in a (possibly nested) ``BaseExceptionGroup``. This walks the
+    group tree and returns the first ``McpError`` leaf so callers can surface its
+    code+message. Returns None when no ``McpError`` is present, so the caller can
+    defer to its generic error handling.
+    """
+    if isinstance(exc, McpError):
+        return exc
+    if isinstance(exc, BaseExceptionGroup):
+        for inner in exc.exceptions:
+            found = find_mcp_error(inner)
+            if found is not None:
+                return found
+    return None

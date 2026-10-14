@@ -669,12 +669,33 @@ class AgentGatewayClient:
         except AgentGatewaySDKError:
             raise
         except Exception as e:
+            tool_label = tool if isinstance(tool, str) else tool.name
+            sdk_error = _find_sdk_error(e)
+            if sdk_error is not None:
+                logger.info(
+                    "Surfacing Agent Gateway error for tool '%s': %s",
+                    tool_label,
+                    sdk_error,
+                )
+                raise sdk_error from e
             logger.exception("Unexpected error during tool invocation")
             cause = _unwrap_exception_group(e)
-            tool_label = tool if isinstance(tool, str) else tool.name
             raise AgentGatewaySDKError(
                 f"Tool invocation failed for '{tool_label}': {cause}"
             ) from e
+
+
+def _find_sdk_error(exc: BaseException) -> AgentGatewaySDKError | None:
+    """Return the first AgentGatewaySDKError carried by exc (bare or inside a
+    possibly-nested ExceptionGroup), or None."""
+    if isinstance(exc, AgentGatewaySDKError):
+        return exc
+    if isinstance(exc, BaseExceptionGroup):
+        for inner in exc.exceptions:
+            found = _find_sdk_error(inner)
+            if found is not None:
+                return found
+    return None
 
 
 def _unwrap_exception_group(exc: BaseException) -> BaseException:

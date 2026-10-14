@@ -1,30 +1,53 @@
 """Pytest fixtures for CBC integration tests.
 
-Tests target a real or mock CBC server. Configuration is read from env vars:
+Tests exercise the real default provisioning path: ``cbc.create_client()`` with
+no overrides, resolving the CBC URL from the tenant-mapping Destination Fragment
+and the mTLS certificate from the Destination Service — the same way the
+agentgateway integration tests drive ``create_client``.
 
-    CLOUD_SDK_CBC_URL              CBC service base URL (required)
-    CLOUD_SDK_CBC_APP_TENANT_ID    Application tenant ID (required)
-    CLOUD_SDK_CBC_CERT_PATH        Client certificate PEM path (optional, mTLS)
-    CLOUD_SDK_CBC_KEY_PATH         Client private key PEM path (optional, mTLS)
+Configuration is read from the environment (optionally from a
+``.env_integration_tests`` file at the repo root, loaded automatically):
 
-When any required variable is missing, integration tests are skipped. The cert
-and key paths are optional — supply both to test against an mTLS server; omit
-them for a plain-HTTP mock.
+    # Destination Service binding (standard SDK convention, instance "default")
+    CLOUD_SDK_CFG_DESTINATION_DEFAULT_CLIENTID
+    CLOUD_SDK_CFG_DESTINATION_DEFAULT_CLIENTSECRET
+    CLOUD_SDK_CFG_DESTINATION_DEFAULT_URL
+    CLOUD_SDK_CFG_DESTINATION_DEFAULT_URI
+    CLOUD_SDK_CFG_DESTINATION_DEFAULT_IDENTITYZONE
+
+    # CBC tenant to target (the client reads these from the runtime context)
+    CLOUD_SDK_CFG_CBC_DEFAULT_APP_TENANT_ID    IAS app_tid of the subscriber tenant
+    CLOUD_SDK_CFG_CBC_DEFAULT_TENANT_SUBDOMAIN subscriber subdomain (selects the fragment)
+
+    # landscape, used to derive the mTLS certificate name
+    CLOUD_SDK_CFG_CBC_DEFAULT_LANDSCAPE        -> APPFND_CONHOS_LANDSCAPE
+
+When the binding or the tenant values are missing, integration tests skip.
 """
 
 from __future__ import annotations
 
 import os
-import ssl
+from pathlib import Path
 
 import pytest
+from dotenv import load_dotenv
 
-from sap_cloud_sdk.cbc import CBCClient, CBCConfig, create_client
+from sap_cloud_sdk.cbc import CBCClient, create_client
+from sap_cloud_sdk.core.runtime_context import APP_TENANT_ID, DWC_SUBDOMAIN
+from sap_cloud_sdk.core.runtime_context._context import RuntimeContext, set_context
 
-ENV_URL = "CLOUD_SDK_CBC_URL"
-ENV_APP_TENANT_ID = "CLOUD_SDK_CBC_APP_TENANT_ID"
-ENV_CERT_PATH = "CLOUD_SDK_CBC_CERT_PATH"
-ENV_KEY_PATH = "CLOUD_SDK_CBC_KEY_PATH"
+ENV_APP_TENANT_ID = "CLOUD_SDK_CFG_CBC_DEFAULT_APP_TENANT_ID"
+ENV_TENANT_SUBDOMAIN = "CLOUD_SDK_CFG_CBC_DEFAULT_TENANT_SUBDOMAIN"
+ENV_LANDSCAPE = "CLOUD_SDK_CFG_CBC_DEFAULT_LANDSCAPE"
+ENV_DESTINATION_CLIENT_ID = "CLOUD_SDK_CFG_DESTINATION_DEFAULT_CLIENTID"
+
+
+def _setup_cloud_mode() -> None:
+    """Load environment variables from .env_integration_tests if present."""
+    env_file = Path(__file__).parents[3] / ".env_integration_tests"
+    if env_file.exists():
+        load_dotenv(env_file)
 
 
 def _require_app_tenant_id() -> str:
@@ -34,33 +57,38 @@ def _require_app_tenant_id() -> str:
     return app_tid
 
 
-def _build_ssl_context() -> ssl.SSLContext | None:
-    """Build an mTLS context from the cert/key path env vars, or None if unset."""
-    cert_path = os.environ.get(ENV_CERT_PATH)
-    key_path = os.environ.get(ENV_KEY_PATH)
-    if not cert_path or not key_path:
-        return None
-    ctx = ssl.create_default_context()
-    ctx.load_cert_chain(certfile=cert_path, keyfile=key_path)
-    return ctx
-
-
 @pytest.fixture(scope="session")
 def cbc_app_tenant_id() -> str:
+    _setup_cloud_mode()
     return _require_app_tenant_id()
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture
 def cbc_client() -> CBCClient:
-    app_tid = _require_app_tenant_id()
-    url = os.environ.get(ENV_URL)
-    if not url:
-        pytest.skip(f"CBC integration tests skipped — set {ENV_URL}.")
-    ctx = _build_ssl_context()
-    return create_client(
-        CBCConfig(
-            base_url=url,
-            app_tenant_id=app_tid,
-            ssl_context=(lambda: ctx) if ctx is not None else None,
+    """Build the client via the default provisioning path (no overrides).
+
+    Seeds the SDK runtime context with the subscriber tenant id and subdomain —
+    what ``bootstrap(app)`` would populate from an incoming request — then lets
+    ``create_client()`` resolve the URL and mTLS certificate from the Destination
+    Service, exactly as it does in production.
+    """
+    _setup_cloud_mode()
+
+    if not os.environ.get(ENV_DESTINATION_CLIENT_ID):
+        pytest.skip(
+            f"CBC integration tests skipped — set the Destination binding "
+            f"({ENV_DESTINATION_CLIENT_ID} and friends)."
         )
+    app_tid = _require_app_tenant_id()
+    subdomain = os.environ.get(ENV_TENANT_SUBDOMAIN)
+    if not subdomain:
+        pytest.skip(f"CBC integration tests skipped — set {ENV_TENANT_SUBDOMAIN}.")
+
+    landscape = os.environ.get(ENV_LANDSCAPE)
+    if landscape:
+        os.environ.setdefault("APPFND_CONHOS_LANDSCAPE", landscape)
+
+    set_context(
+        RuntimeContext({APP_TENANT_ID: app_tid, DWC_SUBDOMAIN: subdomain})
     )
+    return create_client()

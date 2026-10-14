@@ -1,9 +1,17 @@
 """BDD integration tests for the CBC (Central Business Configuration) module.
 
-Run against a real or mock CBC server::
+Run against a real CBC server via the default provisioning path. Supply the
+Destination Service binding and the target tenant (see conftest.py for the full
+list), then::
 
-    CLOUD_SDK_CBC_URL=http://localhost:8001 \\
-    CLOUD_SDK_CBC_APP_TENANT_ID=my-app-tenant \\
+    CLOUD_SDK_CFG_DESTINATION_DEFAULT_CLIENTID=... \\
+    CLOUD_SDK_CFG_DESTINATION_DEFAULT_CLIENTSECRET=... \\
+    CLOUD_SDK_CFG_DESTINATION_DEFAULT_URL=... \\
+    CLOUD_SDK_CFG_DESTINATION_DEFAULT_URI=... \\
+    CLOUD_SDK_CFG_DESTINATION_DEFAULT_IDENTITYZONE=... \\
+    CLOUD_SDK_CFG_CBC_DEFAULT_APP_TENANT_ID=... \\
+    CLOUD_SDK_CFG_CBC_DEFAULT_TENANT_SUBDOMAIN=... \\
+    CLOUD_SDK_CFG_CBC_DEFAULT_LANDSCAPE=... \\
     pytest tests/cbc/integration
 """
 

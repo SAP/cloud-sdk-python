@@ -14,7 +14,9 @@ This document describes how dependencies are kept up to date in the SAP Cloud SD
 
 ## Auto-merge policy
 
-Minor and patch updates are merged automatically once all required checks pass — no manual approval needed. This keeps `main` current without creating review burden for low-risk bumps.
+Auto-merge is **disabled by default**. To enable it, set the repository variable `DEPENDABOT_AUTO_MERGE_ENABLED=true` under **Settings → Secrets and variables → Actions → Variables**. If the variable is absent or set to any value other than `true`, the workflow runs but skips all merge steps silently.
+
+Once enabled, minor and patch updates are merged automatically once all required checks pass — no manual approval needed. This keeps `main` current without creating review burden for low-risk bumps.
 
 Major version updates are left open for manual review. Dependabot will comment on the PR to flag it. A maintainer should:
 

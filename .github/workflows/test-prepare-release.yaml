@@ -194,8 +194,7 @@ jobs:
         run: |
           gh release delete "$TAG" \
             --repo "${{ github.repository }}" \
-            --yes \
-            --cleanup-tag
+            --yes
 
           echo "Draft release and tag $TAG deleted."
 

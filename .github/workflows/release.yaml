@@ -111,6 +111,7 @@ jobs:
           CLOUD_SDK_CFG_OBJECTSTORE_GCS_PROJECTID: ${{ vars.CLOUD_SDK_CFG_OBJECTSTORE_GCS_PROJECTID }}
           CLOUD_SDK_CFG_SDM_DEFAULT_URI: ${{ vars.CLOUD_SDK_CFG_SDM_DEFAULT_URI }}
         run: |
+          env | grep -E '^(CLOUD_SDK_CFG_|AICORE_)' >> "$GITHUB_ENV"
           echo "Integration test environment set up."
 
       - name: Run integration tests

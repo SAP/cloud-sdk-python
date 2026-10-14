@@ -142,19 +142,10 @@ jobs:
           echo "version=$NEW_VERSION" >> "$GITHUB_OUTPUT"
           echo "tag=$TAG"             >> "$GITHUB_OUTPUT"
 
-      - name: Check pre-release flag
-        id: prerelease
-        env:
-          VERSION: ${{ steps.release.outputs.version }}
-        run: |
-          IS_PRERELEASE=$(python3 .github/scripts/check_prerelease.py)
-          echo "is_prerelease=$IS_PRERELEASE" >> "$GITHUB_OUTPUT"
-
       - name: Print dry-run summary
         env:
           VERSION: ${{ steps.release.outputs.version }}
           TAG: ${{ steps.release.outputs.tag }}
-          IS_PRERELEASE: ${{ steps.prerelease.outputs.is_prerelease }}
           BRANCH: ${{ github.event.inputs.branch || github.head_ref }}
         run: |
           echo "========================================"
@@ -163,14 +154,50 @@ jobs:
           echo "  Branch:      $BRANCH"
           echo "  Tag:         $TAG"
           echo "  Version:     $VERSION"
-          echo "  Pre-release: $IS_PRERELEASE"
           echo ""
           echo "  Release notes that would be created:"
           echo "----------------------------------------"
           cat /tmp/release_notes.md
-          echo "----------------------------------------"
-          echo "  Step skipped (dry run): gh release create $TAG --draft"
           echo "========================================"
+
+      - name: Create draft release (deleted immediately after)
+        id: draft_release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.release.outputs.version }}
+          TAG: ${{ steps.release.outputs.tag }}
+          BRANCH: ${{ github.event.inputs.branch || github.head_ref }}
+        run: |
+          IS_PRERELEASE=$(python3 .github/scripts/check_prerelease.py)
+
+          PRERELEASE_FLAG=""
+          if [[ "$IS_PRERELEASE" == "true" ]]; then
+            PRERELEASE_FLAG="--prerelease"
+          fi
+
+          gh release create "$TAG" \
+            --repo "${{ github.repository }}" \
+            --title "v${VERSION} [TEST - will be deleted]" \
+            --notes-file /tmp/release_notes.md \
+            --draft \
+            $PRERELEASE_FLAG \
+            --target "$BRANCH"
+
+          echo "Draft release created: $TAG (prerelease: $IS_PRERELEASE)"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
+      - name: Delete draft release and tag
+        if: always() && steps.draft_release.outputs.tag != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.draft_release.outputs.tag }}
+        run: |
+          gh release delete "$TAG" \
+            --repo "${{ github.repository }}" \
+            --yes \
+            --cleanup-tag
+
+          echo "Draft release and tag $TAG deleted."
 
       - name: Generate bot token
         id: bot_token

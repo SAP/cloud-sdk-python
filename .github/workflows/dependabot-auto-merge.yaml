@@ -14,8 +14,22 @@ jobs:
       pull-requests: write
 
     steps:
+      - name: Check auto-merge feature flag
+        id: flag
+        env:
+          ENABLED: ${{ vars.DEPENDABOT_AUTO_MERGE_ENABLED }}
+        run: |
+          if [[ "$ENABLED" == "true" ]]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+            echo "Auto-merge is enabled (DEPENDABOT_AUTO_MERGE_ENABLED=true)."
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "Auto-merge is disabled. Set repository variable DEPENDABOT_AUTO_MERGE_ENABLED=true to enable it."
+          fi
+
       - name: Fetch Dependabot metadata
         id: metadata
+        if: steps.flag.outputs.enabled == 'true'
         uses: dependabot/fetch-metadata@v2
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
@@ -23,9 +37,11 @@ jobs:
       - name: Generate bot token
         id: bot_token
         if: >
-          steps.metadata.outputs.update-type == 'version-update:semver-patch' ||
-          steps.metadata.outputs.update-type == 'version-update:semver-minor' ||
-          steps.metadata.outputs.dependency-type == 'direct:production' && steps.metadata.outputs.update-type == 'version-update:semver-patch'
+          steps.flag.outputs.enabled == 'true' && (
+            steps.metadata.outputs.update-type == 'version-update:semver-patch' ||
+            steps.metadata.outputs.update-type == 'version-update:semver-minor' ||
+            steps.metadata.outputs.dependency-type == 'direct:production' && steps.metadata.outputs.update-type == 'version-update:semver-patch'
+          )
         uses: actions/create-github-app-token@v1
         with:
           app-id: ${{ secrets.CLOUD_SDK_BOT_APP_ID }}
@@ -33,8 +49,10 @@ jobs:
 
       - name: Approve and enable auto-merge for patch and minor updates
         if: >
-          steps.metadata.outputs.update-type == 'version-update:semver-patch' ||
-          steps.metadata.outputs.update-type == 'version-update:semver-minor'
+          steps.flag.outputs.enabled == 'true' && (
+            steps.metadata.outputs.update-type == 'version-update:semver-patch' ||
+            steps.metadata.outputs.update-type == 'version-update:semver-minor'
+          )
         env:
           GH_TOKEN: ${{ steps.bot_token.outputs.token }}
         run: |
@@ -51,7 +69,7 @@ jobs:
           echo "Auto-merge enabled for PR #${{ github.event.pull_request.number }} (${{ steps.metadata.outputs.update-type }})"
 
       - name: Leave major updates for manual review
-        if: steps.metadata.outputs.update-type == 'version-update:semver-major'
+        if: steps.flag.outputs.enabled == 'true' && steps.metadata.outputs.update-type == 'version-update:semver-major'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |

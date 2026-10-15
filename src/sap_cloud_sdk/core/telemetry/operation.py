@@ -139,6 +139,11 @@ class Operation(str, Enum):
     ADMS_CONFIG_GET_APP_TENANT = "config_get_app_tenant"
     ADMS_CONFIG_DELETE_APP_TENANT = "config_delete_app_tenant"
 
+    # CBC Operations
+    CBC_GET_CONSUMPTION_VERSIONS = "get_consumption_versions"
+    CBC_GET_CONFIGURATION = "get_configuration"
+    CBC_GET_ENTITY_DATA = "get_entity_data"
+
     # Bootstrap Operations
     BOOTSTRAP = "bootstrap"
 

@@ -10,7 +10,6 @@ Usage:
 """
 
 from typing import Optional
-
 from sap_cloud_sdk.objectstore.exceptions import (
     ObjectStoreError,
     ClientCreationError,

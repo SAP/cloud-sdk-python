@@ -1,5 +1,10 @@
 # ObjectStore User Guide
 
+> **Deprecated.** This module is deprecated and will be removed in a future
+> release. Use [`sap_cloud_sdk.object_storage`](../object_storage/user-guide.md)
+> instead, which supports Amazon S3, Azure Blob Storage, and Google Cloud Storage
+> behind the same interface.
+
 This module provides a simple API for interacting with S3-compatible object storage.
 
 Provides a simple and unified way to connect to Object Store services. It abstracts configuration, authentication, and transport, making it easy to upload and download files without dealing with provider-specific details.

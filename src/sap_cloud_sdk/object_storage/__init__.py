@@ -1,0 +1,49 @@
+"""SAP Cloud SDK for Python - Object Store module
+
+``create_client()`` auto-detects the cloud provider from the service binding and
+returns a client implementing the ``ObjectStoreClient`` protocol. Supported
+providers: S3/MinIO, Azure Blob Storage, Google Cloud Storage.
+
+Usage:
+    from sap_cloud_sdk.object_storage import create_client
+
+    client = create_client(instance="object-store-1")
+"""
+
+from sap_cloud_sdk.object_storage._factory import create_client
+from sap_cloud_sdk.object_storage._models import ObjectMetadata
+from sap_cloud_sdk.object_storage._protocol import ObjectReader, ObjectStoreClient
+from sap_cloud_sdk.object_storage.config import (
+    AzureConfig,
+    GcsConfig,
+    S3Config,
+)
+from sap_cloud_sdk.object_storage.exceptions import (
+    ClientCreationError,
+    ConfigError,
+    ListObjectsError,
+    ObjectNotFoundError,
+    ObjectOperationError,
+    ObjectStoreError,
+)
+
+__all__ = [
+    # Protocol (usable as a type annotation)
+    "ObjectStoreClient",
+    "ObjectReader",
+    # Config types (pass to create_client() to bypass auto-detection)
+    "S3Config",
+    "AzureConfig",
+    "GcsConfig",
+    # Metadata model
+    "ObjectMetadata",
+    # Factory function
+    "create_client",
+    # Exceptions
+    "ObjectStoreError",
+    "ConfigError",
+    "ClientCreationError",
+    "ObjectOperationError",
+    "ObjectNotFoundError",
+    "ListObjectsError",
+]

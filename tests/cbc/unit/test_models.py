@@ -136,7 +136,9 @@ class TestConfigurationData:
             configuration_objects=list(configuration_objects),
         )
 
-    def test_get_configuration_object_with_matching_id_returns_configuration_object(self):
+    def test_get_configuration_object_with_matching_id_returns_configuration_object(
+        self,
+    ):
         config = self._config(
             self._configuration_object("ObjA", "E1"),
             self._configuration_object("ObjB", "E2"),

@@ -7,11 +7,13 @@ custom tool naming, argument schemas, or framework integrations.
 
 from __future__ import annotations
 
+import json
 from typing import TYPE_CHECKING, Any, Callable
 
 from pydantic import Field, create_model
 
 from sap_cloud_sdk.agentgateway._models import MCPTool
+from sap_cloud_sdk.agentgateway.exceptions import AgentGatewaySDKError
 
 if TYPE_CHECKING:
     from langchain_core.tools import StructuredTool
@@ -64,6 +66,23 @@ _EXTRA_KEYS: frozenset[str] = frozenset(
 )
 
 
+def _augment_description_with_output_schema(
+    description: str, output_schema: dict[str, Any] | None
+) -> str:
+    """Append a tool's output schema to its description for the LLM.
+
+    LangChain only serializes a tool's name, description, and args schema into the
+    spec sent to the model; there is no field that carries an MCP ``outputSchema``.
+    So the only way the LLM can see the expected result shape is to fold it into
+    the description. Tools without an output schema are returned unchanged.
+    """
+    if not output_schema:
+        return description
+    rendered = json.dumps(output_schema, indent=2)
+    suffix = f"Output schema (JSON):\n{rendered}"
+    return f"{description}\n\n{suffix}" if description else suffix
+
+
 def _resolve_type(json_type: Any) -> tuple[type, bool]:
     """Return (python_type, is_nullable) from a JSON Schema ``type`` value.
 
@@ -83,6 +102,7 @@ def mcp_tool_to_langchain(
     get_user_token: Callable[[], str],
     *,
     omit_none: bool = True,
+    handle_tool_error: bool | str | Callable[[Exception], str] | None = None,
 ) -> StructuredTool:
     """Convert MCPTool to LangChain StructuredTool.
 
@@ -95,6 +115,14 @@ def mcp_tool_to_langchain(
         get_user_token: Callable that returns the user's JWT token.
         omit_none: If True (default), optional parameters with a None value are not
             forwarded to call_tool. Set to False to forward None values explicitly.
+        handle_tool_error: Opt-in LangChain error handling. When set, tool-call failures
+            are surfaced to the LLM as a ToolException and LangChain converts them to an
+            error ToolMessage the model can see and self-correct on. Default (None) keeps
+            the previous behavior: the raw SDK exception propagates.
+            Recommended value is ``True`` (use the error message as the tool result). You
+            may also pass a ``str`` to show the LLM a fixed message instead, or a callable
+            ``(ToolException) -> str`` to compute the message. Passed through to
+            LangChain's ``StructuredTool.handle_tool_error``.
 
     Returns:
         LangChain StructuredTool that invokes the MCP tool.
@@ -122,7 +150,7 @@ def mcp_tool_to_langchain(
         ```
     """
     try:
-        from langchain_core.tools import StructuredTool
+        from langchain_core.tools import StructuredTool, ToolException
     except ImportError:
         raise ImportError(
             "langchain-core is required for mcp_tool_to_langchain. "
@@ -146,11 +174,22 @@ def mcp_tool_to_langchain(
             if omit_none
             else restored
         )
-        return await call_tool(
-            mcp_tool,
-            user_token=get_user_token,
-            **resolved,
-        )
+        if handle_tool_error is None:
+            return await call_tool(
+                mcp_tool,
+                user_token=get_user_token,
+                **resolved,
+            )
+        # Opt-in: surface Agent Gateway failures as a ToolException so LangChain's
+        # handle_tool_error can convert them to an error ToolMessage for the LLM.
+        try:
+            return await call_tool(
+                mcp_tool,
+                user_token=get_user_token,
+                **resolved,
+            )
+        except AgentGatewaySDKError as exc:
+            raise ToolException(str(exc)) from exc
 
     fields: dict[str, Any] = {}
     for safe, orig in name_map.items():
@@ -179,6 +218,13 @@ def mcp_tool_to_langchain(
     return StructuredTool.from_function(
         coroutine=run,
         name=mcp_tool.name,
-        description=mcp_tool.description,
+        description=_augment_description_with_output_schema(
+            mcp_tool.description, mcp_tool.output_schema
+        ),
         args_schema=args_schema,
+        **(
+            {"handle_tool_error": handle_tool_error}
+            if handle_tool_error is not None
+            else {}
+        ),
     )

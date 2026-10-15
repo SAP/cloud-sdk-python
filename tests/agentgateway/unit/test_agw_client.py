@@ -1318,3 +1318,30 @@ class TestGetIasClientId:
         with patch(_GET_IAS_CLIENT_ID_LOB_PATCH, side_effect=EnvironmentError("APPFND_CONHOS_LANDSCAPE not set")):
             with pytest.raises(AgentGatewaySDKError, match="Could not resolve IAS client ID"):
                 create_client(tenant_subdomain="my-tenant").get_ias_client_id()
+
+
+class TestFindSdkError:
+    """Tests for _find_sdk_error (preserves a clean SDK error buried in a group)."""
+
+    def test_returns_bare_sdk_error(self):
+        from sap_cloud_sdk.agentgateway.agw_client import _find_sdk_error
+        from sap_cloud_sdk.agentgateway.exceptions import AgentGatewayServerError
+
+        err = AgentGatewayServerError("boom", error_code=-32602)
+        assert _find_sdk_error(err) is err
+
+    def test_finds_sdk_error_in_nested_group(self):
+        from sap_cloud_sdk.agentgateway.agw_client import _find_sdk_error
+        from sap_cloud_sdk.agentgateway.exceptions import AgentGatewayServerError
+
+        err = AgentGatewayServerError("boom", error_code=-32602)
+        group = BaseExceptionGroup("outer", [BaseExceptionGroup("inner", [err])])
+        found = _find_sdk_error(group)
+        assert found is err
+        assert found.error_code == -32602
+
+    def test_returns_none_without_sdk_error(self):
+        from sap_cloud_sdk.agentgateway.agw_client import _find_sdk_error
+
+        group = BaseExceptionGroup("eg", [ValueError("x"), RuntimeError("y")])
+        assert _find_sdk_error(group) is None

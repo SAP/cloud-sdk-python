@@ -82,3 +82,64 @@ claims = parse_token(token)
 set_tenant_id(claims.app_tid or "")
 add_span_attribute("enduser.id", claims.scim_id or claims.sub or "")
 ```
+
+---
+
+## Verified Claims
+
+`parse_token` decodes the JWT without verifying its signature. For security-sensitive consumers — telemetry identity attributes, audit context — use `IASVerifier` to perform JWKS-backed signature verification before trusting the claims.
+
+### IASVerifier
+
+`IASVerifier` is a built-in verifier that fetches signing keys from the IAS JWKS endpoint and validates the token's signature, issuer, algorithm, and expiry. It auto-configures itself from the environment:
+
+- **Cloud Foundry**: reads `VCAP_SERVICES` → `identity[0]` or `xsuaa[0]` credentials.
+- **Kubernetes (managed runtime)**: reads the `identity-service` secret mounted at `/etc/secrets/appfnd/identity-service/default/` — mounted automatically by the agent deployment template, no `app.yaml` changes needed.
+- **Manual / local**: reads `IAS_URL` (and optionally `IAS_CLIENT_ID`) environment variables.
+
+```python
+from sap_cloud_sdk.ias import IASVerifier, IASConfigError
+
+# Auto-configure from VCAP_SERVICES (CF), K8s secret mount, or IAS_URL env var
+try:
+    verifier = IASVerifier.from_env()
+except IASConfigError:
+    # No IAS binding found — handle gracefully
+    ...
+
+# Or configure explicitly
+verifier = IASVerifier(ias_url="https://my-tenant.accounts.ondemand.com", client_id="my-client-id")
+
+# Verify a token — raises IASTokenError on any failure
+verified = verifier("Bearer <token>")
+claims = verified.claims  # IASClaims, provably from IAS
+```
+
+`IASVerifier` pins algorithms to `RS256` and `ES256` (asymmetric only), caches signing keys internally, and handles key rotation transparently.
+
+### VerifiedIASClaims
+
+`VerifiedIASClaims` is a frozen dataclass that wraps `IASClaims`. Its presence is the SDK's provenance marker: an instance can only be obtained by calling a `TokenVerifier` that ran signature verification. Never construct it directly from `parse_token` output in security-sensitive code.
+
+```python
+from sap_cloud_sdk.ias import VerifiedIASClaims, IASClaims
+
+verified: VerifiedIASClaims = verifier("Bearer <token>")
+claims: IASClaims = verified.claims  # access the underlying claims
+```
+
+### Zero-config with StarletteIASTelemetryMiddleware
+
+When an IAS service binding is present, `StarletteIASTelemetryMiddleware` auto-configures `IASVerifier.from_env()` and verifies every token before stamping span attributes or setting the auth context — no extra code required:
+
+```python
+from starlette.applications import Starlette
+from sap_cloud_sdk.core.telemetry import auto_instrument
+from sap_cloud_sdk.core.telemetry.middleware import StarletteIASTelemetryMiddleware
+
+app = Starlette(...)
+# IASVerifier auto-configured from VCAP_SERVICES or IAS_URL
+auto_instrument(middlewares=[StarletteIASTelemetryMiddleware(app=app)])
+```
+
+If no binding is found, a WARNING is logged at startup and identity attributes are not stamped until a binding is added. See [Telemetry user guide](../core/telemetry/user-guide.md#built-in-starletteiastelemetrymiddleware) for details.

@@ -123,14 +123,14 @@ Check the PR body for the same categories as B1: account-specific URLs containin
 | `Unit Tests with Coverage` | pytest, coverage ≥ 80% |
 | `Build SDK` | `uv build` produces `.whl` + `.tar.gz` |
 | `commit-validation` | commitlint on all commits |
-| `Enforce version bump when src/ is modified` | version must increase if `src/` changed |
+| `Check Version Bump` | rejects manual version bumps — version is auto-managed |
 | `Verify generated proto code is up-to-date` | only for proto changes |
 | `Analyze (python)` | CodeQL security scan |
 
 Any required job ❌ → overall ❌. Pending → ⚠️.
 
 **C2: Version bump**
-If diff touches any `src/` file: `version` in `pyproject.toml` MUST be incremented (semver). Only `docs/`, `tests/`, `.github/`, `.claude/` changed → ➖ N/A.
+The version in `pyproject.toml` is managed **automatically** by the release pipeline — contributors must NOT manually change it. If the diff bumps `version` in `pyproject.toml`, that is a ❌ violation (the `Check Version Bump` CI job will also fail). This criterion is ➖ N/A for all PRs; only flag it if a manual bump is detected.
 
 **C3: Type hints**
 All new/modified public functions, methods, class attributes must have full annotations (params + return type). New modules need `py.typed`. Missing `Optional`, `Union`, or return type on a public method → ⚠️ or ❌.
@@ -299,29 +299,44 @@ Verdict: any ❌ → **Blocked** · any ⚠️ → **Needs Minor Work** · all �
 
 Always post the report as a GitHub PR review and apply the corresponding label. Do not ask — this is mandatory.
 
-**Post the review:**
+**Step 1 — Write the report to a temp file** (avoids shell-quoting issues with long bodies):
+
+```bash
+cat > /tmp/pr<NUMBER>-review.md << 'EOF'
+<full report markdown>
+EOF
+```
+
+**Step 2 — Post the review:**
 
 | Verdict | Command |
 |---|---|
-| ❌ Blocked | `gh pr review <number> --repo <REPO> --request-changes --body "<report>"` |
-| ⚠️ Needs Minor Work | `gh pr review <number> --repo <REPO> --comment --body "<report>"` |
-| ✅ Ready to Merge | `gh pr review <number> --repo <REPO> --approve --body "<report>"` |
+| ❌ Blocked | `gh pr review <NUMBER> --repo <REPO> --request-changes --body-file /tmp/pr<NUMBER>-review.md` |
+| ⚠️ Needs Minor Work | `gh pr review <NUMBER> --repo <REPO> --comment --body-file /tmp/pr<NUMBER>-review.md` |
+| ✅ Ready to Merge | `gh pr review <NUMBER> --repo <REPO> --approve --body-file /tmp/pr<NUMBER>-review.md` |
 
-**Apply the label** (remove all other `sdk-review:` labels first, then add the new one):
+**Step 3 — Apply the label** (two separate commands — remove first, then add):
 
 ```bash
-# Remove any existing sdk-review labels
-gh pr edit <number> --repo <REPO> \
+# Remove all existing sdk-review labels (|| true so it never aborts)
+gh pr edit <NUMBER> --repo <REPO> \
   --remove-label "sdk-review: ✅ passed" \
   --remove-label "sdk-review: ❌ blocked" \
   --remove-label "sdk-review: ⚠️ flagged" \
   --remove-label "sdk-review: skipped" 2>/dev/null || true
+```
 
-# Add the verdict label
-# ✅ Ready to Merge  → sdk-review: ✅ passed
-# ⚠️ Needs Minor Work → sdk-review: ⚠️ flagged
-# ❌ Blocked         → sdk-review: ❌ blocked
-gh pr edit <number> --repo <REPO> --add-label "<verdict-label>"
+Then add **exactly one** of these commands — copy the literal label string, do not paraphrase:
+
+```bash
+# ✅ Ready to Merge
+gh pr edit <NUMBER> --repo <REPO> --add-label "sdk-review: ✅ passed"
+
+# ⚠️ Needs Minor Work
+gh pr edit <NUMBER> --repo <REPO> --add-label "sdk-review: ⚠️ flagged"
+
+# ❌ Blocked
+gh pr edit <NUMBER> --repo <REPO> --add-label "sdk-review: ❌ blocked"
 ```
 
 The `sdk-review: skipped` label is reserved for maintainers to manually mark a PR where the review was intentionally bypassed (e.g. trivial doc fix). The workflow gate treats `skipped` the same as `passed` — it only blocks on missing label or `❌ blocked`.

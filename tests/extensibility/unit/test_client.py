@@ -397,17 +397,28 @@ class TestCallHookAgw:
                 await client.call_hook_agw(hook=_make_hook(), tenant_subdomain="t")
 
     @pytest.mark.asyncio
-    async def test_webhook_inputs_forwarded_to_tool(self):
-        """Verifies webhook payload structure is forwarded correctly to call_mcp_tool."""
+    async def test_message_forwarded_as_body_to_tool(self):
+        """The A2A message is forwarded under 'body' (per the hook tool schema), not wrapped in 'inputs'."""
         agw = _make_agw_client(tools=[_make_hook_tool()], tool_responses=[_success_payload()])
         client = self._make_client()
+        message = MagicMock()
+        message.model_dump.return_value = {
+            "messageId": "msg-in-1",
+            "role": "user",
+            "parts": [{"kind": "text", "text": "hi"}],
+        }
         with patch(
             "sap_cloud_sdk.extensibility.client.create_agw_client",
             return_value=agw,
         ):
-            await client.call_hook_agw(hook=_make_hook(), tenant_subdomain="t")
+            await client.call_hook_agw(
+                hook=_make_hook(), message=message, tenant_subdomain="t"
+            )
         call_kwargs = agw.call_mcp_tool.call_args[1]
-        assert "inputs" in call_kwargs
-        assert call_kwargs["inputs"]["type"] == "webhook"
-        assert "webhookData" in call_kwargs["inputs"]
-        assert call_kwargs["inputs"]["webhookData"]["method"] == HTTPMethod.POST
+        assert "inputs" not in call_kwargs
+        assert call_kwargs["body"] == {
+            "messageId": "msg-in-1",
+            "role": "user",
+            "parts": [{"kind": "text", "text": "hi"}],
+        }
+        message.model_dump.assert_called_once_with(mode="json", exclude_none=True)

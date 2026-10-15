@@ -424,18 +424,12 @@ class ExtensibilityClient:
         message: Optional[Any],
         headers: Optional[dict],
     ) -> Optional[Message]:
-        message_body = message.model_dump(mode="json") if message is not None else {}
-        tool_arguments = {
-            "inputs": {
-                "type": "webhook",
-                "webhookData": {
-                    "method": hook.n8n_workflow_config.method,
-                    "query": {},
-                    "body": message_body,
-                    "headers": headers or {},
-                },
-            },
-        }
+        message_body = (
+            message.model_dump(mode="json", exclude_none=True)
+            if message is not None
+            else {}
+        )
+        tool_arguments = {"body": message_body}
         logger.info(
             "Calling hook tool=%s server=%s",
             hook.n8n_workflow_config.tool_name,
@@ -458,7 +452,9 @@ class ExtensibilityClient:
             raise TransportError(f"Could not parse hook response: {exc}") from exc
 
         try:
-            structured = data.get("structuredContent") if data else None
+            structured = (
+                data.get("structuredContent") or data.get("value") if data else None
+            )
             return Message(**structured) if structured else None
         except (TypeError, ValidationError) as exc:
             raise ExtensibilityError(

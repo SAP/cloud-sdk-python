@@ -25,7 +25,7 @@ def _label(key: str, value: str) -> Label:
 def _full_labels(gtid: str, system_type: str, ord_id: str) -> list[Label]:
     return [
         _label("sap-managed-runtime-gtid", gtid),
-        _label("sap-managed-runtime-system-type", system_type),
+        _label("sap-managed-runtime-assigned-application-namespace", system_type),
         _label("sap-managed-runtime-ordid", ord_id),
         _label("sap-managed-runtime-type", "agw.mcp.server"),
     ]

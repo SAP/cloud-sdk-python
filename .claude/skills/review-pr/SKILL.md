@@ -87,10 +87,14 @@ If you need to verify a specific rule, read the authoritative source directly:
 ### Section A: Process & Compliance
 
 **A1: PR template complete**
-Template requires: Description, Related Issue, Type of Change (one box ticked), How to Test (numbered steps), checklist of 9 items all ticked. Empty or placeholder body → ❌.
+Template requires: Description, Related Issue, Type of Change (one box ticked), How to Test (numbered steps), checklist of 9 core items all ticked. Two conditional items apply only when relevant:
+- *(New modules only)* e2e evidence attached — check if the PR adds a new module under `src/sap_cloud_sdk/`; if so, the item must be ticked and the PR body or comments must reference a screen recording, logs, or screenshots against a real BTP service.
+- *(Security-sensitive changes only)* `/security-review` run and ❌ findings addressed — check if the PR touches auth, credential loading, tenant routing, or external input handling; if so, the item must be ticked.
+
+Empty or placeholder body → ❌.
 
 **A2: Conventional Commits**
-Every commit headline must match `type(scope): description`. Types: `feat`, `fix`, `chore`, `docs`, `refactor`, `test`, `ci`, `perf`, `style`, `build`, `revert`. PR title is also validated. Check `commit-validation` CI job. Quote failing commit titles.
+The **PR title** must match `type(scope): description`. Types: `feat`, `fix`, `chore`, `docs`, `refactor`, `test`, `ci`, `perf`, `style`, `build`, `revert`. Individual commit messages on the branch are not evaluated — PRs are squash-merged and the PR title becomes the commit message on `main`. Check the `commit-validation` CI job result for confirmation.
 
 **A3: Issue linked**
 PR body must contain `Closes #N`, `Fixes #N`, or `Resolves #N`.
@@ -291,12 +295,33 @@ Verdict: any ❌ → **Blocked** · any ⚠️ → **Needs Minor Work** · all �
 
 ---
 
-## Phase 5 (Optional): Post Review
+## Phase 5: Post Review and Apply Label
 
-Ask: "Post as GitHub PR review? (comment / request-changes / approve / skip)"
+Always post the report as a GitHub PR review and apply the corresponding label. Do not ask — this is mandatory.
+
+**Post the review:**
+
+| Verdict | Command |
+|---|---|
+| ❌ Blocked | `gh pr review <number> --repo <REPO> --request-changes --body "<report>"` |
+| ⚠️ Needs Minor Work | `gh pr review <number> --repo <REPO> --comment --body "<report>"` |
+| ✅ Ready to Merge | `gh pr review <number> --repo <REPO> --approve --body "<report>"` |
+
+**Apply the label** (remove all other `sdk-review:` labels first, then add the new one):
 
 ```bash
-gh pr review <number> --comment --body "<report>"
-gh pr review <number> --request-changes --body "<report>"
-gh pr review <number> --approve --body "<report>"
+# Remove any existing sdk-review labels
+gh pr edit <number> --repo <REPO> \
+  --remove-label "sdk-review: ✅ passed" \
+  --remove-label "sdk-review: ❌ blocked" \
+  --remove-label "sdk-review: ⚠️ flagged" \
+  --remove-label "sdk-review: skipped" 2>/dev/null || true
+
+# Add the verdict label
+# ✅ Ready to Merge  → sdk-review: ✅ passed
+# ⚠️ Needs Minor Work → sdk-review: ⚠️ flagged
+# ❌ Blocked         → sdk-review: ❌ blocked
+gh pr edit <number> --repo <REPO> --add-label "<verdict-label>"
 ```
+
+The `sdk-review: skipped` label is reserved for maintainers to manually mark a PR where the review was intentionally bypassed (e.g. trivial doc fix). The workflow gate treats `skipped` the same as `passed` — it only blocks on missing label or `❌ blocked`.

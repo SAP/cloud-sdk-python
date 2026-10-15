@@ -2,7 +2,11 @@
 
 from types import SimpleNamespace
 
+from mcp.shared.exceptions import McpError
+from mcp.types import ErrorData
+
 from sap_cloud_sdk.agentgateway._compat import (
+    find_mcp_error,
     mcp_input_schema,
     mcp_is_error,
     mcp_server_name,
@@ -87,3 +91,33 @@ class TestMcpIsError:
     def test_defaults_to_false_when_missing(self):
         """No error field on either name -> False."""
         assert mcp_is_error(SimpleNamespace()) is False
+
+
+class TestFindMcpError:
+    """Tests for find_mcp_error unwrapping."""
+
+    def test_returns_bare_mcp_error(self):
+        """A bare McpError is returned directly."""
+        err = McpError(ErrorData(code=-32602, message="Unknown tool: foo"))
+        assert find_mcp_error(err) is err
+
+    def test_finds_mcp_error_in_group(self):
+        """An McpError wrapped in a BaseExceptionGroup is found."""
+        err = McpError(ErrorData(code=-32603, message="Internal Server Error"))
+        group = BaseExceptionGroup("eg", [err])
+        assert find_mcp_error(group) is err
+
+    def test_finds_mcp_error_in_nested_group(self):
+        """An McpError nested in a group within a group is found."""
+        err = McpError(ErrorData(code=-32600, message="bad request"))
+        group = BaseExceptionGroup("outer", [BaseExceptionGroup("inner", [err])])
+        assert find_mcp_error(group) is err
+
+    def test_returns_none_without_mcp_error(self):
+        """A group without any McpError leaf returns None (defer to generic handling)."""
+        group = BaseExceptionGroup("eg", [ValueError("x"), RuntimeError("y")])
+        assert find_mcp_error(group) is None
+
+    def test_returns_none_for_unrelated_exception(self):
+        """A plain non-group, non-McpError exception returns None."""
+        assert find_mcp_error(ValueError("x")) is None

@@ -363,11 +363,19 @@ auto_instrument(middlewares=[MyMiddleware(app=app)])
 
 ### Built-in: `StarletteIASTelemetryMiddleware`
 
-For Starlette/FastAPI apps with IAS authentication, the SDK ships a ready-to-use middleware that reads the `Authorization: Bearer <token>` header on each request, parses it as an IAS JWT, and injects:
+For Starlette/FastAPI apps with IAS authentication, the SDK ships a ready-to-use middleware that reads the `Authorization: Bearer <token>` header on each request, **verifies** it as an IAS JWT using JWKS-backed signature verification, and injects:
 - `sap.tenancy.tenant_id` from the `sap_gtid` claim
 - `user.id` from the `user_uuid` claim
 
-If the header is absent or the token cannot be parsed, no attributes are set and the request continues normally.
+Identity attributes are stamped **only** when token verification succeeds. Forged or invalid tokens result in no identity attributes and an empty auth context — the request continues normally.
+
+#### Zero-config (IAS service binding present)
+
+When an IAS service binding is available, `StarletteIASTelemetryMiddleware` auto-configures `IASVerifier` at construction with no extra code. Lookup order:
+
+1. `VCAP_SERVICES` (Cloud Foundry)
+2. Kubernetes secret mount at `/etc/secrets/appfnd/identity-service/default/` — populated automatically by the agent deployment template, no `app.yaml` changes needed
+3. `IAS_URL` environment variable (manual / local)
 
 ```python
 from starlette.applications import Starlette
@@ -377,6 +385,37 @@ from sap_cloud_sdk.core.telemetry.middleware import StarletteIASTelemetryMiddlew
 app = Starlette(...)
 auto_instrument(middlewares=[StarletteIASTelemetryMiddleware(app=app)])
 ```
+
+**Agents with an IAS service binding get verified telemetry and auth context with zero code changes.**
+
+#### Without an IAS service binding
+
+If no binding is found, a WARNING is logged at startup:
+
+```
+StarletteIASTelemetryMiddleware: IAS service binding not found — sap.tenancy.tenant_id
+and user.id will NOT be stamped on spans. Bind an SAP Identity service instance to enable
+verified identity attributes.
+```
+
+The app starts and handles requests normally — only the identity span attributes are omitted.
+Add an IAS service binding to restore them.
+
+#### Custom verifier (advanced)
+
+For scenarios where the token has already been verified upstream (e.g. Istio/Kyma mTLS), pass a custom `TokenVerifier` callable:
+
+```python
+from sap_cloud_sdk.ias import IASVerifier, TokenVerifier
+
+my_verifier: TokenVerifier = IASVerifier(
+    ias_url="https://my-tenant.accounts.ondemand.com",
+    client_id="my-client-id",
+)
+auto_instrument(middlewares=[StarletteIASTelemetryMiddleware(app=app, token_verifier=my_verifier)])
+```
+
+See the [IAS user guide](../../ias/user-guide.md#verified-claims) for the full `IASVerifier` API.
 
 ---
 

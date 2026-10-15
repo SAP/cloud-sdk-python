@@ -156,11 +156,26 @@ For new features or capabilities:
 4. **Link the PR to the original issue** (use "Closes #issue-number" in the PR description)
 5. **Mark the PR as "Ready for Review"**
 
-### 5. Code review and finalization
+### 5. Self-review before opening the PR
+
+Before marking the PR as ready for review, run the following checks locally:
+
+**Security review** — if your PR touches authentication, tenant routing, credential loading, or any code that accepts external input, run `/security-review` in Claude Code. Address all ❌ findings before submitting.
+
+**New modules** — if your PR introduces a new service module, you must include evidence that it works end-to-end in a real application. Attach a screen recording, logs, or screenshots to the PR showing:
+- The module successfully connecting to the service with a real binding
+- At least one happy-path operation completing (e.g. create + read or list)
+- The application running on BTP (locally against a real service or deployed)
+
+This evidence is required because integration tests run against limited environments and cannot substitute for validation against a real service.
+
+### 6. Code review and finalization
 
 Our team will review your implementation for:
 - **Code quality**: Adherence to guidelines and Python best practices
 - **Test coverage**: Comprehensive unit and integration tests
+- **Security**: Input validation, credential handling, tenant isolation (see [Security Review](#5-self-review-before-opening-the-pr))
+- **E2E evidence**: For new modules, the attached evidence of a working real-service integration
 - **Documentation**: Complete user guide with examples
 - **API consistency**: Alignment with existing SDK patterns
 

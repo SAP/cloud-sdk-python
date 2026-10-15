@@ -122,11 +122,20 @@ jobs:
         if: ${{ !contains(github.event.release.body, 'skip-integration-tests') }}
         run: uv run pytest tests/*/integration/ -v --tb=short
 
-  # ── 3. Publish ────────────────────────────────────────────────────────────
-  publish:
-    name: Publish
+  # ── 3. Gate (absorbs skipped integration-tests so publish is never auto-skipped) ──
+  gate:
+    name: Gate
     needs: [parse, integration-tests]
     if: always() && needs.parse.result == 'success' && needs.integration-tests.result == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "Gate passed"
+
+  # ── 4. Publish ────────────────────────────────────────────────────────────
+  publish:
+    name: Publish
+    needs: [parse, gate]
+    if: needs.gate.result == 'success'
     runs-on: ubuntu-latest
     environment: 'pypi:sap-cloud-sdk'
     permissions:
@@ -186,7 +195,7 @@ jobs:
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@v1.14.2
 
-  # ── 4. Notify on failure ──────────────────────────────────────────────────
+  # ── 5. Notify on failure ──────────────────────────────────────────────────
   notify-failure:
     name: Notify Failure
     needs: [parse, integration-tests, publish]

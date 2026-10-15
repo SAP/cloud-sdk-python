@@ -208,6 +208,24 @@ mTLS context from a freshly-fetched certificate and retries the request once. A
 long-lived `create_client()` singleton therefore recovers from rotation on its
 own — no need to recreate it.
 
+## Multi-tenancy
+
+- **Supported:** Yes
+- **Authentication:** IAS (the `app_tid` claim) for tenant identity; provider-level
+  mTLS to CBC. The subscriber subdomain selects the tenant's CBC endpoint.
+- **How to use:** Wire `bootstrap(app)` once at startup, then call
+  `create_client()` with no arguments. CBC is resolved per request from the
+  SDK-wide runtime context: the application tenant id (`APP_TENANT_ID`, the IAS
+  `app_tid` claim) is sent as the `appTenantId` query parameter, and the
+  subscriber subdomain (`DWC_SUBDOMAIN`) selects the tenant-mapping Destination
+  Fragment (`CBC_TenantMapping_<subdomain>`, fetched with
+  `AccessStrategy.SUBSCRIBER_ONLY`) whose `cbcUrl` is the per-tenant base URL. A
+  single client instance is safe to share across tenants and threads — nothing
+  tenant-specific is held on the client; each call reads the current request's
+  tenant from the runtime context. For local development or pro-code callers,
+  override `base_url` / `app_tenant_id` on `CBCConfig` (see [Overrides](#overrides)).
+- **Further reading:** [Platform setup](#platform-setup); `sap_cloud_sdk.core.runtime_context`.
+
 ## Overrides
 
 `create_client` accepts an optional `CBCConfig`. Any field left unset is inferred

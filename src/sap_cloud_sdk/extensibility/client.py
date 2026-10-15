@@ -5,10 +5,12 @@ from __future__ import annotations
 import itertools
 import json
 import logging
-from typing import TYPE_CHECKING, Any, Optional, Union
+import time
+from typing import TYPE_CHECKING, Any, Optional, Union, cast
 
 import httpx
 from a2a.types import Message
+from opentelemetry.propagate import inject
 from pydantic_core import ValidationError
 
 from sap_cloud_sdk.core.telemetry import Module, Operation

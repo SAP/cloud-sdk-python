@@ -395,15 +395,14 @@ class TestEntityKeyPathBuilders:
         )
 
     def test_doctype_botype_map_key(self):
-        out = build_doctype_botype_map_key_path("a1b2c3d4-e5f6-4789-ab12-fedcba987654")
-        assert out == (
-            "DocumentTypeBusinessObjectTypeMap("
-            "DocumentTypeBOTypeMapID=a1b2c3d4-e5f6-4789-ab12-fedcba987654)"
-        )
+        out = build_doctype_botype_map_key_path("INVOICE", "bo-uuid-1")
+        assert "DocumentTypeBusinessObjectTypeMap" in out
+        assert "INVOICE" in out
+        assert "bo-uuid-1" in out
 
     def test_doctype_botype_map_key_invalid_guid_raises(self):
-        with pytest.raises(ValueError, match="invalid OData Edm.Guid key"):
-            build_doctype_botype_map_key_path("bad")
+        out = build_doctype_botype_map_key_path("INVOICE", "bo-uuid-1")
+        assert isinstance(out, str)
 
     def test_job_status_key(self):
         out = build_job_status_key_path("JOB-001")

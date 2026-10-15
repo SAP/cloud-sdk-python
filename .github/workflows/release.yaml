@@ -121,7 +121,7 @@ jobs:
   publish:
     name: Publish
     needs: [parse, integration-tests]
-    if: needs.parse.result == 'success' && (needs.integration-tests.result == 'success' || needs.integration-tests.result == 'skipped')
+    if: always() && needs.parse.result == 'success' && (needs.integration-tests.result == 'success' || needs.integration-tests.result == 'skipped')
     runs-on: ubuntu-latest
     environment: 'pypi:sap-cloud-sdk'
     permissions:

@@ -6,6 +6,7 @@ import itertools
 import json
 import logging
 import time
+import warnings
 from typing import TYPE_CHECKING, Any, Optional, Union, cast
 
 import httpx
@@ -215,6 +216,7 @@ class ExtensibilityClient:
     @record_metrics(
         Module.EXTENSIBILITY,
         Operation.EXTENSIBILITY_CALL_HOOK,
+        deprecated=True,
     )
     def call_hook(
         self,
@@ -222,6 +224,11 @@ class ExtensibilityClient:
         hook_config: HookConfig,
     ) -> Optional[Message]:
         """Call a hook's MCP endpoint and poll until completion.
+
+        .. deprecated::
+            Use :meth:`call_hook_agw` instead, which invokes the hook through
+            Agent Gateway (handles tenant resolution, user-token exchange, and
+            the per-hook MCP translation-card contract).
 
         Executes the workflow via ``execute-workflow``, then polls
         ``get-execution`` every 500 ms until the execution succeeds, fails,
@@ -262,6 +269,12 @@ class ExtensibilityClient:
                 )
             ```
         """
+        warnings.warn(
+            "call_hook() is deprecated. Use call_hook_agw() instead, which "
+            "invokes the hook through Agent Gateway.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         headers = {**_JSONRPC_HEADERS}
         inject(headers)
 

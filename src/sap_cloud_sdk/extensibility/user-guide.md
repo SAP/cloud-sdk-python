@@ -878,6 +878,15 @@ The JSON file uses the same schema as the extensibility backend response:
 
 See `src/sap_cloud_sdk/extensibility/local_extensibility_example.json` for a ready-to-use template.
 
+## Multi-tenancy
+
+| Field | Value |
+|---|---|
+| **Supported** | Yes |
+| **Authentication** | XSUAA / IAS (delegated to Agent Gateway) |
+| **How to use** | Pass `tenant` (local tenant ID from the incoming JWT) to `get_extension_capability_implementation()` — it is used to filter extensions in the UMS GraphQL query and as a cache isolation key. For hook execution via `call_hook_agw()`, pass `tenant_subdomain` to scope the Agent Gateway client to the subscriber tenant, and `user_token` to forward the user's token for on-behalf-of flows. |
+| **Further reading** | [Agent Gateway module](../agentgateway/user-guide.md) |
+
 ## Notes
 
 - Create one `ExtensibilityClient` (via `create_client()`) and reuse it for multiple capability lookups where appropriate.

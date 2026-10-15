@@ -474,24 +474,6 @@ class ExtensibilityClient:
                 f"Hook response did not conform to the A2A Message protocol: {exc}"
             ) from exc
 
-    @staticmethod
-    def _extract_message(data: dict) -> Message:
-        try:
-            result_data = data.get("data", {}).get("resultData", {})
-            last_node = result_data.get("lastNodeExecuted", "")
-            response_json = (
-                result_data.get("runData", {})
-                .get(last_node, [{}])[0]
-                .get("data", {})
-                .get("main", [[{}]])[0][0]
-                .get("json", {})
-            )
-            return Message(**response_json)
-        except (KeyError, IndexError, TypeError, ValidationError) as exc:
-            raise TransportError(
-                f"Failed to extract response from last executed node: {exc}"
-            ) from exc
-
     @record_metrics(
         Module.EXTENSIBILITY,
         Operation.EXTENSIBILITY_CALL_HOOK,

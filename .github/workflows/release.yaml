@@ -159,7 +159,7 @@ jobs:
 
       - name: Check version does not already exist on PyPI
         run: |
-          PKG_NAME=$(python3 -c "import toml; print(toml.load('pyproject.toml')['project']['name'])")
+          PKG_NAME=$(python3 -c "import tomllib; print(tomllib.load(open('pyproject.toml','rb'))['project']['name'])")
           VERSION="${{ needs.parse.outputs.version }}"
           HTTP=$(curl -s -o /dev/null -w "%{http_code}" "https://pypi.org/pypi/$PKG_NAME/$VERSION/json")
           if [[ "$HTTP" == "200" ]]; then

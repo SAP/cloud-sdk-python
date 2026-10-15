@@ -217,6 +217,7 @@ jobs:
           gh pr merge "$PR_URL" \
             --repo "${{ github.repository }}" \
             --squash \
+            --admin \
             --delete-branch
 
           echo "PR merged and release branch deleted."

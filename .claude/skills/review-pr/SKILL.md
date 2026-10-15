@@ -97,7 +97,7 @@ Empty or placeholder body → ❌.
 The **PR title** must match `type(scope): description`. Types: `feat`, `fix`, `chore`, `docs`, `refactor`, `test`, `ci`, `perf`, `style`, `build`, `revert`. Individual commit messages on the branch are not evaluated — PRs are squash-merged and the PR title becomes the commit message on `main`. Check the `commit-validation` CI job result for confirmation.
 
 **A3: Issue linked**
-PR body must contain `Closes #N`, `Fixes #N`, or `Resolves #N`.
+PR body should contain `Closes #N`, `Fixes #N`, or `Resolves #N` if the PR addresses a tracked issue. If absent, assign **⚠️ Warning** — not all PRs are linked to issues, so this is never a ❌ Fail.
 
 **A4: AI-generated code disclosure**
 If the diff looks AI-generated, the PR description must explicitly disclose it and reference the [SAP AI contribution guideline](https://github.com/SAP/.github/blob/main/CONTRIBUTING_USING_GENAI.md). Required by `CONTRIBUTING.md`.

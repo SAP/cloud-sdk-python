@@ -241,6 +241,8 @@ class N8nWorkflowConfig:
         tool_name: MCP tool name (apiName segment of ordId, per ADR-021).
         global_tenant_id: Global tenant ID of the n8n workflow tenant (per ADR-022).
         method: HTTP method for the n8n webhook call.
+        workflow_id: n8n workflow ID. Retained for backward compatibility; not
+            populated by the current backend (defaults to "").
     """
 
     ord_id: str
@@ -248,6 +250,7 @@ class N8nWorkflowConfig:
     tool_name: str
     global_tenant_id: str
     method: HTTPMethod
+    workflow_id: str = ""
 
     @classmethod
     def from_dict(cls, obj: Dict[str, Any]) -> N8nWorkflowConfig:
@@ -276,6 +279,7 @@ class N8nWorkflowConfig:
             tool_name=obj.get("toolName", ""),
             global_tenant_id=obj.get("globalTenantId", ""),
             method=method,
+            workflow_id=obj.get("workflowId", ""),
         )
 
 

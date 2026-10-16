@@ -51,30 +51,34 @@ jobs:
   integration-tests:
     name: Integration Tests
     needs: parse
-    if: ${{ !contains(github.event.release.body, 'skip-integration-tests') }}
     runs-on: ${{ contains(github.server_url, 'github.com') && 'ubuntu-latest' || fromJSON('["self-hosted"]') }}
     permissions:
       contents: read
 
     steps:
       - name: Checkout release branch
+        if: ${{ !contains(github.event.release.body, 'skip-integration-tests') }}
         uses: actions/checkout@v4
         with:
           ref: ${{ needs.parse.outputs.branch }}
           fetch-depth: 0
 
       - name: Set up Python
+        if: ${{ !contains(github.event.release.body, 'skip-integration-tests') }}
         uses: actions/setup-python@v6
         with:
           python-version: "3.11"
 
       - name: Install uv
+        if: ${{ !contains(github.event.release.body, 'skip-integration-tests') }}
         uses: astral-sh/setup-uv@v3
 
       - name: Install dependencies
+        if: ${{ !contains(github.event.release.body, 'skip-integration-tests') }}
         run: uv sync --dev
 
       - name: Set up integration test environment
+        if: ${{ !contains(github.event.release.body, 'skip-integration-tests') }}
         env:
           AICORE_CLIENT_ID: ${{ secrets.AICORE_CLIENT_ID }}
           AICORE_CLIENT_SECRET: ${{ secrets.AICORE_CLIENT_SECRET }}
@@ -115,20 +119,19 @@ jobs:
           echo "Integration test environment set up."
 
       - name: Run integration tests
+        if: ${{ !contains(github.event.release.body, 'skip-integration-tests') }}
         run: uv run pytest tests/*/integration/ -v --tb=short
 
   # ── 3. Publish ────────────────────────────────────────────────────────────
   publish:
     name: Publish
     needs: [parse, integration-tests]
-    if: needs.parse.result == 'success' && (needs.integration-tests.result == 'success' || needs.integration-tests.result == 'skipped')
+    if: always() && needs.parse.result == 'success' && needs.integration-tests.result == 'success'
     runs-on: ubuntu-latest
     environment: 'pypi:sap-cloud-sdk'
     permissions:
       contents: write
       id-token: write
-    outputs:
-      release_url: ${{ steps.gh_release.outputs.release_url }}
 
     steps:
       - name: Checkout release branch
@@ -159,7 +162,7 @@ jobs:
 
       - name: Check version does not already exist on PyPI
         run: |
-          PKG_NAME=$(python3 -c "import toml; print(toml.load('pyproject.toml')['project']['name'])")
+          PKG_NAME=$(python3 -c "import tomllib; print(tomllib.load(open('pyproject.toml','rb'))['project']['name'])")
           VERSION="${{ needs.parse.outputs.version }}"
           HTTP=$(curl -s -o /dev/null -w "%{http_code}" "https://pypi.org/pypi/$PKG_NAME/$VERSION/json")
           if [[ "$HTTP" == "200" ]]; then
@@ -185,7 +188,7 @@ jobs:
   notify-failure:
     name: Notify Failure
     needs: [parse, integration-tests, publish]
-    if: always() && (needs.parse.result == 'failure' || needs['integration-tests'].result == 'failure' || needs.publish.result == 'failure')
+    if: always() && (needs.parse.result == 'failure' || needs.integration-tests.result == 'failure' || needs.publish.result == 'failure')
     runs-on: ubuntu-latest
     permissions:
       contents: write

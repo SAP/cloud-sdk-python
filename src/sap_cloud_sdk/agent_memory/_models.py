@@ -16,7 +16,11 @@ from typing import Any, Optional
 
 
 class AccessStrategy(str, Enum):
-    """Access strategy for tenant-scoped Agent Memory operations."""
+    """Access strategy for XSUAA tenant-scoped Agent Memory operations.
+
+    IAS bindings need no strategy: they are detected from a URL-only binding
+    (no ``token_url``) and the per-request token is supplied via the ContextVar.
+    """
 
     SUBSCRIBER = "SUBSCRIBER"
     PROVIDER = "PROVIDER"
@@ -224,6 +228,11 @@ class RetentionConfig:
         message_days: How long to keep messages (days). ``None`` disables cleanup.
         memory_days: How long to keep memories without access (days). ``None`` disables cleanup.
         usage_log_days: How long to keep access and search logs (days). ``None`` disables cleanup.
+        thread_days: Default TTL (days) applied only to registered threads (those created
+            via the Thread Registry API). Age-based cutoff for thread cleanup; unregistered
+            threads are unaffected. ``None`` disables age-based cleanup.
+        max_checkpoints_per_thread: Keep at most N checkpoints per ``(thread, scope)``,
+            deleting oldest first. ``None`` disables count-based cleanup.
         create_timestamp: ISO-8601 creation timestamp (read-only).
         update_timestamp: ISO-8601 last-update timestamp (read-only).
     """
@@ -232,6 +241,8 @@ class RetentionConfig:
     message_days: Optional[int] = None
     memory_days: Optional[int] = None
     usage_log_days: Optional[int] = None
+    thread_days: Optional[int] = None
+    max_checkpoints_per_thread: Optional[int] = None
     create_timestamp: Optional[str] = None
     update_timestamp: Optional[str] = None
 
@@ -243,6 +254,8 @@ class RetentionConfig:
             message_days=data.get("messageDays"),
             memory_days=data.get("memoryDays"),
             usage_log_days=data.get("usageLogDays"),
+            thread_days=data.get("threadDays"),
+            max_checkpoints_per_thread=data.get("maxCheckpointsPerThread"),
             create_timestamp=data.get("createTimestamp"),
             update_timestamp=data.get("updateTimestamp"),
         )
@@ -254,6 +267,8 @@ class RetentionConfig:
             "messageDays": self.message_days,
             "memoryDays": self.memory_days,
             "usageLogDays": self.usage_log_days,
+            "threadDays": self.thread_days,
+            "maxCheckpointsPerThread": self.max_checkpoints_per_thread,
             "createTimestamp": self.create_timestamp,
             "updateTimestamp": self.update_timestamp,
         }

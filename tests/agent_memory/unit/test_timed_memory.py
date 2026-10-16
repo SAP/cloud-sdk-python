@@ -1,4 +1,4 @@
-"""Unit tests for TimedInMemorySaver and create_checkpointer(ttl_seconds=...)."""
+"""Unit tests for TimedInMemorySaver."""
 
 import time
 from typing import Any, TypedDict
@@ -7,36 +7,29 @@ from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.graph import END, START, StateGraph
 
 from sap_cloud_sdk.agent_memory.factory._timed_memory import TimedInMemorySaver
-from sap_cloud_sdk.agent_memory.factory.langgraph_checkpoint import create_checkpointer
 
 
-class TestCreateCheckpointerWithTTL:
-    """Tests for create_checkpointer(ttl_seconds=...) factory."""
+class TestTimedInMemorySaverDirect:
+    """Tests for TimedInMemorySaver via direct instantiation."""
 
-    def test_no_ttl_returns_in_memory_saver(self):
-        """Default returns plain InMemorySaver when ttl_seconds is None."""
-        result = create_checkpointer()
-        assert isinstance(result, InMemorySaver)
-        assert not isinstance(result, TimedInMemorySaver)
+    def test_default_ttl(self):
+        """Default TTL is 3600 seconds."""
+        saver = TimedInMemorySaver()
+        assert saver.ttl_seconds == 3600
 
-    def test_ttl_returns_timed_in_memory_saver(self):
-        """ttl_seconds returns TimedInMemorySaver."""
-        result = create_checkpointer(ttl_seconds=3600)
-        assert isinstance(result, TimedInMemorySaver)
+    def test_custom_ttl_stored(self):
+        """ttl_seconds value is stored on the saver."""
+        saver = TimedInMemorySaver(ttl_seconds=7200)
+        assert saver.ttl_seconds == 7200
 
-    def test_ttl_value_is_set(self):
-        """ttl_seconds value is stored on the returned saver."""
-        result = create_checkpointer(ttl_seconds=7200)
-        assert isinstance(result, TimedInMemorySaver)
-        assert result.ttl_seconds == 7200
-
-    def test_timed_saver_is_also_in_memory_saver(self):
-        """TimedInMemorySaver is a valid BaseCheckpointSaver subtype."""
-        result = create_checkpointer(ttl_seconds=3600)
-        assert isinstance(result, InMemorySaver)
+    def test_is_also_in_memory_saver(self):
+        """TimedInMemorySaver is a valid InMemorySaver subtype."""
+        saver = TimedInMemorySaver(ttl_seconds=3600)
+        assert isinstance(saver, InMemorySaver)
 
     def test_compiles_with_langgraph_graph(self):
-        """Timed checkpointer compiles a StateGraph correctly."""
+        """TimedInMemorySaver compiles a StateGraph correctly."""
+
         class State(TypedDict):
             value: str
 
@@ -48,22 +41,12 @@ class TestCreateCheckpointerWithTTL:
         builder.add_edge(START, "noop")
         builder.add_edge("noop", END)
 
-        app: Any = builder.compile(checkpointer=create_checkpointer(ttl_seconds=3600))
+        app: Any = builder.compile(checkpointer=TimedInMemorySaver(ttl_seconds=3600))
         assert app is not None
 
 
 class TestTimedInMemorySaver:
     """Tests for TimedInMemorySaver behaviour."""
-
-    def test_default_ttl(self):
-        """Default TTL is 3600 seconds."""
-        saver = TimedInMemorySaver()
-        assert saver.ttl_seconds == 3600
-
-    def test_custom_ttl(self):
-        """Custom TTL is stored correctly."""
-        saver = TimedInMemorySaver(ttl_seconds=1800)
-        assert saver.ttl_seconds == 1800
 
     def test_sweeper_thread_is_daemon(self):
         """Background sweep thread is a daemon — dies with the process."""
@@ -73,6 +56,7 @@ class TestTimedInMemorySaver:
 
     def test_put_updates_last_active(self):
         """put() updates last-active timestamp for the thread."""
+
         class State(TypedDict):
             x: int
 
@@ -94,6 +78,7 @@ class TestTimedInMemorySaver:
 
     def test_expired_thread_evicted(self):
         """Threads inactive beyond ttl_seconds are evicted by _evict_expired."""
+
         class State(TypedDict):
             x: int
 
@@ -123,6 +108,7 @@ class TestTimedInMemorySaver:
 
     def test_active_thread_not_evicted(self):
         """Threads active within ttl_seconds are not evicted."""
+
         class State(TypedDict):
             x: int
 
@@ -146,6 +132,7 @@ class TestTimedInMemorySaver:
 
     def test_state_preserved_across_invocations(self):
         """TimedInMemorySaver preserves state across invocations."""
+
         class State(TypedDict):
             values: list
 

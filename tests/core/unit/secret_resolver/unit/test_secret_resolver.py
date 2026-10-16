@@ -2,10 +2,12 @@
 
 import os
 from dataclasses import dataclass, field
+from typing import Optional
 from unittest.mock import patch, mock_open
 import pytest
 
 from sap_cloud_sdk.core.secret_resolver import read_from_mount_and_fallback_to_env_var
+from sap_cloud_sdk.core.secret_resolver.resolver import _get_field_map
 
 
 @dataclass
@@ -13,6 +15,12 @@ class SampleConfig:
     username: str = field(default="", metadata={"secret": "user"})
     password: str = ""
     endpoint: str = "default"
+
+
+@dataclass
+class OptionalFieldConfig:
+    required_field: str = ""
+    optional_field: Optional[str] = None
 
 
 @dataclass
@@ -255,3 +263,187 @@ class TestSecretResolver:
         assert config.username == "legacy_user"
         assert config.password == "legacy_pass"
         assert config.endpoint == "legacy_ep"
+
+
+class TestOptionalFields:
+    """Tests for Optional[str] field support — optionality declared via type annotation."""
+
+    @patch.dict(os.environ, {"VAR_MODULE_INSTANCE_REQUIRED_FIELD": "req_value"})
+    def test_optional_env_var_absent_keeps_default(self):
+        """Optional env var missing is silently skipped; field keeps its default (None)."""
+        config = OptionalFieldConfig()
+        with (
+            patch("os.path.isdir", return_value=False),
+            patch("os.stat", side_effect=FileNotFoundError()),
+        ):
+            read_from_mount_and_fallback_to_env_var(
+                "/nonexistent", "VAR", "module", "instance", config
+            )
+
+        assert config.required_field == "req_value"
+        assert config.optional_field is None  # default preserved
+
+    @patch.dict(os.environ, {
+        "VAR_MODULE_INSTANCE_REQUIRED_FIELD": "req_value",
+        "VAR_MODULE_INSTANCE_OPTIONAL_FIELD": "opt_value",
+    })
+    def test_optional_env_var_present_is_loaded(self):
+        """Optional env var that IS present is loaded normally."""
+        config = OptionalFieldConfig()
+        with (
+            patch("os.path.isdir", return_value=False),
+            patch("os.stat", side_effect=FileNotFoundError()),
+        ):
+            read_from_mount_and_fallback_to_env_var(
+                "/nonexistent", "VAR", "module", "instance", config
+            )
+
+        assert config.required_field == "req_value"
+        assert config.optional_field == "opt_value"
+
+    @patch.dict(os.environ, {}, clear=True)
+    def test_required_env_var_absent_still_raises(self):
+        """Missing required field still raises RuntimeError even when optional field is absent."""
+        config = OptionalFieldConfig()
+        with (
+            patch("os.path.isdir", return_value=False),
+            patch("os.stat", side_effect=FileNotFoundError()),
+        ):
+            with pytest.raises(RuntimeError, match="env var failed"):
+                read_from_mount_and_fallback_to_env_var(
+                    "/nonexistent", "VAR", "module", "instance", config
+                )
+
+    @patch("os.path.isdir", return_value=True)
+    @patch("os.stat")
+    def test_optional_mount_file_absent_keeps_default(self, mock_stat, mock_isdir):
+        """Optional secret file missing from mount is silently skipped."""
+        file_side_effects = [
+            mock_open(read_data="req_value").return_value,  # required_field file found
+            FileNotFoundError("optional file not found"),    # optional_field file missing
+        ]
+        config = OptionalFieldConfig()
+        with patch("builtins.open", side_effect=file_side_effects):
+            read_from_mount_and_fallback_to_env_var(
+                "/secrets", "VAR", "module", "instance", config
+            )
+
+        assert config.required_field == "req_value"
+        assert config.optional_field is None  # default preserved
+
+    @patch("os.path.isdir", return_value=True)
+    @patch("os.stat")
+    def test_required_mount_file_absent_raises(self, mock_stat, mock_isdir):
+        """Missing required secret file still raises FileNotFoundError."""
+        config = OptionalFieldConfig()
+        with patch("builtins.open", side_effect=FileNotFoundError("file not found")):
+            with pytest.raises(
+                RuntimeError,
+                match="failed to read secrets.*failed to read secret file",
+            ):
+                read_from_mount_and_fallback_to_env_var(
+                    "/secrets", "VAR", "module", "instance", config
+                )
+
+
+# ── TestGetFieldMap ───────────────────────────────────────────────────────────
+
+
+class TestGetFieldMap:
+    """Direct unit tests for _get_field_map() — the internal that drives optionality detection.
+
+    These pin down the exact contract so a refactor can't silently change behaviour:
+      - ``str`` fields are required (is_optional=False)
+      - ``Optional[str]`` fields are optional (is_optional=True)
+      - Non-string fields raise TypeError
+      - Optionality comes from the type annotation, NOT from field.metadata
+    """
+
+    def test_str_field_is_required(self):
+        @dataclass
+        class Config:
+            host: str = ""
+
+        result = _get_field_map(Config())
+        assert result["host"][2] is False  # (name, type, is_optional)
+
+    def test_optional_str_field_is_optional(self):
+        @dataclass
+        class Config:
+            token: Optional[str] = None
+
+        result = _get_field_map(Config())
+        assert result["token"][2] is True
+
+    def test_mixed_fields_correct_flags(self):
+        @dataclass
+        class Config:
+            required: str = ""
+            optional: Optional[str] = None
+
+        result = _get_field_map(Config())
+        assert result["required"][2] is False
+        assert result["optional"][2] is True
+
+    def test_non_string_field_raises_type_error(self):
+        @dataclass
+        class Config:
+            count: int = 0
+
+        with pytest.raises(TypeError, match="is not a string"):
+            _get_field_map(Config())
+
+    def test_metadata_secret_key_still_respected(self):
+        """field(metadata={"secret": "..."}) renames the lookup key; Optional still works."""
+        @dataclass
+        class Config:
+            api_token: Optional[str] = field(default=None, metadata={"secret": "token"})
+
+        result = _get_field_map(Config())
+        # Key is the metadata "secret" value, not the field name
+        assert "token" in result
+        assert result["token"][0] == "api_token"   # attribute name
+        assert result["token"][2] is True           # is_optional
+
+    def test_non_dataclass_raises_type_error(self):
+        with pytest.raises(TypeError, match="target must be a dataclass instance"):
+            _get_field_map("not_a_dataclass")
+
+    def test_dataclass_class_not_instance_raises(self):
+        with pytest.raises(TypeError, match="target must be a dataclass instance"):
+            _get_field_map(OptionalFieldConfig)  # class, not instance
+
+    def test_metadata_optional_true_without_optional_type_is_required(self):
+        """Confirms the old metadata={"optional": True} pattern is no longer honoured.
+
+        After the migration to Optional[str], a plain ``str`` field annotated with
+        ``field(metadata={"optional": True})`` is treated as REQUIRED — the type
+        annotation is the source of truth, not the metadata.  Any pre-migration
+        usage of the metadata pattern must be updated to ``Optional[str]``.
+        """
+        @dataclass
+        class OldStyleConfig:
+            legacy: str = field(default="", metadata={"optional": True})
+
+        result = _get_field_map(OldStyleConfig())
+        # is_optional is False because the annotation is str, not Optional[str]
+        assert result["legacy"][2] is False
+
+    def test_pep563_annotations_resolved_correctly(self):
+        """_get_field_map() works when the dataclass module uses PEP 563 (from __future__ import annotations).
+
+        Under PEP 563, class __annotations__ stores raw strings like "Optional[str]"
+        instead of type objects.  f.type would return a string, making ``f.type is str``
+        and ``get_origin(f.type)`` both return wrong results.  Using get_type_hints()
+        resolves the strings to real objects so Optional[str] detection stays correct.
+        """
+        from tests.core.unit.secret_resolver.unit._future_annotations_fixture import PEP563Config
+
+        # Confirm PEP 563 effect: annotations are strings in the class dict.
+        raw = PEP563Config.__annotations__
+        assert isinstance(raw["required"], str), "PEP 563 not active — test invalid"
+        assert isinstance(raw["optional"], str), "PEP 563 not active — test invalid"
+
+        result = _get_field_map(PEP563Config())
+        assert result["required"][2] is False, "required str field should be required"
+        assert result["optional"][2] is True,  "Optional[str] field should be optional"

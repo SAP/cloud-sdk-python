@@ -107,7 +107,9 @@ def test_get_memory_subscriber():
     pass
 
 
-@scenario("agentmemory.feature", "Update memory content using SUBSCRIBER access strategy")
+@scenario(
+    "agentmemory.feature", "Update memory content using SUBSCRIBER access strategy"
+)
 def test_update_memory_subscriber():
     pass
 
@@ -127,7 +129,9 @@ def test_search_memories_subscriber():
     pass
 
 
-@scenario("agentmemory.feature", "Create and get a message using SUBSCRIBER access strategy")
+@scenario(
+    "agentmemory.feature", "Create and get a message using SUBSCRIBER access strategy"
+)
 def test_add_message_subscriber():
     pass
 
@@ -192,7 +196,9 @@ def use_configured_subscriber_tenant(context, subscriber_tenant):
 def memory_exists(context, agent_memory_client, agent_id, invoker_id, content):
     context["client"] = agent_memory_client
     context["memory"] = agent_memory_client.add_memory(
-        context["agent_id"], context["invoker_id"], content,
+        context["agent_id"],
+        context["invoker_id"],
+        content,
     )
 
 
@@ -201,10 +207,16 @@ def memory_exists(context, agent_memory_client, agent_id, invoker_id, content):
         'a message exists with agent "{agent_id}" invoker "{invoker_id}" group "{group}" role "{role}" content "{content}"'
     )
 )
-def message_exists(context, agent_memory_client, agent_id, invoker_id, group, role, content):
+def message_exists(
+    context, agent_memory_client, agent_id, invoker_id, group, role, content
+):
     context["client"] = agent_memory_client
     context["message"] = agent_memory_client.add_message(
-        context["agent_id"], context["invoker_id"], group, role, content,
+        context["agent_id"],
+        context["invoker_id"],
+        group,
+        role,
+        content,
     )
 
 
@@ -213,10 +225,23 @@ def message_exists(context, agent_memory_client, agent_id, invoker_id, group, ro
         'a message exists with agent "{agent_id}" invoker "{invoker_id}" group "{group}" role "{role}" content "{content}" and metadata "{metadata_value}"'
     )
 )
-def message_exists_with_metadata(context, agent_memory_client, agent_id, invoker_id, group, role, content, metadata_value):
+def message_exists_with_metadata(
+    context,
+    agent_memory_client,
+    agent_id,
+    invoker_id,
+    group,
+    role,
+    content,
+    metadata_value,
+):
     context["client"] = agent_memory_client
     context["message"] = agent_memory_client.add_message(
-        context["agent_id"], context["invoker_id"], group, role, content,
+        context["agent_id"],
+        context["invoker_id"],
+        group,
+        role,
+        content,
         metadata={"tag": metadata_value},
     )
 
@@ -232,7 +257,9 @@ def message_exists_with_metadata(context, agent_memory_client, agent_id, invoker
 def add_memory(context, agent_id, invoker_id, content):
     client: AgentMemoryClient = context["client"]
     context["memory"] = client.add_memory(
-        context["agent_id"], context["invoker_id"], content,
+        context["agent_id"],
+        context["invoker_id"],
+        content,
     )
 
 
@@ -248,7 +275,8 @@ def get_memory(context):
 def update_memory(context, content):
     client: AgentMemoryClient = context["client"]
     client.update_memory(
-        context["memory"].id, content=content,
+        context["memory"].id,
+        content=content,
     )
     context["memory"] = client.get_memory(
         context["memory"].id,
@@ -295,14 +323,16 @@ def search_memories(context, query):
 def add_message(context, agent_id, invoker_id, group, role, content):
     client: AgentMemoryClient = context["client"]
     context["message"] = client.add_message(
-        context["agent_id"], context["invoker_id"], group, MessageRole(role), content,
+        context["agent_id"],
+        context["invoker_id"],
+        group,
+        MessageRole(role),
+        content,
     )
 
 
 @when(
-    parsers.parse(
-        'I list messages filtered by agent "{agent_id}" and group "{group}"'
-    )
+    parsers.parse('I list messages filtered by agent "{agent_id}" and group "{group}"')
 )
 def list_messages(context, agent_id, group):
     client: AgentMemoryClient = context["client"]
@@ -325,24 +355,21 @@ def delete_message(context):
 @when("I get the retention config")
 def get_retention_config(context):
     client: AgentMemoryClient = context["client"]
-    context["retention_config"] = client.get_retention_config(
-    )
+    context["retention_config"] = client.get_retention_config()
 
 
 @when("I update the retention config with message_days 30 and memory_days 90")
 def update_retention_config(context):
     client: AgentMemoryClient = context["client"]
     client.update_retention_config(
-        message_days=30, memory_days=90,
+        message_days=30,
+        memory_days=90,
     )
-    context["retention_config"] = client.get_retention_config(
-    )
+    context["retention_config"] = client.get_retention_config()
 
 
 @when(
-    parsers.parse(
-        'I count memories for agent "{agent_id}" and invoker "{invoker_id}"'
-    )
+    parsers.parse('I count memories for agent "{agent_id}" and invoker "{invoker_id}"')
 )
 def count_memories(context, agent_id, invoker_id):
     client: AgentMemoryClient = context["client"]

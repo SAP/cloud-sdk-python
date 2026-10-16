@@ -15,7 +15,6 @@ from sap_cloud_sdk.agent_memory.utils._odata import (
 
 
 class TestEscapeOdataString:
-
     def test_single_quote_is_doubled(self):
         """Single quotes are escaped as '' per OData 4.01."""
         assert _escape_odata_string("it's") == "it''s"
@@ -37,18 +36,21 @@ class TestEscapeOdataString:
 
 
 class TestBuildContainsClauses:
-
     def test_single_clause(self):
         """A single clause produces one contains() expression."""
-        result = build_contains_clauses([FilterDefinition(target="metadata", contains="john")])
+        result = build_contains_clauses(
+            [FilterDefinition(target="metadata", contains="john")]
+        )
         assert result == ["contains(metadata, 'john')"]
 
     def test_multiple_clauses(self):
         """Multiple clauses produce one expression per clause."""
-        result = build_contains_clauses([
-            FilterDefinition(target="metadata", contains="john"),
-            FilterDefinition(target="content", contains="user prefers"),
-        ])
+        result = build_contains_clauses(
+            [
+                FilterDefinition(target="metadata", contains="john"),
+                FilterDefinition(target="content", contains="user prefers"),
+            ]
+        )
         assert result == [
             "contains(metadata, 'john')",
             "contains(content, 'user prefers')",
@@ -56,7 +58,9 @@ class TestBuildContainsClauses:
 
     def test_single_quote_in_value_is_escaped(self):
         """Single quotes inside the contains value are escaped."""
-        result = build_contains_clauses([FilterDefinition(target="content", contains="it's")])
+        result = build_contains_clauses(
+            [FilterDefinition(target="content", contains="it's")]
+        )
         assert result == ["contains(content, 'it''s')"]
 
     def test_empty_clause_list_returns_empty_list(self):
@@ -68,7 +72,6 @@ class TestBuildContainsClauses:
 
 
 class TestBuildMemoryFilter:
-
     def test_agent_id_only(self):
         """Single agent_id produces a simple eq filter."""
         result = build_memory_filter(agent_id="agent-a")
@@ -118,12 +121,13 @@ class TestBuildMemoryFilter:
 
 
 class TestBuildMessageFilter:
-
     def test_all_filters(self):
         """All four message filters are combined."""
         result = build_message_filter(
-            agent_id="a", invoker_id="u",
-            message_group="g", role="USER",
+            agent_id="a",
+            invoker_id="u",
+            message_group="g",
+            role="USER",
         )
         assert result is not None
         assert "agentID eq 'a'" in result
@@ -177,7 +181,6 @@ class TestBuildMessageFilter:
 
 
 class TestBuildListParams:
-
     def test_filter_param(self):
         """filter_expr is output as $filter."""
         params = build_list_params(filter_expr="agentID eq 'a'")
@@ -258,7 +261,6 @@ class TestBuildListParams:
 
 
 class TestExtractValueAndCount:
-
     def test_data_format(self):
         """Parses the 'data' + 'count' response format."""
         response = {

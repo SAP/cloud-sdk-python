@@ -14,6 +14,7 @@ logger = logging.getLogger(__name__)
 APP_TENANT_ID = ContextKey[str]("ias.app_tid")
 GLOBAL_TENANT_ID = ContextKey[str]("ias.sap_gtid")
 USER_ID = ContextKey[str]("ias.user_uuid")
+IAS_TOKEN = ContextKey[str]("ias.token")
 
 
 def _auto_configure_verifier() -> Optional[TokenVerifier]:
@@ -44,12 +45,17 @@ class IASContextProvider(ContextProvider):
       - :data:`APP_TENANT_ID`    from ``app_tid`` claim
       - :data:`GLOBAL_TENANT_ID` from ``sap_gtid`` claim
       - :data:`USER_ID`          from ``user_uuid`` claim
+      - :data:`IAS_TOKEN`        raw bearer token string (verified)
 
     The JWT signature is verified using an :class:`~sap_cloud_sdk.ias.IASVerifier`
     before any claims are trusted. When no ``token_verifier`` is supplied, one is
     auto-configured from the environment (VCAP_SERVICES → K8s secret mount →
     ``IAS_URL`` env var). If no IAS binding is found, a WARNING is logged and the
     provider returns an empty context for every request (fail-closed).
+
+    :data:`IAS_TOKEN` is populated only after successful verification, so the
+    stored token is always one whose signature, issuer, audience, and expiry
+    have been validated — safe for downstream consumers to forward on-behalf-of.
 
     Args:
         token_verifier: Optional callable that verifies an IAS JWT and returns
@@ -79,7 +85,8 @@ class IASContextProvider(ContextProvider):
             )
             return RuntimeContext()
         claims = verified.claims
-        values = {}
+        raw = auth.removeprefix("Bearer ").removeprefix("bearer ").strip()
+        values: dict = {IAS_TOKEN: raw}
         if claims.app_tid:
             values[APP_TENANT_ID] = claims.app_tid
         if claims.sap_gtid:

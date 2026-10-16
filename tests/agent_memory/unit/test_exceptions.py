@@ -9,7 +9,6 @@ from sap_cloud_sdk.agent_memory.exceptions import (
 
 
 class TestAgentMemoryError:
-
     def test_is_base_exception(self):
         assert issubclass(AgentMemoryError, Exception)
 
@@ -23,7 +22,6 @@ class TestAgentMemoryError:
 
 
 class TestAgentMemoryConfigError:
-
     def test_is_agent_memory_error(self):
         assert issubclass(AgentMemoryConfigError, AgentMemoryError)
 
@@ -37,7 +35,6 @@ class TestAgentMemoryConfigError:
 
 
 class TestAgentMemoryHttpError:
-
     def test_is_agent_memory_error(self):
         assert issubclass(AgentMemoryHttpError, AgentMemoryError)
 
@@ -72,7 +69,6 @@ class TestAgentMemoryHttpError:
 
 
 class TestAgentMemoryNotFoundError:
-
     def test_is_http_error(self):
         assert issubclass(AgentMemoryNotFoundError, AgentMemoryHttpError)
 

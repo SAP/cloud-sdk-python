@@ -5,6 +5,7 @@ from sap_cloud_sdk.core.runtime_context.providers._ias import (
     APP_TENANT_ID,
     GLOBAL_TENANT_ID,
     IASContextProvider,
+    IAS_TOKEN,
     USER_ID,
 )
 from sap_cloud_sdk.core.runtime_context.providers._sap_trigger import (
@@ -16,6 +17,7 @@ __all__ = [
     "DWCContextProvider",
     "GLOBAL_TENANT_ID",
     "IASContextProvider",
+    "IAS_TOKEN",
     "SAPTriggerContextProvider",
     "USER_ID",
 ]

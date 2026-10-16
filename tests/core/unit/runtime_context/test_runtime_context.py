@@ -34,6 +34,7 @@ from sap_cloud_sdk.core.runtime_context._registry import (
 from sap_cloud_sdk.core.runtime_context.providers._ias import (
     APP_TENANT_ID,
     GLOBAL_TENANT_ID,
+    IAS_TOKEN,
     USER_ID,
 )
 from sap_cloud_sdk.core.runtime_context.starlette import _merge
@@ -283,6 +284,7 @@ class TestIASContextProvider:
         assert ctx.get(APP_TENANT_ID) is None
         assert ctx.get(USER_ID) is None
         assert ctx.get(GLOBAL_TENANT_ID) is None
+        assert ctx.get(IAS_TOKEN) is None
 
     def test_returns_empty_context_on_verification_error(self):
         def _boom(auth: str) -> VerifiedIASClaims:
@@ -355,6 +357,27 @@ class TestIASContextProvider:
             ctx = IASContextProvider(token_verifier=_infra_fail).extract(envelope)
         assert ctx.get(APP_TENANT_ID) is None
         assert any("unexpected error" in r.message for r in caplog.records)
+
+    def test_stores_raw_bearer_token(self):
+        claims = _make_claims(app_tid="t-1", user_uuid="u-1")
+        envelope = _make_envelope({"authorization": "Bearer my-token-123"})
+        ctx = IASContextProvider(token_verifier=_make_verifier(claims)).extract(envelope)
+        assert ctx.get(IAS_TOKEN) == "my-token-123"
+
+    def test_no_token_stored_on_verification_error(self):
+        """Fail-closed: an unverified token must never land in context."""
+        def _boom(auth: str) -> VerifiedIASClaims:
+            raise IASTokenError("invalid signature")
+        envelope = _make_envelope({"authorization": "Bearer bad-jwt"})
+        ctx = IASContextProvider(token_verifier=_boom).extract(envelope)
+        assert ctx.get(IAS_TOKEN) is None
+        assert ctx.get(APP_TENANT_ID) is None
+
+    def test_no_ias_token_when_no_auth_header(self):
+        claims = _make_claims(app_tid="t-1", user_uuid="u-1")
+        envelope = _make_envelope({})
+        ctx = IASContextProvider(token_verifier=_make_verifier(claims)).extract(envelope)
+        assert ctx.get(IAS_TOKEN) is None
 
 
 # ---------------------------------------------------------------------------

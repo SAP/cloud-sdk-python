@@ -72,7 +72,10 @@ UMS_RESPONSE_SINGLE = {
                                         "deploymentType": "N8N",
                                         "canShortCircuit": False,
                                         "n8nWorkflowConfig": {
-                                            "workflowId": "wf-before-001",
+                                            "ordId": "sap.n8nwfrt:apiResource:test-solution_hook.testHook:v1",
+                                            "cardOrdId": "sap.n8nwfrt:apiResource:test-solution_hook.testHook_mcp:v1",
+                                            "toolName": "testHook",
+                                            "globalTenantId": "tenant-test-001",
                                             "method": "POST",
                                         },
                                     }
@@ -149,7 +152,10 @@ UMS_RESPONSE_MULTIPLE = {
                                         "deploymentType": "N8N",
                                         "canShortCircuit": False,
                                         "n8nWorkflowConfig": {
-                                            "workflowId": "wf-after-001",
+                                            "ordId": "sap.n8nwfrt:apiResource:test-solution_hook.testHook:v1",
+                                            "cardOrdId": "sap.n8nwfrt:apiResource:test-solution_hook.testHook_mcp:v1",
+                                            "toolName": "testHook",
+                                            "globalTenantId": "tenant-test-001",
                                             "method": "POST",
                                         },
                                     }

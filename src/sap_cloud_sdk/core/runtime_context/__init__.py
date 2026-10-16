@@ -41,6 +41,7 @@ from sap_cloud_sdk.core.runtime_context._registry import (
 from sap_cloud_sdk.core.runtime_context.providers import (
     DWCContextProvider,
     IASContextProvider,
+    IAS_TOKEN,
     SAPTriggerContextProvider,
     APP_TENANT_ID,
     GLOBAL_TENANT_ID,
@@ -63,6 +64,7 @@ __all__ = [
     "get_attached_adapters",
     "GLOBAL_TENANT_ID",
     "IASContextProvider",
+    "IAS_TOKEN",
     "RuntimeContext",
     "RequestEnvelope",
     "SAPTriggerContextProvider",
@@ -71,4 +73,5 @@ __all__ = [
     "get_context",
     "is_feature_enabled",
     "register",
+    "set_context",
 ]

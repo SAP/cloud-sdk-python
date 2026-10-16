@@ -11,7 +11,6 @@ plain text, and the service makes it searchable by meaning.
 
 ## Table of Contents
 
-- [Agent Memory User Guide](#agent-memory-user-guide)
   - [Table of Contents](#table-of-contents)
   - [Installation](#installation)
   - [Import](#import)
@@ -39,6 +38,26 @@ plain text, and the service makes it searchable by meaning.
     - [Delete a Message](#delete-a-message)
     - [List Messages](#list-messages)
       - [Content and metadata filtering](#content-and-metadata-filtering-1)
+  - [Thread Registry](#thread-registry)
+    - [Create or Register a Thread](#create-or-register-a-thread)
+    - [Get a Thread](#get-a-thread)
+    - [List Threads](#list-threads)
+    - [Update a Thread](#update-a-thread)
+    - [Delete a Thread](#delete-a-thread)
+    - [Thread TTL and lifecycle](#thread-ttl-and-lifecycle)
+    - [Resource Management: `close()` and Context Manager](#resource-management-close-and-context-manager)
+    - [Exposing idle TTL with `@agent_config`](#exposing-idle-ttl-with-agent_config)
+  - [LangGraph Checkpointer](#langgraph-checkpointer)
+    - [Prerequisites](#prerequisites)
+    - [Import](#import-1)
+    - [Usage with LangGraph StateGraph](#usage-with-langgraph-stategraph)
+    - [Usage with LangChain create_agent](#usage-with-langchain-create_agent)
+  - [Configuration](#configuration)
+    - [XSUAA binding](#xsuaa-binding)
+      - [Mounted Secrets (Kubernetes)](#mounted-secrets-kubernetes)
+      - [Environment Variables](#environment-variables)
+      - [UAA JSON Schema](#uaa-json-schema)
+    - [IAS binding](#ias-binding)
   - [Data Models](#data-models)
     - [Enums](#enums)
   - [Error Handling](#error-handling)
@@ -57,18 +76,8 @@ plain text, and the service makes it searchable by meaning.
     - [`search_memories()` returns no results](#search_memories-returns-no-results)
     - [`AgentMemoryNotFoundError` when fetching a resource](#agentmemorynotfounderror-when-fetching-a-resource)
     - [`AgentMemoryHttpError` with status 401](#agentmemoryhttperror-with-status-401)
-  - [Configuration](#configuration)
-    - [Service Binding](#service-binding)
-      - [Mounted Secrets (Kubernetes)](#mounted-secrets-kubernetes)
-      - [Environment Variables](#environment-variables)
-      - [UAA JSON Schema](#uaa-json-schema)
-  - [LangGraph Checkpointer](#langgraph-checkpointer)
-    - [Prerequisites](#prerequisites)
-    - [Import](#import-1)
-    - [Usage with LangGraph StateGraph](#usage-with-langgraph-stategraph)
-    - [Usage with LangChain create\_agent](#usage-with-langchain-create_agent)
-    - [Thread TTL](#thread-ttl)
-      - [Exposing TTL as a configurable parameter with `@agent_config`](#exposing-ttl-as-a-configurable-parameter-with-agent_config)
+    - [`AgentMemoryValidationError: IAS token not found in RuntimeContext`](#agentmemoryvalidationerror-ias-token-not-found-in-runtimecontext)
+  - [Binding Rotation](#binding-rotation)
 
 ## Installation
 
@@ -171,6 +180,11 @@ across create, read, and search calls is the implementer's responsibility.
 - **Supported:** Yes
 - **Authentication:** XSUAA
 - **How to use:** Pass `access_strategy` and `tenant` to `create_client()`. The strategy controls whether calls use a subscriber-scoped or provider-scoped XSUAA token. Every method on the client inherits the strategy set at construction time.
+
+  > [!NOTE]
+  > `access_strategy` and `tenant` apply to **XSUAA bindings only**. In **IAS mode**
+  > (auto-detected from a URL-only binding) they are ignored — routing is driven by the
+  > per-request IAS token. See [IAS binding](#ias-binding) under Configuration.
 
   | Value                                 | Description                                                                                     |
   | ------------------------------------- | ----------------------------------------------------------------------------------------------- |
@@ -508,6 +522,313 @@ See the [Content and metadata filtering](#content-and-metadata-filtering) note u
 
 ---
 
+## Thread Registry
+
+The thread registry tracks conversation threads — their owner, idle TTL, and expiry. Unlike
+the LangGraph checkpointer, it is **framework-agnostic**: it works with LangGraph, Pydantic AI,
+CrewAI, or any custom agent.
+
+Use `create_thread_registry()` to create a registry for the current environment:
+
+```python
+from sap_cloud_sdk.agent_memory.thread_registry import create_thread_registry
+
+registry = create_thread_registry(ttl_seconds=3600)  # 1-hour idle TTL
+```
+
+`create_thread_registry()` auto-detects credentials:
+
+- **Credentials present** — returns `SAPAgentMemoryThreadRegistry` backed by the Agent Memory
+  Service. Thread state is persistent across restarts and enforced server-side.
+- **No credentials** — falls back to `InMemoryThreadRegistry`. State is in-process only and
+  will not survive restarts.
+
+You can also import the concrete types and the `BaseThreadRegistry` ABC directly:
+
+```python
+from sap_cloud_sdk.agent_memory.thread_registry import (
+    BaseThreadRegistry,
+    InMemoryThreadRegistry,
+    SAPAgentMemoryThreadRegistry,
+)
+```
+
+### Create or Register a Thread
+
+`create_or_register_thread()` is idempotent: calling it with the same `thread_id` a second
+time touches the thread (resetting its idle TTL) rather than raising an error.
+
+```python
+entry = registry.create_or_register_thread(
+    agent_id="my-agent",
+    invoker_id="user-123",
+    thread_id="session-abc",  # optional — auto-generated UUID if omitted
+    description="Support chat",
+    ttl_seconds=1800,  # per-thread override, or omit to use registry default
+)
+print(entry["threadId"], entry["expiresAt"])
+```
+
+### Get a Thread
+
+```python
+entry = registry.get_thread(thread_id="session-abc")
+```
+
+Raises `AgentMemoryThreadNotFoundError` if the thread does not exist or has expired.
+
+### List Threads
+
+```python
+page = registry.list_threads(
+    agent_id="my-agent",  # optional filter
+    invoker_id="user-123",  # optional filter
+    limit=50,
+    offset=0,
+)
+for entry in page["entries"]:
+    print(entry["threadId"], entry["expiresAt"])
+print(f"{page['total']} threads total")
+```
+
+### Update a Thread
+
+```python
+entry = registry.update_thread(
+    "session-abc",
+    description="Updated description",
+    ttl_seconds=7200,  # extend TTL
+)
+```
+
+`update_thread()` is a PATCH-style merge — only the fields you pass are modified. Omit
+`ttl_seconds` to leave the thread's existing TTL untouched (mirrors LangGraph's
+`threads.update`).
+
+### Delete a Thread
+
+```python
+registry.delete_thread("session-abc")  # idempotent — no error if already gone
+```
+
+### Thread TTL and lifecycle
+
+**Sliding idle TTL**: `ttl_seconds` is an *inactivity* window. The expiry resets on each
+write (register, update). A thread inactive for longer than `ttl_seconds` is treated as
+expired. `None` means threads never expire.
+
+TTL precedence (highest to lowest):
+1. Per-call `ttl_seconds` passed to `create_or_register_thread()` / `update_thread()`
+2. `create_thread_registry(ttl_seconds=...)` registry-level default
+3. No expiry (`None`)
+
+`InMemoryThreadRegistry` evaluates expiry lazily at read time; the service-backed registry
+enforces expiry server-side via the `expiresAt` field.
+
+### Resource Management: `close()` and Context Manager
+
+`SAPAgentMemoryThreadRegistry` owns an HTTP transport with an OAuth token cache and connection
+pool. Call `close()` when the registry is no longer needed, or use the context manager:
+
+```python
+# Explicit close
+registry = create_thread_registry()
+try:
+    ...
+finally:
+    registry.close()
+
+# Context manager (preferred)
+with create_thread_registry() as registry:
+    entry = registry.create_or_register_thread(
+        agent_id="my-agent", invoker_id="user-123"
+    )
+```
+
+> [!NOTE]
+> `InMemoryThreadRegistry.close()` is a no-op — it has no external resources to release.
+> The context manager interface is available on all registry types for uniform usage.
+
+### Exposing idle TTL with `@agent_config`
+
+Use `@agent_config` from `sap_cloud_sdk.agent_decorators` to expose `ttl_seconds` as an
+operator-adjustable configuration field. The key `config.registry.ttl_seconds` groups it
+with other registry settings so external tooling can surface it in the low-code UI alongside
+model selection and temperature.
+
+```python
+from sap_cloud_sdk.agent_decorators import agent_config
+from sap_cloud_sdk.agent_memory.thread_registry import create_thread_registry
+
+
+@agent_config(
+    key="config.registry.ttl_seconds",
+    label="Thread idle TTL (seconds)",
+    description="Expire conversation threads after this period of inactivity. "
+    "Set to 0 to disable eviction.",
+)
+def thread_ttl_seconds() -> int:
+    return 3600  # 1 hour
+
+
+class MyAgent:
+    def __init__(self):
+        ttl = thread_ttl_seconds()
+        self._registry = create_thread_registry(ttl_seconds=ttl or None)
+```
+
+> [!NOTE]
+> `InMemoryThreadRegistry` state does not survive process restarts. When Agent Memory Service
+> credentials are available, `create_thread_registry()` returns `SAPAgentMemoryThreadRegistry`
+> instead, and thread expiry is enforced server-side via the `expiresAt` field on the thread
+> registry row.
+
+## LangGraph Checkpointer
+
+> This section covers the LangGraph-specific
+> factory for short-term memory (checkpointing). It is only relevant if your agent
+> is built with LangGraph or LangChain's `create_agent()`. The core
+> `AgentMemoryClient` and `create_client()` above are framework-agnostic and work
+> independently of this section.
+
+For LangGraph agents, the `agent_memory` module provides a `create_checkpointer()`
+factory in the `factory` subpackage. It returns a `BaseCheckpointSaver` that
+manages short-term session memory — conversation state, thread continuity, and
+HITL support — natively within LangGraph.
+
+`create_checkpointer()` returns an `InMemorySaver`. State is in-process only and
+will not survive process restarts.
+
+> **Deprecated — `create_checkpointer(ttl_seconds=...)`.** Passing `ttl_seconds`
+> returns a `TimedInMemorySaver` that evicts inactive threads. This is deprecated:
+> thread lifecycle is owned by the **thread registry**, and configuring TTL in two
+> places leads to drift. The parameter still works and will not be removed yet
+> (existing code keeps running), but it now emits a `DeprecationWarning`. Configure
+> TTL on `create_thread_registry()` instead:
+>
+> ```python
+> # Deprecated — checkpointer-level TTL
+> checkpointer = create_checkpointer(ttl_seconds=3600)
+>
+> # Preferred — TTL owned by the thread registry
+> registry = create_thread_registry(ttl_seconds=3600)
+> checkpointer = create_checkpointer()
+> ```
+
+### Prerequisites
+
+`langgraph` is an optional dependency. Install it via the SDK extra or directly:
+
+```bash
+# Via SDK optional extra (recommended)
+pip install "sap-cloud-sdk[langgraph]"
+
+# Or install langgraph directly
+pip install langgraph
+```
+
+### Import
+
+```python
+from sap_cloud_sdk.agent_memory.factory.langgraph_checkpoint import create_checkpointer
+```
+
+### Usage with LangGraph StateGraph
+
+```python
+from sap_cloud_sdk.agent_memory.factory.langgraph_checkpoint import create_checkpointer
+
+checkpointer = create_checkpointer()
+app = workflow.compile(checkpointer=checkpointer)
+
+result = app.invoke(
+    {"messages": [{"role": "user", "content": "hello"}]},
+    {"configurable": {"thread_id": "session-1"}},
+)
+```
+
+### Usage with LangChain create_agent
+
+```python
+from langchain.agents import create_agent
+from sap_cloud_sdk.agent_memory.factory.langgraph_checkpoint import create_checkpointer
+
+agent = create_agent(
+    model="...",
+    tools=[...],
+    checkpointer=create_checkpointer(),
+)
+```
+
+## Configuration
+
+`create_client()` auto-detects the binding type:
+
+- A binding whose `uaa` JSON carries a `token_url` (`url`) selects **XSUAA**.
+- A binding with only a service URL and **no** `uaa`/`token_url` selects **IAS**.
+
+### XSUAA binding
+
+- **Mount path**: `$SERVICE_BINDING_ROOT/hana-agent-memory/default/` (defaults to `/etc/secrets/appfnd/hana-agent-memory/default/`)
+- **Required keys**: `application_url` (Agent Memory service URL), `uaa` (JSON string with XSUAA credentials)
+- **Env var fallback**: `CLOUD_SDK_CFG_HANA_AGENT_MEMORY_DEFAULT_{FIELD}` (uppercased)
+
+> **Note:** `SERVICE_BINDING_ROOT` defaults to `/etc/secrets/appfnd` when not set. See the [Secret Resolver guide](../core/secret_resolver/user-guide.md) for details.
+
+#### Mounted Secrets (Kubernetes)
+
+```
+$SERVICE_BINDING_ROOT/hana-agent-memory/default/
+├── application_url
+└── uaa
+```
+
+#### Environment Variables
+
+```bash
+export CLOUD_SDK_CFG_HANA_AGENT_MEMORY_DEFAULT_APPLICATION_URL="https://agent-memory.example.com"
+export CLOUD_SDK_CFG_HANA_AGENT_MEMORY_DEFAULT_UAA='{"clientid":"...","clientsecret":"...","url":"https://..."}'
+```
+
+#### UAA JSON Schema
+
+The `uaa` key must contain a JSON string with the XSUAA credentials:
+
+```json
+{
+  "clientid": "sb-xxx",
+  "clientsecret": "xxx",
+  "url": "https://subdomain.authentication.region.hana.ondemand.com"
+}
+```
+
+### IAS binding
+
+IAS mode is **auto-detected** — a URL-only binding (`application_url`, no `uaa`/`token_url`)
+selects IAS automatically. There is nothing extra to configure on `create_client()`:
+`access_strategy` and `tenant` are **ignored** in IAS mode (requests are routed by the
+per-request token, not by an XSUAA strategy).
+
+Unlike XSUAA, the client holds no credentials and fetches no token of its own. The Bearer
+token travels **per request**, read from the request `RuntimeContext` at call time.
+
+> [!IMPORTANT]
+> **The agent must wire `bootstrap(app)` / `IASContextProvider`.** This is what parses the
+> inbound `Authorization` header and places the IAS token into the `RuntimeContext` that the
+> client reads. Without it, **every** Agent Memory and Thread Registry call fails with:
+>
+> ```
+> AgentMemoryValidationError: IAS token not found in RuntimeContext. Ensure bootstrap(app) is configured.
+> ```
+>
+> Wire it once at startup — for example `bootstrap(app)` on your FastAPI/Flask app — so each
+> inbound request populates the context before any client call runs.
+
+> [!NOTE]
+> **Feedback / future improvement:** the cloud-sdk could auto-bootstrap the IAS context
+> wiring when it detects an IAS binding at runtime, so agents would not have to call
+> `bootstrap(app)` manually. Until then, wiring the context provider is a required manual step.
+
 ## Data Models
 
 | Model             | Description                                                                                           |
@@ -515,7 +836,7 @@ See the [Content and metadata filtering](#content-and-metadata-filtering) note u
 | `Memory`          | A persistent memory entry (`id`, `agent_id`, `invoker_id`, `content`, `metadata`, timestamps)         |
 | `SearchResult`    | Extends `Memory` with a `similarity` field (cosine score, 0–1)                                        |
 | `Message`         | A message (`id`, `agent_id`, `invoker_id`, `message_group`, `role`, `content`, `metadata`, timestamp) |
-| `RetentionConfig` | Data retention policy (`message_days`, `memory_days`, `usage_log_days`, timestamps)                   |
+| `RetentionConfig` | Data retention policy (`message_days`, `memory_days`, `usage_log_days`, `thread_days`, `max_checkpoints_per_thread`, timestamps)                   |
 
 ### Enums
 
@@ -549,10 +870,13 @@ level of specificity:
 
 ```
 AgentMemoryError
-├── AgentMemoryConfigError      # bad or missing configuration
-├── AgentMemoryValidationError  # invalid inputs caught before any network call
-└── AgentMemoryHttpError        # HTTP-level error (status_code, response_text)
-    └── AgentMemoryNotFoundError  # 404 Not Found
+├── AgentMemoryConfigError          # bad or missing configuration
+├── AgentMemoryValidationError      # invalid inputs caught before any network call
+├── AgentMemoryHttpError            # HTTP-level error (status_code, response_text)
+│   └── AgentMemoryNotFoundError    # 404 Not Found (memories, messages)
+├── AgentMemoryThreadNotFoundError  # thread not found in the registry
+├── AgentMemoryThreadConflictError  # thread ID already owned by a different owner
+└── AgentMemoryThreadExpiredError   # thread has expired and cannot be reused
 ```
 
 ```python
@@ -562,6 +886,9 @@ from sap_cloud_sdk.agent_memory.exceptions import (
     AgentMemoryValidationError,
     AgentMemoryHttpError,
     AgentMemoryNotFoundError,
+    AgentMemoryThreadNotFoundError,
+    AgentMemoryThreadConflictError,
+    AgentMemoryThreadExpiredError,
 )
 
 # Catch invalid inputs before they reach the network
@@ -605,6 +932,7 @@ rc = client.get_retention_config()
 print(f"Messages: {rc.message_days} days")
 print(f"Memories: {rc.memory_days} days")
 print(f"Usage logs: {rc.usage_log_days} days")
+print(f"Registered threads: {rc.thread_days} days")
 ```
 
 ### Update Retention Config
@@ -617,8 +945,13 @@ client.update_retention_config(
     message_days=30,
     memory_days=90,
     usage_log_days=180,
+    thread_days=45,
 )
 ```
+
+`thread_days` is the default TTL (in days) applied **only to registered threads**
+(those created via the Thread Registry API). It is the age-based cutoff for thread
+cleanup; threads not registered with the Thread Registry are unaffected.
 
 Set a field to `0` to mark all data in that category for deletion at the next nightly scheduled cleanup. The server also accepts `null` to disable
 automatic cleanup for that category.
@@ -799,160 +1132,20 @@ The OAuth2 token has expired and automatic refresh failed, or the configured cre
 (`client_id`, `client_secret`, `token_url`) are incorrect. Verify the credentials in your
 environment variables or service binding.
 
+### `AgentMemoryValidationError: IAS token not found in RuntimeContext`
+
+```
+AgentMemoryValidationError: IAS token not found in RuntimeContext. Ensure bootstrap(app) is configured.
+```
+
+The client is running in **IAS mode** but no IAS token reached the request `RuntimeContext`.
+The agent must wire `bootstrap(app)` / `IASContextProvider` so the inbound `Authorization`
+header is parsed into the context before any client call. See [IAS binding](#ias-binding).
+
 ---
-
-## Configuration
-
-### Service Binding
-
-- **Mount path**: `$SERVICE_BINDING_ROOT/hana-agent-memory/default/` (defaults to `/etc/secrets/appfnd/hana-agent-memory/default/`)
-- **Required keys**: `application_url` (Agent Memory service URL), `uaa` (JSON string with XSUAA credentials)
-- **Env var fallback**: `CLOUD_SDK_CFG_HANA_AGENT_MEMORY_DEFAULT_{FIELD}` (uppercased)
-
-> **Note:** `SERVICE_BINDING_ROOT` defaults to `/etc/secrets/appfnd` when not set. See the [Secret Resolver guide](../core/secret_resolver/user-guide.md) for details.
-
-#### Mounted Secrets (Kubernetes)
-
-```
-$SERVICE_BINDING_ROOT/hana-agent-memory/default/
-├── application_url
-└── uaa
-```
-
-#### Environment Variables
-
-```bash
-export CLOUD_SDK_CFG_HANA_AGENT_MEMORY_DEFAULT_APPLICATION_URL="https://agent-memory.example.com"
-export CLOUD_SDK_CFG_HANA_AGENT_MEMORY_DEFAULT_UAA='{"clientid":"...","clientsecret":"...","url":"https://..."}'
-```
-
-#### UAA JSON Schema
-
-The `uaa` key must contain a JSON string with the XSUAA credentials:
-
-```json
-{
-  "clientid": "sb-xxx",
-  "clientsecret": "xxx",
-  "url": "https://subdomain.authentication.region.hana.ondemand.com"
-}
-```
 
 ## Binding Rotation
 
 The client handles BTP credential rotation automatically. See the [HTTP Client guide](../core/protocol/http/user-guide.md) for details.
 
 ---
-
-## LangGraph Checkpointer
-
-> This section covers the LangGraph-specific
-> factory for short-term memory (checkpointing). It is only relevant if your agent
-> is built with LangGraph or LangChain's `create_agent()`. The core
-> `AgentMemoryClient` and `create_client()` above are framework-agnostic and work
-> independently of this section.
-
-For LangGraph agents, the `agent_memory` module provides a `create_checkpointer()`
-factory in the `factory` subpackage. It returns a `BaseCheckpointSaver` that
-manages short-term session memory — conversation state, thread continuity, and
-HITL support — natively within LangGraph.
-
-> [!NOTE]
-> The current implementation uses LangGraph's `InMemorySaver` or
-> `TimedInMemorySaver` (when `ttl_seconds` is set). State is held in-process
-> and does not survive restarts. Persistent checkpointing backed by the
-> Agent Memory Service is not yet supported.
-
-### Prerequisites
-
-`langgraph` is an optional dependency. Install it via the SDK extra or directly:
-
-```bash
-# Via SDK optional extra (recommended)
-pip install "sap-cloud-sdk[langgraph]"
-
-# Or install langgraph directly
-pip install langgraph
-```
-
-### Import
-
-```python
-from sap_cloud_sdk.agent_memory.factory.langgraph_checkpoint import create_checkpointer
-```
-
-### Usage with LangGraph StateGraph
-
-```python
-from sap_cloud_sdk.agent_memory.factory.langgraph_checkpoint import create_checkpointer
-
-checkpointer = create_checkpointer()
-app = workflow.compile(checkpointer=checkpointer)
-
-result = app.invoke(
-    {"messages": [{"role": "user", "content": "hello"}]},
-    {"configurable": {"thread_id": "session-1"}},
-)
-```
-
-### Usage with LangChain create_agent
-
-```python
-from langchain.agents import create_agent
-from sap_cloud_sdk.agent_memory.factory.langgraph_checkpoint import create_checkpointer
-
-agent = create_agent(
-    model="...",
-    tools=[...],
-    checkpointer=create_checkpointer(),
-)
-```
-
-### Thread TTL
-
-Pass `ttl_seconds` to evict threads that have been inactive for the given
-period. This prevents unbounded memory growth in long-running processes.
-
-```python
-# Evict threads inactive for more than 1 hour
-checkpointer = create_checkpointer(ttl_seconds=3600)
-```
-
-When `ttl_seconds` is set, the factory returns a `TimedInMemorySaver` that
-tracks last-active time per thread and evicts inactive threads via a
-background daemon sweep. Eviction is best-effort — a thread may live up to
-`ttl_seconds + 60` seconds before deletion.
-
-#### Exposing TTL as a configurable parameter with `@agent_config`
-
-Use `@agent_config` from `sap_cloud_sdk.agent_decorators` to expose
-`ttl_seconds` as an operator-adjustable configuration field. The key
-`config.checkpointer.ttl_seconds` groups it with other checkpointer settings
-so external tooling can surface it in the low-code UI alongside model
-selection and temperature.
-
-```python
-from sap_cloud_sdk.agent_decorators import agent_config
-from sap_cloud_sdk.agent_memory.factory.langgraph_checkpoint import create_checkpointer
-
-
-@agent_config(
-    key="config.checkpointer.ttl_seconds",
-    label="Thread TTL (seconds)",
-    description="Evict inactive conversation threads after this period of "
-    "inactivity. Set to 0 to disable eviction.",
-)
-def thread_ttl_seconds() -> int:
-    return 3600  # 1 hour
-
-
-class MyAgent:
-    def __init__(self):
-        ttl = thread_ttl_seconds()
-        self._checkpointer = create_checkpointer(ttl_seconds=ttl or None)
-```
-
-> [!NOTE]
-> `TimedInMemorySaver` state does not survive process restarts — the TTL
-> applies to in-process memory only. Persistent TTL enforcement will be
-> available when the Agent Memory Service checkpointer ships.

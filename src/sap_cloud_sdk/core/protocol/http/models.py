@@ -176,3 +176,43 @@ class XsuaaAuthProvider(AuthProvider):
         expose a ``base_url`` attribute (e.g. the destination module uses ``url``).
         """
         return getattr(self._config, "base_url", None)
+
+
+class IasAuthProvider(AuthProvider):
+    """Bearer-token auth provider for IAS (Identity Authentication Service).
+
+    Unlike :class:`XsuaaAuthProvider`, this provider holds no credentials and
+    fetches no token. In IAS mode the token is supplied *per request* by the
+    caller's runtime: the IAS context provider (wired via ``bootstrap(app)``)
+    parses the inbound ``Authorization`` header and stores the raw bearer token
+    in the request :class:`~sap_cloud_sdk.core.runtime_context.RuntimeContext`.
+    This provider reads that token at :meth:`get_session` time and attaches it.
+
+    Because the token is read fresh on every call, there is nothing to cache or
+    invalidate — ``invalidate``/``invalidate_all``/``close`` are no-ops.
+
+    When no token is present the session is returned without an ``Authorization``
+    header; enforcing presence is the caller's responsibility (the Agent Memory
+    client raises a validation error before dispatching the request).
+    """
+
+    def get_session(self, tenant_subdomain: Optional[str] = None) -> requests.Session:
+        # Imported lazily: runtime_context pulls in sap_cloud_sdk.ias, which would
+        # create an import cycle if imported at module load time.
+        from sap_cloud_sdk.core.runtime_context import get_context
+        from sap_cloud_sdk.core.runtime_context.providers._ias import IAS_TOKEN
+
+        session = requests.Session()
+        ias_token = get_context().get(IAS_TOKEN)
+        if ias_token:
+            session.headers["Authorization"] = f"Bearer {ias_token}"
+        return session
+
+    def invalidate(self, tenant_subdomain: Optional[str] = None) -> None:
+        pass
+
+    def invalidate_all(self) -> None:
+        pass
+
+    def close(self) -> None:
+        pass

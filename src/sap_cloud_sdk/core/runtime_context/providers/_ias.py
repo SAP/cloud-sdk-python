@@ -13,6 +13,7 @@ logger = logging.getLogger(__name__)
 APP_TENANT_ID = ContextKey[str]("ias.app_tid")
 GLOBAL_TENANT_ID = ContextKey[str]("ias.sap_gtid")
 USER_ID = ContextKey[str]("ias.user_uuid")
+IAS_TOKEN = ContextKey[str]("ias.token")
 
 
 class IASContextProvider(ContextProvider):
@@ -26,25 +27,28 @@ class IASContextProvider(ContextProvider):
       - :data:`APP_TENANT_ID`    from ``app_tid`` claim
       - :data:`GLOBAL_TENANT_ID` from ``sap_gtid`` claim
       - :data:`USER_ID`          from ``user_uuid`` claim
+      - :data:`IAS_TOKEN`        raw bearer token string
     """
 
     def extract(self, envelope: RequestEnvelope) -> RuntimeContext:
         auth = envelope.headers.get("authorization", "")
+        if not auth:
+            return RuntimeContext({})
 
-        claims = None
-        if auth:
-            try:
-                claims = parse_token(auth)
-            except Exception as e:
-                logger.debug("IAS token parsing failed, context will be empty: %s", e)
+        raw = auth.removeprefix("Bearer ").removeprefix("bearer ").strip()
+        if not raw:
+            return RuntimeContext({})
 
-        values = {}
-        if claims:
+        values: dict = {IAS_TOKEN: raw}
+        try:
+            claims = parse_token(raw)
             if claims.app_tid:
                 values[APP_TENANT_ID] = claims.app_tid
             if claims.sap_gtid:
                 values[GLOBAL_TENANT_ID] = claims.sap_gtid
             if claims.user_uuid:
                 values[USER_ID] = claims.user_uuid
+        except Exception as e:
+            logger.debug("IAS token parsing failed, context will be empty: %s", e)
 
         return RuntimeContext(values)

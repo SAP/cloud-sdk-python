@@ -20,7 +20,7 @@ Env fallback convention::
 
 import json
 from dataclasses import dataclass
-from typing import Optional, TYPE_CHECKING
+from typing import Literal, Optional, TYPE_CHECKING
 
 from sap_cloud_sdk.agent_memory.exceptions import AgentMemoryConfigError
 
@@ -44,6 +44,11 @@ class AgentMemoryConfig:
                       ``SUBSCRIBER`` access strategy so the subscriber token URL
                       can be derived by replacing this value in ``token_url``.
         timeout: Timeout in seconds for HTTP requests. Default is 30.0.
+
+    The authentication mode is exposed as the derived :pyattr:`auth_mode`
+    property (``"xsuaa"`` or ``"ias"``) rather than a stored field: it is
+    computed from the credentials so it can never contradict them, and callers
+    dispatch on ``config.auth_mode`` instead of inspecting ``token_url``.
 
     Example — deployed BTP service::
 
@@ -86,6 +91,38 @@ class AgentMemoryConfig:
             raise AgentMemoryConfigError(
                 "identityzone must be a non-empty string when provided"
             )
+        xsuaa_creds = (self.token_url, self.client_id, self.client_secret)
+        if any(xsuaa_creds) and not all(xsuaa_creds):
+            missing = [
+                name
+                for name, value in (
+                    ("token_url", self.token_url),
+                    ("client_id", self.client_id),
+                    ("client_secret", self.client_secret),
+                )
+                if not value
+            ]
+            raise AgentMemoryConfigError(
+                "Partial XSUAA credentials provided — all three (token_url, client_id, "
+                "client_secret) must be set together. Missing: " + ", ".join(missing)
+            )
+        if self.identityzone and not self.token_url:
+            raise AgentMemoryConfigError(
+                "identityzone applies only to XSUAA (it derives the subscriber token URL); "
+                "it must not be set without token_url/client_id/client_secret."
+            )
+
+    @property
+    def auth_mode(self) -> Literal["ias", "xsuaa"]:
+        """Authentication mode derived from the configured credentials.
+
+        ``"xsuaa"`` when OAuth2 credentials are present (``token_url`` set, which
+        ``__post_init__`` guarantees implies ``client_id``/``client_secret`` too),
+        ``"ias"`` otherwise. This is the single source of truth for auth dispatch —
+        callers branch on ``config.auth_mode`` instead of inspecting ``token_url``.
+        Computed, never stored, so it can never contradict the credentials.
+        """
+        return "xsuaa" if self.token_url else "ias"
 
 
 @dataclass
@@ -96,7 +133,8 @@ class BindingData:
     """
 
     application_url: str = ""
-    uaa: str = ""
+    # uaa absent → IAS mode: token provided per-request via ContextVar, no OAuth2 needed.
+    uaa: Optional[str] = None
 
     def validate(self) -> None:
         """Raise ``AgentMemoryConfigError`` if any required field is empty."""
@@ -104,13 +142,18 @@ class BindingData:
             raise AgentMemoryConfigError(
                 "Agent Memory binding is missing required field: application_url"
             )
-        if not self.uaa:
-            raise AgentMemoryConfigError(
-                "Agent Memory binding is missing required field: uaa"
-            )
+        # uaa is optional — absence means IAS mode (token provided per-request via ContextVar).
 
     def extract_config(self) -> AgentMemoryConfig:
-        """Parse the UAA JSON string and return an ``AgentMemoryConfig``."""
+        """Parse the UAA JSON string and return an ``AgentMemoryConfig``.
+
+        When ``uaa`` is absent (URL-only IAS binding), returns a config with
+        only ``base_url`` set. OAuth2 credentials are not required in IAS mode
+        because the token is provided per-request via the RuntimeContext.
+        """
+        if not self.uaa:
+            return AgentMemoryConfig(base_url=self.application_url)
+
         try:
             uaa_data = json.loads(self.uaa, strict=False)
         except json.JSONDecodeError as e:
@@ -128,7 +171,7 @@ class BindingData:
             raise AgentMemoryConfigError(f"Missing required field in uaa JSON: {e}")
 
 
-def _load_config_from_env() -> AgentMemoryConfig:
+def _load_config_from_env() -> Optional[AgentMemoryConfig]:
     """Load Agent Memory configuration from a mounted volume or environment variables.
 
     Uses the secret resolver with fallback order:
@@ -136,13 +179,34 @@ def _load_config_from_env() -> AgentMemoryConfig:
     2. Environment variables ``CLOUD_SDK_CFG_HANA_AGENT_MEMORY_DEFAULT_*``
 
     Returns:
-        A validated ``AgentMemoryConfig``.
+        A validated ``AgentMemoryConfig``, or ``None`` if no binding is found.
 
     Raises:
-        AgentMemoryConfigError: If configuration cannot be loaded or is incomplete.
+        AgentMemoryConfigError: If a binding is found but is incomplete or malformed.
     """
+    from sap_cloud_sdk.core.secret_resolver import (
+        read_from_mount_and_fallback_to_env_var,
+    )
+
+    binding = BindingData()
     try:
-        return _make_config_factory("default")()
+        read_from_mount_and_fallback_to_env_var(
+            base_volume_mount="/etc/secrets/appfnd",
+            base_var_name="CLOUD_SDK_CFG",
+            module=_SERVICE_NAME,
+            instance="default",
+            target=binding,
+        )
+    except RuntimeError:
+        return None
+
+    # If neither field was filled, no binding is configured anywhere.
+    if not binding.application_url and not binding.uaa:
+        return None
+
+    binding.validate()
+    try:
+        return binding.extract_config()
     except AgentMemoryConfigError:
         raise
     except Exception as exc:

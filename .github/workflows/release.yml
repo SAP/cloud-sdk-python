@@ -58,20 +58,20 @@ jobs:
     steps:
       - name: Checkout release branch
         if: ${{ !contains(github.event.release.body, 'skip-integration-tests') }}
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           ref: ${{ needs.parse.outputs.branch }}
           fetch-depth: 0
 
       - name: Set up Python
         if: ${{ !contains(github.event.release.body, 'skip-integration-tests') }}
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@v7
         with:
           python-version: "3.11"
 
       - name: Install uv
         if: ${{ !contains(github.event.release.body, 'skip-integration-tests') }}
-        uses: astral-sh/setup-uv@v3
+        uses: astral-sh/setup-uv@v7
 
       - name: Install dependencies
         if: ${{ !contains(github.event.release.body, 'skip-integration-tests') }}
@@ -135,18 +135,18 @@ jobs:
 
     steps:
       - name: Checkout release branch
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           ref: ${{ needs.parse.outputs.branch }}
           fetch-depth: 0
 
       - name: Set up Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@v7
         with:
           python-version: "3.11"
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v3
+        uses: astral-sh/setup-uv@v7
 
       - name: Build release distribution
         run: uv build

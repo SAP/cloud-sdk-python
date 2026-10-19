@@ -145,7 +145,6 @@ class TestTransformRequestMultiModule:
 
     def _call_transform_request(self, modules_value):
         """Call the filtering injection logic directly, bypassing the LiteLLM base class."""
-        from sap_cloud_sdk.aicore.filtering import _patch as _p
         from unittest.mock import patch
 
         body = {"config": {"modules": modules_value}}

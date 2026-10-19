@@ -5,10 +5,12 @@ Supports mTLS (client certificates) and insecure (no-auth) modes for gRPC.
 """
 
 import json
+import logging
 import os
 import uuid
 from datetime import datetime, timezone
 from typing import Any, Optional, cast
+from urllib.parse import urlparse
 
 import protovalidate
 from protovalidate import ValidationError as ProtoValidationError
@@ -42,6 +44,8 @@ from sap_cloud_sdk.core.runtime_context import get_context
 from sap_cloud_sdk.core.runtime_context.providers import APP_TENANT_ID, USER_ID
 from sap_cloud_sdk.ias._context import get_auth_context
 
+logger = logging.getLogger(__name__)
+
 
 def _fill_common_from_auth_context(event: Message) -> None:
     """Back-fill common fields from the request auth context.
@@ -72,12 +76,61 @@ def _fill_common_from_auth_context(event: Message) -> None:
         common.timestamp.FromDatetime(datetime.now(timezone.utc))
 
 
+def _infer_protocol_from_endpoint(endpoint: Optional[str]) -> Optional[str]:
+    """Infer the OTLP protocol from the shape of *endpoint*.
+
+    An OTLP/HTTP endpoint is a URL with an http(s) scheme and a path, for example
+    ``http://host:4318/v1/logs``. An OTLP/gRPC endpoint is a bare ``host:port`` (optionally
+    with a scheme) and no path, for example ``audit.example.com:443``. Returns
+    ``"http/protobuf"``, ``"grpc"``, or ``None`` when the shape is inconclusive.
+    """
+    ep = (endpoint or "").strip()
+    if not ep:
+        return None
+    parsed = urlparse(ep if "://" in ep else f"//{ep}")
+    if not parsed.netloc:
+        return None
+    has_path = bool(parsed.path.strip("/"))
+    if parsed.scheme.lower() in ("http", "https") and has_path:
+        return "http/protobuf"
+    if not has_path:
+        return "grpc"
+    return None
+
+
+def _resolve_protocol(endpoint: str) -> str:
+    """Resolve the OTLP protocol for the audit exporter.
+
+    An explicit ``OTEL_EXPORTER_OTLP_PROTOCOL`` wins when set, so deliberate overrides keep
+    working. When it is unset, the protocol is inferred from the endpoint shape rather than
+    blindly defaulting to gRPC. The old default previously produced a gRPC exporter aimed at
+    an HTTP endpoint whenever the environment did not inject the protocol (for example under
+    an env-only instrumentation setup), which broke delivery. Falls back to ``grpc`` when the
+    env is unset and the endpoint shape is inconclusive.
+    """
+    explicit = os.getenv(ENV_OTLP_PROTOCOL)
+    if explicit:
+        return explicit.lower()
+    inferred = _infer_protocol_from_endpoint(endpoint)
+    if inferred is not None:
+        logger.debug(
+            "OTEL_EXPORTER_OTLP_PROTOCOL unset; inferred %r from the audit endpoint shape.",
+            inferred,
+        )
+        return inferred
+    return "grpc"
+
+
 def _create_log_exporter(
     config: AuditLogNGConfig,
     credentials: Optional[grpc.ChannelCredentials],
 ):
-    """Create an OTLP log exporter based on OTEL_EXPORTER_OTLP_PROTOCOL."""
-    protocol = os.getenv(ENV_OTLP_PROTOCOL, "grpc").lower()
+    """Create an OTLP log exporter, choosing gRPC vs HTTP from the endpoint shape.
+
+    The protocol is derived from ``config.endpoint`` (see :func:`_resolve_protocol`) so the
+    client is not broken by a missing or mismatched ``OTEL_EXPORTER_OTLP_PROTOCOL``.
+    """
+    protocol = _resolve_protocol(config.endpoint)
     if protocol == "grpc":
         return GRPCLogExporter(
             endpoint=config.endpoint,

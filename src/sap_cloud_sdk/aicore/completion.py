@@ -89,7 +89,9 @@ def _wrap_stream_for_output_filter(iterator: Any) -> Any:
     for chunk in iterator:
         choices = getattr(chunk, "choices", None) or []
         if choices and getattr(choices[0], "finish_reason", None) == "content_filter":
-            raise ContentFilteredError(direction="output", details={}, request_id=None)
+            raise ContentFilteredError(
+                direction="output", details={}, request_id=getattr(chunk, "id", None)
+            )
         yield chunk
 
 
@@ -100,7 +102,9 @@ async def _awrap_stream_for_output_filter(iterator: Any) -> Any:
     async for chunk in iterator:
         choices = getattr(chunk, "choices", None) or []
         if choices and getattr(choices[0], "finish_reason", None) == "content_filter":
-            raise ContentFilteredError(direction="output", details={}, request_id=None)
+            raise ContentFilteredError(
+                direction="output", details={}, request_id=getattr(chunk, "id", None)
+            )
         yield chunk
 
 

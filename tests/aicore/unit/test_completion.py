@@ -318,12 +318,13 @@ class TestStreamingGuard:
             output_filtering=OutputFiltering(filters=[AzureContentFilter()]),
         ))
 
-    def _make_chunk(self, finish_reason=None):
+    def _make_chunk(self, finish_reason=None, request_id=None):
         """Build a minimal object that looks like an OpenAI stream chunk."""
         choice = MagicMock()
         choice.finish_reason = finish_reason
         chunk = MagicMock()
         chunk.choices = [choice]
+        chunk.id = request_id
         return chunk
 
     # --- input-only: stream allowed, iterator returned as-is ----------------
@@ -356,13 +357,14 @@ class TestStreamingGuard:
         self._activate_output()
         chunks = [
             self._make_chunk(finish_reason=None),
-            self._make_chunk(finish_reason="content_filter"),
+            self._make_chunk(finish_reason="content_filter", request_id="req-stream-123"),
         ]
         with patch("sap_cloud_sdk.aicore.completion.litellm.completion", return_value=iter(chunks)):
             stream = completion(model="sap/x", messages=[], stream=True)
         with pytest.raises(ContentFilteredError) as ei:
             list(stream)
         assert ei.value.direction == "output"
+        assert ei.value.request_id == "req-stream-123"
 
     def test_input_and_output_stream_raises_on_content_filter_chunk(self):
         from sap_cloud_sdk.aicore.filtering.exceptions import ContentFilteredError

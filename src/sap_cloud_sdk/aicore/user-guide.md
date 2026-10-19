@@ -367,6 +367,7 @@ the request is sent. This block applies universally to all callers (including
 `ChatLiteLLM` and LangGraph agents) because it fires inside the LiteLLM
 transport patch. Input filtering works with streaming — filter rejections
 surface as `ContentFilteredError` regardless.
+
 All other exceptions surface unchanged.
 
 `ContentFilteredError` exposes three attributes — `direction`, `details`,

@@ -276,6 +276,142 @@ class TestCompletionReactiveReload:
 
 
 # ---------------------------------------------------------------------------
+# Streaming guard — stream=True must not bypass output filtering
+# ---------------------------------------------------------------------------
+
+
+class TestStreamingGuard:
+    """Output-filter streaming: ContentFilteredError raised on content_filter chunk.
+    Input-only filtering: stream=True passes through unmodified.
+    """
+
+    @pytest.fixture(autouse=True)
+    def restore_filtering(self):
+        from sap_cloud_sdk.aicore.filtering._patch import _install
+        _install(None)
+        yield
+        _install(None)
+
+    def _activate_input_only(self):
+        from sap_cloud_sdk.aicore.filtering import (
+            AzureContentFilter, ContentFiltering, InputFiltering, set_filtering,
+        )
+        set_filtering(ContentFiltering(
+            input_filtering=InputFiltering(filters=[AzureContentFilter()])
+        ))
+
+    def _activate_output(self):
+        from sap_cloud_sdk.aicore.filtering import (
+            AzureContentFilter, ContentFiltering, OutputFiltering, set_filtering,
+        )
+        set_filtering(ContentFiltering(
+            output_filtering=OutputFiltering(filters=[AzureContentFilter()])
+        ))
+
+    def _activate_input_and_output(self):
+        from sap_cloud_sdk.aicore.filtering import (
+            AzureContentFilter, ContentFiltering, InputFiltering, OutputFiltering,
+            set_filtering,
+        )
+        set_filtering(ContentFiltering(
+            input_filtering=InputFiltering(filters=[AzureContentFilter()]),
+            output_filtering=OutputFiltering(filters=[AzureContentFilter()]),
+        ))
+
+    def _make_chunk(self, finish_reason=None):
+        """Build a minimal object that looks like an OpenAI stream chunk."""
+        choice = MagicMock()
+        choice.finish_reason = finish_reason
+        chunk = MagicMock()
+        chunk.choices = [choice]
+        return chunk
+
+    # --- input-only: stream allowed, iterator returned as-is ----------------
+
+    def test_no_filtering_stream_allowed(self):
+        sentinel = object()
+        with patch("sap_cloud_sdk.aicore.completion.litellm.completion", return_value=sentinel):
+            result = completion(model="sap/x", messages=[], stream=True)
+        assert result is sentinel
+
+    def test_input_only_filtering_stream_allowed(self):
+        self._activate_input_only()
+        sentinel = object()
+        with patch("sap_cloud_sdk.aicore.completion.litellm.completion", return_value=sentinel):
+            result = completion(model="sap/x", messages=[], stream=True)
+        assert result is sentinel
+
+    # --- output filtering: iterator wrapped, normal chunks pass through ------
+
+    def test_output_filter_stream_normal_chunks_pass_through(self):
+        self._activate_output()
+        chunks = [self._make_chunk(finish_reason=None), self._make_chunk(finish_reason="stop")]
+        with patch("sap_cloud_sdk.aicore.completion.litellm.completion", return_value=iter(chunks)):
+            stream = completion(model="sap/x", messages=[], stream=True)
+        collected = list(stream)
+        assert len(collected) == 2
+
+    def test_output_filter_stream_raises_on_content_filter_chunk(self):
+        from sap_cloud_sdk.aicore.filtering.exceptions import ContentFilteredError
+        self._activate_output()
+        chunks = [
+            self._make_chunk(finish_reason=None),
+            self._make_chunk(finish_reason="content_filter"),
+        ]
+        with patch("sap_cloud_sdk.aicore.completion.litellm.completion", return_value=iter(chunks)):
+            stream = completion(model="sap/x", messages=[], stream=True)
+        with pytest.raises(ContentFilteredError) as ei:
+            list(stream)
+        assert ei.value.direction == "output"
+
+    def test_input_and_output_stream_raises_on_content_filter_chunk(self):
+        from sap_cloud_sdk.aicore.filtering.exceptions import ContentFilteredError
+        self._activate_input_and_output()
+        chunks = [self._make_chunk(finish_reason="content_filter")]
+        with patch("sap_cloud_sdk.aicore.completion.litellm.completion", return_value=iter(chunks)):
+            stream = completion(model="sap/x", messages=[], stream=True)
+        with pytest.raises(ContentFilteredError):
+            list(stream)
+
+    # --- async variants ------------------------------------------------------
+
+    def test_acompletion_input_only_stream_allowed(self):
+        sentinel = object()
+
+        async def _fake_acompletion(*_, **__):  # noqa: S7503
+            return sentinel
+
+        with patch("sap_cloud_sdk.aicore.completion.litellm.acompletion", side_effect=_fake_acompletion):
+            result = asyncio.run(acompletion(model="sap/x", messages=[], stream=True))
+        assert result is sentinel
+
+    def test_acompletion_output_filter_stream_raises_on_content_filter_chunk(self):
+        from sap_cloud_sdk.aicore.filtering.exceptions import ContentFilteredError
+        self._activate_output()
+
+        chunks = [self._make_chunk(finish_reason="content_filter")]
+
+        async def fake_iter():
+            for c in chunks:
+                yield c
+
+        async def fake(*args, **kwargs):
+            return fake_iter()
+
+        with patch("sap_cloud_sdk.aicore.completion.litellm.acompletion", side_effect=fake):
+            stream = asyncio.run(acompletion(model="sap/x", messages=[], stream=True))
+
+        async def collect():
+            results = []
+            async for chunk in stream:
+                results.append(chunk)
+            return results
+
+        with pytest.raises(ContentFilteredError):
+            asyncio.run(collect())
+
+
+# ---------------------------------------------------------------------------
 # Reactive reload on AuthenticationError — async
 # ---------------------------------------------------------------------------
 

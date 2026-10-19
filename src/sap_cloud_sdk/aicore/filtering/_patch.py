@@ -75,8 +75,8 @@ class FilteringOrchestrationConfig(GenAIHubOrchestrationConfig):
 
         modules = body["config"]["modules"]
         if isinstance(modules, list):
-            # Fallback mode (list of configs) — inject into primary config only.
-            modules[0]["filtering"] = filtering_dict
+            for m in modules:
+                m["filtering"] = filtering_dict
         else:
             modules["filtering"] = filtering_dict
 

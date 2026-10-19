@@ -160,6 +160,8 @@ For new features or capabilities:
 
 Before marking the PR as ready for review, run the following checks locally:
 
+**Local review** — Run `/review-pr` in Claude Code. Address all ❌ findings before submitting.
+
 **Security review** — if your PR touches authentication, tenant routing, credential loading, or any code that accepts external input, run `/security-review` in Claude Code. Address all ❌ findings before submitting.
 
 **New modules** — if your PR introduces a new service module, you must include evidence that it works end-to-end in a real application. Attach a screen recording, logs, or screenshots to the PR showing:

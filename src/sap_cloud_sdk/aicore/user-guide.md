@@ -361,10 +361,12 @@ except ContentFilteredError as e:
 ```
 
 The wrapper forwards every argument verbatim to `litellm.completion`,
-including `stream=True`. When output filtering is active and `stream=True`,
-the returned iterator is wrapped so that a `finish_reason == "content_filter"`
-chunk raises `ContentFilteredError` instead of being silently yielded. Input
-filtering works server-side regardless of streaming — no extra handling needed.
+including `stream=True`. When output filtering is active, `stream=True` is
+not supported — a `ContentFilteredError(direction="output")` is raised before
+the request is sent. This block applies universally to all callers (including
+`ChatLiteLLM` and LangGraph agents) because it fires inside the LiteLLM
+transport patch. Input filtering works with streaming — filter rejections
+surface as `ContentFilteredError` regardless.
 All other exceptions surface unchanged.
 
 `ContentFilteredError` exposes three attributes — `direction`, `details`,
@@ -446,9 +448,10 @@ print(response.choices[0].message.content)
 
 ### Streaming Responses
 
-Use `sap_cloud_sdk.aicore.completion` (not `litellm.completion` directly) so
-that output-filter rejections surface as `ContentFilteredError` rather than
-being silently yielded:
+`stream=True` is supported when no output filtering is configured. If output
+filtering is active, streaming is blocked upfront with
+`ContentFilteredError(direction="output")` — this applies to all callers
+including `ChatLiteLLM` and LangGraph agents.
 
 ```python
 from sap_cloud_sdk.aicore import ContentFilteredError, completion, set_aicore_config

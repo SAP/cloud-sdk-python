@@ -281,7 +281,7 @@ class TestCompletionReactiveReload:
 
 
 class TestStreamingGuard:
-    """Output-filter streaming: ContentFilteredError raised on content_filter chunk.
+    """stream=True is blocked upfront when output filtering is active.
     Input-only filtering: stream=True passes through unmodified.
     """
 
@@ -318,16 +318,7 @@ class TestStreamingGuard:
             output_filtering=OutputFiltering(filters=[AzureContentFilter()]),
         ))
 
-    def _make_chunk(self, finish_reason=None, request_id=None):
-        """Build a minimal object that looks like an OpenAI stream chunk."""
-        choice = MagicMock()
-        choice.finish_reason = finish_reason
-        chunk = MagicMock()
-        chunk.choices = [choice]
-        chunk.id = request_id
-        return chunk
-
-    # --- input-only: stream allowed, iterator returned as-is ----------------
+    # --- input-only or no filtering: stream=True allowed --------------------
 
     def test_no_filtering_stream_allowed(self):
         sentinel = object()
@@ -342,41 +333,6 @@ class TestStreamingGuard:
             result = completion(model="sap/x", messages=[], stream=True)
         assert result is sentinel
 
-    # --- output filtering: iterator wrapped, normal chunks pass through ------
-
-    def test_output_filter_stream_normal_chunks_pass_through(self):
-        self._activate_output()
-        chunks = [self._make_chunk(finish_reason=None), self._make_chunk(finish_reason="stop")]
-        with patch("sap_cloud_sdk.aicore.completion.litellm.completion", return_value=iter(chunks)):
-            stream = completion(model="sap/x", messages=[], stream=True)
-        collected = list(stream)
-        assert len(collected) == 2
-
-    def test_output_filter_stream_raises_on_content_filter_chunk(self):
-        from sap_cloud_sdk.aicore.filtering.exceptions import ContentFilteredError
-        self._activate_output()
-        chunks = [
-            self._make_chunk(finish_reason=None),
-            self._make_chunk(finish_reason="content_filter", request_id="req-stream-123"),
-        ]
-        with patch("sap_cloud_sdk.aicore.completion.litellm.completion", return_value=iter(chunks)):
-            stream = completion(model="sap/x", messages=[], stream=True)
-        with pytest.raises(ContentFilteredError) as ei:
-            list(stream)
-        assert ei.value.direction == "output"
-        assert ei.value.request_id == "req-stream-123"
-
-    def test_input_and_output_stream_raises_on_content_filter_chunk(self):
-        from sap_cloud_sdk.aicore.filtering.exceptions import ContentFilteredError
-        self._activate_input_and_output()
-        chunks = [self._make_chunk(finish_reason="content_filter")]
-        with patch("sap_cloud_sdk.aicore.completion.litellm.completion", return_value=iter(chunks)):
-            stream = completion(model="sap/x", messages=[], stream=True)
-        with pytest.raises(ContentFilteredError):
-            list(stream)
-
-    # --- async variants ------------------------------------------------------
-
     def test_acompletion_input_only_stream_allowed(self):
         sentinel = object()
 
@@ -387,30 +343,89 @@ class TestStreamingGuard:
             result = asyncio.run(acompletion(model="sap/x", messages=[], stream=True))
         assert result is sentinel
 
-    def test_acompletion_output_filter_stream_raises_on_content_filter_chunk(self):
+    # --- output filtering + stream=True: blocked upfront --------------------
+
+    def test_output_filter_stream_blocked(self):
         from sap_cloud_sdk.aicore.filtering.exceptions import ContentFilteredError
+        from sap_cloud_sdk.aicore.filtering._patch import FilteringOrchestrationConfig
+        from unittest.mock import patch as _patch
+
         self._activate_output()
 
-        chunks = [self._make_chunk(finish_reason="content_filter")]
+        body = {"config": {"stream": {"enabled": True}, "modules": {"model_id": "x"}}}
+        instance = FilteringOrchestrationConfig()
 
-        async def fake_iter():
-            for c in chunks:
-                yield c
+        with _patch(
+            "sap_cloud_sdk.aicore.filtering._patch.GenAIHubOrchestrationConfig.transform_request",
+            return_value=body,
+        ):
+            with pytest.raises(ContentFilteredError) as ei:
+                instance.transform_request(
+                    model="sap/x", messages=[], optional_params={},
+                    litellm_params={}, headers={},
+                )
+        assert ei.value.direction == "output"
 
-        async def fake(*args, **kwargs):
-            return fake_iter()
+    def test_input_and_output_filter_stream_blocked(self):
+        from sap_cloud_sdk.aicore.filtering.exceptions import ContentFilteredError
+        from sap_cloud_sdk.aicore.filtering._patch import FilteringOrchestrationConfig
+        from unittest.mock import patch as _patch
 
-        with patch("sap_cloud_sdk.aicore.completion.litellm.acompletion", side_effect=fake):
-            stream = asyncio.run(acompletion(model="sap/x", messages=[], stream=True))
+        self._activate_input_and_output()
 
-        async def collect():
-            results = []
-            async for chunk in stream:
-                results.append(chunk)
-            return results
+        body = {"config": {"stream": {"enabled": True}, "modules": {"model_id": "x"}}}
+        instance = FilteringOrchestrationConfig()
 
-        with pytest.raises(ContentFilteredError):
-            asyncio.run(collect())
+        with _patch(
+            "sap_cloud_sdk.aicore.filtering._patch.GenAIHubOrchestrationConfig.transform_request",
+            return_value=body,
+        ):
+            with pytest.raises(ContentFilteredError) as ei:
+                instance.transform_request(
+                    model="sap/x", messages=[], optional_params={},
+                    litellm_params={}, headers={},
+                )
+        assert ei.value.direction == "output"
+
+    def test_output_filter_no_stream_not_blocked(self):
+        from sap_cloud_sdk.aicore.filtering._patch import FilteringOrchestrationConfig
+        from unittest.mock import patch as _patch
+
+        self._activate_output()
+
+        body = {"config": {"modules": {"model_id": "x"}}}
+        instance = FilteringOrchestrationConfig()
+
+        with _patch(
+            "sap_cloud_sdk.aicore.filtering._patch.GenAIHubOrchestrationConfig.transform_request",
+            return_value=body,
+        ):
+            result = instance.transform_request(
+                model="sap/x", messages=[], optional_params={},
+                litellm_params={}, headers={},
+            )
+        assert "filtering" in result["config"]["modules"]
+
+    def test_acompletion_output_filter_stream_blocked(self):
+        from sap_cloud_sdk.aicore.filtering.exceptions import ContentFilteredError
+        from sap_cloud_sdk.aicore.filtering._patch import FilteringOrchestrationConfig
+        from unittest.mock import patch as _patch
+
+        self._activate_output()
+
+        body = {"config": {"stream": {"enabled": True}, "modules": {"model_id": "x"}}}
+        instance = FilteringOrchestrationConfig()
+
+        with _patch(
+            "sap_cloud_sdk.aicore.filtering._patch.GenAIHubOrchestrationConfig.transform_request",
+            return_value=body,
+        ):
+            with pytest.raises(ContentFilteredError) as ei:
+                instance.transform_request(
+                    model="sap/x", messages=[], optional_params={},
+                    litellm_params={}, headers={},
+                )
+        assert ei.value.direction == "output"
 
 
 # ---------------------------------------------------------------------------

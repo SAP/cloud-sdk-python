@@ -40,13 +40,13 @@ Usage::
         ...
 
 These are intentionally thin — every other keyword argument is forwarded
-verbatim to ``litellm.completion`` / ``litellm.acompletion``. When content
-filtering is inactive, or when only input filtering is configured,
-``stream=True`` is allowed — input filter rejections surface as
-:class:`ContentFilteredError` through the stream iterator regardless.
-When output filtering is active, the wrappers wrap the returned iterator
-so that a ``finish_reason == "content_filter"`` chunk raises
-:class:`ContentFilteredError` rather than being yielded silently.
+verbatim to ``litellm.completion`` / ``litellm.acompletion``. When output
+filtering is active, ``stream=True`` is not supported — the filtering
+transport patch raises :class:`ContentFilteredError` upfront before the
+request is sent. This applies universally to all callers (including
+``ChatLiteLLM`` and LangGraph agents). Input filtering works with streaming
+— filter rejections surface as :class:`ContentFilteredError` through the
+stream iterator regardless.
 
 No telemetry is recorded here; the wrappers fire on every LLM call and a
 counter at this level would be both noisy and uninformative about
@@ -64,48 +64,8 @@ from sap_cloud_sdk.core.telemetry.metrics_decorator import record_metrics
 from sap_cloud_sdk.core.telemetry.module import Module
 from sap_cloud_sdk.core.telemetry.operation import Operation
 from .filtering.filters import _parse_input_filter_error
-from .filtering import _patch as _filtering_patch
 
 logger = logging.getLogger(__name__)
-
-
-def _output_filtering_active() -> bool:
-    """Return True only when output filtering is configured.
-
-    Input-filter rejections already surface correctly through the stream
-    iterator (the server sends an in-stream error event). Output filtering
-    needs extra handling because the server signals it via a normal chunk
-    with ``finish_reason == "content_filter"``, which would otherwise be
-    silently yielded to the caller.
-    """
-    cfg = _filtering_patch._active_cfg
-    return cfg is not None and cfg.output_filtering is not None
-
-
-def _wrap_stream_for_output_filter(iterator: Any) -> Any:
-    """Wrap a sync stream iterator to raise ContentFilteredError on filtered chunks."""
-    from .filtering.exceptions import ContentFilteredError
-
-    for chunk in iterator:
-        choices = getattr(chunk, "choices", None) or []
-        if choices and getattr(choices[0], "finish_reason", None) == "content_filter":
-            raise ContentFilteredError(
-                direction="output", details={}, request_id=getattr(chunk, "id", None)
-            )
-        yield chunk
-
-
-async def _awrap_stream_for_output_filter(iterator: Any) -> Any:
-    """Wrap an async stream iterator to raise ContentFilteredError on filtered chunks."""
-    from .filtering.exceptions import ContentFilteredError
-
-    async for chunk in iterator:
-        choices = getattr(chunk, "choices", None) or []
-        if choices and getattr(choices[0], "finish_reason", None) == "content_filter":
-            raise ContentFilteredError(
-                direction="output", details={}, request_id=getattr(chunk, "id", None)
-            )
-        yield chunk
 
 
 @record_metrics(Module.AICORE, Operation.AICORE_REACTIVE_RELOAD)
@@ -140,50 +100,35 @@ def completion(*args: Any, **kwargs: Any) -> Any:
     Model strings (e.g. ``sap/<model>``) are passed verbatim to LiteLLM in all
     routing modes — proxy routing is handled by ``litellm.api_base`` configured
     in :func:`set_aicore_config`, not by rewriting the model name.
-
-    When output filtering is active and ``stream=True``, the returned iterator
-    is wrapped so that a ``finish_reason == "content_filter"`` chunk raises
-    :class:`ContentFilteredError` instead of being yielded silently.
     """
     try:
-        result = litellm.completion(*args, **kwargs)
+        return litellm.completion(*args, **kwargs)
     except litellm.AuthenticationError:
         _reload_reactive()
-        result = litellm.completion(*args, **kwargs)
+        return litellm.completion(*args, **kwargs)
     except Exception as exc:
         translated = _maybe_translate_filter_error(exc)
         if translated is exc:
             raise
         raise translated from exc
-    if kwargs.get("stream") and _output_filtering_active():
-        return _wrap_stream_for_output_filter(result)
-    return result
 
 
 async def acompletion(*args: Any, **kwargs: Any) -> Any:
     """Async wrapper around :func:`litellm.acompletion`.
 
-    Same credential-rotation and output-filter streaming semantics as
-    :func:`completion`. Model strings are passed verbatim to LiteLLM in all
-    routing modes.
-
-    When output filtering is active and ``stream=True``, the returned async
-    iterator is wrapped so that a ``finish_reason == "content_filter"`` chunk
-    raises :class:`ContentFilteredError` instead of being yielded silently.
+    Same credential-rotation semantics as :func:`completion`.
+    Model strings are passed verbatim to LiteLLM in all routing modes.
     """
     try:
-        result = await litellm.acompletion(*args, **kwargs)
+        return await litellm.acompletion(*args, **kwargs)
     except litellm.AuthenticationError:
         _reload_reactive()
-        result = await litellm.acompletion(*args, **kwargs)
+        return await litellm.acompletion(*args, **kwargs)
     except Exception as exc:
         translated = _maybe_translate_filter_error(exc)
         if translated is exc:
             raise
         raise translated from exc
-    if kwargs.get("stream") and _output_filtering_active():
-        return _awrap_stream_for_output_filter(result)
-    return result
 
 
 __all__ = ["completion", "acompletion"]

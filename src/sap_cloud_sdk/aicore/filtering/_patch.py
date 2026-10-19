@@ -26,6 +26,21 @@ the JSON embedded in the exception message.
 back into :class:`ContentFilteredError` before it reaches caller code; the
 :func:`_parse_input_filter_error` helper in :mod:`.filters` does the JSON
 parsing.
+
+Streaming + output filtering
+----------------------------
+The ``transform_response`` hook is never called for streaming responses —
+LiteLLM routes those through a separate iterator path. This means output
+filter rejections (``finish_reason == "content_filter"`` chunks) would be
+silently yielded to the caller rather than raising
+:class:`ContentFilteredError`.
+
+To prevent this bypass, ``transform_request`` raises
+:class:`ContentFilteredError` upfront when both streaming and output
+filtering are requested simultaneously. This guarantee is universal — it
+applies to all callers (``sap_cloud_sdk.aicore.completion``,
+``ChatLiteLLM``, LangGraph, etc.) because ``transform_request`` runs at
+the LiteLLM transport layer.
 """
 
 from __future__ import annotations
@@ -72,6 +87,19 @@ class FilteringOrchestrationConfig(GenAIHubOrchestrationConfig):
         filtering_dict = _active_cfg.to_dict()
         if not filtering_dict:
             return body
+
+        # Streaming + output filtering: transform_response is never called for
+        # streams, so content_filter chunks would be silently yielded. Block
+        # the combination upfront — applies to all callers universally.
+        if (
+            _active_cfg.output_filtering is not None
+            and body.get("config", {}).get("stream", {}).get("enabled")
+        ):
+            raise ContentFilteredError(
+                direction="output",
+                details={},
+                request_id=None,
+            )
 
         modules = body["config"]["modules"]
         if isinstance(modules, list):

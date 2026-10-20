@@ -44,7 +44,6 @@ from sap_cloud_sdk.agentgateway.exceptions import (
     AgentGatewayServerError,
     MCPServerNotFoundError,
 )
-from sap_cloud_sdk.destination import ConsumptionLevel
 
 # Aliases for use in existing test assertions
 _LABEL_KEY = LABEL_KEY
@@ -1235,8 +1234,7 @@ class TestCallMcpToolLob:
     async def test_raises_server_error_with_code_on_mcp_error(self):
         """A JSON-RPC protocol error (McpError) surfaces as AgentGatewayServerError
         carrying the server message and error_code."""
-        from mcp.shared.exceptions import McpError
-        from mcp.types import ErrorData
+        from sap_cloud_sdk.agentgateway._compat import make_mcp_error
 
         tool = MCPTool(
             name="test-tool",
@@ -1263,9 +1261,7 @@ class TestCallMcpToolLob:
             mock_session_instance = AsyncMock()
             mock_session_instance.initialize = AsyncMock()
             mock_session_instance.call_tool = AsyncMock(
-                side_effect=McpError(
-                    ErrorData(code=-32603, message="Internal Server Error")
-                )
+                side_effect=make_mcp_error(-32603, "Internal Server Error")
             )
             mock_session.return_value.__aenter__.return_value = mock_session_instance
 
@@ -1278,8 +1274,7 @@ class TestCallMcpToolLob:
     async def test_raises_server_error_on_grouped_mcp_error(self):
         """A McpError wrapped in a BaseExceptionGroup (anyio task group) is still
         surfaced as AgentGatewayServerError with the server message and code."""
-        from mcp.shared.exceptions import McpError
-        from mcp.types import ErrorData
+        from sap_cloud_sdk.agentgateway._compat import make_mcp_error
 
         tool = MCPTool(
             name="test-tool",
@@ -1291,7 +1286,7 @@ class TestCallMcpToolLob:
         )
         grouped = BaseExceptionGroup(
             "unhandled errors in a TaskGroup",
-            [McpError(ErrorData(code=-32602, message="Unknown tool: foo"))],
+            [make_mcp_error(-32602, "Unknown tool: foo")],
         )
 
         with (

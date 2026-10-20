@@ -33,6 +33,7 @@ except ImportError:
     from mcp.shared.exceptions import MCPError as McpError  # type: ignore[no-redef]  # ty: ignore[unresolved-import]
 
 from sap_cloud_sdk.agentgateway._compat import (
+    find_malformed_result_error,
     find_mcp_error,
     mcp_input_schema,
     mcp_is_error,
@@ -857,13 +858,49 @@ async def call_mcp_tool_customer(
                 await session.initialize()
                 try:
                     result = await session.call_tool(tool.name, kwargs)
-                except (McpError, BaseExceptionGroup) as exc:
+                except (McpError, BaseExceptionGroup, AttributeError) as exc:
                     mcp_error = find_mcp_error(exc)
-                    if mcp_error is None:
-                        raise
-                    raise AgentGatewayServerError(
-                        mcp_error.error.message, error_code=mcp_error.error.code
-                    ) from exc
+                    if mcp_error is not None:
+                        logger.warning(
+                            "Tool '%s' on '%s' (server '%s') failed with MCP protocol "
+                            "error: code=%s message=%s",
+                            tool.name,
+                            tool.url,
+                            tool.server_name,
+                            mcp_error.error.code,
+                            mcp_error.error.message,
+                        )
+                        raise AgentGatewayServerError(
+                            mcp_error.error.message, error_code=mcp_error.error.code
+                        ) from exc
+
+                    malformed = find_malformed_result_error(exc)
+                    if malformed is not None:
+                        logger.warning(
+                            "Tool '%s' on '%s' (server '%s') returned a malformed or "
+                            "empty result from the gateway; the MCP client received no "
+                            "parseable CallToolResult (raw cause: %s: %s)",
+                            tool.name,
+                            tool.url,
+                            tool.server_name,
+                            type(malformed).__name__,
+                            malformed,
+                        )
+                        raise AgentGatewayServerError(
+                            f"Tool '{tool.name}' on '{tool.url}' returned a malformed "
+                            f"or empty result from the gateway"
+                        ) from exc
+
+                    logger.error(
+                        "Tool '%s' on '%s' (server '%s') raised an unhandled error "
+                        "during invocation: %s: %s",
+                        tool.name,
+                        tool.url,
+                        tool.server_name,
+                        type(exc).__name__,
+                        exc,
+                    )
+                    raise
 
                 if result is None:
                     raise AgentGatewayServerError(

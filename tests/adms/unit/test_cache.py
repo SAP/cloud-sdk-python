@@ -52,7 +52,7 @@ class TestInMemoryTokenCache:
 
     def test_token_cache_is_abstract(self):
         with pytest.raises(TypeError):
-            TokenCache()
+            TokenCache()  # ty: ignore[call-non-callable]
 
     def test_valid_ttl_is_cached(self):
         cache = InMemoryTokenCache()

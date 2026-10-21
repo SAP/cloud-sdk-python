@@ -3,7 +3,7 @@
 All notable changes to this project will be documented in this file.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [0.63.0] — 2026-10-21
+## [Unreleased]
 
 ### Security
 

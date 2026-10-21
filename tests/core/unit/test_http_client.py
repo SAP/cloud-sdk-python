@@ -64,6 +64,12 @@ class TestHttpClient:
         assert result.status_code == 401
         assert mock_req.call_count == 1
 
+    def test_execute_sets_allow_redirects_false(self):
+        """Redirects must never be followed — credentials could leak to another origin."""
+        client, auth, session = _make_client_with_mock_session()
+        client.request(HttpMethod.GET, "/path")
+        assert session.request.call_args.kwargs.get("allow_redirects") is False
+
     def test_200_response_not_retried(self):
         client, auth, session = _make_client_with_mock_session()
         result = client.request(HttpMethod.GET, "/data")

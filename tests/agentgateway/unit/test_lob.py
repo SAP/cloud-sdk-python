@@ -1349,6 +1349,130 @@ class TestCallMcpToolLob:
             with pytest.raises(AgentGatewayServerError, match="returned an error"):
                 await call_mcp_tool_lob(tool, "user-auth-token", 60.0)
 
+    @pytest.mark.asyncio
+    async def test_maps_isError_attributeerror_to_server_error(self):
+        """A bare ``AttributeError: 'NoneType' ... has no attribute 'isError'`` raised
+        *inside* mcp's call_tool (when it dereferences a None result) is translated into
+        a clean AgentGatewayServerError rather than leaking the opaque 'NoneType' message
+        to the agent. Mirrors the customer-flow guard — the LoB path shares the defect."""
+        tool = MCPTool(
+            name="test-tool",
+            server_name="test-server",
+            description="Test tool",
+            input_schema={},
+            url="https://example.com/mcp",
+            fragment_name="test-fragment",
+        )
+
+        with (
+            patch("sap_cloud_sdk.agentgateway._lob.httpx.AsyncClient") as mock_http,
+            patch(
+                "sap_cloud_sdk.agentgateway._lob.streamable_http_client"
+            ) as mock_stream,
+            patch("sap_cloud_sdk.agentgateway._lob.ClientSession") as mock_session,
+        ):
+            mock_http.return_value.__aenter__.return_value = AsyncMock()
+            mock_stream.return_value.__aenter__.return_value = (
+                AsyncMock(),
+                AsyncMock(),
+                None,
+            )
+            mock_session_instance = AsyncMock()
+            mock_session_instance.initialize = AsyncMock()
+            mock_session_instance.call_tool = AsyncMock(
+                side_effect=AttributeError(
+                    "'NoneType' object has no attribute 'isError'"
+                )
+            )
+            mock_session.return_value.__aenter__.return_value = mock_session_instance
+
+            with pytest.raises(AgentGatewayServerError) as exc_info:
+                await call_mcp_tool_lob(tool, "user-auth-token", 60.0)
+            message = str(exc_info.value)
+            assert "malformed or empty result" in message
+            assert "test-tool" in message
+            # The raw mcp AttributeError string must NOT leak to the agent.
+            assert "NoneType" not in message
+
+    @pytest.mark.asyncio
+    async def test_maps_grouped_isError_attributeerror_to_server_error(self):
+        """The same malformed-result AttributeError, wrapped in a BaseExceptionGroup
+        (anyio task group — how it actually surfaces from the mcp client), is still
+        translated into a clean AgentGatewayServerError. Uses the ``is_error`` (mcp 2.x)
+        spelling to prove both spellings are recognised."""
+        tool = MCPTool(
+            name="test-tool",
+            server_name="test-server",
+            description="Test tool",
+            input_schema={},
+            url="https://example.com/mcp",
+            fragment_name="test-fragment",
+        )
+        grouped = BaseExceptionGroup(
+            "unhandled errors in a TaskGroup",
+            [AttributeError("'NoneType' object has no attribute 'is_error'")],
+        )
+
+        with (
+            patch("sap_cloud_sdk.agentgateway._lob.httpx.AsyncClient") as mock_http,
+            patch(
+                "sap_cloud_sdk.agentgateway._lob.streamable_http_client"
+            ) as mock_stream,
+            patch("sap_cloud_sdk.agentgateway._lob.ClientSession") as mock_session,
+        ):
+            mock_http.return_value.__aenter__.return_value = AsyncMock()
+            mock_stream.return_value.__aenter__.return_value = (
+                AsyncMock(),
+                AsyncMock(),
+                None,
+            )
+            mock_session_instance = AsyncMock()
+            mock_session_instance.initialize = AsyncMock()
+            mock_session_instance.call_tool = AsyncMock(side_effect=grouped)
+            mock_session.return_value.__aenter__.return_value = mock_session_instance
+
+            with pytest.raises(AgentGatewayServerError) as exc_info:
+                await call_mcp_tool_lob(tool, "user-auth-token", 60.0)
+            message = str(exc_info.value)
+            assert "malformed or empty result" in message
+            assert "is_error" not in message
+
+    @pytest.mark.asyncio
+    async def test_unrelated_attributeerror_is_reraised(self):
+        """An AttributeError unrelated to the isError/is_error dereference is NOT
+        swallowed — it is re-raised so genuine bugs are not masked as gateway errors."""
+        tool = MCPTool(
+            name="test-tool",
+            server_name="test-server",
+            description="Test tool",
+            input_schema={},
+            url="https://example.com/mcp",
+            fragment_name="test-fragment",
+        )
+
+        with (
+            patch("sap_cloud_sdk.agentgateway._lob.httpx.AsyncClient") as mock_http,
+            patch(
+                "sap_cloud_sdk.agentgateway._lob.streamable_http_client"
+            ) as mock_stream,
+            patch("sap_cloud_sdk.agentgateway._lob.ClientSession") as mock_session,
+        ):
+            mock_http.return_value.__aenter__.return_value = AsyncMock()
+            mock_stream.return_value.__aenter__.return_value = (
+                AsyncMock(),
+                AsyncMock(),
+                None,
+            )
+            mock_session_instance = AsyncMock()
+            mock_session_instance.initialize = AsyncMock()
+            mock_session_instance.call_tool = AsyncMock(
+                side_effect=AttributeError("'Foo' object has no attribute 'bar'")
+            )
+            mock_session.return_value.__aenter__.return_value = mock_session_instance
+
+            with pytest.raises(AttributeError, match="has no attribute 'bar'"):
+                await call_mcp_tool_lob(tool, "user-auth-token", 60.0)
+
 
 # ============================================================
 

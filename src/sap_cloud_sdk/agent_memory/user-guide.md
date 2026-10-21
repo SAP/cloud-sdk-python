@@ -1,13 +1,9 @@
 # Agent Memory User Guide
 
-This module provides a Python client for the SAP Agent Memory service (v1 API). It lets agents
-store, retrieve, and semantically search persistent memories, and record conversation messages
-grouped into logical message groups. The service handles vector embeddings automatically for memories — you store
-plain text, and the service makes it searchable by meaning.
+This module provides a Python client for the SAP Agent Memory service (v1 API). It lets agents store, retrieve, and semantically search persistent memories, and record conversation messages grouped into logical message groups. The service handles vector embeddings automatically for memories — you store plain text, and the service makes it searchable by meaning.
 
 > [!NOTE]
-> Memory extraction is the caller's responsibility. This client stores whatever text you pass
-> as `content`; it does not extract or summarize memories from conversation text on its own.
+> Memory extraction is the caller's responsibility. This client stores whatever text you pass as `content`; it does not extract or summarize memories from conversation text on its own.
 
 ## Table of Contents
 
@@ -81,8 +77,7 @@ plain text, and the service makes it searchable by meaning.
 
 ## Installation
 
-See the [SAP Cloud SDK for Python installation guide](https://github.com/SAP/cloud-sdk-python#installation)
-for setup instructions. The agent memory module is included automatically.
+See the [SAP Cloud SDK for Python installation guide](https://github.com/SAP/cloud-sdk-python#installation) for setup instructions. The agent memory module is included automatically.
 
 ## Import
 
@@ -122,9 +117,7 @@ memories = client.list_memories(agent_id="my-agent", invoker_id="user-123")
 print(f"Found {len(memories)} memories")
 ```
 
-`create_client()` reads credentials from the `CLOUD_SDK_CFG_HANA_AGENT_MEMORY_DEFAULT_*`
-environment variables (or a mounted volume on BTP). See the
-[Configuration](#configuration) section for the full variable table.
+`create_client()` reads credentials from the `CLOUD_SDK_CFG_HANA_AGENT_MEMORY_DEFAULT_*` environment variables (or a mounted volume on BTP). See the [Configuration](#configuration) section for the full variable table.
 
 ### Custom Configuration
 
@@ -144,8 +137,7 @@ client = create_client(config=config)
 
 ### Using the Context Manager
 
-The context manager is optional, but it is the easiest way to ensure the client is
-closed even if an exception is raised:
+The context manager is optional, but it is the easiest way to ensure the client is closed even if an exception is raised:
 
 ```python
 with create_client() as client:
@@ -154,8 +146,7 @@ with create_client() as client:
 
 To close the client manually, call `client.close()`.
 
-`close()` is only for local cleanup. It does **not** commit, flush, or roll back data.
-Each API call is independent and final once accepted by the service.
+`close()` is only for local cleanup. It does **not** commit, flush, or roll back data. Each API call is independent and final once accepted by the service.
 
 Calling methods after `close()` is supported.
 
@@ -163,28 +154,22 @@ Calling methods after `close()` is supported.
 
 ### `agent_id`
 
-A stable identifier for the agent that owns the data — for example `"hr-assistant"` or
-`"support-bot"`. Chosen by the implementer; typically the name or ID of the AI agent.
+A stable identifier for the agent that owns the data — for example `"hr-assistant"` or `"support-bot"`. Chosen by the implementer; typically the name or ID of the AI agent.
 
 ### `invoker_id`
 
-Identifies the user or caller associated with the data — for example a user ID from
-the application's auth system. Memories and messages are scoped to the combination of
-`agent_id` and `invoker_id`.
+Identifies the user or caller associated with the data — for example a user ID from the application's auth system. Memories and messages are scoped to the combination of `agent_id` and `invoker_id`.
 
-Neither value is validated by the service — they are free-form strings. Consistent use
-across create, read, and search calls is the implementer's responsibility.
+Neither value is validated by the service — they are free-form strings. Consistent use across create, read, and search calls is the implementer's responsibility.
 
 ## Multitenancy
 
 - **Supported:** Yes
-- **Authentication:** XSUAA
-- **How to use:** Pass `access_strategy` and `tenant` to `create_client()`. The strategy controls whether calls use a subscriber-scoped or provider-scoped XSUAA token. Every method on the client inherits the strategy set at construction time.
+- **Authentication:** XSUAA or IAS
+- **How to use (XSUAA):** Pass `access_strategy` and `tenant` to `create_client()`. The strategy controls whether calls use a subscriber-scoped or provider-scoped XSUAA token. Every method on the client inherits the strategy set at construction time.
+- **How to use (IAS):** Nothing to configure — tenant routing is driven by the per-request IAS token, not by `access_strategy`/`tenant` (which are ignored in IAS mode). The subscriber identity comes from the inbound IAS token placed into the request `RuntimeContext`. See [IAS binding](#ias-binding) under Configuration.
 
-  > [!NOTE]
-  > `access_strategy` and `tenant` apply to **XSUAA bindings only**. In **IAS mode**
-  > (auto-detected from a URL-only binding) they are ignored — routing is driven by the
-  > per-request IAS token. See [IAS binding](#ias-binding) under Configuration.
+  The `access_strategy` values below apply to **XSUAA bindings only**:
 
   | Value                                 | Description                                                                                     |
   | ------------------------------------- | ----------------------------------------------------------------------------------------------- |
@@ -198,15 +183,9 @@ across create, read, and search calls is the implementer's responsibility.
 
 ## Semantic Search: A Brief Primer
 
-Texts with different words — or even different languages — can have the same meaning.
-"How to make pizza dough?" and "Italian flatbread preparation steps" are semantically similar
-despite sharing no words. To search a large corpus by meaning rather than exact keywords, the
-service uses vector embeddings.
+Texts with different words — or even different languages — can have the same meaning. "How to make pizza dough?" and "Italian flatbread preparation steps" are semantically similar despite sharing no words. To search a large corpus by meaning rather than exact keywords, the service uses vector embeddings.
 
-An embedding model translates a text into a high-dimensional numeric vector. Texts with similar
-meaning produce vectors that point in a similar direction. The cosine similarity between two
-vectors measures that directional closeness: a value near 1.0 means the texts are semantically
-similar.
+An embedding model translates a text into a high-dimensional numeric vector. Texts with similar meaning produce vectors that point in a similar direction. The cosine similarity between two vectors measures that directional closeness: a value near 1.0 means the texts are semantically similar.
 
 Example corpus:
 
@@ -216,16 +195,13 @@ Example corpus:
 - "Wolves hunt deer"
 - "Engines power ships"
 
-A search for "Sky illumination" returns "Clouds block sunlight" — closest in meaning, with the
-highest cosine similarity — even though the query shares no words with the result.
+A search for "Sky illumination" returns "Clouds block sunlight" — closest in meaning, with the highest cosine similarity — even though the query shares no words with the result.
 
-`search_memories()` uses this mechanism: you pass a natural-language query and a similarity
-threshold, and the service returns the most semantically relevant stored memories.
+`search_memories()` uses this mechanism: you pass a natural-language query and a similarity threshold, and the service returns the most semantically relevant stored memories.
 
 ## Memories
 
-Memories are persistent knowledge entries scoped to an `agent_id` + `invoker_id` pair.
-The service generates a vector embedding for each memory automatically, enabling semantic search.
+Memories are persistent knowledge entries scoped to an `agent_id` + `invoker_id` pair. The service generates a vector embedding for each memory automatically, enabling semantic search.
 
 ### Create a Memory
 
@@ -260,8 +236,7 @@ print(memory.content)
 
 ### Update a Memory
 
-`update_memory` performs a partial update;
-omitted fields remain untouched.
+`update_memory` performs a partial update; omitted fields remain untouched.
 
 > [!NOTE]
 > `content` and `metadata` are the only editable fields; `memory_id` identifies which memory to update and cannot be modified
@@ -334,9 +309,7 @@ memories = client.list_memories(
 `target` must be `"content"` or `"metadata"`. Multiple clauses are combined with AND.
 
 > [!WARNING]
-> Defining two clauses with the **same target** produces an AND predicate that requires
-> both substrings to be present in the same field simultaneously. This is rarely
-> intentional — for example:
+> Defining two clauses with the **same target** produces an AND predicate that requires both substrings to be present in the same field simultaneously. This is rarely intentional — for example:
 >
 > ```python
 > filters=[
@@ -345,14 +318,10 @@ memories = client.list_memories(
 > ]
 > ```
 >
-> Only memories whose content contains _both_ substrings will be returned, which is
-> typically an empty result set. OR combining across clauses is not yet supported.
+> Only memories whose content contains _both_ substrings will be returned, which is typically an empty result set. OR combining across clauses is not yet supported.
 
 > [!NOTE]
-> Metadata is stored as a JSON string. Filtering on `"metadata"` performs a free-text
-> substring match on the raw JSON — for example `contains="preferences"` matches any
-> metadata whose serialized form includes that word. Structured key-value filtering
-> (e.g. `metadata.source == "preferences"`) is not supported.
+> Metadata is stored as a JSON string. Filtering on `"metadata"` performs a free-text substring match on the raw JSON — for example `contains="preferences"` matches any metadata whose serialized form includes that word. Structured key-value filtering (e.g. `metadata.source == "preferences"`) is not supported.
 
 ### Count Memories
 
@@ -375,8 +344,7 @@ print(f"Total memories: {total}")
 
 ### Semantic Search
 
-Search for memories whose meaning is similar to a natural-language query. The service returns
-results ordered by relevance (highest similarity first).
+Search for memories whose meaning is similar to a natural-language query. The service returns results ordered by relevance (highest similarity first).
 
 ```python
 results = client.search_memories(
@@ -408,9 +376,7 @@ for r in results:
 
 ## Messages
 
-Messages represent individual turns in a conversation. Messages sharing the same `message_group`
-form a logical message group. The service does not enforce a session concept — grouping is done
-entirely via the `message_group` value you choose.
+Messages represent individual turns in a conversation. Messages sharing the same `message_group` form a logical message group. The service does not enforce a session concept — grouping is done entirely via the `message_group` value you choose.
 
 ### Create a Message
 
@@ -517,16 +483,13 @@ messages = client.list_messages(
 )
 ```
 
-See the [Content and metadata filtering](#content-and-metadata-filtering) note under
-[List Memories](#list-memories) for details on metadata free-text limitations.
+See the [Content and metadata filtering](#content-and-metadata-filtering) note under [List Memories](#list-memories) for details on metadata free-text limitations.
 
 ---
 
 ## Thread Registry
 
-The thread registry tracks conversation threads — their owner, idle TTL, and expiry. Unlike
-the LangGraph checkpointer, it is **framework-agnostic**: it works with LangGraph, Pydantic AI,
-CrewAI, or any custom agent.
+The thread registry tracks conversation threads — their owner, idle TTL, and expiry. Unlike the LangGraph checkpointer, it is **framework-agnostic**: it works with LangGraph, Pydantic AI, CrewAI, or any custom agent.
 
 Use `create_thread_registry()` to create a registry for the current environment:
 
@@ -541,7 +504,7 @@ registry = create_thread_registry(ttl_seconds=3600)  # 1-hour idle TTL
 - **Credentials present** — returns `SAPAgentMemoryThreadRegistry` backed by the Agent Memory
   Service. Thread state is persistent across restarts and enforced server-side.
 - **No credentials** — falls back to `InMemoryThreadRegistry`. State is in-process only and
-  will not survive restarts.
+  will not survive restarts. It accepts `tenant_subdomain` for signature parity with the service-backed registry but **ignores it** — all threads share a single store, so tenant isolation is not available in this mode.
 
 You can also import the concrete types and the `BaseThreadRegistry` ABC directly:
 
@@ -555,8 +518,7 @@ from sap_cloud_sdk.agent_memory.thread_registry import (
 
 ### Create or Register a Thread
 
-`create_or_register_thread()` is idempotent: calling it with the same `thread_id` a second
-time touches the thread (resetting its idle TTL) rather than raising an error.
+`create_or_register_thread()` is idempotent: calling it with the same `thread_id` a second time touches the thread (resetting its idle TTL) rather than raising an error.
 
 ```python
 entry = registry.create_or_register_thread(
@@ -601,9 +563,7 @@ entry = registry.update_thread(
 )
 ```
 
-`update_thread()` is a PATCH-style merge — only the fields you pass are modified. Omit
-`ttl_seconds` to leave the thread's existing TTL untouched (mirrors LangGraph's
-`threads.update`).
+`update_thread()` is a PATCH-style merge — only the fields you pass are modified. Omit `ttl_seconds` to leave the thread's existing TTL untouched (mirrors LangGraph's `threads.update`).
 
 ### Delete a Thread
 
@@ -613,22 +573,18 @@ registry.delete_thread("session-abc")  # idempotent — no error if already gone
 
 ### Thread TTL and lifecycle
 
-**Sliding idle TTL**: `ttl_seconds` is an *inactivity* window. The expiry resets on each
-write (register, update). A thread inactive for longer than `ttl_seconds` is treated as
-expired. `None` means threads never expire.
+**Sliding idle TTL**: `ttl_seconds` is an *inactivity* window. The expiry resets on each write (register, update). A thread inactive for longer than `ttl_seconds` is treated as expired. `None` means threads never expire.
 
 TTL precedence (highest to lowest):
 1. Per-call `ttl_seconds` passed to `create_or_register_thread()` / `update_thread()`
 2. `create_thread_registry(ttl_seconds=...)` registry-level default
 3. No expiry (`None`)
 
-`InMemoryThreadRegistry` evaluates expiry lazily at read time; the service-backed registry
-enforces expiry server-side via the `expiresAt` field.
+`InMemoryThreadRegistry` evaluates expiry lazily at read time; the service-backed registry enforces expiry server-side via the `expiresAt` field.
 
 ### Resource Management: `close()` and Context Manager
 
-`SAPAgentMemoryThreadRegistry` owns an HTTP transport with an OAuth token cache and connection
-pool. Call `close()` when the registry is no longer needed, or use the context manager:
+`SAPAgentMemoryThreadRegistry` owns an HTTP transport with an OAuth token cache and connection pool. Call `close()` when the registry is no longer needed, or use the context manager:
 
 ```python
 # Explicit close
@@ -646,15 +602,11 @@ with create_thread_registry() as registry:
 ```
 
 > [!NOTE]
-> `InMemoryThreadRegistry.close()` is a no-op — it has no external resources to release.
-> The context manager interface is available on all registry types for uniform usage.
+> `InMemoryThreadRegistry.close()` is a no-op — it has no external resources to release. The context manager interface is available on all registry types for uniform usage.
 
 ### Exposing idle TTL with `@agent_config`
 
-Use `@agent_config` from `sap_cloud_sdk.agent_decorators` to expose `ttl_seconds` as an
-operator-adjustable configuration field. The key `config.registry.ttl_seconds` groups it
-with other registry settings so external tooling can surface it in the low-code UI alongside
-model selection and temperature.
+Use `@agent_config` from `sap_cloud_sdk.agent_decorators` to expose `ttl_seconds` as an operator-adjustable configuration field. The key `config.registry.ttl_seconds` groups it with other registry settings so external tooling can surface it in the low-code UI alongside model selection and temperature.
 
 ```python
 from sap_cloud_sdk.agent_decorators import agent_config
@@ -678,33 +630,17 @@ class MyAgent:
 ```
 
 > [!NOTE]
-> `InMemoryThreadRegistry` state does not survive process restarts. When Agent Memory Service
-> credentials are available, `create_thread_registry()` returns `SAPAgentMemoryThreadRegistry`
-> instead, and thread expiry is enforced server-side via the `expiresAt` field on the thread
-> registry row.
+> `InMemoryThreadRegistry` state does not survive process restarts. When Agent Memory Service credentials are available, `create_thread_registry()` returns `SAPAgentMemoryThreadRegistry` instead, and thread expiry is enforced server-side via the `expiresAt` field on the thread registry row.
 
 ## LangGraph Checkpointer
 
-> This section covers the LangGraph-specific
-> factory for short-term memory (checkpointing). It is only relevant if your agent
-> is built with LangGraph or LangChain's `create_agent()`. The core
-> `AgentMemoryClient` and `create_client()` above are framework-agnostic and work
-> independently of this section.
+> This section covers the LangGraph-specific factory for short-term memory (checkpointing). It is only relevant if your agent is built with LangGraph or LangChain's `create_agent()`. The core `AgentMemoryClient` and `create_client()` above are framework-agnostic and work independently of this section.
 
-For LangGraph agents, the `agent_memory` module provides a `create_checkpointer()`
-factory in the `factory` subpackage. It returns a `BaseCheckpointSaver` that
-manages short-term session memory — conversation state, thread continuity, and
-HITL support — natively within LangGraph.
+For LangGraph agents, the `agent_memory` module provides a `create_checkpointer()` factory in the `factory` subpackage. It returns a `BaseCheckpointSaver` that manages short-term session memory — conversation state, thread continuity, and HITL support — natively within LangGraph.
 
-`create_checkpointer()` returns an `InMemorySaver`. State is in-process only and
-will not survive process restarts.
+`create_checkpointer()` returns an `InMemorySaver`. State is in-process only and will not survive process restarts.
 
-> **Deprecated — `create_checkpointer(ttl_seconds=...)`.** Passing `ttl_seconds`
-> returns a `TimedInMemorySaver` that evicts inactive threads. This is deprecated:
-> thread lifecycle is owned by the **thread registry**, and configuring TTL in two
-> places leads to drift. The parameter still works and will not be removed yet
-> (existing code keeps running), but it now emits a `DeprecationWarning`. Configure
-> TTL on `create_thread_registry()` instead:
+> **Deprecated — `create_checkpointer(ttl_seconds=...)`.** Passing `ttl_seconds` returns a `TimedInMemorySaver` that evicts inactive threads. This is deprecated: thread lifecycle is owned by the **thread registry**, and configuring TTL in two places leads to drift. The parameter still works and will not be removed yet (existing code keeps running), but it now emits a `DeprecationWarning`. Configure TTL on `create_thread_registry()` instead:
 >
 > ```python
 > # Deprecated — checkpointer-level TTL
@@ -804,30 +740,21 @@ The `uaa` key must contain a JSON string with the XSUAA credentials:
 
 ### IAS binding
 
-IAS mode is **auto-detected** — a URL-only binding (`application_url`, no `uaa`/`token_url`)
-selects IAS automatically. There is nothing extra to configure on `create_client()`:
-`access_strategy` and `tenant` are **ignored** in IAS mode (requests are routed by the
-per-request token, not by an XSUAA strategy).
+IAS mode is **auto-detected** — a URL-only binding (`application_url`, no `uaa`/`token_url`) selects IAS automatically. There is nothing extra to configure on `create_client()`: `access_strategy` and `tenant` are **ignored** in IAS mode (requests are routed by the per-request token, not by an XSUAA strategy).
 
-Unlike XSUAA, the client holds no credentials and fetches no token of its own. The Bearer
-token travels **per request**, read from the request `RuntimeContext` at call time.
+Unlike XSUAA, the client holds no credentials and fetches no token of its own. The Bearer token travels **per request**, read from the request `RuntimeContext` at call time.
 
 > [!IMPORTANT]
-> **The agent must wire `bootstrap(app)` / `IASContextProvider`.** This is what parses the
-> inbound `Authorization` header and places the IAS token into the `RuntimeContext` that the
-> client reads. Without it, **every** Agent Memory and Thread Registry call fails with:
+> **The agent must wire `bootstrap(app)` / `IASContextProvider`.** This is what parses the inbound `Authorization` header and places the IAS token into the `RuntimeContext` that the client reads. Without it, **every** Agent Memory and Thread Registry call fails with:
 >
 > ```
 > AgentMemoryValidationError: IAS token not found in RuntimeContext. Ensure bootstrap(app) is configured.
 > ```
 >
-> Wire it once at startup — for example `bootstrap(app)` on your FastAPI/Flask app — so each
-> inbound request populates the context before any client call runs.
+> Wire it once at startup — for example `bootstrap(app)` on your FastAPI/Flask app — so each inbound request populates the context before any client call runs.
 
 > [!NOTE]
-> **Feedback / future improvement:** the cloud-sdk could auto-bootstrap the IAS context
-> wiring when it detects an IAS binding at runtime, so agents would not have to call
-> `bootstrap(app)` manually. Until then, wiring the context provider is a required manual step.
+> **Feedback / future improvement:** the cloud-sdk could auto-bootstrap the IAS context wiring when it detects an IAS binding at runtime, so agents would not have to call `bootstrap(app)` manually. Until then, wiring the context provider is a required manual step.
 
 ## Data Models
 
@@ -865,8 +792,7 @@ print(memory.to_dict())
 
 ## Error Handling
 
-The module defines a structured exception hierarchy so you can catch errors at the appropriate
-level of specificity:
+The module defines a structured exception hierarchy so you can catch errors at the appropriate level of specificity:
 
 ```
 AgentMemoryError
@@ -922,8 +848,7 @@ except AgentMemoryError as e:
 
 ## Admin — Retention Config
 
-The retention configuration controls automatic data cleanup. It is a singleton — one config
-per tenant.
+The retention configuration controls automatic data cleanup. It is a singleton — one config per tenant.
 
 ### Get Retention Config
 
@@ -937,8 +862,7 @@ print(f"Registered threads: {rc.thread_days} days")
 
 ### Update Retention Config
 
-`update_retention_config` performs a partial update — only the provided fields are
-changed; omitted fields remain unchanged.
+`update_retention_config` performs a partial update — only the provided fields are changed; omitted fields remain unchanged.
 
 ```python
 client.update_retention_config(
@@ -949,29 +873,20 @@ client.update_retention_config(
 )
 ```
 
-`thread_days` is the default TTL (in days) applied **only to registered threads**
-(those created via the Thread Registry API). It is the age-based cutoff for thread
-cleanup; threads not registered with the Thread Registry are unaffected.
+`thread_days` is the default TTL (in days) applied **only to registered threads** (those created via the Thread Registry API). It is the age-based cutoff for thread cleanup; threads not registered with the Thread Registry are unaffected.
 
-Set a field to `0` to mark all data in that category for deletion at the next nightly scheduled cleanup. The server also accepts `null` to disable
-automatic cleanup for that category.
+Set a field to `0` to mark all data in that category for deletion at the next nightly scheduled cleanup. The server also accepts `null` to disable automatic cleanup for that category.
 
 **When changes take effect**
 
 The service runs nightly data cleanup procedures that delete records based on creation timestamp. Changes to retention configuration apply to all future retention sweeps. The new retention window is calculated from each record's original creation timestamp, not from the time of the config change.
 
-_Increasing retention_ — records that were approaching expiry get more time. For example,
-if `message_days` is raised from 90 to 120, a message created 89 days ago will now be
-retained until it reaches 120 days old rather than being cleaned up after 90 days.
+_Increasing retention_ — records that were approaching expiry get more time. For example, if `message_days` is raised from 90 to 120, a message created 89 days ago will now be retained until it reaches 120 days old rather than being cleaned up after 90 days.
 
-_Decreasing retention_ — records outside the new window become eligible for removal. For
-example, if `message_days` is reduced from 90 to 30, messages older than 30 days will be
-removed at the next retention sweep, even if they fell within the original 90-day limit
-when they were created.
+_Decreasing retention_ — records outside the new window become eligible for removal. For example, if `message_days` is reduced from 90 to 30, messages older than 30 days will be removed at the next retention sweep, even if they fell within the original 90-day limit when they were created.
 
 > [!WARNING]
-> Decreasing a retention period is a destructive, irreversible operation. Records outside
-> the new window are permanently deleted at the next cleanup sweep.
+> Decreasing a retention period is a destructive, irreversible operation. Records outside the new window are permanently deleted at the next cleanup sweep.
 
 ---
 
@@ -1032,8 +947,7 @@ def get_conversation(client, agent_id, invoker_id, group_id):
 
 ### Paginating through all memories
 
-`list_memories` returns at most `limit` results per call. Use `offset` to page through large
-sets, or use `count_memories` first to decide whether pagination is even necessary:
+`list_memories` returns at most `limit` results per call. Use `offset` to page through large sets, or use `count_memories` first to decide whether pagination is even necessary:
 
 ```python
 PAGE_SIZE = 100
@@ -1123,14 +1037,11 @@ results = client.search_memories(
 
 ### `AgentMemoryNotFoundError` when fetching a resource
 
-The resource was deleted, the ID is incorrect, or the `agent_id`/`invoker_id` passed to a
-list or search operation does not match the values used when the resource was created.
+The resource was deleted, the ID is incorrect, or the `agent_id`/`invoker_id` passed to a list or search operation does not match the values used when the resource was created.
 
 ### `AgentMemoryHttpError` with status 401
 
-The OAuth2 token has expired and automatic refresh failed, or the configured credentials
-(`client_id`, `client_secret`, `token_url`) are incorrect. Verify the credentials in your
-environment variables or service binding.
+The OAuth2 token has expired and automatic refresh failed, or the configured credentials (`client_id`, `client_secret`, `token_url`) are incorrect. Verify the credentials in your environment variables or service binding.
 
 ### `AgentMemoryValidationError: IAS token not found in RuntimeContext`
 
@@ -1138,9 +1049,7 @@ environment variables or service binding.
 AgentMemoryValidationError: IAS token not found in RuntimeContext. Ensure bootstrap(app) is configured.
 ```
 
-The client is running in **IAS mode** but no IAS token reached the request `RuntimeContext`.
-The agent must wire `bootstrap(app)` / `IASContextProvider` so the inbound `Authorization`
-header is parsed into the context before any client call. See [IAS binding](#ias-binding).
+The client is running in **IAS mode** but no IAS token reached the request `RuntimeContext`. The agent must wire `bootstrap(app)` / `IASContextProvider` so the inbound `Authorization` header is parsed into the context before any client call. See [IAS binding](#ias-binding).
 
 ---
 

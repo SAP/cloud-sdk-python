@@ -132,8 +132,11 @@ class TestIsExpiredResponse:
             is False
         )
 
-    def test_expired_in_exception_message_not_body(self):
-        assert _is_expired_response(self._exc(msg="expired thread")) is True
+    def test_expired_in_exception_message_not_body_returns_false(self):
+        # The fallback searches only the response body, never the exception
+        # message — an unrelated 409 whose prose mentions "expired" (e.g. an
+        # OAuth-token error) must not be misclassified as a thread expiry.
+        assert _is_expired_response(self._exc(msg="expired thread")) is False
 
     def test_json_error_code_expired(self):
         import json
@@ -276,7 +279,7 @@ class TestCreateOrRegisterThread:
     def test_tenant_id_forwarded(self):
         reg = _make_registry()
         reg._request.return_value = _ENTRY.copy()
-        reg.create_or_register_thread("agent-a", "user-1", tenant_id="acme")
+        reg.create_or_register_thread("agent-a", "user-1", tenant_subdomain="acme")
         assert reg._request.call_args[1]["tenant_subdomain"] == "acme"
 
     def test_no_tenant_id_passes_none(self):
@@ -365,7 +368,7 @@ class TestGetThread:
     def test_tenant_id_forwarded(self):
         reg = _make_registry()
         reg._request.return_value = _ENTRY.copy()
-        reg.get_thread("t-1", tenant_id="acme")
+        reg.get_thread("t-1", tenant_subdomain="acme")
         assert reg._request.call_args[1]["tenant_subdomain"] == "acme"
 
 
@@ -474,7 +477,7 @@ class TestListThreads:
     def test_tenant_id_forwarded(self):
         reg = _make_registry()
         reg._request.return_value = self._page_response([])
-        reg.list_threads(tenant_id="acme")
+        reg.list_threads(tenant_subdomain="acme")
         assert reg._request.call_args[1]["tenant_subdomain"] == "acme"
 
 
@@ -553,7 +556,7 @@ class TestUpdateThread:
     def test_tenant_id_forwarded_to_both_calls(self):
         reg = _make_registry()
         reg._request.side_effect = [{}, _ENTRY.copy()]
-        reg.update_thread("t-1", tenant_id="acme")
+        reg.update_thread("t-1", tenant_subdomain="acme")
         assert reg._request.call_args_list[0][1]["tenant_subdomain"] == "acme"
         assert reg._request.call_args_list[1][1]["tenant_subdomain"] == "acme"
 
@@ -587,7 +590,7 @@ class TestDeleteThread:
     def test_tenant_id_forwarded(self):
         reg = _make_registry()
         reg._request.return_value = {}
-        reg.delete_thread("t-1", tenant_id="acme")
+        reg.delete_thread("t-1", tenant_subdomain="acme")
         assert reg._request.call_args[1]["tenant_subdomain"] == "acme"
 
     def test_other_http_errors_propagate(self):

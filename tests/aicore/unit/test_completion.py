@@ -352,7 +352,10 @@ class TestStreamingGuard:
 
         self._activate_output()
 
-        body = {"config": {"stream": {"enabled": True}, "modules": {"model_id": "x"}}}
+        # stream=True is in optional_params — LiteLLM pops it before calling
+        # transform_request, so the body returned by super() never has
+        # body["config"]["stream"]. We must read it from optional_params first.
+        body = {"config": {"modules": {"model_id": "x"}}}
         instance = FilteringOrchestrationConfig()
 
         with _patch(
@@ -361,7 +364,7 @@ class TestStreamingGuard:
         ):
             with pytest.raises(ContentFilteredError) as ei:
                 instance.transform_request(
-                    model="sap/x", messages=[], optional_params={},
+                    model="sap/x", messages=[], optional_params={"stream": True},
                     litellm_params={}, headers={},
                 )
         assert ei.value.direction == "output"
@@ -373,7 +376,7 @@ class TestStreamingGuard:
 
         self._activate_input_and_output()
 
-        body = {"config": {"stream": {"enabled": True}, "modules": {"model_id": "x"}}}
+        body = {"config": {"modules": {"model_id": "x"}}}
         instance = FilteringOrchestrationConfig()
 
         with _patch(
@@ -382,7 +385,7 @@ class TestStreamingGuard:
         ):
             with pytest.raises(ContentFilteredError) as ei:
                 instance.transform_request(
-                    model="sap/x", messages=[], optional_params={},
+                    model="sap/x", messages=[], optional_params={"stream": True},
                     litellm_params={}, headers={},
                 )
         assert ei.value.direction == "output"
@@ -413,7 +416,7 @@ class TestStreamingGuard:
 
         self._activate_output()
 
-        body = {"config": {"stream": {"enabled": True}, "modules": {"model_id": "x"}}}
+        body = {"config": {"modules": {"model_id": "x"}}}
         instance = FilteringOrchestrationConfig()
 
         with _patch(
@@ -422,7 +425,7 @@ class TestStreamingGuard:
         ):
             with pytest.raises(ContentFilteredError) as ei:
                 instance.transform_request(
-                    model="sap/x", messages=[], optional_params={},
+                    model="sap/x", messages=[], optional_params={"stream": True},
                     litellm_params={}, headers={},
                 )
         assert ei.value.direction == "output"

@@ -73,6 +73,9 @@ class FilteringOrchestrationConfig(GenAIHubOrchestrationConfig):
         litellm_params: dict,
         headers: dict,
     ) -> dict:
+        # Capture stream flag before super() pops it from optional_params.
+        is_streaming = bool(optional_params.get("stream"))
+
         body = super().transform_request(
             model=model,
             messages=messages,
@@ -91,9 +94,12 @@ class FilteringOrchestrationConfig(GenAIHubOrchestrationConfig):
         # Streaming + output filtering: transform_response is never called for
         # streams, so content_filter chunks would be silently yielded. Block
         # the combination upfront — applies to all callers universally.
-        if _active_cfg.output_filtering is not None and body.get("config", {}).get(
-            "stream", {}
-        ).get("enabled"):
+        # Note: body["config"]["stream"] is set by _add_stream_param_to_request_body
+        # *after* transform_request returns, so we read stream from optional_params
+        # before super() pops it above.
+        if _active_cfg.output_filtering is not None and (
+            is_streaming or body.get("config", {}).get("stream", {}).get("enabled")
+        ):
             raise ContentFilteredError(
                 direction="output",
                 details={},

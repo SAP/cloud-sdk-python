@@ -1,6 +1,6 @@
 """Thread registry package for SAP Agent Memory.
 
-Public API::
+Public API:
 
     from sap_cloud_sdk.agent_memory.thread_registry import (
         BaseThreadRegistry,

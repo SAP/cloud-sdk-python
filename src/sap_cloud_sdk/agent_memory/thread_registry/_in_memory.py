@@ -9,14 +9,14 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, Optional
 
 from sap_cloud_sdk.agent_memory.exceptions import (
-    AgentMemoryThreadConflictError,
-    AgentMemoryThreadExpiredError,
     AgentMemoryThreadNotFoundError,
 )
 from sap_cloud_sdk.agent_memory.thread_registry._base import (
     BaseThreadRegistry,
     ThreadPage,
     ThreadRegistryEntry,
+    _raise_thread_conflict,
+    _raise_thread_expired,
     _validate_ttl,
 )
 from sap_cloud_sdk.core.telemetry import Module, Operation, record_metrics
@@ -37,6 +37,8 @@ class _StoredEntry:
     )
 
     def is_expired(self, registry_ttl: Optional[int]) -> bool:
+        # Per-thread thread_ttl wins; registry_ttl is only the fallback for
+        # entries that never set one. None at both levels means "never expires".
         effective = self.thread_ttl if self.thread_ttl is not None else registry_ttl
         if effective is None:
             return False
@@ -91,6 +93,9 @@ class InMemoryThreadRegistry(BaseThreadRegistry):
     - **Lazy eviction**: threads are evicted at the next read, not on a sweep
       schedule. A thread may appear live briefly after its true TTL.
     - **No restart survival**: all state is lost on process exit.
+    - **No tenant isolation**: ``tenant_subdomain`` is accepted for signature
+      parity with the service-backed registry but ignored — all threads share a
+      single store regardless of tenant.
 
     Args:
         default_ttl_seconds: Registry-level default inactivity threshold.
@@ -128,7 +133,7 @@ class InMemoryThreadRegistry(BaseThreadRegistry):
         description: Optional[str] = None,
         ttl_seconds: Optional[int] = None,
         metadata: Optional[dict[str, Any]] = None,
-        tenant_id: Optional[str] = None,
+        tenant_subdomain: Optional[str] = None,
     ) -> ThreadRegistryEntry:
         _validate_ttl(ttl_seconds)
         ttl = self._effective_ttl(ttl_seconds)
@@ -150,13 +155,9 @@ class InMemoryThreadRegistry(BaseThreadRegistry):
         existing = self._store.get(thread_id)
         if existing is not None:
             if existing.is_expired(self._default_ttl):
-                raise AgentMemoryThreadExpiredError(
-                    f"Thread '{thread_id}' has expired and cannot be re-created with the same ID"
-                )
+                _raise_thread_expired(thread_id)
             if existing.agent_id != agent_id or existing.invoker_id != invoker_id:
-                raise AgentMemoryThreadConflictError(
-                    f"Thread '{thread_id}' is already registered by a different owner"
-                )
+                _raise_thread_conflict(thread_id)
             existing.touch()
             return existing.to_entry(self._default_ttl)
 
@@ -177,7 +178,7 @@ class InMemoryThreadRegistry(BaseThreadRegistry):
         self,
         thread_id: str,
         *,
-        tenant_id: Optional[str] = None,
+        tenant_subdomain: Optional[str] = None,
     ) -> ThreadRegistryEntry:
         return self._get_live(thread_id).to_entry(self._default_ttl)
 
@@ -189,7 +190,7 @@ class InMemoryThreadRegistry(BaseThreadRegistry):
         invoker_id: Optional[str] = None,
         limit: Optional[int] = None,
         offset: Optional[int] = None,
-        tenant_id: Optional[str] = None,
+        tenant_subdomain: Optional[str] = None,
     ) -> ThreadPage:
         if limit is not None:
             if isinstance(limit, bool) or not isinstance(limit, int) or limit < 0:
@@ -231,7 +232,7 @@ class InMemoryThreadRegistry(BaseThreadRegistry):
         description: Optional[str] = None,
         ttl_seconds: Optional[int] = None,
         metadata: Optional[dict[str, Any]] = None,
-        tenant_id: Optional[str] = None,
+        tenant_subdomain: Optional[str] = None,
     ) -> ThreadRegistryEntry:
         # PATCH-style merge: only fields the caller passed are modified. An
         # omitted ttl_seconds leaves the thread's existing TTL untouched.
@@ -251,6 +252,6 @@ class InMemoryThreadRegistry(BaseThreadRegistry):
         self,
         thread_id: str,
         *,
-        tenant_id: Optional[str] = None,
+        tenant_subdomain: Optional[str] = None,
     ) -> None:
         self._store.pop(thread_id, None)

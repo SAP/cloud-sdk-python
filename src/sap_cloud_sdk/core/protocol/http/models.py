@@ -206,6 +206,11 @@ class IasAuthProvider(AuthProvider):
         ias_token = get_context().get(IAS_TOKEN)
         if ias_token:
             session.headers["Authorization"] = f"Bearer {ias_token}"
+        else:
+            logger.debug(
+                "IasAuthProvider: no IAS token in context, "
+                "session has no Authorization header"
+            )
         return session
 
     def invalidate(self, tenant_subdomain: Optional[str] = None) -> None:

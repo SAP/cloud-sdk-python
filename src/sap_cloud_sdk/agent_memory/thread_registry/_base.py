@@ -3,9 +3,14 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Any, Optional
+from typing import Any, NoReturn, Optional
 
 from typing_extensions import TypedDict
+
+from sap_cloud_sdk.agent_memory.exceptions import (
+    AgentMemoryThreadConflictError,
+    AgentMemoryThreadExpiredError,
+)
 
 
 def _validate_ttl(ttl_seconds: Optional[int]) -> None:
@@ -16,6 +21,29 @@ def _validate_ttl(ttl_seconds: Optional[int]) -> None:
         or ttl_seconds <= 0
     ):
         raise ValueError(f"ttl_seconds must be a positive integer, got {ttl_seconds!r}")
+
+
+def _raise_thread_expired(
+    thread_id: str, *, from_exc: Optional[BaseException] = None
+) -> NoReturn:
+    """Raise the canonical "re-create an expired thread" error.
+
+    Both registries reject re-creating a thread whose ID has expired; this
+    keeps the message identical whether the check is local (in-memory) or
+    derived from a service 409 response.
+    """
+    raise AgentMemoryThreadExpiredError(
+        f"Thread '{thread_id}' has expired and cannot be re-created with the same ID"
+    ) from from_exc
+
+
+def _raise_thread_conflict(
+    thread_id: str, *, from_exc: Optional[BaseException] = None
+) -> NoReturn:
+    """Raise the canonical "thread owned by someone else" error."""
+    raise AgentMemoryThreadConflictError(
+        f"Thread '{thread_id}' is already registered by a different owner"
+    ) from from_exc
 
 
 class ThreadRegistryEntry(TypedDict):
@@ -82,7 +110,7 @@ class BaseThreadRegistry(ABC):
         description: Optional[str] = None,
         ttl_seconds: Optional[int] = None,
         metadata: Optional[dict[str, Any]] = None,
-        tenant_id: Optional[str] = None,
+        tenant_subdomain: Optional[str] = None,
     ) -> ThreadRegistryEntry:
         """Create a thread (server-assigned ID) or register an existing one.
 
@@ -103,7 +131,7 @@ class BaseThreadRegistry(ABC):
         self,
         thread_id: str,
         *,
-        tenant_id: Optional[str] = None,
+        tenant_subdomain: Optional[str] = None,
     ) -> ThreadRegistryEntry:
         """Fetch a single thread by ID.
 
@@ -120,7 +148,7 @@ class BaseThreadRegistry(ABC):
         invoker_id: Optional[str] = None,
         limit: Optional[int] = None,
         offset: Optional[int] = None,
-        tenant_id: Optional[str] = None,
+        tenant_subdomain: Optional[str] = None,
     ) -> ThreadPage:
         """List threads with optional filters and pagination.
 
@@ -136,7 +164,7 @@ class BaseThreadRegistry(ABC):
         description: Optional[str] = None,
         ttl_seconds: Optional[int] = None,
         metadata: Optional[dict[str, Any]] = None,
-        tenant_id: Optional[str] = None,
+        tenant_subdomain: Optional[str] = None,
     ) -> ThreadRegistryEntry:
         """Update mutable fields of a thread.
 
@@ -156,7 +184,7 @@ class BaseThreadRegistry(ABC):
         self,
         thread_id: str,
         *,
-        tenant_id: Optional[str] = None,
+        tenant_subdomain: Optional[str] = None,
     ) -> None:
         """Delete a thread. Idempotent — a missing thread is a no-op."""
         ...

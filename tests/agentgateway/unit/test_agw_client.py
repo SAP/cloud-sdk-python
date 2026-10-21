@@ -981,6 +981,62 @@ class TestCallMcpTool:
             )
 
     @pytest.mark.asyncio
+    async def test_grouped_server_error_is_surfaced_bare(self, mock_tool):
+        """Regression: an AgentGatewayServerError raised by the customer flow but
+        re-wrapped in a BaseExceptionGroup (as anyio's task-group teardown does in
+        the real streamable_http_client / ClientSession path) must reach the caller
+        as a BARE AgentGatewayServerError — never as an ExceptionGroup, and never
+        leaking the opaque 'NoneType' object has no attribute 'isError' crash string.
+
+        This pins the behavior of the outer `_find_sdk_error` unwrap in call_mcp_tool.
+        Without that unwrap the deployed-IBD malformed-result crash would surface as an
+        opaque ExceptionGroup to the agent again.
+        """
+        from sap_cloud_sdk.agentgateway.exceptions import AgentGatewayServerError
+
+        clean_error = AgentGatewayServerError(
+            "Tool 'test-tool' on 'https://example.com/mcp' returned a malformed "
+            "or empty result from the gateway"
+        )
+        # mimic the guard raising the clean error, then anyio re-bundling it on the
+        # way out through the nested async-with task groups.
+        grouped = BaseExceptionGroup("unhandled errors in a TaskGroup", [clean_error])
+
+        with (
+            patch(
+                "sap_cloud_sdk.agentgateway.agw_client.detect_customer_agent_credentials",
+                return_value="/path/to/credentials",
+            ),
+            patch(
+                "sap_cloud_sdk.agentgateway.agw_client.load_customer_credentials",
+            ) as mock_load,
+            patch(
+                "sap_cloud_sdk.agentgateway.agw_client.exchange_user_token",
+                return_value="exchanged-token",
+            ),
+            patch(
+                "sap_cloud_sdk.agentgateway.agw_client.call_mcp_tool_customer",
+                new_callable=AsyncMock,
+                side_effect=grouped,
+            ),
+        ):
+            mock_creds = MagicMock()
+            mock_creds.gateway_url = "https://agw.customer.com"
+            mock_load.return_value = mock_creds
+
+            agw_client = create_client(tenant_subdomain="my-tenant")
+
+            with pytest.raises(AgentGatewayServerError) as exc_info:
+                await agw_client.call_mcp_tool(tool=mock_tool, user_token="jwt-token")
+
+            # bare, clean error — not the opaque crash, not an ExceptionGroup.
+            raised = exc_info.value
+            assert raised is clean_error
+            assert "malformed or empty result" in str(raised)
+            assert "NoneType" not in str(raised)
+            assert "isError" not in str(raised)
+
+    @pytest.mark.asyncio
     async def test_customer_flow_falls_back_to_system_token(self, mock_tool):
         """Customer flow falls back to system token when user_token is None."""
         with (

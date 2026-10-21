@@ -2,11 +2,10 @@
 
 from types import SimpleNamespace
 
-from mcp.shared.exceptions import McpError
-from mcp.types import ErrorData
-
 from sap_cloud_sdk.agentgateway._compat import (
+    find_malformed_result_error,
     find_mcp_error,
+    make_mcp_error,
     mcp_input_schema,
     mcp_is_error,
     mcp_server_name,
@@ -98,18 +97,18 @@ class TestFindMcpError:
 
     def test_returns_bare_mcp_error(self):
         """A bare McpError is returned directly."""
-        err = McpError(ErrorData(code=-32602, message="Unknown tool: foo"))
+        err = make_mcp_error(-32602, "Unknown tool: foo")
         assert find_mcp_error(err) is err
 
     def test_finds_mcp_error_in_group(self):
         """An McpError wrapped in a BaseExceptionGroup is found."""
-        err = McpError(ErrorData(code=-32603, message="Internal Server Error"))
+        err = make_mcp_error(-32603, "Internal Server Error")
         group = BaseExceptionGroup("eg", [err])
         assert find_mcp_error(group) is err
 
     def test_finds_mcp_error_in_nested_group(self):
         """An McpError nested in a group within a group is found."""
-        err = McpError(ErrorData(code=-32600, message="bad request"))
+        err = make_mcp_error(-32600, "bad request")
         group = BaseExceptionGroup("outer", [BaseExceptionGroup("inner", [err])])
         assert find_mcp_error(group) is err
 
@@ -121,3 +120,42 @@ class TestFindMcpError:
     def test_returns_none_for_unrelated_exception(self):
         """A plain non-group, non-McpError exception returns None."""
         assert find_mcp_error(ValueError("x")) is None
+
+
+class TestFindMalformedResultError:
+    """Tests for find_malformed_result_error — the isError/is_error-on-None crash."""
+
+    def test_returns_bare_isError_attributeerror(self):
+        """The mcp 1.x deref: AttributeError mentioning 'isError' is recognised."""
+        err = AttributeError("'NoneType' object has no attribute 'isError'")
+        assert find_malformed_result_error(err) is err
+
+    def test_returns_bare_is_error_attributeerror(self):
+        """The mcp 2.x deref: AttributeError mentioning 'is_error' is recognised."""
+        err = AttributeError("'NoneType' object has no attribute 'is_error'")
+        assert find_malformed_result_error(err) is err
+
+    def test_finds_attributeerror_in_group(self):
+        """Wrapped in a BaseExceptionGroup (anyio task group), it is still found."""
+        err = AttributeError("'NoneType' object has no attribute 'isError'")
+        group = BaseExceptionGroup("eg", [err])
+        assert find_malformed_result_error(group) is err
+
+    def test_finds_attributeerror_in_nested_group(self):
+        """Found through nested BaseExceptionGroups."""
+        err = AttributeError("'NoneType' object has no attribute 'isError'")
+        group = BaseExceptionGroup("outer", [BaseExceptionGroup("inner", [err])])
+        assert find_malformed_result_error(group) is err
+
+    def test_returns_none_for_unrelated_attributeerror(self):
+        """An AttributeError not about isError/is_error is NOT matched (not masked)."""
+        assert find_malformed_result_error(AttributeError("no attr 'bar'")) is None
+
+    def test_returns_none_for_unrelated_exception(self):
+        """A non-AttributeError exception returns None."""
+        assert find_malformed_result_error(ValueError("x")) is None
+
+    def test_returns_none_without_match_in_group(self):
+        """A group with no matching AttributeError leaf returns None."""
+        group = BaseExceptionGroup("eg", [ValueError("x"), RuntimeError("y")])
+        assert find_malformed_result_error(group) is None

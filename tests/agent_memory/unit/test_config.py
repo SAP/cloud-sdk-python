@@ -104,9 +104,9 @@ class TestAgentMemoryConfig:
         # can never contradict the credentials.
         config = AgentMemoryConfig(base_url="http://localhost:3000")
         with pytest.raises(AttributeError):
-            config.auth_mode = "xsuaa"  # type: ignore[misc]
+            config.auth_mode = "xsuaa"  # type: ignore[misc]  # ty: ignore[invalid-assignment]
         with pytest.raises(TypeError):
-            AgentMemoryConfig(base_url="http://localhost:3000", auth_mode="xsuaa")  # type: ignore[call-arg]
+            AgentMemoryConfig(base_url="http://localhost:3000", auth_mode="xsuaa")  # type: ignore[call-arg]  # ty: ignore[unknown-argument]
 
 
 # ── BindingData ───────────────────────────────────────────────────────────────

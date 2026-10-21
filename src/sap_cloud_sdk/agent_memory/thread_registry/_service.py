@@ -14,8 +14,6 @@ from sap_cloud_sdk.agent_memory.config import AgentMemoryConfig
 from sap_cloud_sdk.agent_memory.exceptions import (
     AgentMemoryHttpError,
     AgentMemoryNotFoundError,
-    AgentMemoryThreadConflictError,
-    AgentMemoryThreadExpiredError,
     AgentMemoryThreadNotFoundError,
     AgentMemoryValidationError,
 )
@@ -23,6 +21,8 @@ from sap_cloud_sdk.agent_memory.thread_registry._base import (
     BaseThreadRegistry,
     ThreadPage,
     ThreadRegistryEntry,
+    _raise_thread_conflict,
+    _raise_thread_expired,
     _validate_ttl,
 )
 from sap_cloud_sdk.core.protocol.http import (
@@ -91,9 +91,9 @@ def _is_expired_response(exc: AgentMemoryHttpError) -> bool:
     """Return True if a 409 response indicates an expired thread (vs. conflict).
 
     Tries structured JSON error codes first (``error.code``, ``errorCode``),
-    then falls back to substring matching on both the exception message and the
-    raw response body.  Two-layer detection means a service that upgrades from
-    prose-only errors to machine-readable codes is handled automatically.
+    then falls back to substring matching on the raw response body.  Two-layer
+    detection means a service that upgrades from prose-only errors to
+    machine-readable codes is handled automatically.
     """
     if exc.response_text:
         try:
@@ -109,9 +109,10 @@ def _is_expired_response(exc: AgentMemoryHttpError) -> bool:
             # No code field — fall through to string matching below.
         except (ValueError, TypeError):
             pass  # response body is not JSON
-    # String-match fallback: check both the exception message and response body.
-    combined = f"{exc} {exc.response_text or ''}".lower()
-    return "expired" in combined
+    # String-match fallback: search only the raw response body. The exception
+    # message embeds method/path/status context that could contain "expired"
+    # from an unrelated error (e.g. a 409 whose body says "OAuth token expired").
+    return "expired" in (exc.response_text or "").lower()
 
 
 def _parse_entry(row: dict[str, Any]) -> ThreadRegistryEntry:
@@ -260,7 +261,7 @@ class SAPAgentMemoryThreadRegistry(BaseThreadRegistry):
         description: Optional[str] = None,
         ttl_seconds: Optional[int] = None,
         metadata: Optional[dict[str, Any]] = None,
-        tenant_id: Optional[str] = None,
+        tenant_subdomain: Optional[str] = None,
     ) -> ThreadRegistryEntry:
         ttl = self._ttl(ttl_seconds)
         _validate_ttl(ttl)
@@ -280,18 +281,13 @@ class SAPAgentMemoryThreadRegistry(BaseThreadRegistry):
                 HttpMethod.POST,
                 _THREAD_COLLECTION,
                 json=body,
-                tenant_subdomain=tenant_id,
+                tenant_subdomain=tenant_subdomain,
             )
         except AgentMemoryHttpError as exc:
             if thread_id is not None and exc.status_code == 409:
                 if _is_expired_response(exc):
-                    raise AgentMemoryThreadExpiredError(
-                        f"Thread '{thread_id}' has expired "
-                        f"and cannot be re-created with the same ID"
-                    ) from exc
-                raise AgentMemoryThreadConflictError(
-                    f"Thread '{thread_id}' is already registered by a different owner"
-                ) from exc
+                    _raise_thread_expired(thread_id, from_exc=exc)
+                _raise_thread_conflict(thread_id, from_exc=exc)
             raise
 
         return _parse_entry(data)
@@ -305,15 +301,15 @@ class SAPAgentMemoryThreadRegistry(BaseThreadRegistry):
         self,
         thread_id: str,
         *,
-        tenant_id: Optional[str] = None,
+        tenant_subdomain: Optional[str] = None,
     ) -> ThreadRegistryEntry:
-        return self._get_thread(thread_id, tenant_id=tenant_id)
+        return self._get_thread(thread_id, tenant_subdomain=tenant_subdomain)
 
     def _get_thread(
         self,
         thread_id: str,
         *,
-        tenant_id: Optional[str] = None,
+        tenant_subdomain: Optional[str] = None,
     ) -> ThreadRegistryEntry:
         # Undecorated implementation shared by the public get_thread and by
         # update_thread, so a single update_thread emits exactly one metric
@@ -322,7 +318,7 @@ class SAPAgentMemoryThreadRegistry(BaseThreadRegistry):
             data = self._request(
                 HttpMethod.GET,
                 _odata_entity_path(thread_id),
-                tenant_subdomain=tenant_id,
+                tenant_subdomain=tenant_subdomain,
             )
         except AgentMemoryNotFoundError as exc:
             raise AgentMemoryThreadNotFoundError(
@@ -342,7 +338,7 @@ class SAPAgentMemoryThreadRegistry(BaseThreadRegistry):
         invoker_id: Optional[str] = None,
         limit: Optional[int] = None,
         offset: Optional[int] = None,
-        tenant_id: Optional[str] = None,
+        tenant_subdomain: Optional[str] = None,
     ) -> ThreadPage:
         # Validate limit and offset before the limit==0 early-return.
         # The bool guard must come first: False == 0 in Python, so without it
@@ -359,7 +355,9 @@ class SAPAgentMemoryThreadRegistry(BaseThreadRegistry):
             raise ValueError(f"offset must be a non-negative integer, got {offset!r}")
         if limit is not None and limit == 0:
             path = _build_list_path(agent_id, invoker_id, 0, resolved_offset)
-            body = self._request(HttpMethod.GET, path, tenant_subdomain=tenant_id)
+            body = self._request(
+                HttpMethod.GET, path, tenant_subdomain=tenant_subdomain
+            )
             return ThreadPage(
                 entries=[],
                 total=body.get("@odata.count", 0),
@@ -369,7 +367,9 @@ class SAPAgentMemoryThreadRegistry(BaseThreadRegistry):
 
         if limit is not None:
             path = _build_list_path(agent_id, invoker_id, limit, resolved_offset)
-            body = self._request(HttpMethod.GET, path, tenant_subdomain=tenant_id)
+            body = self._request(
+                HttpMethod.GET, path, tenant_subdomain=tenant_subdomain
+            )
             return ThreadPage(
                 entries=[_parse_entry(row) for row in body.get("value", [])],
                 total=body.get("@odata.count", 0),
@@ -379,13 +379,15 @@ class SAPAgentMemoryThreadRegistry(BaseThreadRegistry):
 
         # Unbounded — follow @odata.nextLink to collect all pages.
         path = _build_list_path(agent_id, invoker_id, None, resolved_offset)
-        body = self._request(HttpMethod.GET, path, tenant_subdomain=tenant_id)
+        body = self._request(HttpMethod.GET, path, tenant_subdomain=tenant_subdomain)
         total = body.get("@odata.count", 0)
         entries = [_parse_entry(row) for row in body.get("value", [])]
         next_link: Optional[str] = body.get("@odata.nextLink")
         while next_link:
             body = self._request(
-                HttpMethod.GET, self._strip_base(next_link), tenant_subdomain=tenant_id
+                HttpMethod.GET,
+                self._strip_base(next_link),
+                tenant_subdomain=tenant_subdomain,
             )
             entries.extend(_parse_entry(row) for row in body.get("value", []))
             next_link = body.get("@odata.nextLink")
@@ -408,7 +410,7 @@ class SAPAgentMemoryThreadRegistry(BaseThreadRegistry):
         description: Optional[str] = None,
         ttl_seconds: Optional[int] = None,
         metadata: Optional[dict[str, Any]] = None,
-        tenant_id: Optional[str] = None,
+        tenant_subdomain: Optional[str] = None,
     ) -> ThreadRegistryEntry:
         # PATCH-style merge: only fields the caller passed are sent. In
         # particular the registry default TTL is NOT reapplied here — a
@@ -427,14 +429,14 @@ class SAPAgentMemoryThreadRegistry(BaseThreadRegistry):
                 HttpMethod.PATCH,
                 _odata_entity_path(thread_id),
                 json=body,
-                tenant_subdomain=tenant_id,
+                tenant_subdomain=tenant_subdomain,
             )
         except AgentMemoryNotFoundError as exc:
             raise AgentMemoryThreadNotFoundError(
                 f"Thread '{thread_id}' not found"
             ) from exc
 
-        return self._get_thread(thread_id, tenant_id=tenant_id)
+        return self._get_thread(thread_id, tenant_subdomain=tenant_subdomain)
 
     # ------------------------------------------------------------------
     # delete_thread
@@ -445,13 +447,15 @@ class SAPAgentMemoryThreadRegistry(BaseThreadRegistry):
         self,
         thread_id: str,
         *,
-        tenant_id: Optional[str] = None,
+        tenant_subdomain: Optional[str] = None,
     ) -> None:
         try:
             self._request(
                 HttpMethod.DELETE,
                 _odata_entity_path(thread_id),
-                tenant_subdomain=tenant_id,
+                tenant_subdomain=tenant_subdomain,
             )
         except AgentMemoryNotFoundError:
-            pass
+            logger.debug(
+                "delete_thread: thread %r not found, treating as no-op", thread_id
+            )

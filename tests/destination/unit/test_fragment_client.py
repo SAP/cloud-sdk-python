@@ -548,3 +548,75 @@ class TestFragmentClientLabels:
         fragment_client.patch_fragment_labels("fragA", PatchLabels(action="ADD", labels=[]))
         _, kwargs = mock_http.request.call_args
         assert kwargs["tenant_subdomain"] is None
+
+
+# ---------------------------------------------------------------------------
+# Path traversal guard — added by security fix
+# ---------------------------------------------------------------------------
+
+_ATTACK_NAMES = ["../etc/passwd", "a/b", "a%2Fb", "a?q=1", "a#frag"]
+
+
+class TestFragmentPathTraversalGuard:
+    """Validates that invalid names are rejected before any HTTP call."""
+
+    @pytest.fixture
+    def client(self):
+        http = Mock()
+        return FragmentClient(http), http
+
+    @pytest.mark.parametrize("name", _ATTACK_NAMES)
+    def test_delete_fragment_rejects_traversal_names(self, client, name):
+        c, http = client
+        with pytest.raises(ValueError):
+            c.delete_fragment(name)
+        http.request.assert_not_called()
+
+    @pytest.mark.parametrize("name", _ATTACK_NAMES)
+    def test_get_fragment_labels_rejects_traversal_names(self, client, name):
+        c, http = client
+        with pytest.raises(ValueError):
+            c.get_fragment_labels(name)
+        http.request.assert_not_called()
+
+    @pytest.mark.parametrize("name", _ATTACK_NAMES)
+    def test_update_fragment_labels_rejects_traversal_names(self, client, name):
+        c, http = client
+        with pytest.raises(ValueError):
+            c.update_fragment_labels(name, [])
+        http.request.assert_not_called()
+
+    @pytest.mark.parametrize("name", _ATTACK_NAMES)
+    def test_patch_fragment_labels_rejects_traversal_names(self, client, name):
+        c, http = client
+        with pytest.raises(ValueError):
+            c.patch_fragment_labels(name, PatchLabels(action="ADD", labels=[]))
+        http.request.assert_not_called()
+
+    def test_create_fragment_rejects_invalid_name(self, client):
+        c, http = client
+        frag = Fragment(name="../evil")
+        with pytest.raises(ValueError):
+            c.create_fragment(frag)
+        http.request.assert_not_called()
+
+    def test_update_fragment_rejects_invalid_name(self, client):
+        c, http = client
+        frag = Fragment(name="../evil")
+        with pytest.raises(ValueError):
+            c.update_fragment(frag)
+        http.request.assert_not_called()
+
+    @pytest.mark.parametrize("name", _ATTACK_NAMES)
+    def test_get_instance_fragment_rejects_traversal_names(self, client, name):
+        c, http = client
+        with pytest.raises(ValueError):
+            c.get_instance_fragment(name)
+        http.request.assert_not_called()
+
+    @pytest.mark.parametrize("name", _ATTACK_NAMES)
+    def test_get_subaccount_fragment_rejects_traversal_names(self, client, name):
+        c, http = client
+        with pytest.raises(ValueError):
+            c.get_subaccount_fragment(name)
+        http.request.assert_not_called()

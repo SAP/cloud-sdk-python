@@ -95,6 +95,7 @@ class HttpClient:
             method_str,
             f"{base_url}{path}",
             timeout=self._timeout,
+            allow_redirects=False,
             **kwargs,
         )
 

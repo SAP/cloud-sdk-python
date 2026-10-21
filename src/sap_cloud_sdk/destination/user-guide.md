@@ -471,6 +471,32 @@ response = http.request("GET", "/api/resource", headers={"X-Correlation-ID": "ab
 
 Per-request headers are merged on top of the pre-baked session headers.
 
+### Redirect behavior (security boundary)
+
+`DestinationHttpClient` **does not follow HTTP redirects by default.** If the target system
+responds with a 3xx, the redirect response is returned as-is. This is intentional: credentials
+pre-baked into the session (auth tokens, API keys, `x-sap-*` headers) must never be forwarded
+to a different origin implicitly.
+
+To follow same-host relative redirects, construct the client with `redirect_mode=RedirectMode.SAME_ORIGIN`:
+
+```python
+from sap_cloud_sdk.destination import create_client, DestinationHttpClient, RedirectMode
+
+dest = client.get_destination("my-erp")
+http = DestinationHttpClient(dest, redirect_mode=RedirectMode.SAME_ORIGIN)
+response = http.request("GET", "/api/resource")
+```
+
+`SAME_ORIGIN` follows a redirect only when the `Location` URL resolves to the same scheme,
+host, and port as the destination URL. Cross-origin redirects, port changes, HTTPS-to-HTTP
+downgrades, and `Location` values with userinfo are silently rejected (the redirect response is
+returned). Redirect chains are bounded at 5 hops.
+
+If the target system has permanently moved to a new URL, update the destination in BTP rather
+than relying on redirect following. Passing `allow_redirects=True` in `**kwargs` has no effect
+— it is silently removed.
+
 ### Using `get_headers()` directly
 
 If you manage your own HTTP client, use `dest.get_headers()` to get all derived headers as a plain dict:

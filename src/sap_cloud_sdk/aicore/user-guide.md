@@ -362,11 +362,13 @@ except ContentFilteredError as e:
 
 The wrapper forwards every argument verbatim to `litellm.completion`,
 including `stream=True`. When output filtering is active, `stream=True` is
-not supported — a `ContentFilteredError(direction="output")` is raised before
-the request is sent. This block applies universally to all callers (including
-`ChatLiteLLM` and LangGraph agents) because it fires inside the LiteLLM
-transport patch. Input filtering works with streaming — filter rejections
-surface as `ContentFilteredError` regardless.
+not currently supported by the SDK — a `ContentFilteredError(direction="output")`
+is raised before the request is sent. The SAP AI Core API does support output
+filtering with streaming, but mid-stream filter rejections surface as an untyped
+error inside LiteLLM's iterator and cannot yet be intercepted uniformly for all
+callers (agent frameworks such as `ChatLiteLLM` and LangGraph call `litellm`
+directly, bypassing the SDK's exception translation). Input filtering works
+with streaming — filter rejections surface as `ContentFilteredError` regardless.
 
 All other exceptions surface unchanged.
 
@@ -450,9 +452,12 @@ print(response.choices[0].message.content)
 ### Streaming Responses
 
 `stream=True` is supported when no output filtering is configured. If output
-filtering is active, streaming is blocked upfront with
-`ContentFilteredError(direction="output")` — this applies to all callers
-including `ChatLiteLLM` and LangGraph agents.
+filtering is active, streaming is not currently supported by the SDK —
+`ContentFilteredError(direction="output")` is raised before the request is
+sent. The underlying API supports output filtering with streaming, but the SDK
+cannot yet translate mid-stream filter rejections into `ContentFilteredError`
+uniformly for all callers (agent frameworks call `litellm` directly and would
+receive an untyped error). Input-only filtering works with streaming.
 
 ```python
 from sap_cloud_sdk.aicore import ContentFilteredError, completion, set_aicore_config

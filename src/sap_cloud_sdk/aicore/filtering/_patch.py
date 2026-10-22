@@ -29,18 +29,21 @@ parsing.
 
 Streaming + output filtering
 ----------------------------
-The ``transform_response`` hook is never called for streaming responses —
-LiteLLM routes those through a separate iterator path. This means output
-filter rejections (``finish_reason == "content_filter"`` chunks) would be
-silently yielded to the caller rather than raising
+The SAP AI Core Orchestration v2 API supports output filtering with streaming
+— the server filters each chunk and signals a rejection via an in-stream error
+event (no ``[DONE]``).  LiteLLM surfaces this as a ``ValueError`` raised from
+inside its streaming iterator, **not** via ``transform_response``.
+
+The SDK cannot intercept that iterator-level error universally: agent
+frameworks (``ChatLiteLLM``, LangGraph, etc.) call ``litellm.completion``
+directly and never pass through ``sap_cloud_sdk.aicore.completion``, so the
+``ValueError`` would surface as an untyped exception rather than
 :class:`ContentFilteredError`.
 
-To prevent this bypass, ``transform_request`` raises
-:class:`ContentFilteredError` upfront when both streaming and output
-filtering are requested simultaneously. This guarantee is universal — it
-applies to all callers (``sap_cloud_sdk.aicore.completion``,
-``ChatLiteLLM``, LangGraph, etc.) because ``transform_request`` runs at
-the LiteLLM transport layer.
+Until the SDK wraps the streaming iterator for all call paths,
+``transform_request`` raises :class:`ContentFilteredError` upfront when both
+streaming and output filtering are active. This guarantee is universal because
+``transform_request`` runs at the LiteLLM transport layer for all callers.
 """
 
 from __future__ import annotations
@@ -91,12 +94,11 @@ class FilteringOrchestrationConfig(GenAIHubOrchestrationConfig):
         if not filtering_dict:
             return body
 
-        # Streaming + output filtering: transform_response is never called for
-        # streams, so content_filter chunks would be silently yielded. Block
-        # the combination upfront — applies to all callers universally.
-        # Note: body["config"]["stream"] is set by _add_stream_param_to_request_body
-        # *after* transform_request returns, so we read stream from optional_params
-        # before super() pops it above.
+        # Streaming + output filtering: the API supports it, but mid-stream
+        # filter rejections surface as ValueError inside LiteLLM's iterator —
+        # a path the SDK cannot intercept universally (agent frameworks call
+        # litellm directly, bypassing sap_cloud_sdk.aicore.completion).
+        # Block upfront until iterator wrapping is implemented for all callers.
         if _active_cfg.output_filtering is not None and (
             is_streaming or body.get("config", {}).get("stream", {}).get("enabled")
         ):

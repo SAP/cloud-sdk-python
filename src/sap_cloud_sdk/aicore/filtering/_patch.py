@@ -26,6 +26,24 @@ the JSON embedded in the exception message.
 back into :class:`ContentFilteredError` before it reaches caller code; the
 :func:`_parse_input_filter_error` helper in :mod:`.filters` does the JSON
 parsing.
+
+Streaming + output filtering
+----------------------------
+The SAP AI Core Orchestration v2 API supports output filtering with streaming
+— the server filters each chunk and signals a rejection via an in-stream error
+event (no ``[DONE]``).  LiteLLM surfaces this as a ``ValueError`` raised from
+inside its streaming iterator, **not** via ``transform_response``.
+
+The SDK cannot intercept that iterator-level error universally: agent
+frameworks (``ChatLiteLLM``, LangGraph, etc.) call ``litellm.completion``
+directly and never pass through ``sap_cloud_sdk.aicore.completion``, so the
+``ValueError`` would surface as an untyped exception rather than
+:class:`ContentFilteredError`.
+
+Until the SDK wraps the streaming iterator for all call paths,
+``transform_request`` raises :class:`ContentFilteredError` upfront when both
+streaming and output filtering are active. This guarantee is universal because
+``transform_request`` runs at the LiteLLM transport layer for all callers.
 """
 
 from __future__ import annotations
@@ -58,6 +76,9 @@ class FilteringOrchestrationConfig(GenAIHubOrchestrationConfig):
         litellm_params: dict,
         headers: dict,
     ) -> dict:
+        # Capture stream flag before super() pops it from optional_params.
+        is_streaming = bool(optional_params.get("stream"))
+
         body = super().transform_request(
             model=model,
             messages=messages,
@@ -73,10 +94,24 @@ class FilteringOrchestrationConfig(GenAIHubOrchestrationConfig):
         if not filtering_dict:
             return body
 
+        # Streaming + output filtering: the API supports it, but mid-stream
+        # filter rejections surface as ValueError inside LiteLLM's iterator —
+        # a path the SDK cannot intercept universally (agent frameworks call
+        # litellm directly, bypassing sap_cloud_sdk.aicore.completion).
+        # Block upfront until iterator wrapping is implemented for all callers.
+        if _active_cfg.output_filtering is not None and (
+            is_streaming or body.get("config", {}).get("stream", {}).get("enabled")
+        ):
+            raise ContentFilteredError(
+                direction="output",
+                details={},
+                request_id=None,
+            )
+
         modules = body["config"]["modules"]
         if isinstance(modules, list):
-            # Fallback mode (list of configs) — inject into primary config only.
-            modules[0]["filtering"] = filtering_dict
+            for m in modules:
+                m["filtering"] = filtering_dict
         else:
             modules["filtering"] = filtering_dict
 

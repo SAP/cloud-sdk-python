@@ -40,9 +40,15 @@ Usage::
         ...
 
 These are intentionally thin — every other keyword argument is forwarded
-verbatim to ``litellm.completion`` / ``litellm.acompletion``, including
-``stream=True`` (the streaming iterator is returned unchanged). No
-telemetry is recorded here; the wrappers fire on every LLM call and a
+verbatim to ``litellm.completion`` / ``litellm.acompletion``. When output
+filtering is active, ``stream=True`` is not supported — the filtering
+transport patch raises :class:`ContentFilteredError` upfront before the
+request is sent. This applies universally to all callers (including
+``ChatLiteLLM`` and LangGraph agents). Input filtering works with streaming
+— filter rejections surface as :class:`ContentFilteredError` through the
+stream iterator regardless.
+
+No telemetry is recorded here; the wrappers fire on every LLM call and a
 counter at this level would be both noisy and uninformative about
 adoption of the SDK.
 """

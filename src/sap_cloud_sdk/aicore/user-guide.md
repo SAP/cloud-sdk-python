@@ -360,10 +360,17 @@ except ContentFilteredError as e:
     return "Your request was blocked by content safety policy."
 ```
 
-The wrapper forwards every argument verbatim to `litellm.completion`
-(including `stream=True`), and only intercepts the wrapped
-`APIConnectionError` shape that LiteLLM produces for input-filter
-rejections. All other exceptions surface unchanged.
+The wrapper forwards every argument verbatim to `litellm.completion`,
+including `stream=True`. When output filtering is active, `stream=True` is
+not currently supported by the SDK — a `ContentFilteredError(direction="output")`
+is raised before the request is sent. The SAP AI Core API does support output
+filtering with streaming, but mid-stream filter rejections surface as an untyped
+error inside LiteLLM's iterator and cannot yet be intercepted uniformly for all
+callers (agent frameworks such as `ChatLiteLLM` and LangGraph call `litellm`
+directly, bypassing the SDK's exception translation). Input filtering works
+with streaming — filter rejections surface as `ContentFilteredError` regardless.
+
+All other exceptions surface unchanged.
 
 `ContentFilteredError` exposes three attributes — `direction`, `details`,
 `request_id`. The `details` field contains severity scalars from the server,
@@ -444,21 +451,31 @@ print(response.choices[0].message.content)
 
 ### Streaming Responses
 
+`stream=True` is supported when no output filtering is configured. If output
+filtering is active, streaming is not currently supported by the SDK —
+`ContentFilteredError(direction="output")` is raised before the request is
+sent. The underlying API supports output filtering with streaming, but the SDK
+cannot yet translate mid-stream filter rejections into `ContentFilteredError`
+uniformly for all callers (agent frameworks call `litellm` directly and would
+receive an untyped error). Input-only filtering works with streaming.
+
 ```python
-from sap_cloud_sdk.aicore import set_aicore_config
-from litellm import completion
+from sap_cloud_sdk.aicore import ContentFilteredError, completion, set_aicore_config
 
 set_aicore_config()
 
-response = completion(
-    model="sap/gpt-4",
-    messages=[{"role": "user", "content": "Tell me a story"}],
-    stream=True,
-)
+try:
+    response = completion(
+        model="sap/gpt-4",
+        messages=[{"role": "user", "content": "Tell me a story"}],
+        stream=True,
+    )
 
-for chunk in response:
-    if chunk.choices[0].delta.content:
-        print(chunk.choices[0].delta.content, end="")
+    for chunk in response:
+        if chunk.choices[0].delta.content:
+            print(chunk.choices[0].delta.content, end="")
+except ContentFilteredError as e:
+    print(f"Blocked ({e.direction}): {e.details}")
 ```
 
 ### Using Different Models

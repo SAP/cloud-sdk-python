@@ -53,6 +53,8 @@ from sap_cloud_sdk.cbc._models import (
     ConsumptionVersion,
     ConsumptionVersions,
     EntityData,
+    FeatureStatus,
+    FeatureStatuses,
 )
 
 
@@ -74,6 +76,9 @@ __all__ = [
     # models — consumption versions
     "ConsumptionVersion",
     "ConsumptionVersions",
+    # models — feature status
+    "FeatureStatus",
+    "FeatureStatuses",
     # models — entities
     "EntityData",
     "ConfigurationEntity",

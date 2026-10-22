@@ -140,6 +140,38 @@ modes = cbc_client.get_entity_data(
 ```
 
 
+## Feature status
+
+Alongside configuration, CBC tracks which AI features are enabled for an app
+tenant. Query the current activation state with `get_feature_statuses`:
+
+```python
+statuses = cbc_client.get_feature_statuses()
+
+if statuses.is_enabled("ai_assisted_supplier_bid_analysis"):
+    ...
+```
+
+`is_enabled(feature_id)` returns `False` for a feature that is disabled or not
+present for the tenant. To inspect a feature directly, use `get`:
+
+```python
+feature = statuses.get("ai_assisted_tco_analysis")  # FeatureStatus | None
+if feature is not None:
+    print(feature.feature_id, feature.enabled)
+```
+
+To fetch a single feature without pulling the whole list, use
+`get_feature_status`, which filters server-side and returns one `FeatureStatus`
+(or `None` if the tenant has no entry for it):
+
+```python
+feature = cbc_client.get_feature_status("ai_assisted_lead_routing")
+if feature is not None and feature.is_enabled():
+    ...
+```
+
+
 ## Error handling
 
 | Exception | When |
@@ -283,7 +315,7 @@ client = cbc.create_client(
 
 `create_client` returns a concrete `CBCClient`. For tests, inject a mock
 `httpx.Client` when constructing one directly, or substitute your own stub object
-that implements the three public methods:
+that implements the public methods:
 
 ```python
 from sap_cloud_sdk import cbc
@@ -301,6 +333,12 @@ class StubCBCClient:
     def get_entity_data(
         self, configuration_object_id, entity_id, consumption_version=None
     ): ...
+
+    def get_feature_statuses(self):
+        return cbc.FeatureStatuses(features=[])
+
+    def get_feature_status(self, feature_id):
+        return None
 
 
 def test_my_service():

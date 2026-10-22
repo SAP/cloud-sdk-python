@@ -14,6 +14,8 @@ from sap_cloud_sdk.cbc._models import (
     ConsumptionVersions,
     ConfigurationEntity,
     EntityData,
+    FeatureStatus,
+    FeatureStatuses,
 )
 
 
@@ -69,6 +71,72 @@ class TestConsumptionVersionsLatest:
         result = v.latest()
         assert result is not None
         assert result.version == "v2"
+
+
+# ---------------------------------------------------------------------------
+# FeatureStatus / FeatureStatuses
+# ---------------------------------------------------------------------------
+
+
+class TestFeatureStatus:
+    def test_parses_camel_case_feature_id_alias(self):
+        f = FeatureStatus.model_validate(
+            {"featureId": "ai_assisted_supplier_bid_analysis", "enabled": True}
+        )
+        assert f.feature_id == "ai_assisted_supplier_bid_analysis"
+        assert f.enabled is True
+        assert f.is_enabled() is True
+
+    def test_enabled_defaults_to_false_when_absent(self):
+        f = FeatureStatus.model_validate({"featureId": "ai_assisted_tco_analysis"})
+        assert f.enabled is False
+        assert f.is_enabled() is False
+
+    def test_ignores_extra_api_fields(self):
+        f = FeatureStatus.model_validate(
+            {
+                "featureId": "ai_assisted_supplier_bid_analysis",
+                "appTenantId": "b012b543-0374-4b3b-8597-c8c3a60bef22",
+                "status": "SUCCESS",
+                "decision": True,
+                "enabled": True,
+                "defaultValue": False,
+                "category": "ai",
+                "packageName": "Joule Premium for Sourcing",
+                "packageId": "SAP_JOULE_PREMIUM_SOURCING",
+            }
+        )
+        assert f.feature_id == "ai_assisted_supplier_bid_analysis"
+        assert f.enabled is True
+
+
+class TestFeatureStatuses:
+    def _statuses(self) -> FeatureStatuses:
+        return FeatureStatuses.model_validate(
+            {
+                "features": [
+                    {"featureId": "ai_assisted_supplier_bid_analysis", "enabled": True},
+                    {"featureId": "ai_assisted_tco_analysis", "enabled": False},
+                ]
+            }
+        )
+
+    def test_is_enabled_true_for_enabled_feature(self):
+        assert self._statuses().is_enabled("ai_assisted_supplier_bid_analysis") is True
+
+    def test_is_enabled_false_for_disabled_feature(self):
+        assert self._statuses().is_enabled("ai_assisted_tco_analysis") is False
+
+    def test_is_enabled_false_for_absent_feature(self):
+        assert self._statuses().is_enabled("ai_assisted_lead_routing") is False
+
+    def test_get_returns_matching_feature(self):
+        f = self._statuses().get("ai_assisted_supplier_bid_analysis")
+        assert f is not None
+        assert f.feature_id == "ai_assisted_supplier_bid_analysis"
+
+    def test_get_returns_none_for_absent_feature(self):
+        assert self._statuses().get("ai_assisted_lead_routing") is None
 
 
 # ---------------------------------------------------------------------------

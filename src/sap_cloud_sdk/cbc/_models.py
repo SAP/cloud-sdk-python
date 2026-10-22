@@ -68,6 +68,54 @@ class ConsumptionVersions(_FrozenModel):
 
 
 # ---------------------------------------------------------------------------
+# Feature status models
+# ---------------------------------------------------------------------------
+
+
+class FeatureStatus(_FrozenModel):
+    """Activation status of one AI feature for an app tenant.
+
+    Attributes:
+        feature_id: Feature identifier (e.g. ``"ai_assisted_supplier_bid_analysis"``).
+        enabled: Whether the feature is enabled for the tenant.
+    """
+
+    feature_id: str = Field(alias="featureId")
+    enabled: bool = False
+
+    def is_enabled(self) -> bool:
+        """Return whether this feature is enabled."""
+        return self.enabled
+
+
+class FeatureStatuses(_FrozenModel):
+    """Activation status of all AI features for an app tenant.
+
+    Attributes:
+        features: List of :class:`FeatureStatus` objects.
+    """
+
+    features: list[FeatureStatus]
+
+    def is_enabled(self, feature_id: str) -> bool:
+        """Return ``True`` if the feature is enabled, ``False`` if disabled or absent.
+
+        Args:
+            feature_id: Feature identifier to look up.
+        """
+        feature = next((f for f in self.features if f.feature_id == feature_id), None)
+        return feature.is_enabled() if feature is not None else False
+
+    def get(self, feature_id: str) -> FeatureStatus | None:
+        """Return the :class:`FeatureStatus` for ``feature_id``, or ``None`` if absent.
+
+        Args:
+            feature_id: Feature identifier to look up.
+        """
+        return next((f for f in self.features if f.feature_id == feature_id), None)
+
+
+# ---------------------------------------------------------------------------
 # Entity models
 # ---------------------------------------------------------------------------
 

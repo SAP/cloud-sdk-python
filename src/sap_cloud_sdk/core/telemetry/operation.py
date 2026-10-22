@@ -319,6 +319,16 @@ class Operation(str, Enum):
     AGENT_MEMORY_GET_RETENTION_CONFIG = "get_retention_config"
     AGENT_MEMORY_UPDATE_RETENTION_CONFIG = "update_retention_config"
 
+    # Agent Memory — Thread Registry Operations
+    AGENT_MEMORY_CREATE_OR_REGISTER_THREAD = "create_or_register_thread"
+    AGENT_MEMORY_GET_THREAD = "get_thread"
+    AGENT_MEMORY_LIST_THREADS = "list_threads"
+    AGENT_MEMORY_UPDATE_THREAD = "update_thread"
+    AGENT_MEMORY_DELETE_THREAD = "delete_thread"
+
+    # Agent Memory — Checkpointer factory
+    AGENT_MEMORY_CREATE_CHECKPOINTER = "create_checkpointer"
+
     # Output Management Operations
     OUTPUT_MANAGEMENT_SEND_EMAIL = "send_email"
     OUTPUT_MANAGEMENT_SEND_EMAIL_WITH_MCP = "send_email_with_mcp"

@@ -90,6 +90,7 @@ dev = [
 markers = [
     "integration: marks tests as integration tests (requires Docker)",
     "aicore: marks tests that require AI Core credentials (AICORE_* env vars)",
+    "no_autouse_credentials: opts out of the default no-credentials fixture in checkpointer tests",
 ]
 
 [tool.coverage.run]

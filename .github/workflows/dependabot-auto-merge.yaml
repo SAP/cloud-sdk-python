@@ -30,7 +30,7 @@ jobs:
       - name: Fetch Dependabot metadata
         id: metadata
         if: steps.flag.outputs.enabled == 'true'
-        uses: dependabot/fetch-metadata@v2
+        uses: dependabot/fetch-metadata@v3
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
@@ -42,7 +42,7 @@ jobs:
             steps.metadata.outputs.update-type == 'version-update:semver-minor' ||
             steps.metadata.outputs.dependency-type == 'direct:production' && steps.metadata.outputs.update-type == 'version-update:semver-patch'
           )
-        uses: actions/create-github-app-token@v1
+        uses: actions/create-github-app-token@v3
         with:
           app-id: ${{ secrets.CLOUD_SDK_BOT_APP_ID }}
           private-key: ${{ secrets.CLOUD_SDK_BOT_PRIVATE_KEY }}

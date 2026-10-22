@@ -22,19 +22,19 @@ jobs:
       contents: read
     steps:
       - name: "Checkout Repository"
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 0
 
       - name: "Install uv"
-        uses: astral-sh/setup-uv@v3
+        uses: astral-sh/setup-uv@v7
         with:
           version: "latest"
           enable-cache: true
 
       - name: "Set up Python"
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@v7
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
@@ -65,7 +65,7 @@ jobs:
           echo "✓ Build artifacts verified: $wheel_count wheel(s), $tar_count source distribution(s)"
 
       - name: "Upload Build Artifacts"
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: contains(github.server_url, 'github.com')
         with:
           name: ${{ env.SDK_DIST_NAME }}

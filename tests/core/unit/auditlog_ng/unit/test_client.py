@@ -8,10 +8,17 @@ from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 
-from sap_cloud_sdk.core.auditlog_ng.client import AuditClient, _fill_common_from_auth_context
+from sap_cloud_sdk.core.auditlog_ng.client import (
+    AuditClient,
+    _fill_common_from_auth_context,
+    _infer_protocol_from_endpoint,
+    _resolve_protocol,
+)
 from sap_cloud_sdk.core.auditlog_ng.config import AuditLogNGConfig, SCHEMA_URL
 from sap_cloud_sdk.core.auditlog_ng.exceptions import ValidationError
-from sap_cloud_sdk.core.auditlog_ng.gen.sap.auditlog.auditevent.v2 import auditevent_pb2 as pb
+from sap_cloud_sdk.core.auditlog_ng.gen.sap.auditlog.auditevent.v2 import (
+    auditevent_pb2 as pb,
+)
 from sap_cloud_sdk.core.telemetry import Module, Operation
 from sap_cloud_sdk.ias._context import set_auth_context
 
@@ -70,7 +77,9 @@ def _make_mocked_client(
     )
 
 
-def _make_mock_event(tenant_id="tenant-123", descriptor_full_name="sap.auditlog.auditevent.v2.DataAccess"):
+def _make_mock_event(
+    tenant_id="tenant-123", descriptor_full_name="sap.auditlog.auditevent.v2.DataAccess"
+):
     event = MagicMock()
     event.common.tenant_id = tenant_id
     event.DESCRIPTOR.full_name = descriptor_full_name
@@ -201,11 +210,15 @@ class TestAuditClientSend:
     def test_send_uses_descriptor_name_when_event_type_missing(self):
         client, mock_logger, _, _, patcher, _ = _make_mocked_client()
         try:
-            event = _make_mock_event(descriptor_full_name="sap.auditlog.auditevent.v2.ConfigurationChange")
+            event = _make_mock_event(
+                descriptor_full_name="sap.auditlog.auditevent.v2.ConfigurationChange"
+            )
             client.send(event)
 
             _, kwargs = mock_logger.emit.call_args
-            assert kwargs["event_name"] == "sap.auditlog.auditevent.v2.ConfigurationChange"
+            assert (
+                kwargs["event_name"] == "sap.auditlog.auditevent.v2.ConfigurationChange"
+            )
         finally:
             patcher.stop()
 
@@ -338,6 +351,89 @@ class TestAuditClientProtocol:
         monkeypatch.setenv("OTEL_EXPORTER_OTLP_PROTOCOL", "http/json")
         with pytest.raises(ValueError, match="Unsupported OTEL_EXPORTER_OTLP_PROTOCOL"):
             AuditClient(_make_config())
+
+
+class TestInferProtocolFromEndpoint:
+    @pytest.mark.parametrize(
+        ("endpoint", "expected"),
+        [
+            # HTTP: http(s) scheme with a path (the OTLP/HTTP signal endpoint shape).
+            ("http://collector:4318/v1/logs", "http/protobuf"),
+            ("https://collector.example.com/v1/logs", "http/protobuf"),
+            # gRPC: bare host:port, no path (the OTLP/gRPC shape), with or without scheme.
+            ("audit.example.com:443", "grpc"),
+            ("localhost:4317", "grpc"),
+            ("https://audit.example.com:443", "grpc"),
+            ("grpc://audit.example.com:443", "grpc"),
+            # gRPC: host without a port and without a path still has the bare-host shape.
+            ("audit.example.com", "grpc"),
+            # No path means gRPC even with an http scheme and a port: a path is the only
+            # positive HTTP signal, and OTLP/gRPC endpoints may carry an http(s) scheme to
+            # indicate (in)secure transport. An explicit env override covers the rare
+            # http-base-without-path case.
+            ("http://collector:4318", "grpc"),
+            # Inconclusive shapes return None so the caller can fall back.
+            ("", None),
+            ("   ", None),
+            (None, None),
+            ("/v1/logs", None),
+            ("grpc://audit.example.com:443/v1/logs", None),
+        ],
+    )
+    def test_infers_shape(self, endpoint, expected):
+        assert _infer_protocol_from_endpoint(endpoint) == expected
+
+
+class TestResolveProtocol:
+    def test_explicit_env_wins_over_endpoint_shape(self, monkeypatch):
+        # A deliberate override is honoured even if it disagrees with the endpoint shape.
+        monkeypatch.setenv("OTEL_EXPORTER_OTLP_PROTOCOL", "http/protobuf")
+        assert _resolve_protocol("audit.example.com:443") == "http/protobuf"
+
+    def test_explicit_env_is_lowercased(self, monkeypatch):
+        monkeypatch.setenv("OTEL_EXPORTER_OTLP_PROTOCOL", "GRPC")
+        assert _resolve_protocol("http://collector:4318/v1/logs") == "grpc"
+
+    def test_infers_http_when_env_unset(self, monkeypatch):
+        monkeypatch.delenv("OTEL_EXPORTER_OTLP_PROTOCOL", raising=False)
+        assert _resolve_protocol("http://collector:4318/v1/logs") == "http/protobuf"
+
+    def test_infers_grpc_when_env_unset(self, monkeypatch):
+        monkeypatch.delenv("OTEL_EXPORTER_OTLP_PROTOCOL", raising=False)
+        assert _resolve_protocol("audit.example.com:443") == "grpc"
+
+    def test_falls_back_to_grpc_when_env_unset_and_shape_inconclusive(
+        self, monkeypatch
+    ):
+        monkeypatch.delenv("OTEL_EXPORTER_OTLP_PROTOCOL", raising=False)
+        assert _resolve_protocol("") == "grpc"
+
+    def test_empty_env_falls_through_to_endpoint_inference(self, monkeypatch):
+        # An env var set to "" is not a deliberate choice; infer from the endpoint instead.
+        monkeypatch.setenv("OTEL_EXPORTER_OTLP_PROTOCOL", "")
+        assert _resolve_protocol("http://collector:4318/v1/logs") == "http/protobuf"
+
+
+class TestProtocolInferredByClient:
+    """End-to-end: the exporter the client builds follows the endpoint when env is unset."""
+
+    @patch("sap_cloud_sdk.core.auditlog_ng.client.HTTPLogExporter")
+    @patch("sap_cloud_sdk.core.auditlog_ng.client.LoggerProvider")
+    def test_http_endpoint_without_env_builds_http_exporter(
+        self, mock_provider_cls, mock_http_exporter_cls, monkeypatch
+    ):
+        monkeypatch.delenv("OTEL_EXPORTER_OTLP_PROTOCOL", raising=False)
+        AuditClient(_make_config(endpoint="http://collector:4318/v1/logs"))
+        mock_http_exporter_cls.assert_called_once()
+
+    @patch("sap_cloud_sdk.core.auditlog_ng.client.GRPCLogExporter")
+    @patch("sap_cloud_sdk.core.auditlog_ng.client.LoggerProvider")
+    def test_grpc_endpoint_without_env_builds_grpc_exporter(
+        self, mock_provider_cls, mock_grpc_exporter_cls, monkeypatch
+    ):
+        monkeypatch.delenv("OTEL_EXPORTER_OTLP_PROTOCOL", raising=False)
+        AuditClient(_make_config(endpoint="audit.example.com:443"))
+        mock_grpc_exporter_cls.assert_called_once()
 
 
 class TestFillCommonFromAuthContext:

@@ -11,6 +11,7 @@ from typing import Any, Callable, Optional
 import requests
 from oauthlib.oauth2 import BackendApplicationClient
 from oauthlib.oauth2.rfc6749.errors import FatalClientError
+from requests.adapters import HTTPAdapter
 from requests_oauthlib import OAuth2Session
 
 from sap_cloud_sdk.core.resilience.cache._cache import Cache
@@ -204,6 +205,20 @@ def _token_key(tenant_subdomain: Optional[str]) -> str:
     return tenant_subdomain if tenant_subdomain is not None else "__provider__"
 
 
+class _BorrowedSession(requests.Session):
+    """A requests.Session that does not close its mounted adapters on close().
+
+    Used by IasAuthProvider to share a single HTTPAdapter (and its underlying
+    urllib3 connection pool) across per-request sessions without the session's
+    close() / __del__ draining the shared pool prematurely.
+    """
+
+    def close(self) -> None:
+        # Unmount adapters so they are no longer referenced by this session,
+        # but do NOT call adapter.close() — the pool is owned by the provider.
+        self.adapters.clear()
+
+
 class IasAuthProvider(AuthProvider):
     """Bearer-token auth provider for IAS (Identity Authentication Service).
 
@@ -215,12 +230,20 @@ class IasAuthProvider(AuthProvider):
     This provider reads that token at :meth:`get_session` time and attaches it.
 
     Because the token is read fresh on every call, there is nothing to cache or
-    invalidate — ``invalidate``/``invalidate_all``/``close`` are no-ops.
+    invalidate — ``invalidate``/``invalidate_all`` are no-ops.
 
     When no token is present the session is returned without an ``Authorization``
     header; enforcing presence is the caller's responsibility (the Agent Memory
     client raises a validation error before dispatching the request).
+
+    A single :class:`~requests.adapters.HTTPAdapter` is shared across all calls
+    so that the underlying ``urllib3`` connection pool (and its TCP/TLS
+    connections) is reused. Each call still gets its own session so the
+    per-request ``Authorization`` header is never shared between threads.
     """
+
+    def __init__(self) -> None:
+        self._adapter = HTTPAdapter()
 
     def get_session(self, tenant_subdomain: Optional[str] = None) -> requests.Session:
         # Imported lazily: runtime_context pulls in sap_cloud_sdk.ias, which would
@@ -228,7 +251,9 @@ class IasAuthProvider(AuthProvider):
         from sap_cloud_sdk.core.runtime_context import get_context
         from sap_cloud_sdk.core.runtime_context.providers._ias import IAS_TOKEN
 
-        session = requests.Session()
+        session = _BorrowedSession()
+        session.mount("https://", self._adapter)
+        session.mount("http://", self._adapter)
         ias_token = get_context().get(IAS_TOKEN)
         if ias_token:
             session.headers["Authorization"] = f"Bearer {ias_token}"
@@ -246,5 +271,4 @@ class IasAuthProvider(AuthProvider):
         pass
 
     def close(self) -> None:
-        pass
-
+        self._adapter.close()

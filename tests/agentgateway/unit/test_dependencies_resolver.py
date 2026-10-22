@@ -120,7 +120,7 @@ class TestIntegrationDependenciesResolverInterface:
     def test_cannot_instantiate_abstract_class(self):
         """Cannot instantiate abstract base class directly."""
         with pytest.raises(TypeError):
-            IntegrationDependenciesResolver()
+            IntegrationDependenciesResolver()  # ty: ignore[call-non-callable]
 
     def test_custom_resolver_implementation(self):
         """Can create custom resolver implementation."""

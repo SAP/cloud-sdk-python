@@ -123,7 +123,7 @@ class _DocumentRelationApi:
         """
         path = (
             build_relation_key_path(document_relation_id, is_active_entity)
-            + "/GenerateDocumentUploadURLs"
+            + "/com.sap.adm.DocumentService.GenerateDocumentUploadURLs"
         )
         payload = {
             "DocumentIsMultipart": is_multipart,
@@ -147,7 +147,7 @@ class _DocumentRelationApi:
         """
         path = (
             build_relation_key_path(document_relation_id, is_active_entity)
-            + "/CompleteMultipartUpload"
+            + "/com.sap.adm.DocumentService.CompleteMultipartUpload"
         )
         self._http.post(path, json={}, service_base=_SERVICE_PATH)
 
@@ -161,7 +161,7 @@ class _DocumentRelationApi:
         """Lock a document and its relation to prevent concurrent modifications."""
         path = (
             build_relation_key_path(document_relation_id, is_active_entity)
-            + "/LockDocumentAndRelation"
+            + "/com.sap.adm.DocumentService.LockDocumentAndRelation"
         )
         self._http.post(path, json={}, service_base=_SERVICE_PATH)
 
@@ -175,7 +175,7 @@ class _DocumentRelationApi:
         """Unlock a previously locked document and relation."""
         path = (
             build_relation_key_path(document_relation_id, is_active_entity)
-            + "/UnlockDocumentAndRelation"
+            + "/com.sap.adm.DocumentService.UnlockDocumentAndRelation"
         )
         self._http.post(path, json={}, service_base=_SERVICE_PATH)
 
@@ -386,7 +386,7 @@ class _AsyncDocumentRelationApi:
         """Async variant of :meth:`_DocumentRelationApi.generate_upload_urls` — same semantics."""
         path = (
             build_relation_key_path(document_relation_id, is_active_entity)
-            + "/GenerateDocumentUploadURLs"
+            + "/com.sap.adm.DocumentService.GenerateDocumentUploadURLs"
         )
         payload = {
             "DocumentIsMultipart": is_multipart,
@@ -405,7 +405,7 @@ class _AsyncDocumentRelationApi:
         """Async variant of :meth:`_DocumentRelationApi.complete_multipart_upload` — same semantics."""
         path = (
             build_relation_key_path(document_relation_id, is_active_entity)
-            + "/CompleteMultipartUpload"
+            + "/com.sap.adm.DocumentService.CompleteMultipartUpload"
         )
         await self._http.post(path, json={}, service_base=_SERVICE_PATH)
 
@@ -419,7 +419,7 @@ class _AsyncDocumentRelationApi:
         """Async variant of :meth:`_DocumentRelationApi.lock` — same semantics."""
         path = (
             build_relation_key_path(document_relation_id, is_active_entity)
-            + "/LockDocumentAndRelation"
+            + "/com.sap.adm.DocumentService.LockDocumentAndRelation"
         )
         await self._http.post(path, json={}, service_base=_SERVICE_PATH)
 
@@ -433,7 +433,7 @@ class _AsyncDocumentRelationApi:
         """Async variant of :meth:`_DocumentRelationApi.unlock` — same semantics."""
         path = (
             build_relation_key_path(document_relation_id, is_active_entity)
-            + "/UnlockDocumentAndRelation"
+            + "/com.sap.adm.DocumentService.UnlockDocumentAndRelation"
         )
         await self._http.post(path, json={}, service_base=_SERVICE_PATH)
 

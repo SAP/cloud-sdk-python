@@ -140,6 +140,131 @@ modes = cbc_client.get_entity_data(
 ```
 
 
+## Event handling
+
+CBC pushes CloudEvents to your application's webhook endpoint when configuration
+changes or AI features are activated or deactivated. Use `CBCEventHandler` to parse and dispatch
+incoming events.
+
+### Setup
+
+```python
+from sap_cloud_sdk import cbc
+
+handler = cbc.CBCEventHandler()
+
+def on_cv(event: cbc.ConsumptionVersionEvent) -> None:
+    # event.app_tenant_id, event.consumption_version_id
+    ...
+
+def on_fa(event: cbc.FeatureActivationEvent) -> None:
+    for f in event.features:
+        print(f.feature_id, f.enabled)
+
+handler.on_consumption_version_event(on_cv)
+handler.on_feature_activation_event(on_fa)
+```
+
+### Wiring into your webhook route
+
+Call `handle_request` from your framework's route handler, passing the raw HTTP
+headers and body:
+
+```python
+# FastAPI example
+@app.post("/cbc/events")
+async def cbc_webhook(request: Request):
+    handler.handle_request(dict(request.headers), await request.body())
+    return Response(status_code=200)
+```
+
+`handle_request` raises `CBCEventError` (a subclass of `CBCError`) if the
+request cannot be parsed as a valid CloudEvent or if the event data is
+structurally invalid. Your webhook route should return HTTP 4xx in that case
+so CBC does not retry the delivery.
+
+Unknown event types are silently ignored.
+
+### Securing the webhook endpoint
+
+CBC delivers events over mTLS using a client certificate with the following
+identity (stable across all CBC regions):
+
+```
+Subject: CN=cbc-notify-client,
+         OU=SAP Cloud Platform Clients+OU=Canary+OU=e804bfc8-44a1-4f27-8625-d7e434148210,
+         O=SAP SE, L=canary-eu, C=DE
+
+Issuer:  CN=SAP PKI Certificate Service Client CA,
+         OU=SAP BTP Clients,
+         O=SAP SE, L=cf-eu12, C=DE
+```
+
+Your webhook endpoint should verify the incoming client certificate against
+this exact Subject+Issuer DN pair before invoking `handle_request`. Accepting
+events without certificate verification allows any caller to inject arbitrary
+payloads. Certificate verification is done at the TLS layer of your web server
+or API gateway — `CBCEventHandler` itself operates on the already-accepted HTTP
+request.
+
+### Event types
+
+| Callback | Event types routed to it |
+|---|---|
+| `on_consumption_version_event` | `cbc.notification.consumptionversion.created`, `cbc.notification.consumptionversion.updated` |
+| `on_feature_activation_event` | `cbc.notification.feature.activation.v1` |
+
+### Event objects
+
+**`ConsumptionVersionEvent`**
+
+| Attribute | Type | Description |
+|---|---|---|
+| `app_tenant_id` | `str` | Application tenant id from the event context |
+| `consumption_version_id` | `str` | The new consumption version id |
+
+**`FeatureActivationEvent`**
+
+| Attribute | Type | Description |
+|---|---|---|
+| `app_tenant_id` | `str` | Application tenant id from the event context |
+| `features` | `list[FeatureActivationData]` | All feature activation states for the tenant |
+
+Each `FeatureActivationData` item has `feature_id: str` and `enabled: bool`.
+
+
+## Feature status
+
+Alongside configuration, CBC tracks which AI features are enabled for an app
+tenant. Query the current activation state with `get_feature_statuses`:
+
+```python
+statuses = cbc_client.get_feature_statuses()
+
+if statuses.is_enabled("ai_assisted_supplier_bid_analysis"):
+    ...
+```
+
+`is_enabled(feature_id)` returns `False` for a feature that is disabled or not
+present for the tenant. To inspect a feature directly, use `get`:
+
+```python
+feature = statuses.get("ai_assisted_tco_analysis")  # FeatureStatus | None
+if feature is not None:
+    print(feature.feature_id, feature.enabled)
+```
+
+To fetch a single feature without pulling the whole list, use
+`get_feature_status`, which filters server-side and returns one `FeatureStatus`
+(or `None` if the tenant has no entry for it):
+
+```python
+feature = cbc_client.get_feature_status("ai_assisted_lead_routing")
+if feature is not None and feature.enabled:
+    ...
+```
+
+
 ## Error handling
 
 | Exception | When |
@@ -283,7 +408,7 @@ client = cbc.create_client(
 
 `create_client` returns a concrete `CBCClient`. For tests, inject a mock
 `httpx.Client` when constructing one directly, or substitute your own stub object
-that implements the three public methods:
+that implements the public methods:
 
 ```python
 from sap_cloud_sdk import cbc
@@ -301,6 +426,12 @@ class StubCBCClient:
     def get_entity_data(
         self, configuration_object_id, entity_id, consumption_version=None
     ): ...
+
+    def get_feature_statuses(self):
+        return cbc.FeatureStatuses(features=[])
+
+    def get_feature_status(self, feature_id):
+        return None
 
 
 def test_my_service():

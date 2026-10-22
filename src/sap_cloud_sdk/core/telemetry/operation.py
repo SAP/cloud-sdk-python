@@ -143,6 +143,9 @@ class Operation(str, Enum):
     CBC_GET_CONSUMPTION_VERSIONS = "get_consumption_versions"
     CBC_GET_CONFIGURATION = "get_configuration"
     CBC_GET_ENTITY_DATA = "get_entity_data"
+    CBC_GET_FEATURE_STATUSES = "get_feature_statuses"
+    CBC_GET_FEATURE_STATUS = "get_feature_status"
+    CBC_HANDLE_EVENT = "handle_event"
 
     # Bootstrap Operations
     BOOTSTRAP = "bootstrap"

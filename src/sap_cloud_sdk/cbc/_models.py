@@ -68,6 +68,56 @@ class ConsumptionVersions(_FrozenModel):
 
 
 # ---------------------------------------------------------------------------
+# Feature status models
+# ---------------------------------------------------------------------------
+
+
+class FeatureStatus(_FrozenModel):
+    """Activation status of one AI feature for an app tenant.
+
+    Attributes:
+        feature_id: Feature identifier (e.g. ``"ai_assisted_supplier_bid_analysis"``).
+        enabled: Whether the feature is enabled for the tenant.
+    """
+
+    feature_id: str = Field(alias="featureId")
+    enabled: bool = False
+
+
+class FeatureStatuses(_FrozenModel):
+    """Activation status of all AI features for an app tenant.
+
+    Attributes:
+        features: List of :class:`FeatureStatus` objects.
+    """
+
+    features: list[FeatureStatus]
+
+    def is_enabled(self, feature_id: str) -> bool:
+        """Return ``True`` if the feature is enabled, ``False`` if disabled or absent.
+
+        Args:
+            feature_id: Feature identifier to look up.
+
+        Returns:
+            ``True`` if the feature is enabled, ``False`` if disabled or not present.
+        """
+        feature = next((f for f in self.features if f.feature_id == feature_id), None)
+        return feature.enabled if feature is not None else False
+
+    def get(self, feature_id: str) -> FeatureStatus | None:
+        """Return the :class:`FeatureStatus` for ``feature_id``, or ``None`` if absent.
+
+        Args:
+            feature_id: Feature identifier to look up.
+
+        Returns:
+            Matching :class:`FeatureStatus`, or ``None`` if not found.
+        """
+        return next((f for f in self.features if f.feature_id == feature_id), None)
+
+
+# ---------------------------------------------------------------------------
 # Entity models
 # ---------------------------------------------------------------------------
 
@@ -244,6 +294,67 @@ class ConfigurationData:
         """
         co = self.get_configuration_object(configuration_object_id)
         return co.get_entity_data(entity_id) if co is not None else None
+
+
+# ---------------------------------------------------------------------------
+# Event models
+# ---------------------------------------------------------------------------
+
+
+class _TenantContext(_FrozenModel):
+    app_tenant_id: str = Field(alias="appTenantId")
+
+
+class _ConsumptionVersionPayload(_FrozenModel):
+    consumption_version_id: str = Field(alias="consumptionVersionId", min_length=1)
+
+
+@dataclass
+class ConsumptionVersionEvent:
+    """Parsed CBC consumption-version CloudEvent.
+
+    Attributes:
+        app_tenant_id: Application tenant id from the event context.
+        consumption_version_id: The new consumption version id.
+    """
+
+    app_tenant_id: str
+    consumption_version_id: str
+
+
+@dataclass
+class FeatureActivationData:
+    """Activation state of one AI feature from a feature activation event.
+
+    Attributes:
+        feature_id: Feature identifier.
+        enabled: Whether the feature is enabled.
+    """
+
+    feature_id: str
+    enabled: bool
+
+
+class _FeatureActivationItem(_FrozenModel):
+    feature_id: str = Field(alias="featureId")
+    enabled: bool
+
+
+@dataclass
+class FeatureActivationEvent:
+    """Parsed CBC feature-activation CloudEvent.
+
+    Carries the app tenant id and the full list of feature activation states
+    for the tenant.  Apply the state directly — no follow-up call to CBC is
+    required.
+
+    Attributes:
+        app_tenant_id: Application tenant id from the event context.
+        features: All feature activation states for the tenant.
+    """
+
+    app_tenant_id: str
+    features: list[FeatureActivationData]
 
 
 # ---------------------------------------------------------------------------

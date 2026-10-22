@@ -151,4 +151,3 @@ exclude = [
     "src/sap_cloud_sdk/core/auditlog_ng/gen",
     "src/buf",
 ]
-

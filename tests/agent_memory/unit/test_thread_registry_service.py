@@ -632,11 +632,11 @@ class TestIASEndToEnd:
 
         with sdk_context(RuntimeContext({IAS_TOKEN: "ias-dummy-token-xyz"})):
             with patch(
-                "sap_cloud_sdk.core.protocol.http.models.requests"
-            ) as mock_requests:
+                "sap_cloud_sdk.core.protocol.http.models._BorrowedSession"
+            ) as mock_session_cls:
                 mock_session = MagicMock()
                 mock_session.headers = {}
-                mock_requests.Session.return_value = mock_session
+                mock_session_cls.return_value = mock_session
                 mock_session.request.return_value = mock_response
 
                 reg = self._make_registry_with_real_transport()
@@ -658,11 +658,11 @@ class TestIASEndToEnd:
 
         with sdk_context(RuntimeContext({IAS_TOKEN: "ias-dummy-token-xyz"})):
             with patch(
-                "sap_cloud_sdk.core.protocol.http.models.requests"
-            ) as mock_requests:
+                "sap_cloud_sdk.core.protocol.http.models._BorrowedSession"
+            ) as mock_session_cls:
                 mock_session = MagicMock()
                 mock_session.headers = {}
-                mock_requests.Session.return_value = mock_session
+                mock_session_cls.return_value = mock_session
                 mock_session.request.return_value = mock_response
 
                 reg = self._make_registry_with_real_transport()

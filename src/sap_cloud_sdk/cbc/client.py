@@ -33,6 +33,7 @@ import threading
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
+from urllib.parse import quote as _url_quote
 
 import httpx
 
@@ -438,7 +439,7 @@ class CBCClient:
         app_tenant_id = self._resolve_app_tenant_id()
         url = self._features_url(
             base_url,
-            f"/features?appTenantId={app_tenant_id}&featureId={feature_id}",
+            f"/features?appTenantId={app_tenant_id}&featureId={_url_quote(feature_id, safe='')}",
         )
         statuses = FeatureStatuses.model_validate(self._request("GET", url).json())
         return statuses.get(feature_id)

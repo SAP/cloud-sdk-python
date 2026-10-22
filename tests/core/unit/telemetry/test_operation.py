@@ -318,5 +318,5 @@ class TestOperation:
         # 3 auditlog + 12 destination + 10 certificate + 10 fragment + 8 objectstore
         # + 2 extensibility + 7 aicore + 23 dms + 7 agentgateway + 13 agent_memory
         # + 5 data_anonymization + 52 adms + 6 print + 94 dpi_ng + 1 bootstrap + 3 output_management
-        # + 5 cbc = 261
-        assert len(all_operations) == 261
+        # + 6 cbc = 262
+        assert len(all_operations) == 262

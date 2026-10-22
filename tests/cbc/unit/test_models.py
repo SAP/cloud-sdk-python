@@ -85,12 +85,10 @@ class TestFeatureStatus:
         )
         assert f.feature_id == "ai_assisted_supplier_bid_analysis"
         assert f.enabled is True
-        assert f.is_enabled() is True
 
     def test_enabled_defaults_to_false_when_absent(self):
         f = FeatureStatus.model_validate({"featureId": "ai_assisted_tco_analysis"})
         assert f.enabled is False
-        assert f.is_enabled() is False
 
     def test_ignores_extra_api_fields(self):
         f = FeatureStatus.model_validate(

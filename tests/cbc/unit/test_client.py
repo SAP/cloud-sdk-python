@@ -466,7 +466,7 @@ class TestGetFeatureStatus:
         result = client.get_feature_status("ai_assisted_supplier_bid_analysis")
         assert result is not None
         assert result.feature_id == "ai_assisted_supplier_bid_analysis"
-        assert result.is_enabled() is True
+        assert result.enabled is True
 
     def test_get_feature_status_sends_both_query_params(self):
         client, mock_http = _make_client(app_tenant_id=_app_tid("tenant-9"))
@@ -498,7 +498,7 @@ class TestGetFeatureStatus:
         result = client.get_feature_status("ai_assisted_tco_analysis")
         assert result is not None
         assert result.feature_id == "ai_assisted_tco_analysis"
-        assert result.is_enabled() is False
+        assert result.enabled is False
 
 
 # ---------------------------------------------------------------------------

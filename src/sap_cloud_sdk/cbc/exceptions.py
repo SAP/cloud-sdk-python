@@ -77,6 +77,12 @@ class CBCServerError(CBCHttpError):
     pass
 
 
+class CBCEventError(CBCError):
+    """Raised when an incoming CloudEvent cannot be parsed or is structurally invalid."""
+
+    pass
+
+
 class CBCNetworkError(CBCError):
     """Raised for network-level failures (DNS, connection refused, timeouts)."""
 

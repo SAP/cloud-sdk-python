@@ -31,6 +31,10 @@ logger = logging.getLogger(__name__)
 class Cache:
     """Per-client cache façade.
 
+    Tenant and user isolation keys are derived automatically from the active
+    :func:`~sap_cloud_sdk.core.runtime_context.get_context` — callers do not
+    need to pass identity information explicitly.
+
     Args:
         config: Per-client override. When ``None``, the global config set via
             :func:`~sap_cloud_sdk.cache._config.configure_cache` is used.
@@ -46,26 +50,17 @@ class Cache:
     # Public façade methods
     # ------------------------------------------------------------------
 
-    def get(
-        self,
-        namespace: str,
-        key: str,
-        tenant_id: str,
-        user_id: str | None = None,
-    ) -> Any | None:
+    def get(self, namespace: str, key: str) -> Any | None:
         """Return a cached value, or ``None`` on miss or when disabled.
 
         Args:
-            namespace: Domain namespace, e.g. ``"destination"``.
-            key: Domain-specific key, e.g. the destination name.
-            tenant_id: Tenant identifier for isolation key derivation.
-            user_id: Optional user identifier. Drives ``TENANT_USER``
-                isolation when present (and no explicit strategy override).
+            namespace: Domain namespace, e.g. ``"csrf"``.
+            key: Domain-specific key, e.g. the service root URL.
         """
         if not self._config.enabled:
             return None
 
-        full_key = self._make_full_key(namespace, key, tenant_id, user_id)
+        full_key = self._make_full_key(namespace, key)
         try:
             return self._backend.get(full_key)
         except Exception as e:
@@ -78,8 +73,6 @@ class Cache:
         key: str,
         value: Any,
         ttl_seconds: int | None,
-        tenant_id: str,
-        user_id: str | None = None,
     ) -> None:
         """Store a value in the cache.
 
@@ -96,8 +89,6 @@ class Cache:
             ttl_seconds: Natural TTL derived from the resource (e.g. token
                 ``exp`` minus now). Pass ``None`` to use the configured
                 default.
-            tenant_id: Tenant identifier for isolation key derivation.
-            user_id: Optional user identifier.
         """
         if not self._config.enabled:
             return
@@ -107,31 +98,23 @@ class Cache:
         )
         effective_ttl = max(raw_ttl - self._config.expiry_buffer_seconds, 1)
 
-        full_key = self._make_full_key(namespace, key, tenant_id, user_id)
+        full_key = self._make_full_key(namespace, key)
         try:
             self._backend.set(full_key, value, effective_ttl)
         except Exception as e:
             raise BackendError(f"cache backend set() failed: {e}") from e
 
-    def evict(
-        self,
-        namespace: str,
-        key: str,
-        tenant_id: str,
-        user_id: str | None = None,
-    ) -> None:
+    def evict(self, namespace: str, key: str) -> None:
         """Remove a single entry (no-op if absent or cache is disabled).
 
         Args:
             namespace: Domain namespace.
             key: Domain-specific key.
-            tenant_id: Tenant identifier.
-            user_id: Optional user identifier.
         """
         if not self._config.enabled:
             return
 
-        full_key = self._make_full_key(namespace, key, tenant_id, user_id)
+        full_key = self._make_full_key(namespace, key)
         try:
             self._backend.delete(full_key)
         except Exception as e:
@@ -160,16 +143,6 @@ class Cache:
             on_evict=self._config.on_evict,
         )
 
-    def _make_full_key(
-        self,
-        namespace: str,
-        key: str,
-        tenant_id: str,
-        user_id: str | None,
-    ) -> str:
-        isolation_key = build_isolation_key(
-            tenant_id=tenant_id,
-            user_id=user_id,
-            strategy=self._config.isolation_strategy,
-        )
+    def _make_full_key(self, namespace: str, key: str) -> str:
+        isolation_key = build_isolation_key(strategy=self._config.isolation_strategy)
         return f"{namespace}::{isolation_key}::{key}"

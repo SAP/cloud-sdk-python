@@ -1,6 +1,6 @@
 # Cache: User Guide
 
-Provides a domain-agnostic, pluggable cache layer shared across all SAP Cloud SDK modules. Supports tenant and tenant-user isolation, configurable TTL and expiry buffers, LRU eviction, and custom backends for multi-instance deployments.
+Provides a domain-agnostic, pluggable cache layer shared across all SAP Cloud SDK modules. Supports tenant, tenant-user, and provider isolation, configurable TTL and expiry buffers, LRU eviction, and custom backends for multi-instance deployments.
 
 ## Installation
 
@@ -42,12 +42,13 @@ Call `configure_cache()` **once at startup**, before any SDK client is created. 
 
 ## Isolation Strategy
 
-The cache automatically scopes keys to the current tenant (and optionally user) to prevent cross-tenant and cross-user cache hits.
+The cache automatically scopes keys to the current tenant (and optionally user) to prevent cross-tenant and cross-user cache hits. Tenant and user identity are read implicitly from the active [`RuntimeContext`](../core/runtime_context) — callers do not pass them explicitly.
 
-| Strategy | Scope | Auto-selected when |
+| Strategy | Scope | When to use |
 |---|---|---|
-| `TENANT` | Per tenant | No user ID present |
-| `TENANT_USER` | Per (tenant, user) pair | User ID is present |
+| `TENANT` | Per tenant | Data shared across all users of a tenant (configuration, metadata). Auto-selected when no user ID is present. |
+| `TENANT_USER` | Per (tenant, user) pair | User-specific data. Auto-selected when a user ID is present in context. |
+| `PROVIDER` | Service-wide (single shared namespace) | Data that is not tenant-specific, e.g. CSRF tokens or provider-level metadata. Ignores tenant and user context entirely. |
 
 Override the strategy globally:
 
@@ -95,12 +96,14 @@ configure_cache(CacheConfig(on_evict=on_evict))
 The built-in `InMemoryLRUBackend` is process-local. For horizontally scaled deployments implement `CacheBackend` and pass it via `CacheConfig`:
 
 ```python
+from typing import Any
+
 from sap_cloud_sdk.cache import CacheBackend, CacheConfig, configure_cache
 
 
 class MyCacheBackend(CacheBackend):
-    def get(self, key: str): ...
-    def set(self, key: str, value, ttl_seconds: int) -> None: ...
+    def get(self, key: str) -> Any | None: ...
+    def set(self, key: str, value: Any, ttl_seconds: int) -> None: ...
     def delete(self, key: str) -> None: ...
     def clear(self) -> None: ...
 
@@ -109,6 +112,12 @@ configure_cache(CacheConfig(backend=MyCacheBackend()))
 ```
 
 The backend interface has exactly four methods and no awareness of tenants, TTL policy, or domain types — all of that is handled by the SDK before keys reach your backend.
+
+> **Redis and other distributed backends:** A built-in Redis backend is not yet available. The `CacheBackend` ABC is designed to support distributed backends, and first-party support is planned for a future release. Until then, implement `CacheBackend` against your store of choice as shown above.
+
+## Integration Example
+
+For a real, in-tree example of how the cache is used, see the CSRF token handling in the core HTTP client (`sap_cloud_sdk.core.protocol.http.client.HttpClient`, opt-in via `csrf_enabled=True`). It uses `IsolationStrategy.PROVIDER` to cache a service-wide CSRF token, injects it on mutating requests, and evicts-and-refetches on a `403`.
 
 ## API Reference
 
@@ -134,13 +143,13 @@ The default backend. Thread-safe, LRU + TTL eviction, backed by `cachetools.TTLC
 
 ### `class IsolationStrategy`
 
-Enum with values `TENANT` and `TENANT_USER`. See [Isolation Strategy](#isolation-strategy) above.
+Enum with values `TENANT`, `TENANT_USER`, and `PROVIDER`. See [Isolation Strategy](#isolation-strategy) above.
 
 ## Multi-tenancy
 
-- **Supported:** Yes, `TENANT` and `TENANT_USER` isolation strategies
+- **Supported:** Yes, `TENANT`, `TENANT_USER`, and `PROVIDER` isolation strategies
 - **Authentication:** N/A, the cache module does not perform BTP authentication
-- **How to use:** Set `isolation_strategy` in `CacheConfig`. Auto-selection uses `TENANT_USER` when a `user_id` is provided to `Cache.get()`/`Cache.set()`, otherwise `TENANT`
+- **How to use:** Set `isolation_strategy` in `CacheConfig`. Tenant and user identity are read implicitly from the active [`RuntimeContext`](../core/runtime_context); auto-selection uses `TENANT_USER` when a user ID is present in context, otherwise `TENANT`. Use `PROVIDER` for service-wide data that must not be tenant-scoped.
 - **Further reading:** N/A
 
 ## Error Handling

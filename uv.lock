@@ -316,6 +316,15 @@ wheels = [
 ]
 
 [[package]]
+name = "cachetools"
+version = "5.5.2"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/6c/81/3747dad6b14fa2cf53fcf10548cf5aea6913e96fab41a3c198676f8948a5/cachetools-5.5.2.tar.gz", hash = "sha256:1a661caa9175d26759571b2e19580f9d6393969e5dfca11fdb1f947a23e640d4", size = 28380, upload-time = "2025-02-20T21:01:19.524Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/72/76/20fa66124dbe6be5cafeb312ece67de6b61dd91a0247d1ea13db4ebb33c2/cachetools-5.5.2-py3-none-any.whl", hash = "sha256:d26a22bcc62eb95c3beabd9f1ee5e820d3d2704fe2967cbe350e20c8ffcd3f0a", size = 10080, upload-time = "2025-02-20T21:01:16.647Z" },
+]
+
+[[package]]
 name = "cel-python"
 version = "0.5.0"
 source = { registry = "https://pypi.org/simple" }
@@ -4353,6 +4362,7 @@ name = "sap-cloud-sdk"
 version = "0.62.0"
 source = { editable = "." }
 dependencies = [
+    { name = "cachetools" },
     { name = "cryptography" },
     { name = "grpcio" },
     { name = "hatchling" },
@@ -4443,6 +4453,7 @@ dev = [
 requires-dist = [
     { name = "a2a-sdk", marker = "extra == 'extensibility'", specifier = ">=0.2.0,<1.0" },
     { name = "aiohttp", marker = "extra == 'aiohttp'", specifier = ">=3.9.0,<4" },
+    { name = "cachetools", specifier = "~=5.5.2" },
     { name = "cryptography", specifier = ">=48.0.1,<51" },
     { name = "django", marker = "extra == 'django'", specifier = ">=4.0,<6" },
     { name = "fastapi", marker = "extra == 'fastapi'", specifier = ">=0.100.0,<1" },

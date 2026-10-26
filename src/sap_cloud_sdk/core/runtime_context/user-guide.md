@@ -93,7 +93,7 @@ metadata or a message queue envelope — as long as the adapter populates
 
 | Provider | Reads | Sets |
 |---|---|---|
-| `IASContextProvider` | `Authorization: Bearer <JWT>` | `TENANT_ID`, `USER_ID`, `GLOBAL_TENANT_ID` |
+| `IASContextProvider` | `Authorization: Bearer <JWT>` (signature verified via `IASVerifier`) | `TENANT_ID`, `USER_ID`, `GLOBAL_TENANT_ID` |
 | `SAPTriggerContextProvider` | `x-sap-origin` | `TRIGGER_TYPE` |
 | `DWCContextProvider` | `dwc-subdomain`, `dwc-tenant`, `dwc-stage-configuration` | `DWC_SUBDOMAIN`, `DWC_TENANT`, `FEATURE_TOGGLES` |
 

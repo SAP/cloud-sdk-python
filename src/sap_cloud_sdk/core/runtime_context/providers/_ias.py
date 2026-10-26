@@ -7,7 +7,7 @@ from sap_cloud_sdk.core.runtime_context._context import RuntimeContext
 from sap_cloud_sdk.core.runtime_context._envelope import RequestEnvelope
 from sap_cloud_sdk.core.runtime_context._keys import ContextKey
 from sap_cloud_sdk.core.runtime_context._protocol import ContextProvider
-from sap_cloud_sdk.ias import IASConfigError, IASVerifier, TokenVerifier
+from sap_cloud_sdk.ias import IASConfigError, IASTokenError, IASVerifier, TokenVerifier
 
 logger = logging.getLogger(__name__)
 
@@ -68,8 +68,15 @@ class IASContextProvider(ContextProvider):
             return RuntimeContext()
         try:
             verified = self._token_verifier(auth)
-        except Exception as e:
+        except IASTokenError as e:
             logger.debug("IAS token verification failed, context will be empty: %s", e)
+            return RuntimeContext()
+        except Exception as e:
+            logger.warning(
+                "IASContextProvider: unexpected error during token verification "
+                "(IAS unreachable?), context will be empty: %s",
+                e,
+            )
             return RuntimeContext()
         claims = verified.claims
         values = {}

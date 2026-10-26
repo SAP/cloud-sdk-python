@@ -347,6 +347,16 @@ class TestIASContextProvider:
         assert provider._token_verifier is None
         assert any("IASContextProvider" in r.message for r in caplog.records)
 
+    def test_infra_error_logs_warning_not_debug(self, caplog):
+        import logging
+        def _infra_fail(auth: str) -> VerifiedIASClaims:
+            raise ConnectionError("DNS failure")
+        envelope = _make_envelope({"authorization": "Bearer tok"})
+        with caplog.at_level(logging.WARNING, logger="sap_cloud_sdk"):
+            ctx = IASContextProvider(token_verifier=_infra_fail).extract(envelope)
+        assert ctx.get(APP_TENANT_ID) is None
+        assert any("unexpected error" in r.message for r in caplog.records)
+
 
 # ---------------------------------------------------------------------------
 # SAPTriggerContextProvider

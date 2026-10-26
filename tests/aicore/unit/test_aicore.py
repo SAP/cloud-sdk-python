@@ -1126,3 +1126,17 @@ class TestAicoreInstanceValidation:
             with pytest.raises(ValueError):
                 _get_secret("ENV_VAR", instance_name="../default")
         assert opened == [], "traversal must not open any file"
+
+    def test_get_secret_dir_mtime_rejects_symlink_escape(self, tmp_path):
+        """A symlink whose name passes component validation but points outside
+        the aicore base must be rejected before os.stat follows it."""
+        from sap_cloud_sdk.aicore import _get_secret_dir_mtime
+
+        aicore_base = tmp_path / "aicore"
+        aicore_base.mkdir()
+        outside = tmp_path / "outside"
+        outside.mkdir()
+        (aicore_base / "inst").symlink_to(outside, target_is_directory=True)
+        with patch("sap_cloud_sdk.aicore.resolve_base_mount", return_value=str(tmp_path)):
+            with pytest.raises(ValueError, match="escapes trusted root"):
+                _get_secret_dir_mtime(instance_name="inst")

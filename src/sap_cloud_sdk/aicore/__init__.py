@@ -310,7 +310,9 @@ def _configure_direct_mode(instance_name: str) -> None:
 def _get_secret_dir_mtime(instance_name: str = "aicore-instance") -> float:
     """Return the mtime of the AI Core secret directory, or 0.0 if it does not exist."""
     _validate_path_component("instance_name", instance_name)
-    secret_dir = os.path.join(resolve_base_mount(), "aicore", instance_name)
+    aicore_base = os.path.join(resolve_base_mount(), "aicore")
+    secret_dir = os.path.join(aicore_base, instance_name)
+    _assert_within_base(aicore_base, secret_dir)
     try:
         return os.stat(secret_dir).st_mtime
     except OSError:

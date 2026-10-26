@@ -1,6 +1,5 @@
 """Unit tests for IsolationStrategy and build_isolation_key."""
 
-import hashlib
 import logging
 
 import pytest
@@ -20,22 +19,17 @@ def _ctx(tenant_id: str | None = None, user_id: str | None = None) -> RuntimeCon
 
 
 class TestBuildIsolationKeyAutoSelect:
-    def test_no_user_id_returns_tenant_id(self) -> None:
+    def test_no_user_id_returns_tenant_key(self) -> None:
         with sdk_context(_ctx(tenant_id="tenant-abc")):
-            assert build_isolation_key() == "tenant-abc"
+            assert build_isolation_key() == "tenant:tenant-abc"
 
-    def test_empty_user_id_returns_tenant_id(self) -> None:
+    def test_empty_user_id_returns_tenant_key(self) -> None:
         with sdk_context(_ctx(tenant_id="tenant-abc", user_id="")):
-            assert build_isolation_key() == "tenant-abc"
+            assert build_isolation_key() == "tenant:tenant-abc"
 
-    def test_with_user_id_returns_sha256_hash(self) -> None:
+    def test_with_user_id_returns_tenant_user_key(self) -> None:
         with sdk_context(_ctx(tenant_id="tenant-abc", user_id="user-123")):
-            expected = hashlib.sha256(b"tenant-abc|user-123").hexdigest()[:32]
-            assert build_isolation_key() == expected
-
-    def test_hash_is_32_chars(self) -> None:
-        with sdk_context(_ctx(tenant_id="t", user_id="u")):
-            assert len(build_isolation_key()) == 32
+            assert build_isolation_key() == "tenant:tenant-abc:user:user-123"
 
     def test_different_users_produce_different_keys(self) -> None:
         with sdk_context(_ctx(tenant_id="t", user_id="user-1")):
@@ -51,7 +45,7 @@ class TestBuildIsolationKeyAutoSelect:
             k2 = build_isolation_key()
         assert k1 != k2
 
-    def test_same_inputs_produce_stable_hash(self) -> None:
+    def test_same_inputs_produce_stable_key(self) -> None:
         with sdk_context(_ctx(tenant_id="t", user_id="u")):
             k1 = build_isolation_key()
             k2 = build_isolation_key()
@@ -62,20 +56,19 @@ class TestBuildIsolationKeyExplicitStrategy:
     def test_explicit_tenant_strategy_ignores_user_id(self) -> None:
         with sdk_context(_ctx(tenant_id="tenant-abc", user_id="user-123")):
             key = build_isolation_key(strategy=IsolationStrategy.TENANT)
-        assert key == "tenant-abc"
+        assert key == "tenant:tenant-abc"
 
     def test_explicit_tenant_user_strategy_with_user_id(self) -> None:
         with sdk_context(_ctx(tenant_id="t", user_id="u")):
             key = build_isolation_key(strategy=IsolationStrategy.TENANT_USER)
-        expected = hashlib.sha256(b"t|u").hexdigest()[:32]
-        assert key == expected
+        assert key == "tenant:t:user:u"
 
     def test_explicit_tenant_user_strategy_without_user_id_falls_back_to_tenant(
         self,
     ) -> None:
         with sdk_context(_ctx(tenant_id="tenant-abc")):
             key = build_isolation_key(strategy=IsolationStrategy.TENANT_USER)
-        assert key == "tenant-abc"
+        assert key == "tenant:tenant-abc"
 
     def test_downgrade_warning_is_logged(
         self, caplog: pytest.LogCaptureFixture
@@ -90,19 +83,19 @@ class TestBuildIsolationKeyProvider:
     def test_provider_strategy_returns_fixed_constant(self) -> None:
         with sdk_context(_ctx(tenant_id="tenant-abc", user_id="user-123")):
             key = build_isolation_key(strategy=IsolationStrategy.PROVIDER)
-        assert key == "__provider__"
+        assert key == "provider"
 
     def test_provider_strategy_ignores_empty_context(self) -> None:
         with sdk_context(RuntimeContext()):
             key = build_isolation_key(strategy=IsolationStrategy.PROVIDER)
-        assert key == "__provider__"
+        assert key == "provider"
 
     def test_provider_is_stable_across_tenants(self) -> None:
         with sdk_context(_ctx(tenant_id="tenant-1")):
             k1 = build_isolation_key(strategy=IsolationStrategy.PROVIDER)
         with sdk_context(_ctx(tenant_id="tenant-2")):
             k2 = build_isolation_key(strategy=IsolationStrategy.PROVIDER)
-        assert k1 == k2 == "__provider__"
+        assert k1 == k2 == "provider"
 
 
 class TestBuildIsolationKeyNoContext:

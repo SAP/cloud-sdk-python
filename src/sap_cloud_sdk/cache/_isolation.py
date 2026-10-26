@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import hashlib
 import logging
 from enum import Enum
 
@@ -52,7 +51,7 @@ def build_isolation_key(strategy: IsolationStrategy | None = None) -> str:
         An opaque string suitable for inclusion in a cache key.
     """
     if strategy is IsolationStrategy.PROVIDER:
-        return "__provider__"
+        return "provider"
 
     ctx = get_context()
     tenant_id = ctx.get(APP_TENANT_ID)
@@ -72,7 +71,6 @@ def build_isolation_key(strategy: IsolationStrategy | None = None) -> str:
         )
 
     if effective is IsolationStrategy.TENANT_USER and has_user:
-        material = f"{tenant_id}|{user_id}"
-        return hashlib.sha256(material.encode()).hexdigest()[:32]
+        return f"tenant:{tenant_id}:user:{user_id}"
 
-    return tenant_id or ""
+    return f"tenant:{tenant_id}" if tenant_id else ""

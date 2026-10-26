@@ -48,7 +48,7 @@ The cache automatically scopes keys to the current tenant (and optionally user) 
 |---|---|---|
 | `TENANT` | Per tenant | Data shared across all users of a tenant (configuration, metadata). Auto-selected when no user ID is present. |
 | `TENANT_USER` | Per (tenant, user) pair | User-specific data. Auto-selected when a user ID is present in context. |
-| `PROVIDER` | Service-wide (single shared namespace) | Data that is not tenant-specific, e.g. CSRF tokens or provider-level metadata. Ignores tenant and user context entirely. |
+| `PROVIDER` | Service-wide (single shared namespace) | Data that is not tenant-specific, e.g. CSRF tokens or provider-level metadata. Ignores tenant and user context entirely. Key: `provider`. |
 
 Override the strategy globally:
 

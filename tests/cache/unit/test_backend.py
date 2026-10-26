@@ -63,6 +63,23 @@ class TestInMemoryLRUBackendDelete:
         backend.delete("k")
         assert evictions == [("k", "manual")]
 
+    def test_ttl_expiry_fires_on_evict_callback_with_ttl_reason(self) -> None:
+        evictions: list[tuple[str, str]] = []
+        backend = InMemoryLRUBackend(on_evict=lambda k, r: evictions.append((k, r)))
+        backend.set("k", "v", ttl_seconds=1)
+        time.sleep(1.1)
+        assert backend.get("k") is None
+        assert evictions == [("k", "ttl")]
+
+    def test_ttl_reason_fires_only_once_per_expired_key(self) -> None:
+        evictions: list[tuple[str, str]] = []
+        backend = InMemoryLRUBackend(on_evict=lambda k, r: evictions.append((k, r)))
+        backend.set("k", "v", ttl_seconds=1)
+        time.sleep(1.1)
+        backend.get("k")  # fires "ttl"
+        backend.get("k")  # already gone — no second callback
+        assert evictions == [("k", "ttl")]
+
 
 class TestInMemoryLRUBackendClear:
     def test_clear_removes_all_entries(self) -> None:

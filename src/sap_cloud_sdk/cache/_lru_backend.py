@@ -52,9 +52,10 @@ class InMemoryLRUBackend(CacheBackend):
     Args:
         max_size: Maximum number of entries before LRU eviction.
         on_evict: Optional callback ``(key, reason) -> None``. *reason* is
-            ``"lru"`` for capacity evictions or ``"manual"`` for explicit
-            :meth:`delete` / :meth:`clear` calls. TTL expiry is handled
-            transparently by cachetools and does not fire this callback.
+            ``"lru"`` for capacity evictions, ``"ttl"`` for entries evicted on
+            access after their TTL elapsed, or ``"manual"`` for explicit
+            :meth:`delete` calls. TTL expiry is detected lazily on the next
+            :meth:`get` of the expired key.
     """
 
     def __init__(
@@ -76,6 +77,7 @@ class InMemoryLRUBackend(CacheBackend):
         self._lock = threading.Lock()
 
     def get(self, key: str) -> Any | None:
+        expired = False
         with self._lock:
             entry = self._cache.get(key)
             if entry is None:
@@ -86,8 +88,11 @@ class InMemoryLRUBackend(CacheBackend):
                     del self._cache[key]
                 except KeyError:
                     pass
-                return None
-            return value
+                expired = True
+        if expired:
+            self._fire_on_evict(key, "ttl")
+            return None
+        return value
 
     def set(self, key: str, value: Any, ttl_seconds: int) -> None:
         expires_at = time.monotonic() + max(ttl_seconds, 1)
@@ -97,12 +102,17 @@ class InMemoryLRUBackend(CacheBackend):
     def delete(self, key: str) -> None:
         with self._lock:
             existed = self._cache.pop(key, None) is not None
-        if existed and self._on_evict is not None:
-            try:
-                self._on_evict(key, "manual")
-            except Exception:
-                logger.debug("on_evict callback raised an exception", exc_info=True)
+        if existed:
+            self._fire_on_evict(key, "manual")
 
     def clear(self) -> None:
         with self._lock:
             self._cache.clear()
+
+    def _fire_on_evict(self, key: str, reason: str) -> None:
+        if self._on_evict is None:
+            return
+        try:
+            self._on_evict(key, reason)
+        except Exception:
+            logger.debug("on_evict callback raised an exception", exc_info=True)

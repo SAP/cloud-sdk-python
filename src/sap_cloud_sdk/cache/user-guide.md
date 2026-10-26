@@ -89,6 +89,7 @@ configure_cache(CacheConfig(on_evict=on_evict))
 
 `reason` values:
 - `"lru"` — evicted because `max_size` was exceeded
+- `"ttl"` — evicted on access after the entry's TTL elapsed
 - `"manual"` — removed by an explicit `evict()` or `reset()` call
 
 ## Custom Backend (Multi-Instance Deployments)

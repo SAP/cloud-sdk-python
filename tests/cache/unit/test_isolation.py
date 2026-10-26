@@ -5,7 +5,7 @@ import logging
 import pytest
 
 from sap_cloud_sdk.cache._isolation import IsolationStrategy, build_isolation_key
-from sap_cloud_sdk.core.runtime_context import APP_TENANT_ID, USER_ID, RuntimeContext
+from sap_cloud_sdk.core.runtime_context import APP_TENANT_ID, DWC_TENANT, USER_ID, RuntimeContext
 from sap_cloud_sdk.core.runtime_context._context import sdk_context
 
 
@@ -13,6 +13,15 @@ def _ctx(tenant_id: str | None = None, user_id: str | None = None) -> RuntimeCon
     values: dict = {}
     if tenant_id is not None:
         values[APP_TENANT_ID] = tenant_id
+    if user_id is not None:
+        values[USER_ID] = user_id
+    return RuntimeContext(values)
+
+
+def _dwc_ctx(dwc_tenant: str | None = None, user_id: str | None = None) -> RuntimeContext:
+    values: dict = {}
+    if dwc_tenant is not None:
+        values[DWC_TENANT] = dwc_tenant
     if user_id is not None:
         values[USER_ID] = user_id
     return RuntimeContext(values)
@@ -102,3 +111,18 @@ class TestBuildIsolationKeyNoContext:
     def test_empty_context_returns_empty_string(self) -> None:
         with sdk_context(RuntimeContext()):
             assert build_isolation_key() == ""
+
+
+class TestBuildIsolationKeyDwcFallback:
+    def test_dwc_tenant_used_when_app_tenant_id_absent(self) -> None:
+        with sdk_context(_dwc_ctx(dwc_tenant="dwc-tenant-1")):
+            assert build_isolation_key() == "tenant:dwc-tenant-1"
+
+    def test_app_tenant_id_takes_precedence_over_dwc_tenant(self) -> None:
+        values = {APP_TENANT_ID: "ias-tenant", DWC_TENANT: "dwc-tenant"}
+        with sdk_context(RuntimeContext(values)):
+            assert build_isolation_key() == "tenant:ias-tenant"
+
+    def test_dwc_tenant_with_user_produces_tenant_user_key(self) -> None:
+        with sdk_context(_dwc_ctx(dwc_tenant="dwc-tenant-1", user_id="user-abc")):
+            assert build_isolation_key() == "tenant:dwc-tenant-1:user:user-abc"

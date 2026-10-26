@@ -5,7 +5,12 @@ from __future__ import annotations
 import logging
 from enum import Enum
 
-from sap_cloud_sdk.core.runtime_context import APP_TENANT_ID, USER_ID, get_context
+from sap_cloud_sdk.core.runtime_context import (
+    APP_TENANT_ID,
+    DWC_TENANT,
+    USER_ID,
+    get_context,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -54,7 +59,7 @@ def build_isolation_key(strategy: IsolationStrategy | None = None) -> str:
         return "provider"
 
     ctx = get_context()
-    tenant_id = ctx.get(APP_TENANT_ID)
+    tenant_id = ctx.get(APP_TENANT_ID) or ctx.get(DWC_TENANT)
     user_id = ctx.get(USER_ID)
 
     has_user = bool(user_id)

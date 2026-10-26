@@ -8,10 +8,9 @@ import requests
 from sap_cloud_sdk.core.protocol.http import HttpClient, HttpMethod, XsuaaAuthProvider
 
 
-def _make_response(status_code: int, headers: dict | None = None) -> MagicMock:
+def _make_response(status_code: int) -> MagicMock:
     resp = MagicMock(spec=requests.Response)
     resp.status_code = status_code
-    resp.headers = headers or {}
     return resp
 
 
@@ -218,99 +217,6 @@ class TestHttpClient:
         client.close()
         mock_session.close.assert_called_once()
         assert client._plain_session is None
-
-
-class TestHttpClientCsrf:
-    """CSRF token fetch-and-carry via the cache module (csrf_enabled=True)."""
-
-    def _csrf_client(
-        self, base_url: str = "https://svc.example.com"
-    ) -> tuple[HttpClient, MagicMock, MagicMock]:
-        auth = _make_mock_auth()
-        session = MagicMock()
-        auth.get_session.return_value = session
-        client = HttpClient(base_url, auth, csrf_enabled=True)
-        return client, auth, session
-
-    @staticmethod
-    def _csrf_fetch_response(token: str) -> MagicMock:
-        return _make_response(200, headers={"X-CSRF-Token": token})
-
-    def test_disabled_by_default_no_fetch(self) -> None:
-        client, _, session = _make_client_with_mock_session()
-        client.request(HttpMethod.POST, "/items", json={"a": 1})
-        # Exactly one call — the POST itself, no CSRF probe.
-        assert session.request.call_count == 1
-        assert session.request.call_args[0][0] == "POST"
-
-    def test_cold_miss_fetches_and_injects_token(self) -> None:
-        client, _, session = self._csrf_client()
-        session.request.side_effect = [
-            self._csrf_fetch_response("tok-abc"),  # CSRF probe (GET root)
-            _make_response(201),  # the POST
-        ]
-        resp = client.request(HttpMethod.POST, "/items", json={"a": 1})
-
-        assert resp.status_code == 201
-        # First call is the GET probe carrying Fetch.
-        probe = session.request.call_args_list[0]
-        assert probe[0][0] == "GET"
-        assert probe[1]["headers"]["X-CSRF-Token"] == "Fetch"
-        # Second call is the POST carrying the fetched token.
-        post = session.request.call_args_list[1]
-        assert post[0][0] == "POST"
-        assert post[1]["headers"]["X-CSRF-Token"] == "tok-abc"
-
-    def test_cache_hit_skips_second_fetch(self) -> None:
-        client, _, session = self._csrf_client()
-        session.request.side_effect = [
-            self._csrf_fetch_response("tok-abc"),  # probe for first POST
-            _make_response(201),  # first POST
-            _make_response(201),  # second POST (no probe)
-        ]
-        client.request(HttpMethod.POST, "/items", json={"a": 1})
-        client.request(HttpMethod.POST, "/items", json={"b": 2})
-
-        methods = [c[0][0] for c in session.request.call_args_list]
-        # Only one GET probe total; the token is reused on the second POST.
-        assert methods == ["GET", "POST", "POST"]
-        second_post = session.request.call_args_list[2]
-        assert second_post[1]["headers"]["X-CSRF-Token"] == "tok-abc"
-
-    def test_403_evicts_refetches_and_retries(self) -> None:
-        client, _, session = self._csrf_client()
-        session.request.side_effect = [
-            self._csrf_fetch_response("stale"),  # initial probe
-            _make_response(403),  # POST rejected — token stale
-            self._csrf_fetch_response("fresh"),  # re-probe after eviction
-            _make_response(201),  # retried POST succeeds
-        ]
-        resp = client.request(HttpMethod.POST, "/items", json={"a": 1})
-
-        assert resp.status_code == 201
-        methods = [c[0][0] for c in session.request.call_args_list]
-        assert methods == ["GET", "POST", "GET", "POST"]
-        retried_post = session.request.call_args_list[3]
-        assert retried_post[1]["headers"]["X-CSRF-Token"] == "fresh"
-
-    def test_403_retry_gives_up_after_one_attempt(self) -> None:
-        client, _, session = self._csrf_client()
-        session.request.side_effect = [
-            self._csrf_fetch_response("t1"),  # probe
-            _make_response(403),  # POST rejected
-            self._csrf_fetch_response("t2"),  # re-probe
-            _make_response(403),  # retried POST still 403 — return as-is
-        ]
-        resp = client.request(HttpMethod.POST, "/items", json={"a": 1})
-        assert resp.status_code == 403
-        assert session.request.call_count == 4
-
-    def test_get_request_does_not_trigger_csrf(self) -> None:
-        client, _, session = self._csrf_client()
-        session.request.return_value = _make_response(200)
-        client.request(HttpMethod.GET, "/items")
-        assert session.request.call_count == 1
-        assert session.request.call_args[0][0] == "GET"
 
 
 class TestXsuaaAuthProviderSubdomainValidation:

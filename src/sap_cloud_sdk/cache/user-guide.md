@@ -38,7 +38,7 @@ Call `configure_cache()` **once at startup**, before any SDK client is created. 
 | `expiry_buffer_seconds` | `int` | `30` | Subtracted from any TTL before storing, to pre-invalidate entries. |
 | `max_size` | `int` | `1000` | Maximum entries in the built-in backend before LRU eviction. |
 | `backend` | `CacheBackend \| None` | `None` | Custom backend. `None` uses the built-in `InMemoryLRUBackend`. |
-| `on_evict` | `Callable[[str, str], None] \| None` | `None` | Callback fired on eviction. Arguments: `(key, reason)` where reason is `"lru"` or `"manual"`. |
+| `on_evict` | `Callable[[str, str], None] \| None` | `None` | Callback fired on eviction. Arguments: `(key, reason)` where reason is `"lru"`, `"ttl"`, or `"manual"`. |
 
 ## Isolation Strategy
 
@@ -118,7 +118,7 @@ The backend interface has exactly four methods and no awareness of tenants, TTL 
 
 ## Integration Example
 
-For a real, in-tree example of how the cache is used, see the CSRF token handling in the core HTTP client (`sap_cloud_sdk.core.protocol.http.client.HttpClient`, opt-in via `csrf_enabled=True`). It uses `IsolationStrategy.PROVIDER` to cache a service-wide CSRF token, injects it on mutating requests, and evicts-and-refetches on a `403`.
+For a real, in-tree example of how the cache is used, see `XsuaaAuthProvider` in `sap_cloud_sdk.core.protocol.http.models`. It uses `IsolationStrategy.TENANT` to cache OAuth2 sessions per tenant, with TTL derived from the token's `expires_in` field and automatic eviction on secret rotation.
 
 ## API Reference
 

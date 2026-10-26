@@ -2,6 +2,7 @@
 
 import base64
 import json
+import logging
 import pytest
 from unittest.mock import MagicMock, patch
 
@@ -340,7 +341,6 @@ class TestIASContextProvider:
         assert ctx.get(USER_ID) is None
 
     def test_auto_configure_warns_when_no_binding(self, caplog):
-        import logging
         with caplog.at_level(logging.WARNING, logger="sap_cloud_sdk"):
             with patch(_PATCH_FROM_ENV, side_effect=IASConfigError("no binding")):
                 provider = IASContextProvider()
@@ -348,7 +348,6 @@ class TestIASContextProvider:
         assert any("IASContextProvider" in r.message for r in caplog.records)
 
     def test_infra_error_logs_warning_not_debug(self, caplog):
-        import logging
         def _infra_fail(auth: str) -> VerifiedIASClaims:
             raise ConnectionError("DNS failure")
         envelope = _make_envelope({"authorization": "Bearer tok"})

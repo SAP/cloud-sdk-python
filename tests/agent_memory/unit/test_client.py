@@ -75,30 +75,38 @@ def _make_subscriber_client(
 
 
 class TestCreateClient:
-
     def test_uses_provided_config(self):
         """Factory with explicit config creates a client successfully."""
         config = AgentMemoryConfig(base_url="http://localhost:3000")
         with patch("sap_cloud_sdk.agent_memory._build_agent_memory_http") as mock_build:
-            mock_build.return_value = Mock(spec=HttpClient)
-            client = create_client(config=config, access_strategy=AccessStrategy.PROVIDER)
+            mock_build.return_value = (Mock(spec=HttpClient), False)
+            client = create_client(
+                config=config, access_strategy=AccessStrategy.PROVIDER
+            )
         assert isinstance(client, AgentMemoryClient)
         assert client._http is not None
 
     def test_subscriber_strategy_loads_default_binding(self, monkeypatch):
         """Factory with SUBSCRIBER loads the default binding (native implementation)."""
         import json
+
         monkeypatch.setenv(
             "CLOUD_SDK_CFG_HANA_AGENT_MEMORY_DEFAULT_APPLICATION_URL",
             "http://memory.example.com",
         )
         monkeypatch.setenv(
             "CLOUD_SDK_CFG_HANA_AGENT_MEMORY_DEFAULT_UAA",
-            json.dumps({"url": "http://auth.example.com", "clientid": "c", "clientsecret": "s",
-                        "identityzone": "provider-zone"}),
+            json.dumps(
+                {
+                    "url": "http://auth.example.com",
+                    "clientid": "c",
+                    "clientsecret": "s",
+                    "identityzone": "provider-zone",
+                }
+            ),
         )
         with patch("sap_cloud_sdk.agent_memory._build_agent_memory_http") as mock_build:
-            mock_build.return_value = Mock(spec=HttpClient)
+            mock_build.return_value = (Mock(spec=HttpClient), False)
             client = create_client(
                 access_strategy=AccessStrategy.SUBSCRIBER,
                 tenant="acme-corp",
@@ -109,28 +117,57 @@ class TestCreateClient:
     def test_provider_strategy_loads_default_binding(self, monkeypatch):
         """Factory with PROVIDER loads the default binding."""
         import json
+
         monkeypatch.setenv(
             "CLOUD_SDK_CFG_HANA_AGENT_MEMORY_DEFAULT_APPLICATION_URL",
             "http://memory.example.com",
         )
         monkeypatch.setenv(
             "CLOUD_SDK_CFG_HANA_AGENT_MEMORY_DEFAULT_UAA",
-            json.dumps({"url": "http://auth.example.com", "clientid": "c", "clientsecret": "s"}),
+            json.dumps(
+                {"url": "http://auth.example.com", "clientid": "c", "clientsecret": "s"}
+            ),
         )
         with patch("sap_cloud_sdk.agent_memory._build_agent_memory_http") as mock_build:
-            mock_build.return_value = Mock(spec=HttpClient)
+            mock_build.return_value = (Mock(spec=HttpClient), False)
             client = create_client(access_strategy=AccessStrategy.PROVIDER)
         assert isinstance(client, AgentMemoryClient)
         assert client._http is not None
+
+    def test_url_only_binding_auto_detects_ias(self):
+        """URL-only binding (no token_url) auto-selects IAS: no tenant/strategy needed."""
+        config = AgentMemoryConfig(base_url="http://memory.example.com")
+        with patch("sap_cloud_sdk.agent_memory._build_agent_memory_http") as mock_build:
+            mock_build.return_value = (Mock(spec=HttpClient), True)  # is_ias=True
+            client = create_client(config=config)  # defaults: SUBSCRIBER, no tenant
+        # IAS auto-detect: no raise despite no tenant, and no subscriber tenant stored.
+        assert isinstance(client, AgentMemoryClient)
+        assert client._tenant is None
+
+    def test_url_only_binding_does_not_warn_as_provider(self, caplog):
+        """IAS auto-detect must not emit the PROVIDER warning."""
+        config = AgentMemoryConfig(base_url="http://memory.example.com")
+        with patch("sap_cloud_sdk.agent_memory._build_agent_memory_http") as mock_build:
+            mock_build.return_value = (Mock(spec=HttpClient), True)  # is_ias=True
+            create_client(config=config)
+        assert "PROVIDER" not in caplog.text
+
+    def test_xsuaa_binding_still_requires_tenant_for_subscriber(self):
+        """A binding with token_url keeps the SUBSCRIBER tenant requirement."""
+        config = AgentMemoryConfig(
+            base_url="http://memory.example.com",
+            token_url="http://auth.example.com/oauth/token",
+            client_id="c",
+            client_secret="s",
+        )
+        with pytest.raises(AgentMemoryConfigError, match="tenant"):
+            create_client(config=config, access_strategy=AccessStrategy.SUBSCRIBER)
 
 
 # ── Access strategy and per-tenant transport routing ─────────────────────────
 
 
-class TestAccessStrategy:
-
-    # ── Construction-time validation ───────────────────────────────────────────
-
+class TestAccessStrategyTransportRouting:
     def test_subscriber_without_tenant_raises_at_construction(self):
         """SUBSCRIBER without tenant raises AgentMemoryValidationError at construction."""
         http = Mock(spec=HttpClient)
@@ -152,18 +189,30 @@ class TestAccessStrategy:
     def test_client_default_subscriber_uses_subscriber_transport(self):
         """Client with SUBSCRIBER default uses the provided HttpClient."""
         client, mock_http = _make_subscriber_client("acme")
-        mock_http.request.return_value = _make_response(200, json_data={
-            "id": "m1", "agentID": "a", "invokerID": "u", "content": "x",
-        })
+        mock_http.request.return_value = _make_response(
+            200,
+            json_data={
+                "id": "m1",
+                "agentID": "a",
+                "invokerID": "u",
+                "content": "x",
+            },
+        )
         client.add_memory("a", "u", "x")
         mock_http.request.assert_called_once()
 
     def test_provider_only_uses_provider_transport(self):
         """PROVIDER uses the provided HttpClient."""
         client, mock_http = _make_client()
-        mock_http.request.return_value = _make_response(200, json_data={
-            "id": "m1", "agentID": "a", "invokerID": "u", "content": "x",
-        })
+        mock_http.request.return_value = _make_response(
+            200,
+            json_data={
+                "id": "m1",
+                "agentID": "a",
+                "invokerID": "u",
+                "content": "x",
+            },
+        )
         client.add_memory("a", "u", "x")
         mock_http.request.assert_called_once()
 
@@ -206,9 +255,15 @@ class TestAccessStrategy:
     def test_subscriber_passes_tenant_to_transport(self):
         """SUBSCRIBER client passes tenant_subdomain to the HTTP layer on every call."""
         client, mock_http = _make_subscriber_client("acme")
-        mock_http.request.return_value = _make_response(200, json_data={
-            "id": "m1", "agentID": "a", "invokerID": "u", "content": "x",
-        })
+        mock_http.request.return_value = _make_response(
+            200,
+            json_data={
+                "id": "m1",
+                "agentID": "a",
+                "invokerID": "u",
+                "content": "x",
+            },
+        )
 
         client.add_memory("a", "u", "x")
 
@@ -217,9 +272,15 @@ class TestAccessStrategy:
     def test_provider_passes_none_tenant_to_transport(self):
         """PROVIDER client passes tenant_subdomain=None to the HTTP layer."""
         client, mock_http = _make_client()
-        mock_http.request.return_value = _make_response(200, json_data={
-            "id": "m1", "agentID": "a", "invokerID": "u", "content": "x",
-        })
+        mock_http.request.return_value = _make_response(
+            200,
+            json_data={
+                "id": "m1",
+                "agentID": "a",
+                "invokerID": "u",
+                "content": "x",
+            },
+        )
 
         client.add_memory("a", "u", "x")
 
@@ -242,13 +303,16 @@ class TestMemoryCRUD:
     def test_add_memory_posts_correct_payload(self):
         """add_memory sends required and optional fields in the POST body."""
         client, mock_http = _make_client()
-        mock_http.request.return_value = _make_response(200, json_data={
-            "id": "mem-1",
-            "agentID": "agent-a",
-            "invokerID": "user-b",
-            "content": "some memory",
-            "createType": "DIRECT",
-        })
+        mock_http.request.return_value = _make_response(
+            200,
+            json_data={
+                "id": "mem-1",
+                "agentID": "agent-a",
+                "invokerID": "user-b",
+                "content": "some memory",
+                "createType": "DIRECT",
+            },
+        )
 
         memory = client.add_memory("agent-a", "user-b", "some memory")
 
@@ -263,9 +327,15 @@ class TestMemoryCRUD:
     def test_add_memory_with_metadata(self):
         """Optional metadata is included in the POST body when provided."""
         client, mock_http = _make_client()
-        mock_http.request.return_value = _make_response(200, json_data={
-            "id": "mem-1", "agentID": "a", "invokerID": "u", "content": "x",
-        })
+        mock_http.request.return_value = _make_response(
+            200,
+            json_data={
+                "id": "mem-1",
+                "agentID": "a",
+                "invokerID": "u",
+                "content": "x",
+            },
+        )
 
         client.add_memory("a", "u", "x", metadata={"key": "val"})
 
@@ -274,9 +344,15 @@ class TestMemoryCRUD:
     def test_add_memory_excludes_none_optionals(self):
         """None-valued optional fields are omitted from the POST body."""
         client, mock_http = _make_client()
-        mock_http.request.return_value = _make_response(200, json_data={
-            "id": "mem-1", "agentID": "a", "invokerID": "u", "content": "x",
-        })
+        mock_http.request.return_value = _make_response(
+            200,
+            json_data={
+                "id": "mem-1",
+                "agentID": "a",
+                "invokerID": "u",
+                "content": "x",
+            },
+        )
 
         client.add_memory("a", "u", "x")
 
@@ -287,9 +363,15 @@ class TestMemoryCRUD:
     def test_add_memory_posts_to_memories_endpoint(self):
         """add_memory sends the POST to the MEMORIES endpoint."""
         client, mock_http = _make_client()
-        mock_http.request.return_value = _make_response(200, json_data={
-            "id": "mem-1", "agentID": "a", "invokerID": "u", "content": "x",
-        })
+        mock_http.request.return_value = _make_response(
+            200,
+            json_data={
+                "id": "mem-1",
+                "agentID": "a",
+                "invokerID": "u",
+                "content": "x",
+            },
+        )
 
         client.add_memory("a", "u", "x")
 
@@ -299,9 +381,15 @@ class TestMemoryCRUD:
     def test_get_memory_calls_get_with_memory_id(self):
         """get_memory constructs the correct path with the memory ID."""
         client, mock_http = _make_client()
-        mock_http.request.return_value = _make_response(200, json_data={
-            "id": "mem-1", "agentID": "a", "invokerID": "u", "content": "hello",
-        })
+        mock_http.request.return_value = _make_response(
+            200,
+            json_data={
+                "id": "mem-1",
+                "agentID": "a",
+                "invokerID": "u",
+                "content": "hello",
+            },
+        )
 
         memory = client.get_memory("mem-1")
 
@@ -357,11 +445,19 @@ class TestListMemories:
     def test_returns_list_of_memories(self):
         """list_memories returns a list of Memory objects."""
         client, mock_http = _make_client()
-        mock_http.request.return_value = _make_response(200, json_data={
-            "value": [
-                {"id": "m1", "agentID": "a", "invokerID": "u", "content": "memory 1"},
-            ],
-        })
+        mock_http.request.return_value = _make_response(
+            200,
+            json_data={
+                "value": [
+                    {
+                        "id": "m1",
+                        "agentID": "a",
+                        "invokerID": "u",
+                        "content": "memory 1",
+                    },
+                ],
+            },
+        )
 
         memories = client.list_memories(agent_id="a", invoker_id="u")
 
@@ -502,7 +598,9 @@ class TestCountMemories:
     def test_returns_count_from_response(self):
         """count_memories returns the @odata.count value."""
         client, mock_http = _make_client()
-        mock_http.request.return_value = _make_response(200, json_data={"value": [], "@odata.count": 42})
+        mock_http.request.return_value = _make_response(
+            200, json_data={"value": [], "@odata.count": 42}
+        )
 
         total = client.count_memories(agent_id="a", invoker_id="u")
 
@@ -511,7 +609,9 @@ class TestCountMemories:
     def test_sends_top_0_and_count_true(self):
         """count_memories uses $top=0 and $count=true."""
         client, mock_http = _make_client()
-        mock_http.request.return_value = _make_response(200, json_data={"value": [], "@odata.count": 0})
+        mock_http.request.return_value = _make_response(
+            200, json_data={"value": [], "@odata.count": 0}
+        )
 
         client.count_memories()
 
@@ -522,7 +622,9 @@ class TestCountMemories:
     def test_passes_filter_when_agent_and_invoker_provided(self):
         """count_memories forwards agent_id and invoker_id as $filter."""
         client, mock_http = _make_client()
-        mock_http.request.return_value = _make_response(200, json_data={"value": [], "@odata.count": 3})
+        mock_http.request.return_value = _make_response(
+            200, json_data={"value": [], "@odata.count": 3}
+        )
 
         client.count_memories(agent_id="agt", invoker_id="usr")
 
@@ -547,24 +649,27 @@ class TestSearchMemories:
     def test_returns_results_in_api_order(self):
         """search_memories returns results in the order returned by the API."""
         client, mock_http = _make_client()
-        mock_http.request.return_value = _make_response(200, json_data={
-            "value": [
-                {
-                    "id": "m1",
-                    "agentID": "a",
-                    "invokerID": "u",
-                    "content": "first",
-                    "similarity": 0.5,
-                },
-                {
-                    "id": "m2",
-                    "agentID": "a",
-                    "invokerID": "u",
-                    "content": "second",
-                    "similarity": 0.9,
-                },
-            ]
-        })
+        mock_http.request.return_value = _make_response(
+            200,
+            json_data={
+                "value": [
+                    {
+                        "id": "m1",
+                        "agentID": "a",
+                        "invokerID": "u",
+                        "content": "first",
+                        "similarity": 0.5,
+                    },
+                    {
+                        "id": "m2",
+                        "agentID": "a",
+                        "invokerID": "u",
+                        "content": "second",
+                        "similarity": 0.9,
+                    },
+                ]
+            },
+        )
 
         results = client.search_memories("a", "u", "test query")
 
@@ -618,14 +723,17 @@ class TestMessageCRUD:
     def test_add_message_posts_correct_payload(self):
         """add_message sends required fields in the POST body."""
         client, mock_http = _make_client()
-        mock_http.request.return_value = _make_response(200, json_data={
-            "id": "msg-1",
-            "agentID": "agent-a",
-            "invokerID": "user-b",
-            "messageGroup": "conv-1",
-            "role": "USER",
-            "content": "Hello!",
-        })
+        mock_http.request.return_value = _make_response(
+            200,
+            json_data={
+                "id": "msg-1",
+                "agentID": "agent-a",
+                "invokerID": "user-b",
+                "messageGroup": "conv-1",
+                "role": "USER",
+                "content": "Hello!",
+            },
+        )
 
         message = client.add_message(
             "agent-a",
@@ -648,10 +756,17 @@ class TestMessageCRUD:
     def test_add_message_posts_to_messages_endpoint(self):
         """add_message sends the POST to the MESSAGES endpoint."""
         client, mock_http = _make_client()
-        mock_http.request.return_value = _make_response(200, json_data={
-            "id": "msg-1", "agentID": "a", "invokerID": "u",
-            "messageGroup": "g", "role": "USER", "content": "hi",
-        })
+        mock_http.request.return_value = _make_response(
+            200,
+            json_data={
+                "id": "msg-1",
+                "agentID": "a",
+                "invokerID": "u",
+                "messageGroup": "g",
+                "role": "USER",
+                "content": "hi",
+            },
+        )
 
         client.add_message("a", "u", "g", MessageRole.USER, "hi")
 
@@ -661,11 +776,18 @@ class TestMessageCRUD:
     def test_add_message_with_metadata(self):
         """Optional metadata is included when provided."""
         client, mock_http = _make_client()
-        mock_http.request.return_value = _make_response(200, json_data={
-            "id": "msg-1", "agentID": "a", "invokerID": "u",
-            "messageGroup": "g", "role": "USER", "content": "hi",
-            "metadata": {"key": "val"},
-        })
+        mock_http.request.return_value = _make_response(
+            200,
+            json_data={
+                "id": "msg-1",
+                "agentID": "a",
+                "invokerID": "u",
+                "messageGroup": "g",
+                "role": "USER",
+                "content": "hi",
+                "metadata": {"key": "val"},
+            },
+        )
 
         client.add_message(
             "a", "u", "g", MessageRole.USER, "hi", metadata={"key": "val"}
@@ -676,10 +798,17 @@ class TestMessageCRUD:
     def test_add_message_excludes_none_metadata(self):
         """None-valued metadata is omitted from the POST body."""
         client, mock_http = _make_client()
-        mock_http.request.return_value = _make_response(200, json_data={
-            "id": "msg-1", "agentID": "a", "invokerID": "u",
-            "messageGroup": "g", "role": "USER", "content": "hi",
-        })
+        mock_http.request.return_value = _make_response(
+            200,
+            json_data={
+                "id": "msg-1",
+                "agentID": "a",
+                "invokerID": "u",
+                "messageGroup": "g",
+                "role": "USER",
+                "content": "hi",
+            },
+        )
 
         client.add_message("a", "u", "g", MessageRole.USER, "hi")
 
@@ -688,10 +817,17 @@ class TestMessageCRUD:
     def test_get_message_calls_get_with_message_id(self):
         """get_message constructs the correct path with the message ID."""
         client, mock_http = _make_client()
-        mock_http.request.return_value = _make_response(200, json_data={
-            "id": "msg-1", "agentID": "a", "invokerID": "u",
-            "messageGroup": "g", "role": "USER", "content": "hi",
-        })
+        mock_http.request.return_value = _make_response(
+            200,
+            json_data={
+                "id": "msg-1",
+                "agentID": "a",
+                "invokerID": "u",
+                "messageGroup": "g",
+                "role": "USER",
+                "content": "hi",
+            },
+        )
 
         message = client.get_message("msg-1")
 
@@ -717,18 +853,21 @@ class TestListMessages:
     def test_returns_list_of_messages(self):
         """list_messages returns a list of Message objects."""
         client, mock_http = _make_client()
-        mock_http.request.return_value = _make_response(200, json_data={
-            "value": [
-                {
-                    "id": "msg-1",
-                    "agentID": "a",
-                    "invokerID": "u",
-                    "messageGroup": "g",
-                    "role": "USER",
-                    "content": "hi",
-                },
-            ],
-        })
+        mock_http.request.return_value = _make_response(
+            200,
+            json_data={
+                "value": [
+                    {
+                        "id": "msg-1",
+                        "agentID": "a",
+                        "invokerID": "u",
+                        "messageGroup": "g",
+                        "role": "USER",
+                        "content": "hi",
+                    },
+                ],
+            },
+        )
 
         messages = client.list_messages(agent_id="a", invoker_id="u")
 
@@ -884,12 +1023,17 @@ class TestRetentionConfig:
     def test_get_retention_config(self):
         """get_retention_config sends GET to the retentionConfig endpoint."""
         client, mock_http = _make_client()
-        mock_http.request.return_value = _make_response(200, json_data={
-            "id": 1, "messageDays": 30, "memoryDays": 90,
-            "usageLogDays": 180,
-            "createTimestamp": "2025-01-01T00:00:00Z",
-            "updateTimestamp": "2025-01-02T00:00:00Z",
-        })
+        mock_http.request.return_value = _make_response(
+            200,
+            json_data={
+                "id": 1,
+                "messageDays": 30,
+                "memoryDays": 90,
+                "usageLogDays": 180,
+                "createTimestamp": "2025-01-01T00:00:00Z",
+                "updateTimestamp": "2025-01-02T00:00:00Z",
+            },
+        )
 
         rc = client.get_retention_config()
 
@@ -926,12 +1070,22 @@ class TestRetentionConfig:
         assert payload["memoryDays"] == 90
         assert payload["usageLogDays"] == 180
 
+    def test_update_retention_config_thread_days(self):
+        """update_retention_config sends threadDays when provided."""
+        client, mock_http = _make_client()
+        mock_http.request.return_value = _make_response(204, content=b"")
+
+        client.update_retention_config(thread_days=45)
+
+        payload = mock_http.request.call_args[1]["json"]
+        assert payload["threadDays"] == 45
+        assert "messageDays" not in payload
+
 
 # ── Context manager ───────────────────────────────────────────────────────────
 
 
 class TestContextManager:
-
     def test_close_delegates_to_http(self):
         """close() delegates to the HttpClient's close method."""
         client, mock_http = _make_client()
@@ -1158,3 +1312,106 @@ class TestFilterDefinitionValidation:
             client.list_messages(
                 filters=[FilterDefinition(target="metadata", contains="")],
             )
+
+
+# ── IAS mode: per-request token guard ──────────────────────────────────────────
+
+
+class TestIASMode:
+    """IAS-mode client raises before dispatch when no token is in context."""
+
+    def _make_ias_client(self) -> tuple[AgentMemoryClient, Mock]:
+        http = Mock(spec=HttpClient)
+        http.request.return_value = _make_response(200)
+        return AgentMemoryClient(http, _ias_mode=True), http
+
+    def test_request_raises_without_ias_token(self):
+        """No IAS_TOKEN in context → AgentMemoryValidationError, no HTTP call."""
+        from sap_cloud_sdk.core.runtime_context._context import sdk_context
+        from sap_cloud_sdk.core.runtime_context import RuntimeContext
+
+        client, http = self._make_ias_client()
+        with sdk_context(RuntimeContext({})):
+            with pytest.raises(AgentMemoryValidationError, match=r"bootstrap\(app\)"):
+                client.list_memories()
+        http.request.assert_not_called()
+
+    def test_request_succeeds_with_ias_token(self):
+        """IAS_TOKEN present → guard passes, request is dispatched."""
+        from sap_cloud_sdk.core.runtime_context._context import sdk_context
+        from sap_cloud_sdk.core.runtime_context import RuntimeContext
+        from sap_cloud_sdk.core.runtime_context.providers._ias import IAS_TOKEN
+
+        client, http = self._make_ias_client()
+        http.request.return_value = _make_response(200, json_data={"value": []})
+        with sdk_context(RuntimeContext({IAS_TOKEN: "ias-token-xyz"})):
+            client.list_memories()
+        http.request.assert_called_once()
+
+
+# ---------------------------------------------------------------------------
+# XSUAA config validation
+# ---------------------------------------------------------------------------
+
+
+class TestXsuaaConfigValidation:
+    """Construction-time XSUAA credential and access strategy validation."""
+
+    def test_partial_xsuaa_config_raises_at_construction(self):
+        """Partial XSUAA creds (token_url only) must raise AgentMemoryConfigError."""
+        from sap_cloud_sdk.agent_memory.config import AgentMemoryConfig
+        from sap_cloud_sdk.agent_memory.exceptions import AgentMemoryConfigError
+
+        with pytest.raises(AgentMemoryConfigError, match="Partial XSUAA"):
+            AgentMemoryConfig(
+                base_url="http://memory.example.com",
+                token_url="http://auth.example.com/oauth/token",
+                # client_id and client_secret deliberately omitted
+            )
+
+    def test_full_xsuaa_config_constructs_successfully(self):
+        """Full XSUAA creds must not raise."""
+        from sap_cloud_sdk.agent_memory.config import AgentMemoryConfig
+
+        cfg = AgentMemoryConfig(
+            base_url="http://memory.example.com",
+            token_url="http://auth.example.com/oauth/token",
+            client_id="cid",
+            client_secret="csecret",
+        )
+        assert cfg.token_url is not None
+
+    def test_ias_only_config_constructs_successfully(self):
+        """URL-only IAS config (no XSUAA creds) must not raise."""
+        from sap_cloud_sdk.agent_memory.config import AgentMemoryConfig
+
+        cfg = AgentMemoryConfig(base_url="http://memory.example.com")
+        assert cfg.token_url is None
+        assert cfg.client_id is None
+        assert cfg.client_secret is None
+
+    def test_xsuaa_subscriber_with_tenant_emits_no_provider_warning(self, caplog):
+        """XSUAA SUBSCRIBER with tenant must not emit the PROVIDER warning."""
+        import logging
+
+        http = Mock(spec=HttpClient)
+        with caplog.at_level(logging.WARNING):
+            AgentMemoryClient(
+                http,
+                access_strategy=AccessStrategy.SUBSCRIBER,
+                tenant="my-tenant",
+            )
+        assert not any("PROVIDER" in r.message for r in caplog.records)
+
+    def test_xsuaa_provider_without_ias_mode_emits_warning(self, caplog):
+        """XSUAA PROVIDER strategy (non-IAS) warns once at construction."""
+        import logging
+
+        http = Mock(spec=HttpClient)
+        with caplog.at_level(logging.WARNING):
+            AgentMemoryClient(
+                http,
+                access_strategy=AccessStrategy.PROVIDER,
+                _ias_mode=False,
+            )
+        assert any("PROVIDER is active" in r.message for r in caplog.records)

@@ -33,6 +33,7 @@ from sap_cloud_sdk.core.runtime_context._registry import (
 from sap_cloud_sdk.core.runtime_context.providers._ias import (
     APP_TENANT_ID,
     GLOBAL_TENANT_ID,
+    IAS_TOKEN,
     USER_ID,
 )
 from sap_cloud_sdk.core.runtime_context.starlette import _merge
@@ -270,13 +271,6 @@ class TestIASContextProvider:
             ctx = IASContextProvider().extract(envelope)
         assert ctx.get(GLOBAL_TENANT_ID) == "g-1"
 
-    def test_returns_empty_context_when_no_auth_header(self):
-        envelope = _make_envelope({})
-        ctx = IASContextProvider().extract(envelope)
-        assert ctx.get(APP_TENANT_ID) is None
-        assert ctx.get(USER_ID) is None
-        assert ctx.get(GLOBAL_TENANT_ID) is None
-
     def test_returns_empty_context_on_parse_error(self):
         envelope = _make_envelope({"authorization": "Bearer bad"})
         with patch(_PATCH_PARSE, side_effect=ValueError("bad")):
@@ -295,9 +289,32 @@ class TestIASContextProvider:
     def test_satisfies_context_provider_protocol(self):
         assert isinstance(IASContextProvider(), ContextProvider)
 
+    def test_stores_raw_bearer_token(self):
+        claims = _make_claims(app_tid="t-1", user_uuid="u-1")
+        envelope = _make_envelope({"authorization": "Bearer my-token-123"})
+        with patch(_PATCH_PARSE, return_value=claims):
+            ctx = IASContextProvider().extract(envelope)
+        assert ctx.get(IAS_TOKEN) == "my-token-123"
 
-# ---------------------------------------------------------------------------
-# SAPTriggerContextProvider
+    def test_stores_raw_bearer_token_on_parse_error(self):
+        envelope = _make_envelope({"authorization": "Bearer bad-jwt"})
+        with patch(_PATCH_PARSE, side_effect=ValueError("bad")):
+            ctx = IASContextProvider().extract(envelope)
+        assert ctx.get(IAS_TOKEN) == "bad-jwt"
+        assert ctx.get(APP_TENANT_ID) is None
+
+    def test_no_ias_token_when_no_auth_header(self):
+        envelope = _make_envelope({})
+        ctx = IASContextProvider().extract(envelope)
+        assert ctx.get(IAS_TOKEN) is None
+
+    def test_returns_empty_context_when_no_auth_header(self):
+        envelope = _make_envelope({})
+        ctx = IASContextProvider().extract(envelope)
+        assert ctx.get(APP_TENANT_ID) is None
+        assert ctx.get(USER_ID) is None
+        assert ctx.get(GLOBAL_TENANT_ID) is None
+        assert ctx.get(IAS_TOKEN) is None
 # ---------------------------------------------------------------------------
 
 

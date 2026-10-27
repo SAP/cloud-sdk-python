@@ -285,3 +285,24 @@ class TestLoadConfigForInstance:
 
         assert config.base_url == "https://acme-corp.memory.example.com"
         assert config.client_id == "acme-client"
+
+
+class TestAgentMemoryPathTraversal:
+    """agent_memory inherits resolver path-traversal protection."""
+
+    _BAD = ["../default", "../../etc", "/etc/passwd", "foo/bar", "..", "a\x00b"]
+
+    @pytest.mark.parametrize("bad", _BAD)
+    def test_bad_instance_rejected(self, bad):
+        # Resolver raises ValueError("instance ..."); config wraps it in
+        # AgentMemoryConfigError. Either way, the bad value is rejected.
+        with pytest.raises((ValueError, AgentMemoryConfigError), match="instance"):
+            _load_config_for_instance(bad)
+
+    def test_bad_instance_reads_no_files(self):
+        def _spy_open(*args, **kwargs):
+            raise AssertionError("open() must not be called for a rejected value")
+
+        with patch("builtins.open", side_effect=_spy_open):
+            with pytest.raises((ValueError, AgentMemoryConfigError), match="instance"):
+                _load_config_for_instance("../../etc")

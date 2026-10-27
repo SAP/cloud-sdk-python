@@ -17,6 +17,8 @@ from __future__ import annotations
 from dataclasses import fields, is_dataclass
 from typing import Any, Protocol, runtime_checkable
 
+from sap_cloud_sdk.core.secret_resolver._validation import _validate_inputs
+
 
 @runtime_checkable
 class Resolver(Protocol):
@@ -67,6 +69,7 @@ class ChainedResolver:
 
     def resolve(self, module: str, instance: str, target: Any) -> None:
         """Try each resolver in order; raise on total failure."""
+        _validate_inputs(module, instance)
         if not is_dataclass(target) or isinstance(target, type):
             raise TypeError("target must be a dataclass instance")
         for f in fields(target):

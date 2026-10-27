@@ -8,11 +8,18 @@ from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 
-from sap_cloud_sdk.core.auditlog_ng.client import AuditClient, _fill_common_from_auth_context
+from sap_cloud_sdk.core.auditlog_ng.client import (
+    AuditClient,
+    _fill_common_from_auth_context,
+)
 from sap_cloud_sdk.core.auditlog_ng.config import AuditLogNGConfig, SCHEMA_URL
 from sap_cloud_sdk.core.auditlog_ng.exceptions import ValidationError
 from sap_cloud_sdk.core.auditlog_ng.gen.sap.auditlog.auditevent.v2 import auditevent_pb2 as pb
 from sap_cloud_sdk.core.telemetry import Module, Operation
+from sap_cloud_sdk.core.telemetry.constants import (
+    ATTR_SAP_QOS_CLASS,
+    QOS_CLASS_AT_LEAST_ONCE,
+)
 from sap_cloud_sdk.ias._context import set_auth_context
 
 
@@ -177,6 +184,7 @@ class TestAuditClientSend:
                 == "application/protobuf"
             )
             assert kwargs["attributes"]["sap.tenancy.tenant_id"] == "tenant-123"
+            assert kwargs["attributes"][ATTR_SAP_QOS_CLASS] == QOS_CLASS_AT_LEAST_ONCE
             assert "cloudevents.event_id" in kwargs["attributes"]
         finally:
             patcher.stop()

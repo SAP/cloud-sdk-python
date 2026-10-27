@@ -8,6 +8,39 @@ import pytest
 from sap_cloud_sdk.core.secret_resolver import read_from_mount_and_fallback_to_env_var
 
 
+BAD_INSTANCE_VALUES = [
+    "../default",
+    "../../etc",
+    "/etc/passwd",
+    "C:\\Windows",
+    "C:/Windows",
+    "\\\\server\\share",
+    "foo/bar",
+    "foo\\bar",
+    "foo\x00bar",
+    "foo\x01bar",
+    ".",
+    "..",
+    "a" * 256,
+]
+
+BAD_MODULE_VALUES = [
+    "../sibling",
+    "/abs/path",
+    "foo/bar",
+    "..",
+]
+
+GOOD_VALUES = [
+    "default",
+    "hana-agent-memory",
+    "aicore-instance",
+    "my-tenant-us10",
+    "foo.bar",
+    "hr-advisor-destination-instance",
+]
+
+
 @dataclass
 class SampleConfig:
     username: str = field(default="", metadata={"secret": "user"})
@@ -255,3 +288,69 @@ class TestSecretResolver:
         assert config.username == "legacy_user"
         assert config.password == "legacy_pass"
         assert config.endpoint == "legacy_ep"
+
+
+class TestPathComponentValidation:
+
+    @pytest.mark.parametrize("bad", BAD_INSTANCE_VALUES)
+    def test_bad_instance_raises_value_error(self, bad):
+        config = SampleConfig()
+        with pytest.raises(ValueError, match="instance"):
+            read_from_mount_and_fallback_to_env_var("/path", "VAR", "module", bad, config)
+
+    @pytest.mark.parametrize("bad", BAD_MODULE_VALUES)
+    def test_bad_module_raises_value_error(self, bad):
+        config = SampleConfig()
+        with pytest.raises(ValueError, match="module"):
+            read_from_mount_and_fallback_to_env_var("/path", "VAR", bad, "instance", config)
+
+    @pytest.mark.parametrize("good", GOOD_VALUES)
+    def test_valid_identifier_passes_validation(self, good):
+        # Valid names pass component validation; the call still fails because
+        # /nonexistent has no mount and no env var is set (RuntimeError, not ValueError).
+        config = SampleConfig()
+        with patch("os.path.isdir", return_value=False), \
+             patch("os.stat", side_effect=FileNotFoundError()), \
+             patch.dict(os.environ, {}, clear=True):
+            with pytest.raises(RuntimeError):
+                read_from_mount_and_fallback_to_env_var("/nonexistent", "VAR", "module", good, config)
+
+    @patch.dict(os.environ, {
+        "VAR_MODULE_X_USER": "leaked",
+        "VAR_MODULE_X_PASSWORD": "leaked",
+        "VAR_MODULE_X_ENDPOINT": "leaked",
+    })
+    def test_rejected_value_reads_no_files_and_no_env_fallback(self):
+        # A rejected instance must short-circuit before any file read AND before
+        # the environment-variable fallback runs.
+        opened: list = []
+
+        def _spy_open(*args, **kwargs):
+            opened.append(args[0])
+            raise AssertionError("open() must not be called for a rejected value")
+
+        config = SampleConfig()
+        with patch("builtins.open", side_effect=_spy_open):
+            with pytest.raises(ValueError, match="instance"):
+                read_from_mount_and_fallback_to_env_var(
+                    "/path", "VAR", "module", "../../x", config
+                )
+        assert opened == []
+        # Env fallback did not populate the config despite matching env vars.
+        assert config.username == ""
+
+    def test_symlink_escaping_base_is_rejected(self, tmp_path):
+        # A symlinked instance dir that points outside the mount root must be rejected
+        # at open-time by the containment check.
+        base = tmp_path / "appfnd"
+        module_dir = base / "module"
+        module_dir.mkdir(parents=True)
+        outside = tmp_path / "outside"
+        outside.mkdir()
+        (module_dir / "default").symlink_to(outside, target_is_directory=True)
+
+        config = SampleConfig()
+        with pytest.raises(RuntimeError, match="escapes trusted root"):
+            read_from_mount_and_fallback_to_env_var(
+                str(base), "VAR", "module", "default", config
+            )

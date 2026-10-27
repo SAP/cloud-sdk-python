@@ -6,6 +6,10 @@ import os
 from dataclasses import fields, is_dataclass
 from typing import Any, Dict, Tuple
 from .constants import BASE_MOUNT_PATH
+from ._validation import (
+    _validate_inputs,
+    _assert_within_base,
+)
 
 
 def resolve_base_mount(base_volume_mount: str = BASE_MOUNT_PATH) -> str:
@@ -24,14 +28,6 @@ def resolve_base_mount(base_volume_mount: str = BASE_MOUNT_PATH) -> str:
         The effective base path for secret mount resolution.
     """
     return os.environ.get("SERVICE_BINDING_ROOT", base_volume_mount)
-
-
-def _validate_inputs(module: str, instance: str) -> None:
-    """Validate module and instance inputs."""
-    if not isinstance(module, str) or not module.strip():
-        raise ValueError("module name cannot be empty")
-    if not isinstance(instance, str) or not instance.strip():
-        raise ValueError("instance name cannot be empty")
 
 
 def _validate_path(path: str) -> None:
@@ -112,6 +108,7 @@ def _load_from_mount(
         {base_volume_mount}/{module}/{instance}/{field_key}
     """
     secret_dir = os.path.join(base_volume_mount, module, instance)
+    _assert_within_base(base_volume_mount, secret_dir)
     _load_from_path(secret_dir, target)
 
 
@@ -169,7 +166,9 @@ def read_from_mount_and_fallback_to_env_var(
     # $ROOT/<module>/<field> before the legacy $ROOT/<module>/<instance>/<field> path.
     if os.environ.get("SERVICE_BINDING_ROOT") is not None:
         try:
-            _load_from_path(os.path.join(resolved_base_path, module), target)
+            flat_dir = os.path.join(resolved_base_path, module)
+            _assert_within_base(resolved_base_path, flat_dir)
+            _load_from_path(flat_dir, target)
             return
         except Exception as e:
             errors.append(f"mount failed: {e};")

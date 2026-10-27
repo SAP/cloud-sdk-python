@@ -1052,3 +1052,40 @@ class TestSetAICoreConfigDestinationMode:
             mock_create.return_value.get_destination.return_value = dest
             set_aicore_config()
         mock_filter.assert_called_once()
+
+
+class TestAicoreInstanceValidation:
+    """Path-traversal validation for aicore instance_name."""
+
+    BAD = ["../other", "../../etc", "/etc/passwd", "foo/bar", "foo\\bar", ".", "..", "a\x00b"]
+
+    @pytest.mark.parametrize("bad", BAD)
+    def test_get_secret_rejects_bad_instance(self, bad):
+        with pytest.raises(ValueError, match="instance_name"):
+            _get_secret("AICORE_CLIENT_ID", "clientid", instance_name=bad)
+
+    @pytest.mark.parametrize("bad", BAD)
+    def test_get_aicore_base_url_rejects_bad_instance(self, bad):
+        with pytest.raises(ValueError, match="instance_name"):
+            _get_aicore_base_url(instance_name=bad)
+
+    @pytest.mark.parametrize("bad", BAD)
+    def test_get_secret_dir_mtime_rejects_bad_instance(self, bad):
+        from sap_cloud_sdk.aicore import _get_secret_dir_mtime
+
+        with pytest.raises(ValueError, match="instance_name"):
+            _get_secret_dir_mtime(instance_name=bad)
+
+    def test_get_secret_dir_mtime_rejects_symlink_escape(self, tmp_path):
+        from sap_cloud_sdk.aicore import _get_secret_dir_mtime
+
+        base = tmp_path / "root"
+        aicore = base / "aicore"
+        aicore.mkdir(parents=True)
+        outside = tmp_path / "outside"
+        outside.mkdir()
+        (aicore / "inst").symlink_to(outside, target_is_directory=True)
+
+        with patch("sap_cloud_sdk.aicore.resolve_base_mount", return_value=str(base)):
+            with pytest.raises(ValueError, match="escapes trusted root"):
+                _get_secret_dir_mtime(instance_name="inst")

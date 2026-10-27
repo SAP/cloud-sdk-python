@@ -11,6 +11,10 @@ import threading
 from typing import Optional
 
 from sap_cloud_sdk.core.secret_resolver import resolve_base_mount
+from sap_cloud_sdk.core.secret_resolver._validation import (
+    _assert_within_base,
+    _validate_path_component,
+)
 from sap_cloud_sdk.core.telemetry.metrics_decorator import record_metrics
 from sap_cloud_sdk.core.telemetry.module import Module
 from sap_cloud_sdk.core.telemetry.operation import Operation
@@ -72,7 +76,9 @@ def _get_secret(
 
     """
     resolved_base_path = resolve_base_mount()
+    _validate_path_component("instance_name", instance_name)
     secrets_base_path = f"{resolved_base_path}/aicore/{instance_name}"
+    _assert_within_base(f"{resolved_base_path}/aicore", secrets_base_path)
     secret_file_name = file_name if file_name else env_var_name
     secret_file_path = os.path.join(secrets_base_path, secret_file_name)
 
@@ -108,7 +114,9 @@ def _get_aicore_base_url(instance_name: str = "aicore-instance") -> str:
         Base URL for AI Core service
     """
     resolved_base_path = resolve_base_mount()
+    _validate_path_component("instance_name", instance_name)
     secrets_base_path = f"{resolved_base_path}/aicore/{instance_name}"
+    _assert_within_base(f"{resolved_base_path}/aicore", secrets_base_path)
     serviceurls_file = os.path.join(secrets_base_path, "serviceurls")
 
     # Try reading from serviceurls file
@@ -301,7 +309,10 @@ def _configure_direct_mode(instance_name: str) -> None:
 
 def _get_secret_dir_mtime(instance_name: str = "aicore-instance") -> float:
     """Return the mtime of the AI Core secret directory, or 0.0 if it does not exist."""
-    secret_dir = os.path.join(resolve_base_mount(), "aicore", instance_name)
+    _validate_path_component("instance_name", instance_name)
+    aicore_base = os.path.join(resolve_base_mount(), "aicore")
+    secret_dir = os.path.join(aicore_base, instance_name)
+    _assert_within_base(aicore_base, secret_dir)
     try:
         return os.stat(secret_dir).st_mtime
     except OSError:

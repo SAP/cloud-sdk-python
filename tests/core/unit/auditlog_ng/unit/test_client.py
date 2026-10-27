@@ -202,6 +202,7 @@ class TestAuditClientSend:
             assert (
                 kwargs["attributes"]["sap.auditlogging.mime_type"] == "application/json"
             )
+            assert kwargs["attributes"][ATTR_SAP_QOS_CLASS] == QOS_CLASS_AT_LEAST_ONCE
             assert isinstance(kwargs["body"], str)
         finally:
             patcher.stop()

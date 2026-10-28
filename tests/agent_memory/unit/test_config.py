@@ -210,3 +210,40 @@ class TestLoadConfigFromEnv:
         with patch("os.stat", side_effect=FileNotFoundError("no mount")):
             with pytest.raises(AgentMemoryConfigError, match="Failed to parse uaa JSON"):
                 _load_config_from_env()
+
+
+# ── Path-traversal propagation ────────────────────────────────────────────────
+
+class TestAgentMemoryPathTraversal:
+    """agent_memory inherits resolver path-traversal protection via ConfigFactory."""
+
+    _BAD = ["../default", "../../etc", "/etc/passwd", "foo/bar", "..", "a\x00b"]
+
+    @pytest.mark.parametrize("bad", _BAD)
+    def test_bad_instance_raises_on_factory_call(self, bad):
+        from sap_cloud_sdk.agent_memory.config import _make_config_factory
+
+        with pytest.raises(ValueError, match="instance"):
+            _make_config_factory(bad)()
+
+    def test_bad_instance_reads_no_files(self):
+        from sap_cloud_sdk.agent_memory.config import _make_config_factory
+
+        def _spy_open(*args, **kwargs):
+            raise AssertionError("open() must not be called for a rejected value")
+
+        with patch("builtins.open", side_effect=_spy_open):
+            with pytest.raises(ValueError, match="instance"):
+                _make_config_factory("../../etc")()
+
+    def test_valid_instance_passes_validation(self):
+        from sap_cloud_sdk.agent_memory.config import _make_config_factory
+
+        # Valid instance passes component validation; fails later because no
+        # mount/env is present (not a ValueError about the instance name).
+        with patch("os.path.isdir", return_value=False), \
+             patch("os.stat", side_effect=FileNotFoundError()), \
+             patch.dict("os.environ", {}, clear=True):
+            with pytest.raises(Exception) as exc:
+                _make_config_factory("default")()
+        assert "instance must be a single path component" not in str(exc.value)

@@ -196,6 +196,109 @@ class TestFetchAuthToken:
 
 
 # ============================================================
+# Test: _fetch_auth_token retry behaviour
+# ============================================================
+
+
+class TestFetchAuthTokenRetry:
+    """Tests for retry logic in _fetch_auth_token."""
+
+    def _make_dest(self, token="Bearer jwt", url="https://agw.example.com"):
+        dest = MagicMock(spec=Destination)
+        dest.auth_tokens = [MagicMock()]
+        dest.auth_tokens[0].http_header = {"value": token}
+        dest.url = url
+        return dest
+
+    def test_succeeds_on_first_attempt(self):
+        """Return result immediately when the first attempt succeeds."""
+        with patch(
+            "sap_cloud_sdk.agentgateway._lob.create_destination_client"
+        ) as mock_client, patch("sap_cloud_sdk.agentgateway._lob.time.sleep") as mock_sleep:
+            mock_client.return_value.get_destination.return_value = self._make_dest()
+
+            result = _fetch_auth_token("dest", "tenant")
+
+            assert result == ("jwt", "https://agw.example.com")
+            mock_sleep.assert_not_called()
+
+    def test_retries_on_transient_error_then_succeeds(self):
+        """Retry after a transient RuntimeError and return result on second attempt."""
+        dest = self._make_dest()
+        with patch(
+            "sap_cloud_sdk.agentgateway._lob.create_destination_client"
+        ) as mock_client, patch("sap_cloud_sdk.agentgateway._lob.time.sleep") as mock_sleep:
+            mock_client.return_value.get_destination.side_effect = [
+                RuntimeError("Failed to obtain OAuth2 token: (missing_token)"),
+                dest,
+            ]
+
+            result = _fetch_auth_token("dest", "tenant")
+
+            assert result == ("jwt", "https://agw.example.com")
+            mock_sleep.assert_called_once_with(1.0)
+
+    def test_retries_on_destination_parse_error_then_succeeds(self):
+        """Retry after a destination parse error and return result on third attempt."""
+        dest = self._make_dest()
+        with patch(
+            "sap_cloud_sdk.agentgateway._lob.create_destination_client"
+        ) as mock_client, patch("sap_cloud_sdk.agentgateway._lob.time.sleep") as mock_sleep:
+            mock_client.return_value.get_destination.side_effect = [
+                Exception("failed to parse consume destination response: ..."),
+                Exception("invalid JSON in list fragments response: ..."),
+                dest,
+            ]
+
+            result = _fetch_auth_token("dest", "tenant")
+
+            assert result == ("jwt", "https://agw.example.com")
+            assert mock_sleep.call_count == 2
+            mock_sleep.assert_any_call(1.0)
+            mock_sleep.assert_any_call(2.0)
+
+    def test_raises_after_all_attempts_exhausted(self):
+        """Re-raise the last exception after all retry attempts fail."""
+        err = RuntimeError("Failed to obtain OAuth2 token: (missing_token)")
+        with patch(
+            "sap_cloud_sdk.agentgateway._lob.create_destination_client"
+        ) as mock_client, patch("sap_cloud_sdk.agentgateway._lob.time.sleep"):
+            mock_client.return_value.get_destination.side_effect = err
+
+            with pytest.raises(RuntimeError, match="Failed to obtain OAuth2 token"):
+                _fetch_auth_token("dest", "tenant")
+
+            assert mock_client.return_value.get_destination.call_count == 3
+
+    def test_mcp_server_not_found_not_retried(self):
+        """MCPServerNotFoundError is not retried — it is a genuine missing resource."""
+        with patch(
+            "sap_cloud_sdk.agentgateway._lob.create_destination_client"
+        ) as mock_client, patch("sap_cloud_sdk.agentgateway._lob.time.sleep") as mock_sleep:
+            mock_client.return_value.get_destination.return_value = None
+
+            with pytest.raises(MCPServerNotFoundError):
+                _fetch_auth_token("dest", "tenant")
+
+            assert mock_client.return_value.get_destination.call_count == 1
+            mock_sleep.assert_not_called()
+
+    def test_backoff_delays_are_exponential(self):
+        """Delays follow base * 2^attempt: 1.0s then 2.0s."""
+        err = Exception("transient")
+        dest = self._make_dest()
+        with patch(
+            "sap_cloud_sdk.agentgateway._lob.create_destination_client"
+        ) as mock_client, patch("sap_cloud_sdk.agentgateway._lob.time.sleep") as mock_sleep:
+            mock_client.return_value.get_destination.side_effect = [err, err, dest]
+
+            _fetch_auth_token("dest", "tenant")
+
+            delays = [call.args[0] for call in mock_sleep.call_args_list]
+            assert delays == [1.0, 2.0]
+
+
+# ============================================================
 # Test: list_mcp_fragments
 # ============================================================
 

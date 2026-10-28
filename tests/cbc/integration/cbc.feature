@@ -34,3 +34,15 @@ Feature: CBC (Central Business Configuration) Integration
   Scenario: Fetch a single entity directly returns EntityData
     When I call get_entity_data for the first entity in the first config object
     Then the result should be EntityData accessible as a list or object
+
+  # ── Feature status ───────────────────────────────────────────────────────────
+
+  Scenario: Fetch feature statuses returns FeatureStatuses
+    When I call get_feature_statuses
+    Then the result should be FeatureStatuses
+    And every feature should have a non-empty feature_id
+
+  Scenario: Look up a single feature status by id
+    When I call get_feature_statuses
+    And I call get_feature_status for the first feature id
+    Then the result should be a FeatureStatus for the requested feature id

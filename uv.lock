@@ -1,5 +1,5 @@
 version = 1
-revision = 5
+revision = 3
 requires-python = ">=3.11"
 resolution-markers = [
     "python_full_version >= '3.15' and sys_platform == 'win32'",
@@ -604,6 +604,19 @@ wheels = [
 ]
 
 [[package]]
+name = "cloudevents"
+version = "2.2.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "deprecation" },
+    { name = "python-dateutil" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/45/fe/3bae2187abea2682a1079c5618e45baf4c9df7e35017e1b9b7940955db59/cloudevents-2.2.0.tar.gz", hash = "sha256:fc52440a1fecde882b3b745361e1c7dd4e044e71a6b719cfec2e2c0aa1a19fa3", size = 48380, upload-time = "2026-06-11T14:10:02.339Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/d0/d4/901b17ea39f4f1125fc92529cb842896309075406a78e13a7c544f0c5600/cloudevents-2.2.0-py3-none-any.whl", hash = "sha256:9ff8adff01b997d251d0fb54076557daa9906330e16afc1712a6447122f8f7a4", size = 98239, upload-time = "2026-06-11T14:10:01.059Z" },
+]
+
+[[package]]
 name = "colorama"
 version = "0.4.6"
 source = { registry = "https://pypi.org/simple" }
@@ -803,6 +816,18 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/49/85/12f0a49a7c4ffb70572b6c2ef13c90c88fd190debda93b23f026b25f9634/deprecated-1.3.1.tar.gz", hash = "sha256:b1b50e0ff0c1fddaa5708a2c6b0a6588bb09b892825ab2b214ac9ea9d92a5223", size = 2932523, upload-time = "2025-10-30T08:19:02.757Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/84/d0/205d54408c08b13550c733c4b85429e7ead111c7f0014309637425520a9a/deprecated-1.3.1-py2.py3-none-any.whl", hash = "sha256:597bfef186b6f60181535a29fbe44865ce137a5079f295b479886c82729d5f3f", size = 11298, upload-time = "2025-10-30T08:19:00.758Z" },
+]
+
+[[package]]
+name = "deprecation"
+version = "2.1.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "packaging" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/5a/d3/8ae2869247df154b64c1884d7346d412fed0c49df84db635aab2d1c40e62/deprecation-2.1.0.tar.gz", hash = "sha256:72b3bde64e5d778694b0cf68178aed03d15e15477116add3fb773e581f9518ff", size = 173788, upload-time = "2020-04-20T14:23:38.738Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/02/c3/253a89ee03fc9b9682f1541728eb66db7db22148cd94f89ab22528cd1e1b/deprecation-2.1.0-py2.py3-none-any.whl", hash = "sha256:a10811591210e1fb0e768a8c25517cabeabcba6f0bf96564f8ff45189f90b14a", size = 11178, upload-time = "2020-04-20T14:23:36.581Z" },
 ]
 
 [[package]]
@@ -4353,6 +4378,7 @@ name = "sap-cloud-sdk"
 version = "0.63.1"
 source = { editable = "." }
 dependencies = [
+    { name = "cloudevents" },
     { name = "cryptography" },
     { name = "grpcio" },
     { name = "hatchling" },
@@ -4443,6 +4469,7 @@ dev = [
 requires-dist = [
     { name = "a2a-sdk", marker = "extra == 'extensibility'", specifier = ">=0.2.0,<1.0" },
     { name = "aiohttp", marker = "extra == 'aiohttp'", specifier = ">=3.9.0,<4" },
+    { name = "cloudevents", specifier = ">=2.2.0,<3" },
     { name = "cryptography", specifier = ">=48.0.1,<51" },
     { name = "django", marker = "extra == 'django'", specifier = ">=4.0,<6" },
     { name = "fastapi", marker = "extra == 'fastapi'", specifier = ">=0.100.0,<1" },

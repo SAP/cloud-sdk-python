@@ -384,6 +384,124 @@ class TestGetEntityData:
 
 
 # ---------------------------------------------------------------------------
+# CBCClient — _features_url
+# ---------------------------------------------------------------------------
+
+
+class TestFeaturesUrl:
+    def test_features_url_joins_base_feature_path_and_suffix(self):
+        client, _ = _make_client("https://my-tenant.cbc.example.ondemand.com")
+        url = client._features_url(
+            "https://my-tenant.cbc.example.ondemand.com", "/features"
+        )
+        assert url == (
+            "https://my-tenant.cbc.example.ondemand.com/feature/v1/features"
+        )
+
+
+# ---------------------------------------------------------------------------
+# CBCClient — get_feature_statuses
+# ---------------------------------------------------------------------------
+
+
+class TestGetFeatureStatuses:
+    def test_get_feature_statuses_returns_parsed_features(self):
+        client, mock_http = _make_client()
+        mock_http.request.return_value = _mock_response(
+            json_body={
+                "features": [
+                    {"featureId": "ai_assisted_supplier_bid_analysis", "enabled": True},
+                    {"featureId": "ai_assisted_tco_analysis", "enabled": False},
+                ]
+            }
+        )
+        result = client.get_feature_statuses()
+        assert result.is_enabled("ai_assisted_supplier_bid_analysis") is True
+        assert result.is_enabled("ai_assisted_tco_analysis") is False
+
+    def test_get_feature_statuses_sends_only_app_tenant_id(self):
+        client, mock_http = _make_client(app_tenant_id=_app_tid("tenant-9"))
+        mock_http.request.return_value = _mock_response(json_body={"features": []})
+        client.get_feature_statuses()
+        called_url = mock_http.request.call_args.kwargs["url"]
+        assert called_url.endswith("/feature/v1/features?appTenantId=tenant-9")
+
+    def test_get_feature_statuses_on_404_raises_cbc_client_error(self):
+        client, mock_http = _make_client()
+        mock_http.request.return_value = _mock_response(
+            status_code=404,
+            content=b'{"error":{"code":"NOT_FOUND","message":"not found"}}',
+        )
+        with pytest.raises(CBCClientError):
+            client.get_feature_statuses()
+
+    def test_get_feature_statuses_on_500_raises_cbc_server_error(self):
+        client, mock_http = _make_client()
+        mock_http.request.return_value = _mock_response(status_code=500, content=b"")
+        with pytest.raises(CBCServerError):
+            client.get_feature_statuses()
+
+    def test_get_feature_statuses_on_connection_failure_raises_cbc_network_error(self):
+        client, mock_http = _make_client()
+        mock_http.request.side_effect = httpx.ConnectError("refused")
+        with pytest.raises(CBCNetworkError):
+            client.get_feature_statuses()
+
+
+# ---------------------------------------------------------------------------
+# CBCClient — get_feature_status
+# ---------------------------------------------------------------------------
+
+
+class TestGetFeatureStatus:
+    def test_get_feature_status_returns_matching_feature(self):
+        client, mock_http = _make_client()
+        mock_http.request.return_value = _mock_response(
+            json_body={
+                "features": [
+                    {"featureId": "ai_assisted_supplier_bid_analysis", "enabled": True}
+                ]
+            }
+        )
+        result = client.get_feature_status("ai_assisted_supplier_bid_analysis")
+        assert result is not None
+        assert result.feature_id == "ai_assisted_supplier_bid_analysis"
+        assert result.enabled is True
+
+    def test_get_feature_status_sends_both_query_params(self):
+        client, mock_http = _make_client(app_tenant_id=_app_tid("tenant-9"))
+        mock_http.request.return_value = _mock_response(json_body={"features": []})
+        client.get_feature_status("ai_assisted_lead_routing")
+        called_url = mock_http.request.call_args.kwargs["url"]
+        assert called_url.endswith(
+            "/feature/v1/features"
+            "?appTenantId=tenant-9&featureId=ai_assisted_lead_routing"
+        )
+
+    def test_get_feature_status_returns_none_when_feature_absent(self):
+        client, mock_http = _make_client()
+        mock_http.request.return_value = _mock_response(json_body={"features": []})
+        assert client.get_feature_status("ai_assisted_lead_routing") is None
+
+    def test_get_feature_status_filters_to_requested_feature_from_full_list(self):
+        # If the server ignores featureId and returns all features, the client
+        # still extracts the requested one.
+        client, mock_http = _make_client()
+        mock_http.request.return_value = _mock_response(
+            json_body={
+                "features": [
+                    {"featureId": "ai_assisted_supplier_bid_analysis", "enabled": True},
+                    {"featureId": "ai_assisted_tco_analysis", "enabled": False},
+                ]
+            }
+        )
+        result = client.get_feature_status("ai_assisted_tco_analysis")
+        assert result is not None
+        assert result.feature_id == "ai_assisted_tco_analysis"
+        assert result.enabled is False
+
+
+# ---------------------------------------------------------------------------
 # CBCClient — context manager
 # ---------------------------------------------------------------------------
 

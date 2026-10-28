@@ -33,6 +33,7 @@ import threading
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
+from urllib.parse import quote as _url_quote
 
 import httpx
 
@@ -44,6 +45,8 @@ from sap_cloud_sdk.cbc._models import (
     ConfigurationObjectList,
     ConsumptionVersions,
     EntityData,
+    FeatureStatus,
+    FeatureStatuses,
 )
 from sap_cloud_sdk.cbc.config import CBCConfig
 from sap_cloud_sdk.cbc.exceptions import (
@@ -126,6 +129,7 @@ class _ApiPaths:
     """API path configuration for a :class:`CBCClient` instance."""
 
     configurations_path: str
+    features_path: str
 
 
 # ---------------------------------------------------------------------------
@@ -181,6 +185,7 @@ class CBCClient:
         self._app_tenant_id = app_tenant_id
         self._config = _ApiPaths(
             configurations_path="/configuration/v1",
+            features_path="/feature/v1",
         )
         self._ssl_factory = ssl_context
         self._lock = threading.Lock()
@@ -393,6 +398,55 @@ class CBCClient:
             configuration_object_id,
             entity_id,
         ).data
+
+    @record_metrics(Module.CBC, Operation.CBC_GET_FEATURE_STATUSES)
+    def get_feature_statuses(self) -> FeatureStatuses:
+        """Return the activation status of every AI feature for the configured tenant.
+
+        Returns:
+            :class:`FeatureStatuses` with one :class:`FeatureStatus` per feature.
+
+        Raises:
+            CBCClientError: On 4xx responses.
+            CBCServerError: On 5xx responses.
+            CBCNetworkError: On connection failures.
+        """
+        base_url = self._base_url()
+        app_tenant_id = self._resolve_app_tenant_id()
+        url = self._features_url(base_url, f"/features?appTenantId={app_tenant_id}")
+        return FeatureStatuses.model_validate(self._request("GET", url).json())
+
+    @record_metrics(Module.CBC, Operation.CBC_GET_FEATURE_STATUS)
+    def get_feature_status(self, feature_id: str) -> FeatureStatus | None:
+        """Return the activation status of a single AI feature for the configured tenant.
+
+        Queries the feature endpoint filtered to both the tenant and the feature,
+        so the server returns only the matching entry.
+
+        Args:
+            feature_id: Feature identifier (e.g. ``"ai_assisted_supplier_bid_analysis"``).
+
+        Returns:
+            The matching :class:`FeatureStatus`, or ``None`` if the feature is not
+            found for the tenant.
+
+        Raises:
+            CBCClientError: On 4xx responses.
+            CBCServerError: On 5xx responses.
+            CBCNetworkError: On connection failures.
+        """
+        base_url = self._base_url()
+        app_tenant_id = self._resolve_app_tenant_id()
+        url = self._features_url(
+            base_url,
+            f"/features?appTenantId={app_tenant_id}&featureId={_url_quote(feature_id, safe='')}",
+        )
+        statuses = FeatureStatuses.model_validate(self._request("GET", url).json())
+        return statuses.get(feature_id)
+
+    def _features_url(self, base_url: str, path: str = "") -> str:
+        base = base_url.rstrip("/")
+        return f"{base}{self._config.features_path}{path}"
 
     def _fetch_entity_data(
         self,

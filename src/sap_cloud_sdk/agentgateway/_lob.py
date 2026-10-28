@@ -8,6 +8,7 @@ LoB agents use BTP Destination Service for credential management:
 import asyncio
 import logging
 import os
+import time
 import uuid
 
 import httpx
@@ -62,6 +63,9 @@ logger = logging.getLogger(__name__)
 
 _DESTINATION_INSTANCE = "default"
 
+_FETCH_AUTH_MAX_ATTEMPTS = 3
+_FETCH_AUTH_BACKOFF_BASE = 1.0  # seconds; actual delays: 1s, 2s
+
 
 def _system_scope_key(tenant_subdomain: str) -> str:
     """Build the cache scope key for tenant-scoped system auth."""
@@ -101,6 +105,11 @@ def _fetch_auth_token(
     destination service (e.g. strips the "Bearer " prefix from "Bearer <jwt>"),
     and the gateway URL from the destination's URL property.
 
+    Retries up to _FETCH_AUTH_MAX_ATTEMPTS times with exponential backoff on
+    transient failures (OAuth2 token endpoint blips, unparseable destination
+    responses). MCPServerNotFoundError is not retried — it indicates a genuine
+    missing resource.
+
     Args:
         dest_name: Destination name.
         tenant_subdomain: Tenant subdomain for multi-tenant lookup.
@@ -110,35 +119,56 @@ def _fetch_auth_token(
         Tuple of (raw_jwt, gateway_url).
 
     Raises:
-        MCPServerNotFoundError: If no auth token is returned.
+        MCPServerNotFoundError: If no auth token is returned (not retried).
+        Exception: Last exception raised after all retry attempts are exhausted.
     """
-    client = create_destination_client(
-        instance=_DESTINATION_INSTANCE,
-        _telemetry_source=Module.AGENTGATEWAY,
-    )
-    dest = client.get_destination(
-        dest_name,
-        level=ConsumptionLevel.PROVIDER_SUBACCOUNT,
-        options=options,
-        tenant=tenant_subdomain,
-    )
+    last_exc: Exception | None = None
+    for attempt in range(_FETCH_AUTH_MAX_ATTEMPTS):
+        try:
+            client = create_destination_client(
+                instance=_DESTINATION_INSTANCE,
+                _telemetry_source=Module.AGENTGATEWAY,
+            )
+            dest = client.get_destination(
+                dest_name,
+                level=ConsumptionLevel.PROVIDER_SUBACCOUNT,
+                options=options,
+                tenant=tenant_subdomain,
+            )
 
-    if not dest or not isinstance(dest, Destination) or not dest.auth_tokens:
-        raise MCPServerNotFoundError(
-            f"No auth token returned for destination '{dest_name}'"
-        )
+            if not dest or not isinstance(dest, Destination) or not dest.auth_tokens:
+                raise MCPServerNotFoundError(
+                    f"No auth token returned for destination '{dest_name}'"
+                )
 
-    auth_token = dest.auth_tokens[0]
-    header_value = auth_token.http_header.get("value") or ""
-    if not header_value:
-        raise MCPServerNotFoundError(f"Empty auth header for destination '{dest_name}'")
+            auth_token = dest.auth_tokens[0]
+            header_value = auth_token.http_header.get("value") or ""
+            if not header_value:
+                raise MCPServerNotFoundError(
+                    f"Empty auth header for destination '{dest_name}'"
+                )
 
-    # Strip "Bearer " prefix — AuthResult.access_token is always a raw JWT
-    raw_token = header_value.removeprefix("Bearer ").strip()
+            # Strip "Bearer " prefix — AuthResult.access_token is always a raw JWT
+            raw_token = header_value.removeprefix("Bearer ").strip()
+            gateway_url = (dest.url or "").rstrip("/")
+            return raw_token, gateway_url
 
-    gateway_url = (dest.url or "").rstrip("/")
+        except MCPServerNotFoundError:
+            raise
+        except Exception as exc:
+            last_exc = exc
+            if attempt < _FETCH_AUTH_MAX_ATTEMPTS - 1:
+                delay = _FETCH_AUTH_BACKOFF_BASE * (2**attempt)
+                logger.warning(
+                    "Auth token fetch failed (attempt %d/%d): %s — retrying in %.1fs",
+                    attempt + 1,
+                    _FETCH_AUTH_MAX_ATTEMPTS,
+                    exc,
+                    delay,
+                )
+                time.sleep(delay)
 
-    return raw_token, gateway_url
+    raise last_exc  # type: ignore[misc]
 
 
 def get_ias_client_id_lob() -> str:

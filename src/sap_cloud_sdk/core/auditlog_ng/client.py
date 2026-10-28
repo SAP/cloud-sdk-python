@@ -38,6 +38,10 @@ from sap_cloud_sdk.core.auditlog_ng.config import (
 from sap_cloud_sdk.core.auditlog_ng.exceptions import ValidationError
 from sap_cloud_sdk.core.telemetry import Module, Operation, record_metrics
 from sap_cloud_sdk.core.telemetry.config import ENV_OTLP_PROTOCOL
+from sap_cloud_sdk.core.telemetry.constants import (
+    ATTR_SAP_QOS_CLASS,
+    QOS_CLASS_AT_LEAST_ONCE,
+)
 from sap_cloud_sdk.core.runtime_context import get_context
 from sap_cloud_sdk.core.runtime_context.providers import APP_TENANT_ID, USER_ID
 from sap_cloud_sdk.ias._context import get_auth_context
@@ -249,6 +253,7 @@ class AuditClient:
                 "cloudevents.event_id": event_id,
                 "sap.tenancy.tenant_id": tenant_id,
                 "sap.auditlogging.mime_type": mime_type,
+                ATTR_SAP_QOS_CLASS: QOS_CLASS_AT_LEAST_ONCE,
             },
         )
 

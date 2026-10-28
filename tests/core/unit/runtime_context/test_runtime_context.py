@@ -2,6 +2,7 @@
 
 import base64
 import json
+import logging
 import pytest
 from unittest.mock import MagicMock, patch
 
@@ -36,8 +37,9 @@ from sap_cloud_sdk.core.runtime_context.providers._ias import (
     USER_ID,
 )
 from sap_cloud_sdk.core.runtime_context.starlette import _merge
+from sap_cloud_sdk.ias import IASConfigError, IASTokenError, VerifiedIASClaims
 
-_PATCH_PARSE = "sap_cloud_sdk.core.runtime_context.providers._ias.parse_token"
+_PATCH_FROM_ENV = "sap_cloud_sdk.core.runtime_context.providers._ias.IASVerifier.from_env"
 
 
 # ---------------------------------------------------------------------------
@@ -245,12 +247,18 @@ def _make_envelope(headers: dict) -> RequestEnvelope:
     return RequestEnvelope(headers=headers)
 
 
+def _make_verifier(claims_obj):
+    """Return a TokenVerifier that always succeeds with the given claims."""
+    def _v(auth: str) -> VerifiedIASClaims:
+        return VerifiedIASClaims(claims=claims_obj)
+    return _v
+
+
 class TestIASContextProvider:
     def test_extracts_tenant_and_user(self):
         claims = _make_claims(app_tid="t-1", user_uuid="u-1")
         envelope = _make_envelope({"authorization": "Bearer tok"})
-        with patch(_PATCH_PARSE, return_value=claims):
-            ctx = IASContextProvider().extract(envelope)
+        ctx = IASContextProvider(token_verifier=_make_verifier(claims)).extract(envelope)
         assert ctx.get(APP_TENANT_ID) == "t-1"
         assert ctx.get(USER_ID) == "u-1"
 
@@ -259,41 +267,94 @@ class TestIASContextProvider:
         envelope = _make_envelope(
             {"authorization": "Bearer tok", "x-sap-origin": "ui5"}
         )
-        with patch(_PATCH_PARSE, return_value=claims):
-            ctx = IASContextProvider().extract(envelope)
+        ctx = IASContextProvider(token_verifier=_make_verifier(claims)).extract(envelope)
         assert ctx.get(TRIGGER_TYPE) is None
 
     def test_extracts_global_tenant_id(self):
         claims = _make_claims(app_tid="t-1", user_uuid="u-1", sap_gtid="g-1")
         envelope = _make_envelope({"authorization": "Bearer tok"})
-        with patch(_PATCH_PARSE, return_value=claims):
-            ctx = IASContextProvider().extract(envelope)
+        ctx = IASContextProvider(token_verifier=_make_verifier(claims)).extract(envelope)
         assert ctx.get(GLOBAL_TENANT_ID) == "g-1"
 
     def test_returns_empty_context_when_no_auth_header(self):
+        claims = _make_claims(app_tid="t-1", user_uuid="u-1")
         envelope = _make_envelope({})
-        ctx = IASContextProvider().extract(envelope)
+        ctx = IASContextProvider(token_verifier=_make_verifier(claims)).extract(envelope)
         assert ctx.get(APP_TENANT_ID) is None
         assert ctx.get(USER_ID) is None
         assert ctx.get(GLOBAL_TENANT_ID) is None
 
-    def test_returns_empty_context_on_parse_error(self):
+    def test_returns_empty_context_on_verification_error(self):
+        def _boom(auth: str) -> VerifiedIASClaims:
+            raise IASTokenError("signature verification failed")
         envelope = _make_envelope({"authorization": "Bearer bad"})
-        with patch(_PATCH_PARSE, side_effect=ValueError("bad")):
-            ctx = IASContextProvider().extract(envelope)
+        ctx = IASContextProvider(token_verifier=_boom).extract(envelope)
         assert ctx.get(APP_TENANT_ID) is None
         assert ctx.get(USER_ID) is None
 
     def test_tenant_id_none_when_claim_absent(self):
         claims = _make_claims(app_tid=None, user_uuid="u-1")
         envelope = _make_envelope({"authorization": "Bearer tok"})
-        with patch(_PATCH_PARSE, return_value=claims):
-            ctx = IASContextProvider().extract(envelope)
+        ctx = IASContextProvider(token_verifier=_make_verifier(claims)).extract(envelope)
         assert ctx.get(APP_TENANT_ID) is None
         assert ctx.get(USER_ID) == "u-1"
 
     def test_satisfies_context_provider_protocol(self):
-        assert isinstance(IASContextProvider(), ContextProvider)
+        with patch(_PATCH_FROM_ENV, side_effect=IASConfigError("no binding")):
+            assert isinstance(IASContextProvider(), ContextProvider)
+
+    def test_no_verifier_returns_empty_context(self):
+        """Fail-closed: no IAS binding → empty context, no crash."""
+        with patch(_PATCH_FROM_ENV, side_effect=IASConfigError("no binding")):
+            provider = IASContextProvider()
+        assert provider._token_verifier is None
+        envelope = _make_envelope({"authorization": "Bearer forged.token"})
+        ctx = provider.extract(envelope)
+        assert ctx.get(APP_TENANT_ID) is None
+        assert ctx.get(GLOBAL_TENANT_ID) is None
+        assert ctx.get(USER_ID) is None
+
+    def test_forged_token_returns_empty_context(self):
+        """Verifier raises on forged token → no claims leak into context."""
+        def _reject(auth: str) -> VerifiedIASClaims:
+            raise IASTokenError("invalid signature")
+        envelope = _make_envelope({"authorization": "Bearer forged"})
+        ctx = IASContextProvider(token_verifier=_reject).extract(envelope)
+        assert ctx.get(APP_TENANT_ID) is None
+        assert ctx.get(GLOBAL_TENANT_ID) is None
+        assert ctx.get(USER_ID) is None
+
+    def test_verified_token_populates_all_keys(self):
+        claims = _make_claims(app_tid="app-t", user_uuid="u-x", sap_gtid="g-x")
+        envelope = _make_envelope({"authorization": "Bearer real"})
+        ctx = IASContextProvider(token_verifier=_make_verifier(claims)).extract(envelope)
+        assert ctx.get(APP_TENANT_ID) == "app-t"
+        assert ctx.get(GLOBAL_TENANT_ID) == "g-x"
+        assert ctx.get(USER_ID) == "u-x"
+
+    def test_missing_auth_header_returns_empty_context(self):
+        claims = _make_claims(app_tid="app-t", user_uuid="u-x", sap_gtid="g-x")
+        envelope = _make_envelope({})
+        ctx = IASContextProvider(token_verifier=_make_verifier(claims)).extract(envelope)
+        assert ctx.get(APP_TENANT_ID) is None
+        assert ctx.get(GLOBAL_TENANT_ID) is None
+        assert ctx.get(USER_ID) is None
+
+    def test_auto_configure_warns_when_no_binding(self, caplog):
+        with caplog.at_level(logging.WARNING, logger="sap_cloud_sdk"):
+            with patch(_PATCH_FROM_ENV, side_effect=IASConfigError("no binding")):
+                provider = IASContextProvider()
+        assert provider._token_verifier is None
+        assert any("IASContextProvider" in r.message for r in caplog.records)
+
+    def test_infra_error_logs_warning_not_debug(self, caplog):
+        def _infra_fail(auth: str) -> VerifiedIASClaims:
+            raise ConnectionError("DNS failure")
+        envelope = _make_envelope({"authorization": "Bearer tok"})
+        with caplog.at_level(logging.WARNING, logger="sap_cloud_sdk"):
+            ctx = IASContextProvider(token_verifier=_infra_fail).extract(envelope)
+        assert ctx.get(APP_TENANT_ID) is None
+        assert any("unexpected error" in r.message for r in caplog.records)
 
 
 # ---------------------------------------------------------------------------

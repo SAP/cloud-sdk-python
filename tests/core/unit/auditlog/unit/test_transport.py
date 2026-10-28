@@ -24,7 +24,7 @@ class TestTransport:
         assert issubclass(Transport, ABC)
 
         with pytest.raises(TypeError):
-            Transport()
+            Transport()  # ty: ignore[call-non-callable]
 
     def test_abstract_send_method(self):
         assert hasattr(Transport, 'send')

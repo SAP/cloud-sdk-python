@@ -280,7 +280,7 @@ class TestFetchAuthTokenRetry:
             with pytest.raises(MCPServerNotFoundError):
                 _fetch_auth_token("dest", "tenant")
 
-            mock_client.return_value.get_destination.call_count == 1
+            assert mock_client.return_value.get_destination.call_count == 1
             mock_sleep.assert_not_called()
 
     def test_backoff_delays_are_exponential(self):

@@ -22,10 +22,9 @@ class ContentFilteredError(OrchestrationError):
             ``error.location`` startswith ``"Filtering Module - Input Filter"``),
             or ``"output"`` if the model response was rejected. In non-streaming
             responses this is signalled by ``finish_reason == "content_filter"``
-            (HTTP 200). When output filtering is active, streaming is blocked
-            upfront by the SDK (raised before the request is sent) because
-            mid-stream filter rejections cannot yet be intercepted uniformly
-            for all callers.
+            (HTTP 200). In streaming responses, the server sends an in-stream
+            error event which :func:`sap_cloud_sdk.aicore.completion` translates
+            into this exception from inside the iterator.
         details: Severity scalars from ``intermediate_results.{input,output}_filtering.data``.
             Safe to log; does NOT include raw prompt or completion content.
         request_id: ``error.request_id`` (input) or top-level ``request_id`` (output).

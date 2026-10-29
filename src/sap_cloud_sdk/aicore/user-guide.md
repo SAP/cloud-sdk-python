@@ -451,13 +451,15 @@ print(response.choices[0].message.content)
 
 ### Streaming Responses
 
-`stream=True` is supported when no output filtering is configured. If output
-filtering is active, streaming is not currently supported by the SDK —
-`ContentFilteredError(direction="output")` is raised before the request is
-sent. The underlying API supports output filtering with streaming, but the SDK
-cannot yet translate mid-stream filter rejections into `ContentFilteredError`
-uniformly for all callers (agent frameworks call `litellm` directly and would
-receive an untyped error). Input-only filtering works with streaming.
+`stream=True` is fully supported, including when output filtering is active.
+When the server rejects a streamed response via an in-stream filter event, the
+SDK raises `ContentFilteredError(direction="output")` from inside the iterator
+— the same exception type used for buffered (non-streaming) rejections.
+
+**Important:** this translation only applies when you use
+`sap_cloud_sdk.aicore.completion` / `acompletion`. If agent frameworks such as
+`ChatLiteLLM` or LangGraph call `litellm.completion` directly, mid-stream
+output-filter rejections surface as a raw `ValueError` from the iterator.
 
 ```python
 from sap_cloud_sdk.aicore import ContentFilteredError, completion, set_aicore_config

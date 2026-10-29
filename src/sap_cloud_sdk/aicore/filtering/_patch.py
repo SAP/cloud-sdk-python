@@ -4,14 +4,14 @@ Patches ``litellm.GenAIHubOrchestrationConfig`` with a subclass that:
 
 - Injects ``modules.filtering`` into every v2 completion request body via
   ``transform_request``.
-- Detects filter rejections in responses and raises ``ContentFilteredError``
-  via ``transform_response``.
+- Detects filter rejections in buffered responses and raises
+  ``ContentFilteredError`` via ``transform_response``.
 
 The patch is applied by :func:`_install` (called by ``set_filtering`` /
 ``disable_filtering`` in :mod:`.filters`) and is idempotent — calling it
 multiple times with the same config is safe.
 
-Two filter-rejection shapes (from the v2 API) are handled:
+Two filter-rejection shapes (from the v2 API) are handled in buffered mode:
 
 - Input rejection: HTTP 4xx with ``error.location`` startswith
   ``"Filtering Module - Input Filter"``.
@@ -29,25 +29,27 @@ parsing.
 
 Streaming + output filtering
 ----------------------------
-The SAP AI Core Orchestration v2 API supports output filtering with streaming
-— the server filters each chunk and signals a rejection via an in-stream error
-event (no ``[DONE]``).  LiteLLM surfaces this as a ``ValueError`` raised from
-inside its streaming iterator, **not** via ``transform_response``.
+The SAP AI Core Orchestration v2 API supports output filtering with streaming.
+The server filters each chunk and signals a rejection via an in-stream error
+event (no ``[DONE]``). LiteLLM's ``SAPStreamIterator`` surfaces this error
+event as a ``ValueError(json.dumps(event_obj))`` from inside the iterator.
 
-The SDK cannot intercept that iterator-level error universally: agent
-frameworks (``ChatLiteLLM``, LangGraph, etc.) call ``litellm.completion``
-directly and never pass through ``sap_cloud_sdk.aicore.completion``, so the
-``ValueError`` would surface as an untyped exception rather than
-:class:`ContentFilteredError`.
+:func:`sap_cloud_sdk.aicore.completion` / :func:`acompletion` wrap the
+returned stream iterator when output filtering is active, catching that
+``ValueError`` and translating it to :class:`ContentFilteredError`. This gives
+callers a single, typed exception for filter rejections in both streaming and
+non-streaming modes.
 
-Until the SDK wraps the streaming iterator for all call paths,
-``transform_request`` raises :class:`ContentFilteredError` upfront when both
-streaming and output filtering are active. This guarantee is universal because
-``transform_request`` runs at the LiteLLM transport layer for all callers.
+Note: agent frameworks (``ChatLiteLLM``, LangGraph, etc.) that call
+``litellm.completion`` directly — bypassing the SDK's completion wrapper —
+will see the raw ``ValueError`` from the iterator. They must either use
+:func:`sap_cloud_sdk.aicore.completion` to get the translated error, or
+handle the ``ValueError`` themselves.
 """
 
 from __future__ import annotations
 
+import json
 import logging
 from typing import Any
 
@@ -76,9 +78,6 @@ class FilteringOrchestrationConfig(GenAIHubOrchestrationConfig):
         litellm_params: dict,
         headers: dict,
     ) -> dict:
-        # Capture stream flag before super() pops it from optional_params.
-        is_streaming = bool(optional_params.get("stream"))
-
         body = super().transform_request(
             model=model,
             messages=messages,
@@ -93,20 +92,6 @@ class FilteringOrchestrationConfig(GenAIHubOrchestrationConfig):
         filtering_dict = _active_cfg.to_dict()
         if not filtering_dict:
             return body
-
-        # Streaming + output filtering: the API supports it, but mid-stream
-        # filter rejections surface as ValueError inside LiteLLM's iterator —
-        # a path the SDK cannot intercept universally (agent frameworks call
-        # litellm directly, bypassing sap_cloud_sdk.aicore.completion).
-        # Block upfront until iterator wrapping is implemented for all callers.
-        if _active_cfg.output_filtering is not None and (
-            is_streaming or body.get("config", {}).get("stream", {}).get("enabled")
-        ):
-            raise ContentFilteredError(
-                direction="output",
-                details={},
-                request_id=None,
-            )
 
         modules = body["config"]["modules"]
         if isinstance(modules, list):
@@ -207,3 +192,46 @@ def _install(cfg: Any) -> None:  # cfg: ContentFiltering | None
     else:
         litellm.GenAIHubOrchestrationConfig = FilteringOrchestrationConfig
         logger.info("content filtering active (FilteringOrchestrationConfig)")
+
+
+def _parse_output_filter_stream_error(
+    exc: BaseException,
+) -> ContentFilteredError | None:
+    """Try to parse an in-stream output-filter rejection from a ValueError.
+
+    LiteLLM's ``SAPStreamIterator`` raises ``ValueError(json.dumps(event_obj))``
+    when the server sends an error event inside the stream.  The v2 error shape
+    for an output-filter rejection is::
+
+        {"error": {"request_id": "...", "code": 500,
+                   "message": "...",
+                   "location": "Filtering Module - Output Filter",
+                   "intermediate_results": {"output_filtering": {"data": {...}}}}}
+
+    Returns a :class:`ContentFilteredError` when the pattern matches, otherwise
+    ``None`` so the caller can re-raise the original exception unchanged.
+    """
+    if not isinstance(exc, (ValueError, Exception)):
+        return None
+    msg = str(exc)
+    brace = msg.find("{")
+    if brace == -1:
+        return None
+    try:
+        payload = json.loads(msg[brace:])
+    except (ValueError, TypeError):
+        return None
+    err = payload.get("error", {})
+    if not isinstance(err, dict):
+        return None
+    location = err.get("location") or ""
+    if not location.startswith("Filtering Module - Output Filter"):
+        return None
+    data = (
+        err.get("intermediate_results", {}).get("output_filtering", {}).get("data", {})
+    )
+    return ContentFilteredError(
+        direction="output",
+        details=data,
+        request_id=err.get("request_id"),
+    )

@@ -46,24 +46,6 @@ _REQUEST_TIMEOUT_SECONDS = 30
 _RESPONSE_TEXT_TRUNCATION_LIMIT = 500
 
 
-def _require_non_blank_jwt(user_jwt: str | None) -> None:
-    """Enforce the OBO invariant: a user assertion must be a non-blank string.
-
-    Raises :class:`ValueError` for ``None``, empty, or whitespace-only input.
-    Callers that want service credentials must omit *user_jwt* (or pass
-    ``None``) at the constructor/factory level, which guards with
-    ``if user_jwt is not None``.
-
-    Blank/whitespace JWTs must never silently fall through to application
-    credentials — callers must always supply a real assertion for OBO mode.
-    """
-    if user_jwt is None or not user_jwt.strip():
-        raise ValueError(
-            "user_jwt must be a non-blank string for OBO mode; "
-            "omit it (or pass None) to use service credentials"
-        )
-
-
 def quote_odata_string_key(value: str) -> str:
     """Quote and escape a string value for use in an OData V4 entity key segment.
 
@@ -146,11 +128,14 @@ def build_business_object_node_type_key_path(unique_id: str) -> str:
     )
 
 
-def build_doctype_botype_map_key_path(map_id: str) -> str:
-    """Return ``DocumentTypeBusinessObjectTypeMap(DocumentTypeBOTypeMapID=<guid>)``."""
+def build_doctype_botype_map_key_path(
+    document_type_id: str, business_object_node_type_unique_id: str
+) -> str:
+    """Return ``DocumentTypeBusinessObjectTypeMap(DocumentTypeID='x',BusinessObjectNodeTypeUniqueID='y')``."""
     return (
         f"DocumentTypeBusinessObjectTypeMap("
-        f"DocumentTypeBOTypeMapID={quote_odata_guid_key(map_id)})"
+        f"DocumentTypeID={quote_odata_string_key(document_type_id)},"
+        f"BusinessObjectNodeTypeUniqueID={quote_odata_string_key(business_object_node_type_unique_id)})"
     )
 
 
@@ -195,8 +180,6 @@ class AdmsHttp:
         self._token_fetcher = token_fetcher
         self._session = session or requests.Session()
         self._user_jwt = user_jwt
-        if user_jwt is not None:
-            _require_non_blank_jwt(user_jwt)
         self._csrf_tokens: dict[str, str] = {}
         # Guards the _csrf_tokens dict.  ``AdmsHttp`` is documented as safe to
         # share across threads (matching ``requests.Session``); without this
@@ -210,16 +193,10 @@ class AdmsHttp:
 
         Args:
             user_jwt: The user's OIDC or XSUAA JWT from the inbound request.
-                Must be a non-blank string — ``None`` and blank/whitespace raise
-                :class:`ValueError`.
 
         Returns:
             New :class:`AdmsHttp` for user-context calls.
-
-        Raises:
-            ValueError: If *user_jwt* is ``None``, empty, or whitespace-only.
         """
-        _require_non_blank_jwt(user_jwt)
         return AdmsHttp(
             config=self._config,
             token_fetcher=self._token_fetcher,
@@ -237,8 +214,15 @@ class AdmsHttp:
         *,
         params: dict[str, Any] | None = None,
         service_base: str | None = None,
+        extra_headers: dict[str, str] | None = None,
     ) -> Response:
-        return self._request("GET", path, params=params, service_base=service_base)
+        return self._request(
+            "GET",
+            path,
+            params=params,
+            service_base=service_base,
+            extra_headers=extra_headers,
+        )
 
     def post(
         self,
@@ -247,9 +231,15 @@ class AdmsHttp:
         json: Any | None = None,
         params: dict[str, Any] | None = None,
         service_base: str | None = None,
+        extra_headers: dict[str, str] | None = None,
     ) -> Response:
         return self._send_with_csrf(
-            "POST", path, json=json, params=params, service_base=service_base
+            "POST",
+            path,
+            json=json,
+            params=params,
+            service_base=service_base,
+            extra_headers=extra_headers,
         )
 
     def delete(
@@ -258,9 +248,14 @@ class AdmsHttp:
         *,
         params: dict[str, Any] | None = None,
         service_base: str | None = None,
+        extra_headers: dict[str, str] | None = None,
     ) -> Response:
         return self._send_with_csrf(
-            "DELETE", path, params=params, service_base=service_base
+            "DELETE",
+            path,
+            params=params,
+            service_base=service_base,
+            extra_headers=extra_headers,
         )
 
     def patch(
@@ -270,9 +265,15 @@ class AdmsHttp:
         json: Any | None = None,
         params: dict[str, Any] | None = None,
         service_base: str | None = None,
+        extra_headers: dict[str, str] | None = None,
     ) -> Response:
         return self._send_with_csrf(
-            "PATCH", path, json=json, params=params, service_base=service_base
+            "PATCH",
+            path,
+            json=json,
+            params=params,
+            service_base=service_base,
+            extra_headers=extra_headers,
         )
 
     def _send_with_csrf(
@@ -283,8 +284,12 @@ class AdmsHttp:
         json: Any | None = None,
         params: dict[str, Any] | None = None,
         service_base: str | None = None,
+        extra_headers: dict[str, str] | None = None,
     ) -> Response:
         csrf = self._get_csrf_token(service_base)
+        merged: dict[str, str] = {_CSRF_FETCH_HEADER: csrf}
+        if extra_headers:
+            merged.update(extra_headers)
         try:
             return self._request(
                 method,
@@ -292,7 +297,7 @@ class AdmsHttp:
                 json=json,
                 params=params,
                 service_base=service_base,
-                extra_headers={_CSRF_FETCH_HEADER: csrf},
+                extra_headers=merged,
             )
         except HttpError as exc:
             if exc.status_code != 403:
@@ -303,13 +308,16 @@ class AdmsHttp:
                 if self._csrf_tokens.get(service_base or "") == csrf:
                     self._csrf_tokens.pop(service_base or "", None)
             csrf = self._get_csrf_token(service_base)
+            merged = {_CSRF_FETCH_HEADER: csrf}
+            if extra_headers:
+                merged.update(extra_headers)
             return self._request(
                 method,
                 path,
                 json=json,
                 params=params,
                 service_base=service_base,
-                extra_headers={_CSRF_FETCH_HEADER: csrf},
+                extra_headers=merged,
             )
 
     # ------------------------------------------------------------------
@@ -317,7 +325,7 @@ class AdmsHttp:
     # ------------------------------------------------------------------
 
     def _bearer_token(self) -> str:
-        if self._user_jwt is not None:
+        if self._user_jwt:
             return self._token_fetcher.exchange_token(self._user_jwt)
         return self._token_fetcher.get_token()
 
@@ -462,8 +470,6 @@ class AsyncAdmsHttp(AsyncHttpClient):
         self._config = config
         self._token_fetcher = token_fetcher
         self._user_jwt = user_jwt
-        if user_jwt is not None:
-            _require_non_blank_jwt(user_jwt)
         # Default to owning the underlying ``httpx.AsyncClient``.  Borrowed
         # instances created via :meth:`with_user_jwt` flip this to ``False``
         # so they share — and do *not* close — the parent's connection pool.
@@ -471,7 +477,7 @@ class AsyncAdmsHttp(AsyncHttpClient):
         _jwt = user_jwt  # capture for closure before super().__init__()
         get_token = (
             (lambda: token_fetcher.exchange_token(_jwt))
-            if _jwt is not None
+            if _jwt
             else token_fetcher.get_token
         )
         super().__init__(
@@ -506,9 +512,13 @@ class AsyncAdmsHttp(AsyncHttpClient):
         params: dict[str, Any] | None = None,
         service_base: str | None = None,
         headers: dict[str, str] | None = None,  # accepted for LSP compat, ignored
+        extra_headers: dict[str, str] | None = None,
     ) -> httpx.Response:
         return await self._request(
-            "GET", self._prefixed(path, service_base), params=params
+            "GET",
+            self._prefixed(path, service_base),
+            params=params,
+            extra_headers=extra_headers,
         )
 
     async def post(
@@ -520,9 +530,15 @@ class AsyncAdmsHttp(AsyncHttpClient):
         service_base: str | None = None,
         content: bytes | None = None,  # accepted for LSP compat, ignored
         headers: dict[str, str] | None = None,  # accepted for LSP compat, ignored
+        extra_headers: dict[str, str] | None = None,
     ) -> httpx.Response:
         return await self._send_with_csrf(
-            "POST", path, json=json, params=params, service_base=service_base
+            "POST",
+            path,
+            json=json,
+            params=params,
+            service_base=service_base,
+            extra_headers=extra_headers,
         )
 
     async def delete(
@@ -532,9 +548,14 @@ class AsyncAdmsHttp(AsyncHttpClient):
         params: dict[str, Any] | None = None,
         service_base: str | None = None,
         headers: dict[str, str] | None = None,  # accepted for LSP compat, ignored
+        extra_headers: dict[str, str] | None = None,
     ) -> httpx.Response:
         return await self._send_with_csrf(
-            "DELETE", path, params=params, service_base=service_base
+            "DELETE",
+            path,
+            params=params,
+            service_base=service_base,
+            extra_headers=extra_headers,
         )
 
     async def patch(
@@ -545,9 +566,15 @@ class AsyncAdmsHttp(AsyncHttpClient):
         params: dict[str, Any] | None = None,
         service_base: str | None = None,
         headers: dict[str, str] | None = None,  # accepted for LSP compat, ignored
+        extra_headers: dict[str, str] | None = None,
     ) -> httpx.Response:
         return await self._send_with_csrf(
-            "PATCH", path, json=json, params=params, service_base=service_base
+            "PATCH",
+            path,
+            json=json,
+            params=params,
+            service_base=service_base,
+            extra_headers=extra_headers,
         )
 
     async def _send_with_csrf(
@@ -558,15 +585,19 @@ class AsyncAdmsHttp(AsyncHttpClient):
         json: Any | None = None,
         params: dict[str, Any] | None = None,
         service_base: str | None = None,
+        extra_headers: dict[str, str] | None = None,
     ) -> httpx.Response:
         csrf = await self._get_csrf_token(service_base)
+        merged: dict[str, str] = {_CSRF_FETCH_HEADER: csrf}
+        if extra_headers:
+            merged.update(extra_headers)
         try:
             return await self._request(
                 method,
                 self._prefixed(path, service_base),
                 json=json,
                 params=params,
-                extra_headers={_CSRF_FETCH_HEADER: csrf},
+                extra_headers=merged,
             )
         except HttpError as exc:
             if exc.status_code != 403:
@@ -577,12 +608,15 @@ class AsyncAdmsHttp(AsyncHttpClient):
                 if self._csrf_tokens.get(service_base or "") == csrf:
                     self._csrf_tokens.pop(service_base or "", None)
             csrf = await self._get_csrf_token(service_base)
+            merged = {_CSRF_FETCH_HEADER: csrf}
+            if extra_headers:
+                merged.update(extra_headers)
             return await self._request(
                 method,
                 self._prefixed(path, service_base),
                 json=json,
                 params=params,
-                extra_headers={_CSRF_FETCH_HEADER: csrf},
+                extra_headers=merged,
             )
 
     # ------------------------------------------------------------------
@@ -674,16 +708,10 @@ class AsyncAdmsHttp(AsyncHttpClient):
 
         Args:
             user_jwt: The user's OIDC or XSUAA JWT from the inbound request.
-                Must be a non-blank string — ``None`` and blank/whitespace raise
-                :class:`ValueError`.
 
         Returns:
             New :class:`AsyncAdmsHttp` for user-context calls.
-
-        Raises:
-            ValueError: If *user_jwt* is ``None``, empty, or whitespace-only.
         """
-        _require_non_blank_jwt(user_jwt)
         borrowed = AsyncAdmsHttp(
             config=self._config,
             token_fetcher=self._token_fetcher,

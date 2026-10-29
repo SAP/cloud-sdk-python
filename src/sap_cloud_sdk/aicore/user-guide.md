@@ -360,10 +360,12 @@ except ContentFilteredError as e:
     return "Your request was blocked by content safety policy."
 ```
 
-The wrapper forwards every argument verbatim to `litellm.completion`
-(including `stream=True`), and only intercepts the wrapped
-`APIConnectionError` shape that LiteLLM produces for input-filter
-rejections. All other exceptions surface unchanged.
+The wrapper forwards every argument verbatim to `litellm.completion`,
+including `stream=True`. Both input and output filtering work with streaming —
+filter rejections surface as `ContentFilteredError` regardless. See the
+[Streaming Responses](#streaming-responses) section for details.
+
+All other exceptions surface unchanged.
 
 `ContentFilteredError` exposes three attributes — `direction`, `details`,
 `request_id`. The `details` field contains severity scalars from the server,
@@ -444,21 +446,33 @@ print(response.choices[0].message.content)
 
 ### Streaming Responses
 
+`stream=True` is fully supported, including when output filtering is active.
+When the server rejects a streamed response via an in-stream filter event, the
+SDK raises `ContentFilteredError(direction="output")` from inside the iterator
+— the same exception type used for buffered (non-streaming) rejections.
+
+**Important:** this translation only applies when you use
+`sap_cloud_sdk.aicore.completion` / `acompletion`. If agent frameworks such as
+`ChatLiteLLM` or LangGraph call `litellm.completion` directly, mid-stream
+output-filter rejections surface as a raw `ValueError` from the iterator.
+
 ```python
-from sap_cloud_sdk.aicore import set_aicore_config
-from litellm import completion
+from sap_cloud_sdk.aicore import ContentFilteredError, completion, set_aicore_config
 
 set_aicore_config()
 
-response = completion(
-    model="sap/gpt-4",
-    messages=[{"role": "user", "content": "Tell me a story"}],
-    stream=True,
-)
+try:
+    response = completion(
+        model="sap/gpt-4",
+        messages=[{"role": "user", "content": "Tell me a story"}],
+        stream=True,
+    )
 
-for chunk in response:
-    if chunk.choices[0].delta.content:
-        print(chunk.choices[0].delta.content, end="")
+    for chunk in response:
+        if chunk.choices[0].delta.content:
+            print(chunk.choices[0].delta.content, end="")
+except ContentFilteredError as e:
+    print(f"Blocked ({e.direction}): {e.details}")
 ```
 
 ### Using Different Models

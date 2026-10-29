@@ -1,6 +1,8 @@
 """Tests for HttpClient and XsuaaAuthProvider."""
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, call, patch
+
+from oauthlib.oauth2.rfc6749.errors import InvalidClientError
 
 import pytest
 import requests
@@ -306,3 +308,92 @@ class TestXsuaaAuthProviderSubdomainValidation:
         call_kwargs = mock_session.fetch_token.call_args[1]
         # Only the first hostname label must be replaced; path segment untouched
         assert call_kwargs["token_url"] == "https://tenant-abc.authentication.region/provider-zone/token"
+
+
+class TestXsuaaAuthProviderTokenFetchRetry:
+    """Retry + backoff on transient OAuth2 token-fetch failures (issue #6810)."""
+
+    def _make_provider(self) -> XsuaaAuthProvider:
+        cfg = MagicMock()
+        cfg.token_url = "https://provider.authentication.region/oauth/token"
+        cfg.identityzone = "provider"
+        cfg.client_id = "cid"
+        cfg.client_secret = "csecret"
+        cfg.base_url = None
+        factory = MagicMock(return_value=cfg)
+        factory.has_changed = MagicMock(return_value=False)
+        return XsuaaAuthProvider(factory)
+
+    def test_succeeds_on_first_attempt(self):
+        provider = self._make_provider()
+        with patch("sap_cloud_sdk.core.protocol.http.models.OAuth2Session") as mock_cls, \
+             patch("sap_cloud_sdk.core.protocol.http.models.time.sleep") as mock_sleep:
+            mock_session = MagicMock()
+            mock_cls.return_value = mock_session
+            mock_session.fetch_token.return_value = {"access_token": "tok", "expires_in": 3600}
+            provider._fetch_token(None)
+        assert mock_session.fetch_token.call_count == 1
+        mock_sleep.assert_not_called()
+
+    def test_retries_on_transient_failure_then_succeeds(self):
+        provider = self._make_provider()
+        transient = RuntimeError("missing_token")
+        with patch("sap_cloud_sdk.core.protocol.http.models.OAuth2Session") as mock_cls, \
+             patch("sap_cloud_sdk.core.protocol.http.models.time.sleep") as mock_sleep:
+            mock_session = MagicMock()
+            mock_cls.return_value = mock_session
+            mock_session.fetch_token.side_effect = [
+                transient,
+                {"access_token": "tok", "expires_in": 3600},
+            ]
+            provider._fetch_token(None)
+        assert mock_session.fetch_token.call_count == 2
+        mock_sleep.assert_called_once_with(0.5)
+
+    def test_retries_exhaust_and_raises_runtime_error(self):
+        provider = self._make_provider()
+        err = Exception("IAS token endpoint unavailable")
+        with patch("sap_cloud_sdk.core.protocol.http.models.OAuth2Session") as mock_cls, \
+             patch("sap_cloud_sdk.core.protocol.http.models.time.sleep"):
+            mock_session = MagicMock()
+            mock_cls.return_value = mock_session
+            mock_session.fetch_token.side_effect = err
+            with pytest.raises(RuntimeError, match="Failed to obtain OAuth2 token after 3 attempts"):
+                provider._fetch_token(None)
+        assert mock_session.fetch_token.call_count == 3
+
+    def test_backoff_delays_are_exponential(self):
+        provider = self._make_provider()
+        with patch("sap_cloud_sdk.core.protocol.http.models.OAuth2Session") as mock_cls, \
+             patch("sap_cloud_sdk.core.protocol.http.models.time.sleep") as mock_sleep:
+            mock_session = MagicMock()
+            mock_cls.return_value = mock_session
+            mock_session.fetch_token.side_effect = Exception("transient")
+            with pytest.raises(RuntimeError):
+                provider._fetch_token(None)
+        assert mock_sleep.call_args_list == [call(0.5), call(1.0)]
+
+    def test_no_sleep_after_final_attempt(self):
+        """The last attempt must not be followed by a sleep before raising."""
+        provider = self._make_provider()
+        with patch("sap_cloud_sdk.core.protocol.http.models.OAuth2Session") as mock_cls, \
+             patch("sap_cloud_sdk.core.protocol.http.models.time.sleep") as mock_sleep:
+            mock_session = MagicMock()
+            mock_cls.return_value = mock_session
+            mock_session.fetch_token.side_effect = Exception("transient")
+            with pytest.raises(RuntimeError):
+                provider._fetch_token(None)
+        assert mock_sleep.call_count == 2  # only after attempts 1 and 2, not 3
+
+    def test_fatal_client_error_raises_immediately_without_retry(self):
+        provider = self._make_provider()
+        fatal = InvalidClientError()
+        with patch("sap_cloud_sdk.core.protocol.http.models.OAuth2Session") as mock_cls, \
+             patch("sap_cloud_sdk.core.protocol.http.models.time.sleep") as mock_sleep:
+            mock_session = MagicMock()
+            mock_cls.return_value = mock_session
+            mock_session.fetch_token.side_effect = fatal
+            with pytest.raises(InvalidClientError):
+                provider._fetch_token(None)
+        assert mock_session.fetch_token.call_count == 1
+        mock_sleep.assert_not_called()

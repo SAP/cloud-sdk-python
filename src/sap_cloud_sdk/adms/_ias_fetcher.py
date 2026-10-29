@@ -14,16 +14,13 @@ Token caching:
 
 from __future__ import annotations
 
-import logging
-from typing import Callable, Optional
+from typing import Optional
 
 import requests
 
 from sap_cloud_sdk.adms._token_cache import InMemoryTokenCache, TokenCache
 from sap_cloud_sdk.adms.config import AdmsConfig
 from sap_cloud_sdk.adms.exceptions import AuthError
-
-logger = logging.getLogger(__name__)
 
 # Grant types (RFC 6749 / RFC 7523)
 _GRANT_CLIENT_CREDENTIALS = "client_credentials"
@@ -79,35 +76,17 @@ class IasTokenFetcher:
 
     def __init__(
         self,
-        config: AdmsConfig | Callable[[], AdmsConfig],
+        config: AdmsConfig,
         session: Optional[requests.Session] = None,
         cache: Optional[TokenCache] = None,
     ) -> None:
-        if callable(config) and not isinstance(config, AdmsConfig):
-            self._config_factory: Callable[[], AdmsConfig] = config
-            self._config = config()
-        else:
-            self._config_factory = lambda: config  # type: ignore[arg-type]
-            self._config = config  # type: ignore[assignment]
+        self._ias_url = config.ias_url.rstrip("/")
+        self._client_id = config.client_id
+        self._client_secret = config.client_secret
         self._session = session or requests.Session()
-        self._cache: TokenCache = cache or InMemoryTokenCache()
-        self._apply_config()
-
-    def _apply_config(self) -> None:
-        """Sync derived attributes from the current ``_config``."""
-        self._ias_url = self._config.ias_url.rstrip("/")
-        self._client_id = self._config.client_id
-        self._client_secret = self._config.client_secret
         self._token_url = self._ias_url + "/oauth2/token"
-        self._resource: Optional[str] = self._config.resource
-
-    def _refresh_if_rotated(self) -> None:
-        """Proactively refresh credentials and clear the token cache if the binding changed."""
-        has_changed = getattr(self._config_factory, "has_changed", None)
-        if callable(has_changed) and has_changed():
-            self._config = self._config_factory()
-            self._apply_config()
-            self._cache = InMemoryTokenCache()
+        self._cache: TokenCache = cache or InMemoryTokenCache()
+        self._resource: Optional[str] = config.resource
 
     # ------------------------------------------------------------------
     # Public API
@@ -126,7 +105,6 @@ class IasTokenFetcher:
             AuthError: If the IAS token endpoint returns an error or the
                 response is missing ``access_token``.
         """
-        self._refresh_if_rotated()
         cached = self._cache.get(_CC_CACHE_KEY)
         if cached:
             return cached

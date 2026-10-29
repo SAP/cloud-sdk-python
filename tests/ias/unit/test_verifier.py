@@ -25,13 +25,15 @@ class TestIASVerifierFromEnv:
             v = IASVerifier.from_env()
         assert v._ias_url == "https://ias.example.com"
 
-    def test_cf_vcap_services_no_client_id(self, monkeypatch):
+    def test_cf_vcap_services_no_client_id_raises(self, monkeypatch):
+        # Security (FINDING-444): a binding without clientid must not silently
+        # disable audience validation — from_env fails closed.
         vcap = {"identity": [{"credentials": {"url": "https://ias.example.com"}}]}
         monkeypatch.setenv("VCAP_SERVICES", json.dumps(vcap))
         monkeypatch.delenv("IAS_URL", raising=False)
         with patch("sap_cloud_sdk.ias._verifier.PyJWKClient"):
-            v = IASVerifier.from_env()
-        assert v._client_id is None
+            with pytest.raises(IASConfigError, match="clientid"):
+                IASVerifier.from_env()
 
     def test_cf_vcap_services_xsuaa_fallback(self, monkeypatch):
         vcap = {"xsuaa": [{"credentials": {"url": "https://xsuaa.example.com", "clientid": "xc"}}]}
@@ -50,13 +52,14 @@ class TestIASVerifierFromEnv:
         assert v._ias_url == "https://k8s-ias.example.com"
         assert v._client_id == "k8s-client"
 
-    def test_k8s_env_vars_no_client_id(self, monkeypatch):
+    def test_k8s_env_vars_no_client_id_raises(self, monkeypatch):
+        # Security (FINDING-444): IAS_URL without IAS_CLIENT_ID must fail closed.
         monkeypatch.delenv("VCAP_SERVICES", raising=False)
         monkeypatch.setenv("IAS_URL", "https://k8s-ias.example.com")
         monkeypatch.delenv("IAS_CLIENT_ID", raising=False)
         with patch("sap_cloud_sdk.ias._verifier.PyJWKClient"):
-            v = IASVerifier.from_env()
-        assert v._client_id is None
+            with pytest.raises(IASConfigError, match="IAS_CLIENT_ID"):
+                IASVerifier.from_env()
 
     def test_raises_when_nothing_configured(self, monkeypatch):
         monkeypatch.delenv("VCAP_SERVICES", raising=False)
@@ -103,6 +106,7 @@ class TestIASVerifierFromEnv:
     def test_k8s_mount_no_url_falls_through_to_env_var(self, monkeypatch):
         monkeypatch.delenv("VCAP_SERVICES", raising=False)
         monkeypatch.setenv("IAS_URL", "https://env-ias.example.com")
+        monkeypatch.setenv("IAS_CLIENT_ID", "env-client")
 
         def _fake_read_secret(base_volume_mount, base_var_name, module, instance, target):
             target.clientid = "mount-client"
@@ -113,9 +117,25 @@ class TestIASVerifierFromEnv:
                 v = IASVerifier.from_env()
         assert v._ias_url == "https://env-ias.example.com"
 
+    def test_k8s_mount_with_url_no_client_id_raises(self, monkeypatch):
+        # Security (FINDING-444): a mounted binding with url but no clientid
+        # must fail closed rather than fall through or skip audience.
+        monkeypatch.delenv("VCAP_SERVICES", raising=False)
+        monkeypatch.delenv("IAS_URL", raising=False)
+
+        def _fake_read_secret(base_volume_mount, base_var_name, module, instance, target):
+            target.url = "https://mount-ias.example.com"
+            # clientid stays ""
+
+        with patch("sap_cloud_sdk.ias._verifier._read_secret", side_effect=_fake_read_secret):
+            with patch("sap_cloud_sdk.ias._verifier.PyJWKClient"):
+                with pytest.raises(IASConfigError, match="clientid"):
+                    IASVerifier.from_env()
+
     def test_k8s_mount_raises_falls_through_to_env_var(self, monkeypatch):
         monkeypatch.delenv("VCAP_SERVICES", raising=False)
         monkeypatch.setenv("IAS_URL", "https://env-ias.example.com")
+        monkeypatch.setenv("IAS_CLIENT_ID", "env-client")
 
         with patch("sap_cloud_sdk.ias._verifier._read_secret", side_effect=RuntimeError("mount not found")):
             with patch("sap_cloud_sdk.ias._verifier.PyJWKClient"):
@@ -141,6 +161,7 @@ class TestIASVerifierFromEnv:
 
         def _fake_read_secret(base_volume_mount, base_var_name, module, instance, target):
             target.url = "https://mount-ias.example.com"
+            target.clientid = "mount-client"
 
         with patch("sap_cloud_sdk.ias._verifier._read_secret", side_effect=_fake_read_secret):
             with patch("sap_cloud_sdk.ias._verifier.PyJWKClient"):

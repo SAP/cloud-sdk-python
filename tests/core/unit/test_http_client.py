@@ -2,6 +2,8 @@
 
 from unittest.mock import MagicMock, call, patch
 
+from oauthlib.oauth2.rfc6749.errors import InvalidClientError
+
 import pytest
 import requests
 
@@ -382,3 +384,16 @@ class TestXsuaaAuthProviderTokenFetchRetry:
             with pytest.raises(RuntimeError):
                 provider._fetch_token(None)
         assert mock_sleep.call_count == 2  # only after attempts 1 and 2, not 3
+
+    def test_fatal_client_error_raises_immediately_without_retry(self):
+        provider = self._make_provider()
+        fatal = InvalidClientError()
+        with patch("sap_cloud_sdk.core.protocol.http.models.OAuth2Session") as mock_cls, \
+             patch("sap_cloud_sdk.core.protocol.http.models.time.sleep") as mock_sleep:
+            mock_session = MagicMock()
+            mock_cls.return_value = mock_session
+            mock_session.fetch_token.side_effect = fatal
+            with pytest.raises(InvalidClientError):
+                provider._fetch_token(None)
+        assert mock_session.fetch_token.call_count == 1
+        mock_sleep.assert_not_called()

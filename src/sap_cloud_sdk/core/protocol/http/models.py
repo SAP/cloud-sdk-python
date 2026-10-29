@@ -12,6 +12,7 @@ from enum import Enum
 
 import requests
 from oauthlib.oauth2 import BackendApplicationClient
+from oauthlib.oauth2.rfc6749.errors import FatalClientError
 from requests_oauthlib import OAuth2Session
 
 from sap_cloud_sdk.core._tenant import (
@@ -136,6 +137,8 @@ class XsuaaAuthProvider(AuthProvider):
                 )
                 last_exc = None
                 break
+            except FatalClientError:
+                raise
             except Exception as exc:
                 last_exc = exc
                 if attempt < _TOKEN_FETCH_MAX_ATTEMPTS - 1:

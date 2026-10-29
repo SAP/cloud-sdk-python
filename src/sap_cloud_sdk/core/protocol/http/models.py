@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import threading
+import time
 from abc import ABC, abstractmethod
 from datetime import datetime, timedelta
 from typing import Any, Callable, Optional
@@ -22,6 +23,8 @@ logger = logging.getLogger(__name__)
 
 _TOKEN_EXPIRY_BUFFER_SECONDS = 60
 _DEFAULT_TIMEOUT = 30.0
+_TOKEN_FETCH_MAX_ATTEMPTS = 3
+_TOKEN_FETCH_BACKOFF_BASE = 0.5  # seconds; delay = base * 2^attempt
 
 
 class HttpMethod(Enum):
@@ -121,16 +124,34 @@ class XsuaaAuthProvider(AuthProvider):
 
         client = BackendApplicationClient(client_id=str(self._config.client_id))
         oauth = OAuth2Session(client=client)
-        try:
-            token = oauth.fetch_token(
-                token_url=token_url,
-                client_id=str(self._config.client_id),
-                client_secret=str(self._config.client_secret),
-                include_client_id=True,
-                timeout=self._timeout,
-            )
-        except Exception as exc:
-            raise RuntimeError(f"Failed to obtain OAuth2 token: {exc}") from exc
+        last_exc: Exception | None = None
+        for attempt in range(_TOKEN_FETCH_MAX_ATTEMPTS):
+            try:
+                token = oauth.fetch_token(
+                    token_url=token_url,
+                    client_id=str(self._config.client_id),
+                    client_secret=str(self._config.client_secret),
+                    include_client_id=True,
+                    timeout=self._timeout,
+                )
+                last_exc = None
+                break
+            except Exception as exc:
+                last_exc = exc
+                if attempt < _TOKEN_FETCH_MAX_ATTEMPTS - 1:
+                    delay = _TOKEN_FETCH_BACKOFF_BASE * (2**attempt)
+                    logger.warning(
+                        "OAuth2 token fetch failed (attempt %d/%d), retrying in %.1fs: %s",
+                        attempt + 1,
+                        _TOKEN_FETCH_MAX_ATTEMPTS,
+                        delay,
+                        exc,
+                    )
+                    time.sleep(delay)
+        if last_exc is not None:
+            raise RuntimeError(
+                f"Failed to obtain OAuth2 token after {_TOKEN_FETCH_MAX_ATTEMPTS} attempts: {last_exc}"
+            ) from last_exc
 
         expires_in: int = token.get("expires_in", 3600)
         expires_at = datetime.now() + timedelta(

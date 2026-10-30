@@ -464,8 +464,10 @@ class AgentGatewayClient:
                 tenant,
                 auth.access_token,
                 self._config.timeout,
+                auth.gateway_url,
                 filter=filter,
                 max_concurrent_tasks=self._config.max_concurrent_tasks,
+                allowed_tool_hosts=self._config.allowed_tool_hosts,
             )
 
         except AgentGatewaySDKError:
@@ -647,7 +649,11 @@ class AgentGatewayClient:
                 )
 
                 return await call_mcp_tool_customer(
-                    tool, auth.access_token, self._config.timeout, **kwargs
+                    tool,
+                    auth.access_token,
+                    self._config.timeout,
+                    auth.gateway_url,
+                    **kwargs,
                 )
 
             # Check for transparent mode
@@ -655,7 +661,11 @@ class AgentGatewayClient:
                 logger.debug(_LOG_TRANSPARENT_MODE)
 
                 return await call_mcp_tool_customer(
-                    tool, auth.access_token, self._config.timeout, **kwargs
+                    tool,
+                    auth.access_token,
+                    self._config.timeout,
+                    auth.gateway_url,
+                    **kwargs,
                 )
 
             if not user_token:
@@ -663,7 +673,12 @@ class AgentGatewayClient:
                     "user_token is required for LoB tool invocation."
                 )
             return await call_mcp_tool_lob(
-                tool, auth.access_token, self._config.timeout, **kwargs
+                tool,
+                auth.access_token,
+                self._config.timeout,
+                auth.gateway_url,
+                self._config.allowed_tool_hosts,
+                **kwargs,
             )
 
         except AgentGatewaySDKError:

@@ -52,6 +52,7 @@ from sap_cloud_sdk.agentgateway._models import (
     MCPToolFilter,
 )
 from sap_cloud_sdk.agentgateway._token_cache import _GatewayUrlCache, _TokenCache
+from sap_cloud_sdk.agentgateway._url import _require_same_origin
 from sap_cloud_sdk.agentgateway.exceptions import (
     AgentGatewaySDKError,
     AgentGatewayServerError,
@@ -364,7 +365,12 @@ def _log_mcp_server_error(fragment_name: str, exc: BaseException) -> None:
 
 
 async def list_server_tools(
-    dest_url: str, auth_token: str, fragment_name: str, timeout: float
+    dest_url: str,
+    auth_token: str,
+    fragment_name: str,
+    timeout: float,
+    gateway_url: str,
+    allowed_tool_hosts: tuple[str, ...] = (),
 ) -> list[MCPTool]:
     """List tools from a single MCP server.
 
@@ -372,10 +378,18 @@ async def list_server_tools(
         dest_url: MCP endpoint URL.
         auth_token: Raw access token for the request.
         fragment_name: Fragment name for reference.
+        timeout: HTTP timeout in seconds for the MCP server call.
+        gateway_url: Trusted gateway origin; dest_url is pinned to it before the
+            token is attached.
+        allowed_tool_hosts: Additional permitted hosts (LoB escape hatch).
 
     Returns:
         List of MCPTool objects from this server.
+
+    Raises:
+        AgentGatewaySDKError: If dest_url is not pinned to the gateway origin.
     """
+    _require_same_origin(dest_url, gateway_url, extra_allowed_hosts=allowed_tool_hosts)
     async with httpx.AsyncClient(
         headers={
             "Authorization": f"Bearer {auth_token}",
@@ -415,8 +429,10 @@ async def get_mcp_tools_lob(
     tenant_subdomain: str,
     system_token: str,
     timeout: float,
+    gateway_url: str,
     filter: MCPToolFilter | None = None,
     max_concurrent_tasks: int = DEFAULT_MAX_CONCURRENT_TASKS,
+    allowed_tool_hosts: tuple[str, ...] = (),
 ) -> list[MCPTool]:
     """List all MCP tools using LoB flow (destination-based).
 
@@ -426,10 +442,13 @@ async def get_mcp_tools_lob(
         tenant_subdomain: Tenant subdomain for multi-tenant lookup.
         system_token: Pre-fetched raw system token (from get_system_auth).
         timeout: HTTP timeout in seconds for MCP server calls.
+        gateway_url: Trusted gateway origin; each fragment URL is pinned to it
+            before the token is attached.
         filter: Optional MCPToolFilter narrowing results by tool name or ORD ID.
             If None or empty, all tools are included.
         max_concurrent_tasks: Maximum number of fragment fetches that run
             concurrently. Defaults to 15.
+        allowed_tool_hosts: Additional permitted hosts (LoB escape hatch).
 
     Returns:
         List of MCPTool objects from all MCP servers.
@@ -471,6 +490,17 @@ async def get_mcp_tools_lob(
                 "Fragment '%s' has no URL property — skipping", fragment_name
             )
             continue
+        try:
+            _require_same_origin(
+                mcp_url, gateway_url, extra_allowed_hosts=allowed_tool_hosts
+            )
+        except AgentGatewaySDKError as exc:
+            logger.warning(
+                "Fragment '%s' URL is not pinned to the gateway origin — skipping: %s",
+                fragment_name,
+                exc,
+            )
+            continue
         tasks.append((fragment_name, mcp_url))
 
     # Fetch all fragments concurrently; isolate per-fragment failures
@@ -479,7 +509,12 @@ async def get_mcp_tools_lob(
     async def _guarded_mcp(mcp_url: str, fragment_name: str) -> list[MCPTool]:
         async with semaphore:
             return await list_server_tools(
-                mcp_url, system_token, fragment_name, timeout
+                mcp_url,
+                system_token,
+                fragment_name,
+                timeout,
+                gateway_url,
+                allowed_tool_hosts,
             )
 
     results = await asyncio.gather(
@@ -515,6 +550,8 @@ async def call_mcp_tool_lob(
     tool: MCPTool,
     user_auth_token: str,
     timeout: float,
+    gateway_url: str,
+    allowed_tool_hosts: tuple[str, ...] = (),
     **kwargs,
 ) -> str:
     """Invoke an MCP tool using LoB flow (destination-based).
@@ -525,11 +562,18 @@ async def call_mcp_tool_lob(
         tool: MCPTool object (from list_mcp_tools).
         user_auth_token: Pre-fetched raw user token (from get_user_auth).
         timeout: HTTP timeout in seconds for the MCP server call.
+        gateway_url: Trusted gateway origin; tool.url is pinned to it before the
+            token is attached.
+        allowed_tool_hosts: Additional permitted hosts (LoB escape hatch).
         **kwargs: Tool input parameters.
 
     Returns:
         Tool execution result as string.
+
+    Raises:
+        AgentGatewaySDKError: If tool.url is not pinned to the gateway origin.
     """
+    _require_same_origin(tool.url, gateway_url, extra_allowed_hosts=allowed_tool_hosts)
     async with httpx.AsyncClient(
         headers={
             "Authorization": f"Bearer {user_auth_token}",

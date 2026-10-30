@@ -52,6 +52,7 @@ from sap_cloud_sdk.agentgateway._models import (
     MCPToolFilter,
 )
 from sap_cloud_sdk.agentgateway._token_cache import _TokenCache
+from sap_cloud_sdk.agentgateway._url import _require_same_origin, _validate_mcp_id
 from sap_cloud_sdk.agentgateway.exceptions import (
     AgentGatewaySDKError,
     AgentGatewayServerError,
@@ -627,7 +628,13 @@ def _build_mcp_url(gateway_url: str, ord_id: str, gt_id: str) -> str:
 
     Returns:
         Full MCP server URL.
+
+    Raises:
+        AgentGatewaySDKError: If ord_id or gt_id is empty or contains characters
+            that are not allowed in a URL path segment.
     """
+    _validate_mcp_id(ord_id, "ord_id")
+    _validate_mcp_id(gt_id, "global_tenant_id")
     # Gateway URL may or may not include /v1/mcp
     if "/v1/mcp" in gateway_url:
         return f"{gateway_url}/{ord_id}/{gt_id}"
@@ -783,6 +790,7 @@ async def get_mcp_tools_customer(
 
     async def _guarded(dep: IntegrationDependency) -> list[MCPTool]:
         url = _build_mcp_url(credentials.gateway_url, dep.ord_id, dep.global_tenant_id)
+        _require_same_origin(url, credentials.gateway_url)
         logger.debug(
             "Discovering tools from %s (ord_id=%s, gt_id=%s)",
             url,
@@ -824,6 +832,7 @@ async def call_mcp_tool_customer(
     tool: MCPTool,
     auth_token: str,
     timeout: float,
+    gateway_url: str,
     **kwargs,
 ) -> str:
     """Invoke an MCP tool using customer flow.
@@ -835,11 +844,17 @@ async def call_mcp_tool_customer(
         tool: MCPTool to invoke.
         auth_token: Pre-fetched raw access token for authentication.
         timeout: HTTP timeout in seconds for the MCP server call.
+        gateway_url: Trusted gateway origin; tool.url is pinned to it before the
+            token is attached.
         **kwargs: Tool input parameters.
 
     Returns:
         Tool execution result as string.
+
+    Raises:
+        AgentGatewaySDKError: If tool.url is not pinned to the gateway origin.
     """
+    _require_same_origin(tool.url, gateway_url)
     logger.info("Calling tool '%s' on server '%s'", tool.name, tool.server_name)
 
     async with httpx.AsyncClient(

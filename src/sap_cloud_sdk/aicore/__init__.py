@@ -10,8 +10,8 @@ import os
 import threading
 from typing import Optional
 
-from sap_cloud_sdk.core.secret_resolver import resolve_base_mount
-from sap_cloud_sdk.core.secret_resolver._validation import (
+from sap_cloud_sdk.core.secret_resolver import (
+    resolve_base_mount,
     _assert_within_base,
     _validate_path_component,
 )

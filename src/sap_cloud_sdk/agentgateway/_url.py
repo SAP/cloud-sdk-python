@@ -49,10 +49,21 @@ def _validate_mcp_id(value: str, param_name: str) -> str:
     return value
 
 
-def _origin_host(parsed_host: str | None, parsed_port: int | None) -> str:
-    """Render a ``host[:port]`` key for comparison (host lower-cased)."""
+_DEFAULT_PORTS: dict[str, int] = {"https": 443, "http": 80}
+
+
+def _origin_host(
+    parsed_host: str | None, parsed_port: int | None, scheme: str = ""
+) -> str:
+    """Render a ``host[:port]`` key for comparison (host lower-cased).
+
+    The port is omitted when it equals the scheme default (443 for https, 80
+    for http), so ``https://host:443/`` and ``https://host/`` compare equal.
+    """
     host = (parsed_host or "").lower()
-    return f"{host}:{parsed_port}" if parsed_port is not None else host
+    if parsed_port is not None and parsed_port != _DEFAULT_PORTS.get(scheme):
+        return f"{host}:{parsed_port}"
+    return host
 
 
 def _require_same_origin(
@@ -89,12 +100,14 @@ def _require_same_origin(
     if parsed.username or parsed.password:
         raise AgentGatewaySDKError("MCP tool URL must not embed credentials (userinfo)")
 
-    url_host = _origin_host(parsed.hostname, parsed.port)
+    url_host = _origin_host(parsed.hostname, parsed.port, parsed.scheme)
     if not url_host:
         raise AgentGatewaySDKError(f"MCP tool URL has no host: {url!r}")
 
     origin_parsed = urlparse(allowed_origin)
-    origin_host = _origin_host(origin_parsed.hostname, origin_parsed.port)
+    origin_host = _origin_host(
+        origin_parsed.hostname, origin_parsed.port, origin_parsed.scheme
+    )
 
     allowed = {origin_host} | {h.lower() for h in extra_allowed_hosts}
     if url_host not in allowed:

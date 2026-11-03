@@ -82,6 +82,19 @@ class TestRequireSameOrigin:
             extra_allowed_hosts=("other.example",),
         )
 
+    def test_allow_listed_host_matches_when_url_has_explicit_default_port(self):
+        _require_same_origin(
+            "https://other.example:443/mcp",
+            "https://agw.example.com",
+            extra_allowed_hosts=("other.example",),
+        )
+
+    def test_gateway_origin_matches_when_url_has_explicit_default_port(self):
+        _require_same_origin(
+            "https://agw.example.com:443/v1/mcp",
+            "https://agw.example.com",
+        )
+
     def test_still_rejects_non_allow_listed_host(self):
         with pytest.raises(AgentGatewaySDKError):
             _require_same_origin(

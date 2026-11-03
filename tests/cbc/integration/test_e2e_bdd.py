@@ -20,7 +20,13 @@ from __future__ import annotations
 import pytest
 from pytest_bdd import given, scenario, then, when
 
-from sap_cloud_sdk.cbc import ConfigurationData, ConsumptionVersions, EntityData
+from sap_cloud_sdk.cbc import (
+    ConfigurationData,
+    ConsumptionVersions,
+    EntityData,
+    FeatureStatus,
+    FeatureStatuses,
+)
 from sap_cloud_sdk.cbc.client import CBCClient
 
 pytestmark = pytest.mark.integration
@@ -69,6 +75,16 @@ def test_every_entity_has_id_and_data():
     "Fetch a single entity directly returns EntityData",
 )
 def test_get_entity_data_returns_entity_data():
+    pass
+
+
+@scenario("cbc.feature", "Fetch feature statuses returns FeatureStatuses")
+def test_get_feature_statuses_returns_feature_statuses():
+    pass
+
+
+@scenario("cbc.feature", "Look up a single feature status by id")
+def test_get_feature_status_matches_full_list():
     pass
 
 
@@ -171,3 +187,36 @@ def assert_single_entity_data(ctx: dict):
     except ValueError:
         result = data.as_object()
         assert result is not None
+
+
+@when("I call get_feature_statuses")
+def call_get_feature_statuses(ctx: dict, cbc_client: CBCClient):
+    ctx["feature_statuses"] = cbc_client.get_feature_statuses()
+
+
+@then("the result should be FeatureStatuses")
+def assert_feature_statuses_type(ctx: dict):
+    assert isinstance(ctx["feature_statuses"], FeatureStatuses)
+
+
+@then("every feature should have a non-empty feature_id")
+def assert_feature_ids_non_empty(ctx: dict):
+    statuses: FeatureStatuses = ctx["feature_statuses"]
+    for f in statuses.features:
+        assert f.feature_id, "feature_id missing on a FeatureStatus"
+
+
+@when("I call get_feature_status for the first feature id")
+def call_get_feature_status(ctx: dict, cbc_client: CBCClient):
+    statuses: FeatureStatuses = ctx["feature_statuses"]
+    if not statuses.features:
+        pytest.skip("tenant has no features — cannot test get_feature_status")
+    ctx["first_feature_id"] = statuses.features[0].feature_id
+    ctx["single_feature"] = cbc_client.get_feature_status(ctx["first_feature_id"])
+
+
+@then("the result should be a FeatureStatus for the requested feature id")
+def assert_single_feature_matches(ctx: dict):
+    single: FeatureStatus | None = ctx["single_feature"]
+    assert single is not None
+    assert single.feature_id == ctx["first_feature_id"]

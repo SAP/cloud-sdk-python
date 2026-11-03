@@ -40,10 +40,16 @@ from sap_cloud_sdk.cbc.exceptions import (
     CBCError,
     CBCClientError,
     CBCConfigError,
+    CBCEventError,
     CBCHttpError,
     CBCNetworkError,
     CBCServerError,
     HttpContext,
+)
+from sap_cloud_sdk.cbc._events import (
+    CBCEventHandler,
+    ConsumptionVersionEvent,
+    FeatureActivationEvent,
 )
 from sap_cloud_sdk.cbc._models import (
     ApiError,
@@ -53,6 +59,9 @@ from sap_cloud_sdk.cbc._models import (
     ConsumptionVersion,
     ConsumptionVersions,
     EntityData,
+    FeatureActivationData,
+    FeatureStatus,
+    FeatureStatuses,
 )
 
 
@@ -67,13 +76,22 @@ __all__ = [
     "CBCError",
     "CBCClientError",
     "CBCConfigError",
+    "CBCEventError",
     "CBCHttpError",
     "CBCNetworkError",
     "CBCServerError",
     "HttpContext",
+    # event handler
+    "CBCEventHandler",
+    "ConsumptionVersionEvent",
+    "FeatureActivationData",
+    "FeatureActivationEvent",
     # models — consumption versions
     "ConsumptionVersion",
     "ConsumptionVersions",
+    # models — feature status
+    "FeatureStatus",
+    "FeatureStatuses",
     # models — entities
     "EntityData",
     "ConfigurationEntity",

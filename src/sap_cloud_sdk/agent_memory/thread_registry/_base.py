@@ -49,12 +49,12 @@ def _raise_thread_conflict(
 class ThreadRegistryEntry(TypedDict):
     """A single thread registry record returned by all registry operations."""
 
-    threadId: str
-    agentId: str
-    invokerId: str
+    threadID: str
+    agentID: str
+    invokerID: str
     description: Optional[str]
-    createdAt: Optional[str]
-    updatedAt: Optional[str]
+    createTimestamp: Optional[str]
+    updateTimestamp: Optional[str]
     expiresAt: Optional[str]
     threadTtl: Optional[int]
     metadata: Optional[dict[str, Any]]

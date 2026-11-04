@@ -32,12 +32,12 @@ def reg():
 class TestInMemoryThreadRegistryCRUD:
     def test_create_or_register_and_get(self, reg):
         e = reg.create_or_register_thread("agent-a", "user-1", thread_id="t-1")
-        assert e["threadId"] == "t-1"
-        assert e["agentId"] == "agent-a"
-        assert e["invokerId"] == "user-1"
+        assert e["threadID"] == "t-1"
+        assert e["agentID"] == "agent-a"
+        assert e["invokerID"] == "user-1"
 
         got = reg.get_thread("t-1")
-        assert got["threadId"] == "t-1"
+        assert got["threadID"] == "t-1"
 
     def test_get_missing_raises(self, reg):
         with pytest.raises(AgentMemoryThreadNotFoundError, match="t-missing"):
@@ -46,7 +46,7 @@ class TestInMemoryThreadRegistryCRUD:
     def test_idempotent_create_or_register_same_owner(self, reg):
         e1 = reg.create_or_register_thread("agent-a", "user-1", thread_id="t-1")
         e2 = reg.create_or_register_thread("agent-a", "user-1", thread_id="t-1")
-        assert e1["threadId"] == e2["threadId"]
+        assert e1["threadID"] == e2["threadID"]
 
     def test_ownership_conflict(self, reg):
         reg.create_or_register_thread("agent-a", "user-1", thread_id="t-1")
@@ -55,7 +55,7 @@ class TestInMemoryThreadRegistryCRUD:
 
     def test_create_without_thread_id_assigns_uuid(self, reg):
         e = reg.create_or_register_thread("agent-a", "user-1")
-        assert len(e["threadId"]) == 36  # UUID format
+        assert len(e["threadID"]) == 36  # UUID format
 
     def test_list_threads(self, reg):
         reg.create_or_register_thread("agent-a", "user-1", thread_id="t-1")
@@ -69,14 +69,14 @@ class TestInMemoryThreadRegistryCRUD:
         reg.create_or_register_thread("agent-b", "user-2", thread_id="t-2")
         page = reg.list_threads(agent_id="agent-a")
         assert len(page["entries"]) == 1
-        assert page["entries"][0]["threadId"] == "t-1"
+        assert page["entries"][0]["threadID"] == "t-1"
 
     def test_list_threads_filter_invoker_id(self, reg):
         reg.create_or_register_thread("agent-a", "user-1", thread_id="t-1")
         reg.create_or_register_thread("agent-a", "user-2", thread_id="t-2")
         page = reg.list_threads(invoker_id="user-2")
         assert len(page["entries"]) == 1
-        assert page["entries"][0]["threadId"] == "t-2"
+        assert page["entries"][0]["threadID"] == "t-2"
 
     def test_list_threads_returns_thread_page_fields(self, reg):
         for i in range(5):
@@ -144,7 +144,7 @@ class TestInMemoryThreadRegistrySlidingTTL:
     def test_no_ttl_thread_never_expires(self):
         r = InMemoryThreadRegistry()
         r.create_or_register_thread("agent-a", "user-1", thread_id="t-1")
-        assert r.get_thread("t-1")["threadId"] == "t-1"
+        assert r.get_thread("t-1")["threadID"] == "t-1"
 
     def test_thread_expires_after_idle_ttl(self, monkeypatch):
         r = InMemoryThreadRegistry(default_ttl_seconds=10)
@@ -162,7 +162,7 @@ class TestInMemoryThreadRegistrySlidingTTL:
         monkeypatch.setattr(entry, "last_active", time.monotonic() - 11)
         page = r.list_threads()
         assert len(page["entries"]) == 1
-        assert page["entries"][0]["threadId"] == "t-2"
+        assert page["entries"][0]["threadID"] == "t-2"
 
     def test_update_slides_window(self, monkeypatch):
         r = InMemoryThreadRegistry(default_ttl_seconds=10)
@@ -170,12 +170,12 @@ class TestInMemoryThreadRegistrySlidingTTL:
         entry = r._store["t-1"]
         monkeypatch.setattr(entry, "last_active", time.monotonic() - 9)
         r.update_thread("t-1", description="touched")
-        assert r.get_thread("t-1")["threadId"] == "t-1"
+        assert r.get_thread("t-1")["threadID"] == "t-1"
 
     def test_none_ttl_never_expires(self):
         r = InMemoryThreadRegistry(default_ttl_seconds=None)
         r.create_or_register_thread("agent-a", "user-1", thread_id="t-1")
-        assert r.get_thread("t-1")["threadId"] == "t-1"
+        assert r.get_thread("t-1")["threadID"] == "t-1"
 
 
 # ---------------------------------------------------------------------------
@@ -221,7 +221,7 @@ class TestInMemoryThreadRegistryPerThreadTTL:
         )
         entry = r._store["t-1"]
         monkeypatch.setattr(entry, "last_active", time.monotonic() - 6)
-        assert r.get_thread("t-1")["threadId"] == "t-1"
+        assert r.get_thread("t-1")["threadID"] == "t-1"
 
     def test_to_entry_includes_thread_ttl(self):
         r = InMemoryThreadRegistry()

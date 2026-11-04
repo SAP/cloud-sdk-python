@@ -57,12 +57,12 @@ class _StoredEntry:
         else:
             expires_iso = None
         return ThreadRegistryEntry(
-            threadId=self.thread_id,
-            agentId=self.agent_id,
-            invokerId=self.invoker_id,
+            threadID=self.thread_id,
+            agentID=self.agent_id,
+            invokerID=self.invoker_id,
             description=self.description,
-            createdAt=self.created_at,
-            updatedAt=self.last_active_wall.strftime("%Y-%m-%dT%H:%M:%SZ"),
+            createTimestamp=self.created_at,
+            updateTimestamp=self.last_active_wall.strftime("%Y-%m-%dT%H:%M:%SZ"),
             expiresAt=expires_iso,
             threadTtl=self.thread_ttl,
             metadata=self.metadata,

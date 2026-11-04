@@ -504,3 +504,103 @@ class TestSdkConfig:
         # Verify it contains MountResolver and SdkEnvVarResolver by attempting resolution
         # (the internal _resolvers list is private, so we check behaviour via the protocol)
         assert hasattr(resolver, "resolve")
+
+
+BAD_INSTANCE_VALUES = [
+    "../default",
+    "../../etc",
+    "/etc/passwd",
+    "C:\\Windows",
+    "C:/Windows",
+    "\\\\server\\share",
+    "foo/bar",
+    "foo\\bar",
+    "foo\x00bar",
+    "foo\x01bar",
+    ".",
+    "..",
+    "a" * 256,
+]
+
+BAD_MODULE_VALUES = [
+    "../sibling",
+    "/abs/path",
+    "foo/bar",
+    "..",
+]
+
+GOOD_VALUES = [
+    "default",
+    "hana-agent-memory",
+    "aicore-instance",
+    "my-tenant-us10",
+    "foo.bar",
+]
+
+
+class TestPathTraversalLegacy:
+    """Path-traversal validation via the legacy function entry point."""
+
+    @pytest.mark.parametrize("bad", BAD_INSTANCE_VALUES)
+    def test_bad_instance_raises(self, bad):
+        with pytest.raises(ValueError, match="instance"):
+            read_from_mount_and_fallback_to_env_var("/path", "VAR", "module", bad, SampleConfig())
+
+    @pytest.mark.parametrize("bad", BAD_MODULE_VALUES)
+    def test_bad_module_raises(self, bad):
+        with pytest.raises(ValueError, match="module"):
+            read_from_mount_and_fallback_to_env_var("/path", "VAR", bad, "instance", SampleConfig())
+
+
+class TestPathTraversalChainedResolver:
+    """Path-traversal validation via the default class-based entry point."""
+
+    def _chain(self):
+        return ChainedResolver([MountResolver(), SdkEnvVarResolver()])
+
+    @pytest.mark.parametrize("bad", BAD_INSTANCE_VALUES)
+    def test_bad_instance_raises(self, bad):
+        with pytest.raises(ValueError, match="instance"):
+            self._chain().resolve("module", bad, SampleConfig())
+
+    @pytest.mark.parametrize("bad", BAD_MODULE_VALUES)
+    def test_bad_module_raises(self, bad):
+        with pytest.raises(ValueError, match="module"):
+            self._chain().resolve(bad, "instance", SampleConfig())
+
+    @patch.dict(os.environ, {
+        "CLOUD_SDK_CFG_MODULE_X_USER": "leaked",
+    })
+    def test_rejected_value_reads_no_files_and_no_env_fallback(self):
+        def _spy_open(*args, **kwargs):
+            raise AssertionError("open() must not be called for a rejected value")
+
+        config = SampleConfig()
+        with patch("builtins.open", side_effect=_spy_open):
+            with pytest.raises(ValueError, match="instance"):
+                self._chain().resolve("module", "../../x", config)
+        assert config.username == ""
+
+    @pytest.mark.parametrize("good", GOOD_VALUES)
+    def test_valid_identifier_passes_validation(self, good):
+        # Valid names pass validation; the chain still fails (no mount, no env).
+        with patch.dict(os.environ, {}, clear=True):
+            with pytest.raises(RuntimeError):
+                ChainedResolver([MountResolver("/nonexistent"), SdkEnvVarResolver()]).resolve(
+                    "module", good, SampleConfig()
+                )
+
+
+class TestPathTraversalMountContainment:
+    """Containment (symlink-escape) protection in the mount resolver."""
+
+    def test_symlink_escaping_base_is_rejected(self, tmp_path):
+        base = tmp_path / "appfnd"
+        module_dir = base / "module"
+        module_dir.mkdir(parents=True)
+        outside = tmp_path / "outside"
+        outside.mkdir()
+        (module_dir / "default").symlink_to(outside, target_is_directory=True)
+
+        with pytest.raises(ValueError, match="escapes trusted root"):
+            MountResolver(str(base)).resolve("module", "default", SampleConfig())

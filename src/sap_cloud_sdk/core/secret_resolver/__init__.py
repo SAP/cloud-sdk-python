@@ -46,6 +46,10 @@ from sap_cloud_sdk.core.secret_resolver.sdk_config import (
     get_sdk_config,
     get_resolver,
 )
+from sap_cloud_sdk.core.secret_resolver._validation import (
+    _assert_within_base,
+    _validate_path_component,
+)
 
 __all__ = [
     # Class-based API
@@ -61,4 +65,7 @@ __all__ = [
     # Legacy function-based API
     "read_from_mount_and_fallback_to_env_var",
     "resolve_base_mount",
+    # Internal helpers (re-exported for SDK-internal cross-package use)
+    "_assert_within_base",
+    "_validate_path_component",
 ]

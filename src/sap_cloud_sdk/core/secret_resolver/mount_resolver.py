@@ -4,6 +4,7 @@ import os
 from typing import Any
 
 from sap_cloud_sdk.core.secret_resolver._mapping import _get_field_map
+from sap_cloud_sdk.core.secret_resolver._validation import _assert_within_base
 from sap_cloud_sdk.core.secret_resolver.constants import (
     BASE_MOUNT_PATH,
     SERVICE_BINDING_ROOT,
@@ -59,6 +60,7 @@ def _load_from_mount(
     Sets string attributes directly on the dataclass instance.
     """
     secret_dir = os.path.join(base_volume_mount, module, instance)
+    _assert_within_base(base_volume_mount, secret_dir)
     _validate_path(secret_dir)
 
     field_map = _get_field_map(target)

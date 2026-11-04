@@ -9,6 +9,7 @@ from sap_cloud_sdk.core.secret_resolver.mount_resolver import (
     _load_from_mount,
 )
 from sap_cloud_sdk.core.secret_resolver.sdk_env_resolver import _load_from_env
+from sap_cloud_sdk.core.secret_resolver._validation import _validate_inputs
 
 
 def read_from_mount_and_fallback_to_env_var(
@@ -67,11 +68,3 @@ def read_from_mount_and_fallback_to_env_var(
     raise RuntimeError(
         f"module={module} instance={instance} failed to read secrets: {errors} {guidance}"
     )
-
-
-def _validate_inputs(module: str, instance: str) -> None:
-    """Validate module and instance inputs."""
-    if not isinstance(module, str) or not module.strip():
-        raise ValueError("module name cannot be empty")
-    if not isinstance(instance, str) or not instance.strip():
-        raise ValueError("instance name cannot be empty")

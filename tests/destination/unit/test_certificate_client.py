@@ -576,3 +576,75 @@ class TestCertificateClientLabels:
         certificate_client.patch_certificate_labels("cert1", PatchLabels(action="ADD", labels=[]))
         _, kwargs = mock_http.request.call_args
         assert kwargs["tenant_subdomain"] is None
+
+
+# ---------------------------------------------------------------------------
+# Path traversal guard — added by security fix
+# ---------------------------------------------------------------------------
+
+_ATTACK_NAMES = ["../etc/passwd", "a/b", "a%2Fb", "a?q=1", "a#frag"]
+
+
+class TestCertificatePathTraversalGuard:
+    """Validates that invalid names are rejected before any HTTP call."""
+
+    @pytest.fixture
+    def client(self):
+        http = Mock()
+        return CertificateClient(http), http
+
+    @pytest.mark.parametrize("name", _ATTACK_NAMES)
+    def test_delete_certificate_rejects_traversal_names(self, client, name):
+        c, http = client
+        with pytest.raises(ValueError):
+            c.delete_certificate(name)
+        http.request.assert_not_called()
+
+    @pytest.mark.parametrize("name", _ATTACK_NAMES)
+    def test_get_certificate_labels_rejects_traversal_names(self, client, name):
+        c, http = client
+        with pytest.raises(ValueError):
+            c.get_certificate_labels(name)
+        http.request.assert_not_called()
+
+    @pytest.mark.parametrize("name", _ATTACK_NAMES)
+    def test_update_certificate_labels_rejects_traversal_names(self, client, name):
+        c, http = client
+        with pytest.raises(ValueError):
+            c.update_certificate_labels(name, [])
+        http.request.assert_not_called()
+
+    @pytest.mark.parametrize("name", _ATTACK_NAMES)
+    def test_patch_certificate_labels_rejects_traversal_names(self, client, name):
+        c, http = client
+        with pytest.raises(ValueError):
+            c.patch_certificate_labels(name, PatchLabels(action="ADD", labels=[]))
+        http.request.assert_not_called()
+
+    def test_create_certificate_rejects_invalid_name(self, client):
+        c, http = client
+        cert = Certificate(name="../evil", content="abc")
+        with pytest.raises(ValueError):
+            c.create_certificate(cert)
+        http.request.assert_not_called()
+
+    def test_update_certificate_rejects_invalid_name(self, client):
+        c, http = client
+        cert = Certificate(name="../evil", content="abc")
+        with pytest.raises(ValueError):
+            c.update_certificate(cert)
+        http.request.assert_not_called()
+
+    @pytest.mark.parametrize("name", _ATTACK_NAMES)
+    def test_get_instance_certificate_rejects_traversal_names(self, client, name):
+        c, http = client
+        with pytest.raises(ValueError):
+            c.get_instance_certificate(name)
+        http.request.assert_not_called()
+
+    @pytest.mark.parametrize("name", _ATTACK_NAMES)
+    def test_get_subaccount_certificate_rejects_traversal_names(self, client, name):
+        c, http = client
+        with pytest.raises(ValueError):
+            c.get_subaccount_certificate(name)
+        http.request.assert_not_called()

@@ -1,4 +1,4 @@
-"""Unit tests for the LiteLLM patch (FilteringOrchestrationConfig, _install, _parse_input_filter_error)."""
+"""Unit tests for the LiteLLM patch (FilteringOrchestrationConfig, _install, _parse_input_filter_error, _parse_output_filter_stream_error)."""
 
 import json
 import pytest
@@ -17,6 +17,7 @@ from sap_cloud_sdk.aicore.filtering._patch import (
     FilteringOrchestrationConfig,
     _install,
     _ORIGINAL_CONFIG,
+    _parse_output_filter_stream_error,
 )
 from sap_cloud_sdk.aicore.filtering.config import load_from_env
 from sap_cloud_sdk.aicore.filtering.exceptions import ContentFilteredError
@@ -284,3 +285,59 @@ class TestInstall:
         _install(cfg)  # second call — no error
         assert litellm.GenAIHubOrchestrationConfig is FilteringOrchestrationConfig
         _install(None)
+
+
+# ---------------------------------------------------------------------------
+# _parse_output_filter_stream_error tests
+# ---------------------------------------------------------------------------
+
+
+OUTPUT_FILTER_STREAM_ERROR = {
+    "error": {
+        "request_id": "req-stream-output",
+        "code": 500,
+        "message": "Content filtered by output filter.",
+        "location": "Filtering Module - Output Filter",
+        "intermediate_results": {
+            "output_filtering": {
+                "data": {
+                    "azure_content_safety": {"Hate": 0, "Violence": 6}
+                }
+            }
+        },
+    }
+}
+
+
+class TestParseOutputFilterStreamError:
+    def _make_exc(self, payload: dict) -> ValueError:
+        return ValueError(json.dumps(payload))
+
+    def test_extracts_output_filter(self):
+        exc = self._make_exc(OUTPUT_FILTER_STREAM_ERROR)
+        blocked = _parse_output_filter_stream_error(exc)
+        assert blocked is not None
+        assert blocked.direction == "output"
+        assert blocked.request_id == "req-stream-output"
+        assert blocked.details["azure_content_safety"]["Violence"] == 6
+
+    def test_returns_none_for_non_output_location(self):
+        body = {"error": {"location": "Filtering Module - Input Filter", "message": "x"}}
+        assert _parse_output_filter_stream_error(self._make_exc(body)) is None
+
+    def test_returns_none_for_non_filter_error(self):
+        body = {"error": {"location": "Model Module", "message": "model error"}}
+        assert _parse_output_filter_stream_error(self._make_exc(body)) is None
+
+    def test_returns_none_for_no_brace(self):
+        assert _parse_output_filter_stream_error(ValueError("network error")) is None
+
+    def test_returns_none_for_malformed_json(self):
+        assert _parse_output_filter_stream_error(ValueError("{not valid json}")) is None
+
+    def test_returns_none_for_non_exception(self):
+        assert _parse_output_filter_stream_error(KeyboardInterrupt()) is None
+
+    def test_stream_with_no_output_filter_location_passes_through(self):
+        body = {"code": 500, "message": "some server error"}
+        assert _parse_output_filter_stream_error(self._make_exc(body)) is None

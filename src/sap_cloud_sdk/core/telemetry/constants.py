@@ -26,6 +26,10 @@ ATTR_SAP_SDK_LANGUAGE = "sap.cloud_sdk.language"
 ATTR_SAP_SDK_VERSION = "sap.cloud_sdk.version"
 ATTR_SAP_SOLUTION_AREA = "sap.solution_area"
 
+# Attribute keys - SAP QoS (quality of service)
+ATTR_SAP_QOS_CLASS = "sap.qos.class"
+QOS_CLASS_AT_LEAST_ONCE = "at_least_once"
+
 # Attribute keys - MLflow
 ATTR_MLFLOW_EXPERIMENT_ID = "mlflow.experiment_id"
 

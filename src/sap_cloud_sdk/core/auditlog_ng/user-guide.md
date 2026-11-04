@@ -133,6 +133,9 @@ print(f"Sent event with ID: {event_id}")
 event_id = client.send_json(event)
 ```
 
+> **Note:** Every emitted LogRecord carries a fixed `sap.qos.class` attribute set to
+> `at_least_once`. The value is always set by the SDK and is not configurable.
+
 ### Close the Client
 
 Always close the client when the agent shuts down to flush pending events:

@@ -32,6 +32,10 @@ from sap_cloud_sdk.destination.utils._pagination import (
     PagedResult,
     parse_pagination_headers,
 )
+from sap_cloud_sdk.destination.utils._validation import (
+    encode_path_segment,
+    validate_resource_name,
+)
 
 T = TypeVar("T")
 
@@ -39,6 +43,59 @@ logger = logging.getLogger(__name__)
 
 _SUBACCOUNT_COLLECTION = "subaccountDestinations"
 _INSTANCE_COLLECTION = "instanceDestinations"
+
+
+def _split_name_and_level(
+    name: str,
+    level: Optional[ConsumptionLevel],
+) -> tuple[str, Optional[ConsumptionLevel]]:
+    """Auto-parse a legacy ``@ConsumptionLevel`` suffix from a destination name.
+
+    Allows callers that use the old pattern ``"my-dest@provider_subaccount"``
+    to keep working without changes.  The ``@``-suffix is extracted, validated
+    against the :class:`ConsumptionLevel` enum, and merged with the explicit
+    ``level`` parameter.
+
+    * If *name* contains no ``@``, returns ``(name, level)`` unchanged.
+    * If the suffix is not a recognised :class:`ConsumptionLevel` value,
+      raises :exc:`ValueError` with a clear message listing valid values.
+    * If both the suffix and the explicit *level* parameter are set to
+      **different** values, raises :exc:`ValueError` (conflicting levels).
+    * If both are set to the **same** value, the redundancy is accepted.
+
+    Args:
+        name:  Raw destination name, possibly containing an ``@level`` suffix.
+        level: Explicit level parameter passed by the caller (may be ``None``).
+
+    Returns:
+        ``(base_name, resolved_level)`` — the base name (before any ``@``) and
+        the resolved :class:`ConsumptionLevel` (or ``None`` if neither source
+        provided one).
+
+    Raises:
+        ValueError: If the suffix is not a valid :class:`ConsumptionLevel`, or
+            if the suffix and the explicit *level* parameter conflict.
+    """
+    if "@" not in name:
+        return name, level
+
+    base_name, _, level_hint = name.partition("@")
+    try:
+        parsed_level = ConsumptionLevel(level_hint)
+    except ValueError:
+        valid = [e.value for e in ConsumptionLevel]
+        raise ValueError(
+            f"Invalid resource name {name!r}: '@' is only allowed as a "
+            f"ConsumptionLevel suffix (e.g. 'my-dest@provider_subaccount'). "
+            f"Unknown level {level_hint!r}. Valid values: {valid}"
+        )
+    if level is not None and level != parsed_level:
+        raise ValueError(
+            f"Conflicting levels: name contains '@{level_hint}' but "
+            f"level={level!r} was also passed explicitly. "
+            f"Use only the level= parameter instead."
+        )
+    return base_name, parsed_level
 
 
 class DestinationClient:
@@ -240,6 +297,7 @@ class DestinationClient:
             DeprecationWarning,
             stacklevel=2,
         )
+        validate_resource_name(name)
         try:
             if self._should_use_proxy(proxy_enabled):
                 return TransparentProxyDestination.from_proxy(
@@ -295,6 +353,7 @@ class DestinationClient:
             DeprecationWarning,
             stacklevel=2,
         )
+        validate_resource_name(name)
         try:
             if self._should_use_proxy(proxy_enabled) and self._transparent_proxy:
                 return TransparentProxyDestination.from_proxy(
@@ -386,6 +445,8 @@ class DestinationClient:
             dest = client.get_destination("my-api", proxy_enabled=True)
             ```
         """
+        name, level = _split_name_and_level(name, level)
+        validate_resource_name(name)
         try:
             if self._should_use_proxy(proxy_enabled):
                 return TransparentProxyDestination.from_proxy(
@@ -434,9 +495,9 @@ class DestinationClient:
 
             # Build path with optional level hint
             path = (
-                f"{API_V2}/destinations/{name}@{level.value}"
+                f"{API_V2}/destinations/{encode_path_segment(name)}@{level.value}"
                 if level
-                else f"{API_V2}/destinations/{name}"
+                else f"{API_V2}/destinations/{encode_path_segment(name)}"
             )
 
             params: Dict[str, Any] = {}
@@ -501,6 +562,7 @@ class DestinationClient:
             DestinationOperationError: For unexpected errors.
         """
         coll = self._sub_path_for_level(level)
+        validate_resource_name(dest.name)
         body = dest.to_dict()
 
         try:
@@ -542,6 +604,7 @@ class DestinationClient:
             DestinationOperationError: For unexpected errors.
         """
         coll = self._sub_path_for_level(level)
+        validate_resource_name(dest.name)
         body = dest.to_dict()
 
         try:
@@ -579,12 +642,13 @@ class DestinationClient:
             DestinationOperationError: For unexpected errors.
         """
         coll = self._sub_path_for_level(level)
+        validate_resource_name(name)
 
         try:
             _request(
                 self._http,
                 HttpMethod.DELETE,
-                f"{API_V1}/{coll}/{name}",
+                f"{API_V1}/{coll}/{encode_path_segment(name)}",
                 tenant_subdomain=tenant,
             )
         except HttpError:
@@ -616,12 +680,13 @@ class DestinationClient:
         Raises:
             DestinationOperationError: If an HTTP error occurs or response parsing fails.
         """
+        validate_resource_name(name)
         try:
             path = self._sub_path_for_level(level)
             resp = _request(
                 self._http,
                 HttpMethod.GET,
-                f"{API_V1}/{path}/{name}/labels",
+                f"{API_V1}/{path}/{encode_path_segment(name)}/labels",
                 tenant_subdomain=tenant,
             )
             data = resp.json()
@@ -660,12 +725,13 @@ class DestinationClient:
             DestinationOperationError: For unexpected errors.
         """
         resolved_level = level or Level.SUB_ACCOUNT
+        validate_resource_name(name)
         try:
             path = self._sub_path_for_level(resolved_level)
             _request(
                 self._http,
                 HttpMethod.PUT,
-                f"{API_V1}/{path}/{name}/labels",
+                f"{API_V1}/{path}/{encode_path_segment(name)}/labels",
                 json=[lbl.to_dict() for lbl in labels],
                 tenant_subdomain=tenant,
             )
@@ -697,12 +763,13 @@ class DestinationClient:
             DestinationOperationError: For unexpected errors.
         """
         resolved_level = level or Level.SUB_ACCOUNT
+        validate_resource_name(name)
         try:
             path = self._sub_path_for_level(resolved_level)
             _request(
                 self._http,
                 HttpMethod.PATCH,
-                f"{API_V1}/{path}/{name}/labels",
+                f"{API_V1}/{path}/{encode_path_segment(name)}/labels",
                 json=patch.to_dict(),
                 tenant_subdomain=tenant,
             )
@@ -769,7 +836,7 @@ class DestinationClient:
             resp = _request(
                 self._http,
                 HttpMethod.GET,
-                f"{API_V1}/{path}/{name}",
+                f"{API_V1}/{path}/{encode_path_segment(name)}",
                 tenant_subdomain=tenant_subdomain,
             )
             data = resp.json()

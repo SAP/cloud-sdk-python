@@ -127,7 +127,7 @@ def register_same_thread_again(context, agent_id, invoker_id):
         context["thread"] = registry.create_or_register_thread(
             context["agent_id"],
             context["invoker_id"],
-            thread_id=context["thread"]["threadId"],
+            thread_id=context["thread"]["threadID"],
         )
         context["error"] = None
     except Exception as exc:
@@ -143,7 +143,7 @@ def register_same_thread_different_owner(context, agent_id, invoker_id):
     registry: SAPAgentMemoryThreadRegistry = context["registry"]
     try:
         registry.create_or_register_thread(
-            agent_id, invoker_id, thread_id=context["thread"]["threadId"]
+            agent_id, invoker_id, thread_id=context["thread"]["threadID"]
         )
         context["error"] = None
     except AgentMemoryThreadConflictError as exc:
@@ -165,7 +165,7 @@ def create_thread(context, agent_id, invoker_id):
 @when("I get the thread by id")
 def get_thread(context):
     registry: SAPAgentMemoryThreadRegistry = context["registry"]
-    context["fetched_thread"] = registry.get_thread(context["thread"]["threadId"])
+    context["fetched_thread"] = registry.get_thread(context["thread"]["threadID"])
 
 
 @when(parsers.parse('I list threads filtered by agent "{agent_id}"'))
@@ -178,38 +178,38 @@ def list_threads(context, agent_id):
 def update_thread(context, description):
     registry: SAPAgentMemoryThreadRegistry = context["registry"]
     context["thread"] = registry.update_thread(
-        context["thread"]["threadId"], description=description
+        context["thread"]["threadID"], description=description
     )
 
 
 @when("I delete the thread")
 def delete_thread(context):
     registry: SAPAgentMemoryThreadRegistry = context["registry"]
-    registry.delete_thread(context["thread"]["threadId"])
+    registry.delete_thread(context["thread"]["threadID"])
 
 
 # -- Then steps ----------------------------------------------------------------
 
 
-@then("the thread should have a non-empty threadId")
+@then("the thread should have a non-empty threadID")
 def check_thread_id(context):
-    assert context["thread"]["threadId"] != ""
+    assert context["thread"]["threadID"] != ""
 
 
-@then(parsers.parse('the thread should have agentId "{agent_id}"'))
+@then(parsers.parse('the thread should have agentID "{agent_id}"'))
 def check_thread_agent_id(context, agent_id):
-    assert context["thread"]["agentId"] == context["agent_id"]
+    assert context["thread"]["agentID"] == context["agent_id"]
 
 
-@then(parsers.parse('the thread should have invokerId "{invoker_id}"'))
+@then(parsers.parse('the thread should have invokerID "{invoker_id}"'))
 def check_thread_invoker_id(context, invoker_id):
-    assert context["thread"]["invokerId"] == context["invoker_id"]
+    assert context["thread"]["invokerID"] == context["invoker_id"]
 
 
 @then("the fetched thread should match the registered thread")
 def check_fetched_thread(context):
-    assert context["fetched_thread"]["threadId"] == context["thread"]["threadId"]
-    assert context["fetched_thread"]["agentId"] == context["thread"]["agentId"]
+    assert context["fetched_thread"]["threadID"] == context["thread"]["threadID"]
+    assert context["fetched_thread"]["agentID"] == context["thread"]["agentID"]
 
 
 @then("the result should contain at least one thread")
@@ -217,10 +217,10 @@ def check_threads_not_empty(context):
     assert len(context["threads"]["entries"]) >= 1
 
 
-@then(parsers.parse('all returned threads should have agentId "{agent_id}"'))
+@then(parsers.parse('all returned threads should have agentID "{agent_id}"'))
 def check_all_threads_agent_id(context, agent_id):
     assert all(
-        t["agentId"] == context["agent_id"] for t in context["threads"]["entries"]
+        t["agentID"] == context["agent_id"] for t in context["threads"]["entries"]
     )
 
 
@@ -233,7 +233,7 @@ def check_thread_description(context, description):
 def check_thread_deleted(context):
     registry: SAPAgentMemoryThreadRegistry = context["registry"]
     with pytest.raises(AgentMemoryThreadNotFoundError):
-        registry.get_thread(context["thread"]["threadId"])
+        registry.get_thread(context["thread"]["threadID"])
 
 
 @then("no error should be raised")

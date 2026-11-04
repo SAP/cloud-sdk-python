@@ -44,12 +44,12 @@ def _make_registry(base_url=_BASE, default_ttl=None):
 
 
 _ENTRY = {
-    "threadId": "t-1",
-    "agentId": "agent-a",
-    "invokerId": "user-1",
+    "threadID": "t-1",
+    "agentID": "agent-a",
+    "invokerID": "user-1",
     "description": None,
-    "createdAt": "2024-01-01T00:00:00Z",
-    "updatedAt": "2024-01-01T00:00:00Z",
+    "createTimestamp": "2024-01-01T00:00:00Z",
+    "updateTimestamp": "2024-01-01T00:00:00Z",
     "expiresAt": None,
     "threadTtl": None,
     "metadata": None,
@@ -73,7 +73,7 @@ class TestODataHelpers:
 
     def test_odata_entity_path_basic(self):
         path = _odata_entity_path("t-1")
-        assert path == "/v1/agent/threads(threadId='t-1')"
+        assert path == "/v1/agent/threads(threadID='t-1')"
 
     def test_odata_entity_path_escapes_single_quote(self):
         path = _odata_entity_path("t'1")
@@ -99,12 +99,12 @@ class TestODataHelpers:
 
     def test_build_list_path_filter_agent_id(self):
         path = _build_list_path("my-agent", None, None, 0)
-        assert "agentId" in path
+        assert "agentID" in path
         assert "my-agent" in path
 
     def test_build_list_path_filter_invoker_id(self):
         path = _build_list_path(None, "user-1", None, 0)
-        assert "invokerId" in path
+        assert "invokerID" in path
         assert "user-1" in path
 
     def test_build_list_path_no_dollar_sign_encoding(self):
@@ -223,23 +223,23 @@ class TestCreateOrRegisterThread:
         assert call_args[0][0] == HttpMethod.POST
         assert call_args[0][1] == "/v1/agent/threads"
         body = call_args[1]["json"]
-        assert body["agentId"] == "agent-a"
-        assert body["invokerId"] == "user-1"
-        assert "threadId" not in body
+        assert body["agentID"] == "agent-a"
+        assert body["invokerID"] == "user-1"
+        assert "threadID" not in body
 
     def test_returns_parsed_entry(self):
         reg = _make_registry()
         reg._request.return_value = _ENTRY.copy()
         e = reg.create_or_register_thread("agent-a", "user-1")
-        assert e["threadId"] == "t-1"
-        assert e["agentId"] == "agent-a"
+        assert e["threadID"] == "t-1"
+        assert e["agentID"] == "agent-a"
 
     def test_with_explicit_thread_id_included_in_body(self):
         reg = _make_registry()
         reg._request.return_value = _ENTRY.copy()
         reg.create_or_register_thread("agent-a", "user-1", thread_id="t-1")
         body = reg._request.call_args[1]["json"]
-        assert body["threadId"] == "t-1"
+        assert body["threadID"] == "t-1"
 
     def test_description_included_when_provided(self):
         reg = _make_registry()
@@ -357,7 +357,7 @@ class TestGetThread:
         reg = _make_registry()
         reg._request.return_value = _ENTRY.copy()
         e = reg.get_thread("t-1")
-        assert e["threadId"] == "t-1"
+        assert e["threadID"] == "t-1"
 
     def test_not_found_raises_thread_not_found(self):
         reg = _make_registry()
@@ -419,7 +419,7 @@ class TestListThreads:
         reg = _make_registry()
         next_link = f"{_BASE}/v1/agent/threads?$top=1&$skip=1"
         first_page = self._page_response([_ENTRY.copy()], total=2, next_link=next_link)
-        second_page = self._page_response([{**_ENTRY, "threadId": "t-2"}], total=2)
+        second_page = self._page_response([{**_ENTRY, "threadID": "t-2"}], total=2)
         reg._request.side_effect = [first_page, second_page]
 
         page = reg.list_threads()  # no limit = follow all pages
@@ -431,7 +431,7 @@ class TestListThreads:
         reg = _make_registry()
         next_link = f"{_BASE}/v1/agent/threads?$skip=1"
         first = self._page_response([_ENTRY.copy()], total=2, next_link=next_link)
-        second = self._page_response([{**_ENTRY, "threadId": "t-2"}], total=2)
+        second = self._page_response([{**_ENTRY, "threadID": "t-2"}], total=2)
         reg._request.side_effect = [first, second]
         reg.list_threads()
         second_call_path = reg._request.call_args_list[1][0][1]
@@ -508,7 +508,7 @@ class TestUpdateThread:
         reg._request.side_effect = [{}, _ENTRY.copy()]
         reg.update_thread("t-1")
         body = reg._request.call_args_list[0][1]["json"]
-        assert "threadId" not in body
+        assert "threadID" not in body
 
     def test_description_included_in_body(self):
         reg = _make_registry()
@@ -625,9 +625,9 @@ class TestIASEndToEnd:
         mock_response.ok = True
         mock_response.content = b"{}"
         mock_response.json.return_value = {
-            "threadId": "t-1",
-            "agentId": "agent-a",
-            "invokerId": "user-1",
+            "threadID": "t-1",
+            "agentID": "agent-a",
+            "invokerID": "user-1",
         }
 
         with sdk_context(RuntimeContext({IAS_TOKEN: "ias-dummy-token-xyz"})):
@@ -651,9 +651,9 @@ class TestIASEndToEnd:
         mock_response.ok = True
         mock_response.content = b"{}"
         mock_response.json.return_value = {
-            "threadId": "t-1",
-            "agentId": "agent-a",
-            "invokerId": "user-1",
+            "threadID": "t-1",
+            "agentID": "agent-a",
+            "invokerID": "user-1",
         }
 
         with sdk_context(RuntimeContext({IAS_TOKEN: "ias-dummy-token-xyz"})):

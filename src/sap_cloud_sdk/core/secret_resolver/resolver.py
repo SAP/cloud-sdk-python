@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 import os
+import typing
 from dataclasses import fields, is_dataclass
-from typing import Any, Dict, Tuple
+from typing import Any, Dict, Tuple, Union
 from .constants import BASE_MOUNT_PATH
 
 
@@ -47,31 +48,51 @@ def _validate_path(path: str) -> None:
         raise NotADirectoryError(f"path is not a directory: {path}")
 
 
-def _get_field_map(target: Any) -> Dict[str, Tuple[str, type]]:
+def _get_field_map(target: Any) -> Dict[str, Tuple[str, type, bool]]:
     """
-    Build a mapping from secret key -> (attribute_name, attribute_type) for a dataclass instance.
+    Build a mapping from secret key -> (attribute_name, attribute_type, is_optional).
 
     Priority:
       1. Use field.metadata["secret"] if present as the key
       2. Fallback to the lowercase dataclass field name
-    Only string-typed fields are supported.
+
+    Supported field types:
+      - ``str``           → required; absent secret raises an error
+      - ``Optional[str]`` → optional; absent secret is silently skipped and the
+                            field keeps its dataclass default
+
+    Optionality is declared via ``Optional[str]`` (not metadata); uses
+    ``get_type_hints()`` to handle PEP 563 string annotations correctly.
     """
     if not is_dataclass(target) or isinstance(target, type):
         raise TypeError("target must be a dataclass instance")
 
-    mapping: Dict[str, Tuple[str, type]] = {}
+    # get_type_hints() resolves PEP 563 string annotations to real type objects.
+    hints = typing.get_type_hints(type(target))
+
+    mapping: Dict[str, Tuple[str, type, bool]] = {}
     for f in fields(target):
-        # Only support string fields for secrets (consistent with Go SDK)
-        # Allow plain 'str' annotations; reject others to keep behavior predictable
-        if f.type is not str:
+        hint = hints.get(f.name)
+        origin = typing.get_origin(hint)
+        args = typing.get_args(hint)
+
+        # Optional[str] is Union[str, NoneType] with exactly two args.
+        is_optional_str = (
+            origin is Union and len(args) == 2 and str in args and type(None) in args
+        )
+
+        if hint is not str and not is_optional_str:
             raise TypeError(
-                f"target field '{f.name}' is not a string (only str fields are supported)"
+                f"target field '{f.name}' is not a string "
+                "(only str and Optional[str] fields are supported)"
             )
+
+        is_optional = is_optional_str
         key = f.metadata.get("secret") if hasattr(f, "metadata") else None
         if key and isinstance(key, str) and key.strip():
-            mapping[key] = (f.name, f.type)
+            mapping[key] = (f.name, str, is_optional)
         else:
-            mapping[f.name.lower()] = (f.name, f.type)
+            mapping[f.name.lower()] = (f.name, str, is_optional)
     return mapping
 
 
@@ -82,17 +103,20 @@ def _load_from_path(secret_dir: str, target: Any) -> None:
     Reads each field key as a file name under secret_dir. Used for both the
     servicebinding.io flat layout ($ROOT/<module>/<field>) and the legacy
     three-level layout via :func:`_load_from_mount`.
+    Fields typed ``Optional[str]`` are silently skipped when the file is absent.
     """
     _validate_path(secret_dir)
 
     field_map = _get_field_map(target)
-    for key, (attr_name, _) in field_map.items():
+    for key, (attr_name, _, is_optional) in field_map.items():
         file_path = os.path.join(secret_dir, key)
         try:
             # Read entire file content as text; do not strip newlines to match Go behavior
             with open(file_path, "r", encoding="utf-8") as f:
                 content = f.read()
         except FileNotFoundError as e:
+            if is_optional:
+                continue
             # Align with Go: surface precise file error
             raise FileNotFoundError(
                 f"failed to read secret file {file_path}: {e}"
@@ -120,14 +144,17 @@ def _load_from_env(base_var_name: str, module: str, instance: str, target: Any) 
     Load secrets from environment variables with names:
         {base_var_name}_{module}_{instance}_{field_key} (uppercased)
     instance names have '-' replaced with '_' for env var compatibility.
+    Fields typed ``Optional[str]`` are silently skipped when the env var is absent.
     """
     field_map = _get_field_map(target)
     prefix = f"{base_var_name}_{module}_{instance}".upper()
 
-    for key, (attr_name, _) in field_map.items():
+    for key, (attr_name, _, is_optional) in field_map.items():
         var_name = f"{prefix}_{key}".upper()
         value = os.environ.get(var_name)
         if value is None:
+            if is_optional:
+                continue
             # Align with Go: error if env var not found
             raise KeyError(f"env var not found: {var_name}")
         setattr(target, attr_name, value)

@@ -11,6 +11,7 @@ from enum import Enum
 
 import requests
 from oauthlib.oauth2 import BackendApplicationClient
+from requests.adapters import HTTPAdapter
 from requests_oauthlib import OAuth2Session
 
 from sap_cloud_sdk.core._tenant import (
@@ -176,3 +177,72 @@ class XsuaaAuthProvider(AuthProvider):
         expose a ``base_url`` attribute (e.g. the destination module uses ``url``).
         """
         return getattr(self._config, "base_url", None)
+
+
+class _BorrowedSession(requests.Session):
+    """A requests.Session that does not close its mounted adapters on close().
+
+    Used by IasAuthProvider to share a single HTTPAdapter (and its underlying
+    urllib3 connection pool) across per-request sessions without the session's
+    close() / __del__ draining the shared pool prematurely.
+    """
+
+    def close(self) -> None:
+        # Unmount adapters so they are no longer referenced by this session,
+        # but do NOT call adapter.close() — the pool is owned by the provider.
+        self.adapters.clear()
+
+
+class IasAuthProvider(AuthProvider):
+    """Bearer-token auth provider for IAS (Identity Authentication Service).
+
+    Unlike :class:`XsuaaAuthProvider`, this provider holds no credentials and
+    fetches no token. In IAS mode the token is supplied *per request* by the
+    caller's runtime: the IAS context provider (wired via ``bootstrap(app)``)
+    parses the inbound ``Authorization`` header and stores the raw bearer token
+    in the request :class:`~sap_cloud_sdk.core.runtime_context.RuntimeContext`.
+    This provider reads that token at :meth:`get_session` time and attaches it.
+
+    Because the token is read fresh on every call, there is nothing to cache or
+    invalidate — ``invalidate``/``invalidate_all`` are no-ops.
+
+    When no token is present the session is returned without an ``Authorization``
+    header; enforcing presence is the caller's responsibility (the Agent Memory
+    client raises a validation error before dispatching the request).
+
+    A single :class:`~requests.adapters.HTTPAdapter` is shared across all calls
+    so that the underlying ``urllib3`` connection pool (and its TCP/TLS
+    connections) is reused. Each call still gets its own session so the
+    per-request ``Authorization`` header is never shared between threads.
+    """
+
+    def __init__(self) -> None:
+        self._adapter = HTTPAdapter()
+
+    def get_session(self, tenant_subdomain: Optional[str] = None) -> requests.Session:
+        # Imported lazily: runtime_context pulls in sap_cloud_sdk.ias, which would
+        # create an import cycle if imported at module load time.
+        from sap_cloud_sdk.core.runtime_context import get_context
+        from sap_cloud_sdk.core.runtime_context.providers._ias import IAS_TOKEN
+
+        session = _BorrowedSession()
+        session.mount("https://", self._adapter)
+        session.mount("http://", self._adapter)
+        ias_token = get_context().get(IAS_TOKEN)
+        if ias_token:
+            session.headers["Authorization"] = f"Bearer {ias_token}"
+        else:
+            logger.debug(
+                "IasAuthProvider: no IAS token in context, "
+                "session has no Authorization header"
+            )
+        return session
+
+    def invalidate(self, tenant_subdomain: Optional[str] = None) -> None:
+        pass
+
+    def invalidate_all(self) -> None:
+        pass
+
+    def close(self) -> None:
+        self._adapter.close()

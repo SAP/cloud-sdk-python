@@ -64,7 +64,9 @@ class TestAgentMemoryConfig:
     def test_raises_when_identityzone_set_without_token_url(self):
         # identityzone is XSUAA-only (derives the subscriber token URL); it must
         # not be set in IAS mode (no token_url/client_id/client_secret).
-        with pytest.raises(AgentMemoryConfigError, match="identityzone applies only to XSUAA"):
+        with pytest.raises(
+            AgentMemoryConfigError, match="identityzone applies only to XSUAA"
+        ):
             AgentMemoryConfig(base_url="http://localhost", identityzone="my-zone")
 
     def test_identityzone_allowed_with_full_xsuaa_credentials(self):

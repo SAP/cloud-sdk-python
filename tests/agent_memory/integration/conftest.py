@@ -153,6 +153,6 @@ def run_thread_agent_id(
     page = thread_registry.list_threads(agent_id=agent_id)
     for entry in page["entries"]:
         try:
-            thread_registry.delete_thread(entry["threadId"])
+            thread_registry.delete_thread(entry["threadID"])
         except Exception:
             pass

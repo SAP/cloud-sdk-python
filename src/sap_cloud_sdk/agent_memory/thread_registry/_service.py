@@ -49,9 +49,9 @@ def _escape_odata_string(value: str) -> str:
 
 
 def _odata_entity_path(thread_id: str) -> str:
-    """Build OData entity-key path: /v1/agent/threads(threadId='...')."""
+    """Build OData entity-key path: /v1/agent/threads(threadID='...')."""
     encoded = quote(_escape_odata_string(thread_id), safe="")
-    return f"{_THREAD_COLLECTION}(threadId='{encoded}')"
+    return f"{_THREAD_COLLECTION}(threadID='{encoded}')"
 
 
 def _build_list_path(
@@ -63,13 +63,13 @@ def _build_list_path(
     """Build the GET path for list_threads, keeping OData $ params un-encoded."""
     filter_parts: list[str] = []
     if agent_id is not None:
-        filter_parts.append(f"agentId eq '{_escape_odata_string(agent_id)}'")
+        filter_parts.append(f"agentID eq '{_escape_odata_string(agent_id)}'")
     if invoker_id is not None:
-        filter_parts.append(f"invokerId eq '{_escape_odata_string(invoker_id)}'")
+        filter_parts.append(f"invokerID eq '{_escape_odata_string(invoker_id)}'")
 
     # Build OData query string manually — urlencode would encode $ as %24.
     parts = [
-        f"$orderby={quote('updatedAt desc', safe=',')}",
+        f"$orderby={quote('updateTimestamp desc', safe=',')}",
         "$count=true",
     ]
     if limit is not None:
@@ -120,12 +120,12 @@ def _parse_entry(row: dict[str, Any]) -> ThreadRegistryEntry:
     # Using plain .get() avoids the lossy `or` operator (which would discard
     # a legitimate empty-string value by falling through to the next key).
     return ThreadRegistryEntry(
-        threadId=row.get("threadId", ""),
-        agentId=row.get("agentId", ""),
-        invokerId=row.get("invokerId", ""),
+        threadID=row.get("threadID", ""),
+        agentID=row.get("agentID", ""),
+        invokerID=row.get("invokerID", ""),
         description=row.get("description"),
-        createdAt=row.get("createdAt"),
-        updatedAt=row.get("updatedAt"),
+        createTimestamp=row.get("createTimestamp"),
+        updateTimestamp=row.get("updateTimestamp"),
         expiresAt=row.get("expiresAt"),
         threadTtl=row.get("threadTtl"),
         metadata=row.get("metadata"),
@@ -266,9 +266,9 @@ class SAPAgentMemoryThreadRegistry(BaseThreadRegistry):
         ttl = self._ttl(ttl_seconds)
         _validate_ttl(ttl)
 
-        body: dict[str, Any] = {"agentId": agent_id, "invokerId": invoker_id}
+        body: dict[str, Any] = {"agentID": agent_id, "invokerID": invoker_id}
         if thread_id is not None:
-            body["threadId"] = thread_id
+            body["threadID"] = thread_id
         if description is not None:
             body["description"] = description
         if ttl is not None:

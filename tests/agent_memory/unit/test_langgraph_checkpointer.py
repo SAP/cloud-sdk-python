@@ -14,6 +14,7 @@ from sap_cloud_sdk.core.telemetry import Module, Operation
 
 _REQUEST_METRIC = "sap_cloud_sdk.core.telemetry.metrics_decorator.record_request_metric"
 
+
 class TestCreateCheckpointer:
     """Tests for create_checkpointer() factory."""
 
@@ -28,7 +29,9 @@ class TestCreateCheckpointer:
         """Passing ttl_seconds returns a TimedInMemorySaver (deprecated path)."""
         from sap_cloud_sdk.agent_memory.factory._timed_memory import TimedInMemorySaver
 
-        with pytest.warns(DeprecationWarning, match="ttl_seconds parameter is deprecated"):
+        with pytest.warns(
+            DeprecationWarning, match="ttl_seconds parameter is deprecated"
+        ):
             result = create_checkpointer(ttl_seconds=3600)
         assert isinstance(result, TimedInMemorySaver)
         assert result.ttl_seconds == 3600

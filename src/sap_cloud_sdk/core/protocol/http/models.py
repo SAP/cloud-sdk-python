@@ -83,7 +83,8 @@ class XsuaaAuthProvider(AuthProvider):
         self._config = config_factory()
         self._timeout = timeout
         self._cache: Cache = Cache(
-            CacheConfig(isolation_strategy=IsolationStrategy.TENANT)
+            CacheConfig(isolation_strategy=IsolationStrategy.TENANT),
+            module="core.protocol.http",
         )
 
     def get_session(self, tenant_subdomain: Optional[str] = None) -> OAuth2Session:

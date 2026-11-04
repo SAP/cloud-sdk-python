@@ -120,6 +120,29 @@ The backend interface has exactly four methods and no awareness of tenants, TTL 
 
 For a real, in-tree example of how the cache is used, see `XsuaaAuthProvider` in `sap_cloud_sdk.core.protocol.http.models`. It uses `IsolationStrategy.TENANT` to cache OAuth2 sessions per tenant, with TTL derived from the token's `expires_in` field and automatic eviction on secret rotation.
 
+## Per-Module Shared Backend
+
+By default each `Cache` instance gets its own `InMemoryLRUBackend`. That is fine when the same client object is reused across requests, but some modules (e.g. Agent Gateway) create a fresh client on every request. In that case the cache would be empty on each request, defeating its purpose.
+
+Pass `module=` to share a single backend across all `Cache` instances that name the same module:
+
+```python
+from sap_cloud_sdk.cache._cache import Cache
+from sap_cloud_sdk.cache import CacheConfig, IsolationStrategy
+
+# Every time this module creates a new client, it gets the same backend.
+self._cache = Cache(
+    CacheConfig(isolation_strategy=IsolationStrategy.TENANT),
+    module="agentgateway",
+)
+```
+
+The backend is created once (process-scoped, singleton per module name) and reused for the lifetime of the process. Tenant isolation still works normally — the isolation key is derived from the active `RuntimeContext` on every `get`/`set`, so entries are never shared across tenants.
+
+### Sizing and eviction
+
+`max_size` and `on_evict` are taken from the **first** `Cache` created for a given module name. Later callers with different values are silently ignored. This is intentional: a module uses one sizing policy for its backend.
+
 ## API Reference
 
 ### `configure_cache(config: CacheConfig) -> None`

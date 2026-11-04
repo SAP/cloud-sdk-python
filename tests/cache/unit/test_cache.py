@@ -1,5 +1,6 @@
 """Unit tests for the Cache façade."""
 
+from collections.abc import Generator
 from unittest.mock import MagicMock
 
 import pytest
@@ -8,6 +9,7 @@ from sap_cloud_sdk.cache._backend import CacheBackend
 from sap_cloud_sdk.cache._cache import Cache
 from sap_cloud_sdk.cache._config import CacheConfig, configure_cache
 from sap_cloud_sdk.cache._isolation import IsolationStrategy
+from sap_cloud_sdk.cache._registry import reset_module_backends
 from sap_cloud_sdk.core.runtime_context import APP_TENANT_ID, USER_ID, RuntimeContext
 from sap_cloud_sdk.core.runtime_context._context import sdk_context
 from sap_cloud_sdk.cache.exceptions import BackendError
@@ -20,6 +22,18 @@ def _ctx(tenant_id: str | None = None, user_id: str | None = None) -> RuntimeCon
     if user_id is not None:
         values[USER_ID] = user_id
     return RuntimeContext(values)
+
+
+@pytest.fixture(autouse=True)
+def _clear_module_registry() -> Generator[None, None, None]:
+    """Reset the per-module backend registry before every test.
+
+    Module-level singletons persist across test cases, which would cause
+    tests that use ``module=`` to interfere with each other.
+    """
+    reset_module_backends()
+    yield
+    reset_module_backends()
 
 
 class TestCacheGet:
@@ -195,3 +209,90 @@ class TestCacheFullKeyStructure:
         assert full_key.startswith("destination::")
         assert full_key.endswith("::my-dest")
         assert "tenant-xyz" in full_key
+
+
+class TestCacheModuleBackend:
+    """Tests for the optional ``module=`` keyword on :class:`Cache`."""
+
+    def test_same_module_name_shares_backend(self) -> None:
+        """Two Cache instances with the same module share state."""
+        cfg = CacheConfig(isolation_strategy=IsolationStrategy.TENANT)
+        cache_a = Cache(cfg, module="mymodule")
+        cache_b = Cache(cfg, module="mymodule")
+
+        with sdk_context(_ctx(tenant_id="t1")):
+            cache_a.set("ns", "key", "shared-value", ttl_seconds=60)
+            assert cache_b.get("ns", "key") == "shared-value"
+
+    def test_different_module_names_are_isolated(self) -> None:
+        """Two Cache instances with different module names do not share state."""
+        cfg = CacheConfig(isolation_strategy=IsolationStrategy.TENANT)
+        cache_x = Cache(cfg, module="module-x")
+        cache_y = Cache(cfg, module="module-y")
+
+        with sdk_context(_ctx(tenant_id="t1")):
+            cache_x.set("ns", "key", "value-x", ttl_seconds=60)
+            assert cache_y.get("ns", "key") is None
+
+    def test_no_module_gives_fresh_per_instance_backend(self) -> None:
+        """Without module=, each Cache instance has its own backend (legacy behavior)."""
+        cfg = CacheConfig(isolation_strategy=IsolationStrategy.TENANT)
+        cache_1 = Cache(cfg)
+        cache_2 = Cache(cfg)
+
+        with sdk_context(_ctx(tenant_id="t1")):
+            cache_1.set("ns", "key", "value-1", ttl_seconds=60)
+            # cache_2 has a separate backend, so it must not see cache_1's entry.
+            assert cache_2.get("ns", "key") is None
+
+    def test_explicit_backend_overrides_module(self) -> None:
+        """CacheConfig(backend=...) wins over module=."""
+        explicit_backend = MagicMock(spec=CacheBackend)
+        explicit_backend.get.return_value = "from-explicit"
+        cache = Cache(CacheConfig(backend=explicit_backend), module="mymodule")
+
+        with sdk_context(_ctx(tenant_id="t1")):
+            result = cache.get("ns", "key")
+
+        explicit_backend.get.assert_called_once()
+        assert result == "from-explicit"
+
+    def test_module_backend_survives_across_simulated_requests(self) -> None:
+        """Simulate per-request client creation: backend must carry state across."""
+        cfg = CacheConfig(isolation_strategy=IsolationStrategy.TENANT)
+
+        # First "request": create a client and populate the cache.
+        cache_req1 = Cache(cfg, module="agentgateway")
+        with sdk_context(_ctx(tenant_id="t1")):
+            cache_req1.set("token", "svc-url", "my-token", ttl_seconds=60)
+
+        # Second "request": a brand-new client must still find the entry.
+        cache_req2 = Cache(cfg, module="agentgateway")
+        with sdk_context(_ctx(tenant_id="t1")):
+            assert cache_req2.get("token", "svc-url") == "my-token"
+
+    def test_module_backend_tenant_isolation(self) -> None:
+        """Shared module backend must still isolate across tenants."""
+        cfg = CacheConfig(isolation_strategy=IsolationStrategy.TENANT)
+        cache = Cache(cfg, module="agentgateway")
+
+        with sdk_context(_ctx(tenant_id="tenant-a")):
+            cache.set("token", "svc", "token-a", ttl_seconds=60)
+        with sdk_context(_ctx(tenant_id="tenant-b")):
+            assert cache.get("token", "svc") is None
+
+    def test_module_backend_sizing_from_first_caller(self) -> None:
+        """max_size is fixed on the first Cache created for a module."""
+        # First caller: max_size=2
+        cache_first = Cache(CacheConfig(max_size=2), module="sized-module")
+        # Second caller: max_size=500 (ignored — backend already exists)
+        cache_second = Cache(CacheConfig(max_size=500), module="sized-module")
+
+        # Both should share the same backend (capped at 2).
+        with sdk_context(_ctx(tenant_id="t1")):
+            cache_first.set("ns", "k1", "v1", ttl_seconds=60)
+            cache_first.set("ns", "k2", "v2", ttl_seconds=60)
+            # Third entry evicts the oldest (LRU) when max_size=2.
+            cache_first.set("ns", "k3", "v3", ttl_seconds=60)
+            # k3 is always present; exactly one of k1/k2 was evicted.
+            assert cache_second.get("ns", "k3") == "v3"

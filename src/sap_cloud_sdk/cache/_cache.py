@@ -23,6 +23,7 @@ from sap_cloud_sdk.cache._backend import CacheBackend
 from sap_cloud_sdk.cache._config import CacheConfig, get_cache_config
 from sap_cloud_sdk.cache._isolation import build_isolation_key
 from sap_cloud_sdk.cache._lru_backend import InMemoryLRUBackend
+from sap_cloud_sdk.cache._registry import get_module_backend
 from sap_cloud_sdk.cache.exceptions import BackendError
 
 logger = logging.getLogger(__name__)
@@ -40,10 +41,31 @@ class Cache:
             :func:`~sap_cloud_sdk.cache._config.configure_cache` is used.
             The config is snapshotted at construction time — subsequent calls
             to :func:`configure_cache` do not affect an existing ``Cache``.
+        module: Optional logical module name (e.g. ``"agentgateway"``).
+            When given, all ``Cache`` instances with the same *module* name
+            share a single :class:`~sap_cloud_sdk.cache._lru_backend.InMemoryLRUBackend`
+            that lives for the process lifetime. This lets modules that
+            create a new client on every request still benefit from
+            cross-request caching.
+
+            ``max_size`` and ``on_evict`` are taken from the **first**
+            ``Cache`` created for a given *module* name; later callers with
+            different values are silently ignored. Pass ``None`` (the
+            default) to get a per-instance cache backend — nothing is
+            shared.
+
+            An explicit ``CacheConfig(backend=...)`` always takes precedence
+            over *module*.
     """
 
-    def __init__(self, config: CacheConfig | None = None) -> None:
+    def __init__(
+        self,
+        config: CacheConfig | None = None,
+        *,
+        module: str | None = None,
+    ) -> None:
         self._config: CacheConfig = config if config is not None else get_cache_config()
+        self._module: str | None = module
         self._backend = self._resolve_backend()
 
     # ------------------------------------------------------------------
@@ -136,8 +158,19 @@ class Cache:
     # ------------------------------------------------------------------
 
     def _resolve_backend(self) -> CacheBackend:
+        # 1. Explicit backend wins (e.g. Redis)
         if self._config.backend is not None:
             return self._config.backend
+
+        # 2. Per-module shared backend, memoized by name
+        if self._module is not None:
+            return get_module_backend(
+                self._module,
+                self._config.max_size,
+                self._config.on_evict,
+            )
+
+        # 3. Fresh per-instance backend
         return InMemoryLRUBackend(
             max_size=self._config.max_size,
             on_evict=self._config.on_evict,

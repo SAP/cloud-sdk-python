@@ -133,3 +133,60 @@ class TestDisableFiltering:
         disable_filtering()
         assert litellm.GenAIHubOrchestrationConfig is _ORIGINAL_CONFIG
         assert _filters_mod._active_cfg is None
+
+
+class TestTransformRequestMultiModule:
+    """Regression tests: filtering must be injected into every fallback module, not just modules[0]."""
+
+    def _make_cfg(self) -> ContentFiltering:
+        return ContentFiltering(
+            input_filtering=InputFiltering(filters=[AzureContentFilter()])
+        )
+
+    def _call_transform_request(self, modules_value):
+        """Call the filtering injection logic directly, bypassing the LiteLLM base class."""
+        from unittest.mock import patch
+
+        body = {"config": {"modules": modules_value}}
+        instance = FilteringOrchestrationConfig()
+
+        with patch(
+            "sap_cloud_sdk.aicore.filtering._patch.GenAIHubOrchestrationConfig.transform_request",
+            return_value=body,
+        ):
+            return instance.transform_request(
+                model="sap/x",
+                messages=[],
+                optional_params={},
+                litellm_params={},
+                headers={},
+            )
+
+    def test_single_module_dict_gets_filtering(self, monkeypatch):
+        _clear_aicore_env(monkeypatch)
+        set_filtering(self._make_cfg())
+        modules = {"model_id": "primary-llm"}
+        result = self._call_transform_request(modules)
+        assert "filtering" in result["config"]["modules"]
+
+    def test_multi_module_list_all_get_filtering(self, monkeypatch):
+        _clear_aicore_env(monkeypatch)
+        set_filtering(self._make_cfg())
+        modules = [
+            {"model_id": "primary-llm"},
+            {"model_id": "fallback-llm-1"},
+            {"model_id": "fallback-llm-2"},
+        ]
+        result = self._call_transform_request(modules)
+        for i, m in enumerate(result["config"]["modules"]):
+            assert "filtering" in m, f"modules[{i}] missing filtering block"
+
+    def test_multi_module_filtering_dict_is_identical_across_modules(self, monkeypatch):
+        _clear_aicore_env(monkeypatch)
+        set_filtering(self._make_cfg())
+        modules = [{"model_id": "a"}, {"model_id": "b"}]
+        result = self._call_transform_request(modules)
+        assert (
+            result["config"]["modules"][0]["filtering"]
+            == result["config"]["modules"][1]["filtering"]
+        )

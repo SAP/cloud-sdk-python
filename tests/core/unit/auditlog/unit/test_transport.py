@@ -258,7 +258,7 @@ class TestHttpTransportRotation:
 
         HttpTransport(mock_factory)
 
-        mock_auth_cls.assert_called_once_with(mock_factory)
+        mock_auth_cls.assert_called_once_with(mock_factory, module="auditlog")
 
     @patch("sap_cloud_sdk.core.auditlog._transport.HttpClient")
     @patch("sap_cloud_sdk.core.auditlog._transport.XsuaaAuthProvider")

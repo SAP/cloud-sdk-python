@@ -75,6 +75,10 @@ class XsuaaAuthProvider(AuthProvider):
             (or any callable with a ``has_changed() -> bool`` method) that returns
             fresh XSUAA credentials on every call.
         timeout: Timeout in seconds for token-endpoint requests.
+        module: Optional module name passed to :class:`~sap_cloud_sdk.core.resilience.cache._cache.Cache`.
+            Instances with the same name share one backend, which keeps the token
+            cache alive across per-request client re-creation. Callers that create
+            a single long-lived provider can omit this.
     """
 
     def __init__(
@@ -82,13 +86,14 @@ class XsuaaAuthProvider(AuthProvider):
         config_factory: Callable[[], Any],
         *,
         timeout: float = _DEFAULT_TIMEOUT,
+        module: str | None = None,
     ) -> None:
         self._config_factory = config_factory
         self._config = config_factory()
         self._timeout = timeout
         self._cache: Cache = Cache(
             CacheConfig(isolation_strategy=IsolationStrategy.TENANT),
-            module="core.protocol.http",
+            module=module,
         )
 
     def get_session(self, tenant_subdomain: Optional[str] = None) -> OAuth2Session:

@@ -45,11 +45,15 @@ def _build_agent_memory_http(
     instance: str, config: Optional[AgentMemoryConfig]
 ) -> HttpClient:
     if config is not None:
-        auth = XsuaaAuthProvider(lambda: config) if config.token_url else None
+        auth = (
+            XsuaaAuthProvider(lambda: config, module="agent_memory")
+            if config.token_url
+            else None
+        )
         return HttpClient(config.base_url, auth, timeout=config.timeout)
     factory = _make_config_factory(instance)
     cfg = factory()
-    auth = XsuaaAuthProvider(factory) if cfg.token_url else None
+    auth = XsuaaAuthProvider(factory, module="agent_memory") if cfg.token_url else None
     return HttpClient(cfg.base_url, auth, timeout=cfg.timeout)
 
 

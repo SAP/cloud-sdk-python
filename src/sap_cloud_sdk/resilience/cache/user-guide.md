@@ -15,7 +15,7 @@ No BTP service binding is required — the cache module is self-contained.
 By default every SDK client uses an in-process LRU cache with sensible defaults. No configuration is needed unless you want to tune it.
 
 ```python
-from sap_cloud_sdk.cache import CacheConfig, configure_cache
+from sap_cloud_sdk.resilience.cache import CacheConfig, configure_cache
 
 configure_cache(
     CacheConfig(
@@ -53,7 +53,7 @@ The cache automatically scopes keys to the current tenant (and optionally user) 
 Override the strategy globally:
 
 ```python
-from sap_cloud_sdk.cache import CacheConfig, IsolationStrategy, configure_cache
+from sap_cloud_sdk.resilience.cache import CacheConfig, IsolationStrategy, configure_cache
 
 configure_cache(CacheConfig(isolation_strategy=IsolationStrategy.TENANT))
 ```
@@ -66,7 +66,7 @@ Pass a `CacheConfig(enabled=False)` when constructing a client to disable cachin
 
 ```python
 from sap_cloud_sdk.destination import create_client
-from sap_cloud_sdk.cache import CacheConfig
+from sap_cloud_sdk.resilience.cache import CacheConfig
 
 client = create_client(cache_config=CacheConfig(enabled=False))
 ```
@@ -75,7 +75,7 @@ client = create_client(cache_config=CacheConfig(enabled=False))
 
 ```python
 import logging
-from sap_cloud_sdk.cache import CacheConfig, configure_cache
+from sap_cloud_sdk.resilience.cache import CacheConfig, configure_cache
 
 logger = logging.getLogger(__name__)
 
@@ -99,7 +99,7 @@ The built-in `InMemoryLRUBackend` is process-local. For horizontally scaled depl
 ```python
 from typing import Any
 
-from sap_cloud_sdk.cache import CacheBackend, CacheConfig, configure_cache
+from sap_cloud_sdk.resilience.cache import CacheBackend, CacheConfig, configure_cache
 
 
 class MyCacheBackend(CacheBackend):
@@ -127,8 +127,8 @@ By default each `Cache` instance gets its own `InMemoryLRUBackend`. That is fine
 Pass `module=` to share a single backend across all `Cache` instances that name the same module:
 
 ```python
-from sap_cloud_sdk.cache._cache import Cache
-from sap_cloud_sdk.cache import CacheConfig, IsolationStrategy
+from sap_cloud_sdk.resilience.cache._cache import Cache
+from sap_cloud_sdk.resilience.cache import CacheConfig, IsolationStrategy
 
 # Every time this module creates a new client, it gets the same backend.
 self._cache = Cache(
@@ -179,7 +179,7 @@ Enum with values `TENANT`, `TENANT_USER`, and `PROVIDER`. See [Isolation Strateg
 ## Error Handling
 
 ```python
-from sap_cloud_sdk.cache.exceptions import BackendError, CacheError
+from sap_cloud_sdk.resilience.cache.exceptions import BackendError, CacheError
 
 try:
     # SDK client operations that use the cache internally

@@ -2,8 +2,8 @@
 
 import pytest
 
-from sap_cloud_sdk.cache._config import CacheConfig, configure_cache, get_cache_config
-from sap_cloud_sdk.cache._lru_backend import InMemoryLRUBackend
+from sap_cloud_sdk.resilience.cache._config import CacheConfig, configure_cache, get_cache_config
+from sap_cloud_sdk.resilience.cache._lru_backend import InMemoryLRUBackend
 
 
 class TestGetCacheConfigDefaults:

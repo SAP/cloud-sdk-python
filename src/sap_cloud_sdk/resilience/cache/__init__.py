@@ -7,7 +7,7 @@ deployments.
 
 Global configuration example::
 
-    from sap_cloud_sdk.cache import CacheConfig, configure_cache
+    from sap_cloud_sdk.resilience.cache import CacheConfig, configure_cache
 
     configure_cache(CacheConfig(
         default_ttl_seconds=600,
@@ -18,13 +18,13 @@ Global configuration example::
 Disabling the cache for a specific client::
 
     from sap_cloud_sdk.destination import create_client
-    from sap_cloud_sdk.cache import CacheConfig
+    from sap_cloud_sdk.resilience.cache import CacheConfig
 
     client = create_client(cache_config=CacheConfig(enabled=False))
 
 Custom backend example (Redis)::
 
-    from sap_cloud_sdk.cache import CacheBackend, CacheConfig, configure_cache
+    from sap_cloud_sdk.resilience.cache import CacheBackend, CacheConfig, configure_cache
 
     class RedisCacheBackend(CacheBackend):
         def get(self, key): ...
@@ -35,11 +35,15 @@ Custom backend example (Redis)::
     configure_cache(CacheConfig(backend=RedisCacheBackend(...)))
 """
 
-from sap_cloud_sdk.cache._backend import CacheBackend
-from sap_cloud_sdk.cache._config import CacheConfig, configure_cache, get_cache_config
-from sap_cloud_sdk.cache._isolation import IsolationStrategy
-from sap_cloud_sdk.cache._lru_backend import InMemoryLRUBackend
-from sap_cloud_sdk.cache.exceptions import BackendError, CacheError
+from sap_cloud_sdk.resilience.cache._backend import CacheBackend
+from sap_cloud_sdk.resilience.cache._config import (
+    CacheConfig,
+    configure_cache,
+    get_cache_config,
+)
+from sap_cloud_sdk.resilience.cache._isolation import IsolationStrategy
+from sap_cloud_sdk.resilience.cache._lru_backend import InMemoryLRUBackend
+from sap_cloud_sdk.resilience.cache.exceptions import BackendError, CacheError
 
 __all__ = [
     "CacheBackend",

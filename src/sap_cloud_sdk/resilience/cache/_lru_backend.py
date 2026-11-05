@@ -9,7 +9,7 @@ from typing import Any, Callable
 
 from cachetools import TTLCache
 
-from sap_cloud_sdk.cache._backend import CacheBackend
+from sap_cloud_sdk.resilience.cache._backend import CacheBackend
 
 logger = logging.getLogger(__name__)
 
@@ -45,9 +45,9 @@ class InMemoryLRUBackend(CacheBackend):
 
     Suitable for single-process (single-instance) deployments. For
     horizontally scaled deployments implement a custom
-    :class:`~sap_cloud_sdk.cache._backend.CacheBackend` backed by a shared
+    :class:`~sap_cloud_sdk.resilience.cache._backend.CacheBackend` backed by a shared
     store (Redis, Memcached, etc.) and pass it via
-    :class:`~sap_cloud_sdk.cache._config.CacheConfig`.
+    :class:`~sap_cloud_sdk.resilience.cache._config.CacheConfig`.
 
     Args:
         max_size: Maximum number of entries before LRU eviction.

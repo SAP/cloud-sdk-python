@@ -4,7 +4,7 @@ import logging
 
 import pytest
 
-from sap_cloud_sdk.cache._isolation import IsolationStrategy, build_isolation_key
+from sap_cloud_sdk.resilience.cache._isolation import IsolationStrategy, build_isolation_key
 from sap_cloud_sdk.core.runtime_context import APP_TENANT_ID, DWC_TENANT, USER_ID, RuntimeContext
 from sap_cloud_sdk.core.runtime_context._context import sdk_context
 
@@ -82,7 +82,7 @@ class TestBuildIsolationKeyExplicitStrategy:
     def test_downgrade_warning_is_logged(
         self, caplog: pytest.LogCaptureFixture
     ) -> None:
-        with caplog.at_level(logging.WARNING, logger="sap_cloud_sdk.cache._isolation"):
+        with caplog.at_level(logging.WARNING, logger="sap_cloud_sdk.resilience.cache._isolation"):
             with sdk_context(_ctx(tenant_id="t", user_id="u")):
                 build_isolation_key(strategy=IsolationStrategy.TENANT)
         assert any("cross-user" in record.message for record in caplog.records)

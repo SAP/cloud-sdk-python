@@ -4,14 +4,14 @@ Patches ``litellm.GenAIHubOrchestrationConfig`` with a subclass that:
 
 - Injects ``modules.filtering`` into every v2 completion request body via
   ``transform_request``.
-- Detects filter rejections in responses and raises ``ContentFilteredError``
-  via ``transform_response``.
+- Detects filter rejections in buffered responses and raises
+  ``ContentFilteredError`` via ``transform_response``.
 
 The patch is applied by :func:`_install` (called by ``set_filtering`` /
 ``disable_filtering`` in :mod:`.filters`) and is idempotent — calling it
 multiple times with the same config is safe.
 
-Two filter-rejection shapes (from the v2 API) are handled:
+Two filter-rejection shapes (from the v2 API) are handled in buffered mode:
 
 - Input rejection: HTTP 4xx with ``error.location`` startswith
   ``"Filtering Module - Input Filter"``.
@@ -26,10 +26,30 @@ the JSON embedded in the exception message.
 back into :class:`ContentFilteredError` before it reaches caller code; the
 :func:`_parse_input_filter_error` helper in :mod:`.filters` does the JSON
 parsing.
+
+Streaming + output filtering
+----------------------------
+The SAP AI Core Orchestration v2 API supports output filtering with streaming.
+The server filters each chunk and signals a rejection via an in-stream error
+event (no ``[DONE]``). LiteLLM's ``SAPStreamIterator`` surfaces this error
+event as a ``ValueError(json.dumps(event_obj))`` from inside the iterator.
+
+:func:`sap_cloud_sdk.aicore.completion` / :func:`acompletion` wrap the
+returned stream iterator when output filtering is active, catching that
+``ValueError`` and translating it to :class:`ContentFilteredError`. This gives
+callers a single, typed exception for filter rejections in both streaming and
+non-streaming modes.
+
+Note: agent frameworks (``ChatLiteLLM``, LangGraph, etc.) that call
+``litellm.completion`` directly — bypassing the SDK's completion wrapper —
+will see the raw ``ValueError`` from the iterator. They must either use
+:func:`sap_cloud_sdk.aicore.completion` to get the translated error, or
+handle the ``ValueError`` themselves.
 """
 
 from __future__ import annotations
 
+import json
 import logging
 from typing import Any
 
@@ -75,8 +95,8 @@ class FilteringOrchestrationConfig(GenAIHubOrchestrationConfig):
 
         modules = body["config"]["modules"]
         if isinstance(modules, list):
-            # Fallback mode (list of configs) — inject into primary config only.
-            modules[0]["filtering"] = filtering_dict
+            for m in modules:
+                m["filtering"] = filtering_dict
         else:
             modules["filtering"] = filtering_dict
 
@@ -172,3 +192,46 @@ def _install(cfg: Any) -> None:  # cfg: ContentFiltering | None
     else:
         litellm.GenAIHubOrchestrationConfig = FilteringOrchestrationConfig
         logger.info("content filtering active (FilteringOrchestrationConfig)")
+
+
+def _parse_output_filter_stream_error(
+    exc: BaseException,
+) -> ContentFilteredError | None:
+    """Try to parse an in-stream output-filter rejection from a ValueError.
+
+    LiteLLM's ``SAPStreamIterator`` raises ``ValueError(json.dumps(event_obj))``
+    when the server sends an error event inside the stream.  The v2 error shape
+    for an output-filter rejection is::
+
+        {"error": {"request_id": "...", "code": 500,
+                   "message": "...",
+                   "location": "Filtering Module - Output Filter",
+                   "intermediate_results": {"output_filtering": {"data": {...}}}}}
+
+    Returns a :class:`ContentFilteredError` when the pattern matches, otherwise
+    ``None`` so the caller can re-raise the original exception unchanged.
+    """
+    if not isinstance(exc, (ValueError, Exception)):
+        return None
+    msg = str(exc)
+    brace = msg.find("{")
+    if brace == -1:
+        return None
+    try:
+        payload = json.loads(msg[brace:])
+    except (ValueError, TypeError):
+        return None
+    err = payload.get("error", {})
+    if not isinstance(err, dict):
+        return None
+    location = err.get("location") or ""
+    if not location.startswith("Filtering Module - Output Filter"):
+        return None
+    data = (
+        err.get("intermediate_results", {}).get("output_filtering", {}).get("data", {})
+    )
+    return ContentFilteredError(
+        direction="output",
+        details=data,
+        request_id=err.get("request_id"),
+    )

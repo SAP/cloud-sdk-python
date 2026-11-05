@@ -1,5 +1,7 @@
 import logging
+import re
 from typing import BinaryIO, Dict, List, Optional, Union
+from urllib.parse import quote
 from requests import Response
 from sap_cloud_sdk.dms.model import (
     DMSCredentials,
@@ -33,6 +35,31 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 _REPOSITORIES = "/rest/v2/repositories"
 _CONFIGS = "/rest/v2/configs"
+
+_SAFE_ID_RE = re.compile(r"^[A-Za-z0-9_-]+$")
+
+
+def _validate_id(value: str, param_name: str) -> None:
+    """Raise ValueError if *value* is empty or contains URL path metacharacters."""
+    if not value or not value.strip():
+        raise ValueError(f"{param_name} must not be empty")
+    if not _SAFE_ID_RE.match(value):
+        raise ValueError(
+            f"{param_name} contains characters not allowed in a URL path segment: {value!r}"
+        )
+
+
+def _safe_cmis_path(path: str) -> str:
+    """Percent-encode a CMIS browse path; raise ValueError on dot-segment traversal."""
+    segments = [s for s in path.split("/") if s]
+    for seg in segments:
+        if seg in (".", ".."):
+            raise ValueError(
+                f"Path traversal segment {seg!r} is not allowed in a CMIS path"
+            )
+    return "/".join(quote(seg, safe="") for seg in segments)
+
+
 # ---------------------------------------------------------------------------
 
 
@@ -207,6 +234,7 @@ class DMSClient:
             DMSRuntimeException: If the server encounters an internal error.
         """
         logger.info("Fetching repository '%s'", repo_id)
+        _validate_id(repo_id, "repo_id")
         response = self._http.get(
             path=f"{_REPOSITORIES}/{repo_id}",
             tenant_subdomain=tenant,
@@ -239,8 +267,7 @@ class DMSClient:
             DMSPermissionDeniedException: If the access token is invalid or expired.
             DMSRuntimeException: If the server encounters an internal error.
         """
-        if not repo_id or not repo_id.strip():
-            raise ValueError("repo_id must not be empty")
+        _validate_id(repo_id, "repo_id")
         logger.info("Updating repository '%s'", repo_id)
         response = self._http.put(
             path=f"{_REPOSITORIES}/{repo_id}",
@@ -272,6 +299,7 @@ class DMSClient:
             DMSPermissionDeniedException: If the access token is invalid or expired.
             DMSRuntimeException: If the server encounters an internal error.
         """
+        _validate_id(repo_id, "repo_id")
         self._http.delete(
             path=f"{_REPOSITORIES}/{repo_id}",
             tenant_subdomain=tenant,
@@ -363,8 +391,7 @@ class DMSClient:
             DMSPermissionDeniedException: If the access token is invalid or expired.
             DMSRuntimeException: If the server encounters an internal error.
         """
-        if not config_id or not config_id.strip():
-            raise ValueError("config_id must not be empty")
+        _validate_id(config_id, "config_id")
         logger.info("Updating config '%s'", config_id)
         response = self._http.put(
             path=f"{_CONFIGS}/{config_id}",
@@ -396,8 +423,7 @@ class DMSClient:
             DMSPermissionDeniedException: If the access token is invalid or expired.
             DMSRuntimeException: If the server encounters an internal error.
         """
-        if not config_id or not config_id.strip():
-            raise ValueError("config_id must not be empty")
+        _validate_id(config_id, "config_id")
         logger.info("Deleting config '%s'", config_id)
         self._http.delete(
             path=f"{_CONFIGS}/{config_id}",
@@ -411,9 +437,10 @@ class DMSClient:
 
     @staticmethod
     def _browser_url(repository_id: str, path: Optional[str] = None) -> str:
+        _validate_id(repository_id, "repository_id")
         base = f"/browser/{repository_id}/root"
         if path:
-            return f"{base}/{path.lstrip('/')}"
+            return f"{base}/{_safe_cmis_path(path)}"
         return base
 
     # ==================================================================
@@ -1083,6 +1110,8 @@ class DMSClient:
             DMSPermissionDeniedException: If the access token is invalid.
             DMSRuntimeException: If the server encounters an internal error.
         """
+        _validate_id(repository_id, "repository_id")
+        _validate_id(object_id, "object_id")
         path = f"{_REPOSITORIES}/{repository_id}/deleted/objects/{object_id}/restore"
         logger.info("Restoring object '%s' in repo '%s'", object_id, repository_id)
         response = self._http.post(
@@ -1208,6 +1237,7 @@ class DMSClient:
         params.update(opts.to_query_params())
 
         logger.info("Executing CMIS query in repo '%s'", repository_id)
+        _validate_id(repository_id, "repository_id")
         response = self._http.get(
             f"/browser/{repository_id}",
             params=params,

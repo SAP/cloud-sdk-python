@@ -87,13 +87,17 @@ If you need to verify a specific rule, read the authoritative source directly:
 ### Section A: Process & Compliance
 
 **A1: PR template complete**
-Template requires: Description, Related Issue, Type of Change (one box ticked), How to Test (numbered steps), checklist of 9 items all ticked. Empty or placeholder body → ❌.
+Template requires: Description, Related Issue, Type of Change (one box ticked), How to Test (numbered steps), checklist of 9 core items all ticked. Two conditional items apply only when relevant:
+- *(New modules only)* e2e evidence attached — check if the PR adds a new module under `src/sap_cloud_sdk/`; if so, the item must be ticked and the PR body or comments must reference a screen recording, logs, or screenshots against a real BTP service.
+- *(Security-sensitive changes only)* `/security-review` run and ❌ findings addressed — check if the PR touches auth, credential loading, tenant routing, or external input handling; if so, the item must be ticked.
+
+Empty or placeholder body → ❌.
 
 **A2: Conventional Commits**
-Every commit headline must match `type(scope): description`. Types: `feat`, `fix`, `chore`, `docs`, `refactor`, `test`, `ci`, `perf`, `style`, `build`, `revert`. PR title is also validated. Check `commit-validation` CI job. Quote failing commit titles.
+The **PR title** must match `type(scope): description`. Types: `feat`, `fix`, `chore`, `docs`, `refactor`, `test`, `ci`, `perf`, `style`, `build`, `revert`. Individual commit messages on the branch are not evaluated — PRs are squash-merged and the PR title becomes the commit message on `main`. Check the `commit-validation` CI job result for confirmation.
 
 **A3: Issue linked**
-PR body must contain `Closes #N`, `Fixes #N`, or `Resolves #N`.
+PR body should contain `Closes #N`, `Fixes #N`, or `Resolves #N` if the PR addresses a tracked issue. If absent, assign **⚠️ Warning** — not all PRs are linked to issues, so this is never a ❌ Fail.
 
 **A4: AI-generated code disclosure**
 If the diff looks AI-generated, the PR description must explicitly disclose it and reference the [SAP AI contribution guideline](https://github.com/SAP/.github/blob/main/CONTRIBUTING_USING_GENAI.md). Required by `CONTRIBUTING.md`.
@@ -119,14 +123,14 @@ Check the PR body for the same categories as B1: account-specific URLs containin
 | `Unit Tests with Coverage` | pytest, coverage ≥ 80% |
 | `Build SDK` | `uv build` produces `.whl` + `.tar.gz` |
 | `commit-validation` | commitlint on all commits |
-| `Enforce version bump when src/ is modified` | version must increase if `src/` changed |
+| `Check Version Bump` | rejects manual version bumps — version is auto-managed |
 | `Verify generated proto code is up-to-date` | only for proto changes |
 | `Analyze (python)` | CodeQL security scan |
 
 Any required job ❌ → overall ❌. Pending → ⚠️.
 
 **C2: Version bump**
-If diff touches any `src/` file: `version` in `pyproject.toml` MUST be incremented (semver). Only `docs/`, `tests/`, `.github/`, `.claude/` changed → ➖ N/A.
+The version in `pyproject.toml` is managed **automatically** by the release pipeline — contributors must NOT manually change it. If the diff bumps `version` in `pyproject.toml`, that is a ❌ violation (the `Check Version Bump` CI job will also fail). This criterion is ➖ N/A for all PRs; only flag it if a manual bump is detected.
 
 **C3: Type hints**
 All new/modified public functions, methods, class attributes must have full annotations (params + return type). New modules need `py.typed`. Missing `Optional`, `Union`, or return type on a public method → ⚠️ or ❌.
@@ -291,12 +295,48 @@ Verdict: any ❌ → **Blocked** · any ⚠️ → **Needs Minor Work** · all �
 
 ---
 
-## Phase 5 (Optional): Post Review
+## Phase 5: Post Review and Apply Label
 
-Ask: "Post as GitHub PR review? (comment / request-changes / approve / skip)"
+Always post the report as a GitHub PR review and apply the corresponding label. Do not ask — this is mandatory.
+
+**Step 1 — Write the report to a temp file** (avoids shell-quoting issues with long bodies):
 
 ```bash
-gh pr review <number> --comment --body "<report>"
-gh pr review <number> --request-changes --body "<report>"
-gh pr review <number> --approve --body "<report>"
+cat > /tmp/pr<NUMBER>-review.md << 'EOF'
+<full report markdown>
+EOF
 ```
+
+**Step 2 — Post the review:**
+
+| Verdict | Command |
+|---|---|
+| ❌ Blocked | `gh pr review <NUMBER> --repo <REPO> --request-changes --body-file /tmp/pr<NUMBER>-review.md` |
+| ⚠️ Needs Minor Work | `gh pr review <NUMBER> --repo <REPO> --comment --body-file /tmp/pr<NUMBER>-review.md` |
+| ✅ Ready to Merge | `gh pr review <NUMBER> --repo <REPO> --approve --body-file /tmp/pr<NUMBER>-review.md` |
+
+**Step 3 — Apply the label** (two separate commands — remove first, then add):
+
+```bash
+# Remove all existing sdk-review labels (|| true so it never aborts)
+gh pr edit <NUMBER> --repo <REPO> \
+  --remove-label "sdk-review: ✅ passed" \
+  --remove-label "sdk-review: ❌ blocked" \
+  --remove-label "sdk-review: ⚠️ flagged" \
+  --remove-label "sdk-review: skipped" 2>/dev/null || true
+```
+
+Then add **exactly one** of these commands — copy the literal label string, do not paraphrase:
+
+```bash
+# ✅ Ready to Merge
+gh pr edit <NUMBER> --repo <REPO> --add-label "sdk-review: ✅ passed"
+
+# ⚠️ Needs Minor Work
+gh pr edit <NUMBER> --repo <REPO> --add-label "sdk-review: ⚠️ flagged"
+
+# ❌ Blocked
+gh pr edit <NUMBER> --repo <REPO> --add-label "sdk-review: ❌ blocked"
+```
+
+The `sdk-review: skipped` label is reserved for maintainers to manually mark a PR where the review was intentionally bypassed (e.g. trivial doc fix). The workflow gate treats `skipped` the same as `passed` — it only blocks on missing label or `❌ blocked`.

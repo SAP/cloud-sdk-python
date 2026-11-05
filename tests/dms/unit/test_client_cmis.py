@@ -1277,3 +1277,62 @@ class TestCmisQuery:
         )
 
         assert client._mock_http.get.call_args[1]["user_claim"] is claim
+
+
+# ---------------------------------------------------------------
+# URL path injection — security regression tests
+# ---------------------------------------------------------------
+
+
+class TestUrlInjectionPrevention:
+    """Regression tests: URL path injection must be rejected before hitting HTTP."""
+
+    _TRAVERSAL_IDS = [
+        "../../../browser/evil-repo/root",
+        "repo/../../../admin",
+        "repo?injected=yes",
+        "repo#fragment",
+        "/etc/passwd",
+    ]
+
+    # _browser_url: repository_id injection
+    @pytest.mark.parametrize("bad_id", _TRAVERSAL_IDS)
+    def test_browser_url_rejects_repository_id_injection(self, bad_id):
+        with pytest.raises(ValueError, match="contains characters not allowed"):
+            DMSClient._browser_url(bad_id)
+
+    # _browser_url: path dot-segment traversal
+    @pytest.mark.parametrize(
+        "bad_path",
+        [
+            "../../../rest/v2/repositories",
+            "docs/../../../admin",
+            "docs/./secret",
+        ],
+    )
+    def test_browser_url_rejects_dotdot_in_path(self, bad_path):
+        with pytest.raises(ValueError, match="traversal segment"):
+            DMSClient._browser_url("repo1", bad_path)
+
+    # _browser_url: query/fragment in path segment
+    def test_browser_url_encodes_special_chars_in_path_segment(self):
+        url = DMSClient._browser_url("repo1", "docs/file name.pdf")
+        assert "file%20name.pdf" in url
+
+    # restore_object: repository_id injection
+    @pytest.mark.parametrize("bad_id", _TRAVERSAL_IDS)
+    def test_restore_object_rejects_repository_id_injection(self, client, bad_id):
+        with pytest.raises(ValueError, match="contains characters not allowed"):
+            client.restore_object(bad_id, "valid-object-id")
+
+    # restore_object: object_id injection
+    @pytest.mark.parametrize("bad_id", _TRAVERSAL_IDS)
+    def test_restore_object_rejects_object_id_injection(self, client, bad_id):
+        with pytest.raises(ValueError, match="contains characters not allowed"):
+            client.restore_object("valid-repo-id", bad_id)
+
+    # cmis_query: repository_id injection
+    @pytest.mark.parametrize("bad_id", _TRAVERSAL_IDS)
+    def test_cmis_query_rejects_repository_id_injection(self, client, bad_id):
+        with pytest.raises(ValueError, match="contains characters not allowed"):
+            client.cmis_query(bad_id, "SELECT * FROM cmis:document")

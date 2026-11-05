@@ -79,7 +79,7 @@ SAMPLE_RESPONSE_WITH_HOOKS = {
             "name": "Before Tool Execution Hook",
             "hookType": "BEFORE",
             "deploymentType": "N8N",
-            "n8nWorkflowConfig": {"workflowId": "wf-before-001", "method": "POST"},
+            "n8nWorkflowConfig": {"ordId": "sap.n8nwfrt:apiResource:test-solution_hook.testHook:v1", "cardOrdId": "sap.n8nwfrt:apiResource:test-solution_hook.testHook_mcp:v1", "toolName": "testHook", "globalTenantId": "tenant-test-001", "method": "POST"},
             "timeout": 30,
             "executionMode": "SYNC",
             "onFailure": "CONTINUE",
@@ -108,7 +108,7 @@ SAMPLE_RESPONSE_WITH_INSTRUCTION_MCP_HOOKS = {
             "name": "Pre Execution Hook",
             "hookType": "BEFORE",
             "deploymentType": "N8N",
-            "n8nWorkflowConfig": {"workflowId": "wf-pre-001", "method": "POST"},
+            "n8nWorkflowConfig": {"ordId": "sap.n8nwfrt:apiResource:test-solution_hook.testHook:v1", "cardOrdId": "sap.n8nwfrt:apiResource:test-solution_hook.testHook_mcp:v1", "toolName": "testHook", "globalTenantId": "tenant-test-001", "method": "POST"},
             "timeout": 20,
             "executionMode": "SYNC",
             "onFailure": "CONTINUE",
@@ -137,7 +137,7 @@ SAMPLE_RESPONSE_WITH_MULTIPLE_HOOKS = {
             "name": "Before Tool Execution Hook",
             "hookType": "BEFORE",
             "deploymentType": "N8N",
-            "n8nWorkflowConfig": {"workflowId": "wf-before-001", "method": "POST"},
+            "n8nWorkflowConfig": {"ordId": "sap.n8nwfrt:apiResource:test-solution_hook.testHook:v1", "cardOrdId": "sap.n8nwfrt:apiResource:test-solution_hook.testHook_mcp:v1", "toolName": "testHook", "globalTenantId": "tenant-test-001", "method": "POST"},
             "timeout": 30,
             "executionMode": "SYNC",
             "onFailure": "BLOCK",
@@ -150,7 +150,7 @@ SAMPLE_RESPONSE_WITH_MULTIPLE_HOOKS = {
             "name": "After Tool Execution Hook",
             "hookType": "AFTER",
             "deploymentType": "SERVERLESS",
-            "n8nWorkflowConfig": {"workflowId": "wf-after-001", "method": "POST"},
+            "n8nWorkflowConfig": {"ordId": "sap.n8nwfrt:apiResource:test-solution_hook.testHook:v1", "cardOrdId": "sap.n8nwfrt:apiResource:test-solution_hook.testHook_mcp:v1", "toolName": "testHook", "globalTenantId": "tenant-test-001", "method": "POST"},
             "timeout": 60,
             "executionMode": "ASYNC",
             "onFailure": "CONTINUE",
@@ -163,7 +163,7 @@ SAMPLE_RESPONSE_WITH_MULTIPLE_HOOKS = {
             "name": "Validation Hook",
             "hookType": "BEFORE",
             "deploymentType": "N8N",
-            "n8nWorkflowConfig": {"workflowId": "wf-validate-001", "method": "POST"},
+            "n8nWorkflowConfig": {"ordId": "sap.n8nwfrt:apiResource:test-solution_hook.testHook:v1", "cardOrdId": "sap.n8nwfrt:apiResource:test-solution_hook.testHook_mcp:v1", "toolName": "testHook", "globalTenantId": "tenant-test-001", "method": "POST"},
             "timeout": 15,
             "executionMode": "SYNC",
             "onFailure": "BLOCK",
@@ -203,7 +203,10 @@ def _make_hook(
         hook_id=hook_id,
         id=hook_uuid,
         n8n_workflow_config=N8nWorkflowConfig(
-            workflow_id=f"wf-{hook_id}",
+            ord_id="sap.n8nwfrt:apiResource:test-solution_hook.testHook:v1",
+            card_ord_id="sap.n8nwfrt:apiResource:test-solution_hook.testHook_mcp:v1",
+            tool_name="testHook",
+            global_tenant_id="tenant-test-001",
             method=HTTPMethod.POST,
         ),
         name=f"Test Hook {hook_id}",
@@ -304,7 +307,7 @@ class TestLocalTransport:
         hook = result.hooks[0]
         assert hook.hook_id == "before_tool_execution"
         assert hook.id == "9f6e5f66-7e4f-4ef0-a9f6-e6e1c1220c11"
-        assert hook.n8n_workflow_config.workflow_id == "wf-before-001"
+        assert hook.n8n_workflow_config.tool_name == "testHook"
         assert hook.name == "Before Tool Execution Hook"
         assert hook.type == HookType.BEFORE
         assert hook.deployment_type == DeploymentType.N8N

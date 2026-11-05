@@ -36,8 +36,11 @@ from sap_cloud_sdk.agentgateway._fragments import (
     list_mcp_fragments,
 )
 from sap_cloud_sdk.agentgateway._compat import (
+    find_malformed_result_error,
+    find_mcp_error,
     mcp_input_schema,
     mcp_is_error,
+    mcp_output_schema,
     mcp_server_name,
 )
 from sap_cloud_sdk.agentgateway._models import (
@@ -400,6 +403,7 @@ async def list_server_tools(
                         server_name=server_name,
                         description=t.description or "",
                         input_schema=mcp_input_schema(t),
+                        output_schema=mcp_output_schema(t),
                         url=dest_url,
                         fragment_name=fragment_name,
                     )
@@ -540,23 +544,78 @@ async def call_mcp_tool_lob(
         ):
             async with ClientSession(read, write) as session:
                 await session.initialize()
-                result = await session.call_tool(tool.name, kwargs)
+                try:
+                    result = await session.call_tool(tool.name, kwargs)
+                except (McpError, BaseExceptionGroup, AttributeError) as exc:
+                    mcp_error = find_mcp_error(exc)
+                    if mcp_error is not None:
+                        logger.warning(
+                            "Tool '%s' on '%s' (server '%s') failed with MCP protocol "
+                            "error: code=%s message=%s",
+                            tool.name,
+                            tool.url,
+                            tool.server_name,
+                            mcp_error.error.code,
+                            mcp_error.error.message,
+                        )
+                        raise AgentGatewayServerError(
+                            mcp_error.error.message, error_code=mcp_error.error.code
+                        ) from exc
+
+                    malformed = find_malformed_result_error(exc)
+                    if malformed is not None:
+                        logger.warning(
+                            "Tool '%s' on '%s' (server '%s') returned a malformed or "
+                            "empty result from the gateway; the MCP client received no "
+                            "parseable CallToolResult (raw cause: %s: %s)",
+                            tool.name,
+                            tool.url,
+                            tool.server_name,
+                            type(malformed).__name__,
+                            malformed,
+                        )
+                        raise AgentGatewayServerError(
+                            f"Tool '{tool.name}' on '{tool.url}' returned a malformed "
+                            f"or empty result from the gateway"
+                        ) from exc
+
+                    logger.error(
+                        "Tool '%s' on '%s' (server '%s') raised an unhandled error "
+                        "during invocation: %s: %s",
+                        tool.name,
+                        tool.url,
+                        tool.server_name,
+                        type(exc).__name__,
+                        exc,
+                    )
+                    raise
                 if result is None:
                     raise AgentGatewayServerError(
                         f"Tool '{tool.name}' on '{tool.url}' returned None"
                     )
+
+                text = (
+                    str(getattr(result.content[0], "text", ""))
+                    if result.content
+                    else ""
+                )
+
+                if mcp_is_error(result):
+                    logger.warning(
+                        "Tool '%s' on '%s' returned an error: %s",
+                        tool.name,
+                        tool.url,
+                        text,
+                    )
+                    raise AgentGatewayServerError(
+                        f"Tool '{tool.name}' returned an error: {text}"
+                    )
+
                 if not result.content:
                     logger.warning(
                         "Tool '%s' on '%s' returned empty content", tool.name, tool.url
                     )
                     return ""
-                first = result.content[0]
-                text = str(getattr(first, "text", ""))
-
-                if mcp_is_error(result):
-                    raise AgentGatewayServerError(
-                        f"Tool '{tool.name}' on '{tool.url}' returned an error: {text}"
-                    )
 
                 return text
 

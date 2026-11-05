@@ -51,6 +51,98 @@
 - Use `pytest` as the testing framework
 - Organize tests to mirror source code structure
 - Use descriptive test names that explain what is being tested, following the `test_<functionality>_<condition>_<expected_result>` pattern
+- For integration tests, follow the [Integration Test Guidelines](#integration-tests) below
+
+## Integration Tests
+
+Integration tests live under `tests/<module>/integration/` and hit real external services. Follow the patterns established in `objectstore` and `destination`.
+
+### File structure
+
+```
+tests/<module>/integration/
+    __init__.py
+    conftest.py          # fixtures and environment setup
+    test_<module>_bdd.py # BDD step definitions
+    <module>.feature     # Gherkin scenarios (one or more)
+```
+
+### conftest.py conventions
+
+- Use a session-scoped fixture to load `.env_integration_tests` and validate required env vars — call `pytest.skip(...)` (not `pytest.fail`) when vars are missing, so CI doesn't report an error on environments where the service isn't configured.
+- Create service clients in session-scoped fixtures so they are shared across the full test run.
+- Add a session-scoped `autouse=True` fixture that cleans up any leftover test data before and after the session.
+- Add per-test cleanup via a `cleanup_*` fixture or an `autouse=True` scenario-level fixture that deletes all resources registered during the scenario.
+- Provide a `failure_simulation` fixture that creates clients configured with unreachable endpoints or invalid credentials — use explicit `config=` injection rather than patching env vars.
+- Register the `integration` pytest marker in `pytest_configure` and apply it automatically to all tests under `integration/` in `pytest_collection_modifyitems`.
+
+```python
+@pytest.fixture(scope="session")
+def integration_env() -> dict:
+    env_file = Path(__file__).parents[3] / ".env_integration_tests"
+    if env_file.exists():
+        load_dotenv(env_file)
+    required = ["CLOUD_SDK_CFG_<MODULE>_DEFAULT_URL", ...]
+    missing = [v for v in required if not os.getenv(v)]
+    if missing:
+        pytest.skip(f"Missing env vars: {missing}")
+    return {v: os.environ[v] for v in required}
+
+@pytest.fixture(scope="session")
+def my_client(integration_env):
+    try:
+        return create_client()
+    except Exception as e:
+        pytest.fail(f"Failed to create client: {e}")
+```
+
+### test_\<module\>_bdd.py conventions
+
+- Wire scenarios from feature files with `scenarios("my_module.feature")` at the top.
+- Maintain a `ScenarioContext` dataclass to carry state between steps — don't use module-level variables.
+- Provide a `context` fixture that returns a fresh `ScenarioContext` per scenario.
+- Wrap every action (`when` / `given` that calls the SDK) in a `try/except` that stores the error on `context.last_error` or `context.operation_error` rather than letting it propagate — this lets `then` steps assert on both success and failure paths cleanly.
+- Prefix cleanup operations with an idempotent delete before create to avoid 409 conflicts on re-runs.
+- Name test objects with a timestamped prefix (e.g. `sdk-python-integration-tests/test-<timestamp>-`) to namespace them and enable bulk cleanup.
+
+```python
+class ScenarioContext:
+    def __init__(self):
+        self.result = None
+        self.last_error: Optional[Exception] = None
+        self.cleanup_items: list = []
+
+@pytest.fixture
+def context():
+    return ScenarioContext()
+
+@when("I perform the operation")
+def perform_operation(context, my_client):
+    try:
+        context.result = my_client.do_something()
+        context.last_error = None
+    except Exception as e:
+        context.last_error = e
+
+@then("the operation should succeed")
+def operation_succeeds(context):
+    assert context.last_error is None, f"Unexpected error: {context.last_error}"
+    assert context.result is not None
+```
+
+### What to test
+
+- Happy path for each public operation (create, read, update, delete, list)
+- Not-found and permission-denied error paths using the `failure_simulation` fixture
+- Optional/multi-tenant scenarios — guard with `pytest.skip` when the required env var is absent rather than failing
+- Concurrent operations where the module supports them
+
+### What not to test
+
+- Internal implementation details — only test through the public `create_client()` API
+- Retry logic or credential rotation — those belong in unit tests with mocks
+
+See [Integration Tests](INTEGRATION_TESTS.md) for environment setup and how to run tests locally.
 
 ## Documentation
 - Use docstrings for all public functions, classes, and modules

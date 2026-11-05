@@ -49,7 +49,7 @@ from sap_cloud_sdk.adms._configuration_api import (
     _ConfigurationApi,
 )
 from sap_cloud_sdk.adms._document_api import _AsyncDocumentApi, _DocumentApi
-from sap_cloud_sdk.adms._http import AdmsHttp, AsyncAdmsHttp
+from sap_cloud_sdk.adms._http import AdmsHttp, AsyncAdmsHttp, _require_non_blank_jwt
 from sap_cloud_sdk.adms._ias_fetcher import IasTokenFetcher
 from sap_cloud_sdk.adms._job_api import _AsyncJobApi, _JobApi
 from sap_cloud_sdk.adms._relation_api import (
@@ -91,10 +91,16 @@ class AdmsClient:
 
         Args:
             user_jwt: The user's OIDC or XSUAA JWT from the inbound request.
+                Must be a non-blank string — ``None`` and blank/whitespace raise
+                :class:`ValueError`.
 
         Returns:
             New :class:`AdmsClient` configured for user-context calls.
+
+        Raises:
+            ValueError: If *user_jwt* is ``None``, empty, or whitespace-only.
         """
+        _require_non_blank_jwt(user_jwt)
         return AdmsClient(self._http.with_user_jwt(user_jwt))
 
 
@@ -129,10 +135,16 @@ class AsyncAdmsClient:
 
         Args:
             user_jwt: The user's OIDC or XSUAA JWT.
+                Must be a non-blank string — ``None`` and blank/whitespace raise
+                :class:`ValueError`.
 
         Returns:
             New :class:`AsyncAdmsClient` for user-context calls.
+
+        Raises:
+            ValueError: If *user_jwt* is ``None``, empty, or whitespace-only.
         """
+        _require_non_blank_jwt(user_jwt)
         return AsyncAdmsClient(self._http.with_user_jwt(user_jwt))
 
 
@@ -166,12 +178,14 @@ def create_client(
 
     Raises:
         ConfigError: If the binding configuration is missing or incomplete.
-        ValueError: If ``instance`` is an empty string.
+        ValueError: If ``instance`` is an empty string or ``user_jwt`` is blank/whitespace.
     """
     if instance is not None and instance == "":
         raise ValueError(
             "instance must not be an empty string; omit it to use 'default'"
         )
+    if user_jwt is not None:
+        _require_non_blank_jwt(user_jwt)
     try:
         if config is not None:
             token_fetcher = IasTokenFetcher(config=config, cache=token_cache)
@@ -210,12 +224,14 @@ def create_async_client(
 
     Raises:
         ConfigError: If binding configuration is missing or incomplete.
-        ValueError: If ``instance`` is an empty string.
+        ValueError: If ``instance`` is an empty string or ``user_jwt`` is blank/whitespace.
     """
     if instance is not None and instance == "":
         raise ValueError(
             "instance must not be an empty string; omit it to use 'default'"
         )
+    if user_jwt is not None:
+        _require_non_blank_jwt(user_jwt)
     try:
         if config is not None:
             token_fetcher = IasTokenFetcher(config=config, cache=token_cache)

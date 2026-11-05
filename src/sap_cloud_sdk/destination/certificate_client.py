@@ -23,6 +23,10 @@ from sap_cloud_sdk.destination.utils._pagination import (
     PagedResult,
     parse_pagination_headers,
 )
+from sap_cloud_sdk.destination.utils._validation import (
+    encode_path_segment,
+    validate_resource_name,
+)
 
 _SUBACCOUNT_COLLECTION = "subaccountCertificates"
 _INSTANCE_COLLECTION = "instanceCertificates"
@@ -169,6 +173,7 @@ class CertificateClient:
         Raises:
             DestinationOperationError: If an HTTP error occurs or response parsing fails.
         """
+        validate_resource_name(name)
         try:
             return self._get_certificate(name=name, level=Level.SERVICE_INSTANCE)
         except HttpError as e:
@@ -203,6 +208,7 @@ class CertificateClient:
             DestinationOperationError: If tenant is missing for subscriber access strategies,
                                        on HTTP errors, or response parsing failures.
         """
+        validate_resource_name(name)
         try:
             return self._apply_access_strategy(
                 access_strategy=access_strategy,
@@ -239,6 +245,7 @@ class CertificateClient:
             DestinationOperationError: For unexpected errors.
         """
         coll = self._sub_path_for_level(level)
+        validate_resource_name(certificate.name)
         body = certificate.to_dict()
 
         try:
@@ -280,6 +287,7 @@ class CertificateClient:
             DestinationOperationError: For unexpected errors.
         """
         coll = self._sub_path_for_level(level)
+        validate_resource_name(certificate.name)
         body = certificate.to_dict()
 
         try:
@@ -317,12 +325,13 @@ class CertificateClient:
             DestinationOperationError: For unexpected errors.
         """
         coll = self._sub_path_for_level(level)
+        validate_resource_name(name)
 
         try:
             _request(
                 self._http,
                 HttpMethod.DELETE,
-                f"{API_V1}/{coll}/{name}",
+                f"{API_V1}/{coll}/{encode_path_segment(name)}",
                 tenant_subdomain=tenant,
             )
         except HttpError:
@@ -354,12 +363,13 @@ class CertificateClient:
         Raises:
             DestinationOperationError: If an HTTP error occurs or response parsing fails.
         """
+        validate_resource_name(name)
         try:
             path = self._sub_path_for_level(level)
             resp = _request(
                 self._http,
                 HttpMethod.GET,
-                f"{API_V1}/{path}/{name}/labels",
+                f"{API_V1}/{path}/{encode_path_segment(name)}/labels",
                 tenant_subdomain=tenant,
             )
             data = resp.json()
@@ -398,12 +408,13 @@ class CertificateClient:
             DestinationOperationError: For unexpected errors.
         """
         resolved_level = level or Level.SUB_ACCOUNT
+        validate_resource_name(name)
         try:
             path = self._sub_path_for_level(resolved_level)
             _request(
                 self._http,
                 HttpMethod.PUT,
-                f"{API_V1}/{path}/{name}/labels",
+                f"{API_V1}/{path}/{encode_path_segment(name)}/labels",
                 json=[lbl.to_dict() for lbl in labels],
                 tenant_subdomain=tenant,
             )
@@ -435,12 +446,13 @@ class CertificateClient:
             DestinationOperationError: For unexpected errors.
         """
         resolved_level = level or Level.SUB_ACCOUNT
+        validate_resource_name(name)
         try:
             path = self._sub_path_for_level(resolved_level)
             _request(
                 self._http,
                 HttpMethod.PATCH,
-                f"{API_V1}/{path}/{name}/labels",
+                f"{API_V1}/{path}/{encode_path_segment(name)}/labels",
                 json=patch.to_dict(),
                 tenant_subdomain=tenant,
             )
@@ -478,7 +490,7 @@ class CertificateClient:
             resp = _request(
                 self._http,
                 HttpMethod.GET,
-                f"{API_V1}/{path}/{name}",
+                f"{API_V1}/{path}/{encode_path_segment(name)}",
                 tenant_subdomain=tenant_subdomain,
             )
             data = resp.json()

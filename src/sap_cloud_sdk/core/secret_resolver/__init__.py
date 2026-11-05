@@ -23,9 +23,12 @@ Usage:
 
 from .resolver import read_from_mount_and_fallback_to_env_var, resolve_base_mount
 from ._config_factory import ConfigFactory
+from ._validation import _assert_within_base, _validate_path_component
 
 __all__ = [
     "read_from_mount_and_fallback_to_env_var",
     "resolve_base_mount",
     "ConfigFactory",
+    "_assert_within_base",
+    "_validate_path_component",
 ]

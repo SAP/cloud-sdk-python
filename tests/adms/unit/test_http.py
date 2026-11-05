@@ -3,12 +3,14 @@
 from typing import Optional
 from unittest.mock import MagicMock
 
+import httpx
 import pytest
 import requests
 
 from sap_cloud_sdk.adms._ias_fetcher import IasTokenFetcher
 from sap_cloud_sdk.adms._http import (
     AdmsHttp,
+    AsyncAdmsHttp,
     build_allowed_domain_key_path,
     build_business_object_node_type_key_path,
     build_doctype_botype_map_key_path,
@@ -219,6 +221,142 @@ class TestAdmsHttpUserJwt:
 
         token_fetcher.get_token.assert_called()
         token_fetcher.exchange_token.assert_not_called()
+
+
+class TestAdmsHttpOboInvariant:
+    """OBO invariant — blank/whitespace/None user_jwt must raise ValueError.
+
+    Guards are at: AdmsHttp constructor, AdmsHttp.with_user_jwt,
+    AsyncAdmsHttp constructor, and AsyncAdmsHttp.with_user_jwt.
+    None remains the valid service-credentials sentinel ONLY at the
+    constructor level; with_user_jwt rejects it since it signals explicit OBO
+    intent.
+    """
+
+    # ------------------------------------------------------------------
+    # Sync transport — AdmsHttp
+    # ------------------------------------------------------------------
+
+    def test_constructor_empty_user_jwt_raises(self, config, token_fetcher):
+        with pytest.raises(ValueError, match="non-blank"):
+            AdmsHttp(config=config, token_fetcher=token_fetcher, user_jwt="")
+
+    def test_constructor_whitespace_user_jwt_raises(self, config, token_fetcher):
+        with pytest.raises(ValueError, match="non-blank"):
+            AdmsHttp(config=config, token_fetcher=token_fetcher, user_jwt="  ")
+
+    def test_constructor_none_user_jwt_does_not_raise(self, config, token_fetcher):
+        # Regression: None is the documented service-mode sentinel — must NOT raise.
+        http = AdmsHttp(config=config, token_fetcher=token_fetcher, user_jwt=None)
+        assert http is not None
+
+    def test_with_user_jwt_empty_raises(self, config, token_fetcher):
+        http = AdmsHttp(config=config, token_fetcher=token_fetcher)
+        with pytest.raises(ValueError, match="non-blank"):
+            http.with_user_jwt("")
+
+    def test_with_user_jwt_whitespace_raises(self, config, token_fetcher):
+        http = AdmsHttp(config=config, token_fetcher=token_fetcher)
+        with pytest.raises(ValueError, match="non-blank"):
+            http.with_user_jwt("   ")
+
+    def test_with_user_jwt_none_raises(self, config, token_fetcher):
+        # with_user_jwt signals explicit OBO intent — None must also raise.
+        http = AdmsHttp(config=config, token_fetcher=token_fetcher)
+        with pytest.raises(ValueError, match="non-blank"):
+            http.with_user_jwt(None)  # ty: ignore[invalid-argument-type]
+
+    def test_valid_jwt_calls_exchange_not_get(self, config, token_fetcher):
+        session = MagicMock(spec=requests.Session)
+        session.request.return_value = _make_resp(200)
+        http = AdmsHttp(
+            config=config,
+            token_fetcher=token_fetcher,
+            session=session,
+            user_jwt="valid.jwt.token",
+        )
+        http.get("Document")
+        token_fetcher.exchange_token.assert_called_once_with("valid.jwt.token")
+        token_fetcher.get_token.assert_not_called()
+
+    def test_none_jwt_uses_service_credentials(self, config, token_fetcher):
+        # Regression: None → service creds, not OBO.
+        session = MagicMock(spec=requests.Session)
+        session.request.return_value = _make_resp(200)
+        http = AdmsHttp(
+            config=config, token_fetcher=token_fetcher, session=session, user_jwt=None
+        )
+        http.get("Document")
+        token_fetcher.get_token.assert_called()
+        token_fetcher.exchange_token.assert_not_called()
+
+    # ------------------------------------------------------------------
+    # Async transport — AsyncAdmsHttp
+    # ------------------------------------------------------------------
+
+    def test_async_constructor_empty_user_jwt_raises(self, config):
+        fetcher = MagicMock(spec=IasTokenFetcher)
+        with pytest.raises(ValueError, match="non-blank"):
+            AsyncAdmsHttp(
+                config=config,
+                token_fetcher=fetcher,
+                client=MagicMock(spec=httpx.AsyncClient),
+                user_jwt="",
+            )
+
+    def test_async_constructor_whitespace_user_jwt_raises(self, config):
+        fetcher = MagicMock(spec=IasTokenFetcher)
+        with pytest.raises(ValueError, match="non-blank"):
+            AsyncAdmsHttp(
+                config=config,
+                token_fetcher=fetcher,
+                client=MagicMock(spec=httpx.AsyncClient),
+                user_jwt="   ",
+            )
+
+    def test_async_constructor_none_does_not_raise(self, config):
+        fetcher = MagicMock(spec=IasTokenFetcher)
+        fetcher.get_token.return_value = "service-token"
+        http = AsyncAdmsHttp(
+            config=config,
+            token_fetcher=fetcher,
+            client=MagicMock(spec=httpx.AsyncClient),
+            user_jwt=None,
+        )
+        assert http is not None
+
+    def test_async_with_user_jwt_empty_raises(self, config):
+        fetcher = MagicMock(spec=IasTokenFetcher)
+        fetcher.get_token.return_value = "service-token"
+        http = AsyncAdmsHttp(
+            config=config,
+            token_fetcher=fetcher,
+            client=MagicMock(spec=httpx.AsyncClient),
+        )
+        with pytest.raises(ValueError, match="non-blank"):
+            http.with_user_jwt("")
+
+    def test_async_with_user_jwt_whitespace_raises(self, config):
+        fetcher = MagicMock(spec=IasTokenFetcher)
+        fetcher.get_token.return_value = "service-token"
+        http = AsyncAdmsHttp(
+            config=config,
+            token_fetcher=fetcher,
+            client=MagicMock(spec=httpx.AsyncClient),
+        )
+        with pytest.raises(ValueError, match="non-blank"):
+            http.with_user_jwt("   ")
+
+    def test_async_with_user_jwt_none_raises(self, config):
+        fetcher = MagicMock(spec=IasTokenFetcher)
+        fetcher.get_token.return_value = "service-token"
+        http = AsyncAdmsHttp(
+            config=config,
+            token_fetcher=fetcher,
+            client=MagicMock(spec=httpx.AsyncClient),
+        )
+        with pytest.raises(ValueError, match="non-blank"):
+            http.with_user_jwt(None)  # ty: ignore[invalid-argument-type]
 
 
 class TestQuoteOdataStringKey:

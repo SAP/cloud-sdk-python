@@ -93,7 +93,7 @@ metadata or a message queue envelope — as long as the adapter populates
 
 | Provider | Reads | Sets |
 |---|---|---|
-| `IASContextProvider` | `Authorization: Bearer <JWT>` | `TENANT_ID`, `USER_ID`, `GLOBAL_TENANT_ID` |
+| `IASContextProvider` | `Authorization: Bearer <JWT>` (signature verified via `IASVerifier`) | `TENANT_ID`, `USER_ID`, `GLOBAL_TENANT_ID` |
 | `SAPTriggerContextProvider` | `x-sap-origin` | `TRIGGER_TYPE` |
 | `DWCContextProvider` | `dwc-subdomain`, `dwc-tenant`, `dwc-stage-configuration` | `DWC_SUBDOMAIN`, `DWC_TENANT`, `FEATURE_TOGGLES` |
 
@@ -261,3 +261,14 @@ Returns an empty list if `bootstrap()` has not been called yet. Each entry corre
 ```bash
 uv run pytest tests/core/unit/runtime_context/
 ```
+
+---
+
+## Multi-tenancy
+
+| Field | Value |
+|---|---|
+| **Supported** | Yes |
+| **Authentication** | IAS |
+| **How to use** | `IASContextProvider` extracts `app_tid` (→ `APP_TENANT_ID`), `sap_gtid` (→ `GLOBAL_TENANT_ID`), and `user_uuid` (→ `USER_ID`) from the IAS JWT on every request. All claims are verified via `IASVerifier` (JWKS-backed signature check). Downstream SDK components (`RuntimeContextSpanProcessor`, `IdentityLogFilter`, `AuditClient`) read these keys to attribute spans, logs, and audit events to the correct tenant. No extra configuration is required — `bootstrap(app)` registers `IASContextProvider` as the first provider by default. |
+| **Further reading** | [IAS user guide](../../ias/user-guide.md) · [StarletteIASTelemetryMiddleware](../telemetry/user-guide.md) |

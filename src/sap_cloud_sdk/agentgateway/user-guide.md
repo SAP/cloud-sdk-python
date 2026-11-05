@@ -70,6 +70,31 @@ result = await agw_client.call_mcp_tool(
 )
 ```
 
+### Multi-System — List Connected Systems and Filter by GTID
+
+When multiple backend systems are connected to the same agent, use `list_active_integrations()` to discover them and `MCPToolFilter(gtids=[...])` to load tools from only the chosen backend.
+
+```python
+from sap_cloud_sdk.agentgateway import MCPToolFilter, create_client
+
+agw_client = create_client(tenant_subdomain="my-tenant")
+
+# Discover connected backend systems
+integrations = agw_client.list_active_integrations()
+# [
+#   {"global_tenant_id": "abc-123", "system_type": "...", "integration_dependency": "..."},
+#   {"global_tenant_id": "def-456", "system_type": "...",  "integration_dependency": "..."},
+# ]
+
+# Pick the system to use (e.g. ask the user, or derive from the triggering event)
+target_gtid = integrations[0]["global_tenant_id"]
+
+# Load only that backend's MCP tools
+tools = await agw_client.list_mcp_tools(
+    filter=MCPToolFilter(gtids=[target_gtid])
+)
+```
+
 ### A2A Agent Cards (LoB only)
 
 Discover A2A agents and their agent cards from destination fragments labelled `agw.a2a.server`. Each fragment must have a `URL` property; the agent card is fetched from `{URL}/.well-known/agent-card.json` and the ORD ID is extracted from the second-to-last URL path segment.
@@ -129,6 +154,19 @@ mcp_tool_to_langchain(
     omit_none=False,
 )
 ```
+
+By default, a failed tool call raises the raw SDK exception, which propagates out of the agent. Set `handle_tool_error=True` to instead surface Agent Gateway failures to the LLM as a LangChain `ToolException`; LangChain converts it to an error `ToolMessage` the model can see and self-correct on, rather than crashing the agent loop:
+
+```python
+mcp_tool_to_langchain(
+    t,
+    agw_client.call_mcp_tool,
+    get_user_token=lambda: request.headers["Authorization"],
+    handle_tool_error=True,
+)
+```
+
+With `handle_tool_error=True`, a tool error such as `Tool 'recalc' on '<url>' returned an error: backend unavailable` is delivered to the model as a tool result instead of being raised. You may also pass a fixed `str` to show the LLM a constant message, or a callable `(ToolException) -> str` to compute one; both are forwarded to LangChain's `StructuredTool.handle_tool_error`.
 
 The converter maps each property's JSON Schema `"type"` to the corresponding Python type so Pydantic validates and forwards the correct native type to the MCP server:
 
@@ -243,6 +281,8 @@ class AgentGatewayClient:
         filter: AgentCardFilter | None = None,
     ) -> list[Agent]
 
+    def list_active_integrations(self) -> list[ConnectedSystem]
+
     def get_ias_client_id(self) -> str
 ```
 
@@ -259,6 +299,25 @@ Raises `AgentGatewaySDKError` if the value cannot be resolved.
 agw_client = create_client(tenant_subdomain="my-tenant")
 client_id = agw_client.get_ias_client_id()
 ```
+
+#### `list_active_integrations()`
+
+Returns the backend systems currently connected to the agent's tenant. Use this to discover which GTIDs are available before calling `list_mcp_tools` with a `gtids` filter.
+
+Only available for LoB agents.
+
+```python
+from sap_cloud_sdk.agentgateway import create_client
+
+agw_client = create_client(tenant_subdomain="my-tenant")
+integrations = agw_client.list_active_integrations()
+# [
+#   {"global_tenant_id": "abc-123", "system_type": "...", "integration_dependency": "sap.pce:..."},
+#   {"global_tenant_id": "def-456", "system_type": "...",  "integration_dependency": "sap.pc:..."},
+# ]
+```
+
+Returns a list of `ConnectedSystem` dicts. Returns an empty list when no active integrations exist.
 
 ### AgentCardFilter
 
@@ -279,19 +338,30 @@ Both fields default to empty lists. `agent_names` is applied after fetching; `or
 from sap_cloud_sdk.agentgateway import MCPToolFilter
 
 MCPToolFilter(
-    names=[],  # tool names to include (matched against MCPTool.name); empty = no filter
+    names=[],    # tool names to include (matched against MCPTool.name); empty = no filter
     ord_ids=[],  # ORD IDs to include (extracted from fragment URL for LoB, or matched
-    # against IntegrationDependency.ord_id for customer agents); empty = no filter
+                 # against IntegrationDependency.ord_id for customer agents); empty = no filter
+    gtids=[],    # GTIDs of connected systems whose tools to include (LoB only); empty = no filter
 )
 ```
 
-Both fields default to empty lists. `names` is applied after fetching; `ord_ids` is applied before fetching, skipping non-matching fragments.
+All fields default to empty lists.
 
-> Both filter classes use AND semantics: if both fields are set, a result must match all of them to be included.
+- `names` is applied after fetching.
+- `ord_ids` is applied before fetching, skipping non-matching fragments.
+- `gtids` is applied before fetching: filters fragments by the `sap-managed-runtime-gtid` label.
+
+> All three filter classes use AND semantics: if multiple fields are set, a result must match all of them to be included.
 
 ### Data Models
 
 ```python
+class ConnectedSystem(TypedDict):
+    global_tenant_id: str | None   # GTID of the connected backend system
+    system_type: str | None        # application namespace
+    integration_dependency: str | None  # ORD ID fulfilled by this integration
+
+
 @dataclass
 class Agent:
     ord_id: str  # ORD ID from fragment ordId property

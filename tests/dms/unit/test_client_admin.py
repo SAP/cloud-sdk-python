@@ -443,3 +443,80 @@ class TestDeleteConfig:
         call_args = client._mock_http.delete.call_args
         assert call_args[1]["tenant_subdomain"] == "t1"
         assert call_args[1]["user_claim"] is claim
+
+
+# ---------------------------------------------------------------
+# URL path injection — security regression tests
+# ---------------------------------------------------------------
+
+
+class TestUrlInjectionPrevention:
+    """Regression tests: caller-supplied IDs with path metacharacters must be rejected.
+
+    Slashes, dot-segments, and query characters in an ID could redirect the
+    authenticated request to unintended endpoints before it reaches the HTTP layer.
+    """
+
+    # repo_id sinks
+    @pytest.mark.parametrize(
+        "bad_id",
+        [
+            "../../../rest/v2/repositories/other",
+            "repo/../admin",
+            "repo?injected=yes",
+            "repo#fragment",
+            "/etc/passwd",
+        ],
+    )
+    def test_get_repository_rejects_injection(self, client, bad_id):
+        with pytest.raises(ValueError, match="contains characters not allowed"):
+            client.get_repository(bad_id)
+
+    @pytest.mark.parametrize(
+        "bad_id",
+        [
+            "../../../rest/v2/repositories/other",
+            "repo/../admin",
+            "repo?injected=yes",
+        ],
+    )
+    def test_update_repository_rejects_injection(self, client, bad_id):
+        request = UpdateRepoRequest(description="x")
+        with pytest.raises(ValueError, match="contains characters not allowed"):
+            client.update_repository(bad_id, request)
+
+    @pytest.mark.parametrize(
+        "bad_id",
+        [
+            "../../../rest/v2/repositories/other",
+            "repo/../admin",
+        ],
+    )
+    def test_delete_repository_rejects_injection(self, client, bad_id):
+        with pytest.raises(ValueError, match="contains characters not allowed"):
+            client.delete_repository(bad_id)
+
+    # config_id sinks
+    @pytest.mark.parametrize(
+        "bad_id",
+        [
+            "../../../rest/v2/configs/other",
+            "cfg/../admin",
+            "cfg?injected=yes",
+        ],
+    )
+    def test_update_config_rejects_injection(self, client, bad_id):
+        request = UpdateConfigRequest(id="x", config_name="n", config_value="v")
+        with pytest.raises(ValueError, match="contains characters not allowed"):
+            client.update_config(bad_id, request)
+
+    @pytest.mark.parametrize(
+        "bad_id",
+        [
+            "../../../rest/v2/configs/other",
+            "cfg/../admin",
+        ],
+    )
+    def test_delete_config_rejects_injection(self, client, bad_id):
+        with pytest.raises(ValueError, match="contains characters not allowed"):
+            client.delete_config(bad_id)

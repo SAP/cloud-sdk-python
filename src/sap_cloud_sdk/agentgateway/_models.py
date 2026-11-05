@@ -44,6 +44,8 @@ class MCPTool:
         server_name: MCP server name from server_info.name
         description: Tool description
         input_schema: JSON schema for tool input parameters
+        output_schema: JSON schema for the tool's structured result, if the MCP
+            server advertises one (MCP Builder tools do). None when absent.
         url: MCP endpoint URL
         fragment_name: Destination fragment name (used for auth lookup)
     """
@@ -54,6 +56,7 @@ class MCPTool:
     input_schema: dict[str, Any]
     url: str
     fragment_name: str | None = None
+    output_schema: dict[str, Any] | None = None
 
 
 @dataclass

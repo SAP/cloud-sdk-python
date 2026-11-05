@@ -1339,3 +1339,155 @@ class TestGetServiceInstanceId:
         client = DestinationClient(Mock())
         with pytest.raises(DestinationOperationError, match="Could not resolve destination instance ID from secrets"):
             client.get_service_instance_id()
+
+
+# ---------------------------------------------------------------------------
+# Path traversal guard — added by security fix
+# ---------------------------------------------------------------------------
+
+_ATTACK_NAMES = ["../etc/passwd", "a/b", "a%2Fb", "a?q=1", "a#frag"]
+
+
+class TestPathTraversalGuard:
+    """Validates that invalid names are rejected before any HTTP or OAuth call."""
+
+    @pytest.fixture
+    def client(self):
+        http = Mock()
+        return DestinationClient(http), http
+
+    # --- get_destination (V2) ---
+
+    @pytest.mark.parametrize("name", _ATTACK_NAMES)
+    def test_get_destination_rejects_traversal_names(self, client, name):
+        c, http = client
+        with pytest.raises(ValueError):
+            c.get_destination(name)
+        http.request.assert_not_called()
+
+    def test_get_destination_valid_name_calls_http(self, client):
+        c, http = client
+        http.request.return_value = _make_response(200, json_data={
+            "destinationConfiguration": {"name": "my-api", "type": "HTTP", "url": "https://x.com"},
+            "authTokens": [], "certificates": [],
+        })
+        c.get_destination("my-api")
+        http.request.assert_called_once()
+        path_arg = http.request.call_args[0][1]
+        assert "my-api" in path_arg
+
+    # --- auto-parse @ConsumptionLevel suffix (backward compat) ---
+
+    def test_get_destination_auto_parses_at_level_suffix(self, client):
+        c, http = client
+        http.request.return_value = _make_response(200, json_data={
+            "destinationConfiguration": {"name": "sap-ias-eu12", "type": "HTTP", "url": "https://x.com"},
+            "authTokens": [], "certificates": [],
+        })
+        c.get_destination("sap-ias-eu12@provider_subaccount")
+        path_arg = http.request.call_args[0][1]
+        assert "sap-ias-eu12@provider_subaccount" in path_arg
+
+    def test_get_destination_at_level_same_url_as_explicit_level(self, client):
+        c, http = client
+        http.request.return_value = _make_response(200, json_data={
+            "destinationConfiguration": {"name": "my-dest", "type": "HTTP", "url": "https://x.com"},
+            "authTokens": [], "certificates": [],
+        })
+        # Call with @level in name
+        c.get_destination("my-dest@provider_subaccount")
+        path_implicit = http.request.call_args[0][1]
+        http.reset_mock()
+        # Call with explicit level=
+        c.get_destination("my-dest", level=ConsumptionLevel.PROVIDER_SUBACCOUNT)
+        path_explicit = http.request.call_args[0][1]
+        assert path_implicit == path_explicit
+
+    def test_get_destination_unknown_at_level_raises_value_error(self, client):
+        c, http = client
+        with pytest.raises(ValueError, match="Unknown level"):
+            c.get_destination("my-dest@bogus_level")
+        http.request.assert_not_called()
+
+    def test_get_destination_conflicting_levels_raises_value_error(self, client):
+        c, http = client
+        with pytest.raises(ValueError, match="Conflicting levels"):
+            c.get_destination(
+                "my-dest@provider_subaccount",
+                level=ConsumptionLevel.PROVIDER_INSTANCE,
+            )
+        http.request.assert_not_called()
+
+    def test_get_destination_traversal_via_at_suffix_rejected(self, client):
+        c, http = client
+        with pytest.raises(ValueError):
+            c.get_destination("../evil@provider_subaccount")
+        http.request.assert_not_called()
+
+    # --- delete_destination ---
+
+    @pytest.mark.parametrize("name", _ATTACK_NAMES)
+    def test_delete_destination_rejects_traversal_names(self, client, name):
+        c, http = client
+        with pytest.raises(ValueError):
+            c.delete_destination(name)
+        http.request.assert_not_called()
+
+    # --- get_destination_labels ---
+
+    @pytest.mark.parametrize("name", _ATTACK_NAMES)
+    def test_get_destination_labels_rejects_traversal_names(self, client, name):
+        c, http = client
+        with pytest.raises(ValueError):
+            c.get_destination_labels(name)
+        http.request.assert_not_called()
+
+    # --- update_destination_labels ---
+
+    @pytest.mark.parametrize("name", _ATTACK_NAMES)
+    def test_update_destination_labels_rejects_traversal_names(self, client, name):
+        c, http = client
+        with pytest.raises(ValueError):
+            c.update_destination_labels(name, [])
+        http.request.assert_not_called()
+
+    # --- patch_destination_labels ---
+
+    @pytest.mark.parametrize("name", _ATTACK_NAMES)
+    def test_patch_destination_labels_rejects_traversal_names(self, client, name):
+        c, http = client
+        with pytest.raises(ValueError):
+            c.patch_destination_labels(name, PatchLabels(action="ADD", labels=[]))
+        http.request.assert_not_called()
+
+    # --- deprecated wrappers ---
+
+    @pytest.mark.parametrize("name", _ATTACK_NAMES)
+    def test_get_instance_destination_rejects_traversal_names(self, client, name):
+        c, http = client
+        with pytest.raises(ValueError):
+            c.get_instance_destination(name)
+        http.request.assert_not_called()
+
+    @pytest.mark.parametrize("name", _ATTACK_NAMES)
+    def test_get_subaccount_destination_rejects_traversal_names(self, client, name):
+        c, http = client
+        with pytest.raises(ValueError):
+            c.get_subaccount_destination(name)
+        http.request.assert_not_called()
+
+    # --- create / update (Step 2b round-trip consistency) ---
+
+    def test_create_destination_rejects_invalid_name(self, client):
+        c, http = client
+        dest = Destination(name="../evil", type=DestinationType.HTTP, url="https://x.com")
+        with pytest.raises(ValueError):
+            c.create_destination(dest)
+        http.request.assert_not_called()
+
+    def test_update_destination_rejects_invalid_name(self, client):
+        c, http = client
+        dest = Destination(name="../evil", type=DestinationType.HTTP, url="https://x.com")
+        with pytest.raises(ValueError):
+            c.update_destination(dest)
+        http.request.assert_not_called()

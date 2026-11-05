@@ -95,6 +95,14 @@ class TestRequest:
         call_args = http.request.call_args
         assert call_args[1]["tenant_subdomain"] == "subscriber-abc"
 
+    def test_path_with_dotdot_segment_raises_http_error(self):
+        http, _ = _mock_http(200)
+
+        with pytest.raises(HttpError, match="traversal"):
+            _request(http, HttpMethod.GET, "v1/subaccountDestinations/../adminDestinations/secret")
+
+        http.request.assert_not_called()
+
     def test_params_forwarded(self):
         http, _ = _mock_http(200)
         params = {"$filter": "Name eq 'dest'"}

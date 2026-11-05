@@ -6,6 +6,7 @@ import base64
 import json
 import logging
 from typing import IO, Callable, Optional, Union
+from urllib.parse import quote
 
 from requests.exceptions import RequestException
 
@@ -22,6 +23,17 @@ _TASKS_PATH = "/qm/api/v1/rest/print-tasks"
 _IF_NONE_MATCH = {"If-None-Match": "*"}
 
 logger = logging.getLogger(__name__)
+
+
+def _encode_path_segment(value: object) -> str:
+    """Percent-encode a value as a single URL path segment.
+
+    Literal '.' and '..' segments raise HttpError to prevent path traversal.
+    """
+    segment = f"{value}"
+    if segment in (".", ".."):
+        raise HttpError("path identifier must not be '.' or '..'")
+    return quote(segment, safe="")
 
 
 def _resolve_username(access_token: str, fallback_client_id: str) -> str:
@@ -164,7 +176,7 @@ class PrintClient:
         """
         try:
             self.put(
-                f"{_QUEUES_PATH}/{queue.qname}",
+                f"{_QUEUES_PATH}/{_encode_path_segment(queue.qname)}",
                 json=queue.to_dict(),
                 headers=_IF_NONE_MATCH,
             )
@@ -191,7 +203,7 @@ class PrintClient:
             PrintOperationError: If the request fails or the response cannot be parsed.
         """
         try:
-            resp = self.get(f"{_QUEUES_PATH}/{qname}/profiles")
+            resp = self.get(f"{_QUEUES_PATH}/{_encode_path_segment(qname)}/profiles")
             data = resp.json()
             return [PrintProfile.from_dict(item) for item in data]
         except HttpError as e:
@@ -261,7 +273,7 @@ class PrintClient:
             task.username = self.get_username()
         try:
             self.put(
-                f"{_TASKS_PATH}/{task.item_id}",
+                f"{_TASKS_PATH}/{_encode_path_segment(task.item_id)}",
                 json=task.to_body(),
                 headers=_IF_NONE_MATCH,
             )

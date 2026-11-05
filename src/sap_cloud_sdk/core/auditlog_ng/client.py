@@ -76,6 +76,29 @@ def _fill_common_from_auth_context(event: Message) -> None:
         common.timestamp.FromDatetime(datetime.now(timezone.utc))
 
 
+def _strip_message_context_text(event: Message) -> None:
+    """Remove free-text fields from an event's ``message_context``, if present.
+
+    Several AI audit events embed an ``AiMessageContext`` (proto field
+    ``message_context``) whose ``prompt_text`` and ``response_text`` fields hold
+    the verbatim model input/output and may contain sensitive data. We never
+    forward that content to the audit log; correlation fields (uid, name,
+    ai_role_id) and token counts are left intact.
+
+    Safe to call on any event: events without a ``message_context`` field, or
+    with one that was never set, are left untouched (we only act when the field
+    is actually present, so we never auto-create an empty sub-message).
+    """
+    if not hasattr(event, "message_context"):
+        return
+    event_any = cast(Any, event)
+    if not event_any.HasField("message_context"):
+        return
+    message_context = event_any.message_context
+    message_context.ClearField("prompt_text")
+    message_context.ClearField("response_text")
+
+
 def _create_log_exporter(
     config: AuditLogNGConfig,
     credentials: Optional[grpc.ChannelCredentials],
@@ -216,6 +239,7 @@ class AuditClient:
             raise ValueError("format must be 'protobuf-binary' or 'json'")
 
         _fill_common_from_auth_context(event)
+        _strip_message_context_text(event)
 
         try:
             protovalidate.validate(event)

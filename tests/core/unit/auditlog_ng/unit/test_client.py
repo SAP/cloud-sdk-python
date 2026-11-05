@@ -11,6 +11,7 @@ import pytest
 from sap_cloud_sdk.core.auditlog_ng.client import (
     AuditClient,
     _fill_common_from_auth_context,
+    _strip_message_context_text,
 )
 from sap_cloud_sdk.core.auditlog_ng.config import AuditLogNGConfig, SCHEMA_URL
 from sap_cloud_sdk.core.auditlog_ng.exceptions import ValidationError
@@ -401,3 +402,56 @@ class TestFillCommonFromAuthContext:
     def test_event_without_common_field_is_skipped(self):
         event = MagicMock(spec=[])  # no 'common' attribute
         _fill_common_from_auth_context(event)  # must not raise
+
+
+class TestStripMessageContextText:
+    def test_strips_prompt_and_response_text(self):
+        event = pb.AiPromptReceived()
+        event.message_context.prompt_text = "verbatim user prompt"
+        event.message_context.response_text = "verbatim model response"
+        _strip_message_context_text(event)
+        assert event.message_context.prompt_text == ""
+        assert event.message_context.response_text == ""
+
+    def test_preserves_correlation_and_token_fields(self):
+        event = pb.AiPromptReceived()
+        event.message_context.prompt_text = "secret"
+        event.message_context.response_text = "secret"
+        event.message_context.uid = "conversation-123"
+        event.message_context.name = "thread-name"
+        event.message_context.prompt_tokens = 42
+        event.message_context.completion_tokens = 7
+        event.message_context.total_tokens = 49
+        _strip_message_context_text(event)
+        assert event.message_context.uid == "conversation-123"
+        assert event.message_context.name == "thread-name"
+        assert event.message_context.prompt_tokens == 42
+        assert event.message_context.completion_tokens == 7
+        assert event.message_context.total_tokens == 49
+
+    def test_unset_message_context_is_not_created(self):
+        event = pb.AiPromptReceived()
+        _strip_message_context_text(event)
+        assert not event.HasField("message_context")
+
+    def test_event_without_message_context_field_is_skipped(self):
+        # AiSkillSelected has no message_context field at all.
+        event = pb.AiSkillSelected()
+        _strip_message_context_text(event)  # must not raise
+
+    def test_send_strips_message_context_text_before_emit(self):
+        client, mock_logger, _, _, patcher, _ = _make_mocked_client()
+        try:
+            event = pb.AiPromptReceived()
+            event.common.tenant_id = "tenant-123"
+            event.message_context.prompt_text = "sensitive prompt"
+            event.message_context.response_text = "sensitive response"
+
+            client.send(event)
+
+            # The event object itself is scrubbed in place before serialization.
+            assert event.message_context.prompt_text == ""
+            assert event.message_context.response_text == ""
+            mock_logger.emit.assert_called_once()
+        finally:
+            patcher.stop()

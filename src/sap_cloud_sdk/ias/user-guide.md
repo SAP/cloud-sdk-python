@@ -149,3 +149,14 @@ auto_instrument(middlewares=[StarletteIASTelemetryMiddleware(app=app)])
 ```
 
 If no binding is found, a WARNING is logged at startup and identity attributes are not stamped until a binding is added. See [Telemetry user guide](../core/telemetry/user-guide.md#built-in-starletteiastelemetrymiddleware) for details.
+
+---
+
+## Multi-tenancy
+
+| Field | Value |
+|-------|-------|
+| **Supported** | Yes |
+| **Authentication** | IAS |
+| **How to use** | The `app_tid` claim in `IASClaims` carries the SAP tenant ID for the authenticated user. `IASVerifier` enforces the `aud` claim against the application's own `clientid`, preventing tokens issued for sibling applications (cross-tenant or same-tenant) from being accepted. For subscriber-tenant routing (e.g. deriving a per-tenant IAS URL), use `IASVerifier(ias_url=..., client_id=...)` constructed explicitly per tenant rather than `from_env()`. |
+| **Further reading** | [SAP IAS multi-tenancy documentation](https://help.sap.com/docs/identity-authentication/identity-authentication/tenant-model-and-licensing) |

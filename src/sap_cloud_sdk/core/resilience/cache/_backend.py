@@ -10,7 +10,7 @@ class CacheBackend(ABC):
     """Domain-agnostic key/value cache backend.
 
     The backend has no awareness of tenants, TTL policy, namespaces, or domain
-    types. All of that is handled by the :class:`~sap_cloud_sdk.resilience.cache._cache.Cache`
+    types. All of that is handled by the :class:`~sap_cloud_sdk.core.resilience.cache._cache.Cache`
     façade before keys and values reach the backend.
 
     Implement this to plug in any shared cache (Redis, Memcached, etc.) for

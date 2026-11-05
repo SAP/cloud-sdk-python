@@ -4,7 +4,7 @@ import time
 
 import pytest
 
-from sap_cloud_sdk.resilience.cache._lru_backend import InMemoryLRUBackend
+from sap_cloud_sdk.core.resilience.cache._lru_backend import InMemoryLRUBackend
 
 
 class TestInMemoryLRUBackendGet:

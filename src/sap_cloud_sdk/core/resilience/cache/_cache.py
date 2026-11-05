@@ -9,9 +9,9 @@ SDK modules instantiate :class:`Cache` per-client and call its
 - Honouring the ``enabled`` flag.
 
 This class is **not part of the public API** and is not exported from
-``sap_cloud_sdk.resilience.cache``. Import it directly::
+``sap_cloud_sdk.core.resilience.cache``. Import it directly::
 
-    from sap_cloud_sdk.resilience.cache._cache import Cache
+    from sap_cloud_sdk.core.resilience.cache._cache import Cache
 """
 
 from __future__ import annotations
@@ -19,12 +19,12 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from sap_cloud_sdk.resilience.cache._backend import CacheBackend
-from sap_cloud_sdk.resilience.cache._config import CacheConfig, get_cache_config
-from sap_cloud_sdk.resilience.cache._isolation import build_isolation_key
-from sap_cloud_sdk.resilience.cache._lru_backend import InMemoryLRUBackend
-from sap_cloud_sdk.resilience.cache._registry import get_module_backend
-from sap_cloud_sdk.resilience.cache.exceptions import BackendError
+from sap_cloud_sdk.core.resilience.cache._backend import CacheBackend
+from sap_cloud_sdk.core.resilience.cache._config import CacheConfig, get_cache_config
+from sap_cloud_sdk.core.resilience.cache._isolation import build_isolation_key
+from sap_cloud_sdk.core.resilience.cache._lru_backend import InMemoryLRUBackend
+from sap_cloud_sdk.core.resilience.cache._registry import get_module_backend
+from sap_cloud_sdk.core.resilience.cache.exceptions import BackendError
 
 logger = logging.getLogger(__name__)
 
@@ -38,12 +38,12 @@ class Cache:
 
     Args:
         config: Per-client override. When ``None``, the global config set via
-            :func:`~sap_cloud_sdk.resilience.cache._config.configure_cache` is used.
+            :func:`~sap_cloud_sdk.core.resilience.cache._config.configure_cache` is used.
             The config is snapshotted at construction time — subsequent calls
             to :func:`configure_cache` do not affect an existing ``Cache``.
         module: Optional logical module name (e.g. ``"agentgateway"``).
             When given, all ``Cache`` instances with the same *module* name
-            share a single :class:`~sap_cloud_sdk.resilience.cache._lru_backend.InMemoryLRUBackend`
+            share a single :class:`~sap_cloud_sdk.core.resilience.cache._lru_backend.InMemoryLRUBackend`
             that lives for the process lifetime. This lets modules that
             create a new client on every request still benefit from
             cross-request caching.

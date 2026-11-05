@@ -13,9 +13,9 @@ from oauthlib.oauth2 import BackendApplicationClient
 from oauthlib.oauth2.rfc6749.errors import FatalClientError
 from requests_oauthlib import OAuth2Session
 
-from sap_cloud_sdk.resilience.cache._cache import Cache
-from sap_cloud_sdk.resilience.cache._config import CacheConfig
-from sap_cloud_sdk.resilience.cache._isolation import IsolationStrategy
+from sap_cloud_sdk.core.resilience.cache._cache import Cache
+from sap_cloud_sdk.core.resilience.cache._config import CacheConfig
+from sap_cloud_sdk.core.resilience.cache._isolation import IsolationStrategy
 from sap_cloud_sdk.core._tenant import (
     _derive_tenant_token_url,
     _validate_tenant_subdomain,
@@ -64,7 +64,7 @@ class XsuaaAuthProvider(AuthProvider):
     """OAuth2 client-credentials auth provider for XSUAA.
 
     Caches tokens per tenant subdomain with expiry-aware eviction backed by the
-    SDK :class:`~sap_cloud_sdk.resilience.cache._cache.Cache` module.
+    SDK :class:`~sap_cloud_sdk.core.resilience.cache._cache.Cache` module.
     Re-reads credentials from the binding on every token refresh so that
     rotated secrets are picked up automatically.
     Detects rotation proactively by checking the secret directory mtime before

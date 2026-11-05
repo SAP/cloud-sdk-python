@@ -5,14 +5,14 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from sap_cloud_sdk.resilience.cache._backend import CacheBackend
-from sap_cloud_sdk.resilience.cache._cache import Cache
-from sap_cloud_sdk.resilience.cache._config import CacheConfig, configure_cache
-from sap_cloud_sdk.resilience.cache._isolation import IsolationStrategy
-from sap_cloud_sdk.resilience.cache._registry import reset_module_backends
+from sap_cloud_sdk.core.resilience.cache._backend import CacheBackend
+from sap_cloud_sdk.core.resilience.cache._cache import Cache
+from sap_cloud_sdk.core.resilience.cache._config import CacheConfig, configure_cache
+from sap_cloud_sdk.core.resilience.cache._isolation import IsolationStrategy
+from sap_cloud_sdk.core.resilience.cache._registry import reset_module_backends
 from sap_cloud_sdk.core.runtime_context import APP_TENANT_ID, USER_ID, RuntimeContext
 from sap_cloud_sdk.core.runtime_context._context import sdk_context
-from sap_cloud_sdk.resilience.cache.exceptions import BackendError
+from sap_cloud_sdk.core.resilience.cache.exceptions import BackendError
 
 
 def _ctx(tenant_id: str | None = None, user_id: str | None = None) -> RuntimeContext:

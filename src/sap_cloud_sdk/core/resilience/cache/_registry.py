@@ -9,7 +9,7 @@ given module name; subsequent calls with different values are ignored.
 That is intentional — a module uses one sizing policy and registers its
 backend exactly once at startup.
 
-Private to the cache package; not exported from ``sap_cloud_sdk.resilience.cache``.
+Private to the cache package; not exported from ``sap_cloud_sdk.core.resilience.cache``.
 """
 
 from __future__ import annotations
@@ -17,7 +17,7 @@ from __future__ import annotations
 import threading
 from typing import Callable
 
-from sap_cloud_sdk.resilience.cache._lru_backend import InMemoryLRUBackend
+from sap_cloud_sdk.core.resilience.cache._lru_backend import InMemoryLRUBackend
 
 # Module-level registry guarded by a lock so concurrent first-time
 # registrations are safe.
@@ -30,7 +30,7 @@ def get_module_backend(
     max_size: int,
     on_evict: Callable[[str, str], None] | None,
 ) -> InMemoryLRUBackend:
-    """Return the shared :class:`~sap_cloud_sdk.resilience.cache._lru_backend.InMemoryLRUBackend`
+    """Return the shared :class:`~sap_cloud_sdk.core.resilience.cache._lru_backend.InMemoryLRUBackend`
     for *name*, creating it on the first call.
 
     Args:

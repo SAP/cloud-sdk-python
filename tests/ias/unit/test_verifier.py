@@ -26,8 +26,7 @@ class TestIASVerifierFromEnv:
         assert v._ias_url == "https://ias.example.com"
 
     def test_cf_vcap_services_no_client_id_raises(self, monkeypatch):
-        # Security (FINDING-444): a binding without clientid must not silently
-        # disable audience validation — from_env fails closed.
+        # a binding without clientid must not silently disable audience validation — from_env fails closed.
         vcap = {"identity": [{"credentials": {"url": "https://ias.example.com"}}]}
         monkeypatch.setenv("VCAP_SERVICES", json.dumps(vcap))
         monkeypatch.delenv("IAS_URL", raising=False)
@@ -53,7 +52,7 @@ class TestIASVerifierFromEnv:
         assert v._client_id == "k8s-client"
 
     def test_k8s_env_vars_no_client_id_raises(self, monkeypatch):
-        # Security (FINDING-444): IAS_URL without IAS_CLIENT_ID must fail closed.
+        # IAS_URL without IAS_CLIENT_ID must fail closed.
         monkeypatch.delenv("VCAP_SERVICES", raising=False)
         monkeypatch.setenv("IAS_URL", "https://k8s-ias.example.com")
         monkeypatch.delenv("IAS_CLIENT_ID", raising=False)
@@ -118,8 +117,7 @@ class TestIASVerifierFromEnv:
         assert v._ias_url == "https://env-ias.example.com"
 
     def test_k8s_mount_with_url_no_client_id_raises(self, monkeypatch):
-        # Security (FINDING-444): a mounted binding with url but no clientid
-        # must fail closed rather than fall through or skip audience.
+        # a mounted binding with url but no clientid must fail closed rather than fall through or skip audience.
         monkeypatch.delenv("VCAP_SERVICES", raising=False)
         monkeypatch.delenv("IAS_URL", raising=False)
 

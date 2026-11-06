@@ -25,6 +25,13 @@ _ENV_VAR_BASE = "CLOUD_SDK_CFG"
 _SECRET_MODULE = "identity-service"
 _SECRET_DEFAULT_INSTANCE = "default"
 
+_NO_CLIENT_ID_HINT = (
+    "the audience (aud) claim cannot be validated. from_env() refuses to build a "
+    "verifier that silently accepts tokens issued for any application. Add a "
+    "clientid to the binding, or — only if you intentionally accept any audience "
+    "— construct the verifier explicitly: IASVerifier(ias_url=..., client_id=None)."
+)
+
 
 @dataclass
 class _IASBindingData:
@@ -52,7 +59,9 @@ class IASVerifier:
                    The JWKS endpoint is derived as ``{ias_url}/oauth2/certs``.
         client_id: Expected ``aud`` claim (the application's client ID in IAS).
                    When provided, tokens issued for other applications are rejected.
-                   When ``None``, audience validation is skipped.
+                   When ``None``, audience validation is skipped — an explicit
+                   opt-out. :meth:`from_env` never produces this state silently;
+                   it raises :class:`IASConfigError` if a binding lacks a clientid.
 
     Usage::
 
@@ -99,7 +108,10 @@ class IASVerifier:
             A configured :class:`IASVerifier` instance.
 
         Raises:
-            IASConfigError: when no IAS configuration can be resolved.
+            IASConfigError: when no IAS configuration can be resolved, or when a
+                binding is resolved but carries no ``clientid`` (audience would be
+                unverifiable). To intentionally accept any audience, construct the
+                verifier explicitly with ``IASVerifier(ias_url=..., client_id=None)``.
         """
         vcap_raw = os.getenv("VCAP_SERVICES")
         if vcap_raw:
@@ -112,17 +124,22 @@ class IASVerifier:
                         url = creds.get("url") or creds.get("issuer")
                         client_id = creds.get("clientid")
                         if url:
+                            if not client_id:
+                                raise IASConfigError(
+                                    f"IAS binding VCAP_SERVICES[{svc_name}] has no "
+                                    f"'clientid'; {_NO_CLIENT_ID_HINT}"
+                                ) from None
                             logger.debug(
                                 "IASVerifier.from_env: configured from VCAP_SERVICES[%s]",
                                 svc_name,
                             )
-                            return cls(ias_url=url, client_id=client_id or None)
+                            return cls(ias_url=url, client_id=client_id)
             except (json.JSONDecodeError, KeyError, IndexError, TypeError) as exc:
                 logger.debug("IASVerifier.from_env: VCAP_SERVICES parse error: %s", exc)
 
         # Step 2 — Kubernetes volume mount (identity-service secret)
+        binding = _IASBindingData()
         try:
-            binding = _IASBindingData()
             _read_secret(
                 base_volume_mount=_SECRET_MOUNT_BASE,
                 base_var_name=_ENV_VAR_BASE,
@@ -130,17 +147,27 @@ class IASVerifier:
                 instance=_SECRET_DEFAULT_INSTANCE,
                 target=binding,
             )
-            if binding.url:
-                logger.debug(
-                    "IASVerifier.from_env: configured from Kubernetes secret mount"
-                )
-                return cls(ias_url=binding.url, client_id=binding.clientid or None)
         except Exception as exc:
             logger.debug("IASVerifier.from_env: secret mount lookup failed: %s", exc)
+        if binding.url:
+            if not binding.clientid:
+                raise IASConfigError(
+                    f"IAS identity-service secret mount has no 'clientid'; "
+                    f"{_NO_CLIENT_ID_HINT}"
+                ) from None
+            logger.debug(
+                "IASVerifier.from_env: configured from Kubernetes secret mount"
+            )
+            return cls(ias_url=binding.url, client_id=binding.clientid)
 
         ias_url = os.getenv(_ENV_IAS_URL)
         if ias_url:
-            client_id = os.getenv(_ENV_IAS_CLIENT_ID) or None
+            client_id = os.getenv(_ENV_IAS_CLIENT_ID)
+            if not client_id:
+                raise IASConfigError(
+                    f"{_ENV_IAS_URL} is set but {_ENV_IAS_CLIENT_ID} is missing; "
+                    f"{_NO_CLIENT_ID_HINT}"
+                ) from None
             logger.debug("IASVerifier.from_env: configured from env vars")
             return cls(ias_url=ias_url, client_id=client_id)
 
@@ -149,7 +176,7 @@ class IASVerifier:
             f"Set VCAP_SERVICES (CF), mount the identity-service secret at "
             f"{_SECRET_MOUNT_BASE}/{_SECRET_MODULE}/{_SECRET_DEFAULT_INSTANCE}/ (Kubernetes), "
             f"or set {_ENV_IAS_URL} (and optionally {_ENV_IAS_CLIENT_ID}) manually."
-        )
+        ) from None
 
     def __call__(self, authorization: str) -> VerifiedIASClaims:
         """Verify the token and return its claims.

@@ -95,7 +95,13 @@ add_span_attribute("enduser.id", claims.scim_id or claims.sub or "")
 
 - **Cloud Foundry**: reads `VCAP_SERVICES` → `identity[0]` or `xsuaa[0]` credentials.
 - **Kubernetes (managed runtime)**: reads the `identity-service` secret mounted at `/etc/secrets/appfnd/identity-service/default/` — mounted automatically by the agent deployment template, no `app.yaml` changes needed.
-- **Manual / local**: reads `IAS_URL` (and optionally `IAS_CLIENT_ID`) environment variables.
+- **Manual / local**: reads `IAS_URL` and `IAS_CLIENT_ID` environment variables.
+
+`from_env()` is secure by default: it fails closed. If a binding is resolved but
+carries no `clientid`, it raises `IASConfigError` rather than building a verifier
+that silently skips audience (`aud`) validation and accepts tokens issued for any
+application. To intentionally accept any audience, opt out explicitly by
+constructing `IASVerifier(ias_url=..., client_id=None)`.
 
 ```python
 from sap_cloud_sdk.ias import IASVerifier, IASConfigError
@@ -104,7 +110,7 @@ from sap_cloud_sdk.ias import IASVerifier, IASConfigError
 try:
     verifier = IASVerifier.from_env()
 except IASConfigError:
-    # No IAS binding found — handle gracefully
+    # No IAS binding (or a binding without clientid) — handle gracefully
     ...
 
 # Or configure explicitly
@@ -143,3 +149,14 @@ auto_instrument(middlewares=[StarletteIASTelemetryMiddleware(app=app)])
 ```
 
 If no binding is found, a WARNING is logged at startup and identity attributes are not stamped until a binding is added. See [Telemetry user guide](../core/telemetry/user-guide.md#built-in-starletteiastelemetrymiddleware) for details.
+
+---
+
+## Multi-tenancy
+
+| Field | Value |
+|-------|-------|
+| **Supported** | Yes |
+| **Authentication** | IAS |
+| **How to use** | The `app_tid` claim in `IASClaims` carries the SAP tenant ID for the authenticated user. `IASVerifier` enforces the `aud` claim against the application's own `clientid`, preventing tokens issued for sibling applications (cross-tenant or same-tenant) from being accepted. For subscriber-tenant routing (e.g. deriving a per-tenant IAS URL), use `IASVerifier(ias_url=..., client_id=...)` constructed explicitly per tenant rather than `from_env()`. |
+| **Further reading** | [SAP IAS multi-tenancy documentation](https://help.sap.com/docs/identity-authentication/identity-authentication/tenant-model-and-licensing) |

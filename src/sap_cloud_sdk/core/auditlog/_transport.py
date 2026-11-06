@@ -77,7 +77,7 @@ class HttpTransport(Transport):
             self._config_factory = lambda: config  # type: ignore[arg-type]
             self.config = config  # type: ignore[assignment]
 
-        auth_provider = XsuaaAuthProvider(self._config_factory)
+        auth_provider = XsuaaAuthProvider(self._config_factory, module="auditlog")
         self._http = HttpClient(self.config.service_url, auth_provider)
 
     def send(self, event: AuditMessage) -> None:

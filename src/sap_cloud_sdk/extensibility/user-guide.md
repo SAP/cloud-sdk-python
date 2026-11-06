@@ -192,11 +192,11 @@ async def call_hook_agw(
 ```python
 @dataclass
 class N8nWorkflowConfig:
-    ord_id: str          # ORD ID of the n8n API resource
-    card_ord_id: str     # ORD ID of the n8n MCP translation card (server identifier)
-    tool_name: str       # MCP tool name to call on the card server
+    ord_id: str  # ORD ID of the n8n API resource
+    card_ord_id: str  # ORD ID of the n8n MCP translation card (server identifier)
+    tool_name: str  # MCP tool name to call on the card server
     global_tenant_id: str  # LWT global tenant ID for the workflow
-    method: HTTPMethod   # HTTP method used by webhook execution
+    method: HTTPMethod  # HTTP method used by webhook execution
 ```
 
 #### `HookConfig`
@@ -324,9 +324,7 @@ class Hook:
     name: str  # Human-readable name
     type: HookType  # Hook type (BEFORE, AFTER)
     deployment_type: DeploymentType  # Deployment type (N8N, SERVERLESS)
-    n8n_workflow_config: (
-        N8nWorkflowConfig  # Workflow config (ORD IDs, tool name, global tenant ID, HTTP method)
-    )
+    n8n_workflow_config: N8nWorkflowConfig  # Workflow config (ORD IDs, tool name, global tenant ID, HTTP method)
     timeout: int  # Timeout in seconds
     execution_mode: ExecutionMode  # Execution mode (SYNC, ASYNC)
     on_failure: OnFailure  # Failure behavior (CONTINUE, BLOCK)

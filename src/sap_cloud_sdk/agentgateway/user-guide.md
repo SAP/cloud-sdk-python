@@ -90,9 +90,7 @@ integrations = agw_client.list_active_integrations()
 target_gtid = integrations[0]["global_tenant_id"]
 
 # Load only that backend's MCP tools
-tools = await agw_client.list_mcp_tools(
-    filter=MCPToolFilter(gtids=[target_gtid])
-)
+tools = await agw_client.list_mcp_tools(filter=MCPToolFilter(gtids=[target_gtid]))
 ```
 
 ### A2A Agent Cards (LoB only)
@@ -338,10 +336,10 @@ Both fields default to empty lists. `agent_names` is applied after fetching; `or
 from sap_cloud_sdk.agentgateway import MCPToolFilter
 
 MCPToolFilter(
-    names=[],    # tool names to include (matched against MCPTool.name); empty = no filter
+    names=[],  # tool names to include (matched against MCPTool.name); empty = no filter
     ord_ids=[],  # ORD IDs to include (extracted from fragment URL for LoB, or matched
-                 # against IntegrationDependency.ord_id for customer agents); empty = no filter
-    gtids=[],    # GTIDs of connected systems whose tools to include (LoB only); empty = no filter
+    # against IntegrationDependency.ord_id for customer agents); empty = no filter
+    gtids=[],  # GTIDs of connected systems whose tools to include (LoB only); empty = no filter
 )
 ```
 
@@ -357,8 +355,8 @@ All fields default to empty lists.
 
 ```python
 class ConnectedSystem(TypedDict):
-    global_tenant_id: str | None   # GTID of the connected backend system
-    system_type: str | None        # application namespace
+    global_tenant_id: str | None  # GTID of the connected backend system
+    system_type: str | None  # application namespace
     integration_dependency: str | None  # ORD ID fulfilled by this integration
 
 

@@ -11,7 +11,7 @@ from sap_cloud_sdk.aicore.filtering.models import (
     LlamaGuard38bFilter,
     OutputFiltering,
 )
-from sap_cloud_sdk.aicore.filtering.config import load_from_env
+from sap_cloud_sdk.aicore.filtering.config import load_from_env, load_strict_from_env
 
 
 class TestInputFiltering:
@@ -113,6 +113,15 @@ class TestContentFilteringFromEnv:
         self._clear_env(monkeypatch)
         monkeypatch.setenv("AICORE_FILTER_ENABLED", "false")
         assert load_from_env() is None
+
+    def test_strict_default_false(self, monkeypatch):
+        self._clear_env(monkeypatch)
+        assert load_strict_from_env() is False
+
+    def test_strict_true_from_env(self, monkeypatch):
+        self._clear_env(monkeypatch)
+        monkeypatch.setenv("AICORE_FILTER_STRICT", "true")
+        assert load_strict_from_env() is True
 
     def test_custom_severity_from_env(self, monkeypatch):
         self._clear_env(monkeypatch)

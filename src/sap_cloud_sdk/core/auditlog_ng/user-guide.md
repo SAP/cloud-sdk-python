@@ -63,9 +63,9 @@ You can spell out the destination parameters and pass connection options alongsi
 
 ```python
 client = create_client(
-    tenant="tenant_subdomain",                    # required to activate destination resolution
-    destination_name="AuditLogV3_Destination",    # optional — this is the default
-    destination_instance="default",               # optional — this is the default
+    tenant="tenant_subdomain",  # required to activate destination resolution
+    destination_name="AuditLogV3_Destination",  # optional — this is the default
+    destination_instance="default",  # optional — this is the default
     # fragment_name="AuditLogV3_Fragment_tenant_subdomain",  # optional tenant-specific fragment
     service_name="my-agent",
     batch=True,

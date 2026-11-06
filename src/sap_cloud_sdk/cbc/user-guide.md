@@ -153,13 +153,16 @@ from sap_cloud_sdk import cbc
 
 handler = cbc.CBCEventHandler()
 
+
 def on_cv(event: cbc.ConsumptionVersionEvent) -> None:
     # event.app_tenant_id, event.consumption_version_id
     ...
 
+
 def on_fa(event: cbc.FeatureActivationEvent) -> None:
     for f in event.features:
         print(f.feature_id, f.enabled)
+
 
 handler.on_consumption_version_event(on_cv)
 handler.on_feature_activation_event(on_fa)

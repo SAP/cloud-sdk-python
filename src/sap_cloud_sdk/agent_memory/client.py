@@ -88,6 +88,18 @@ def _validate_filter_clauses(
             )
 
 
+def _encode_entity_id(value: object) -> str:
+    """Percent-encode an identifier for use in a URL path.
+
+    Encoding failures raise AgentMemoryHttpError.
+    """
+    segment = f"{value}"
+    try:
+        return quote(segment, safe="")
+    except UnicodeEncodeError as exc:
+        raise AgentMemoryHttpError(str(exc)) from exc
+
+
 class AgentMemoryClient:
     """Client for the SAP Agent Memory service (v1 API).
 
@@ -240,7 +252,9 @@ class AgentMemoryClient:
         """
         _require_non_empty(memory_id=memory_id)
         data = self._request(
-            HttpMethod.GET, f"{MEMORIES}({memory_id})", tenant_subdomain=self._tenant
+            HttpMethod.GET,
+            f"{MEMORIES}({_encode_entity_id(memory_id)})",
+            tenant_subdomain=self._tenant,
         )
         return Memory.from_dict(data)
 
@@ -277,7 +291,7 @@ class AgentMemoryClient:
             payload[_METADATA_KEY] = metadata
         self._request(
             HttpMethod.PATCH,
-            f"{MEMORIES}({memory_id})",
+            f"{MEMORIES}({_encode_entity_id(memory_id)})",
             json=payload,
             tenant_subdomain=self._tenant,
         )
@@ -296,7 +310,9 @@ class AgentMemoryClient:
         """
         _require_non_empty(memory_id=memory_id)
         self._request(
-            HttpMethod.DELETE, f"{MEMORIES}({memory_id})", tenant_subdomain=self._tenant
+            HttpMethod.DELETE,
+            f"{MEMORIES}({_encode_entity_id(memory_id)})",
+            tenant_subdomain=self._tenant,
         )
 
     @record_metrics(Module.AGENT_MEMORY, Operation.AGENT_MEMORY_LIST_MEMORIES)
@@ -497,7 +513,9 @@ class AgentMemoryClient:
         """
         _require_non_empty(message_id=message_id)
         data = self._request(
-            HttpMethod.GET, f"{MESSAGES}({message_id})", tenant_subdomain=self._tenant
+            HttpMethod.GET,
+            f"{MESSAGES}({_encode_entity_id(message_id)})",
+            tenant_subdomain=self._tenant,
         )
         return Message.from_dict(data)
 
@@ -516,7 +534,7 @@ class AgentMemoryClient:
         _require_non_empty(message_id=message_id)
         self._request(
             HttpMethod.DELETE,
-            f"{MESSAGES}({message_id})",
+            f"{MESSAGES}({_encode_entity_id(message_id)})",
             tenant_subdomain=self._tenant,
         )
 

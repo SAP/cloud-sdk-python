@@ -11,6 +11,16 @@ The patch is applied by :func:`_install` (called by ``set_filtering`` /
 ``disable_filtering`` in :mod:`.filters`) and is idempotent — calling it
 multiple times with the same config is safe.
 
+Fail-open behaviour
+-------------------
+``transform_request`` must never silently drop the ``modules.filtering`` block.
+If the active config is missing or serialises empty, :func:`_fail_open` is
+invoked: in the default mode it emits a ``logging.WARNING`` and the request
+proceeds unfiltered; in strict (fail-closed) mode — opt-in via
+``AICORE_FILTER_STRICT`` or ``set_filtering(strict=True)`` — it raises
+:class:`ContentFilteringNotConfiguredError` instead of sending an unfiltered
+body.
+
 Two filter-rejection shapes (from the v2 API) are handled in buffered mode:
 
 - Input rejection: HTTP 4xx with ``error.location`` startswith
@@ -57,7 +67,7 @@ import litellm
 from litellm.llms.sap.chat.transformation import GenAIHubOrchestrationConfig
 from litellm.types.utils import ModelResponse
 
-from .exceptions import ContentFilteredError
+from .exceptions import ContentFilteredError, ContentFilteringNotConfiguredError
 
 logger = logging.getLogger(__name__)
 
@@ -65,6 +75,23 @@ logger = logging.getLogger(__name__)
 _ORIGINAL_CONFIG = litellm.GenAIHubOrchestrationConfig
 
 _active_cfg: Any = None  # ContentFiltering | None, stored at module level
+_strict_mode: bool = False  # fail-closed: raise instead of sending unfiltered
+_configured: bool = False  # True once _install() has run (set or disable)
+
+
+def _fail_open(reason: str) -> None:
+    """Handle a would-be-unfiltered request.
+
+    In strict mode, raise :class:`ContentFilteringNotConfiguredError`. Otherwise
+    emit a ``logging.WARNING`` and let the caller send the request unfiltered.
+    """
+    if _strict_mode:
+        raise ContentFilteringNotConfiguredError(
+            f"refusing to send unfiltered request: {reason}"
+        )
+    logger.warning(
+        "content filtering INACTIVE — request sent WITHOUT filter (%s)", reason
+    )
 
 
 class FilteringOrchestrationConfig(GenAIHubOrchestrationConfig):
@@ -87,10 +114,15 @@ class FilteringOrchestrationConfig(GenAIHubOrchestrationConfig):
         )
 
         if _active_cfg is None:
+            # Defensive: the subclass is installed iff _active_cfg is not None,
+            # so this fires only if litellm cached the patched class across a
+            # disable_filtering(). Treat as a fail-open condition.
+            _fail_open("set_filtering() not called or filter patch stale")
             return body
 
         filtering_dict = _active_cfg.to_dict()
         if not filtering_dict:
+            _fail_open("content filtering config is empty")
             return body
 
         modules = body["config"]["modules"]
@@ -179,13 +211,16 @@ class FilteringOrchestrationConfig(GenAIHubOrchestrationConfig):
         )
 
 
-def _install(cfg: Any) -> None:  # cfg: ContentFiltering | None
+def _install(cfg: Any, *, strict: bool = False) -> None:  # cfg: ContentFiltering | None
     """Patch litellm.GenAIHubOrchestrationConfig. Idempotent.
 
     cfg=None restores the original config and disables filtering.
+    strict=True enables fail-closed mode (raise instead of sending unfiltered).
     """
-    global _active_cfg
+    global _active_cfg, _strict_mode, _configured
     _active_cfg = cfg
+    _strict_mode = strict
+    _configured = True
     if cfg is None:
         litellm.GenAIHubOrchestrationConfig = _ORIGINAL_CONFIG
         logger.debug("content filtering disabled")

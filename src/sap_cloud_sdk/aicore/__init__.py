@@ -24,6 +24,7 @@ from .filtering import (
     ContentFilter,
     ContentFilteredError,
     ContentFiltering,
+    ContentFilteringNotConfiguredError,
     InputFiltering,
     LlamaGuard38bFilter,
     OrchestrationError,
@@ -457,5 +458,6 @@ __all__ = [
     "ContentFilter",
     "Severity",
     "ContentFilteredError",
+    "ContentFilteringNotConfiguredError",
     "OrchestrationError",
 ]

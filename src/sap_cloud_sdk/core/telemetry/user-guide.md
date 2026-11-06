@@ -412,7 +412,9 @@ my_verifier: TokenVerifier = IASVerifier(
     ias_url="https://my-tenant.accounts.ondemand.com",
     client_id="my-client-id",
 )
-auto_instrument(middlewares=[StarletteIASTelemetryMiddleware(app=app, token_verifier=my_verifier)])
+auto_instrument(
+    middlewares=[StarletteIASTelemetryMiddleware(app=app, token_verifier=my_verifier)]
+)
 ```
 
 See the [IAS user guide](../../ias/user-guide.md#verified-claims) for the full `IASVerifier` API.

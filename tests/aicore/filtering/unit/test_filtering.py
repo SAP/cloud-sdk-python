@@ -109,6 +109,41 @@ class TestSetFiltering:
         assert filters[0].provider == "azure_content_safety"
         assert filters[1].provider == "llama_guard_3_8b"
 
+    def test_strict_param_sets_mode(self, monkeypatch):
+        _clear_aicore_env(monkeypatch)
+        from sap_cloud_sdk.aicore.filtering import _patch as _filters_mod
+
+        set_filtering(
+            ContentFiltering(
+                input_filtering=InputFiltering(filters=[AzureContentFilter()])
+            ),
+            strict=True,
+        )
+        assert _filters_mod._strict_mode is True
+
+    def test_strict_defaults_to_env(self, monkeypatch):
+        _clear_aicore_env(monkeypatch)
+        monkeypatch.setenv("AICORE_FILTER_STRICT", "true")
+        from sap_cloud_sdk.aicore.filtering import _patch as _filters_mod
+
+        set_filtering()
+        assert _filters_mod._strict_mode is True
+
+    def test_strict_off_by_default(self, monkeypatch):
+        _clear_aicore_env(monkeypatch)
+        from sap_cloud_sdk.aicore.filtering import _patch as _filters_mod
+
+        set_filtering()
+        assert _filters_mod._strict_mode is False
+
+    def test_explicit_strict_overrides_env(self, monkeypatch):
+        _clear_aicore_env(monkeypatch)
+        monkeypatch.setenv("AICORE_FILTER_STRICT", "true")
+        from sap_cloud_sdk.aicore.filtering import _patch as _filters_mod
+
+        set_filtering(strict=False)
+        assert _filters_mod._strict_mode is False
+
 
 class TestDisableFiltering:
     def test_disable_restores_original_config(self, monkeypatch):
@@ -123,6 +158,14 @@ class TestDisableFiltering:
         disable_filtering()
         disable_filtering()
         assert litellm.GenAIHubOrchestrationConfig is _ORIGINAL_CONFIG
+
+    def test_disable_clears_strict(self, monkeypatch):
+        _clear_aicore_env(monkeypatch)
+        from sap_cloud_sdk.aicore.filtering import _patch as _filters_mod
+
+        set_filtering(strict=True)
+        disable_filtering()
+        assert _filters_mod._strict_mode is False
 
     def test_disable_when_never_enabled(self, monkeypatch):
         # disable_filtering() before any set_filtering() is a clean no-op:

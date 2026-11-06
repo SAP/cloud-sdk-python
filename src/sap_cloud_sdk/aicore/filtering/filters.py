@@ -25,12 +25,14 @@ from sap_cloud_sdk.core.telemetry.operation import Operation
 
 from .models import ContentFiltering
 from ._patch import _install
-from .config import load_from_env
+from .config import load_from_env, load_strict_from_env
 from .exceptions import ContentFilteredError
 
 
 @record_metrics(Module.AICORE, Operation.AICORE_SET_FILTERING)
-def set_filtering(config: ContentFiltering | None = None) -> None:
+def set_filtering(
+    config: ContentFiltering | None = None, *, strict: bool | None = None
+) -> None:
     """Install a content-filtering configuration.
 
     Args:
@@ -39,6 +41,11 @@ def set_filtering(config: ContentFiltering | None = None) -> None:
             ``AICORE_FILTER_ENABLED=false`` to keep filtering off. An
             explicit non-``None`` config always activates filtering, even
             when the env var would have disabled it.
+        strict: Enable fail-closed mode. When ``True``, a request that would be
+            sent without a content filter (empty config) raises
+            :class:`ContentFilteringNotConfiguredError` instead of proceeding
+            unfiltered. When ``None`` (the default), the value is read from the
+            ``AICORE_FILTER_STRICT`` environment variable (default ``False``).
 
     Examples:
         Activate strict input filtering with Prompt Shield::
@@ -58,11 +65,17 @@ def set_filtering(config: ContentFiltering | None = None) -> None:
         Re-apply env-based config after changing variables::
 
             set_filtering()
+
+        Fail closed if filtering is ever misconfigured::
+
+            set_filtering(my_config, strict=True)
     """
+    if strict is None:
+        strict = load_strict_from_env()
     if config is None:
-        _install(load_from_env())
+        _install(load_from_env(), strict=strict)
         return
-    _install(config)
+    _install(config, strict=strict)
 
 
 @record_metrics(Module.AICORE, Operation.AICORE_DISABLE_FILTERING)
@@ -70,9 +83,10 @@ def disable_filtering() -> None:
     """Disable content filtering for SAP AI Core model calls.
 
     Restores the original ``litellm.GenAIHubOrchestrationConfig``.
-    Idempotent — safe to call when filtering is already disabled.
+    Idempotent — safe to call when filtering is already disabled. Disabling is
+    an explicit opt-out, so strict/fail-closed mode is cleared.
     """
-    _install(None)
+    _install(None, strict=False)
 
 
 def _parse_input_filter_error(exc: Exception) -> ContentFilteredError | None:

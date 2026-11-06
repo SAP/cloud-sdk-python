@@ -34,7 +34,11 @@ from .models import (
     OutputFiltering,
     Severity,
 )
-from .exceptions import ContentFilteredError, OrchestrationError
+from .exceptions import (
+    ContentFilteredError,
+    ContentFilteringNotConfiguredError,
+    OrchestrationError,
+)
 
 __all__ = [
     "set_filtering",
@@ -47,5 +51,6 @@ __all__ = [
     "ContentFilter",
     "Severity",
     "ContentFilteredError",
+    "ContentFilteringNotConfiguredError",
     "OrchestrationError",
 ]

@@ -47,3 +47,23 @@ class ContentFilteredError(OrchestrationError):
         super().__init__(
             f"Content filter blocked the {direction} (request_id={request_id})"
         )
+
+
+class ContentFilteringNotConfiguredError(OrchestrationError):
+    """Raised in strict mode when a request would be sent WITHOUT content filtering.
+
+    Strict (fail-closed) mode is opt-in via the ``AICORE_FILTER_STRICT``
+    environment variable or the ``strict=`` argument to
+    :func:`sap_cloud_sdk.aicore.set_filtering`. When active, the SDK refuses to
+    send an unfiltered orchestration request instead of silently failing open.
+
+    This is raised when:
+
+    - ``completion()`` is called but content filtering was never configured
+      (neither :func:`set_aicore_config` nor :func:`set_filtering` ran), or
+    - the active :class:`ContentFiltering` serialises to an empty wire payload
+      (e.g. ``ContentFiltering()`` with no input or output direction).
+
+    In the default (non-strict) mode these conditions emit a
+    ``logging.WARNING`` and the request proceeds unfiltered.
+    """

@@ -182,7 +182,7 @@ jobs:
           echo "Artifacts uploaded to release ${{ needs.parse.outputs.tag }}"
 
       - name: Publish to PyPI
-        uses: pypa/gh-action-pypi-publish@v1.14.2
+        uses: pypa/gh-action-pypi-publish@v1.14.3
 
   # ── 4. Notify on failure ──────────────────────────────────────────────────
   notify-failure:

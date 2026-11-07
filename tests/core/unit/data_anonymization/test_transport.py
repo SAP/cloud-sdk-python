@@ -46,7 +46,7 @@ class TestTransport:
         assert issubclass(Transport, ABC)
 
         try:
-            Transport()
+            Transport()  # ty: ignore[call-non-callable]
         except TypeError:
             pass
         else:

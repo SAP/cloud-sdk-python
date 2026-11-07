@@ -31,7 +31,7 @@ class _ConcreteClient(BaseODataClient):
 class TestBaseODataClientAbstract:
     def test_cannot_instantiate_base_directly(self, _):
         with pytest.raises(TypeError):
-            BaseODataClient(_make_config())  # type: ignore[abstract]
+            BaseODataClient(_make_config())  # type: ignore[abstract]  # ty: ignore[call-non-callable]
 
     def test_concrete_subclass_instantiates(self, mock_session_cls):
         mock_session_cls.return_value = MagicMock()

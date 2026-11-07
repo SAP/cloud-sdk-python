@@ -215,6 +215,13 @@ def mcp_tool_to_langchain(
             fields[safe] = (py_type, Field(..., **field_kwargs))
     args_schema = create_model(f"{mcp_tool.name}_args", **fields) if fields else None
 
+    # Only forward handle_tool_error when set, to preserve LangChain's default.
+    # Typed as dict[str, Any] so the ** unpack is not type-checked against each
+    # keyword parameter of from_function (which otherwise rejects the union value).
+    tool_kwargs: dict[str, Any] = {}
+    if handle_tool_error is not None:
+        tool_kwargs["handle_tool_error"] = handle_tool_error
+
     return StructuredTool.from_function(
         coroutine=run,
         name=mcp_tool.name,
@@ -222,9 +229,5 @@ def mcp_tool_to_langchain(
             mcp_tool.description, mcp_tool.output_schema
         ),
         args_schema=args_schema,
-        **(
-            {"handle_tool_error": handle_tool_error}
-            if handle_tool_error is not None
-            else {}
-        ),
+        **tool_kwargs,
     )

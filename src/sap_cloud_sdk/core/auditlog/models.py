@@ -550,8 +550,10 @@ class DataDeletionEvent(DataModificationEvent):
         ValueError: If required fields are missing or invalid during validation
     """
 
-    # Override the attributes field to use DeletedAttribute instead of ChangeAttribute
-    attributes: List[DeletedAttribute] = field(default_factory=list)
+    # Override the attributes field to use DeletedAttribute instead of ChangeAttribute.
+    # Deletion events intentionally carry a different attribute shape; the narrowing is
+    # by design, so the invariant-list override is suppressed rather than redesigned.
+    attributes: List[DeletedAttribute] = field(default_factory=list)  # ty: ignore[invalid-attribute-override]
 
     def validate(self):
         """Validate the data deletion event - override parent validation."""
@@ -628,8 +630,10 @@ class ConfigurationDeletionEvent(ConfigurationChangeEvent):
         ValueError: If required fields are missing or invalid during validation
     """
 
-    # Override the attributes field to use DeletedAttribute instead of ChangeAttribute
-    attributes: List[DeletedAttribute] = field(default_factory=list)
+    # Override the attributes field to use DeletedAttribute instead of ChangeAttribute.
+    # Deletion events intentionally carry a different attribute shape; the narrowing is
+    # by design, so the invariant-list override is suppressed rather than redesigned.
+    attributes: List[DeletedAttribute] = field(default_factory=list)  # ty: ignore[invalid-attribute-override]
 
     def validate(self):
         """Validate the configuration deletion event - override parent validation."""

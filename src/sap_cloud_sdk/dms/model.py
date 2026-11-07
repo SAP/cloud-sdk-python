@@ -205,7 +205,7 @@ class Repository:
         - An empty list or ``None``
         """
         if not raw:
-            return cast(RepositoryParams, {})
+            return {}
         if isinstance(raw, dict):
             raw = [raw]
         return cast(RepositoryParams, {p["paramName"]: p["paramValue"] for p in raw})

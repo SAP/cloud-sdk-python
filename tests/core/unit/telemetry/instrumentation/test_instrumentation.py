@@ -35,7 +35,7 @@ class _ConcreteInstrumentor(LibraryInstrumentor):
 
 
 class _MissingLibraryInstrumentor(LibraryInstrumentor):
-    library_name = "_nonexistent_library_xyz"
+    library_name = "_nonexistent_library_xyz"  # ty: ignore[invalid-assignment]
 
     def __init__(self):
         self._instrumented = False

@@ -93,6 +93,7 @@ def auto_instrument(
     )
 
     _merge_resource_attrs_into_active_provider_if_wrapper_installed(resource)
+    _drop_wrapper_span_exporter_if_sdk_exports()
 
     _set_baggage_processor()
     _set_propagated_attributes_processor()
@@ -225,4 +226,65 @@ def _merge_resource_attrs_into_active_provider_if_wrapper_installed(
     logger.info(
         "Merged sap-cloud-sdk resource attrs onto wrapper-installed "
         "TracerProvider (marker: telemetry.auto.version)"
+    )
+
+
+def _drop_wrapper_span_exporter_if_sdk_exports() -> None:
+    """Remove the auto-instrumentation wrapper's span exporter when the SDK already exports.
+
+    The OTel operator ``inject-python`` auto-instrumentation installs a TracerProvider that
+    already carries its own OTLP span exporter (marked by ``telemetry.auto.version``).
+    ``Traceloop.init`` then adds the SDK's own exporting span processor to that same provider,
+    so every span leaves the process twice. We consolidate on the SDK exporter, which also
+    applies the GenAI attribute normalization, and remove the wrapper's duplicate exporter.
+    This anticipates retiring the operator auto-instrumentation layer: once it is gone this
+    becomes a no-op and the SDK exporter is simply the only one.
+
+    Spans produced by the wrapper's own instrumentations still land on the shared provider and
+    are shipped by the SDK exporter, so nothing is lost. No-op when the SDK exporter is not
+    present, so the wrapper's exporter is never removed while it is the only one. In the
+    managed runtime the only non-SDK span exporter on the provider is the wrapper's; an
+    app-added custom exporter would also be treated as the wrapper's here. Touches
+    ``_active_span_processor`` because the OTel SDK exposes no public API to remove a span
+    processor, mirroring how the resource merge above mutates provider internals.
+    """
+    provider = trace.get_tracer_provider()
+    if not isinstance(provider, TracerProvider):
+        return
+
+    attributes = getattr(provider.resource, "attributes", None)
+    if (
+        not isinstance(attributes, Mapping)
+        or "telemetry.auto.version" not in attributes
+    ):
+        return
+
+    active = getattr(provider, "_active_span_processor", None)
+    if active is None:
+        return
+    processors = getattr(active, "_span_processors", None)
+    if not processors:
+        return
+
+    exporting = [p for p in processors if getattr(p, "span_exporter", None) is not None]
+    sdk_added = [p for p in exporting if getattr(p, "_traceloop_processor", False)]
+    wrapper_added = [
+        p for p in exporting if not getattr(p, "_traceloop_processor", False)
+    ]
+
+    # Only drop the wrapper's exporter when the SDK is also exporting; otherwise the wrapper's
+    # exporter is the only one and must stay.
+    if not sdk_added or not wrapper_added:
+        return
+
+    active._span_processors = tuple(p for p in processors if p not in wrapper_added)
+    for processor in wrapper_added:
+        try:
+            processor.shutdown()
+        except Exception:  # noqa: BLE001 telemetry must never break startup
+            pass
+
+    logger.info(
+        "SDK already exports spans; removed the auto-instrumentation wrapper's duplicate "
+        "span exporter to prevent double export"
     )

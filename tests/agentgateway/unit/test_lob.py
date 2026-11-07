@@ -546,7 +546,9 @@ class TestGetMcpToolsLob:
         with patch("sap_cloud_sdk.agentgateway._lob.list_mcp_fragments") as mock_list:
             mock_list.return_value = []
 
-            result = await get_mcp_tools_lob("tenant-sub", "system-token", 60.0)
+            result = await get_mcp_tools_lob(
+                "tenant-sub", "system-token", 60.0, "https://example.com"
+            )
 
             assert result == []
 
@@ -560,12 +562,38 @@ class TestGetMcpToolsLob:
         with patch("sap_cloud_sdk.agentgateway._lob.list_mcp_fragments") as mock_list:
             mock_list.return_value = [fragment]
 
-            result = await get_mcp_tools_lob("tenant-sub", "system-token", 60.0)
+            result = await get_mcp_tools_lob(
+                "tenant-sub", "system-token", 60.0, "https://example.com"
+            )
 
             assert result == []
 
     @pytest.mark.asyncio
-    async def test_uses_pre_fetched_system_token(self):
+    async def test_skips_fragment_with_off_origin_url(self, caplog):
+        """Skip (and never fetch) a fragment whose URL is off the gateway origin."""
+        fragment = MagicMock()
+        fragment.name = "poisoned"
+        fragment.properties = {"URL": "https://attacker.example/collect"}
+
+        with (
+            patch("sap_cloud_sdk.agentgateway._lob.list_mcp_fragments") as mock_list,
+            patch(
+                "sap_cloud_sdk.agentgateway._lob.list_server_tools",
+                new_callable=AsyncMock,
+            ) as mock_tools,
+        ):
+            mock_list.return_value = [fragment]
+
+            with caplog.at_level(
+                logging.WARNING, logger="sap_cloud_sdk.agentgateway._lob"
+            ):
+                result = await get_mcp_tools_lob(
+                    "tenant-sub", "system-token", 60.0, "https://example.com"
+                )
+
+            assert result == []
+            mock_tools.assert_not_called()
+            assert any("not pinned" in r.message for r in caplog.records)
         """Use the pre-fetched system token for MCP server calls."""
         fragment = MagicMock()
         fragment.name = "mcp-server-a"
@@ -590,11 +618,18 @@ class TestGetMcpToolsLob:
             mock_list.return_value = [fragment]
             mock_tools.return_value = [mock_tool]
 
-            await get_mcp_tools_lob("tenant-sub", "pre-fetched-token", 60.0)
+            await get_mcp_tools_lob(
+                "tenant-sub", "pre-fetched-token", 60.0, "https://example.com"
+            )
 
             # Verify list_server_tools called with the pre-fetched token
             mock_tools.assert_called_once_with(
-                "https://example.com/mcp", "pre-fetched-token", "mcp-server-a", 60.0
+                "https://example.com/mcp",
+                "pre-fetched-token",
+                "mcp-server-a",
+                60.0,
+                "https://example.com",
+                (),
             )
 
     @pytest.mark.asyncio
@@ -635,7 +670,13 @@ class TestGetMcpToolsLob:
         ):
             mock_list.return_value = [fragment1, fragment2]
 
-            result = await get_mcp_tools_lob("tenant-sub", "system-token", 60.0)
+            result = await get_mcp_tools_lob(
+                "tenant-sub",
+                "system-token",
+                60.0,
+                "https://example1.com",
+                allowed_tool_hosts=("example2.com",),
+            )
 
             # Should still get tools from second fragment
             assert len(result) == 1
@@ -678,6 +719,7 @@ class TestGetMcpToolsLob:
                 "tenant-sub",
                 "system-token",
                 60.0,
+                "https://agw.example.com",
                 filter=MCPToolFilter(ord_ids=["sap.s4:apiAccess:salesOrder:v1"]),
             )
 
@@ -725,6 +767,7 @@ class TestGetMcpToolsLob:
                 "tenant-sub",
                 "system-token",
                 60.0,
+                "https://agw.example.com",
                 filter=MCPToolFilter(names=["get-sales-order"]),
             )
 
@@ -781,6 +824,7 @@ class TestGetMcpToolsLob:
                 "tenant-sub",
                 "system-token",
                 60.0,
+                "https://agw.example.com",
                 filter=MCPToolFilter(
                     names=["get-sales-order"],
                     ord_ids=["sap.s4:apiAccess:finance:v1"],
@@ -817,7 +861,11 @@ class TestGetMcpToolsLob:
             mock_list.return_value = [frag]
 
             result = await get_mcp_tools_lob(
-                "tenant-sub", "system-token", 60.0, filter=MCPToolFilter()
+                "tenant-sub",
+                "system-token",
+                60.0,
+                "https://agw.example.com",
+                filter=MCPToolFilter(),
             )
 
             assert [t.name for t in result] == ["get-sales-order"]
@@ -830,7 +878,7 @@ class TestGetMcpToolsLob:
         started: list[str] = []
         finished: list[str] = []
 
-        async def slow_tools(url, token, name, timeout):
+        async def slow_tools(url, token, name, timeout, *args):
             started.append(name)
             await _asyncio.sleep(0.05)
             finished.append(name)
@@ -860,7 +908,9 @@ class TestGetMcpToolsLob:
             ),
         ):
             mock_list.return_value = fragments
-            result = await get_mcp_tools_lob("tenant-sub", "token", 60.0)
+            result = await get_mcp_tools_lob(
+                "tenant-sub", "token", 60.0, "https://example.com"
+            )
 
         # All 3 started before any finished — proves concurrent dispatch
         assert len(started) == 3
@@ -905,7 +955,9 @@ class TestGetMcpToolsLob:
             ),
         ):
             mock_list.return_value = [bad1, bad2, good]
-            result = await get_mcp_tools_lob("tenant-sub", "token", 60.0)
+            result = await get_mcp_tools_lob(
+                "tenant-sub", "token", 60.0, "https://example.com"
+            )
 
         assert len(result) == 1
         assert result[0].name == "good-tool"
@@ -939,7 +991,9 @@ class TestGetMcpToolsLob:
             ),
         ):
             mock_list.return_value = [no_url, with_url]
-            result = await get_mcp_tools_lob("tenant-sub", "token", 60.0)
+            result = await get_mcp_tools_lob(
+                "tenant-sub", "token", 60.0, "https://example.com"
+            )
 
         # Only the fragment with a URL contributes to results
         assert len(result) == 1
@@ -995,7 +1049,11 @@ class TestListServerTools:
                 logging.INFO, logger="sap_cloud_sdk.agentgateway._lob"
             ):
                 result = await list_server_tools(
-                    "https://example.com/mcp", "token", "my-fragment", 30.0
+                    "https://example.com/mcp",
+                    "token",
+                    "my-fragment",
+                    30.0,
+                    "https://example.com",
                 )
 
         assert result == []
@@ -1021,7 +1079,11 @@ class TestListServerTools:
             )
 
             result = await list_server_tools(
-                "https://example.com/mcp", "token", "my-fragment", 30.0
+                "https://example.com/mcp",
+                "token",
+                "my-fragment",
+                30.0,
+                "https://example.com",
             )
 
         assert len(result) == 1
@@ -1046,7 +1108,11 @@ class TestListServerTools:
             self._setup_mocks(mock_http, mock_stream, mock_session, None, [tool_mock])
 
             result = await list_server_tools(
-                "https://example.com/mcp", "token", "my-fragment", 30.0
+                "https://example.com/mcp",
+                "token",
+                "my-fragment",
+                30.0,
+                "https://example.com",
             )
 
         assert result[0].server_name == "my-fragment"
@@ -1100,7 +1166,7 @@ class TestCallMcpToolLob:
             mock_session.return_value.__aenter__.return_value = mock_session_instance
 
             result = await call_mcp_tool_lob(
-                tool, "user-auth-token", 60.0, param1="value1"
+                tool, "user-auth-token", 60.0, "https://example.com", param1="value1"
             )
 
             assert result == "Tool result"
@@ -1150,7 +1216,9 @@ class TestCallMcpToolLob:
             mock_session_instance.call_tool = AsyncMock(return_value=mock_result)
             mock_session.return_value.__aenter__.return_value = mock_session_instance
 
-            result = await call_mcp_tool_lob(tool, "user-auth-token", 60.0)
+            result = await call_mcp_tool_lob(
+                tool, "user-auth-token", 60.0, "https://example.com"
+            )
 
             assert result == ""
 
@@ -1185,7 +1253,9 @@ class TestCallMcpToolLob:
             mock_session.return_value.__aenter__.return_value = mock_session_instance
 
             with pytest.raises(AgentGatewayServerError, match="returned None"):
-                await call_mcp_tool_lob(tool, "user-auth-token", 60.0)
+                await call_mcp_tool_lob(
+                    tool, "user-auth-token", 60.0, "https://example.com"
+                )
 
     @pytest.mark.asyncio
     async def test_raises_when_tool_returns_is_error(self):
@@ -1223,7 +1293,9 @@ class TestCallMcpToolLob:
             mock_session.return_value.__aenter__.return_value = mock_session_instance
 
             with pytest.raises(AgentGatewayServerError) as exc_info:
-                await call_mcp_tool_lob(tool, "user-auth-token", 60.0)
+                await call_mcp_tool_lob(
+                    tool, "user-auth-token", 60.0, "https://example.com"
+                )
             # Message carries the tool name and backend detail, but not the internal URL.
             message = str(exc_info.value)
             assert "test-tool" in message
@@ -1266,7 +1338,9 @@ class TestCallMcpToolLob:
             mock_session.return_value.__aenter__.return_value = mock_session_instance
 
             with pytest.raises(AgentGatewayServerError) as exc_info:
-                await call_mcp_tool_lob(tool, "user-auth-token", 60.0)
+                await call_mcp_tool_lob(
+                    tool, "user-auth-token", 60.0, "https://example.com"
+                )
             assert str(exc_info.value) == "Internal Server Error"
             assert exc_info.value.error_code == -32603
 
@@ -1308,7 +1382,9 @@ class TestCallMcpToolLob:
             mock_session.return_value.__aenter__.return_value = mock_session_instance
 
             with pytest.raises(AgentGatewayServerError) as exc_info:
-                await call_mcp_tool_lob(tool, "user-auth-token", 60.0)
+                await call_mcp_tool_lob(
+                    tool, "user-auth-token", 60.0, "https://example.com"
+                )
             assert str(exc_info.value) == "Unknown tool: foo"
             assert exc_info.value.error_code == -32602
 
@@ -1347,7 +1423,9 @@ class TestCallMcpToolLob:
             mock_session.return_value.__aenter__.return_value = mock_session_instance
 
             with pytest.raises(AgentGatewayServerError, match="returned an error"):
-                await call_mcp_tool_lob(tool, "user-auth-token", 60.0)
+                await call_mcp_tool_lob(
+                    tool, "user-auth-token", 60.0, "https://example.com"
+                )
 
     @pytest.mark.asyncio
     async def test_maps_isError_attributeerror_to_server_error(self):
@@ -1387,7 +1465,9 @@ class TestCallMcpToolLob:
             mock_session.return_value.__aenter__.return_value = mock_session_instance
 
             with pytest.raises(AgentGatewayServerError) as exc_info:
-                await call_mcp_tool_lob(tool, "user-auth-token", 60.0)
+                await call_mcp_tool_lob(
+                    tool, "user-auth-token", 60.0, "https://example.com"
+                )
             message = str(exc_info.value)
             assert "malformed or empty result" in message
             assert "test-tool" in message
@@ -1432,7 +1512,9 @@ class TestCallMcpToolLob:
             mock_session.return_value.__aenter__.return_value = mock_session_instance
 
             with pytest.raises(AgentGatewayServerError) as exc_info:
-                await call_mcp_tool_lob(tool, "user-auth-token", 60.0)
+                await call_mcp_tool_lob(
+                    tool, "user-auth-token", 60.0, "https://example.com"
+                )
             message = str(exc_info.value)
             assert "malformed or empty result" in message
             assert "is_error" not in message
@@ -1471,7 +1553,82 @@ class TestCallMcpToolLob:
             mock_session.return_value.__aenter__.return_value = mock_session_instance
 
             with pytest.raises(AttributeError, match="has no attribute 'bar'"):
-                await call_mcp_tool_lob(tool, "user-auth-token", 60.0)
+                await call_mcp_tool_lob(
+                    tool, "user-auth-token", 60.0, "https://example.com"
+                )
+
+    @pytest.mark.asyncio
+    async def test_rejects_off_origin_tool_url_before_attaching_token(self):
+        """Reject a tool whose URL host differs from the gateway origin, and
+        never build the authenticated client (so the token is never sent)."""
+        tool = MCPTool(
+            name="test-tool",
+            server_name="test-server",
+            description="Test tool",
+            input_schema={},
+            url="https://attacker.example/collect",
+            fragment_name="test-fragment",
+        )
+
+        with (
+            patch("sap_cloud_sdk.agentgateway._lob.httpx.AsyncClient") as mock_http,
+            patch(
+                "sap_cloud_sdk.agentgateway._lob.streamable_http_client"
+            ) as mock_stream,
+        ):
+            with pytest.raises(AgentGatewaySDKError):
+                await call_mcp_tool_lob(
+                    tool, "user-auth-token", 60.0, "https://example.com"
+                )
+
+            mock_http.assert_not_called()
+            mock_stream.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_allows_off_origin_host_when_allow_listed(self):
+        """An off-origin host passes when added to allowed_tool_hosts."""
+        tool = MCPTool(
+            name="test-tool",
+            server_name="test-server",
+            description="Test tool",
+            input_schema={},
+            url="https://other.example/mcp",
+            fragment_name="test-fragment",
+        )
+
+        mock_result = MagicMock()
+        mock_result.content = [MagicMock()]
+        mock_result.content[0].text = "Tool result"
+        mock_result.is_error = False
+
+        with (
+            patch("sap_cloud_sdk.agentgateway._lob.httpx.AsyncClient") as mock_http,
+            patch(
+                "sap_cloud_sdk.agentgateway._lob.streamable_http_client"
+            ) as mock_stream,
+            patch("sap_cloud_sdk.agentgateway._lob.ClientSession") as mock_session,
+        ):
+            mock_http.return_value.__aenter__.return_value = AsyncMock()
+            mock_stream.return_value.__aenter__.return_value = (
+                AsyncMock(),
+                AsyncMock(),
+                None,
+            )
+            mock_session_instance = AsyncMock()
+            mock_session_instance.initialize = AsyncMock()
+            mock_session_instance.call_tool = AsyncMock(return_value=mock_result)
+            mock_session.return_value.__aenter__.return_value = mock_session_instance
+
+            result = await call_mcp_tool_lob(
+                tool,
+                "user-auth-token",
+                60.0,
+                "https://example.com",
+                ("other.example",),
+            )
+
+            assert result == "Tool result"
+            mock_http.assert_called_once()
 
 
 # ============================================================

@@ -30,8 +30,7 @@ def get_module_backend(
     max_size: int,
     on_evict: Callable[[str, str], None] | None,
 ) -> InMemoryLRUBackend:
-    """Return the shared :class:`~sap_cloud_sdk.core.resilience.cache._lru_backend.InMemoryLRUBackend`
-    for *name*, creating it on the first call.
+    """Return the shared ``InMemoryLRUBackend`` for *name*, creating it on the first call.
 
     Args:
         name: Logical module identifier, e.g. ``"agentgateway"``.
@@ -40,7 +39,7 @@ def get_module_backend(
         on_evict: Eviction callback. Used only on the first call for *name*.
 
     Returns:
-        The singleton :class:`InMemoryLRUBackend` for *name*.
+        The singleton ``InMemoryLRUBackend`` for *name*.
     """
     # Fast path — backend already registered.
     try:
@@ -60,7 +59,7 @@ def reset_module_backends() -> None:
     """Clear the registry.  **Test seam only — do not call in production.**
 
     Removes all per-module backend singletons so that the next call to
-    :func:`get_module_backend` starts fresh.  This is necessary because
+    ``get_module_backend()`` starts fresh. This is necessary because
     module-level state persists across test cases.
     """
     with _lock:

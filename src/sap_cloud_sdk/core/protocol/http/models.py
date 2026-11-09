@@ -64,18 +64,17 @@ class XsuaaAuthProvider(AuthProvider):
     """OAuth2 client-credentials auth provider for XSUAA.
 
     Caches tokens per tenant subdomain with expiry-aware eviction backed by the
-    SDK :class:`~sap_cloud_sdk.core.resilience.cache._cache.Cache` module.
-    Re-reads credentials from the binding on every token refresh so that
-    rotated secrets are picked up automatically.
-    Detects rotation proactively by checking the secret directory mtime before
-    each cache hit via :meth:`~ConfigFactory.has_changed`.
+    SDK ``Cache`` module. Re-reads credentials from the binding on every token
+    refresh so that rotated secrets are picked up automatically. Detects rotation
+    proactively by checking the secret directory mtime before each cache hit via
+    ``has_changed()``.
 
     Args:
-        config_factory: A :class:`~sap_cloud_sdk.core.secret_resolver.ConfigFactory`
-            (or any callable with a ``has_changed() -> bool`` method) that returns
-            fresh XSUAA credentials on every call.
+        config_factory: A ``ConfigFactory`` (or any callable with a
+            ``has_changed() -> bool`` method) that returns fresh XSUAA
+            credentials on every call.
         timeout: Timeout in seconds for token-endpoint requests.
-        module: Optional module name passed to :class:`~sap_cloud_sdk.core.resilience.cache._cache.Cache`.
+        module: Optional module name passed to ``Cache``.
             Instances with the same name share one backend, which keeps the token
             cache alive across per-request client re-creation. Callers that create
             a single long-lived provider can omit this.

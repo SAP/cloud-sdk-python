@@ -40,8 +40,7 @@ class IsolationStrategy(str, Enum):
 def build_isolation_key(strategy: IsolationStrategy | None = None) -> str:
     """Derive a cache isolation key from the current runtime context.
 
-    Reads ``tenant_id`` and ``user_id`` implicitly from the active
-    :func:`~sap_cloud_sdk.core.runtime_context.get_context`.
+    Reads ``tenant_id`` and ``user_id`` implicitly from the active runtime context.
 
     When *strategy* is ``None``, the strategy is selected automatically:
     ``TENANT_USER`` if a user ID is present in context, ``TENANT`` otherwise.

@@ -1,6 +1,6 @@
 """SDK-internal cache façade.
 
-SDK modules instantiate :class:`Cache` per-client and call its
+SDK modules instantiate ``Cache`` per-client and call its
 ``get``/``set``/``evict``/``reset`` methods. The façade handles:
 
 - Selecting the active backend (per-client override or global default).
@@ -9,7 +9,7 @@ SDK modules instantiate :class:`Cache` per-client and call its
 - Honouring the ``enabled`` flag.
 
 This class is **not part of the public API** and is not exported from
-``sap_cloud_sdk.core.resilience.cache``. Import it directly::
+``sap_cloud_sdk.core.resilience.cache``. Import it directly:
 
     from sap_cloud_sdk.core.resilience.cache._cache import Cache
 """
@@ -33,20 +33,18 @@ class Cache:
     """Per-client cache façade.
 
     Tenant and user isolation keys are derived automatically from the active
-    :func:`~sap_cloud_sdk.core.runtime_context.get_context` — callers do not
-    need to pass identity information explicitly.
+    runtime context — callers do not need to pass identity information explicitly.
 
     Args:
         config: Per-client override. When ``None``, the global config set via
-            :func:`~sap_cloud_sdk.core.resilience.cache._config.configure_cache` is used.
-            The config is snapshotted at construction time — subsequent calls
-            to :func:`configure_cache` do not affect an existing ``Cache``.
+            ``configure_cache()`` is used. The config is snapshotted at
+            construction time — subsequent calls to ``configure_cache()`` do
+            not affect an existing ``Cache``.
         module: Optional logical module name (e.g. ``"agentgateway"``).
             When given, all ``Cache`` instances with the same *module* name
-            share a single :class:`~sap_cloud_sdk.core.resilience.cache._lru_backend.InMemoryLRUBackend`
-            that lives for the process lifetime. This lets modules that
-            create a new client on every request still benefit from
-            cross-request caching.
+            share a single ``InMemoryLRUBackend`` that lives for the process
+            lifetime. This lets modules that create a new client on every
+            request still benefit from cross-request caching.
 
             ``max_size`` and ``on_evict`` are taken from the **first**
             ``Cache`` created for a given *module* name; later callers with

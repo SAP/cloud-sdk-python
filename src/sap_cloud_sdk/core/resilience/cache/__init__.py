@@ -5,7 +5,7 @@ modules. Supports tenant and tenant-user isolation, configurable TTL and
 expiry buffers, LRU eviction, and custom backends for multi-instance
 deployments.
 
-Global configuration example::
+Global configuration example:
 
     from sap_cloud_sdk.core.resilience.cache import CacheConfig, configure_cache
 
@@ -15,14 +15,14 @@ Global configuration example::
         max_size=2000,
     ))
 
-Disabling the cache for a specific client::
+Disabling the cache for a specific client:
 
     from sap_cloud_sdk.destination import create_client
     from sap_cloud_sdk.core.resilience.cache import CacheConfig
 
     client = create_client(cache_config=CacheConfig(enabled=False))
 
-Custom backend example (Redis)::
+Custom backend example (Redis):
 
     from sap_cloud_sdk.core.resilience.cache import CacheBackend, CacheConfig, configure_cache
 

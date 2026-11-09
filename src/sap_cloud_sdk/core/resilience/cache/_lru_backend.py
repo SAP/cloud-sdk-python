@@ -39,23 +39,22 @@ class _EvictingTTLCache(TTLCache):
 class InMemoryLRUBackend(CacheBackend):
     """Thread-safe in-memory LRU + TTL cache.
 
-    Uses :class:`cachetools.TTLCache` under the hood. Each entry has an
+    Uses ``cachetools.TTLCache`` under the hood. Each entry has an
     individual TTL supplied at write time. Least-recently-used entries are
     evicted when *max_size* is exceeded.
 
     Suitable for single-process (single-instance) deployments. For
-    horizontally scaled deployments implement a custom
-    :class:`~sap_cloud_sdk.core.resilience.cache._backend.CacheBackend` backed by a shared
-    store (Redis, Memcached, etc.) and pass it via
-    :class:`~sap_cloud_sdk.core.resilience.cache._config.CacheConfig`.
+    horizontally scaled deployments implement a custom ``CacheBackend``
+    backed by a shared store (Redis, Memcached, etc.) and pass it via
+    ``CacheConfig``.
 
     Args:
         max_size: Maximum number of entries before LRU eviction.
         on_evict: Optional callback ``(key, reason) -> None``. *reason* is
             ``"lru"`` for capacity evictions, ``"ttl"`` for entries evicted on
             access after their TTL elapsed, or ``"manual"`` for explicit
-            :meth:`delete` calls. TTL expiry is detected lazily on the next
-            :meth:`get` of the expired key.
+            ``delete()`` calls. TTL expiry is detected lazily on the next
+            ``get()`` of the expired key.
     """
 
     def __init__(

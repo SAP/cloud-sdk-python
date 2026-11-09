@@ -20,7 +20,11 @@ import logging
 from typing import Any
 
 from sap_cloud_sdk.core.resilience.cache._backend import CacheBackend
-from sap_cloud_sdk.core.resilience.cache._config import CacheConfig, get_cache_config
+from sap_cloud_sdk.core.resilience.cache._config import (
+    CacheConfig,
+    get_cache_config,
+    is_cache_disabled_by_env,
+)
 from sap_cloud_sdk.core.resilience.cache._isolation import build_isolation_key
 from sap_cloud_sdk.core.resilience.cache._lru_backend import InMemoryLRUBackend
 from sap_cloud_sdk.core.resilience.cache._registry import get_module_backend
@@ -77,7 +81,7 @@ class Cache:
             namespace: Domain namespace, e.g. ``"csrf"``.
             key: Domain-specific key, e.g. the service root URL.
         """
-        if not self._config.enabled:
+        if not self._is_enabled():
             return None
 
         full_key = self._make_full_key(namespace, key)
@@ -110,7 +114,7 @@ class Cache:
                 ``exp`` minus now). Pass ``None`` to use the configured
                 default.
         """
-        if not self._config.enabled:
+        if not self._is_enabled():
             return
 
         raw_ttl = (
@@ -131,7 +135,7 @@ class Cache:
             namespace: Domain namespace.
             key: Domain-specific key.
         """
-        if not self._config.enabled:
+        if not self._is_enabled():
             return
 
         full_key = self._make_full_key(namespace, key)
@@ -154,6 +158,16 @@ class Cache:
     # ------------------------------------------------------------------
     # Private helpers
     # ------------------------------------------------------------------
+
+    def _is_enabled(self) -> bool:
+        """Return whether reads and writes are active.
+
+        The cache is active only when ``CacheConfig.enabled`` is ``True`` and the
+        ``CLOUD_SDK_CACHE_DISABLED`` kill switch is not set. The env var is checked
+        at call time and always wins, so ops can disable the cache without a
+        redeploy even when application code hardcodes ``enabled=True``.
+        """
+        return self._config.enabled and not is_cache_disabled_by_env()
 
     def _resolve_backend(self) -> CacheBackend:
         # 1. Explicit backend wins (e.g. Redis)

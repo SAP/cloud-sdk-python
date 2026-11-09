@@ -7,7 +7,11 @@ import pytest
 
 from sap_cloud_sdk.core.resilience.cache._backend import CacheBackend
 from sap_cloud_sdk.core.resilience.cache._cache import Cache
-from sap_cloud_sdk.core.resilience.cache._config import CacheConfig, configure_cache
+from sap_cloud_sdk.core.resilience.cache._config import (
+    ENV_CACHE_DISABLED,
+    CacheConfig,
+    configure_cache,
+)
 from sap_cloud_sdk.core.resilience.cache._isolation import IsolationStrategy
 from sap_cloud_sdk.core.resilience.cache._registry import reset_module_backends
 from sap_cloud_sdk.core.runtime_context import APP_TENANT_ID, USER_ID, RuntimeContext
@@ -296,3 +300,56 @@ class TestCacheModuleBackend:
             cache_first.set("ns", "k3", "v3", ttl_seconds=60)
             # k3 is always present; exactly one of k1/k2 was evicted.
             assert cache_second.get("ns", "k3") == "v3"
+
+
+class TestCacheEnvKillSwitch:
+    """Tests for the CLOUD_SDK_CACHE_DISABLED environment kill switch."""
+
+    def test_env_disables_get(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        cache = Cache(CacheConfig())
+        with sdk_context(_ctx(tenant_id="t1")):
+            cache.set("ns", "key", "value", ttl_seconds=60)
+            monkeypatch.setenv(ENV_CACHE_DISABLED, "true")
+            assert cache.get("ns", "key") is None
+
+    def test_env_disables_set(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        backend = MagicMock(spec=CacheBackend)
+        cache = Cache(CacheConfig(backend=backend))
+        monkeypatch.setenv(ENV_CACHE_DISABLED, "true")
+        with sdk_context(_ctx(tenant_id="t1")):
+            cache.set("ns", "key", "v", ttl_seconds=60)
+        backend.set.assert_not_called()
+
+    def test_env_disables_evict(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        backend = MagicMock(spec=CacheBackend)
+        cache = Cache(CacheConfig(backend=backend))
+        monkeypatch.setenv(ENV_CACHE_DISABLED, "true")
+        with sdk_context(_ctx(tenant_id="t1")):
+            cache.evict("ns", "key")
+        backend.delete.assert_not_called()
+
+    def test_env_overrides_enabled_true(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """The env var wins even when the client hardcodes enabled=True."""
+        cache = Cache(CacheConfig(enabled=True))
+        monkeypatch.setenv(ENV_CACHE_DISABLED, "true")
+        with sdk_context(_ctx(tenant_id="t1")):
+            cache.set("ns", "key", "value", ttl_seconds=60)
+            assert cache.get("ns", "key") is None
+
+    def test_cache_active_when_env_unset(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Regression guard: unset env var preserves normal behavior."""
+        monkeypatch.delenv(ENV_CACHE_DISABLED, raising=False)
+        cache = Cache(CacheConfig())
+        with sdk_context(_ctx(tenant_id="t1")):
+            cache.set("ns", "key", "value", ttl_seconds=60)
+            assert cache.get("ns", "key") == "value"
+
+    def test_cache_active_when_env_not_true(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """A non-"true" value does not disable the cache."""
+        monkeypatch.setenv(ENV_CACHE_DISABLED, "false")
+        cache = Cache(CacheConfig())
+        with sdk_context(_ctx(tenant_id="t1")):
+            cache.set("ns", "key", "value", ttl_seconds=60)
+            assert cache.get("ns", "key") == "value"

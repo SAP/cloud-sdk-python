@@ -60,9 +60,21 @@ configure_cache(CacheConfig(isolation_strategy=IsolationStrategy.TENANT))
 
 Downgrading from `TENANT_USER` to `TENANT` when a user ID is present logs a warning, as it risks cross-user contamination.
 
-## Disabling the Cache Per Client
+## Disabling the Cache
 
-Pass a `CacheConfig(enabled=False)` when constructing a client to disable caching for that client only, without affecting the global configuration:
+### Disabling the cache entirely (environment variable)
+
+Set `CLOUD_SDK_CACHE_DISABLED=true` to disable the **entire** SDK cache layer across every module and every `Cache` instance. This is an operational kill switch for incidents (e.g. a misbehaving backend or unexpected cache entries): it takes effect without a code change or redeploy.
+
+```bash
+export CLOUD_SDK_CACHE_DISABLED=true
+```
+
+> Note: The env var is a hard override: it always wins over `CacheConfig.enabled`. Even if application code constructs a client with `CacheConfig(enabled=True)`, setting `CLOUD_SDK_CACHE_DISABLED=true` disables caching. The variable is read on every cache access, so flipping it does not require re-importing the SDK.
+
+### Disabling the cache for a specific client (programmatic)
+
+Pass a `CacheConfig(enabled=False)` when constructing a client to disable caching for that client only, without affecting the global configuration or other clients:
 
 ```python
 from sap_cloud_sdk.destination import create_client
@@ -70,6 +82,8 @@ from sap_cloud_sdk.core.resilience.cache import CacheConfig
 
 client = create_client(cache_config=CacheConfig(enabled=False))
 ```
+
+Use the env var as the fleet-wide incident switch and `CacheConfig(enabled=False)` for a targeted, in-code opt-out (e.g. a single client or local development).
 
 ## Eviction Callback
 

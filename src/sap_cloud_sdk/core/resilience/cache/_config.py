@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Callable
 
 if TYPE_CHECKING:
     from sap_cloud_sdk.core.resilience.cache._backend import CacheBackend
     from sap_cloud_sdk.core.resilience.cache._isolation import IsolationStrategy
+
+ENV_CACHE_DISABLED = "CLOUD_SDK_CACHE_DISABLED"
 
 
 @dataclass
@@ -65,3 +68,18 @@ def configure_cache(config: CacheConfig) -> None:
 def get_cache_config() -> CacheConfig:
     """Return the current global cache configuration."""
     return _global_config
+
+
+def is_cache_disabled_by_env() -> bool:
+    """Return ``True`` when the global cache kill switch is set.
+
+    Controlled by the ``CLOUD_SDK_CACHE_DISABLED`` environment variable. When
+    set to ``"true"`` (case-insensitive), the entire SDK cache layer is disabled
+    regardless of ``CacheConfig.enabled``. This is an operational kill switch for
+    incidents: it takes effect without a code change or redeploy and overrides any
+    programmatic configuration.
+
+    Returns:
+        ``True`` if ``CLOUD_SDK_CACHE_DISABLED`` is ``"true"``, otherwise ``False``.
+    """
+    return os.getenv(ENV_CACHE_DISABLED, "false").lower() == "true"

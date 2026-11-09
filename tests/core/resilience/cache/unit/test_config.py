@@ -2,7 +2,13 @@
 
 import pytest
 
-from sap_cloud_sdk.core.resilience.cache._config import CacheConfig, configure_cache, get_cache_config
+from sap_cloud_sdk.core.resilience.cache._config import (
+    ENV_CACHE_DISABLED,
+    CacheConfig,
+    configure_cache,
+    get_cache_config,
+    is_cache_disabled_by_env,
+)
 from sap_cloud_sdk.core.resilience.cache._lru_backend import InMemoryLRUBackend
 
 
@@ -57,3 +63,23 @@ class TestConfigureCache:
 
     def teardown_method(self) -> None:
         configure_cache(CacheConfig())
+
+
+class TestIsCacheDisabledByEnv:
+    def test_returns_false_when_unset(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.delenv(ENV_CACHE_DISABLED, raising=False)
+        assert is_cache_disabled_by_env() is False
+
+    @pytest.mark.parametrize("value", ["true", "TRUE", "True", "tRuE"])
+    def test_returns_true_for_truthy_values(
+        self, monkeypatch: pytest.MonkeyPatch, value: str
+    ) -> None:
+        monkeypatch.setenv(ENV_CACHE_DISABLED, value)
+        assert is_cache_disabled_by_env() is True
+
+    @pytest.mark.parametrize("value", ["false", "False", "0", "1", "yes", "", "off"])
+    def test_returns_false_for_non_true_values(
+        self, monkeypatch: pytest.MonkeyPatch, value: str
+    ) -> None:
+        monkeypatch.setenv(ENV_CACHE_DISABLED, value)
+        assert is_cache_disabled_by_env() is False

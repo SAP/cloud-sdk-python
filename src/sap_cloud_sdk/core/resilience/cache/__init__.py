@@ -22,6 +22,13 @@ Disabling the cache for a specific client:
 
     client = create_client(cache_config=CacheConfig(enabled=False))
 
+Disabling the cache entirely:
+
+    Set the environment variable ``CLOUD_SDK_CACHE_DISABLED=true`` to disable the
+    entire SDK cache layer globally, without a code change or redeploy. The env
+    var always wins over ``CacheConfig.enabled``, so it disables caching even when
+    application code hardcodes ``enabled=True``.
+
 Custom backend example (Redis):
 
     from sap_cloud_sdk.core.resilience.cache import CacheBackend, CacheConfig, configure_cache

@@ -37,3 +37,28 @@ class AgentMemoryNotFoundError(AgentMemoryHttpError):
 
 class AgentMemoryValidationError(AgentMemoryError):
     """Raised when client-side input validation fails before a request is sent."""
+
+
+class AgentMemoryThreadNotFoundError(AgentMemoryError):
+    """Raised when a thread_id does not exist in the thread registry.
+
+    Both the in-memory and service-backed registries raise this type so callers
+    catch a single exception regardless of backend.
+    """
+
+
+class AgentMemoryThreadConflictError(AgentMemoryError):
+    """Raised when a thread_id is already registered by a different owner.
+
+    "Owner" is the ``(agent_id, invoker_id)`` pair. The service-backed registry
+    maps the HTTP 409 ownership conflict onto this type.
+    """
+
+
+class AgentMemoryThreadExpiredError(AgentMemoryError):
+    """Raised when a thread_id belongs to an expired thread that has not yet been cleaned up.
+
+    Raised on 409 responses whose body contains "expired", meaning the thread
+    row still exists in the DB but its TTL has passed. Re-registering with the
+    same ID is not allowed until the cleanup job removes the row.
+    """

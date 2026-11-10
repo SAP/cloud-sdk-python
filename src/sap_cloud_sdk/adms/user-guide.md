@@ -78,15 +78,6 @@ client = create_client(config=config)
 client = create_client(user_jwt=request.headers["Authorization"].split()[1])
 ```
 
-> **Note:** `user_jwt` must be a non-blank string. Passing an
-> empty string or whitespace-only value raises `ValueError` instead of silently
-> falling back to service credentials. To use service credentials explicitly,
-> omit `user_jwt` or pass `None` at `create_client` / `create_async_client`.
->
-> `with_user_jwt(...)` always requires a non-blank JWT — passing `None` or
-> blank raises `ValueError`, since the method signals explicit user-context
-> intent. Use the service-credentials factory path instead.
-
 ## Token Cache for Scale-Out
 
 ```python
@@ -266,9 +257,14 @@ active = client.relations.activate_draft(activate_input)
 
 ## Multi-tenancy
 
-- **Supported:** No
+- **Supported:** Partial (ApplicationTenant operations only)
 - **Authentication:** IAS
-- **How to use:** Multi-tenancy is not supported by this service.
+- **How to use:** ADM is a single-tenant service for most operations. The
+  `ApplicationTenant` entity is an exception: create, list, get, and delete
+  operations accept an optional `subaccount_id` parameter, which is forwarded
+  as the `X-SubaccountId` header required by ADM for subaccount-scoped tenant
+  management. All other ADM APIs (documents, jobs, configuration) do not
+  support multi-tenancy.
 - **Further reading:** N/A
 
 ## Error Handling

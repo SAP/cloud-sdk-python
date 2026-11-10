@@ -49,7 +49,7 @@ from sap_cloud_sdk.adms._configuration_api import (
     _ConfigurationApi,
 )
 from sap_cloud_sdk.adms._document_api import _AsyncDocumentApi, _DocumentApi
-from sap_cloud_sdk.adms._http import AdmsHttp, AsyncAdmsHttp, _require_non_blank_jwt
+from sap_cloud_sdk.adms._http import AdmsHttp, AsyncAdmsHttp
 from sap_cloud_sdk.adms._ias_fetcher import IasTokenFetcher
 from sap_cloud_sdk.adms._job_api import _AsyncJobApi, _JobApi
 from sap_cloud_sdk.adms._relation_api import (
@@ -57,8 +57,7 @@ from sap_cloud_sdk.adms._relation_api import (
     _DocumentRelationApi,
 )
 from sap_cloud_sdk.adms._token_cache import TokenCache
-from sap_cloud_sdk.adms.config import AdmsConfig, _make_config_factory
-from sap_cloud_sdk.adms.exceptions import ConfigError
+from sap_cloud_sdk.adms.config import AdmsConfig, load_from_env_or_mount
 
 
 # ---------------------------------------------------------------------------
@@ -91,16 +90,10 @@ class AdmsClient:
 
         Args:
             user_jwt: The user's OIDC or XSUAA JWT from the inbound request.
-                Must be a non-blank string — ``None`` and blank/whitespace raise
-                :class:`ValueError`.
 
         Returns:
             New :class:`AdmsClient` configured for user-context calls.
-
-        Raises:
-            ValueError: If *user_jwt* is ``None``, empty, or whitespace-only.
         """
-        _require_non_blank_jwt(user_jwt)
         return AdmsClient(self._http.with_user_jwt(user_jwt))
 
 
@@ -135,16 +128,10 @@ class AsyncAdmsClient:
 
         Args:
             user_jwt: The user's OIDC or XSUAA JWT.
-                Must be a non-blank string — ``None`` and blank/whitespace raise
-                :class:`ValueError`.
 
         Returns:
             New :class:`AsyncAdmsClient` for user-context calls.
-
-        Raises:
-            ValueError: If *user_jwt* is ``None``, empty, or whitespace-only.
         """
-        _require_non_blank_jwt(user_jwt)
         return AsyncAdmsClient(self._http.with_user_jwt(user_jwt))
 
 
@@ -178,26 +165,15 @@ def create_client(
 
     Raises:
         ConfigError: If the binding configuration is missing or incomplete.
-        ValueError: If ``instance`` is an empty string or ``user_jwt`` is blank/whitespace.
+        ValueError: If ``instance`` is an empty string.
     """
     if instance is not None and instance == "":
         raise ValueError(
             "instance must not be an empty string; omit it to use 'default'"
         )
-    if user_jwt is not None:
-        _require_non_blank_jwt(user_jwt)
-    try:
-        if config is not None:
-            token_fetcher = IasTokenFetcher(config=config, cache=token_cache)
-        else:
-            token_fetcher = IasTokenFetcher(
-                config=_make_config_factory(instance), cache=token_cache
-            )
-    except RuntimeError as exc:
-        raise ConfigError(str(exc)) from exc
-    http = AdmsHttp(
-        config=token_fetcher._config, token_fetcher=token_fetcher, user_jwt=user_jwt
-    )
+    binding = config or load_from_env_or_mount(instance)
+    token_fetcher = IasTokenFetcher(config=binding, cache=token_cache)
+    http = AdmsHttp(config=binding, token_fetcher=token_fetcher, user_jwt=user_jwt)
     return AdmsClient(http)
 
 
@@ -224,25 +200,16 @@ def create_async_client(
 
     Raises:
         ConfigError: If binding configuration is missing or incomplete.
-        ValueError: If ``instance`` is an empty string or ``user_jwt`` is blank/whitespace.
+        ValueError: If ``instance`` is an empty string.
     """
     if instance is not None and instance == "":
         raise ValueError(
             "instance must not be an empty string; omit it to use 'default'"
         )
-    if user_jwt is not None:
-        _require_non_blank_jwt(user_jwt)
-    try:
-        if config is not None:
-            token_fetcher = IasTokenFetcher(config=config, cache=token_cache)
-        else:
-            token_fetcher = IasTokenFetcher(
-                config=_make_config_factory(instance), cache=token_cache
-            )
-    except RuntimeError as exc:
-        raise ConfigError(str(exc)) from exc
+    binding = config or load_from_env_or_mount(instance)
+    token_fetcher = IasTokenFetcher(config=binding, cache=token_cache)
     http = AsyncAdmsHttp(
-        config=token_fetcher._config,
+        config=binding,
         token_fetcher=token_fetcher,
         client=http_client,
         user_jwt=user_jwt,

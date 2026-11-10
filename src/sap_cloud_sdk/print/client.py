@@ -172,7 +172,8 @@ class PrintClient:
                 the path parameter — this is enforced automatically.
 
         Raises:
-            PrintOperationError: If the request fails.
+            PrintOperationError: If the request fails or the queue name is '.' or '..'.
+            UnicodeEncodeError: If the queue name cannot be encoded as UTF-8.
         """
         try:
             self.put(
@@ -200,7 +201,8 @@ class PrintClient:
             List of PrintProfile objects for the queue.
 
         Raises:
-            PrintOperationError: If the request fails or the response cannot be parsed.
+            PrintOperationError: If the request fails, the response cannot be parsed,
+                or the queue name is '.', '..', or cannot be encoded as UTF-8.
         """
         try:
             resp = self.get(f"{_QUEUES_PATH}/{_encode_path_segment(qname)}/profiles")
@@ -267,7 +269,8 @@ class PrintClient:
             task: PrintTask describing the print job.
 
         Raises:
-            PrintOperationError: If the request fails.
+            PrintOperationError: If the request fails or the task ID is '.' or '..'.
+            UnicodeEncodeError: If the task ID cannot be encoded as UTF-8.
         """
         if not task.username:
             task.username = self.get_username()

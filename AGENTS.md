@@ -17,7 +17,7 @@ Conventions for AI coding agents that work in this repo. This file lists only wh
 ## Commits and Pull Requests
 
 - [Conventional Commits](https://www.conventionalcommits.org/): `<type>(<scope>): <description>`.
-- Title only, no body.
+- Commit messages use a subject line only. Do not add a commit body.
 - Follow the pull request template in `.github/pull_request_template.md`.
 
 ## Code

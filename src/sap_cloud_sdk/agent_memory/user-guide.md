@@ -591,6 +591,9 @@ except AgentMemoryError as e:
     print(f"Agent Memory error: {e}")
 ```
 
+The SDK automatically URL-encodes `memory_id` and `message_id` when building URL paths.
+Identifiers that cannot be encoded as UTF-8 raise `AgentMemoryHttpError` before the service request.
+
 ---
 
 ## Admin — Retention Config

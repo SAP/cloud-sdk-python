@@ -1,13 +1,15 @@
 ---
 name: security-review
-description: Security-focused review of a pull request against the cloud-sdk-python security standards. Extends review-pr with deeper checks on tenant isolation, input validation, credential handling, JWT verification, and URL safety. Use when you want targeted security feedback, or as a sub-step of prep-pr.
+description: Security-focused review of a pull request against the cloud-sdk-python security standards. Extends review-pr with deeper checks on tenant isolation, input validation, credential handling, JWT verification, and URL safety, plus regression checks against the project's published GitHub Security Advisories. Use when you want targeted security feedback, or as a sub-step of prep-pr.
 tools: Bash, Read
 compatibility: gh CLI ≥ 2.0, git, GitHub access to SAP/cloud-sdk-python
 ---
 
 # Security Review: SAP Cloud SDK for Python
 
-A security-focused extension of `review-pr`. Evaluates 12 security criteria derived from the guardrails introduced in the project (subdomain validation, URL injection safeguards, JWT verification, credential emptiness checks, sensitive data exposure, and more).
+A security-focused extension of `review-pr`. Evaluates 13 security criteria derived from the guardrails introduced in the project (subdomain validation, URL injection safeguards, JWT verification, credential emptiness checks, sensitive data exposure, and more).
+
+The final criterion (**S13**) guards against regressions of the project's own published GitHub Security Advisories: it fetches the live advisory list, reads each one, and checks whether the diff reintroduces a fixed vulnerability — either by weakening the exact guard or by repeating the same vulnerability class in another module.
 
 Run from the root of the `cloud-sdk-python` repository. Can be invoked standalone or as a sub-step of `prep-pr` / `review-pr`.
 
@@ -27,7 +29,10 @@ Run in parallel:
 gh pr diff <NUMBER> --repo <REPO>
 gh pr view <NUMBER> --repo <REPO> --json number,title,headRefName,baseRefName,author,files
 gh pr view <NUMBER> --repo <REPO> --json commits --jq '.commits[].messageHeadline'
+gh api repos/SAP/cloud-sdk-python/security-advisories --jq '.[] | {ghsa: .ghsa_id, cve: .cve_id, severity, summary}'
 ```
+
+The last command fetches the live list of published advisories for **S13**. If it returns nothing or access is denied, note that and score S13 `⚠️` (see S13).
 
 Fetch each changed `src/` file at the PR head commit SHA (same method as `review-pr` Phase 2 — skip files >500 KB or binary). Store under `/tmp/pr<NUMBER>/`.
 
@@ -39,7 +44,7 @@ cat src/sap_cloud_sdk/core/_tenant.py
 
 ---
 
-## Phase 3: Evaluate 12 Security Criteria
+## Phase 3: Evaluate 13 Security Criteria
 
 Assign each: **✅ Pass** / **⚠️ Warning** / **❌ Fail** / **➖ N/A**
 
@@ -208,6 +213,25 @@ Use `Read /tmp/pr<NUMBER>/<path>` for exact line references. Do not derive line 
 
 ---
 
+### S13: No regression of published security advisories
+
+**Applies to**: any PR that changes source under `src/`. Score `➖ N/A` only when the diff is limited to docs, CI, or pure test data with no source change. A source change in a module *different* from where an advisory was originally fixed still applies — vulnerability classes recur across modules.
+
+**Rule**: The diff must not reintroduce (regress) a vulnerability that a published GitHub Security Advisory already fixed. A regression is either (a) **direct** — the diff removes, weakens, or bypasses the guard the fix added; or (b) **pattern reintroduction** — the diff adds new code that repeats the same vulnerability class elsewhere. Any confirmed regression of a published advisory is **❌ and blocking**, regardless of the advisory's original severity.
+
+**Check**:
+- **Fetch** the live advisory list (from Phase 2: `gh api repos/SAP/cloud-sdk-python/security-advisories`). If it returns nothing or access is denied → score **⚠️** with "could not fetch advisories; regression check not performed". Never score ✅ without having fetched the list.
+- **Read** each advisory for detail and derive its **guard** (the check/function the fix introduced) and **call site(s)** (where the guard must run). Use `gh api repos/SAP/cloud-sdk-python/security-advisories/<GHSA>` and the linked fix commit / `references`.
+- For each advisory, check both regression modes against the diff (quote the exact `file:line` via `Read /tmp/pr<NUMBER>/<path>`):
+  - **Direct**: does the diff edit the guard or its call site to drop/weaken/bypass it? e.g. deleting a `_validate_tenant_subdomain(...)` call, flipping a `verify` flag, broadening a validation regex, or removing a fail-closed `return`.
+  - **Pattern reintroduction (cross-module)**: does the diff add *new* code that repeats the fixed class in another module? e.g. a new client that builds a tenant/OAuth URL by host or string substitution without `_validate_tenant_subdomain`, reads JWT claims without signature verification, or joins external input into a path/URL without the `_validate_path_component` / `_assert_within_base` pattern.
+- **Core strictness** — if the diff changes any file under `src/sap_cloud_sdk/core/` (any depth), raise the rigor: advisory guards live in core, and a past SSRF fix already regressed once because the HTTP client was refactored *into* core. In that case:
+  - `➖ N/A` is not allowed for an advisory whose guard or call site is in core.
+  - Verify guards **repo-wide, not just in the diff**: grep `src/` to confirm each core guard still exists *and* is still invoked at its call site in the current tree, then `Read` and quote the confirming line. A refactor can drop a call without editing the guard file.
+  - Widen the pattern search to all modules that consume the changed core primitive (HTTP client under `core/protocol/http/`, `core/_tenant.py`, `core/runtime_context/`, `core/secret_resolver/`, auth/token helpers). A plausible but unconfirmed weakening here is `⚠️`, never silent `✅`.
+
+---
+
 ## Phase 4: Report
 
 ```markdown
@@ -232,6 +256,7 @@ Use `Read /tmp/pr<NUMBER>/<path>` for exact line references. Do not derive line 
 | S10 | New dependencies checked for CVEs | | |
 | S11 | No verify=False in HTTP calls | | |
 | S12 | Audit log for mutating tenant operations | | |
+| S13 | No regression of published advisories | | |
 
 ---
 
@@ -249,6 +274,8 @@ Use `Read /tmp/pr<NUMBER>/<path>` for exact line references. Do not derive line 
 ```
 
 Verdict: any ❌ → **Blocked** · any ⚠️ → **Needs attention** · all ✅/➖ → **No security issues**
+
+S13 is a single roll-up row: its status is the worst outcome across all advisories, and its finding names the affected advisory with `file:line` (e.g. `<GHSA-id>: _validate_tenant_subdomain call removed at models.py:121`). A confirmed advisory regression is ❌ and forces **Blocked**.
 
 ---
 

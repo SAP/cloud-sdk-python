@@ -4509,7 +4509,7 @@ requires-dist = [
     { name = "protobuf", specifier = ">=7.36.0,<8" },
     { name = "protovalidate", specifier = ">=1.0.0,<2" },
     { name = "pydantic", specifier = "~=2.12.3" },
-    { name = "pyjwt", specifier = ">=2.13.0,<3" },
+    { name = "pyjwt", specifier = ">=2.15.0,<3" },
     { name = "python-odata", specifier = ">=0.7.0" },
     { name = "requests", specifier = ">=2.33.0,<3" },
     { name = "requests-oauthlib", specifier = ">=2.0.0,<3" },

@@ -11,7 +11,7 @@ from typing import Any, Callable, Dict, List, Optional, Union
 
 import jwt
 
-from sap_cloud_sdk.ias._claims import _IASClaim, _KNOWN_CLAIM_VALUES
+from sap_cloud_sdk.ias._claims import _KNOWN_CLAIM_VALUES, _IASClaim
 from sap_cloud_sdk.ias.exceptions import IASTokenError
 
 
@@ -140,6 +140,10 @@ def parse_token(token: str) -> IASClaims:
         )
     except jwt.exceptions.DecodeError as e:
         raise IASTokenError(f"Failed to decode IAS token: {e}") from e
+    except RecursionError as e:
+        raise IASTokenError(
+            "Failed to decode IAS token: malformed or over-nested token"
+        ) from e
 
     return IASClaims(
         app_tid=payload.get(_IASClaim.APP_TID),

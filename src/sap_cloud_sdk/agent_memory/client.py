@@ -248,7 +248,8 @@ class AgentMemoryClient:
         Raises:
             AgentMemoryNotFoundError: If no memory with the given ID exists.
             AgentMemoryValidationError: If ``memory_id`` is empty.
-            AgentMemoryHttpError: If the request fails.
+            AgentMemoryHttpError: If the request fails or the identifier cannot
+                be encoded as UTF-8.
         """
         _require_non_empty(memory_id=memory_id)
         data = self._request(
@@ -277,7 +278,8 @@ class AgentMemoryClient:
             AgentMemoryNotFoundError: If no memory with the given ID exists.
             AgentMemoryValidationError: If ``memory_id`` is empty, no fields are provided,
                 or tenant is missing for ``SUBSCRIBER``.
-            AgentMemoryHttpError: If the request fails.
+            AgentMemoryHttpError: If the request fails or the identifier cannot
+                be encoded as UTF-8.
         """
         _require_non_empty(memory_id=memory_id)
         if content is None and metadata is None:
@@ -306,7 +308,8 @@ class AgentMemoryClient:
         Raises:
             AgentMemoryNotFoundError: If no memory with the given ID exists.
             AgentMemoryValidationError: If ``memory_id`` is empty.
-            AgentMemoryHttpError: If the request fails.
+            AgentMemoryHttpError: If the request fails or the identifier cannot
+                be encoded as UTF-8.
         """
         _require_non_empty(memory_id=memory_id)
         self._request(
@@ -509,7 +512,8 @@ class AgentMemoryClient:
         Raises:
             AgentMemoryNotFoundError: If no message with the given ID exists.
             AgentMemoryValidationError: If ``message_id`` is empty.
-            AgentMemoryHttpError: If the request fails.
+            AgentMemoryHttpError: If the request fails or the identifier cannot
+                be encoded as UTF-8.
         """
         _require_non_empty(message_id=message_id)
         data = self._request(
@@ -529,7 +533,8 @@ class AgentMemoryClient:
         Raises:
             AgentMemoryNotFoundError: If no message with the given ID exists.
             AgentMemoryValidationError: If ``message_id`` is empty.
-            AgentMemoryHttpError: If the request fails.
+            AgentMemoryHttpError: If the request fails or the identifier cannot
+                be encoded as UTF-8.
         """
         _require_non_empty(message_id=message_id)
         self._request(

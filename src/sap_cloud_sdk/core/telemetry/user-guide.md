@@ -34,7 +34,7 @@ from litellm import completion
 Wrap your LLM calls to add the context autoinstrumentation can't provide, including the agent's input and output messages:
 
 ```python
-from sap_cloud_sdk.core.telemetry import invoke_agent_span add_span_attribute
+from sap_cloud_sdk.core.telemetry import invoke_agent_span, add_span_attribute
 import json
 
 with invoke_agent_span(

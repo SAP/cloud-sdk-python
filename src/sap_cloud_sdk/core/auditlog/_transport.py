@@ -6,6 +6,7 @@ from abc import ABC, abstractmethod
 from typing import Callable, Union
 
 from sap_cloud_sdk.core.protocol.http import HttpClient, HttpMethod, XsuaaAuthProvider
+from sap_cloud_sdk.core.telemetry import Module
 from sap_cloud_sdk.core.auditlog.models import (
     SecurityEvent,
     DataAccessEvent,
@@ -77,7 +78,7 @@ class HttpTransport(Transport):
             self._config_factory = lambda: config  # type: ignore[arg-type]
             self.config = config  # type: ignore[assignment]
 
-        auth_provider = XsuaaAuthProvider(self._config_factory)
+        auth_provider = XsuaaAuthProvider(self._config_factory, module=Module.AUDITLOG)
         self._http = HttpClient(self.config.service_url, auth_provider)
 
     def send(self, event: AuditMessage) -> None:

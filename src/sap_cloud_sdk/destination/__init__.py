@@ -87,12 +87,12 @@ def _build_destination_http(
     instance: Optional[str], config: Optional[DestinationConfig]
 ) -> HttpClient:
     if config is not None:
-        auth = XsuaaAuthProvider(lambda: config)
+        auth = XsuaaAuthProvider(lambda: config, module=Module.DESTINATION)
         binding = config
     else:
         factory = _make_config_factory(instance or _DEFAULT_INSTANCE)
         binding = factory()
-        auth = XsuaaAuthProvider(factory)
+        auth = XsuaaAuthProvider(factory, module=Module.DESTINATION)
     base_url = f"{binding.url.rstrip('/')}/destination-configuration"
     return HttpClient(base_url, auth)
 

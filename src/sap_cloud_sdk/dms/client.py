@@ -135,7 +135,7 @@ class DMSClient:
             factory = credentials
         else:
             factory = lambda: credentials  # type: ignore[return-value]
-        auth_provider = XsuaaAuthProvider(factory)
+        auth_provider = XsuaaAuthProvider(factory, module=Module.DMS)
         base_url = factory().uri
         self._http: HttpInvoker = HttpInvoker(
             auth_provider=auth_provider,

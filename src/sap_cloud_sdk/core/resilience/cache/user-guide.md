@@ -1,0 +1,208 @@
+# Cache: User Guide
+
+Provides a domain-agnostic, pluggable cache layer shared across all SAP Cloud SDK modules. Supports tenant, tenant-user, and provider isolation, configurable TTL and expiry buffers, LRU eviction, and custom backends for multi-instance deployments.
+
+## Installation
+
+```bash
+uv add sap-cloud-sdk
+```
+
+No BTP service binding is required — the cache module is self-contained.
+
+## Quick Start
+
+By default every SDK client uses an in-process LRU cache with sensible defaults. No configuration is needed unless you want to tune it.
+
+```python
+from sap_cloud_sdk.core.resilience.cache import CacheConfig, configure_cache
+
+configure_cache(
+    CacheConfig(
+        default_ttl_seconds=600,
+        expiry_buffer_seconds=60,
+        max_size=2000,
+    )
+)
+```
+
+Call `configure_cache()` **once at startup**, before any SDK client is created. Changes made after client construction have no effect on already-instantiated clients.
+
+## Configuration Reference
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `enabled` | `bool` | `True` | Master on/off switch. `False` turns all gets into misses and all sets into no-ops. |
+| `isolation_strategy` | `IsolationStrategy \| None` | `None` | Override automatic isolation. `None` = auto-detect from context. |
+| `default_ttl_seconds` | `int` | `300` | Fallback TTL when no natural TTL is available. |
+| `expiry_buffer_seconds` | `int` | `30` | Subtracted from any TTL before storing, to pre-invalidate entries. |
+| `max_size` | `int` | `1000` | Maximum entries in the built-in backend before LRU eviction. |
+| `backend` | `CacheBackend \| None` | `None` | Custom backend. `None` uses the built-in `InMemoryLRUBackend`. |
+| `on_evict` | `Callable[[str, str], None] \| None` | `None` | Callback fired on eviction. Arguments: `(key, reason)` where reason is `"lru"`, `"ttl"`, or `"manual"`. |
+
+## Isolation Strategy
+
+The cache automatically scopes keys to the current tenant (and optionally user) to prevent cross-tenant and cross-user cache hits. Tenant and user identity are read implicitly from the active [`RuntimeContext`](../core/runtime_context) — callers do not pass them explicitly.
+
+| Strategy | Scope | When to use |
+|---|---|---|
+| `TENANT` | Per tenant | Data shared across all users of a tenant (configuration, metadata). Auto-selected when no user ID is present. |
+| `TENANT_USER` | Per (tenant, user) pair | User-specific data. Auto-selected when a user ID is present in context. |
+| `PROVIDER` | Service-wide (single shared namespace) | Data that is not tenant-specific, e.g. CSRF tokens or provider-level metadata. Ignores tenant and user context entirely. Key: `provider`. |
+
+Override the strategy globally:
+
+```python
+from sap_cloud_sdk.core.resilience.cache import CacheConfig, IsolationStrategy, configure_cache
+
+configure_cache(CacheConfig(isolation_strategy=IsolationStrategy.TENANT))
+```
+
+Downgrading from `TENANT_USER` to `TENANT` when a user ID is present logs a warning, as it risks cross-user contamination.
+
+## Disabling the Cache
+
+### Disabling the cache entirely (environment variable)
+
+Set `CLOUD_SDK_CACHE_DISABLED=true` to disable the **entire** SDK cache layer across every module and every `Cache` instance. This is an operational kill switch for incidents (e.g. a misbehaving backend or unexpected cache entries): it takes effect without a code change or redeploy.
+
+```bash
+export CLOUD_SDK_CACHE_DISABLED=true
+```
+
+> Note: The env var is a hard override: it always wins over `CacheConfig.enabled`. Even if application code constructs a client with `CacheConfig(enabled=True)`, setting `CLOUD_SDK_CACHE_DISABLED=true` disables caching. The variable is read on every cache access, so flipping it does not require re-importing the SDK.
+
+### Disabling the cache for a specific client (programmatic)
+
+Pass a `CacheConfig(enabled=False)` when constructing a client to disable caching for that client only, without affecting the global configuration or other clients:
+
+```python
+from sap_cloud_sdk.destination import create_client
+from sap_cloud_sdk.core.resilience.cache import CacheConfig
+
+client = create_client(cache_config=CacheConfig(enabled=False))
+```
+
+Use the env var as the fleet-wide incident switch and `CacheConfig(enabled=False)` for a targeted, in-code opt-out (e.g. a single client or local development).
+
+## Eviction Callback
+
+```python
+import logging
+from sap_cloud_sdk.core.resilience.cache import CacheConfig, configure_cache
+
+logger = logging.getLogger(__name__)
+
+
+def on_evict(key: str, reason: str) -> None:
+    logger.info("cache evicted key=%s reason=%s", key, reason)
+
+
+configure_cache(CacheConfig(on_evict=on_evict))
+```
+
+`reason` values:
+- `"lru"` — evicted because `max_size` was exceeded
+- `"ttl"` — evicted on access after the entry's TTL elapsed
+- `"manual"` — removed by an explicit `evict()` or `reset()` call
+
+## Custom Backend (Multi-Instance Deployments)
+
+The built-in `InMemoryLRUBackend` is process-local. For horizontally scaled deployments implement `CacheBackend` and pass it via `CacheConfig`:
+
+```python
+from typing import Any
+
+from sap_cloud_sdk.core.resilience.cache import CacheBackend, CacheConfig, configure_cache
+
+
+class MyCacheBackend(CacheBackend):
+    def get(self, key: str) -> Any | None: ...
+    def set(self, key: str, value: Any, ttl_seconds: int) -> None: ...
+    def delete(self, key: str) -> None: ...
+    def clear(self) -> None: ...
+
+
+configure_cache(CacheConfig(backend=MyCacheBackend()))
+```
+
+The backend interface has exactly four methods and no awareness of tenants, TTL policy, or domain types — all of that is handled by the SDK before keys reach your backend.
+
+> **Redis and other distributed backends:** A built-in Redis backend is not yet available. The `CacheBackend` ABC is designed to support distributed backends, and first-party support is planned for a future release. Until then, implement `CacheBackend` against your store of choice as shown above.
+
+## Integration Example
+
+For a real, in-tree example of how the cache is used, see `XsuaaAuthProvider` in `sap_cloud_sdk.core.protocol.http.models`. It uses `IsolationStrategy.TENANT` to cache OAuth2 sessions per tenant, with TTL derived from the token's `expires_in` field and automatic eviction on secret rotation.
+
+## Per-Module Shared Backend
+
+By default each `Cache` instance gets its own `InMemoryLRUBackend`. That is fine when the same client object is reused across requests, but some modules (e.g. Agent Gateway) create a fresh client on every request. In that case the cache would be empty on each request, defeating its purpose.
+
+Pass `module=` to share a single backend across all `Cache` instances that name the same module:
+
+```python
+from sap_cloud_sdk.core.resilience.cache._cache import Cache
+from sap_cloud_sdk.core.resilience.cache import CacheConfig, IsolationStrategy
+
+# Every time this module creates a new client, it gets the same backend.
+self._cache = Cache(
+    CacheConfig(isolation_strategy=IsolationStrategy.TENANT),
+    module="agentgateway",
+)
+```
+
+The backend is created once (process-scoped, singleton per module name) and reused for the lifetime of the process. Tenant isolation still works normally — the isolation key is derived from the active `RuntimeContext` on every `get`/`set`, so entries are never shared across tenants.
+
+### Sizing and eviction
+
+`max_size` and `on_evict` are taken from the **first** `Cache` created for a given module name. Later callers with different values are silently ignored. This is intentional: a module uses one sizing policy for its backend.
+
+## API Reference
+
+### `configure_cache(config: CacheConfig) -> None`
+
+Sets the global cache configuration. Must be called before any SDK client is created.
+
+### `get_cache_config() -> CacheConfig`
+
+Returns the current global cache configuration.
+
+### `class CacheConfig`
+
+Dataclass holding all cache settings. See [Configuration Reference](#configuration-reference) above.
+
+### `class CacheBackend` (ABC)
+
+Abstract base for custom backends. Implement `get`, `set`, `delete`, and `clear`.
+
+### `class InMemoryLRUBackend`
+
+The default backend. Thread-safe, LRU + TTL eviction, backed by `cachetools.TTLCache`. Suitable for single-process deployments.
+
+### `class IsolationStrategy`
+
+Enum with values `TENANT`, `TENANT_USER`, and `PROVIDER`. See [Isolation Strategy](#isolation-strategy) above.
+
+## Multi-tenancy
+
+- **Supported:** Yes, `TENANT`, `TENANT_USER`, and `PROVIDER` isolation strategies
+- **Authentication:** N/A, the cache module does not perform BTP authentication
+- **How to use:** Set `isolation_strategy` in `CacheConfig`. Tenant and user identity are read implicitly from the active [`RuntimeContext`](../core/runtime_context); auto-selection uses `TENANT_USER` when a user ID is present in context, otherwise `TENANT`. Use `PROVIDER` for service-wide data that must not be tenant-scoped.
+- **Further reading:** N/A
+
+## Error Handling
+
+```python
+from sap_cloud_sdk.core.resilience.cache.exceptions import BackendError, CacheError
+
+try:
+    # SDK client operations that use the cache internally
+    ...
+except BackendError as e:
+    # Raised when a custom backend raises during a set() call
+    print(f"Cache backend error: {e}")
+except CacheError as e:
+    print(f"Cache error: {e}")
+```
+
+Cache misses and backend errors during `get()` are always safe — the SDK treats them as misses and falls back to a fresh fetch.

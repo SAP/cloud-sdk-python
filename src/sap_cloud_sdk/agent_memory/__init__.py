@@ -39,17 +39,26 @@ from sap_cloud_sdk.agent_memory._models import (
 )
 from sap_cloud_sdk.agent_memory.utils._odata import FilterDefinition
 from sap_cloud_sdk.core.protocol.http import HttpClient, XsuaaAuthProvider
+from sap_cloud_sdk.core.telemetry import Module
 
 
 def _build_agent_memory_http(
     instance: str, config: Optional[AgentMemoryConfig]
 ) -> HttpClient:
     if config is not None:
-        auth = XsuaaAuthProvider(lambda: config) if config.token_url else None
+        auth = (
+            XsuaaAuthProvider(lambda: config, module=Module.AGENT_MEMORY)
+            if config.token_url
+            else None
+        )
         return HttpClient(config.base_url, auth, timeout=config.timeout)
     factory = _make_config_factory(instance)
     cfg = factory()
-    auth = XsuaaAuthProvider(factory) if cfg.token_url else None
+    auth = (
+        XsuaaAuthProvider(factory, module=Module.AGENT_MEMORY)
+        if cfg.token_url
+        else None
+    )
     return HttpClient(cfg.base_url, auth, timeout=cfg.timeout)
 
 

@@ -3,27 +3,29 @@
 from __future__ import annotations
 
 import logging
-import threading
 import time
 from abc import ABC, abstractmethod
-from datetime import datetime, timedelta
-from typing import Any, Callable, Optional
 from enum import Enum
+from typing import Any, Callable, Optional
 
 import requests
 from oauthlib.oauth2 import BackendApplicationClient
 from oauthlib.oauth2.rfc6749.errors import FatalClientError
 from requests_oauthlib import OAuth2Session
 
+from sap_cloud_sdk.core.resilience.cache._cache import Cache
+from sap_cloud_sdk.core.resilience.cache._config import CacheConfig
+from sap_cloud_sdk.core.resilience.cache._isolation import IsolationStrategy
 from sap_cloud_sdk.core._tenant import (
-    _validate_tenant_subdomain,
     _derive_tenant_token_url,
+    _validate_tenant_subdomain,
 )
 
 logger = logging.getLogger(__name__)
 
 _TOKEN_EXPIRY_BUFFER_SECONDS = 60
 _DEFAULT_TIMEOUT = 30.0
+_TOKEN_NAMESPACE = "xsuaa_token"
 _TOKEN_FETCH_MAX_ATTEMPTS = 3
 _TOKEN_FETCH_BACKOFF_BASE = 0.5  # seconds; delay = base * 2^attempt
 
@@ -61,17 +63,21 @@ class AuthProvider(ABC):
 class XsuaaAuthProvider(AuthProvider):
     """OAuth2 client-credentials auth provider for XSUAA.
 
-    Caches tokens per tenant subdomain with expiry-aware eviction.
-    Re-reads credentials from the binding on every token refresh so that
-    rotated secrets are picked up automatically.
-    Detects rotation proactively by checking the secret directory mtime before
-    each cache hit via :meth:`~ConfigFactory.has_changed`.
+    Caches tokens per tenant subdomain with expiry-aware eviction backed by the
+    SDK ``Cache`` module. Re-reads credentials from the binding on every token
+    refresh so that rotated secrets are picked up automatically. Detects rotation
+    proactively by checking the secret directory mtime before each cache hit via
+    ``has_changed()``.
 
     Args:
-        config_factory: A :class:`~sap_cloud_sdk.core.secret_resolver.ConfigFactory`
-            (or any callable with a ``has_changed() -> bool`` method) that returns
-            fresh XSUAA credentials on every call.
+        config_factory: A ``ConfigFactory`` (or any callable with a
+            ``has_changed() -> bool`` method) that returns fresh XSUAA
+            credentials on every call.
         timeout: Timeout in seconds for token-endpoint requests.
+        module: Optional module name passed to ``Cache``.
+            Instances with the same name share one backend, which keeps the token
+            cache alive across per-request client re-creation. Callers that create
+            a single long-lived provider can omit this.
     """
 
     def __init__(
@@ -79,26 +85,27 @@ class XsuaaAuthProvider(AuthProvider):
         config_factory: Callable[[], Any],
         *,
         timeout: float = _DEFAULT_TIMEOUT,
+        module: str | None = None,
     ) -> None:
         self._config_factory = config_factory
         self._config = config_factory()
         self._timeout = timeout
-        self._cache: dict[Optional[str], tuple[OAuth2Session, datetime]] = {}
-        self._lock = threading.Lock()
+        self._cache: Cache = Cache(
+            CacheConfig(isolation_strategy=IsolationStrategy.TENANT),
+            module=module,
+        )
 
     def get_session(self, tenant_subdomain: Optional[str] = None) -> OAuth2Session:
         has_changed = getattr(self._config_factory, "has_changed", None)
         if callable(has_changed) and has_changed():
-            with self._lock:
-                logger.debug("Invalidating token cache due to secret rotation")
-                self._invalidate_all_unsafe()
+            logger.debug("Invalidating token cache due to secret rotation")
+            self._cache.reset()
 
-        with self._lock:
-            cached = self._cache.get(tenant_subdomain)
-            if cached is not None:
-                oauth, expires_at = cached
-                if datetime.now() < expires_at:
-                    return oauth
+        cached: OAuth2Session | None = self._cache.get(
+            _TOKEN_NAMESPACE, _token_key(tenant_subdomain)
+        )
+        if cached is not None:
+            return cached
 
         return self._fetch_token(tenant_subdomain)
 
@@ -157,15 +164,14 @@ class XsuaaAuthProvider(AuthProvider):
             ) from last_exc
 
         expires_in: int = token.get("expires_in", 3600)
-        expires_at = datetime.now() + timedelta(
-            seconds=expires_in - _TOKEN_EXPIRY_BUFFER_SECONDS
-        )
+        ttl = max(expires_in - _TOKEN_EXPIRY_BUFFER_SECONDS, 1)
 
-        with self._lock:
-            existing = self._cache.get(tenant_subdomain)
-            if existing is not None:
-                existing[0].close()
-            self._cache[tenant_subdomain] = (oauth, expires_at)
+        key = _token_key(tenant_subdomain)
+        # Close the stale session before overwriting to release its connection pool.
+        stale: OAuth2Session | None = self._cache.get(_TOKEN_NAMESPACE, key)
+        if stale is not None:
+            stale.close()
+        self._cache.set(_TOKEN_NAMESPACE, key, oauth, ttl_seconds=ttl)
 
         logger.debug(
             "Obtained OAuth2 token for tenant=%r (expires in %ds)",
@@ -175,18 +181,10 @@ class XsuaaAuthProvider(AuthProvider):
         return oauth
 
     def invalidate(self, tenant_subdomain: Optional[str] = None) -> None:
-        with self._lock:
-            self._cache.pop(tenant_subdomain, None)
+        self._cache.evict(_TOKEN_NAMESPACE, _token_key(tenant_subdomain))
 
     def invalidate_all(self) -> None:
-        with self._lock:
-            self._invalidate_all_unsafe()
-
-    def _invalidate_all_unsafe(self) -> None:
-        """Invalidate all cached sessions. Caller must hold ``self._lock``."""
-        for oauth, _ in self._cache.values():
-            oauth.close()
-        self._cache.clear()
+        self._cache.reset()
 
     def close(self) -> None:
         self.invalidate_all()
@@ -200,3 +198,7 @@ class XsuaaAuthProvider(AuthProvider):
         expose a ``base_url`` attribute (e.g. the destination module uses ``url``).
         """
         return getattr(self._config, "base_url", None)
+
+
+def _token_key(tenant_subdomain: Optional[str]) -> str:
+    return tenant_subdomain if tenant_subdomain is not None else "__provider__"

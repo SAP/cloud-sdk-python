@@ -73,7 +73,7 @@ def create_client(
     """
     try:
         if config is not None:
-            auth_provider = XsuaaAuthProvider(lambda: config)
+            auth_provider = XsuaaAuthProvider(lambda: config, module=Module.PRINT)
             return PrintClient(
                 http=HttpClient(config.url, auth_provider),
                 auth_provider=auth_provider,
@@ -83,7 +83,7 @@ def create_client(
         else:
             factory = _make_config_factory(instance)
             initial_config = factory()
-            auth_provider = XsuaaAuthProvider(factory)
+            auth_provider = XsuaaAuthProvider(factory, module=Module.PRINT)
             return PrintClient(
                 http=HttpClient(initial_config.url, auth_provider),
                 auth_provider=auth_provider,

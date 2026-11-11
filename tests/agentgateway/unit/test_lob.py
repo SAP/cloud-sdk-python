@@ -594,6 +594,9 @@ class TestGetMcpToolsLob:
             assert result == []
             mock_tools.assert_not_called()
             assert any("not pinned" in r.message for r in caplog.records)
+
+    @pytest.mark.asyncio
+    async def test_uses_pre_fetched_system_token(self):
         """Use the pre-fetched system token for MCP server calls."""
         fragment = MagicMock()
         fragment.name = "mcp-server-a"

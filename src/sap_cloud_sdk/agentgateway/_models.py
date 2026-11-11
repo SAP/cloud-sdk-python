@@ -96,8 +96,8 @@ class CustomerCredentials:
     client_id: str
     gateway_url: str
     integration_dependencies: list[IntegrationDependency]
-    certificate: str | None = None
-    private_key: str | None = None
+    certificate: str | None = field(default=None, repr=False)
+    private_key: str | None = field(default=None, repr=False)
 
 
 @dataclass

@@ -196,6 +196,7 @@ See [Integration Tests](INTEGRATION_TESTS.md) for environment setup and how to r
 
 ## Security
 - Never log or expose sensitive information (passwords, tokens, etc.)
+- Keep credential material (private keys, certificates, client secrets, passwords, tokens) out of auto-generated representations: any dataclass field holding such a value should be defined with `repr=False`.
 - Validate all inputs, especially from external sources
 - Follow principle of least privilege in code design
 

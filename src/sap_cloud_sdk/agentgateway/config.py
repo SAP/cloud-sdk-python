@@ -26,6 +26,12 @@ class ClientConfig:
         max_concurrent_tasks: Maximum number of MCP and Agent fetches (MCP tool
             discovery or A2A agent card fetches) that run concurrently.
             Defaults to 15.
+        allowed_tool_hosts: Additional hostnames (``host`` or ``host:port``),
+            beyond the gateway origin, permitted as MCP tool/fragment
+            destinations in the LoB flow. Tool URLs are otherwise pinned to the
+            gateway origin before the bearer token is attached. Default empty
+            (strict pin); add a host here only if a legitimate LoB destination
+            is served from a different origin than the discovered gateway URL.
     """
 
     timeout: float = DEFAULT_TIMEOUT_SECONDS
@@ -34,6 +40,7 @@ class ClientConfig:
     max_system_token_cache_size: int = DEFAULT_MAX_SYSTEM_TOKEN_CACHE_SIZE
     max_user_token_cache_size: int = DEFAULT_MAX_USER_TOKEN_CACHE_SIZE
     max_concurrent_tasks: int = DEFAULT_MAX_CONCURRENT_TASKS
+    allowed_tool_hosts: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         if self.token_expiry_buffer_seconds >= self.fallback_token_ttl_seconds:

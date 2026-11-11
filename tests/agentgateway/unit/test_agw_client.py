@@ -488,7 +488,7 @@ class TestListMcpTools:
             await agw_client.list_mcp_tools()
 
             mock_lob.assert_called_once_with(
-                "my-tenant", "system-token", 60.0, filter=None, max_concurrent_tasks=15
+                "my-tenant", "system-token", 60.0, "https://agw.example.com", filter=None, max_concurrent_tasks=15, allowed_tool_hosts=()
             )
 
     @pytest.mark.asyncio
@@ -524,8 +524,10 @@ class TestListMcpTools:
                 "my-tenant",
                 "system-token",
                 60.0,
+                "https://agw.example.com",
                 filter=MCPToolFilter(gtids=["gtid-a", "gtid-b"]),
                 max_concurrent_tasks=15,
+                allowed_tool_hosts=(),
             )
 
     @pytest.mark.asyncio
@@ -556,7 +558,7 @@ class TestListMcpTools:
             await agw_client.list_mcp_tools(filter=MCPToolFilter())
 
             mock_lob.assert_called_once_with(
-                "my-tenant", "system-token", 60.0, filter=MCPToolFilter(), max_concurrent_tasks=15
+                "my-tenant", "system-token", 60.0, "https://agw.example.com", filter=MCPToolFilter(), max_concurrent_tasks=15, allowed_tool_hosts=()
             )
 
     @pytest.mark.asyncio
@@ -583,7 +585,7 @@ class TestListMcpTools:
             await agw_client.list_mcp_tools()
 
             mock_lob.assert_called_once_with(
-                "my-tenant", "system-token-xyz", 60.0, filter=None, max_concurrent_tasks=15
+                "my-tenant", "system-token-xyz", 60.0, "https://agw.example.com", filter=None, max_concurrent_tasks=15, allowed_tool_hosts=()
             )
 
     @pytest.mark.asyncio
@@ -677,7 +679,7 @@ class TestListMcpTools:
 
             assert mock_user_auth.call_count == 1
             mock_lob.assert_called_once_with(
-                "my-tenant", "user-token-xyz", 60.0, filter=None, max_concurrent_tasks=15
+                "my-tenant", "user-token-xyz", 60.0, "https://agw.example.com", filter=None, max_concurrent_tasks=15, allowed_tool_hosts=()
             )
 
     @pytest.mark.asyncio
@@ -738,8 +740,10 @@ class TestListMcpTools:
             "my-tenant",
             "token",
             60.0,
+            "https://agw.example.com",
             filter=f,
             max_concurrent_tasks=15,
+            allowed_tool_hosts=(),
         )
 
     @pytest.mark.asyncio
@@ -766,7 +770,7 @@ class TestListMcpTools:
             await agw_client.list_mcp_tools(filter=f)
 
         mock_lob.assert_called_once_with(
-            "my-tenant", "token", 60.0, filter=f, max_concurrent_tasks=15
+            "my-tenant", "token", 60.0, "https://agw.example.com", filter=f, max_concurrent_tasks=15, allowed_tool_hosts=()
         )
 
     @pytest.mark.asyncio
@@ -908,7 +912,7 @@ class TestCallMcpTool:
 
             assert result == "result"
             mock_lob.assert_called_once_with(
-                mock_tool, "exchanged-token", 60.0, param1="value1"
+                mock_tool, "exchanged-token", 60.0, "https://agw.example.com", (), param1="value1"
             )
 
     @pytest.mark.asyncio
@@ -939,7 +943,7 @@ class TestCallMcpTool:
             )
 
             assert result == "result"
-            mock_lob.assert_called_once_with(mock_tool, "exchanged-token", 60.0)
+            mock_lob.assert_called_once_with(mock_tool, "exchanged-token", 60.0, "https://agw.example.com", ())
 
     @pytest.mark.asyncio
     async def test_customer_credentials_calls_customer_flow(self, mock_tool):
@@ -977,7 +981,7 @@ class TestCallMcpTool:
             # load_customer_credentials is called once in get_user_auth()
             mock_load.assert_called_once_with("/path/to/credentials")
             mock_customer.assert_called_once_with(
-                mock_tool, "exchanged-token", 60.0
+                mock_tool, "exchanged-token", 60.0, "https://agw.customer.com"
             )
 
     @pytest.mark.asyncio
@@ -1070,7 +1074,7 @@ class TestCallMcpTool:
 
             assert result == "result with system token"
             mock_customer.assert_called_once_with(
-                mock_tool, "system-token", 60.0
+                mock_tool, "system-token", 60.0, "https://agw.customer.com"
             )
 
     @pytest.mark.asyncio
@@ -1102,7 +1106,7 @@ class TestCallMcpTool:
 
             assert result == "tool result"
             mock_lob.assert_called_once_with(
-                mock_tool, "exchanged-user-token", 60.0, order_id="12345"
+                mock_tool, "exchanged-user-token", 60.0, "https://agw.example.com", (), order_id="12345"
             )
 
     @pytest.mark.asyncio

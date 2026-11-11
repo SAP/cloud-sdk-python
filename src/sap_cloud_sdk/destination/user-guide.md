@@ -977,11 +977,11 @@ client.get_destination("MyDest.v2")
 client.get_destination("AuditLogV3_Destination")
 
 # Invalid names — ValueError raised before any HTTP call
-client.get_destination("../etc/passwd")  # path traversal
-client.get_destination("a/b")  # path separator
-client.get_destination("a%2Fb")  # encoded separator
-client.get_destination("a?query=1")  # query delimiter
-client.get_destination("")  # empty
+client.get_destination("../etc/passwd")   # path traversal
+client.get_destination("a/b")             # path separator
+client.get_destination("a%2Fb")           # encoded separator
+client.get_destination("a?query=1")       # query delimiter
+client.get_destination("")                # empty
 ```
 
 ### `get_destination` — ConsumptionLevel shorthand

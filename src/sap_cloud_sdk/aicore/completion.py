@@ -111,12 +111,6 @@ def _output_filtering_active() -> bool:
     return cfg is not None and cfg.output_filtering is not None
 
 
-def _filtering_is_active() -> bool:
-    """True when an active config will inject a non-empty ``modules.filtering``."""
-    cfg = _filtering_patch._active_cfg
-    return cfg is not None and bool(cfg.to_dict())
-
-
 def _assert_filtering_ready() -> None:
     """Pre-flight guard against calling completion with filtering never configured.
 
@@ -128,7 +122,7 @@ def _assert_filtering_ready() -> None:
     default mode it emits a one-time warning.
     """
     global _unconfigured_warned
-    if _filtering_is_active() or _filtering_patch._configured:
+    if _filtering_patch._configured:
         return
     if load_strict_from_env():
         raise ContentFilteringNotConfiguredError(

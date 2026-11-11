@@ -88,7 +88,6 @@ def integration_env() -> dict:
         pytest.skip(f"Missing env vars: {missing}")
     return {v: os.environ[v] for v in required}
 
-
 @pytest.fixture(scope="session")
 def my_client(integration_env):
     try:
@@ -113,11 +112,9 @@ class ScenarioContext:
         self.last_error: Optional[Exception] = None
         self.cleanup_items: list = []
 
-
 @pytest.fixture
 def context():
     return ScenarioContext()
-
 
 @when("I perform the operation")
 def perform_operation(context, my_client):
@@ -126,7 +123,6 @@ def perform_operation(context, my_client):
         context.last_error = None
     except Exception as e:
         context.last_error = e
-
 
 @then("the operation should succeed")
 def operation_succeeds(context):
@@ -233,7 +229,7 @@ def _refresh_if_rotated(self) -> None:
     has_changed = getattr(self._config_factory, "has_changed", None)
     if callable(has_changed) and has_changed():
         self._config = self._config_factory()
-        self._cached_token = None  # discard stale token
+        self._cached_token = None          # discard stale token
         # rebuild session/client if needed
 ```
 
@@ -243,7 +239,6 @@ Credentials are baked into the client at construction time, so the client itself
 
 ```python
 _CREDENTIAL_ERROR_CODES = frozenset({"InvalidAccessKeyId", "SignatureDoesNotMatch"})
-
 
 def _execute_with_retry(self, fn):
     self._refresh_if_rotated()

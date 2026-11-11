@@ -114,9 +114,7 @@ except IASConfigError:
     ...
 
 # Or configure explicitly
-verifier = IASVerifier(
-    ias_url="https://my-tenant.accounts.ondemand.com", client_id="my-client-id"
-)
+verifier = IASVerifier(ias_url="https://my-tenant.accounts.ondemand.com", client_id="my-client-id")
 
 # Verify a token — raises IASTokenError on any failure
 verified = verifier("Bearer <token>")

@@ -261,10 +261,7 @@ class TestCompletionReactiveReload:
             return result
 
         with (
-            patch(
-                "sap_cloud_sdk.aicore.completion.litellm.completion",
-                side_effect=fake_completion,
-            ),
+            patch("sap_cloud_sdk.aicore.completion.litellm.completion", side_effect=fake_completion),
             patch("sap_cloud_sdk.aicore.set_aicore_config") as mock_reload,
         ):
             result = completion(model="sap/x", messages=[])
@@ -279,10 +276,7 @@ class TestCompletionReactiveReload:
         )
 
         with (
-            patch(
-                "sap_cloud_sdk.aicore.completion.litellm.completion",
-                side_effect=auth_err,
-            ),
+            patch("sap_cloud_sdk.aicore.completion.litellm.completion", side_effect=auth_err),
             patch("sap_cloud_sdk.aicore.set_aicore_config"),
         ):
             with pytest.raises(litellm.AuthenticationError):
@@ -310,9 +304,7 @@ class TestCompletionReactiveReload:
         raised = ValueError("some other error")
 
         with (
-            patch(
-                "sap_cloud_sdk.aicore.completion.litellm.completion", side_effect=raised
-            ),
+            patch("sap_cloud_sdk.aicore.completion.litellm.completion", side_effect=raised),
             patch("sap_cloud_sdk.aicore.set_aicore_config") as mock_reload,
         ):
             with pytest.raises(ValueError):
@@ -335,71 +327,48 @@ class TestStreamingGuard:
     @pytest.fixture(autouse=True)
     def restore_filtering(self):
         from sap_cloud_sdk.aicore.filtering._patch import _install
-
         _install(None)
         yield
         _install(None)
 
     def _activate_input_only(self):
         from sap_cloud_sdk.aicore.filtering import (
-            AzureContentFilter,
-            ContentFiltering,
-            InputFiltering,
-            set_filtering,
+            AzureContentFilter, ContentFiltering, InputFiltering, set_filtering,
         )
-
-        set_filtering(
-            ContentFiltering(
-                input_filtering=InputFiltering(filters=[AzureContentFilter()])
-            )
-        )
+        set_filtering(ContentFiltering(
+            input_filtering=InputFiltering(filters=[AzureContentFilter()])
+        ))
 
     def _activate_output(self):
         from sap_cloud_sdk.aicore.filtering import (
-            AzureContentFilter,
-            ContentFiltering,
-            OutputFiltering,
-            set_filtering,
+            AzureContentFilter, ContentFiltering, OutputFiltering, set_filtering,
         )
-
-        set_filtering(
-            ContentFiltering(
-                output_filtering=OutputFiltering(filters=[AzureContentFilter()])
-            )
-        )
+        set_filtering(ContentFiltering(
+            output_filtering=OutputFiltering(filters=[AzureContentFilter()])
+        ))
 
     def _activate_input_and_output(self):
         from sap_cloud_sdk.aicore.filtering import (
-            AzureContentFilter,
-            ContentFiltering,
-            InputFiltering,
-            OutputFiltering,
+            AzureContentFilter, ContentFiltering, InputFiltering, OutputFiltering,
             set_filtering,
         )
-
-        set_filtering(
-            ContentFiltering(
-                input_filtering=InputFiltering(filters=[AzureContentFilter()]),
-                output_filtering=OutputFiltering(filters=[AzureContentFilter()]),
-            )
-        )
+        set_filtering(ContentFiltering(
+            input_filtering=InputFiltering(filters=[AzureContentFilter()]),
+            output_filtering=OutputFiltering(filters=[AzureContentFilter()]),
+        ))
 
     # --- no filtering or input-only: stream=True passes through --------------------
 
     def test_no_filtering_stream_allowed(self):
         sentinel = object()
-        with patch(
-            "sap_cloud_sdk.aicore.completion.litellm.completion", return_value=sentinel
-        ):
+        with patch("sap_cloud_sdk.aicore.completion.litellm.completion", return_value=sentinel):
             result = completion(model="sap/x", messages=[], stream=True)
         assert result is sentinel
 
     def test_input_only_filtering_stream_allowed(self):
         self._activate_input_only()
         sentinel = object()
-        with patch(
-            "sap_cloud_sdk.aicore.completion.litellm.completion", return_value=sentinel
-        ):
+        with patch("sap_cloud_sdk.aicore.completion.litellm.completion", return_value=sentinel):
             result = completion(model="sap/x", messages=[], stream=True)
         assert result is sentinel
 
@@ -409,10 +378,7 @@ class TestStreamingGuard:
         async def _fake_acompletion(*_, **__):
             return sentinel
 
-        with patch(
-            "sap_cloud_sdk.aicore.completion.litellm.acompletion",
-            side_effect=_fake_acompletion,
-        ):
+        with patch("sap_cloud_sdk.aicore.completion.litellm.acompletion", side_effect=_fake_acompletion):
             result = asyncio.run(acompletion(model="sap/x", messages=[], stream=True))
         assert result is sentinel
 
@@ -423,10 +389,7 @@ class TestStreamingGuard:
 
         self._activate_output()
         fake_stream = iter([])
-        with patch(
-            "sap_cloud_sdk.aicore.completion.litellm.completion",
-            return_value=fake_stream,
-        ):
+        with patch("sap_cloud_sdk.aicore.completion.litellm.completion", return_value=fake_stream):
             result = completion(model="sap/x", messages=[], stream=True)
         assert isinstance(result, _FilteringStreamWrapper)
 
@@ -435,10 +398,7 @@ class TestStreamingGuard:
 
         self._activate_input_and_output()
         fake_stream = iter([])
-        with patch(
-            "sap_cloud_sdk.aicore.completion.litellm.completion",
-            return_value=fake_stream,
-        ):
+        with patch("sap_cloud_sdk.aicore.completion.litellm.completion", return_value=fake_stream):
             result = completion(model="sap/x", messages=[], stream=True)
         assert isinstance(result, _FilteringStreamWrapper)
 
@@ -447,9 +407,7 @@ class TestStreamingGuard:
 
         self._activate_output()
         sentinel = object()
-        with patch(
-            "sap_cloud_sdk.aicore.completion.litellm.completion", return_value=sentinel
-        ):
+        with patch("sap_cloud_sdk.aicore.completion.litellm.completion", return_value=sentinel):
             result = completion(model="sap/x", messages=[])
         assert result is sentinel
         assert not isinstance(result, _FilteringStreamWrapper)
@@ -466,10 +424,7 @@ class TestStreamingGuard:
         async def _fake_acompletion(*_, **__):
             return _fake_stream_aiter()
 
-        with patch(
-            "sap_cloud_sdk.aicore.completion.litellm.acompletion",
-            side_effect=_fake_acompletion,
-        ):
+        with patch("sap_cloud_sdk.aicore.completion.litellm.acompletion", side_effect=_fake_acompletion):
             result = asyncio.run(acompletion(model="sap/x", messages=[], stream=True))
         assert isinstance(result, _AsyncFilteringStreamWrapper)
 
@@ -481,21 +436,21 @@ class TestStreamingGuard:
 
 def _output_filter_stream_error_json() -> str:
     """In-stream error event JSON for an output-filter rejection (v2 shape)."""
-    return json.dumps(
-        {
-            "error": {
-                "request_id": "req-stream-out",
-                "code": 500,
-                "message": "Content filtered by output filter.",
-                "location": "Filtering Module - Output Filter",
-                "intermediate_results": {
-                    "output_filtering": {
-                        "data": {"azure_content_safety": {"Violence": 6, "Hate": 0}}
+    return json.dumps({
+        "error": {
+            "request_id": "req-stream-out",
+            "code": 500,
+            "message": "Content filtered by output filter.",
+            "location": "Filtering Module - Output Filter",
+            "intermediate_results": {
+                "output_filtering": {
+                    "data": {
+                        "azure_content_safety": {"Violence": 6, "Hate": 0}
                     }
-                },
-            }
+                }
+            },
         }
-    )
+    })
 
 
 class TestStreamOutputFilterIterator:
@@ -504,24 +459,17 @@ class TestStreamOutputFilterIterator:
     @pytest.fixture(autouse=True)
     def restore_filtering(self):
         from sap_cloud_sdk.aicore.filtering._patch import _install
-
         _install(None)
         yield
         _install(None)
 
     def _activate_output(self):
         from sap_cloud_sdk.aicore.filtering import (
-            AzureContentFilter,
-            ContentFiltering,
-            OutputFiltering,
-            set_filtering,
+            AzureContentFilter, ContentFiltering, OutputFiltering, set_filtering,
         )
-
-        set_filtering(
-            ContentFiltering(
-                output_filtering=OutputFiltering(filters=[AzureContentFilter()])
-            )
-        )
+        set_filtering(ContentFiltering(
+            output_filtering=OutputFiltering(filters=[AzureContentFilter()])
+        ))
 
     # --- sync wrapper ---
 
@@ -565,10 +513,7 @@ class TestStreamOutputFilterIterator:
             raise ValueError(_output_filter_stream_error_json())
             yield
 
-        with patch(
-            "sap_cloud_sdk.aicore.completion.litellm.completion",
-            return_value=_bad_stream(),
-        ):
+        with patch("sap_cloud_sdk.aicore.completion.litellm.completion", return_value=_bad_stream()):
             stream = completion(model="sap/x", messages=[], stream=True)
 
         with pytest.raises(ContentFilteredError) as ei:
@@ -647,10 +592,7 @@ class TestACompletionReactiveReload:
             return result
 
         with (
-            patch(
-                "sap_cloud_sdk.aicore.completion.litellm.acompletion",
-                side_effect=fake_acompletion,
-            ),
+            patch("sap_cloud_sdk.aicore.completion.litellm.acompletion", side_effect=fake_acompletion),
             patch("sap_cloud_sdk.aicore.set_aicore_config") as mock_reload,
         ):
             result = asyncio.run(acompletion(model="sap/x", messages=[]))
@@ -667,10 +609,7 @@ class TestACompletionReactiveReload:
             raise auth_err
 
         with (
-            patch(
-                "sap_cloud_sdk.aicore.completion.litellm.acompletion",
-                side_effect=fake_acompletion,
-            ),
+            patch("sap_cloud_sdk.aicore.completion.litellm.acompletion", side_effect=fake_acompletion),
             patch("sap_cloud_sdk.aicore.set_aicore_config"),
         ):
             with pytest.raises(litellm.AuthenticationError):

@@ -343,7 +343,9 @@ OUTPUT_FILTER_STREAM_ERROR = {
         "location": "Filtering Module - Output Filter",
         "intermediate_results": {
             "output_filtering": {
-                "data": {"azure_content_safety": {"Hate": 0, "Violence": 6}}
+                "data": {
+                    "azure_content_safety": {"Hate": 0, "Violence": 6}
+                }
             }
         },
     }
@@ -363,9 +365,7 @@ class TestParseOutputFilterStreamError:
         assert blocked.details["azure_content_safety"]["Violence"] == 6
 
     def test_returns_none_for_non_output_location(self):
-        body = {
-            "error": {"location": "Filtering Module - Input Filter", "message": "x"}
-        }
+        body = {"error": {"location": "Filtering Module - Input Filter", "message": "x"}}
         assert _parse_output_filter_stream_error(self._make_exc(body)) is None
 
     def test_returns_none_for_non_filter_error(self):

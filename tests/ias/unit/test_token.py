@@ -133,6 +133,16 @@ class TestParseToken:
         with pytest.raises(IASTokenError):
             parse_token("")
 
+    def test_recursionerror_degrades_to_ias_token_error(self):
+        from unittest.mock import patch
+
+        with patch(
+            "sap_cloud_sdk.ias._token.jwt.decode",
+            side_effect=RecursionError("maximum recursion depth exceeded"),
+        ):
+            with pytest.raises(IASTokenError, match="over-nested"):
+                parse_token(_make_token({"sub": "x"}))
+
     def test_returns_ias_claims_instance(self):
         claims = parse_token(_make_token({"sub": "x"}))
         assert isinstance(claims, IASClaims)

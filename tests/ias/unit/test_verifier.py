@@ -215,6 +215,12 @@ class TestIASVerifierCall:
         with pytest.raises(IASTokenError):
             verifier("Bearer expired")
 
+    def test_recursionerror_degrades_to_iastokenerror(self):
+        verifier = self._make_verifier()
+        verifier._jwk_client.get_signing_key_from_jwt.side_effect = RecursionError("maximum recursion depth exceeded")
+        with pytest.raises(IASTokenError, match="over-nested"):
+            verifier("Bearer over.nested.token")
+
     def test_raises_on_wrong_issuer(self):
         import jwt.exceptions
         verifier = self._make_verifier()

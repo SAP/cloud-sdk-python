@@ -211,5 +211,9 @@ class IASVerifier:
 
         except jwt.exceptions.PyJWTError as exc:
             raise IASTokenError(f"IAS JWT verification failed: {exc}") from exc
+        except RecursionError as exc:
+            raise IASTokenError(
+                "IAS JWT rejected: malformed or over-nested token"
+            ) from exc
 
         return VerifiedIASClaims(claims=parse_token(raw))

@@ -140,6 +140,10 @@ def parse_token(token: str) -> IASClaims:
         )
     except jwt.exceptions.DecodeError as e:
         raise IASTokenError(f"Failed to decode IAS token: {e}") from e
+    except RecursionError as e:
+        raise IASTokenError(
+            "Failed to decode IAS token: malformed or over-nested token"
+        ) from e
 
     return IASClaims(
         app_tid=payload.get(_IASClaim.APP_TID),

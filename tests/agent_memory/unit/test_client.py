@@ -123,6 +123,51 @@ class TestCreateClient:
         assert isinstance(client, AgentMemoryClient)
         assert client._http is not None
 
+    def test_subscriber_uses_tenant_binding_when_present(self):
+        """SUBSCRIBER with a per-tenant binding loads that binding, not 'default'."""
+        with (
+            patch("sap_cloud_sdk.agent_memory._tenant_binding_exists", return_value=True),
+            patch("sap_cloud_sdk.agent_memory._build_agent_memory_http") as mock_build,
+        ):
+            mock_build.return_value = Mock(spec=HttpClient)
+            client = create_client(
+                access_strategy=AccessStrategy.SUBSCRIBER,
+                tenant="731632078",
+            )
+        mock_build.assert_called_once_with("731632078", None)
+        assert client._tenant == "731632078"
+
+    def test_subscriber_falls_back_to_default_when_no_tenant_binding(self):
+        """SUBSCRIBER without a per-tenant binding falls back to 'default'."""
+        with (
+            patch("sap_cloud_sdk.agent_memory._tenant_binding_exists", return_value=False),
+            patch("sap_cloud_sdk.agent_memory._build_agent_memory_http") as mock_build,
+        ):
+            mock_build.return_value = Mock(spec=HttpClient)
+            client = create_client(
+                access_strategy=AccessStrategy.SUBSCRIBER,
+                tenant="acme-corp",
+            )
+        mock_build.assert_called_once_with("default", None)
+        assert client._tenant == "acme-corp"
+
+    def test_provider_always_uses_default_binding(self):
+        """PROVIDER mode always uses 'default' even if a tenant binding dir exists."""
+        with (
+            patch("sap_cloud_sdk.agent_memory._tenant_binding_exists", return_value=True),
+            patch("sap_cloud_sdk.agent_memory._build_agent_memory_http") as mock_build,
+        ):
+            mock_build.return_value = Mock(spec=HttpClient)
+            create_client(access_strategy=AccessStrategy.PROVIDER)
+        mock_build.assert_called_once_with("default", None)
+
+    def test_tenant_binding_exists_rejects_path_traversal(self):
+        """_tenant_binding_exists raises ValueError for path-traversal tenant values."""
+        from sap_cloud_sdk.agent_memory import _tenant_binding_exists
+        import pytest
+        with pytest.raises(ValueError):
+            _tenant_binding_exists("../victim-corp")
+
 
 # ── Access strategy and per-tenant transport routing ─────────────────────────
 

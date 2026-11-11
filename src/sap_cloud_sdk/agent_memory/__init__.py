@@ -15,6 +15,7 @@ Usage::
     memories = client.list_memories(agent_id="my-agent", invoker_id="user-123")
 """
 
+import os
 from typing import Optional
 
 from sap_cloud_sdk.agent_memory.client import AgentMemoryClient
@@ -39,7 +40,14 @@ from sap_cloud_sdk.agent_memory._models import (
 )
 from sap_cloud_sdk.agent_memory.utils._odata import FilterDefinition
 from sap_cloud_sdk.core.protocol.http import HttpClient, XsuaaAuthProvider
+from sap_cloud_sdk.core._tenant import _validate_tenant_subdomain
 from sap_cloud_sdk.core.telemetry import Module
+
+
+def _tenant_binding_exists(tenant: str) -> bool:
+    """Return True if a per-tenant binding directory exists for *tenant*."""
+    _validate_tenant_subdomain(tenant)
+    return os.path.isdir(_make_config_factory(tenant)._watch_path)
 
 
 def _build_agent_memory_http(
@@ -72,11 +80,12 @@ def create_client(
 
     The binding loaded depends on ``access_strategy`` and ``tenant``:
 
-    - ``SUBSCRIBER`` with ``tenant="acme-corp"`` — loads credentials from
-      ``/etc/secrets/appfnd/hana-agent-memory/default/`` (or
-      ``CLOUD_SDK_CFG_HANA_AGENT_MEMORY_DEFAULT_*`` env vars) and derives the
-      subscriber token URL using the ``identityzone`` field.
-    - ``PROVIDER`` — same binding, uses provider token directly.
+    - ``SUBSCRIBER`` with ``tenant="acme-corp"`` — checks for a per-tenant
+      binding at ``<root>/hana-agent-memory/acme-corp/`` first. If found, loads
+      that binding directly (the tenant's own credentials, no URL derivation
+      needed). Falls back to ``default`` + subscriber token URL derivation via
+      the ``identityzone`` field when no per-tenant binding is present.
+    - ``PROVIDER`` — loads ``default`` binding, uses provider token directly.
     - Explicit ``config`` — uses the provided configuration directly.
 
     Args:
@@ -96,10 +105,17 @@ def create_client(
                 ``tenant`` is not provided.
     """
     try:
-        if config is not None:
-            http = _build_agent_memory_http("default", config)
-        else:
-            http = _build_agent_memory_http("default", None)
+        instance = (
+            tenant
+            if (
+                config is None
+                and access_strategy is AccessStrategy.SUBSCRIBER
+                and tenant is not None
+                and _tenant_binding_exists(tenant)
+            )
+            else "default"
+        )
+        http = _build_agent_memory_http(instance, config)
         return AgentMemoryClient(
             http,
             access_strategy=access_strategy,

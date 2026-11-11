@@ -155,10 +155,7 @@ class TestParseToken:
         payload = {"sub": "x", "my_app_claim": "value", "another_custom": 42}
         claims = parse_token(_make_token(payload))
 
-        assert claims.custom_attributes == {
-            "my_app_claim": "value",
-            "another_custom": 42,
-        }
+        assert claims.custom_attributes == {"my_app_claim": "value", "another_custom": 42}
 
     def test_custom_attributes_empty_when_no_unknown_claims(self):
         claims = parse_token(_make_token({"sub": "x", "email": "a@b.com"}))

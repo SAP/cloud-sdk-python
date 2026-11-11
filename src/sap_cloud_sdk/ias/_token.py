@@ -11,7 +11,7 @@ from typing import Any, Callable, Dict, List, Optional, Union
 
 import jwt
 
-from sap_cloud_sdk.ias._claims import _KNOWN_CLAIM_VALUES, _IASClaim
+from sap_cloud_sdk.ias._claims import _IASClaim, _KNOWN_CLAIM_VALUES
 from sap_cloud_sdk.ias.exceptions import IASTokenError
 
 

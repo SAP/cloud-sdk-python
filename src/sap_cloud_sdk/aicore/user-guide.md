@@ -227,6 +227,7 @@ Set these **before** calling `set_aicore_config()`:
 | `AICORE_FILTER_SEXUAL` | `4` | Azure severity threshold |
 | `AICORE_FILTER_SELF_HARM` | `4` | Azure severity threshold |
 | `AICORE_FILTER_PROMPT_SHIELD` | `true` | Enable/disable prompt shield |
+| `AICORE_FILTER_STRICT` | `false` | Fail-closed mode — raise instead of sending an unfiltered request |
 
 Example — strict self-harm and violence:
 
@@ -337,6 +338,33 @@ Or disable entirely via env (before `set_aicore_config()`):
 ```bash
 AICORE_FILTER_ENABLED=false
 ```
+
+### Strict (fail-closed) mode
+
+By default, if a request would be sent without a content filter — because
+filtering was never configured, or because the active configuration is empty —
+the SDK emits a `logging.WARNING` and sends the request **unfiltered**. This
+fail-open behaviour keeps calls working, but a silently-disabled filter can go
+unnoticed.
+
+Enable **strict mode** to fail closed instead: the SDK raises
+`ContentFilteringNotConfiguredError` rather than sending an unfiltered body.
+
+```python
+from sap_cloud_sdk.aicore import set_filtering
+
+set_filtering(my_config, strict=True)  # programmatic
+```
+
+```bash
+AICORE_FILTER_STRICT=true    # or via env, before set_aicore_config()
+```
+
+The `strict=` argument takes precedence over `AICORE_FILTER_STRICT`; when it is
+omitted (or `None`), the env var decides (default `false`). `disable_filtering()`
+is an explicit opt-out and always clears strict mode. The strict guard covers
+both calling `completion()` before any filtering setup and an empty
+`ContentFiltering()` config.
 
 ### Handle blocked requests
 

@@ -18,6 +18,7 @@ Reads:
 - ``AICORE_FILTER_SEXUAL``        (int 0/2/4/6, default ``4``)
 - ``AICORE_FILTER_SELF_HARM``     (int 0/2/4/6, default ``4``)
 - ``AICORE_FILTER_PROMPT_SHIELD`` (bool, default ``true``) — input-only
+- ``AICORE_FILTER_STRICT``        (bool, default ``false``) — fail-closed mode
 """
 
 from __future__ import annotations
@@ -69,6 +70,16 @@ def _read_env_choice(key: str, choices: set[int], default: int) -> int:
     if value not in choices:
         raise ValueError(f"{key} must be one of {sorted(choices)}, got {value}")
     return value
+
+
+def load_strict_from_env() -> bool:
+    """Return the fail-closed toggle from ``AICORE_FILTER_STRICT`` (default ``False``).
+
+    When ``True``, the SDK raises
+    :class:`sap_cloud_sdk.aicore.filtering.exceptions.ContentFilteringNotConfiguredError`
+    instead of sending an unfiltered request.
+    """
+    return _read_env_bool("AICORE_FILTER_STRICT", default=False)
 
 
 def load_from_env() -> ContentFiltering | None:

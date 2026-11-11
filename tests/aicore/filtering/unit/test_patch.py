@@ -20,7 +20,10 @@ from sap_cloud_sdk.aicore.filtering._patch import (
     _parse_output_filter_stream_error,
 )
 from sap_cloud_sdk.aicore.filtering.config import load_from_env
-from sap_cloud_sdk.aicore.filtering.exceptions import ContentFilteredError
+from sap_cloud_sdk.aicore.filtering.exceptions import (
+    ContentFilteredError,
+    ContentFilteringNotConfiguredError,
+)
 
 
 @pytest.fixture(autouse=True)
@@ -123,8 +126,8 @@ class TestTransformRequest:
             }
         }
 
-    def _call(self, filtering):
-        _install(filtering)
+    def _call(self, filtering, *, strict=False):
+        _install(filtering, strict=strict)
         with patch(
             "sap_cloud_sdk.aicore.filtering._patch.GenAIHubOrchestrationConfig.transform_request",
             return_value=self._fresh_base_body(),
@@ -164,6 +167,46 @@ class TestTransformRequest:
         body = self._call(load_from_env())
         in_cfg = body["config"]["modules"]["filtering"]["input"]["filters"][0]["config"]
         assert in_cfg.get("prompt_shield") is True
+
+
+# ---------------------------------------------------------------------------
+# Fail-open behaviour (warn / fail-closed) tests
+# ---------------------------------------------------------------------------
+
+
+class TestFailOpen(TestTransformRequest):
+    """Fail-open branches must warn (default) or raise (strict), never go silent."""
+
+    def test_empty_config_warns_default(self, caplog):
+        # ContentFiltering() with no directions → to_dict() == {} → branch 2.
+        with caplog.at_level("WARNING", logger="sap_cloud_sdk.aicore.filtering._patch"):
+            body = self._call(ContentFiltering())
+        assert "filtering" not in body["config"]["modules"]
+        assert any("WITHOUT filter" in r.message for r in caplog.records)
+
+    def test_empty_config_raises_in_strict(self):
+        with pytest.raises(ContentFilteringNotConfiguredError):
+            self._call(ContentFiltering(), strict=True)
+
+    def test_cfg_none_warns_default(self, caplog):
+        # Defensive branch 1: subclass invoked while _active_cfg is None.
+        with caplog.at_level("WARNING", logger="sap_cloud_sdk.aicore.filtering._patch"):
+            body = self._call(None)
+        assert "filtering" not in body["config"]["modules"]
+        assert any("WITHOUT filter" in r.message for r in caplog.records)
+
+    def test_cfg_none_raises_in_strict(self):
+        with pytest.raises(ContentFilteringNotConfiguredError):
+            self._call(None, strict=True)
+
+    def test_valid_config_no_warning(self, caplog):
+        cfg = ContentFiltering(
+            input_filtering=InputFiltering(filters=[AzureContentFilter()])
+        )
+        with caplog.at_level("WARNING", logger="sap_cloud_sdk.aicore.filtering._patch"):
+            body = self._call(cfg, strict=True)
+        assert "filtering" in body["config"]["modules"]
+        assert not any("WITHOUT filter" in r.message for r in caplog.records)
 
 
 # ---------------------------------------------------------------------------

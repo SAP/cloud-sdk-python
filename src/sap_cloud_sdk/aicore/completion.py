@@ -76,8 +76,12 @@ from sap_cloud_sdk.core.telemetry.operation import Operation
 from .filtering.filters import _parse_input_filter_error
 from .filtering import _patch as _filtering_patch
 from .filtering._patch import _parse_output_filter_stream_error
+from .filtering.config import load_strict_from_env
+from .filtering.exceptions import ContentFilteringNotConfiguredError
 
 logger = logging.getLogger(__name__)
+
+_unconfigured_warned = False  # emit the "never configured" warning at most once
 
 
 @record_metrics(Module.AICORE, Operation.AICORE_REACTIVE_RELOAD)
@@ -105,6 +109,31 @@ def _maybe_translate_filter_error(exc: BaseException) -> BaseException:
 def _output_filtering_active() -> bool:
     cfg = _filtering_patch._active_cfg
     return cfg is not None and cfg.output_filtering is not None
+
+
+def _assert_filtering_ready() -> None:
+    """Pre-flight guard against calling completion with filtering never configured.
+
+    Fires only when neither :func:`set_aicore_config` nor :func:`set_filtering`
+    has run in this process (``_filtering_patch._configured`` is ``False``). An
+    intentional opt-out — ``disable_filtering()`` or ``AICORE_FILTER_ENABLED=false``
+    — sets ``_configured`` and stays silent; the empty-config case is handled at
+    request time inside ``transform_request``. In strict mode this raises; in the
+    default mode it emits a one-time warning.
+    """
+    global _unconfigured_warned
+    if _filtering_patch._configured:
+        return
+    if load_strict_from_env():
+        raise ContentFilteringNotConfiguredError(
+            "completion() called but content filtering was never configured"
+        )
+    if not _unconfigured_warned:
+        logger.warning(
+            "completion() called but content filtering was never configured — "
+            "request is UNFILTERED (call set_aicore_config() or set_filtering())"
+        )
+        _unconfigured_warned = True
 
 
 class _FilteringStreamWrapper:
@@ -171,6 +200,7 @@ def completion(*args: Any, **kwargs: Any) -> Any:
     in :func:`set_aicore_config`, not by rewriting the model name.
     """
     is_streaming = kwargs.get("stream", False)
+    _assert_filtering_ready()
     try:
         result = litellm.completion(*args, **kwargs)
     except litellm.AuthenticationError:
@@ -195,6 +225,7 @@ async def acompletion(*args: Any, **kwargs: Any) -> Any:
     Model strings are passed verbatim to LiteLLM in all routing modes.
     """
     is_streaming = kwargs.get("stream", False)
+    _assert_filtering_ready()
     try:
         result = await litellm.acompletion(*args, **kwargs)
     except litellm.AuthenticationError:

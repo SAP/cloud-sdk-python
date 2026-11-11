@@ -262,6 +262,9 @@ except HttpError as e:
 | `PrintOperationError` | An API operation fails (wraps `HttpError`) |
 | `HttpError` | Raw HTTP error with `status_code` and `response_text` |
 
+The SDK automatically URL-encodes `qname` and `item_id` when building URL paths.
+Literal `.` or `..` identifiers raise `PrintOperationError` before the Print Service request.
+
 ---
 
 ## Models

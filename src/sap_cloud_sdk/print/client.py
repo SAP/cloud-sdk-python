@@ -6,6 +6,7 @@ import base64
 import json
 import logging
 from typing import IO, Callable, Optional, Union
+from urllib.parse import quote
 
 from requests.exceptions import RequestException
 
@@ -22,6 +23,17 @@ _TASKS_PATH = "/qm/api/v1/rest/print-tasks"
 _IF_NONE_MATCH = {"If-None-Match": "*"}
 
 logger = logging.getLogger(__name__)
+
+
+def _encode_path_segment(value: object) -> str:
+    """Percent-encode a value as a single URL path segment.
+
+    Literal '.' and '..' segments raise HttpError to prevent path traversal.
+    """
+    segment = f"{value}"
+    if segment in (".", ".."):
+        raise HttpError("path identifier must not be '.' or '..'")
+    return quote(segment, safe="")
 
 
 def _resolve_username(access_token: str, fallback_client_id: str) -> str:
@@ -160,11 +172,12 @@ class PrintClient:
                 the path parameter — this is enforced automatically.
 
         Raises:
-            PrintOperationError: If the request fails.
+            PrintOperationError: If the request fails or the queue name is '.' or '..'.
+            UnicodeEncodeError: If the queue name cannot be encoded as UTF-8.
         """
         try:
             self.put(
-                f"{_QUEUES_PATH}/{queue.qname}",
+                f"{_QUEUES_PATH}/{_encode_path_segment(queue.qname)}",
                 json=queue.to_dict(),
                 headers=_IF_NONE_MATCH,
             )
@@ -188,10 +201,11 @@ class PrintClient:
             List of PrintProfile objects for the queue.
 
         Raises:
-            PrintOperationError: If the request fails or the response cannot be parsed.
+            PrintOperationError: If the request fails, the response cannot be parsed,
+                or the queue name is '.', '..', or cannot be encoded as UTF-8.
         """
         try:
-            resp = self.get(f"{_QUEUES_PATH}/{qname}/profiles")
+            resp = self.get(f"{_QUEUES_PATH}/{_encode_path_segment(qname)}/profiles")
             data = resp.json()
             return [PrintProfile.from_dict(item) for item in data]
         except HttpError as e:
@@ -255,13 +269,14 @@ class PrintClient:
             task: PrintTask describing the print job.
 
         Raises:
-            PrintOperationError: If the request fails.
+            PrintOperationError: If the request fails or the task ID is '.' or '..'.
+            UnicodeEncodeError: If the task ID cannot be encoded as UTF-8.
         """
         if not task.username:
             task.username = self.get_username()
         try:
             self.put(
-                f"{_TASKS_PATH}/{task.item_id}",
+                f"{_TASKS_PATH}/{_encode_path_segment(task.item_id)}",
                 json=task.to_body(),
                 headers=_IF_NONE_MATCH,
             )

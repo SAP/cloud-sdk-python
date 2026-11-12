@@ -25,8 +25,10 @@ from sap_cloud_sdk.agentgateway._models import (
     MCPTool,
     MCPToolFilter,
 )
-from sap_cloud_sdk.agentgateway._token_cache import _TokenCache
-from sap_cloud_sdk.agentgateway.config import ClientConfig
+from sap_cloud_sdk.core.resilience.cache._cache import Cache
+from sap_cloud_sdk.core.resilience.cache._config import CacheConfig
+from sap_cloud_sdk.core.resilience.cache._isolation import IsolationStrategy
+from sap_cloud_sdk.core.telemetry import Module
 from sap_cloud_sdk.agentgateway.exceptions import (
     AgentGatewaySDKError,
     AgentGatewayServerError,
@@ -353,7 +355,10 @@ class TestGetSystemTokenMtls:
 
     def test_reuses_cached_system_token(self, credentials):
         """Reuse cached system token until it expires."""
-        token_cache = _TokenCache(ClientConfig())
+        token_cache = Cache(
+            CacheConfig(isolation_strategy=IsolationStrategy.TENANT),
+            module=Module.AGENTGATEWAY,
+        )
 
         with patch(
             "sap_cloud_sdk.agentgateway._customer._request_token_mtls",
@@ -421,7 +426,10 @@ class TestExchangeUserToken:
 
     def test_reuses_cached_user_token(self, credentials):
         """Reuse exchanged user token until it expires."""
-        token_cache = _TokenCache(ClientConfig())
+        token_cache = Cache(
+            CacheConfig(isolation_strategy=IsolationStrategy.TENANT),
+            module=Module.AGENTGATEWAY,
+        )
 
         with patch(
             "sap_cloud_sdk.agentgateway._customer._request_token_mtls",
@@ -1576,3 +1584,115 @@ class TestTransparentModeTokenRequests:
             assert result == "mtls-system-token"
             # Verify SSL context was created (STANDARD mode)
             mock_ssl.assert_called_once()
+
+
+# ============================================================
+# Test: Cache isolation and kill-switch (customer flow)
+# ============================================================
+
+
+class TestCustomerCacheIsolation:
+    """Verify cross-client and cross-user isolation, and CLOUD_SDK_CACHE_DISABLED."""
+
+    @pytest.fixture
+    def credentials_a(self):
+        return CustomerCredentials(
+            token_service_url="https://ias.example.com/oauth2/token",
+            client_id="client-a",
+            certificate="-----BEGIN CERTIFICATE-----\ntest\n-----END CERTIFICATE-----",
+            private_key="-----BEGIN PRIVATE KEY-----\ntest\n-----END PRIVATE KEY-----",
+            gateway_url="https://agw.example.com",
+            integration_dependencies=[],
+        )
+
+    @pytest.fixture
+    def credentials_b(self):
+        return CustomerCredentials(
+            token_service_url="https://ias.example.com/oauth2/token",
+            client_id="client-b",
+            certificate="-----BEGIN CERTIFICATE-----\ntest\n-----END CERTIFICATE-----",
+            private_key="-----BEGIN PRIVATE KEY-----\ntest\n-----END PRIVATE KEY-----",
+            gateway_url="https://agw.example.com",
+            integration_dependencies=[],
+        )
+
+    def test_different_client_ids_do_not_share_system_token(
+        self, credentials_a, credentials_b
+    ):
+        """Two different client_ids must each fetch independently."""
+        token_cache = Cache(
+            CacheConfig(isolation_strategy=IsolationStrategy.TENANT),
+            module=Module.AGENTGATEWAY,
+        )
+
+        call_count = 0
+
+        def fake_request(creds, **_kwargs):
+            nonlocal call_count
+            call_count += 1
+            return {"access_token": f"token-for-{creds.client_id}", "expires_in": 300}
+
+        with patch(
+            "sap_cloud_sdk.agentgateway._customer._request_token_mtls",
+            side_effect=fake_request,
+        ):
+            token_a = get_system_token_mtls(
+                credentials_a, timeout=60.0, token_cache=token_cache
+            )
+            token_b = get_system_token_mtls(
+                credentials_b, timeout=60.0, token_cache=token_cache
+            )
+
+        assert token_a == "token-for-client-a"
+        assert token_b == "token-for-client-b"
+        assert call_count == 2
+
+    def test_different_user_tokens_do_not_collide(self, credentials_a):
+        """Two different user_tokens must produce separate cache entries."""
+        token_cache = Cache(
+            CacheConfig(isolation_strategy=IsolationStrategy.TENANT),
+            module=Module.AGENTGATEWAY,
+        )
+
+        call_count = 0
+
+        def fake_request(creds, grant_type, timeout, extra_data=None, **_kwargs):
+            nonlocal call_count
+            call_count += 1
+            assertion = (extra_data or {}).get("assertion", "unknown")
+            return {
+                "access_token": f"exchanged-{assertion[:5]}",
+                "expires_in": 300,
+            }
+
+        with patch(
+            "sap_cloud_sdk.agentgateway._customer._request_token_mtls",
+            side_effect=fake_request,
+        ):
+            token_alice = exchange_user_token(
+                credentials_a, "alice-jwt", timeout=60.0, token_cache=token_cache
+            )
+            token_bob = exchange_user_token(
+                credentials_a, "bob-j-jwt", timeout=60.0, token_cache=token_cache
+            )
+
+        assert token_alice != token_bob
+        assert call_count == 2
+
+    def test_cache_disabled_env_forces_refetch(self, credentials_a):
+        """CLOUD_SDK_CACHE_DISABLED=true must bypass the cache on every call."""
+        token_cache = Cache(
+            CacheConfig(isolation_strategy=IsolationStrategy.TENANT),
+            module=Module.AGENTGATEWAY,
+        )
+
+        with patch.dict(
+            "os.environ", {"CLOUD_SDK_CACHE_DISABLED": "true"}
+        ), patch(
+            "sap_cloud_sdk.agentgateway._customer._request_token_mtls",
+            return_value={"access_token": "fresh-token", "expires_in": 300},
+        ) as mock_request:
+            get_system_token_mtls(credentials_a, timeout=60.0, token_cache=token_cache)
+            get_system_token_mtls(credentials_a, timeout=60.0, token_cache=token_cache)
+
+        assert mock_request.call_count == 2

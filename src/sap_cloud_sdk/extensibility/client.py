@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import itertools
 import json
 import logging
@@ -18,6 +19,7 @@ from sap_cloud_sdk.core.telemetry import Module, Operation
 from sap_cloud_sdk.core.telemetry.metrics_decorator import record_metrics
 from sap_cloud_sdk.agentgateway import ClientConfig as AgwClientConfig
 from sap_cloud_sdk.agentgateway import create_client as create_agw_client
+from sap_cloud_sdk.agentgateway import find_http_error as _find_http_error
 from sap_cloud_sdk.extensibility._models import (
     DEFAULT_EXTENSION_CAPABILITY_ID,
     ExtensionCapabilityImplementation,
@@ -55,6 +57,10 @@ _EXECUTE_TERMINAL_STATUSES = frozenset({"error", "canceled", "crashed", "unknown
 _EXECUTION_TERMINAL_STATUSES = frozenset({"error", "canceled", "crashed"})
 
 _HOOK_POLL_INTERVAL = 0.5  # seconds between get-execution polls
+
+_AGW_RETRY_STATUSES = frozenset({408, 429, 502, 503, 504})
+_AGW_MAX_ATTEMPTS = 3
+_AGW_BACKOFF_BASE = 1.0
 
 # ---------------------------------------------------------------------------
 # JSON-RPC helpers
@@ -449,16 +455,44 @@ class ExtensibilityClient:
             hook.n8n_workflow_config.tool_name,
             hook.n8n_workflow_config.card_ord_id,
         )
-        try:
-            result_str = await agw_client.call_mcp_tool(
-                hook_tool,
-                user_token=user_token or None,
-                **tool_arguments,  # type: ignore[arg-type]
-            )
-        except Exception as exc:
+        last_exc: Exception | None = None
+        for attempt in range(_AGW_MAX_ATTEMPTS):
+            try:
+                result_str = await agw_client.call_mcp_tool(
+                    hook_tool,
+                    user_token=user_token or None,
+                    **tool_arguments,  # type: ignore[arg-type]
+                )
+                break
+            except Exception as exc:
+                http_err = _find_http_error(exc)
+                if (
+                    http_err is None
+                    or http_err.response.status_code not in _AGW_RETRY_STATUSES
+                ):
+                    raise TransportError(
+                        f"AGW tool call for '{hook.n8n_workflow_config.tool_name}' failed: {exc}"
+                    ) from exc
+                last_exc = exc
+                if attempt < _AGW_MAX_ATTEMPTS - 1:
+                    delay = _AGW_BACKOFF_BASE * (2**attempt)
+                    if http_err.response.status_code == 429:
+                        after = http_err.response.headers.get("Retry-After", "")
+                        if after.isdigit():
+                            delay = float(after)
+                    logger.warning(
+                        "AGW tool call failed with HTTP %d, retrying (attempt %d/%d) in %.1f s",
+                        http_err.response.status_code,
+                        attempt + 1,
+                        _AGW_MAX_ATTEMPTS,
+                        delay,
+                    )
+                    await asyncio.sleep(delay)
+        else:
             raise TransportError(
-                f"AGW tool call for '{hook.n8n_workflow_config.tool_name}' failed: {exc}"
-            ) from exc
+                f"AGW tool call for '{hook.n8n_workflow_config.tool_name}' failed"
+                f" after {_AGW_MAX_ATTEMPTS} attempts: {last_exc}"
+            ) from last_exc
 
         try:
             data = json.loads(result_str)

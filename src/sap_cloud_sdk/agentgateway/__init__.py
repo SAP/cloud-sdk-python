@@ -52,6 +52,7 @@ Usage (Customer agent):
     ]
 """
 
+from sap_cloud_sdk.agentgateway._compat import find_http_error
 from sap_cloud_sdk.agentgateway._fragments import ConnectedSystem
 from sap_cloud_sdk.agentgateway._models import (
     Agent,
@@ -89,4 +90,6 @@ __all__ = [
     "AgentGatewaySDKError",
     "AgentGatewayServerError",
     "MCPServerNotFoundError",
+    # Exception helpers
+    "find_http_error",
 ]

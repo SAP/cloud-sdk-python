@@ -3,6 +3,7 @@
 import json
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import httpx
 import pytest
 
 from sap_cloud_sdk.extensibility import create_client
@@ -33,7 +34,9 @@ from sap_cloud_sdk.agentgateway._models import MCPTool
 
 _TOOL_NAME = "convertCurrency"
 _CARD_ORD_ID = "sap.n8nwfrt:apiResource:invoice-po-solution_currency-conversion.convertCurrency_mcp:v1"
-_ORD_ID = "sap.n8nwfrt:apiResource:invoice-po-solution_currency-conversion.convertCurrency:v1"
+_ORD_ID = (
+    "sap.n8nwfrt:apiResource:invoice-po-solution_currency-conversion.convertCurrency:v1"
+)
 _GLOBAL_TENANT_ID = "tenant-example-001"
 
 
@@ -235,6 +238,7 @@ class TestExtensibilityClientGetExtensionCapabilityImplementation:
 # Helpers shared across call_hook_agw tests
 # ---------------------------------------------------------------------------
 
+
 def _make_hook(
     tool_name: str = _TOOL_NAME,
     card_ord_id: str = _CARD_ORD_ID,
@@ -288,14 +292,16 @@ def _make_other_server_tool(tool_name: str = _TOOL_NAME) -> MCPTool:
 
 def _success_payload() -> str:
     """Full MCP tool result JSON; AGW puts the A2A Message in structuredContent."""
-    return json.dumps({
-        "content": [{"type": "text", "text": "Currency converted successfully."}],
-        "structuredContent": {
-            "messageId": "msg-1",
-            "role": "agent",
-            "parts": [{"kind": "text", "text": "Currency converted successfully."}],
-        },
-    })
+    return json.dumps(
+        {
+            "content": [{"type": "text", "text": "Currency converted successfully."}],
+            "structuredContent": {
+                "messageId": "msg-1",
+                "role": "agent",
+                "parts": [{"kind": "text", "text": "Currency converted successfully."}],
+            },
+        }
+    )
 
 
 def _make_agw_client(tools: list, tool_responses: list) -> MagicMock:
@@ -344,7 +350,9 @@ class TestCallHookAgw:
     @pytest.mark.asyncio
     async def test_success_returns_message(self):
         """Returns a Message on a successful single tool call."""
-        agw = _make_agw_client(tools=[_make_hook_tool()], tool_responses=[_success_payload()])
+        agw = _make_agw_client(
+            tools=[_make_hook_tool()], tool_responses=[_success_payload()]
+        )
         client = self._make_client()
         with patch(
             "sap_cloud_sdk.extensibility.client.create_agw_client",
@@ -399,7 +407,9 @@ class TestCallHookAgw:
     @pytest.mark.asyncio
     async def test_message_forwarded_as_body_to_tool(self):
         """The A2A message is forwarded under 'body' (per the hook tool schema), not wrapped in 'inputs'."""
-        agw = _make_agw_client(tools=[_make_hook_tool()], tool_responses=[_success_payload()])
+        agw = _make_agw_client(
+            tools=[_make_hook_tool()], tool_responses=[_success_payload()]
+        )
         client = self._make_client()
         message = MagicMock()
         message.model_dump.return_value = {
@@ -422,3 +432,146 @@ class TestCallHookAgw:
             "parts": [{"kind": "text", "text": "hi"}],
         }
         message.model_dump.assert_called_once_with(mode="json", exclude_none=True)
+
+
+# ---------------------------------------------------------------------------
+# Helpers for retry tests
+# ---------------------------------------------------------------------------
+
+
+def _make_http_error(status: int, headers: dict | None = None) -> httpx.HTTPStatusError:
+    request = httpx.Request("POST", "https://agw.example.com/mcp")
+    response = httpx.Response(status, headers=headers or {}, request=request)
+    return httpx.HTTPStatusError("", request=request, response=response)
+
+
+def _wrap_in_group(exc: Exception) -> BaseExceptionGroup:
+    return BaseExceptionGroup("anyio task group", [exc])
+
+
+# ---------------------------------------------------------------------------
+# Tests for retry behaviour in _execute_workflow_via_agw
+# ---------------------------------------------------------------------------
+
+
+class TestCallHookAgwRetry:
+    """Retry logic in _execute_workflow_via_agw."""
+
+    def _make_client(self) -> ExtensibilityClient:
+        return ExtensibilityClient(MagicMock())
+
+    @pytest.mark.asyncio
+    async def test_non_retryable_http_status_raises_immediately(self):
+        """A 400 error is not retried — TransportError raised on first attempt."""
+        exc = _wrap_in_group(_make_http_error(400))
+        agw = _make_agw_client(tools=[_make_hook_tool()], tool_responses=[exc])
+        with patch(
+            "sap_cloud_sdk.extensibility.client.create_agw_client", return_value=agw
+        ):
+            with patch("asyncio.sleep") as mock_sleep:
+                with pytest.raises(TransportError):
+                    await self._make_client().call_hook_agw(
+                        hook=_make_hook(), tenant_subdomain="t"
+                    )
+        mock_sleep.assert_not_called()
+        assert agw.call_mcp_tool.call_count == 1
+
+    @pytest.mark.asyncio
+    async def test_non_http_error_raises_immediately(self):
+        """A non-HTTP exception (e.g. RuntimeError) is not retried."""
+        agw = _make_agw_client(
+            tools=[_make_hook_tool()], tool_responses=[RuntimeError("boom")]
+        )
+        with patch(
+            "sap_cloud_sdk.extensibility.client.create_agw_client", return_value=agw
+        ):
+            with patch("asyncio.sleep") as mock_sleep:
+                with pytest.raises(TransportError, match="boom"):
+                    await self._make_client().call_hook_agw(
+                        hook=_make_hook(), tenant_subdomain="t"
+                    )
+        mock_sleep.assert_not_called()
+        assert agw.call_mcp_tool.call_count == 1
+
+    @pytest.mark.asyncio
+    async def test_retryable_status_succeeds_on_second_attempt(self):
+        """A 502 wrapped in BaseExceptionGroup is retried; succeeds on attempt 2."""
+        exc = _wrap_in_group(_make_http_error(502))
+        agw = _make_agw_client(
+            tools=[_make_hook_tool()], tool_responses=[exc, _success_payload()]
+        )
+        with patch(
+            "sap_cloud_sdk.extensibility.client.create_agw_client", return_value=agw
+        ):
+            with patch("asyncio.sleep"):
+                result = await self._make_client().call_hook_agw(
+                    hook=_make_hook(), tenant_subdomain="t"
+                )
+        assert result is not None
+        assert agw.call_mcp_tool.call_count == 2
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("status", [408, 429, 502, 503, 504])
+    async def test_all_retryable_statuses_are_retried(self, status: int):
+        """Each retryable status triggers at least one retry."""
+        exc = _wrap_in_group(_make_http_error(status))
+        agw = _make_agw_client(
+            tools=[_make_hook_tool()], tool_responses=[exc, _success_payload()]
+        )
+        with patch(
+            "sap_cloud_sdk.extensibility.client.create_agw_client", return_value=agw
+        ):
+            with patch("asyncio.sleep"):
+                await self._make_client().call_hook_agw(
+                    hook=_make_hook(), tenant_subdomain="t"
+                )
+        assert agw.call_mcp_tool.call_count == 2
+
+    @pytest.mark.asyncio
+    async def test_exhausts_all_attempts_raises_transport_error(self):
+        """Three consecutive 503s exhaust retries and raise TransportError."""
+        exc = _wrap_in_group(_make_http_error(503))
+        agw = _make_agw_client(
+            tools=[_make_hook_tool()], tool_responses=[exc, exc, exc]
+        )
+        with patch(
+            "sap_cloud_sdk.extensibility.client.create_agw_client", return_value=agw
+        ):
+            with patch("asyncio.sleep"):
+                with pytest.raises(TransportError, match="3 attempts"):
+                    await self._make_client().call_hook_agw(
+                        hook=_make_hook(), tenant_subdomain="t"
+                    )
+        assert agw.call_mcp_tool.call_count == 3
+
+    @pytest.mark.asyncio
+    async def test_429_respects_retry_after_header(self):
+        """For 429, Retry-After header overrides the backoff delay."""
+        exc = _wrap_in_group(_make_http_error(429, headers={"Retry-After": "42"}))
+        agw = _make_agw_client(
+            tools=[_make_hook_tool()], tool_responses=[exc, _success_payload()]
+        )
+        with patch(
+            "sap_cloud_sdk.extensibility.client.create_agw_client", return_value=agw
+        ):
+            with patch("asyncio.sleep") as mock_sleep:
+                await self._make_client().call_hook_agw(
+                    hook=_make_hook(), tenant_subdomain="t"
+                )
+        mock_sleep.assert_called_once_with(42.0)
+
+    @pytest.mark.asyncio
+    async def test_502_uses_backoff_delay(self):
+        """For 502, the first retry delay is the base backoff (1.0 s)."""
+        exc = _wrap_in_group(_make_http_error(502))
+        agw = _make_agw_client(
+            tools=[_make_hook_tool()], tool_responses=[exc, _success_payload()]
+        )
+        with patch(
+            "sap_cloud_sdk.extensibility.client.create_agw_client", return_value=agw
+        ):
+            with patch("asyncio.sleep") as mock_sleep:
+                await self._make_client().call_hook_agw(
+                    hook=_make_hook(), tenant_subdomain="t"
+                )
+        mock_sleep.assert_called_once_with(1.0)

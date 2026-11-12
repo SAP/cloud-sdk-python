@@ -2,6 +2,8 @@
 
 from typing import Any
 
+import httpx
+
 try:
     from mcp.shared.exceptions import McpError
 except ImportError:
@@ -88,6 +90,26 @@ def find_mcp_error(exc: BaseException) -> "McpError | None":
     if isinstance(exc, BaseExceptionGroup):
         for inner in exc.exceptions:
             found = find_mcp_error(inner)
+            if found is not None:
+                return found
+    return None
+
+
+def find_http_error(exc: BaseException) -> httpx.HTTPStatusError | None:
+    """Return the first ``httpx.HTTPStatusError`` carried by ``exc``, or None.
+
+    An HTTP transport error raised by the MCP client (e.g. the gateway returned
+    a non-2xx status) surfaces either as a bare ``httpx.HTTPStatusError`` or,
+    because the MCP client runs inside anyio task groups, wrapped in a
+    ``BaseExceptionGroup``. This walks the group tree and returns the first
+    ``HTTPStatusError`` leaf so callers can inspect its ``.response.status_code``.
+    Returns None when no ``HTTPStatusError`` is present.
+    """
+    if isinstance(exc, httpx.HTTPStatusError):
+        return exc
+    if isinstance(exc, BaseExceptionGroup):
+        for inner in exc.exceptions:
+            found = find_http_error(inner)
             if found is not None:
                 return found
     return None

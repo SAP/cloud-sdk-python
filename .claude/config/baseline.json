@@ -1,0 +1,18 @@
+{
+  "_documentation": "at_commit = SHA of origin/main against which pre-existing debt was snapshotted. Findings on lines touched after this SHA are compared against the baseline; entries already present at at_commit are exempted. schema_version bumps when the shape of 'exemptions' changes. Rule IDs here MUST match rule IDs in rules.yaml exactly (agnostic form, no PY-/JV- prefix).",
+  "created_at": "2026-07-07T20:00:00Z",
+  "at_commit": "d19427f5f3b9de409d7e4a655d6ce99362c1a17e",
+  "schema_version": 1,
+  "exemptions": {
+    "LIC-01": {
+      "reason": "Repo uses REUSE.toml aggregate — pre-existing files exempt",
+      "detector": "REUSE.toml exists with path='**' aggregate annotation",
+      "scope": "repo",
+      "files_exempted_glob": "src/**/*.py"
+    },
+    "LIC-02": {
+      "reason": "Same as LIC-01",
+      "scope": "repo"
+    }
+  }
+}

@@ -6,8 +6,13 @@ from contextlib import ExitStack
 
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import TracerProvider as SDKTracerProvider
+from opentelemetry.sdk.trace.export import SimpleSpanProcessor
+from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 
-from sap_cloud_sdk.core.telemetry.auto_instrument import auto_instrument
+from sap_cloud_sdk.core.telemetry.auto_instrument import (
+    auto_instrument,
+    _drop_wrapper_span_exporter_if_sdk_exports,
+)
 
 
 @pytest.fixture
@@ -432,3 +437,80 @@ class TestAutoInstrumentLogging:
             auto_instrument()
 
             mock_traceloop_components['setup_log_provider'].assert_called_once()
+
+
+class TestDropWrapperSpanExporterIfSdkExports:
+    """Tests for the trace double-export guard _drop_wrapper_span_exporter_if_sdk_exports.
+
+    The guard removes the auto-instrumentation wrapper's span exporter when the SDK's own
+    exporter is also present on the active provider, so each span is exported once.
+    """
+
+    PATCH_TARGET = "sap_cloud_sdk.core.telemetry.auto_instrument.trace.get_tracer_provider"
+
+    @staticmethod
+    def _provider(with_marker: bool = True) -> SDKTracerProvider:
+        attrs = {"service.name": "agent"}
+        if with_marker:
+            attrs["telemetry.auto.version"] = "0.65b0"
+        return SDKTracerProvider(resource=Resource.create(attrs))
+
+    @staticmethod
+    def _sdk_processor() -> SimpleSpanProcessor:
+        # The SDK (Traceloop) processor is tagged with _traceloop_processor.
+        proc = SimpleSpanProcessor(InMemorySpanExporter())
+        setattr(proc, "_traceloop_processor", True)
+        return proc
+
+    @staticmethod
+    def _wrapper_processor() -> SimpleSpanProcessor:
+        # The inject-python wrapper processor is a plain exporting processor (untagged).
+        return SimpleSpanProcessor(InMemorySpanExporter())
+
+    @staticmethod
+    def _exporting(provider: SDKTracerProvider) -> list:
+        active = provider._active_span_processor
+        return [
+            p
+            for p in active._span_processors
+            if getattr(p, "span_exporter", None) is not None
+        ]
+
+    def test_drops_wrapper_exporter_and_keeps_sdk_when_both_present(self):
+        provider = self._provider(with_marker=True)
+        wrapper = self._wrapper_processor()
+        sdk = self._sdk_processor()
+        provider.add_span_processor(wrapper)
+        provider.add_span_processor(sdk)
+
+        with patch(self.PATCH_TARGET, return_value=provider):
+            _drop_wrapper_span_exporter_if_sdk_exports()
+
+        remaining = self._exporting(provider)
+        assert remaining == [sdk]
+        assert wrapper not in remaining
+
+    def test_noop_when_only_sdk_exporter_present(self):
+        # Mirrors the state after the wrapper layer is retired: SDK exporter must stay.
+        provider = self._provider(with_marker=True)
+        sdk = self._sdk_processor()
+        provider.add_span_processor(sdk)
+
+        with patch(self.PATCH_TARGET, return_value=provider):
+            _drop_wrapper_span_exporter_if_sdk_exports()
+
+        assert self._exporting(provider) == [sdk]
+
+    def test_noop_when_wrapper_marker_absent(self):
+        provider = self._provider(with_marker=False)
+        wrapper = self._wrapper_processor()
+        sdk = self._sdk_processor()
+        provider.add_span_processor(wrapper)
+        provider.add_span_processor(sdk)
+
+        with patch(self.PATCH_TARGET, return_value=provider):
+            _drop_wrapper_span_exporter_if_sdk_exports()
+
+        remaining = self._exporting(provider)
+        assert wrapper in remaining
+        assert sdk in remaining

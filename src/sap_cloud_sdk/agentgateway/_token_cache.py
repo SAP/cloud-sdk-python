@@ -1,52 +1,29 @@
-"""Token cache for Agent Gateway flows.
+"""Token-cache helpers for Agent Gateway flows.
 
-Caches IAS tokens (system + user-exchanged) per client to avoid redundant
-token requests during agentic loops. Used by both customer flow (mTLS) and
-LoB flow (BTP Destination Service).
+TTL computation for system and user tokens; a small LRU cache for gateway URLs.
+Token storage is delegated to the shared Core Cache module (Cache), which
+provides the kill switch, process-wide shared backend, and thread-safe LRU.
 
 Keying:
-- System tokens are keyed by a flow-specific scope key.
-- User tokens are keyed by `sha256(user_jwt + "|" + scope_key)[:16]`.
+- System tokens: `credentials.client_id` (customer) or `tenant_subdomain` (LoB).
+- User tokens:   `user_cache_key(user_jwt, scope)`.
 
-Thread safety:
-Token fetches run in the default `ThreadPoolExecutor` via
-`loop.run_in_executor`. CPython GIL makes individual dict / OrderedDict
-operations atomic, but compound check-then-set is not. Two concurrent
-coroutines for the same key may both miss and both fetch; the race
-produces redundant token requests, not corruption.
+TTL helpers return the *natural* TTL (no buffer). Cache.set applies its own
+expiry buffer (default 30 s), so a double-subtraction is intentional to avoid.
 """
 
 import base64
 import hashlib
 import json
-import logging
 import time
 from collections import OrderedDict
-from dataclasses import dataclass
-from datetime import datetime, timezone
-
-from sap_cloud_sdk.agentgateway.config import ClientConfig
-
-logger = logging.getLogger(__name__)
-
-
-@dataclass
-class _CachedToken:
-    """A cached token with monotonic expiry."""
-
-    token: str
-    expires_at: float  # time.monotonic() value
-
-    def is_valid(self) -> bool:
-        """Return True if the token has not yet reached its monotonic expiry."""
-        return time.monotonic() < self.expires_at
 
 
 def _parse_jwt_exp(jwt: str) -> int | None:
     """Extract `exp` claim (seconds since epoch) from a JWT without verification.
 
     Returns None if the JWT is malformed or has no `exp` claim. The result
-    is used only as a hint for cache TTL — never for security decisions.
+    is used only as a hint for cache TTL -- never for security decisions.
     """
     try:
         parts = jwt.split(".")
@@ -63,6 +40,8 @@ def _parse_jwt_exp(jwt: str) -> int | None:
 
 def _parse_response_expires_at(expires_at: object) -> float | None:
     """Parse a token response `expires_at` value into epoch seconds."""
+    from datetime import datetime, timezone
+
     if expires_at is None or isinstance(expires_at, bool):
         return None
 
@@ -92,36 +71,23 @@ def _parse_response_expires_at(expires_at: object) -> float | None:
     return parsed.timestamp()
 
 
-def _monotonic_expiry_from_epoch(expiry_epoch_seconds: float, buffer: float) -> float:
-    """Translate a wall-clock expiry into a monotonic deadline."""
-    return time.monotonic() + (expiry_epoch_seconds - time.time()) - buffer
-
-
-def _monotonic_expiry_from_ttl(ttl_seconds: float, buffer: float) -> float:
-    """Translate a TTL into a monotonic deadline."""
-    return time.monotonic() + ttl_seconds - buffer
-
-
-def compute_expires_at(token_data: dict, config: ClientConfig) -> float:
-    """Resolve the cache expiry timestamp (monotonic) for a token response.
+def compute_ttl_seconds(token_data: dict, fallback_ttl: float) -> int:
+    """Natural TTL in seconds, NO buffer.
 
     Resolution order:
-    1. `expires_at` from the response, minus the buffer.
-    2. `expires_in` from the response, minus the buffer.
-    3. `exp` claim from `access_token`, minus the buffer.
-    4. `exp` claim from `id_token`, minus the buffer.
-    5. Config-provided fallback TTL.
+      expires_at - now -> expires_in -> access_token exp - now
+      -> id_token exp - now -> fallback_ttl. Clamped to >= 1.
     """
-    buffer = config.token_expiry_buffer_seconds
+    now = time.time()
 
     expires_at = _parse_response_expires_at(token_data.get("expires_at"))
     if expires_at is not None:
-        return _monotonic_expiry_from_epoch(expires_at, buffer)
+        return max(1, int(expires_at - now))
 
     expires_in = token_data.get("expires_in")
     if expires_in is not None:
         try:
-            return _monotonic_expiry_from_ttl(float(expires_in), buffer)
+            return max(1, int(float(expires_in)))
         except (ValueError, TypeError):
             pass
 
@@ -129,12 +95,26 @@ def compute_expires_at(token_data: dict, config: ClientConfig) -> float:
         jwt = token_data.get(token_field)
         if not jwt:
             continue
-
         exp = _parse_jwt_exp(jwt)
         if exp is not None:
-            return _monotonic_expiry_from_epoch(float(exp), buffer)
+            return max(1, int(exp - now))
 
-    return time.monotonic() + config.fallback_token_ttl_seconds
+    return max(1, int(fallback_ttl))
+
+
+def compute_ttl_seconds_from_bearer(auth_header: str, fallback_ttl: float) -> int:
+    """Natural TTL from a Bearer header's JWT exp (NO buffer), else fallback_ttl."""
+    jwt = auth_header[7:] if auth_header.lower().startswith("bearer ") else auth_header
+    exp = _parse_jwt_exp(jwt)
+    if exp is not None:
+        return max(1, int(exp - time.time()))
+    return max(1, int(fallback_ttl))
+
+
+def user_cache_key(user_jwt: str, scope: str) -> str:
+    """Derive a short, stable cache key from `(user_jwt, scope)` via sha256."""
+    material = f"{user_jwt}|{scope}"
+    return hashlib.sha256(material.encode()).hexdigest()[:16]
 
 
 class _GatewayUrlCache:
@@ -159,115 +139,3 @@ class _GatewayUrlCache:
         self._cache.move_to_end(scope_key)
         while len(self._cache) > self._max_size:
             self._cache.popitem(last=False)
-
-
-class _TokenCache:
-    """Per-client token cache with TTL and LRU eviction.
-
-    Both system and user tokens use OrderedDict for LRU ordering.
-    """
-
-    def __init__(self, config: ClientConfig):
-        """Initialize empty caches bounded by sizes from `config`."""
-        self._config = config
-        self._system_tokens: OrderedDict[str, _CachedToken] = OrderedDict()
-        self._user_tokens: OrderedDict[str, _CachedToken] = OrderedDict()
-
-    # --- System Token ---
-
-    def get_system_token(self, scope_key: str) -> str | None:
-        """Return a valid cached system token for `scope_key`, or None."""
-        cached = self._system_tokens.get(scope_key)
-        if cached and cached.is_valid():
-            self._system_tokens.move_to_end(scope_key)
-            return cached.token
-        if cached:
-            del self._system_tokens[scope_key]
-        return None
-
-    def set_system_token(self, token: str, expires_at: float, scope_key: str) -> None:
-        """Cache a system token under `scope_key`; evict LRU once size exceeds limit."""
-        self._system_tokens[scope_key] = _CachedToken(
-            token=token, expires_at=expires_at
-        )
-        self._system_tokens.move_to_end(scope_key)
-        while len(self._system_tokens) > self._config.max_system_token_cache_size:
-            evicted, _ = self._system_tokens.popitem(last=False)
-            logger.debug("System token cache full — evicted '%s'", evicted)
-
-    def invalidate_system_token(self, scope_key: str) -> None:
-        """Drop the cached system token for `scope_key` (no-op if absent)."""
-        if self._system_tokens.pop(scope_key, None):
-            logger.debug("Invalidated system token (scope_key=%s)", scope_key)
-
-    # --- User Tokens ---
-
-    def get_user_token(self, user_jwt: str, scope_key: str) -> str | None:
-        """Return a valid cached exchanged token for `(user_jwt, scope_key)`, or None."""
-        key = self._hash_key(user_jwt, scope_key)
-        cached = self._user_tokens.get(key)
-        if cached and cached.is_valid():
-            self._user_tokens.move_to_end(key)
-            return cached.token
-        if cached:
-            del self._user_tokens[key]
-        return None
-
-    def set_user_token(
-        self,
-        user_jwt: str,
-        token: str,
-        expires_at: float,
-        scope_key: str,
-    ) -> None:
-        """Cache an exchanged user token; evict LRU once size exceeds limit."""
-        key = self._hash_key(user_jwt, scope_key)
-        self._user_tokens[key] = _CachedToken(token=token, expires_at=expires_at)
-        self._user_tokens.move_to_end(key)
-        while len(self._user_tokens) > self._config.max_user_token_cache_size:
-            evicted, _ = self._user_tokens.popitem(last=False)
-            logger.debug("User token cache full — evicted '%s'", evicted)
-
-    def invalidate_user_token(self, user_jwt: str, scope_key: str) -> None:
-        """Drop the cached user token for `(user_jwt, scope_key)` (no-op if absent)."""
-        key = self._hash_key(user_jwt, scope_key)
-        if self._user_tokens.pop(key, None):
-            logger.debug("Invalidated user token (scope_key=%s)", scope_key)
-
-    # --- Utility ---
-
-    def compute_expires_at(self, token_data: dict) -> float:
-        """Resolve the cache expiry timestamp (monotonic) for a token response."""
-        return compute_expires_at(token_data, self._config)
-
-    def compute_expires_at_from_bearer(self, auth_header: str) -> float:
-        """Resolve the cache expiry timestamp for a bearer auth header string.
-
-        Strips the 'Bearer ' prefix and parses the `exp` claim from the JWT.
-        Falls back to the config-provided fallback TTL if parsing fails.
-        """
-        buffer = self._config.token_expiry_buffer_seconds
-
-        jwt = (
-            auth_header[7:]
-            if auth_header.lower().startswith("bearer ")
-            else auth_header
-        )
-        exp = _parse_jwt_exp(jwt)
-        if exp is not None:
-            return _monotonic_expiry_from_epoch(float(exp), buffer)
-
-        return time.monotonic() + self._config.fallback_token_ttl_seconds
-
-    # --- Maintenance ---
-
-    def clear(self) -> None:
-        """Drop all cached tokens. Forces a fresh fetch on next access."""
-        self._system_tokens.clear()
-        self._user_tokens.clear()
-
-    @staticmethod
-    def _hash_key(user_jwt: str, scope_key: str) -> str:
-        """Derive a short, stable cache key from `(user_jwt, scope_key)` via sha256."""
-        material = f"{user_jwt}|{scope_key}"
-        return hashlib.sha256(material.encode()).hexdigest()[:16]

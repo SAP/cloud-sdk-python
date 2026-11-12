@@ -39,10 +39,14 @@ from sap_cloud_sdk.agentgateway._models import (
     MCPToolFilter,
 )
 from sap_cloud_sdk.core._tenant import _validate_tenant_subdomain
-from sap_cloud_sdk.agentgateway._token_cache import _GatewayUrlCache, _TokenCache
+from sap_cloud_sdk.agentgateway._token_cache import _GatewayUrlCache
 from sap_cloud_sdk.agentgateway.exceptions import AgentGatewaySDKError
 from sap_cloud_sdk.agentgateway import _fragments
 from sap_cloud_sdk.core.telemetry import Module, Operation, record_metrics
+from sap_cloud_sdk.core.resilience.cache._cache import Cache
+from sap_cloud_sdk.core.resilience.cache._config import CacheConfig
+from sap_cloud_sdk.core.resilience.cache._isolation import IsolationStrategy
+from dataclasses import replace
 
 logger = logging.getLogger(__name__)
 
@@ -115,6 +119,7 @@ class AgentGatewayClient:
         self,
         tenant_subdomain: str | Callable[[], str] | None = None,
         config: ClientConfig | None = None,
+        cache_config: CacheConfig | None = None,
         _telemetry_source: Module | None = None,
     ):
         """Initialize the Agent Gateway client.
@@ -124,13 +129,24 @@ class AgentGatewayClient:
                 Can be a string or a callable returning a string.
                 Required for LoB agents, ignored for Customer agents.
             config: Client configuration. Uses defaults if not provided.
+            cache_config: Optional cache configuration. When provided the
+                isolation_strategy is always overridden to TENANT; AGW
+                carries the authoritative isolation anchor in the cache key.
             _telemetry_source: Internal telemetry source identifier. Not intended for external use.
         """
         self._tenant_subdomain = tenant_subdomain
         self._config = config or ClientConfig()
-        self._token_cache = _TokenCache(self._config)
+        self._token_cache = Cache(
+            self._build_cache_config(cache_config), module=Module.AGENTGATEWAY
+        )
         self._gateway_url_cache = _GatewayUrlCache()
         self._telemetry_source = _telemetry_source
+
+    @staticmethod
+    def _build_cache_config(cache_config: CacheConfig | None) -> CacheConfig:
+        return replace(
+            cache_config or CacheConfig(), isolation_strategy=IsolationStrategy.TENANT
+        )
 
     @staticmethod
     def _resolve_value(
@@ -708,6 +724,7 @@ def _unwrap_exception_group(exc: BaseException) -> BaseException:
 def create_client(
     tenant_subdomain: str | Callable[[], str] | None = None,
     config: ClientConfig | None = None,
+    cache_config: CacheConfig | None = None,
     *,
     _telemetry_source: Module | None = None,
 ) -> AgentGatewayClient:
@@ -721,6 +738,8 @@ def create_client(
             Can be a string or a callable returning a string.
             Required for LoB agents, ignored for Customer agents.
         config: Client configuration. Uses defaults if not provided.
+        cache_config: Optional cache configuration. The isolation_strategy
+            is always forced to TENANT regardless of what is provided.
         _telemetry_source: Internal telemetry source identifier. Not intended for external use.
 
     Returns:
@@ -778,5 +797,6 @@ def create_client(
     return AgentGatewayClient(
         tenant_subdomain=tenant_subdomain,
         config=config,
+        cache_config=cache_config,
         _telemetry_source=_telemetry_source,
     )

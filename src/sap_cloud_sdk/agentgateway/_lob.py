@@ -51,7 +51,17 @@ from sap_cloud_sdk.agentgateway._models import (
     MCPTool,
     MCPToolFilter,
 )
-from sap_cloud_sdk.agentgateway._token_cache import _GatewayUrlCache, _TokenCache
+from sap_cloud_sdk.agentgateway._token_cache import (
+    _GatewayUrlCache,
+    compute_ttl_seconds_from_bearer,
+    user_cache_key,
+)
+from sap_cloud_sdk.agentgateway.config import DEFAULT_FALLBACK_TOKEN_TTL_SECONDS
+from sap_cloud_sdk.agentgateway.constants import (
+    CACHE_NS_LOB_SYSTEM_TOKEN,
+    CACHE_NS_LOB_USER_TOKEN,
+)
+from sap_cloud_sdk.core.resilience.cache._cache import Cache
 from sap_cloud_sdk.agentgateway.exceptions import (
     AgentGatewaySDKError,
     AgentGatewayServerError,
@@ -61,16 +71,6 @@ from sap_cloud_sdk.agentgateway.exceptions import (
 logger = logging.getLogger(__name__)
 
 _DESTINATION_INSTANCE = "default"
-
-
-def _system_scope_key(tenant_subdomain: str) -> str:
-    """Build the cache scope key for tenant-scoped system auth."""
-    return f"lob-system::{tenant_subdomain}"
-
-
-def _user_scope_key(tenant_subdomain: str) -> str:
-    """Build the cache scope key for tenant-scoped user auth."""
-    return f"lob-user::{tenant_subdomain}"
 
 
 def _ias_dest_name() -> str:
@@ -178,7 +178,7 @@ def get_ias_client_id_lob() -> str:
 
 async def fetch_system_auth(
     tenant_subdomain: str,
-    token_cache: _TokenCache | None = None,
+    token_cache: Cache | None = None,
     gateway_url_cache: _GatewayUrlCache | None = None,
 ) -> tuple[str, str]:
     """Fetch system-scoped auth (Phase 1 - client credentials).
@@ -199,14 +199,13 @@ async def fetch_system_auth(
     Raises:
         MCPServerNotFoundError: If no IAS fragment or auth token is found.
     """
-    scope_key = _system_scope_key(tenant_subdomain)
     if (token_cache is None) != (gateway_url_cache is None):
         raise ValueError(
             "token_cache and gateway_url_cache must both be provided or both be None"
         )
     if token_cache and gateway_url_cache is not None:
-        cached_token = token_cache.get_system_token(scope_key)
-        cached_gateway_url = gateway_url_cache.get(scope_key)
+        cached_token = token_cache.get(CACHE_NS_LOB_SYSTEM_TOKEN, tenant_subdomain)
+        cached_gateway_url = gateway_url_cache.get(tenant_subdomain)
         if cached_token and cached_gateway_url:
             logger.debug("Using cached system auth for tenant '%s'", tenant_subdomain)
             return cached_token, cached_gateway_url
@@ -233,13 +232,16 @@ async def fetch_system_auth(
     token, gateway_url = await loop.run_in_executor(None, _fetch_system_auth_sync)
 
     if token_cache:
-        token_cache.set_system_token(
+        token_cache.set(
+            CACHE_NS_LOB_SYSTEM_TOKEN,
+            tenant_subdomain,
             token,
-            token_cache.compute_expires_at_from_bearer(token),
-            scope_key,
+            ttl_seconds=compute_ttl_seconds_from_bearer(
+                token, DEFAULT_FALLBACK_TOKEN_TTL_SECONDS
+            ),
         )
     if gateway_url_cache is not None:
-        gateway_url_cache[scope_key] = gateway_url
+        gateway_url_cache[tenant_subdomain] = gateway_url
 
     return token, gateway_url
 
@@ -247,7 +249,7 @@ async def fetch_system_auth(
 async def fetch_user_auth(
     user_token: str,
     tenant_subdomain: str,
-    token_cache: _TokenCache | None = None,
+    token_cache: Cache | None = None,
     gateway_url_cache: _GatewayUrlCache | None = None,
 ) -> tuple[str, str]:
     """Fetch user-scoped auth (Phase 2 - token exchange).
@@ -270,14 +272,14 @@ async def fetch_user_auth(
     Raises:
         MCPServerNotFoundError: If no IAS user fragment or auth token is found.
     """
-    scope_key = _user_scope_key(tenant_subdomain)
+    cache_key = user_cache_key(user_token, tenant_subdomain)
     if (token_cache is None) != (gateway_url_cache is None):
         raise ValueError(
             "token_cache and gateway_url_cache must both be provided or both be None"
         )
     if token_cache and gateway_url_cache is not None:
-        cached_token = token_cache.get_user_token(user_token, scope_key)
-        cached_gateway_url = gateway_url_cache.get(scope_key)
+        cached_token = token_cache.get(CACHE_NS_LOB_USER_TOKEN, cache_key)
+        cached_gateway_url = gateway_url_cache.get(cache_key)
         if cached_token and cached_gateway_url:
             logger.debug("Using cached user auth for tenant '%s'", tenant_subdomain)
             return cached_token, cached_gateway_url
@@ -306,14 +308,16 @@ async def fetch_user_auth(
     token, gateway_url = await loop.run_in_executor(None, _fetch_user_auth_sync)
 
     if token_cache:
-        token_cache.set_user_token(
-            user_token,
+        token_cache.set(
+            CACHE_NS_LOB_USER_TOKEN,
+            cache_key,
             token,
-            token_cache.compute_expires_at_from_bearer(token),
-            scope_key,
+            ttl_seconds=compute_ttl_seconds_from_bearer(
+                token, DEFAULT_FALLBACK_TOKEN_TTL_SECONDS
+            ),
         )
     if gateway_url_cache is not None:
-        gateway_url_cache[scope_key] = gateway_url
+        gateway_url_cache[cache_key] = gateway_url
 
     return token, gateway_url
 

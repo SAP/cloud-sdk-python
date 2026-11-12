@@ -17,12 +17,14 @@ class ClientConfig:
     Attributes:
         timeout: HTTP timeout in seconds for token requests and MCP server calls.
             Defaults to 60 seconds.
-        fallback_token_ttl_seconds: Fallback cache TTL used when a token
-            response does not provide expiry metadata.
-        token_expiry_buffer_seconds: Safety buffer subtracted from explicit
-            token expiries before a cached token is considered stale.
-        max_system_token_cache_size: Maximum number of cached system tokens.
-        max_user_token_cache_size: Maximum number of cached user tokens.
+        fallback_token_ttl_seconds: Deprecated / no-op: the shared cache owns
+            buffering, sizing, and fallback TTL. Kept for backwards compatibility.
+        token_expiry_buffer_seconds: Deprecated / no-op: the shared cache owns
+            the expiry buffer. Kept for backwards compatibility.
+        max_system_token_cache_size: Deprecated / no-op: the shared cache owns
+            backend sizing. Kept for backwards compatibility.
+        max_user_token_cache_size: Deprecated / no-op: the shared cache owns
+            backend sizing. Kept for backwards compatibility.
         max_concurrent_tasks: Maximum number of MCP and Agent fetches (MCP tool
             discovery or A2A agent card fetches) that run concurrently.
             Defaults to 15.

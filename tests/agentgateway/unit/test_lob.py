@@ -36,8 +36,11 @@ from sap_cloud_sdk.agentgateway._models import (
     MCPTool,
     MCPToolFilter,
 )
-from sap_cloud_sdk.agentgateway._token_cache import _GatewayUrlCache, _TokenCache
-from sap_cloud_sdk.agentgateway.config import ClientConfig
+from sap_cloud_sdk.agentgateway._token_cache import _GatewayUrlCache
+from sap_cloud_sdk.core.resilience.cache._cache import Cache
+from sap_cloud_sdk.core.resilience.cache._config import CacheConfig
+from sap_cloud_sdk.core.resilience.cache._isolation import IsolationStrategy
+from sap_cloud_sdk.core.telemetry import Module
 from sap_cloud_sdk.destination import ConsumptionOptions, ConsumptionLevel
 from sap_cloud_sdk.agentgateway.exceptions import (
     AgentGatewaySDKError,
@@ -393,7 +396,10 @@ class TestFetchSystemAuth:
     @pytest.mark.asyncio
     async def test_reuses_cached_system_auth(self):
         """Reuse tenant-scoped system auth until it expires."""
-        token_cache = _TokenCache(ClientConfig())
+        token_cache = Cache(
+            CacheConfig(isolation_strategy=IsolationStrategy.TENANT),
+            module=Module.AGENTGATEWAY,
+        )
         gateway_url_cache = _GatewayUrlCache()
 
         with patch.dict(os.environ, {"APPFND_CONHOS_LANDSCAPE": "eu10"}):
@@ -427,7 +433,11 @@ class TestFetchSystemAuth:
         """Raise ValueError when token_cache given without gateway_url_cache."""
         with pytest.raises(ValueError, match="both be provided or both be None"):
             await fetch_system_auth(
-                "tenant-sub", token_cache=_TokenCache(ClientConfig())
+                "tenant-sub",
+                token_cache=Cache(
+                    CacheConfig(isolation_strategy=IsolationStrategy.TENANT),
+                    module=Module.AGENTGATEWAY,
+                ),
             )
 
     @pytest.mark.asyncio
@@ -484,7 +494,10 @@ class TestFetchUserAuth:
     @pytest.mark.asyncio
     async def test_reuses_cached_user_auth(self):
         """Reuse tenant-scoped user auth until it expires."""
-        token_cache = _TokenCache(ClientConfig())
+        token_cache = Cache(
+            CacheConfig(isolation_strategy=IsolationStrategy.TENANT),
+            module=Module.AGENTGATEWAY,
+        )
         gateway_url_cache = _GatewayUrlCache()
 
         with patch.dict(os.environ, {"APPFND_CONHOS_LANDSCAPE": "eu10"}):
@@ -520,7 +533,12 @@ class TestFetchUserAuth:
         """Raise ValueError when token_cache given without gateway_url_cache."""
         with pytest.raises(ValueError, match="both be provided or both be None"):
             await fetch_user_auth(
-                "user-jwt", "tenant-sub", token_cache=_TokenCache(ClientConfig())
+                "user-jwt",
+                "tenant-sub",
+                token_cache=Cache(
+                    CacheConfig(isolation_strategy=IsolationStrategy.TENANT),
+                    module=Module.AGENTGATEWAY,
+                ),
             )
 
     @pytest.mark.asyncio
@@ -1957,3 +1975,121 @@ class TestGetIasClientIdLob:
         ):
             with pytest.raises(EnvironmentError, match="APPFND_CONHOS_LANDSCAPE"):
                 get_ias_client_id_lob()
+
+
+# ============================================================
+# Test: Cache isolation and kill-switch (LoB flow)
+# ============================================================
+
+
+class TestLobCacheIsolation:
+    """Verify cross-tenant and cross-user isolation, and CLOUD_SDK_CACHE_DISABLED."""
+
+    @pytest.mark.asyncio
+    async def test_different_tenants_do_not_share_system_auth(self):
+        """Two different tenant_subdomains must each fetch independently."""
+        token_cache = Cache(
+            CacheConfig(isolation_strategy=IsolationStrategy.TENANT),
+            module=Module.AGENTGATEWAY,
+        )
+        gateway_url_cache = _GatewayUrlCache()
+
+        results = []
+
+        def fake_fetch(ias_dest, subdomain, opts):
+            token = f"token-for-{subdomain}"
+            results.append(token)
+            return (token, "https://agw.example.com")
+
+        with patch.dict(os.environ, {"APPFND_CONHOS_LANDSCAPE": "eu10"}), patch(
+            "sap_cloud_sdk.agentgateway._lob.get_ias_fragment_name",
+            return_value="sap-managed-runtime-agw-subscriber-ias-abc",
+        ), patch(
+            "sap_cloud_sdk.agentgateway._lob._fetch_auth_token",
+            side_effect=fake_fetch,
+        ):
+            r1 = await fetch_system_auth(
+                "tenant-a",
+                token_cache=token_cache,
+                gateway_url_cache=gateway_url_cache,
+            )
+            r2 = await fetch_system_auth(
+                "tenant-b",
+                token_cache=token_cache,
+                gateway_url_cache=gateway_url_cache,
+            )
+
+        assert r1[0] == "token-for-tenant-a"
+        assert r2[0] == "token-for-tenant-b"
+        assert len(results) == 2
+
+    @pytest.mark.asyncio
+    async def test_different_user_jwts_do_not_collide(self):
+        """Two different user_jwts for the same tenant must not share a cache entry."""
+        token_cache = Cache(
+            CacheConfig(isolation_strategy=IsolationStrategy.TENANT),
+            module=Module.AGENTGATEWAY,
+        )
+        gateway_url_cache = _GatewayUrlCache()
+
+        results = []
+
+        def fake_fetch(ias_dest, subdomain, opts):
+            token = f"token-for-{opts.user_token[:5]}"
+            results.append(token)
+            return (token, "https://agw.example.com")
+
+        with patch.dict(os.environ, {"APPFND_CONHOS_LANDSCAPE": "eu10"}), patch(
+            "sap_cloud_sdk.agentgateway._lob.get_ias_user_fragment_name",
+            return_value="sap-managed-runtime-agw-subscriber-ias-user-abc",
+        ), patch(
+            "sap_cloud_sdk.agentgateway._lob._fetch_auth_token",
+            side_effect=fake_fetch,
+        ):
+            r1 = await fetch_user_auth(
+                "alice-jwt",
+                "tenant-a",
+                token_cache=token_cache,
+                gateway_url_cache=gateway_url_cache,
+            )
+            r2 = await fetch_user_auth(
+                "bob-j-jwt",
+                "tenant-a",
+                token_cache=token_cache,
+                gateway_url_cache=gateway_url_cache,
+            )
+
+        assert r1[0] != r2[0]
+        assert len(results) == 2
+
+    @pytest.mark.asyncio
+    async def test_cache_disabled_env_forces_refetch(self):
+        """CLOUD_SDK_CACHE_DISABLED=true must bypass the cache on every call."""
+        token_cache = Cache(
+            CacheConfig(isolation_strategy=IsolationStrategy.TENANT),
+            module=Module.AGENTGATEWAY,
+        )
+        gateway_url_cache = _GatewayUrlCache()
+
+        with patch.dict(
+            os.environ,
+            {"APPFND_CONHOS_LANDSCAPE": "eu10", "CLOUD_SDK_CACHE_DISABLED": "true"},
+        ), patch(
+            "sap_cloud_sdk.agentgateway._lob.get_ias_fragment_name",
+            return_value="sap-managed-runtime-agw-subscriber-ias-abc",
+        ), patch(
+            "sap_cloud_sdk.agentgateway._lob._fetch_auth_token",
+            return_value=("fresh-token", "https://agw.example.com"),
+        ) as mock_fetch:
+            await fetch_system_auth(
+                "tenant-a",
+                token_cache=token_cache,
+                gateway_url_cache=gateway_url_cache,
+            )
+            await fetch_system_auth(
+                "tenant-a",
+                token_cache=token_cache,
+                gateway_url_cache=gateway_url_cache,
+            )
+
+        assert mock_fetch.call_count == 2

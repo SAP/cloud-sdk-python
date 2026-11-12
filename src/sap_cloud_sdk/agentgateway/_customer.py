@@ -25,7 +25,10 @@ import httpx
 from mcp import ClientSession
 from mcp.client.streamable_http import streamable_http_client
 
-from sap_cloud_sdk.agentgateway.config import DEFAULT_MAX_CONCURRENT_TASKS
+from sap_cloud_sdk.agentgateway.config import (
+    DEFAULT_FALLBACK_TOKEN_TTL_SECONDS,
+    DEFAULT_MAX_CONCURRENT_TASKS,
+)
 
 try:
     from mcp.shared.exceptions import McpError
@@ -51,7 +54,12 @@ from sap_cloud_sdk.agentgateway._models import (
     MCPTool,
     MCPToolFilter,
 )
-from sap_cloud_sdk.agentgateway._token_cache import _TokenCache
+from sap_cloud_sdk.agentgateway._token_cache import compute_ttl_seconds, user_cache_key
+from sap_cloud_sdk.agentgateway.constants import (
+    CACHE_NS_CUSTOMER_SYSTEM_TOKEN,
+    CACHE_NS_CUSTOMER_USER_TOKEN,
+)
+from sap_cloud_sdk.core.resilience.cache._cache import Cache
 from sap_cloud_sdk.agentgateway.exceptions import (
     AgentGatewaySDKError,
     AgentGatewayServerError,
@@ -83,11 +91,6 @@ _GRANT_TYPE_JWT_BEARER = "urn:ietf:params:oauth:grant-type:jwt-bearer"
 # Token response field keys
 _TOKEN_FIELD_CLIENT_ID = "client_id"
 _TOKEN_FIELD_ACCESS_TOKEN = "access_token"
-
-
-def _cache_scope_key(credentials: CustomerCredentials) -> str:
-    """Build a cache scope key for customer-flow tokens."""
-    return f"customer::{credentials.client_id}"
 
 
 class _CredentialFields:
@@ -483,7 +486,7 @@ def _request_token_transparent(
 def get_system_token_mtls(
     credentials: CustomerCredentials,
     timeout: float,
-    token_cache: _TokenCache | None = None,
+    token_cache: Cache | None = None,
 ) -> str:
     """Get system-scoped token using client credentials flow.
 
@@ -501,11 +504,14 @@ def get_system_token_mtls(
     Returns:
         System-scoped access token, fetched or served from cache.
     """
-    scope_key = _cache_scope_key(credentials)
     if token_cache:
-        cached_token = token_cache.get_system_token(scope_key)
+        cached_token = token_cache.get(
+            CACHE_NS_CUSTOMER_SYSTEM_TOKEN, credentials.client_id
+        )
         if cached_token:
-            logger.debug("Using cached system token for scope '%s'", scope_key)
+            logger.debug(
+                "Using cached system token for client '%s'", credentials.client_id
+            )
             return cached_token
 
     # Determine which token request method to use based on credentials
@@ -531,10 +537,13 @@ def get_system_token_mtls(
     access_token = token_data[_TOKEN_FIELD_ACCESS_TOKEN]
 
     if token_cache:
-        token_cache.set_system_token(
+        token_cache.set(
+            CACHE_NS_CUSTOMER_SYSTEM_TOKEN,
+            credentials.client_id,
             access_token,
-            token_cache.compute_expires_at(token_data),
-            scope_key,
+            ttl_seconds=compute_ttl_seconds(
+                token_data, DEFAULT_FALLBACK_TOKEN_TTL_SECONDS
+            ),
         )
 
     return access_token
@@ -544,7 +553,7 @@ def exchange_user_token(
     credentials: CustomerCredentials,
     user_token: str,
     timeout: float,
-    token_cache: _TokenCache | None = None,
+    token_cache: Cache | None = None,
 ) -> str:
     """Exchange user token for AGW-scoped token using jwt-bearer grant.
 
@@ -565,11 +574,14 @@ def exchange_user_token(
     Returns:
         AGW-scoped access token with user identity, fetched or served from cache.
     """
-    scope_key = _cache_scope_key(credentials)
+    cache_key = user_cache_key(user_token, credentials.client_id)
     if token_cache:
-        cached_token = token_cache.get_user_token(user_token, scope_key)
+        cached_token = token_cache.get(CACHE_NS_CUSTOMER_USER_TOKEN, cache_key)
         if cached_token:
-            logger.debug("Using cached exchanged user token for scope '%s'", scope_key)
+            logger.debug(
+                "Using cached exchanged user token for client '%s'",
+                credentials.client_id,
+            )
             return cached_token
 
     # Determine which token request method to use based on credentials
@@ -603,11 +615,13 @@ def exchange_user_token(
     access_token = token_data[_TOKEN_FIELD_ACCESS_TOKEN]
 
     if token_cache:
-        token_cache.set_user_token(
-            user_token,
+        token_cache.set(
+            CACHE_NS_CUSTOMER_USER_TOKEN,
+            cache_key,
             access_token,
-            token_cache.compute_expires_at(token_data),
-            scope_key,
+            ttl_seconds=compute_ttl_seconds(
+                token_data, DEFAULT_FALLBACK_TOKEN_TTL_SECONDS
+            ),
         )
 
     return access_token

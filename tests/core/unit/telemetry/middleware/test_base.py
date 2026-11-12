@@ -8,7 +8,7 @@ from sap_cloud_sdk.core.telemetry.middleware.base import TelemetryMiddleware
 class TestTelemetryMiddlewareAbstract:
     def test_cannot_instantiate_directly(self):
         with pytest.raises(TypeError):
-            TelemetryMiddleware()
+            TelemetryMiddleware()  # ty: ignore[call-non-callable]
 
     def test_concrete_subclass_with_both_methods_works(self):
         class Concrete(TelemetryMiddleware):
@@ -28,7 +28,7 @@ class TestTelemetryMiddlewareAbstract:
                 return {}
 
         with pytest.raises(TypeError):
-            Incomplete()
+            Incomplete()  # ty: ignore[call-non-callable]
 
     def test_missing_get_attributes_raises(self):
         class Incomplete(TelemetryMiddleware):
@@ -36,4 +36,4 @@ class TestTelemetryMiddlewareAbstract:
                 pass
 
         with pytest.raises(TypeError):
-            Incomplete()
+            Incomplete()  # ty: ignore[call-non-callable]

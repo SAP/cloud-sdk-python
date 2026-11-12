@@ -16,6 +16,7 @@ from pydantic_core import ValidationError
 
 from sap_cloud_sdk.core.telemetry import Module, Operation
 from sap_cloud_sdk.core.telemetry.metrics_decorator import record_metrics
+from sap_cloud_sdk.agentgateway import ClientConfig as AgwClientConfig
 from sap_cloud_sdk.agentgateway import create_client as create_agw_client
 from sap_cloud_sdk.extensibility._models import (
     DEFAULT_EXTENSION_CAPABILITY_ID,
@@ -532,7 +533,9 @@ class ExtensibilityClient:
             ```
         """
         agw_client = create_agw_client(
-            tenant_subdomain, _telemetry_source=Module.EXTENSIBILITY
+            tenant_subdomain,
+            AgwClientConfig(timeout=float(hook.timeout)),
+            _telemetry_source=Module.EXTENSIBILITY,
         )
         logger.info(
             "AGW client created successfully for tenant_subdomain=%s", tenant_subdomain

@@ -186,17 +186,19 @@ async def call_hook_agw(
 - Returns the response data as a `Message` object, or `None` if no message is produced.
 - Raises `TransportError` if the AGW tool call itself fails (network error, etc.).
 - Raises `ExtensibilityError` if the hook MCP tool is not found via AGW, or the hook response does not conform to the A2A Message protocol.
+- `hook.timeout` is used as the HTTP timeout (in seconds) for the AGW client created for this call.
+- Transient HTTP errors from the n8n workflow (408, 429, 502, 503, 504) are retried up to 3 times with exponential backoff (1 s, then 2 s). For 429 responses, a numeric `Retry-After` header overrides the backoff delay. Non-retryable errors raise immediately.
 
 #### `N8nWorkflowConfig`
 
 ```python
 @dataclass
 class N8nWorkflowConfig:
-    ord_id: str          # ORD ID of the n8n API resource
-    card_ord_id: str     # ORD ID of the n8n MCP translation card (server identifier)
-    tool_name: str       # MCP tool name to call on the card server
+    ord_id: str  # ORD ID of the n8n API resource
+    card_ord_id: str  # ORD ID of the n8n MCP translation card (server identifier)
+    tool_name: str  # MCP tool name to call on the card server
     global_tenant_id: str  # LWT global tenant ID for the workflow
-    method: HTTPMethod   # HTTP method used by webhook execution
+    method: HTTPMethod  # HTTP method used by webhook execution
 ```
 
 #### `HookConfig`
@@ -324,9 +326,7 @@ class Hook:
     name: str  # Human-readable name
     type: HookType  # Hook type (BEFORE, AFTER)
     deployment_type: DeploymentType  # Deployment type (N8N, SERVERLESS)
-    n8n_workflow_config: (
-        N8nWorkflowConfig  # Workflow config (ORD IDs, tool name, global tenant ID, HTTP method)
-    )
+    n8n_workflow_config: N8nWorkflowConfig  # Workflow config (ORD IDs, tool name, global tenant ID, HTTP method)
     timeout: int  # Timeout in seconds
     execution_mode: ExecutionMode  # Execution mode (SYNC, ASYNC)
     on_failure: OnFailure  # Failure behavior (CONTINUE, BLOCK)

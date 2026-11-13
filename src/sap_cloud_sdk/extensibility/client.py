@@ -16,7 +16,11 @@ from pydantic_core import ValidationError
 
 from sap_cloud_sdk.core.telemetry import Module, Operation
 from sap_cloud_sdk.core.telemetry.metrics_decorator import record_metrics
+from sap_cloud_sdk.agentgateway import ClientConfig as AgwClientConfig
 from sap_cloud_sdk.agentgateway import create_client as create_agw_client
+from tenacity import AsyncRetrying, retry_if_exception, stop_after_attempt
+
+from sap_cloud_sdk.agentgateway import find_http_error as _find_http_error
 from sap_cloud_sdk.extensibility._models import (
     DEFAULT_EXTENSION_CAPABILITY_ID,
     ExtensionCapabilityImplementation,
@@ -54,6 +58,43 @@ _EXECUTE_TERMINAL_STATUSES = frozenset({"error", "canceled", "crashed", "unknown
 _EXECUTION_TERMINAL_STATUSES = frozenset({"error", "canceled", "crashed"})
 
 _HOOK_POLL_INTERVAL = 0.5  # seconds between get-execution polls
+
+_AGW_RETRY_STATUSES = frozenset({408, 429, 502, 503, 504})
+_AGW_MAX_ATTEMPTS = 3
+
+# ---------------------------------------------------------------------------
+# Tenacity retry helpers for AGW tool calls
+# ---------------------------------------------------------------------------
+
+
+def _is_retryable_agw_error(exc: BaseException) -> bool:
+    http_err = _find_http_error(exc)
+    return http_err is not None and http_err.response.status_code in _AGW_RETRY_STATUSES
+
+
+def _agw_wait(retry_state: Any) -> float:
+    exc = retry_state.outcome.exception()
+    if exc is not None:
+        http_err = _find_http_error(exc)
+        if http_err is not None and http_err.response.status_code == 429:
+            after = http_err.response.headers.get("Retry-After", "")
+            if after.isdigit():
+                return float(after)
+    return 1.0 * (2 ** (retry_state.attempt_number - 1))
+
+
+def _log_agw_retry(retry_state: Any) -> None:
+    exc = retry_state.outcome.exception()
+    http_err = _find_http_error(exc) if exc is not None else None
+    if http_err is not None:
+        logger.warning(
+            "AGW tool call failed with HTTP %d, retrying (attempt %d/%d) in %.1f s",
+            http_err.response.status_code,
+            retry_state.attempt_number,
+            _AGW_MAX_ATTEMPTS,
+            retry_state.next_action.sleep,
+        )
+
 
 # ---------------------------------------------------------------------------
 # JSON-RPC helpers
@@ -449,12 +490,25 @@ class ExtensibilityClient:
             hook.n8n_workflow_config.card_ord_id,
         )
         try:
-            result_str = await agw_client.call_mcp_tool(
-                hook_tool,
-                user_token=user_token or None,
-                **tool_arguments,  # type: ignore[arg-type]
-            )
+            async for attempt in AsyncRetrying(
+                retry=retry_if_exception(_is_retryable_agw_error),
+                stop=stop_after_attempt(_AGW_MAX_ATTEMPTS),
+                wait=_agw_wait,
+                before_sleep=_log_agw_retry,
+                reraise=True,
+            ):
+                with attempt:
+                    result_str = await agw_client.call_mcp_tool(
+                        hook_tool,
+                        user_token=user_token or None,
+                        **tool_arguments,  # type: ignore[arg-type]
+                    )
         except Exception as exc:
+            if _is_retryable_agw_error(exc):
+                raise TransportError(
+                    f"AGW tool call for '{hook.n8n_workflow_config.tool_name}' failed"
+                    f" after {_AGW_MAX_ATTEMPTS} attempts: {exc}"
+                ) from exc
             raise TransportError(
                 f"AGW tool call for '{hook.n8n_workflow_config.tool_name}' failed: {exc}"
             ) from exc
@@ -532,7 +586,9 @@ class ExtensibilityClient:
             ```
         """
         agw_client = create_agw_client(
-            tenant_subdomain, _telemetry_source=Module.EXTENSIBILITY
+            tenant_subdomain,
+            AgwClientConfig(timeout=float(hook.timeout)),
+            _telemetry_source=Module.EXTENSIBILITY,
         )
         logger.info(
             "AGW client created successfully for tenant_subdomain=%s", tenant_subdomain

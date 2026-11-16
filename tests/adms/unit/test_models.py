@@ -454,20 +454,17 @@ class TestCreateBusinessObjectNodeTypeInput:
 class TestDocumentTypeBusinessObjectTypeMap:
     def test_from_dict(self):
         data = {
-            "DocumentTypeBOTypeMapID": "map-uuid-1",
             "BusinessObjectNodeTypeUniqueID": "bo-uuid-1",
             "DocumentTypeID": "INVOICE",
-            "IsDefault": True,
+            "DocumentTypeIsDefault": True,
         }
         m = DocumentTypeBusinessObjectTypeMap.from_dict(data)
-        assert m.document_type_bo_type_map_id == "map-uuid-1"
         assert m.business_object_node_type_unique_id == "bo-uuid-1"
         assert m.document_type_id == "INVOICE"
         assert m.is_default is True
 
     def test_from_dict_default_is_false(self):
         data = {
-            "DocumentTypeBOTypeMapID": "map-uuid-2",
             "BusinessObjectNodeTypeUniqueID": "bo-uuid-1",
             "DocumentTypeID": "CONTRACT",
         }
@@ -480,18 +477,9 @@ class TestCreateDocumentTypeBoTypeMapInput:
         inp = CreateDocumentTypeBoTypeMapInput(
             business_object_node_type_unique_id="bo-uuid-1",
             document_type_id="INVOICE",
-            is_default=True,
         )
         d = inp.to_odata_dict()
         assert d == {
             "BusinessObjectNodeTypeUniqueID": "bo-uuid-1",
             "DocumentTypeID": "INVOICE",
-            "IsDefault": True,
         }
-
-    def test_is_default_defaults_to_false(self):
-        inp = CreateDocumentTypeBoTypeMapInput(
-            business_object_node_type_unique_id="bo-uuid-1",
-            document_type_id="INVOICE",
-        )
-        assert inp.is_default is False

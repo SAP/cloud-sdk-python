@@ -52,7 +52,7 @@ class StarletteContextMiddleware:
             await self.app(scope, receive, send)
             return
 
-        headers = Headers(scope=scope)
+        headers = Headers(raw=scope["headers"])
         envelope = RequestEnvelope(headers=dict(headers))
         ctx = _merge([p.extract(envelope) for p in self._providers])
         async with async_sdk_context(ctx):

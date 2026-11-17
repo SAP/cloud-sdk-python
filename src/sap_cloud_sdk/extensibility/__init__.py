@@ -95,8 +95,12 @@ from sap_cloud_sdk.extensibility.config import ExtensibilityConfig, HookConfig
 from sap_cloud_sdk.extensibility.exceptions import (
     ClientCreationError,
     ExtensibilityError,
+    HookShortCircuit,
     TransportError,
 )
+from sap_cloud_sdk.extensibility._logging import configure_extension_logging
+from sap_cloud_sdk.extensibility._mcp_patches import unwrap_buggy_mcp_otel_patches
+from sap_cloud_sdk.extensibility._mcp_servers import resolve_mcp_servers
 
 
 def create_client(
@@ -128,13 +132,19 @@ def create_client(
         agent_ord_id: ORD ID of the agent (e.g.,
             ``"sap.ai:agent:myAgent:v1"``). Required for the backend transport
             to identify the agent when querying extensibility data.
-        config: Optional configuration overrides for destination name and
-            instance. If omitted, uses default :class:`ExtensibilityConfig`.
+        config: Optional configuration overrides for destination name,
+            instance, and audit settings. If omitted, uses default
+            :class:`ExtensibilityConfig`.
         _telemetry_source: Internal telemetry source identifier. Not intended for external use.
 
     Returns:
         A client ready for :meth:`ExtensibilityClient.get_extension_capability_implementation`.
     """
+    effective = config or ExtensibilityConfig()
+    _audit_kw = dict(
+        _audit_channel_id=effective.audit_channel_id,
+        _audit_service_name=effective.audit_service_name,
+    )
     try:
         # 1. Env var takes precedence (explicit always wins)
         local_file = os.environ.get(CLOUD_SDK_LOCAL_EXTENSIBILITY_FILE_ENV)
@@ -146,7 +156,9 @@ def create_client(
                 local_file,
             )
             transport = LocalTransport(local_file)
-            return ExtensibilityClient(transport, _telemetry_source=_telemetry_source)
+            return ExtensibilityClient(
+                transport, _telemetry_source=_telemetry_source, **_audit_kw
+            )
 
         # 2. File-presence detection at mocks/extensibility.json
         mock_path = _mock_file(EXTENSIBILITY_MOCK_FILE)
@@ -158,12 +170,15 @@ def create_client(
                 mock_path,
             )
             transport = LocalTransport(mock_path)
-            return ExtensibilityClient(transport, _telemetry_source=_telemetry_source)
+            return ExtensibilityClient(
+                transport, _telemetry_source=_telemetry_source, **_audit_kw
+            )
 
         # 3. Cloud mode via extensibility service transport
-        effective = config or ExtensibilityConfig()
         transport = UmsTransport(agent_ord_id, effective)
-        return ExtensibilityClient(transport, _telemetry_source=_telemetry_source)
+        return ExtensibilityClient(
+            transport, _telemetry_source=_telemetry_source, **_audit_kw
+        )
     except Exception:
         _logger.error(
             "Failed to create extensibility client. "
@@ -211,5 +226,52 @@ __all__ = [
     # Exceptions
     "ClientCreationError",
     "ExtensibilityError",
+    "HookShortCircuit",
     "TransportError",
+    # Utilities (always available — no optional deps)
+    "configure_extension_logging",
+    "unwrap_buggy_mcp_otel_patches",
+    "resolve_mcp_servers",
+    # LangChain adapters (lazy — require extensibility-langchain extra)
+    "ExtensionTelemetryInterceptor",
+    "load_extension_tools_langchain",
 ]
+
+# ---------------------------------------------------------------------------
+# Lazy loading for optional framework adapters
+# ---------------------------------------------------------------------------
+
+_LAZY: dict[str, tuple[str, str]] = {
+    "ExtensionTelemetryInterceptor": (
+        "sap_cloud_sdk.extensibility._langchain",
+        "ExtensionTelemetryInterceptor",
+    ),
+    "load_extension_tools_langchain": (
+        "sap_cloud_sdk.extensibility._tools_langchain",
+        "load_extension_tools_langchain",
+    ),
+}
+
+_LAZY_HINTS: dict[str, str] = {
+    "ExtensionTelemetryInterceptor": "langchain-mcp-adapters",
+    "load_extension_tools_langchain": "langchain-mcp-adapters",
+}
+
+
+def __getattr__(name: str) -> object:
+    if name in _LAZY:
+        module_path, attr = _LAZY[name]
+        import importlib
+
+        try:
+            mod = importlib.import_module(module_path)
+            value = getattr(mod, attr)
+            globals()[name] = value
+            return value
+        except ImportError as exc:
+            hint = _LAZY_HINTS.get(name, "")
+            raise ImportError(
+                f"'{name}' requires '{hint}' to be installed. "
+                f"Install it with: pip install 'sap-cloud-sdk[extensibility-langchain]'"
+            ) from exc
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

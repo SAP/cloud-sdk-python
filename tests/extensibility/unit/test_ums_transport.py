@@ -69,6 +69,7 @@ class TestUmsDestinationName:
             == "sap-managed-runtime-ias-exttest-dev-eu12"
         )
 
+
 # ---------------------------------------------------------------------------
 # Tests: UmsTransport construction
 # ---------------------------------------------------------------------------

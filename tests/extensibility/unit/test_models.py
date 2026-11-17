@@ -269,7 +269,13 @@ class TestExtensionCapabilityImplementation:
                     "name": "Before Tool Execution Hook",
                     "hookType": "BEFORE",
                     "deploymentType": "N8N",
-                    "n8nWorkflowConfig": {"ordId": "sap.n8nwfrt:apiResource:test-solution_hook.testHook:v1", "cardOrdId": "sap.n8nwfrt:apiResource:test-solution_hook.testHook_mcp:v1", "toolName": "testHook", "globalTenantId": "tenant-test-001", "method": "POST"},
+                    "n8nWorkflowConfig": {
+                        "ordId": "sap.n8nwfrt:apiResource:test-solution_hook.testHook:v1",
+                        "cardOrdId": "sap.n8nwfrt:apiResource:test-solution_hook.testHook_mcp:v1",
+                        "toolName": "testHook",
+                        "globalTenantId": "tenant-test-001",
+                        "method": "POST",
+                    },
                     "timeout": 30,
                     "executionMode": "SYNC",
                     "onFailure": "CONTINUE",
@@ -317,7 +323,13 @@ class TestExtensionCapabilityImplementation:
                     "name": "Before Hook",
                     "hookType": "BEFORE",
                     "deploymentType": "N8N",
-                    "n8nWorkflowConfig": {"ordId": "sap.n8nwfrt:apiResource:test-solution_hook.testHook:v1", "cardOrdId": "sap.n8nwfrt:apiResource:test-solution_hook.testHook_mcp:v1", "toolName": "testHook", "globalTenantId": "tenant-test-001", "method": "POST"},
+                    "n8nWorkflowConfig": {
+                        "ordId": "sap.n8nwfrt:apiResource:test-solution_hook.testHook:v1",
+                        "cardOrdId": "sap.n8nwfrt:apiResource:test-solution_hook.testHook_mcp:v1",
+                        "toolName": "testHook",
+                        "globalTenantId": "tenant-test-001",
+                        "method": "POST",
+                    },
                     "timeout": 30,
                     "executionMode": "SYNC",
                     "onFailure": "CONTINUE",
@@ -330,7 +342,13 @@ class TestExtensionCapabilityImplementation:
                     "name": "After Hook",
                     "hookType": "AFTER",
                     "deploymentType": "N8N",
-                    "n8nWorkflowConfig": {"ordId": "sap.n8nwfrt:apiResource:test-solution_hook.testHook:v1", "cardOrdId": "sap.n8nwfrt:apiResource:test-solution_hook.testHook_mcp:v1", "toolName": "testHook", "globalTenantId": "tenant-test-001", "method": "POST"},
+                    "n8nWorkflowConfig": {
+                        "ordId": "sap.n8nwfrt:apiResource:test-solution_hook.testHook:v1",
+                        "cardOrdId": "sap.n8nwfrt:apiResource:test-solution_hook.testHook_mcp:v1",
+                        "toolName": "testHook",
+                        "globalTenantId": "tenant-test-001",
+                        "method": "POST",
+                    },
                     "timeout": 60,
                     "executionMode": "ASYNC",
                     "onFailure": "BLOCK",
@@ -423,7 +441,13 @@ class TestHook:
             "name": "Before Tool Execution Hook",
             "hookType": "BEFORE",
             "deploymentType": "N8N",
-            "n8nWorkflowConfig": {"ordId": "sap.n8nwfrt:apiResource:test-solution_hook.testHook:v1", "cardOrdId": "sap.n8nwfrt:apiResource:test-solution_hook.testHook_mcp:v1", "toolName": "testHook", "globalTenantId": "tenant-test-001", "method": "POST"},
+            "n8nWorkflowConfig": {
+                "ordId": "sap.n8nwfrt:apiResource:test-solution_hook.testHook:v1",
+                "cardOrdId": "sap.n8nwfrt:apiResource:test-solution_hook.testHook_mcp:v1",
+                "toolName": "testHook",
+                "globalTenantId": "tenant-test-001",
+                "method": "POST",
+            },
             "timeout": 30,
             "executionMode": "SYNC",
             "onFailure": "CONTINUE",
@@ -456,7 +480,13 @@ class TestHook:
             "hookId": "partial_hook",
             "hookType": "BEFORE",
             "deploymentType": "N8N",
-            "n8nWorkflowConfig": {"ordId": "sap.n8nwfrt:apiResource:test-solution_hook.testHook:v1", "cardOrdId": "sap.n8nwfrt:apiResource:test-solution_hook.testHook_mcp:v1", "toolName": "testHook", "globalTenantId": "tenant-test-001", "method": "POST"},
+            "n8nWorkflowConfig": {
+                "ordId": "sap.n8nwfrt:apiResource:test-solution_hook.testHook:v1",
+                "cardOrdId": "sap.n8nwfrt:apiResource:test-solution_hook.testHook_mcp:v1",
+                "toolName": "testHook",
+                "globalTenantId": "tenant-test-001",
+                "method": "POST",
+            },
         }
         hook = Hook.from_dict(data)
         assert hook.hook_id == "partial_hook"
@@ -475,7 +505,13 @@ class TestHook:
             "name": "Async Hook",
             "hookType": "AFTER",
             "deploymentType": "N8N",
-            "n8nWorkflowConfig": {"ordId": "sap.n8nwfrt:apiResource:test-solution_hook.testHook:v1", "cardOrdId": "sap.n8nwfrt:apiResource:test-solution_hook.testHook_mcp:v1", "toolName": "testHook", "globalTenantId": "tenant-test-001", "method": "POST"},
+            "n8nWorkflowConfig": {
+                "ordId": "sap.n8nwfrt:apiResource:test-solution_hook.testHook:v1",
+                "cardOrdId": "sap.n8nwfrt:apiResource:test-solution_hook.testHook_mcp:v1",
+                "toolName": "testHook",
+                "globalTenantId": "tenant-test-001",
+                "method": "POST",
+            },
             "timeout": 60,
             "executionMode": "ASYNC",
             "onFailure": "BLOCK",
@@ -495,7 +531,13 @@ class TestHook:
             "hookId": "n8n_hook",
             "hookType": "BEFORE",
             "deploymentType": "N8N",
-            "n8nWorkflowConfig": {"ordId": "sap.n8nwfrt:apiResource:test-solution_hook.testHook:v1", "cardOrdId": "sap.n8nwfrt:apiResource:test-solution_hook.testHook_mcp:v1", "toolName": "testHook", "globalTenantId": "tenant-test-001", "method": "POST"},
+            "n8nWorkflowConfig": {
+                "ordId": "sap.n8nwfrt:apiResource:test-solution_hook.testHook:v1",
+                "cardOrdId": "sap.n8nwfrt:apiResource:test-solution_hook.testHook_mcp:v1",
+                "toolName": "testHook",
+                "globalTenantId": "tenant-test-001",
+                "method": "POST",
+            },
         }
         n8n_hook = Hook.from_dict(n8n_data)
         assert n8n_hook.deployment_type == DeploymentType.N8N
@@ -521,7 +563,13 @@ class TestHook:
             "hookId": "before",
             "hookType": "BEFORE",
             "deploymentType": "N8N",
-            "n8nWorkflowConfig": {"ordId": "sap.n8nwfrt:apiResource:test-solution_hook.testHook:v1", "cardOrdId": "sap.n8nwfrt:apiResource:test-solution_hook.testHook_mcp:v1", "toolName": "testHook", "globalTenantId": "tenant-test-001", "method": "POST"},
+            "n8nWorkflowConfig": {
+                "ordId": "sap.n8nwfrt:apiResource:test-solution_hook.testHook:v1",
+                "cardOrdId": "sap.n8nwfrt:apiResource:test-solution_hook.testHook_mcp:v1",
+                "toolName": "testHook",
+                "globalTenantId": "tenant-test-001",
+                "method": "POST",
+            },
         }
         before_hook = Hook.from_dict(before_data)
         assert before_hook.type == HookType.BEFORE
@@ -530,7 +578,13 @@ class TestHook:
             "hookId": "after",
             "hookType": "AFTER",
             "deploymentType": "N8N",
-            "n8nWorkflowConfig": {"ordId": "sap.n8nwfrt:apiResource:test-solution_hook.testHook:v1", "cardOrdId": "sap.n8nwfrt:apiResource:test-solution_hook.testHook_mcp:v1", "toolName": "testHook", "globalTenantId": "tenant-test-001", "method": "POST"},
+            "n8nWorkflowConfig": {
+                "ordId": "sap.n8nwfrt:apiResource:test-solution_hook.testHook:v1",
+                "cardOrdId": "sap.n8nwfrt:apiResource:test-solution_hook.testHook_mcp:v1",
+                "toolName": "testHook",
+                "globalTenantId": "tenant-test-001",
+                "method": "POST",
+            },
         }
         after_hook = Hook.from_dict(after_data)
         assert after_hook.type == HookType.AFTER
@@ -542,7 +596,13 @@ class TestHook:
             "hookType": "BEFORE",
             "deploymentType": "N8N",
             "canShortCircuit": True,
-            "n8nWorkflowConfig": {"ordId": "sap.n8nwfrt:apiResource:test-solution_hook.testHook:v1", "cardOrdId": "sap.n8nwfrt:apiResource:test-solution_hook.testHook_mcp:v1", "toolName": "testHook", "globalTenantId": "tenant-test-001", "method": "POST"},
+            "n8nWorkflowConfig": {
+                "ordId": "sap.n8nwfrt:apiResource:test-solution_hook.testHook:v1",
+                "cardOrdId": "sap.n8nwfrt:apiResource:test-solution_hook.testHook_mcp:v1",
+                "toolName": "testHook",
+                "globalTenantId": "tenant-test-001",
+                "method": "POST",
+            },
         }
         hook = Hook.from_dict(data)
         assert hook.can_short_circuit is True
@@ -554,7 +614,13 @@ class TestHook:
             "hookType": "BEFORE",
             "deploymentType": "N8N",
             "canShortCircuit": False,
-            "n8nWorkflowConfig": {"ordId": "sap.n8nwfrt:apiResource:test-solution_hook.testHook:v1", "cardOrdId": "sap.n8nwfrt:apiResource:test-solution_hook.testHook_mcp:v1", "toolName": "testHook", "globalTenantId": "tenant-test-001", "method": "POST"},
+            "n8nWorkflowConfig": {
+                "ordId": "sap.n8nwfrt:apiResource:test-solution_hook.testHook:v1",
+                "cardOrdId": "sap.n8nwfrt:apiResource:test-solution_hook.testHook_mcp:v1",
+                "toolName": "testHook",
+                "globalTenantId": "tenant-test-001",
+                "method": "POST",
+            },
         }
         hook = Hook.from_dict(data)
         assert hook.can_short_circuit is False
@@ -565,7 +631,13 @@ class TestHook:
             "hookId": "wf_hook",
             "hookType": "BEFORE",
             "deploymentType": "N8N",
-            "n8nWorkflowConfig": {"ordId": "sap.n8nwfrt:apiResource:test-solution_hook.testHook:v1", "cardOrdId": "sap.n8nwfrt:apiResource:test-solution_hook.testHook_mcp:v1", "toolName": "testHook", "globalTenantId": "tenant-test-001", "method": "PUT"},
+            "n8nWorkflowConfig": {
+                "ordId": "sap.n8nwfrt:apiResource:test-solution_hook.testHook:v1",
+                "cardOrdId": "sap.n8nwfrt:apiResource:test-solution_hook.testHook_mcp:v1",
+                "toolName": "testHook",
+                "globalTenantId": "tenant-test-001",
+                "method": "PUT",
+            },
         }
         hook = Hook.from_dict(data)
         assert hook.n8n_workflow_config.tool_name == "testHook"
@@ -579,7 +651,13 @@ class TestHook:
             "name": "",
             "hookType": "",
             "deploymentType": "",
-            "n8nWorkflowConfig": {"ordId": "sap.n8nwfrt:apiResource:test-solution_hook.testHook:v1", "cardOrdId": "sap.n8nwfrt:apiResource:test-solution_hook.testHook_mcp:v1", "toolName": "testHook", "globalTenantId": "tenant-test-001", "method": "POST"},
+            "n8nWorkflowConfig": {
+                "ordId": "sap.n8nwfrt:apiResource:test-solution_hook.testHook:v1",
+                "cardOrdId": "sap.n8nwfrt:apiResource:test-solution_hook.testHook_mcp:v1",
+                "toolName": "testHook",
+                "globalTenantId": "tenant-test-001",
+                "method": "POST",
+            },
         }
         with pytest.raises(ValueError, match="Invalid or missing hookType"):
             Hook.from_dict(data)
@@ -614,7 +692,12 @@ class TestHook:
             "hookId": "hook_without_method",
             "hookType": "BEFORE",
             "deploymentType": "N8N",
-            "n8nWorkflowConfig": {"ordId": "sap.n8nwfrt:apiResource:test-solution_hook.testHook:v1", "cardOrdId": "sap.n8nwfrt:apiResource:test-solution_hook.testHook_mcp:v1", "toolName": "testHook", "globalTenantId": "tenant-test-001"},
+            "n8nWorkflowConfig": {
+                "ordId": "sap.n8nwfrt:apiResource:test-solution_hook.testHook:v1",
+                "cardOrdId": "sap.n8nwfrt:apiResource:test-solution_hook.testHook_mcp:v1",
+                "toolName": "testHook",
+                "globalTenantId": "tenant-test-001",
+            },
         }
         hook = Hook.from_dict(data)
         assert hook.n8n_workflow_config.method == HTTPMethod.POST
@@ -625,7 +708,13 @@ class TestHook:
             "hookId": "invalid_hook",
             "hookType": "INVALID_TYPE",
             "deploymentType": "N8N",
-            "n8nWorkflowConfig": {"ordId": "sap.n8nwfrt:apiResource:test-solution_hook.testHook:v1", "cardOrdId": "sap.n8nwfrt:apiResource:test-solution_hook.testHook_mcp:v1", "toolName": "testHook", "globalTenantId": "tenant-test-001", "method": "POST"},
+            "n8nWorkflowConfig": {
+                "ordId": "sap.n8nwfrt:apiResource:test-solution_hook.testHook:v1",
+                "cardOrdId": "sap.n8nwfrt:apiResource:test-solution_hook.testHook_mcp:v1",
+                "toolName": "testHook",
+                "globalTenantId": "tenant-test-001",
+                "method": "POST",
+            },
         }
         with pytest.raises(
             ValueError, match="Invalid or missing hookType.*INVALID_TYPE"

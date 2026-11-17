@@ -870,3 +870,25 @@ class ExtensionCapabilityImplementation:
         if self.source and extension_id in self.source.instructions:
             return self.source.instructions[extension_id]
         return None
+
+    @property
+    def first_solution_id(self) -> str:
+        """Return the first non-empty solution ID found across all source maps.
+
+        Searches instructions, then hooks, then tools, in that order.
+        Returns an empty string when no solution ID is set.
+
+        Useful for summary telemetry spans that need a representative
+        solution ID for the entire extension capability implementation.
+        """
+        if not self.source:
+            return ""
+        for src_map in [
+            getattr(self.source, "instructions", {}) or {},
+            self.source.hooks or {},
+            self.source.tools or {},
+        ]:
+            for src_info in src_map.values():
+                if src_info.solution_id:
+                    return src_info.solution_id
+        return ""

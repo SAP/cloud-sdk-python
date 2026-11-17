@@ -45,6 +45,10 @@ dependencies = [
 
 [project.optional-dependencies]
 extensibility = ["a2a-sdk>=0.2.0,<1.0"]
+extensibility-langchain = [
+    "sap-cloud-sdk[extensibility]",
+    "langchain-mcp-adapters>=0.1.0",
+]
 starlette = ["starlette>=0.40.0,<1"]
 fastapi = ["fastapi>=0.100.0,<1"]
 aiohttp = ["aiohttp>=3.9.0,<4"]

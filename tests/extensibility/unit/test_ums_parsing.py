@@ -74,7 +74,13 @@ class TestBuildHook:
             "timeout": 30,
             "deploymentType": "N8N",
             "canShortCircuit": False,
-            "n8nWorkflowConfig": {"ordId": "sap.n8nwfrt:apiResource:test-solution_hook.testHook:v1", "cardOrdId": "sap.n8nwfrt:apiResource:test-solution_hook.testHook_mcp:v1", "toolName": "testHook", "globalTenantId": "tenant-test-001", "method": "POST"},
+            "n8nWorkflowConfig": {
+                "ordId": "sap.n8nwfrt:apiResource:test-solution_hook.testHook:v1",
+                "cardOrdId": "sap.n8nwfrt:apiResource:test-solution_hook.testHook_mcp:v1",
+                "toolName": "testHook",
+                "globalTenantId": "tenant-test-001",
+                "method": "POST",
+            },
         }
         hook = _build_hook(raw)
         assert hook is not None
@@ -100,7 +106,13 @@ class TestBuildHook:
             "timeout": 60,
             "deploymentType": "SERVERLESS",
             "canShortCircuit": True,
-            "n8nWorkflowConfig": {"ordId": "sap.n8nwfrt:apiResource:test-solution_hook.testHook:v1", "cardOrdId": "sap.n8nwfrt:apiResource:test-solution_hook.testHook_mcp:v1", "toolName": "testHook", "globalTenantId": "tenant-test-001", "method": "POST"},
+            "n8nWorkflowConfig": {
+                "ordId": "sap.n8nwfrt:apiResource:test-solution_hook.testHook:v1",
+                "cardOrdId": "sap.n8nwfrt:apiResource:test-solution_hook.testHook_mcp:v1",
+                "toolName": "testHook",
+                "globalTenantId": "tenant-test-001",
+                "method": "POST",
+            },
         }
         hook = _build_hook(raw)
         assert hook is not None
@@ -342,6 +354,7 @@ class TestBuildSourceMapping:
         ]
         mapping = _build_source_mapping(nodes, [], [])
         assert mapping.instructions == {}
+
 
 # ---------------------------------------------------------------------------
 # Tests: _transform_ums_response

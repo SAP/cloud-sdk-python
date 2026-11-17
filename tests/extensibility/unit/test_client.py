@@ -33,7 +33,9 @@ from sap_cloud_sdk.agentgateway._models import MCPTool
 
 _TOOL_NAME = "convertCurrency"
 _CARD_ORD_ID = "sap.n8nwfrt:apiResource:invoice-po-solution_currency-conversion.convertCurrency_mcp:v1"
-_ORD_ID = "sap.n8nwfrt:apiResource:invoice-po-solution_currency-conversion.convertCurrency:v1"
+_ORD_ID = (
+    "sap.n8nwfrt:apiResource:invoice-po-solution_currency-conversion.convertCurrency:v1"
+)
 _GLOBAL_TENANT_ID = "tenant-example-001"
 
 
@@ -235,6 +237,7 @@ class TestExtensibilityClientGetExtensionCapabilityImplementation:
 # Helpers shared across call_hook_agw tests
 # ---------------------------------------------------------------------------
 
+
 def _make_hook(
     tool_name: str = _TOOL_NAME,
     card_ord_id: str = _CARD_ORD_ID,
@@ -288,14 +291,16 @@ def _make_other_server_tool(tool_name: str = _TOOL_NAME) -> MCPTool:
 
 def _success_payload() -> str:
     """Full MCP tool result JSON; AGW puts the A2A Message in structuredContent."""
-    return json.dumps({
-        "content": [{"type": "text", "text": "Currency converted successfully."}],
-        "structuredContent": {
-            "messageId": "msg-1",
-            "role": "agent",
-            "parts": [{"kind": "text", "text": "Currency converted successfully."}],
-        },
-    })
+    return json.dumps(
+        {
+            "content": [{"type": "text", "text": "Currency converted successfully."}],
+            "structuredContent": {
+                "messageId": "msg-1",
+                "role": "agent",
+                "parts": [{"kind": "text", "text": "Currency converted successfully."}],
+            },
+        }
+    )
 
 
 def _make_agw_client(tools: list, tool_responses: list) -> MagicMock:
@@ -344,7 +349,9 @@ class TestCallHookAgw:
     @pytest.mark.asyncio
     async def test_success_returns_message(self):
         """Returns a Message on a successful single tool call."""
-        agw = _make_agw_client(tools=[_make_hook_tool()], tool_responses=[_success_payload()])
+        agw = _make_agw_client(
+            tools=[_make_hook_tool()], tool_responses=[_success_payload()]
+        )
         client = self._make_client()
         with patch(
             "sap_cloud_sdk.extensibility.client.create_agw_client",
@@ -399,7 +406,9 @@ class TestCallHookAgw:
     @pytest.mark.asyncio
     async def test_message_forwarded_as_body_to_tool(self):
         """The A2A message is forwarded under 'body' (per the hook tool schema), not wrapped in 'inputs'."""
-        agw = _make_agw_client(tools=[_make_hook_tool()], tool_responses=[_success_payload()])
+        agw = _make_agw_client(
+            tools=[_make_hook_tool()], tool_responses=[_success_payload()]
+        )
         client = self._make_client()
         message = MagicMock()
         message.model_dump.return_value = {

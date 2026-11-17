@@ -1729,6 +1729,20 @@ wheels = [
 ]
 
 [[package]]
+name = "langchain-mcp-adapters"
+version = "0.3.2"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "langchain-core" },
+    { name = "mcp" },
+    { name = "typing-extensions" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/05/49/f3b8497b64024ab50d10011f27e94d149668fef754da74c1c2ce6ebe4a30/langchain_mcp_adapters-0.3.2.tar.gz", hash = "sha256:61cd1a09597adb619a9bafb0642938ffc2a9463d699a753f7af0420ea46c381a", size = 47129, upload-time = "2026-08-06T06:15:04.094Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/a3/5e/4f117d2500a661079a1895a6eb18954a906e458b1e45fa04a301fcdabd61/langchain_mcp_adapters-0.3.2-py3-none-any.whl", hash = "sha256:094e6b3096dbcc408417d5722f6915f164772e50c502ae3d8989405bf12c3c84", size = 28879, upload-time = "2026-08-06T06:15:02.832Z" },
+]
+
+[[package]]
 name = "langchain-protocol"
 version = "0.0.19"
 source = { registry = "https://pypi.org/simple" }
@@ -4431,6 +4445,10 @@ django = [
 extensibility = [
     { name = "a2a-sdk" },
 ]
+extensibility-langchain = [
+    { name = "a2a-sdk" },
+    { name = "langchain-mcp-adapters" },
+]
 fastapi = [
     { name = "fastapi" },
 ]
@@ -4488,6 +4506,7 @@ requires-dist = [
     { name = "grpcio", specifier = ">=1.60.0,<2" },
     { name = "hatchling", specifier = "~=1.27.0" },
     { name = "httpx", specifier = ">=0.27.0,<1" },
+    { name = "langchain-mcp-adapters", marker = "extra == 'extensibility-langchain'", specifier = ">=0.1.0" },
     { name = "langgraph", marker = "extra == 'langgraph'", specifier = ">=1.0.0,<2" },
     { name = "mcp", specifier = ">=1.1.0,<3" },
     { name = "minio", specifier = ">=7.2.16,<7.2.21" },
@@ -4513,12 +4532,13 @@ requires-dist = [
     { name = "python-odata", specifier = ">=0.7.0" },
     { name = "requests", specifier = ">=2.33.0,<3" },
     { name = "requests-oauthlib", specifier = ">=2.0.0,<3" },
+    { name = "sap-cloud-sdk", extras = ["extensibility"], marker = "extra == 'extensibility-langchain'" },
     { name = "setuptools", specifier = ">=83.0,<85" },
     { name = "sqlalchemy", marker = "extra == 'sqlalchemy'", specifier = ">=2.0.0,<3" },
     { name = "starlette", marker = "extra == 'starlette'", specifier = ">=0.40.0,<1" },
     { name = "traceloop-sdk", specifier = "~=0.61.0" },
 ]
-provides-extras = ["extensibility", "starlette", "fastapi", "aiohttp", "sqlalchemy", "django", "flask", "langgraph"]
+provides-extras = ["extensibility", "extensibility-langchain", "starlette", "fastapi", "aiohttp", "sqlalchemy", "django", "flask", "langgraph"]
 
 [package.metadata.requires-dev]
 dev = [

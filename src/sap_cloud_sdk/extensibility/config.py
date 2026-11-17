@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+import os
+from dataclasses import dataclass, field
 from typing import Optional
 
 
@@ -28,10 +29,20 @@ class ExtensibilityConfig:
             resolves to the default destination service instance. Specify a name
             only if your deployment binds the destination service under a
             non-default instance name.
+        audit_channel_id: ALS channel identifier for extension audit events
+            (e.g. ``"my-agent-v1"``).  When empty (the default) audit events
+            are not emitted.  Set this to enable extension audit logging.
+        audit_service_name: ALS ``app_id`` stamped on every audit event.
+            Defaults to the ``AUDIT_APP_ID`` environment variable when set,
+            otherwise falls back to ``audit_channel_id``.
     """
 
     destination_name: Optional[str] = None
     destination_instance: str = "default"
+    audit_channel_id: str = ""
+    audit_service_name: str = field(
+        default_factory=lambda: os.environ.get("AUDIT_APP_ID", "")
+    )
 
 
 @dataclass

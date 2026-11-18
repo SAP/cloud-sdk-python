@@ -58,8 +58,36 @@ class TestCreateThreadRegistryNoCredentials:
                 create_thread_registry()
 
 
-class TestCreateThreadRegistryServicePath:
-    """create_thread_registry() with credentials returns SAPAgentMemoryThreadRegistry."""
+class TestCreateThreadRegistryInstanceParam:
+    """create_thread_registry() correctly forwards the instance parameter."""
+
+    def test_passes_instance_to_config_loader(self):
+        with patch(_NO_CREDENTIALS) as mock_loader:
+            mock_loader.return_value = None
+            create_thread_registry(instance="my-svc")
+        mock_loader.assert_called_once_with("my-svc")
+
+    def test_default_instance_used_when_omitted(self):
+        with patch(_NO_CREDENTIALS) as mock_loader:
+            mock_loader.return_value = None
+            create_thread_registry()
+        mock_loader.assert_called_once_with("default")
+
+    def test_ias_binding_with_custom_instance_returns_sap_registry(self):
+        ias_config = AgentMemoryConfig(base_url="https://serverless-memory.example.com")
+        with patch(_NO_CREDENTIALS, return_value=ias_config):
+            result = create_thread_registry(instance="my-svc")
+        from sap_cloud_sdk.agent_memory.thread_registry import SAPAgentMemoryThreadRegistry
+
+        assert isinstance(result, SAPAgentMemoryThreadRegistry)
+
+    def test_instance_and_ttl_seconds_both_accepted(self):
+        with patch(_NO_CREDENTIALS, return_value=None):
+            result = create_thread_registry(instance="my-svc", ttl_seconds=3600)
+        from sap_cloud_sdk.agent_memory.thread_registry import InMemoryThreadRegistry
+
+        assert isinstance(result, InMemoryThreadRegistry)
+        assert result._default_ttl == 3600
 
     def _with_config(self, fn, config=_VALID_CONFIG):
         with patch(_NO_CREDENTIALS, return_value=config):

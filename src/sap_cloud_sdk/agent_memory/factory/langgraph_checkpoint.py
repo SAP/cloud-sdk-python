@@ -43,7 +43,7 @@ def _create_timed_checkpointer(ttl_seconds: int):
     return TimedInMemorySaver(ttl_seconds=ttl_seconds)
 
 
-def create_checkpointer(*, ttl_seconds: Optional[int] = None):
+def create_checkpointer(*, instance: str = "default", ttl_seconds: Optional[int] = None):
     """Create a LangGraph checkpointer for the current environment.
 
     Returns LangGraph's ``InMemorySaver`` (no TTL) or ``TimedInMemorySaver``
@@ -51,6 +51,10 @@ def create_checkpointer(*, ttl_seconds: Optional[int] = None):
     survive restarts.
 
     Args:
+        instance: Binding instance name. Accepted for forward compatibility and
+            reserved for future use — has no effect on the returned checkpointer
+            in this release. A real HANA-backed checkpointer that honours this
+            parameter is planned for a subsequent PR.
         ttl_seconds: Evict threads inactive for this many seconds.
                      ``None`` (default) disables eviction.
 

@@ -292,7 +292,8 @@ class TestLoadConfigFromEnv:
         assert config.client_id == "my-client"
         assert config.client_secret == "my-secret"
 
-    def test_calls_resolver_with_correct_arguments(self):
+    def test_calls_resolver_with_correct_arguments(self, monkeypatch):
+        monkeypatch.delenv("SERVICE_BINDING_ROOT", raising=False)
         with patch(_RESOLVER, side_effect=_fill_binding) as mock_resolver:
             _load_config_from_env()
 
@@ -302,6 +303,37 @@ class TestLoadConfigFromEnv:
         assert kwargs["base_var_name"] == "CLOUD_SDK_CFG"
         assert kwargs["module"] == "hana-agent-memory"
         assert kwargs["instance"] == "default"
+
+    def test_calls_resolver_with_custom_instance(self):
+        with patch(_RESOLVER, side_effect=_fill_binding) as mock_resolver:
+            _load_config_from_env("my-binding")
+
+        mock_resolver.assert_called_once()
+        _, kwargs = mock_resolver.call_args
+        assert kwargs["instance"] == "my-binding"
+
+    def test_honours_service_binding_root_env_var(self, monkeypatch):
+        monkeypatch.setenv("SERVICE_BINDING_ROOT", "/custom/path")
+        with patch(_RESOLVER, side_effect=_fill_binding) as mock_resolver:
+            _load_config_from_env()
+
+        _, kwargs = mock_resolver.call_args
+        assert kwargs["base_volume_mount"] == "/custom/path"
+
+    def test_ias_binding_with_custom_instance(self, monkeypatch):
+        monkeypatch.setenv(
+            "CLOUD_SDK_CFG_HANA_AGENT_MEMORY_MY_SVC_APPLICATION_URL",
+            "https://serverless-memory.example.com",
+        )
+        monkeypatch.delenv("CLOUD_SDK_CFG_HANA_AGENT_MEMORY_MY_SVC_UAA", raising=False)
+
+        with patch("os.stat", side_effect=FileNotFoundError("no mount")):
+            config = _load_config_from_env("my-svc")
+
+        assert config is not None
+        assert config.base_url == "https://serverless-memory.example.com"
+        assert config.token_url is None
+        assert config.auth_mode == "ias"
 
     def test_falls_back_to_env_vars(self, monkeypatch):
         monkeypatch.setenv(

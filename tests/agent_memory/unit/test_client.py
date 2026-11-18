@@ -163,6 +163,22 @@ class TestCreateClient:
         with pytest.raises(AgentMemoryConfigError, match="tenant"):
             create_client(config=config, access_strategy=AccessStrategy.SUBSCRIBER)
 
+    def test_passes_instance_to_http_builder(self):
+        """create_client(instance=...) forwards the name to _build_agent_memory_http."""
+        ias_config = AgentMemoryConfig(base_url="https://serverless-memory.example.com")
+        with patch("sap_cloud_sdk.agent_memory._build_agent_memory_http") as mock_build:
+            mock_build.return_value = (Mock(spec=HttpClient), True)
+            create_client(instance="my-svc", config=ias_config)
+        mock_build.assert_called_once_with("my-svc", ias_config)
+
+    def test_default_instance_used_when_omitted(self):
+        """create_client() with no instance uses 'default'."""
+        config = AgentMemoryConfig(base_url="https://memory.example.com")
+        with patch("sap_cloud_sdk.agent_memory._build_agent_memory_http") as mock_build:
+            mock_build.return_value = (Mock(spec=HttpClient), True)
+            create_client(config=config)
+        mock_build.assert_called_once_with("default", config)
+
 
 # ── Access strategy and per-tenant transport routing ─────────────────────────
 

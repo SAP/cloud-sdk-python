@@ -171,12 +171,18 @@ class BindingData:
             raise AgentMemoryConfigError(f"Missing required field in uaa JSON: {e}")
 
 
-def _load_config_from_env() -> Optional[AgentMemoryConfig]:
+def _load_config_from_env(instance: str = "default") -> Optional[AgentMemoryConfig]:
     """Load Agent Memory configuration from a mounted volume or environment variables.
 
     Uses the secret resolver with fallback order:
-    1. Mount at ``/etc/secrets/appfnd/hana-agent-memory/default/``
-    2. Environment variables ``CLOUD_SDK_CFG_HANA_AGENT_MEMORY_DEFAULT_*``
+    1. Mount at ``$SERVICE_BINDING_ROOT/hana-agent-memory/{instance}/``
+       (``SERVICE_BINDING_ROOT`` defaults to ``/etc/secrets/appfnd`` when unset)
+    2. Environment variables ``CLOUD_SDK_CFG_HANA_AGENT_MEMORY_{INSTANCE_UPPER}_*``
+
+    Args:
+        instance: Binding instance name declared in ``app.yaml``. Defaults to
+            ``"default"``, which matches the XSUAA-backed HANA Agent Memory
+            service. Serverless agents pass the name they declared in ``requires:``.
 
     Returns:
         A validated ``AgentMemoryConfig``, or ``None`` if no binding is found.
@@ -187,14 +193,15 @@ def _load_config_from_env() -> Optional[AgentMemoryConfig]:
     from sap_cloud_sdk.core.secret_resolver import (
         read_from_mount_and_fallback_to_env_var,
     )
+    from sap_cloud_sdk.core.secret_resolver.resolver import resolve_base_mount
 
     binding = BindingData()
     try:
         read_from_mount_and_fallback_to_env_var(
-            base_volume_mount="/etc/secrets/appfnd",
+            base_volume_mount=resolve_base_mount(),
             base_var_name="CLOUD_SDK_CFG",
             module=_SERVICE_NAME,
-            instance="default",
+            instance=instance,
             target=binding,
         )
     except RuntimeError:

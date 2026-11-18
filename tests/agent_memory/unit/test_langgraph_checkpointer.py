@@ -78,6 +78,26 @@ class TestCreateCheckpointer:
             with pytest.raises(ImportError, match="langgraph is required"):
                 create_checkpointer()
 
+    # ── instance parameter ────────────────────────────────────────────────────
+
+    def test_instance_param_accepted_without_error(self):
+        """create_checkpointer(instance=...) does not raise."""
+        result = create_checkpointer(instance="any-name")
+        assert isinstance(result, InMemorySaver)
+
+    def test_instance_param_does_not_affect_return_type(self):
+        """Both default and custom instance values return InMemorySaver."""
+        assert isinstance(create_checkpointer(instance="default"), InMemorySaver)
+        assert isinstance(create_checkpointer(instance="my-agent"), InMemorySaver)
+
+    def test_no_deprecation_warning_for_instance_param(self):
+        """The instance parameter does not trigger a DeprecationWarning."""
+        import warnings
+
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", DeprecationWarning)
+            create_checkpointer(instance="my-agent")
+
     # ── LangGraph integration ─────────────────────────────────────────────────
 
     def test_checkpointer_compiles_with_langgraph_graph(self):

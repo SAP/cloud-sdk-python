@@ -78,26 +78,29 @@ def _build_agent_memory_http(
 
 def create_client(
     *,
+    instance: str = "default",
     config: Optional[AgentMemoryConfig] = None,
     access_strategy: AccessStrategy = AccessStrategy.SUBSCRIBER,
     tenant: Optional[str] = None,
 ) -> AgentMemoryClient:
     """Create an :class:`AgentMemoryClient` with automatic credential detection.
 
-    The binding loaded depends on ``access_strategy`` and ``tenant``:
+    The binding loaded depends on ``instance``, ``access_strategy``, and ``tenant``:
 
-    - ``SUBSCRIBER`` with ``tenant="acme-corp"`` — loads credentials from
-      ``/etc/secrets/appfnd/hana-agent-memory/default/`` (or
-      ``CLOUD_SDK_CFG_HANA_AGENT_MEMORY_DEFAULT_*`` env vars) and derives the
-      subscriber token URL using the ``identityzone`` field.
-    - ``PROVIDER`` — same binding, uses provider token directly.
-    - **IAS binding** (URL-only, no ``token_url``) — detected from the config:
-      ``access_strategy`` and ``tenant`` are ignored, and the per-request Bearer
-      token is supplied via RuntimeContext (wired by ``bootstrap(app)`` on the
-      server, or set manually for scripts).
-    - Explicit ``config`` — uses the provided configuration directly.
+    - ``instance="default"`` (the default) — discovers the XSUAA-backed HANA Agent
+      Memory binding at ``$SERVICE_BINDING_ROOT/hana-agent-memory/default/``
+      (or ``CLOUD_SDK_CFG_HANA_AGENT_MEMORY_DEFAULT_*`` env vars).
+    - ``instance="my-agent-memory"`` — discovers the IAS-based Serverless Agent
+      Memory binding at ``$SERVICE_BINDING_ROOT/hana-agent-memory/my-agent-memory/``.
+      The SDK detects auth mode from the binding contents: ``uaa`` present → XSUAA,
+      absent → IAS.
+    - Explicit ``config`` — uses the provided configuration directly, ``instance``
+      is ignored.
 
     Args:
+        instance: Binding instance name declared in ``app.yaml``. Defaults to
+            ``"default"``, which matches the XSUAA-backed HANA Agent Memory
+            service. Serverless agents pass the name they declared in ``requires:``.
         config: Optional explicit configuration. When provided, binding
                 discovery is skipped.
         access_strategy: Tenant access strategy for all operations.
@@ -114,7 +117,7 @@ def create_client(
                 ``tenant`` is not provided.
     """
     try:
-        http, is_ias = _build_agent_memory_http("default", config)
+        http, is_ias = _build_agent_memory_http(instance, config)
         if is_ias:
             # IAS mode: calls are routed by the per-request token, not by an
             # XSUAA access strategy — tenant/access_strategy do not apply.

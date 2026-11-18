@@ -13,6 +13,7 @@ logger = logging.getLogger(__name__)
 
 def create_thread_registry(
     *,
+    instance: str = "default",
     ttl_seconds: Optional[int] = None,
 ) -> "BaseThreadRegistry":
     """Create a thread registry for the current environment.
@@ -25,6 +26,9 @@ def create_thread_registry(
       in-process only and will not survive restarts.
 
     Args:
+        instance: Binding instance name declared in ``app.yaml``. Defaults to
+            ``"default"``, which matches the XSUAA-backed HANA Agent Memory
+            service. Serverless agents pass the name they declared in ``requires:``.
         ttl_seconds: Registry-level default inactivity threshold in seconds.
             Threads inactive for longer than this are treated as expired. The window
             slides — it resets on each write. Applied per-thread when the caller does
@@ -42,7 +46,7 @@ def create_thread_registry(
         SAPAgentMemoryThreadRegistry,
     )
 
-    config = _load_config_from_env()
+    config = _load_config_from_env(instance)
 
     if config is not None:
         logger.info("create_thread_registry(): using SAPAgentMemoryThreadRegistry.")

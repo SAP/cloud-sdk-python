@@ -1,8 +1,8 @@
 """
 GenAI Attribute Transformer.
 
-Transforms OpenInference llm.* attributes to OpenTelemetry gen_ai.* semantic conventions,
-replacing the original attributes to ensure pure OpenTelemetry compliance.
+Normalizes Traceloop GenAI span attributes into OpenTelemetry gen_ai.* semantic
+conventions, dropping vendor-proprietary attributes.
 """
 
 import json
@@ -18,8 +18,8 @@ logger = logging.getLogger(__name__)
 class GenAIAttributeTransformer(SpanExporter):
     """
     Span exporter wrapper that performs a minimal normalization of attributes for GenAI spans.
-    It reduces span size and normalizes provider/model and usage metrics while removing only
-    standard vendor-specific attributes. All non-standard attributes are preserved, allowing
+    It reduces span size and normalizes provider/model while dropping only vendor-proprietary
+    attributes that duplicate normalized data. All other attributes are preserved, allowing
     users to include custom telemetry data without naming restrictions.
     """
 
@@ -30,16 +30,17 @@ class GenAIAttributeTransformer(SpanExporter):
     _GENAI_PROMPT_PREFIX = "gen_ai.prompt."
     _GENAI_COMPLETION_PREFIX = "gen_ai.completion."
 
-    _OPENINFERENCE_PREFIX = "llm."
     _TRACELOOP_PREFIX = "traceloop."
 
-    # OpenInference llm.usage.* attribute keys
-    _LLM_USAGE_TOTAL_TOKENS = "llm.usage.total_tokens"
-    _LLM_USAGE_INPUT_TOKENS = "llm.usage.input_tokens"
-    _LLM_USAGE_PROMPT_TOKENS = "llm.usage.prompt_tokens"
-    _LLM_USAGE_OUTPUT_TOKENS = "llm.usage.output_tokens"
-    _LLM_USAGE_COMPLETION_TOKENS = "llm.usage.completion_tokens"
-    _LLM_USAGE_CACHE_READ_INPUT_TOKENS = "llm.usage.cache_read_input_tokens"
+    # Vendor-proprietary attributes that duplicate data already normalized into the
+    # gen_ai.* semconv (or are pure span noise). Dropped verbatim after useful
+    # extraction has run.
+    _DENY_LIST = frozenset(
+        {
+            "traceloop.entity.input",
+            "traceloop.entity.output",
+        }
+    )
 
     def __init__(self, wrapped_exporter: SpanExporter):
         """
@@ -104,12 +105,12 @@ class GenAIAttributeTransformer(SpanExporter):
 
         attrs: Dict[str, Any] = dict(span.attributes)
 
-        # Only process spans that have traceloop.* or llm.* or gen_ai.prompt.* or gen_ai.completion.* attributes
+        # Only process spans that carry traceloop.* or gen_ai.prompt.* or
+        # gen_ai.completion.* attributes.
         if not any(
             k.startswith(
                 (
                     self._TRACELOOP_PREFIX,
-                    self._OPENINFERENCE_PREFIX,
                     self._GENAI_PROMPT_PREFIX,
                     self._GENAI_COMPLETION_PREFIX,
                 )
@@ -133,7 +134,9 @@ class GenAIAttributeTransformer(SpanExporter):
             attrs["gen_ai.provider.name"] = provider
             keys_to_remove.add(self._TL_PROVIDER)
 
-        keys_to_remove.update(self._map_llm_usage(attrs))
+        # Drop deny-listed attributes;
+        keys_to_remove.update(k for k in attrs if k in self._DENY_LIST)
+
         keys_to_remove.update(self._get_message_keys_to_remove(attrs))
         self._transform_messages(attrs)
 
@@ -154,47 +157,6 @@ class GenAIAttributeTransformer(SpanExporter):
             start_time=span.start_time,
             end_time=span.end_time,
         )
-
-    def _map_llm_usage(self, attrs: Dict[str, Any]) -> set:
-        """
-        Map llm.usage.* keys into gen_ai.usage.* keys.
-
-        Returns:
-            Set of llm.usage.* keys that were transformed and should be removed
-        """
-        transformed_keys = set()
-
-        # total tokens
-        if self._LLM_USAGE_TOTAL_TOKENS in attrs:
-            attrs["gen_ai.usage.total_tokens"] = attrs[self._LLM_USAGE_TOTAL_TOKENS]
-            transformed_keys.add(self._LLM_USAGE_TOTAL_TOKENS)
-
-        # input tokens (prefer input_tokens, fallback to prompt_tokens)
-        if self._LLM_USAGE_INPUT_TOKENS in attrs:
-            attrs["gen_ai.usage.input_tokens"] = attrs[self._LLM_USAGE_INPUT_TOKENS]
-            transformed_keys.add(self._LLM_USAGE_INPUT_TOKENS)
-        elif self._LLM_USAGE_PROMPT_TOKENS in attrs:
-            attrs["gen_ai.usage.input_tokens"] = attrs[self._LLM_USAGE_PROMPT_TOKENS]
-            transformed_keys.add(self._LLM_USAGE_PROMPT_TOKENS)
-
-        # output tokens (prefer output_tokens, fallback to completion_tokens)
-        if self._LLM_USAGE_OUTPUT_TOKENS in attrs:
-            attrs["gen_ai.usage.output_tokens"] = attrs[self._LLM_USAGE_OUTPUT_TOKENS]
-            transformed_keys.add(self._LLM_USAGE_OUTPUT_TOKENS)
-        elif self._LLM_USAGE_COMPLETION_TOKENS in attrs:
-            attrs["gen_ai.usage.output_tokens"] = attrs[
-                self._LLM_USAGE_COMPLETION_TOKENS
-            ]
-            transformed_keys.add(self._LLM_USAGE_COMPLETION_TOKENS)
-
-        # cache read input tokens (optional)
-        if self._LLM_USAGE_CACHE_READ_INPUT_TOKENS in attrs:
-            attrs["gen_ai.usage.cache_read_input_tokens"] = attrs[
-                self._LLM_USAGE_CACHE_READ_INPUT_TOKENS
-            ]
-            transformed_keys.add(self._LLM_USAGE_CACHE_READ_INPUT_TOKENS)
-
-        return transformed_keys
 
     def _get_message_keys_to_remove(self, attrs: Dict[str, Any]) -> set:
         """

@@ -13,7 +13,6 @@ from sap_cloud_sdk.agent_memory._models import (
 
 
 class TestMemory:
-
     def test_from_dict_maps_known_fields(self):
         """All known API fields are mapped to model attributes."""
         data = {
@@ -45,15 +44,25 @@ class TestMemory:
 
     def test_from_dict_parses_string_metadata(self):
         """String metadata is parsed as JSON."""
-        data = {"id": "m1", "agentID": "a", "invokerID": "u", "content": "x",
-                "metadata": '{"key": "val"}'}
+        data = {
+            "id": "m1",
+            "agentID": "a",
+            "invokerID": "u",
+            "content": "x",
+            "metadata": '{"key": "val"}',
+        }
         memory = Memory.from_dict(data)
         assert memory.metadata == {"key": "val"}
 
     def test_from_dict_handles_invalid_json_metadata(self):
         """Invalid JSON metadata is wrapped in a raw dict."""
-        data = {"id": "m1", "agentID": "a", "invokerID": "u", "content": "x",
-                "metadata": "not-json"}
+        data = {
+            "id": "m1",
+            "agentID": "a",
+            "invokerID": "u",
+            "content": "x",
+            "metadata": "not-json",
+        }
         memory = Memory.from_dict(data)
         assert memory.metadata == {"raw": "not-json"}
 
@@ -67,7 +76,10 @@ class TestMemory:
     def test_to_dict_shape(self):
         """to_dict outputs all fields with camelCase keys."""
         memory = Memory(
-            id="m1", agent_id="a", invoker_id="u", content="hello",
+            id="m1",
+            agent_id="a",
+            invoker_id="u",
+            content="hello",
             create_timestamp="2025-01-01T00:00:00Z",
             update_timestamp="2025-01-02T00:00:00Z",
         )
@@ -84,7 +96,10 @@ class TestMemory:
     def test_to_dict_includes_metadata_when_set(self):
         """to_dict includes metadata when set."""
         memory = Memory(
-            id="m1", agent_id="a", invoker_id="u", content="hello",
+            id="m1",
+            agent_id="a",
+            invoker_id="u",
+            content="hello",
             metadata={"k": "v"},
         )
         d = memory.to_dict()
@@ -115,7 +130,6 @@ class TestMemory:
 
 
 class TestSearchResult:
-
     def test_from_dict_maps_all_fields(self):
         """All known fields including similarity score are mapped correctly."""
         data = {
@@ -146,7 +160,10 @@ class TestSearchResult:
     def test_to_dict_includes_similarity(self):
         """to_dict includes the similarity score."""
         result = SearchResult(
-            id="m1", agent_id="a", invoker_id="u", content="x",
+            id="m1",
+            agent_id="a",
+            invoker_id="u",
+            content="x",
             similarity=0.85,
         )
         d = result.to_dict()
@@ -172,7 +189,6 @@ class TestSearchResult:
 
 
 class TestMessage:
-
     def test_from_dict_maps_known_fields(self):
         """All known message fields are mapped correctly."""
         data = {
@@ -199,8 +215,12 @@ class TestMessage:
     def test_from_dict_parses_string_metadata(self):
         """String metadata is parsed as JSON."""
         data = {
-            "id": "msg-1", "agentID": "a", "invokerID": "u",
-            "messageGroup": "g", "role": "USER", "content": "hi",
+            "id": "msg-1",
+            "agentID": "a",
+            "invokerID": "u",
+            "messageGroup": "g",
+            "role": "USER",
+            "content": "hi",
             "metadata": '{"key": "val"}',
         }
         msg = Message.from_dict(data)
@@ -209,8 +229,12 @@ class TestMessage:
     def test_from_dict_handles_invalid_json_metadata(self):
         """Invalid JSON metadata is wrapped in a raw dict."""
         data = {
-            "id": "msg-1", "agentID": "a", "invokerID": "u",
-            "messageGroup": "g", "role": "USER", "content": "hi",
+            "id": "msg-1",
+            "agentID": "a",
+            "invokerID": "u",
+            "messageGroup": "g",
+            "role": "USER",
+            "content": "hi",
             "metadata": "not-json",
         }
         msg = Message.from_dict(data)
@@ -219,8 +243,12 @@ class TestMessage:
     def test_from_dict_handles_missing_metadata(self):
         """Missing metadata defaults to None."""
         data = {
-            "id": "msg-1", "agentID": "a", "invokerID": "u",
-            "messageGroup": "g", "role": "USER", "content": "hi",
+            "id": "msg-1",
+            "agentID": "a",
+            "invokerID": "u",
+            "messageGroup": "g",
+            "role": "USER",
+            "content": "hi",
         }
         msg = Message.from_dict(data)
         assert msg.metadata is None
@@ -236,8 +264,12 @@ class TestMessage:
     def test_to_dict_shape(self):
         """to_dict outputs all fields with camelCase keys."""
         msg = Message(
-            id="msg-1", agent_id="a", invoker_id="u",
-            message_group="g", role=MessageRole.USER, content="hi",
+            id="msg-1",
+            agent_id="a",
+            invoker_id="u",
+            message_group="g",
+            role=MessageRole.USER,
+            content="hi",
             create_timestamp="2025-01-01T00:00:00Z",
         )
         d = msg.to_dict()
@@ -254,8 +286,12 @@ class TestMessage:
     def test_to_dict_includes_metadata_when_set(self):
         """to_dict includes metadata when set."""
         msg = Message(
-            id="msg-1", agent_id="a", invoker_id="u",
-            message_group="g", role=MessageRole.USER, content="hi",
+            id="msg-1",
+            agent_id="a",
+            invoker_id="u",
+            message_group="g",
+            role=MessageRole.USER,
+            content="hi",
             metadata={"key": "val"},
         )
         d = msg.to_dict()
@@ -264,8 +300,11 @@ class TestMessage:
     def test_to_dict_omits_none_role_and_metadata(self):
         """to_dict omits role and metadata when None."""
         msg = Message(
-            id="msg-1", agent_id="a", invoker_id="u",
-            message_group="g", content="hi",
+            id="msg-1",
+            agent_id="a",
+            invoker_id="u",
+            message_group="g",
+            content="hi",
         )
         d = msg.to_dict()
         assert "role" not in d
@@ -291,7 +330,6 @@ class TestMessage:
 
 
 class TestEnums:
-
     def test_message_role_values(self):
         """MessageRole enum has the expected members."""
         assert MessageRole.USER == "USER"
@@ -309,7 +347,6 @@ class TestEnums:
 
 
 class TestRetentionConfig:
-
     def test_from_dict_maps_known_fields(self):
         """All known retention config fields are mapped correctly."""
         data = {
@@ -317,6 +354,8 @@ class TestRetentionConfig:
             "messageDays": 30,
             "memoryDays": 90,
             "usageLogDays": 180,
+            "threadDays": 45,
+            "maxCheckpointsPerThread": 10,
             "createTimestamp": "2025-01-01T00:00:00Z",
             "updateTimestamp": "2025-01-02T00:00:00Z",
         }
@@ -326,6 +365,8 @@ class TestRetentionConfig:
         assert rc.message_days == 30
         assert rc.memory_days == 90
         assert rc.usage_log_days == 180
+        assert rc.thread_days == 45
+        assert rc.max_checkpoints_per_thread == 10
         assert rc.create_timestamp == "2025-01-01T00:00:00Z"
         assert rc.update_timestamp == "2025-01-02T00:00:00Z"
 
@@ -336,6 +377,8 @@ class TestRetentionConfig:
         assert rc.message_days is None
         assert rc.memory_days is None
         assert rc.usage_log_days is None
+        assert rc.thread_days is None
+        assert rc.max_checkpoints_per_thread is None
         assert rc.create_timestamp is None
         assert rc.update_timestamp is None
 
@@ -352,6 +395,8 @@ class TestRetentionConfig:
             "messageDays": 30,
             "memoryDays": 90,
             "usageLogDays": 180,
+            "threadDays": 45,
+            "maxCheckpointsPerThread": 10,
             "createTimestamp": "2025-01-01T00:00:00Z",
             "updateTimestamp": "2025-01-02T00:00:00Z",
         }

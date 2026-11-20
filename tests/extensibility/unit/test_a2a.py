@@ -398,6 +398,33 @@ class TestBuildExtensionCapabilities:
         assert isinstance(result, list)
         assert all(isinstance(ext, AgentExtension) for ext in result)
 
+    def test_discovery_absent_from_params_when_none(self):
+        """discovery=None (default) → 'discovery' key must not appear in params."""
+        cap = ExtensionCapability(
+            display_name="Test",
+            description="Test.",
+        )
+
+        result = build_extension_capabilities([cap])
+
+        assert "discovery" not in result[0].params
+
+    def test_discovery_in_params_when_set(self):
+        """discovery=<dict> → 'discovery' key appears verbatim in params."""
+        payload = {
+            "steps": [{"stepId": "chat", "stepName": "Chat"}],
+            "supportedExtensions": [],
+        }
+        cap = ExtensionCapability(
+            display_name="Test",
+            description="Test.",
+            discovery=payload,
+        )
+
+        result = build_extension_capabilities([cap])
+
+        assert result[0].params["discovery"] == payload
+
     def test_instruction_supported_true(self):
         caps = [
             ExtensionCapability(

@@ -68,6 +68,22 @@ class TestExtensionCapability:
         )
         assert cap.tools.additions.enabled is False
 
+    def test_discovery_defaults_to_none(self):
+        cap = ExtensionCapability(
+            display_name="Test",
+            description="Test capability.",
+        )
+        assert cap.discovery is None
+
+    def test_discovery_accepts_dict(self):
+        payload = {"steps": [{"stepId": "chat", "stepName": "Chat"}]}
+        cap = ExtensionCapability(
+            display_name="Test",
+            description="Test capability.",
+            discovery=payload,
+        )
+        assert cap.discovery == payload
+
 
 class TestMcpServer:
     """Tests for McpServer dataclass."""

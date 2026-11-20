@@ -601,6 +601,9 @@ class ExtensionCapability:
         tools: Tool-related configuration (additions, and future sub-options).
         instruction_supported: Whether the extension capability supports custom instructions.
         supported_hooks: List of supported hooks for this extension capability.
+        discovery: Optional discovery object loaded from ``extension_discovery.json``.
+            When set, serialized verbatim into the A2A card ``params`` under the
+            ``"discovery"`` key.  ``None`` means the key is omitted entirely.
     """
 
     display_name: str
@@ -609,6 +612,7 @@ class ExtensionCapability:
     tools: Tools = field(default_factory=Tools)
     instruction_supported: bool = True
     supported_hooks: List[HookCapability] = field(default_factory=list)
+    discovery: Optional[Dict[str, Any]] = None
 
 
 @dataclass

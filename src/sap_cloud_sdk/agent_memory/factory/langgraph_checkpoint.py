@@ -43,7 +43,9 @@ def _create_timed_checkpointer(ttl_seconds: int):
     return TimedInMemorySaver(ttl_seconds=ttl_seconds)
 
 
-def create_checkpointer(*, instance: str = "default", ttl_seconds: Optional[int] = None):
+def create_checkpointer(
+    *, instance: str = "default", ttl_seconds: Optional[int] = None
+):
     """Create a LangGraph checkpointer for the current environment.
 
     Returns LangGraph's ``InMemorySaver`` (no TTL) or ``TimedInMemorySaver``

@@ -407,7 +407,7 @@ class TestBuildExtensionCapabilities:
 
         result = build_extension_capabilities([cap])
 
-        assert "discovery" not in result[0].params
+        assert result[0].params is None or "discovery" not in result[0].params
 
     def test_discovery_in_params_when_set(self):
         """discovery=<dict> → 'discovery' key appears verbatim in params."""
@@ -423,6 +423,7 @@ class TestBuildExtensionCapabilities:
 
         result = build_extension_capabilities([cap])
 
+        assert result[0].params is not None
         assert result[0].params["discovery"] == payload
 
     def test_instruction_supported_true(self):

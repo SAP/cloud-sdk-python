@@ -152,7 +152,8 @@ def build_extension_capabilities(
     - ``description``: From the capability's description field
     - ``params``: A dict with camelCase keys containing ``capabilityId``,
       ``displayName``, ``instructionSupported``, ``tools`` (serialized
-      ``Tools`` and ``supportedHooks`` (serialized ``HookCapability``))
+      ``Tools``), ``supportedHooks`` (serialized ``HookCapability``), and
+      optionally ``discovery`` (verbatim dict when set on the capability)
     - ``required``: Always ``False``
 
     Input (list of ExtensionCapability)::
@@ -176,7 +177,8 @@ def build_extension_capabilities(
                 "displayName": "Default",
                 "instructionSupported": True,
                 "tools": {"additions": {"enabled": True}},
-                "supportedHooks": [{"type": "BEFORE", "id": "onboarding_before", "displayName": "Onboarding Before Hook", "description": "Hook executed before onboarding workflow step."}]
+                "supportedHooks": [{"type": "BEFORE", "id": "onboarding_before", "displayName": "Onboarding Before Hook", "description": "Hook executed before onboarding workflow step."}],
+                "discovery": {"steps": [...]}  # only present when capability.discovery is not None
             },
             "required": False
         }]
@@ -211,6 +213,8 @@ def build_extension_capabilities(
             "tools": tools_dict,
             "supportedHooks": supported_hooks_dict,
         }
+        if cap.discovery is not None:
+            params["discovery"] = cap.discovery
 
         agent_extension = AgentExtension(
             uri=uri,

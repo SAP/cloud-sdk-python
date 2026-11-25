@@ -73,7 +73,7 @@ _GRAPHQL_QUERY_FRAGMENT = """\
           tools {
             additions { type mcpConfig { globalTenantId ordId toolNames } }
           }
-          hooks { id hookId type name onFailure timeout deploymentType canShortCircuit
+          hooks { id hookId type name onFailure timeout deploymentType executionMode canShortCircuit
             n8nWorkflowConfig { ordId cardOrdId toolName globalTenantId method }
           }
         }
@@ -146,6 +146,9 @@ _DEPLOYMENT_TYPE_MAP: dict[str, DeploymentType] = {
 _HTTP_METHOD_MAP: dict[str, HTTPMethod] = {
     member.value: member for member in HTTPMethod
 }
+_EXECUTION_MODE_MAP: dict[str, ExecutionMode] = {
+    member.value: member for member in ExecutionMode
+}
 
 
 def _parse_hook_type_safe(value: str) -> Optional[HookType]:
@@ -175,6 +178,14 @@ def _parse_method_safe(value: str) -> HTTPMethod:
     if result is None and value:
         logger.warning("Unknown HTTP method %r; defaulting to POST", value)
     return result or HTTPMethod.POST
+
+
+def _parse_execution_mode_safe(value: str) -> ExecutionMode:
+    """Return an ``ExecutionMode`` for *value*, defaulting to ``SYNC``."""
+    result = _EXECUTION_MODE_MAP.get(value)
+    if result is None and value:
+        logger.warning("Unknown executionMode value %r; defaulting to SYNC", value)
+    return result or ExecutionMode.SYNC
 
 
 # ---------------------------------------------------------------------------
@@ -292,6 +303,7 @@ def _build_hook(raw: Dict[str, Any]) -> Optional[Hook]:
     deployment_type = _parse_deployment_type_safe(raw.get("deploymentType", ""))
     method = _parse_method_safe(n8n_config.get("method", "POST"))
     on_failure = _parse_on_failure_safe(raw.get("onFailure", ""))
+    execution_mode = _parse_execution_mode_safe(raw.get("executionMode", ""))
 
     return Hook(
         id=raw.get("id", ""),
@@ -307,7 +319,7 @@ def _build_hook(raw: Dict[str, Any]) -> Optional[Hook]:
         type=hook_type,
         deployment_type=deployment_type,
         timeout=raw.get("timeout", DEFAULT_HOOK_TIMEOUT),
-        execution_mode=ExecutionMode.SYNC,
+        execution_mode=execution_mode,
         on_failure=on_failure,
         order=0,
         can_short_circuit=raw.get("canShortCircuit", False),

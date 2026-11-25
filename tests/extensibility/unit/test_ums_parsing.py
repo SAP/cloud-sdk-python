@@ -74,7 +74,13 @@ class TestBuildHook:
             "timeout": 30,
             "deploymentType": "N8N",
             "canShortCircuit": False,
-            "n8nWorkflowConfig": {"ordId": "sap.n8nwfrt:apiResource:test-solution_hook.testHook:v1", "cardOrdId": "sap.n8nwfrt:apiResource:test-solution_hook.testHook_mcp:v1", "toolName": "testHook", "globalTenantId": "tenant-test-001", "method": "POST"},
+            "n8nWorkflowConfig": {
+                "ordId": "sap.n8nwfrt:apiResource:test-solution_hook.testHook:v1",
+                "cardOrdId": "sap.n8nwfrt:apiResource:test-solution_hook.testHook_mcp:v1",
+                "toolName": "testHook",
+                "globalTenantId": "tenant-test-001",
+                "method": "POST",
+            },
         }
         hook = _build_hook(raw)
         assert hook is not None
@@ -100,7 +106,13 @@ class TestBuildHook:
             "timeout": 60,
             "deploymentType": "SERVERLESS",
             "canShortCircuit": True,
-            "n8nWorkflowConfig": {"ordId": "sap.n8nwfrt:apiResource:test-solution_hook.testHook:v1", "cardOrdId": "sap.n8nwfrt:apiResource:test-solution_hook.testHook_mcp:v1", "toolName": "testHook", "globalTenantId": "tenant-test-001", "method": "POST"},
+            "n8nWorkflowConfig": {
+                "ordId": "sap.n8nwfrt:apiResource:test-solution_hook.testHook:v1",
+                "cardOrdId": "sap.n8nwfrt:apiResource:test-solution_hook.testHook_mcp:v1",
+                "toolName": "testHook",
+                "globalTenantId": "tenant-test-001",
+                "method": "POST",
+            },
         }
         hook = _build_hook(raw)
         assert hook is not None
@@ -123,6 +135,74 @@ class TestBuildHook:
     def test_empty_dict(self):
         hook = _build_hook({})
         assert hook is None
+
+    def test_execution_mode_async_parsed(self):
+        """executionMode ASYNC from UMS is propagated to the Hook object."""
+        raw = {
+            "hookId": "async_hook",
+            "type": "BEFORE",
+            "name": "Async Hook",
+            "onFailure": "CONTINUE",
+            "timeout": 30,
+            "deploymentType": "N8N",
+            "executionMode": "ASYNC",
+            "canShortCircuit": False,
+            "n8nWorkflowConfig": {
+                "ordId": "sap.n8nwfrt:apiResource:test-solution_hook.testHook:v1",
+                "cardOrdId": "sap.n8nwfrt:apiResource:test-solution_hook.testHook_mcp:v1",
+                "toolName": "testHook",
+                "globalTenantId": "tenant-test-001",
+                "method": "POST",
+            },
+        }
+        hook = _build_hook(raw)
+        assert hook is not None
+        assert hook.execution_mode == ExecutionMode.ASYNC
+
+    def test_execution_mode_missing_defaults_to_sync(self):
+        """When executionMode is absent, the hook defaults to SYNC."""
+        raw = {
+            "hookId": "sync_hook",
+            "type": "BEFORE",
+            "name": "Sync Hook",
+            "deploymentType": "N8N",
+            "n8nWorkflowConfig": {
+                "ordId": "sap.n8nwfrt:apiResource:test-solution_hook.testHook:v1",
+                "cardOrdId": "sap.n8nwfrt:apiResource:test-solution_hook.testHook_mcp:v1",
+                "toolName": "testHook",
+                "globalTenantId": "tenant-test-001",
+                "method": "POST",
+            },
+        }
+        hook = _build_hook(raw)
+        assert hook is not None
+        assert hook.execution_mode == ExecutionMode.SYNC
+
+    def test_execution_mode_unknown_defaults_to_sync(self, caplog):
+        """An unrecognised executionMode value defaults to SYNC and logs a warning."""
+        import logging
+
+        raw = {
+            "hookId": "bad_mode_hook",
+            "type": "BEFORE",
+            "name": "Bad Mode Hook",
+            "deploymentType": "N8N",
+            "executionMode": "FIRE_AND_HOPE",
+            "n8nWorkflowConfig": {
+                "ordId": "sap.n8nwfrt:apiResource:test-solution_hook.testHook:v1",
+                "cardOrdId": "sap.n8nwfrt:apiResource:test-solution_hook.testHook_mcp:v1",
+                "toolName": "testHook",
+                "globalTenantId": "tenant-test-001",
+                "method": "POST",
+            },
+        }
+        with caplog.at_level(
+            logging.WARNING, logger="sap_cloud_sdk.extensibility._ums_transport"
+        ):
+            hook = _build_hook(raw)
+        assert hook is not None
+        assert hook.execution_mode == ExecutionMode.SYNC
+        assert "FIRE_AND_HOPE" in caplog.text
 
 
 # ---------------------------------------------------------------------------
@@ -342,6 +422,7 @@ class TestBuildSourceMapping:
         ]
         mapping = _build_source_mapping(nodes, [], [])
         assert mapping.instructions == {}
+
 
 # ---------------------------------------------------------------------------
 # Tests: _transform_ums_response

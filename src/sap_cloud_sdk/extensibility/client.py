@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import itertools
 import json
 import logging
@@ -19,6 +20,7 @@ from sap_cloud_sdk.core.telemetry.metrics_decorator import record_metrics
 from sap_cloud_sdk.agentgateway import create_client as create_agw_client
 from sap_cloud_sdk.extensibility._models import (
     DEFAULT_EXTENSION_CAPABILITY_ID,
+    ExecutionMode,
     ExtensionCapabilityImplementation,
     Hook,
 )
@@ -49,9 +51,9 @@ _JSONRPC_HEADERS: dict[str, str] = {
 }
 
 #: execute-workflow statuses that mean the execution cannot continue.
-_EXECUTE_TERMINAL_STATUSES = frozenset({"error", "canceled", "crashed", "unknown"})
+_EXECUTE_TERMINAL_STATUSES = frozenset({"error", "canceled", "unknown"})
 #: get-execution statuses that mean the execution has permanently failed.
-_EXECUTION_TERMINAL_STATUSES = frozenset({"error", "canceled", "crashed"})
+_EXECUTION_TERMINAL_STATUSES = frozenset({"error", "canceled"})
 
 _HOOK_POLL_INTERVAL = 0.5  # seconds between get-execution polls
 
@@ -153,6 +155,7 @@ class ExtensibilityClient:
         """
         self._transport = transport
         self._telemetry_source = _telemetry_source
+        self._hook_tool_cache: dict[tuple[str | None, str | None, str, str], Any] = {}
 
     @record_metrics(
         Module.EXTENSIBILITY,
@@ -409,12 +412,24 @@ class ExtensibilityClient:
         )
 
     async def _discover_n8n_tools(
-        self, agw_client: Any, hook: Hook, user_token: Optional[str]
+        self,
+        agw_client: Any,
+        hook: Hook,
+        user_token: Optional[str],
+        tenant_subdomain: Optional[str],
     ) -> Any:
-        tools = await agw_client.list_mcp_tools(user_token=user_token or None)
-
         tool_name = hook.n8n_workflow_config.tool_name
         card_ord_id = hook.n8n_workflow_config.card_ord_id
+        cache_key = (user_token, tenant_subdomain, card_ord_id, tool_name)
+
+        cached = self._hook_tool_cache.get(cache_key)
+        if cached is not None:
+            logger.debug(
+                "Cache hit for hook tool: name=%s server=%s", tool_name, card_ord_id
+            )
+            return cached
+
+        tools = await agw_client.list_mcp_tools(user_token=user_token or None)
 
         hook_tool = next(
             (t for t in tools if t.name == tool_name and t.server_name == card_ord_id),
@@ -426,6 +441,7 @@ class ExtensibilityClient:
                 "not found via Agent Gateway."
             )
         logger.info("Discovered hook tool: name=%s server=%s", tool_name, card_ord_id)
+        self._hook_tool_cache[cache_key] = hook_tool
         return hook_tool
 
     async def _execute_workflow_via_agw(
@@ -537,8 +553,27 @@ class ExtensibilityClient:
         logger.info(
             "AGW client created successfully for tenant_subdomain=%s", tenant_subdomain
         )
-        hook_tool = await self._discover_n8n_tools(agw_client, hook, user_token)
-        logger.info("Discovered n8n workflow tool")
-        return await self._execute_workflow_via_agw(
-            agw_client, hook_tool, hook, user_token, message, headers
+        hook_tool = await self._discover_n8n_tools(
+            agw_client, hook, user_token, tenant_subdomain
         )
+        logger.info("Discovered n8n workflow tool")
+
+        if hook.execution_mode == ExecutionMode.ASYNC:
+            asyncio.ensure_future(
+                self._execute_workflow_via_agw(
+                    agw_client, hook_tool, hook, user_token, message, headers
+                )
+            )
+            return None
+
+        try:
+            return await asyncio.wait_for(
+                self._execute_workflow_via_agw(
+                    agw_client, hook_tool, hook, user_token, message, headers
+                ),
+                timeout=hook.timeout,
+            )
+        except asyncio.TimeoutError as exc:
+            raise TransportError(
+                f"Hook '{hook.n8n_workflow_config.tool_name}' timed out after {hook.timeout}s"
+            ) from exc

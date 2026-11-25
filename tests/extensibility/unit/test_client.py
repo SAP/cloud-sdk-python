@@ -1,5 +1,6 @@
 """Tests for ExtensibilityClient and create_client."""
 
+import asyncio
 import json
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -8,8 +9,6 @@ import pytest
 from sap_cloud_sdk.extensibility import create_client
 from sap_cloud_sdk.extensibility.client import (
     ExtensibilityClient,
-    _EXECUTE_WORKFLOW_TOOL_NAME,
-    _GET_EXECUTION_TOOL_NAME,
 )
 from sap_cloud_sdk.extensibility._models import (
     ExtensionCapabilityImplementation,
@@ -33,7 +32,9 @@ from sap_cloud_sdk.agentgateway._models import MCPTool
 
 _TOOL_NAME = "convertCurrency"
 _CARD_ORD_ID = "sap.n8nwfrt:apiResource:invoice-po-solution_currency-conversion.convertCurrency_mcp:v1"
-_ORD_ID = "sap.n8nwfrt:apiResource:invoice-po-solution_currency-conversion.convertCurrency:v1"
+_ORD_ID = (
+    "sap.n8nwfrt:apiResource:invoice-po-solution_currency-conversion.convertCurrency:v1"
+)
 _GLOBAL_TENANT_ID = "tenant-example-001"
 
 
@@ -235,10 +236,12 @@ class TestExtensibilityClientGetExtensionCapabilityImplementation:
 # Helpers shared across call_hook_agw tests
 # ---------------------------------------------------------------------------
 
+
 def _make_hook(
     tool_name: str = _TOOL_NAME,
     card_ord_id: str = _CARD_ORD_ID,
     timeout: int = 30,
+    execution_mode: ExecutionMode = ExecutionMode.SYNC,
 ) -> Hook:
     return Hook(
         hook_id="agent_pre_hook",
@@ -254,7 +257,7 @@ def _make_hook(
         type=HookType.BEFORE,
         deployment_type=DeploymentType.N8N,
         timeout=timeout,
-        execution_mode=ExecutionMode.SYNC,
+        execution_mode=execution_mode,
         on_failure=OnFailure.CONTINUE,
         order=0,
         can_short_circuit=True,
@@ -288,14 +291,16 @@ def _make_other_server_tool(tool_name: str = _TOOL_NAME) -> MCPTool:
 
 def _success_payload() -> str:
     """Full MCP tool result JSON; AGW puts the A2A Message in structuredContent."""
-    return json.dumps({
-        "content": [{"type": "text", "text": "Currency converted successfully."}],
-        "structuredContent": {
-            "messageId": "msg-1",
-            "role": "agent",
-            "parts": [{"kind": "text", "text": "Currency converted successfully."}],
-        },
-    })
+    return json.dumps(
+        {
+            "content": [{"type": "text", "text": "Currency converted successfully."}],
+            "structuredContent": {
+                "messageId": "msg-1",
+                "role": "agent",
+                "parts": [{"kind": "text", "text": "Currency converted successfully."}],
+            },
+        }
+    )
 
 
 def _make_agw_client(tools: list, tool_responses: list) -> MagicMock:
@@ -344,7 +349,9 @@ class TestCallHookAgw:
     @pytest.mark.asyncio
     async def test_success_returns_message(self):
         """Returns a Message on a successful single tool call."""
-        agw = _make_agw_client(tools=[_make_hook_tool()], tool_responses=[_success_payload()])
+        agw = _make_agw_client(
+            tools=[_make_hook_tool()], tool_responses=[_success_payload()]
+        )
         client = self._make_client()
         with patch(
             "sap_cloud_sdk.extensibility.client.create_agw_client",
@@ -399,7 +406,9 @@ class TestCallHookAgw:
     @pytest.mark.asyncio
     async def test_message_forwarded_as_body_to_tool(self):
         """The A2A message is forwarded under 'body' (per the hook tool schema), not wrapped in 'inputs'."""
-        agw = _make_agw_client(tools=[_make_hook_tool()], tool_responses=[_success_payload()])
+        agw = _make_agw_client(
+            tools=[_make_hook_tool()], tool_responses=[_success_payload()]
+        )
         client = self._make_client()
         message = MagicMock()
         message.model_dump.return_value = {
@@ -422,3 +431,186 @@ class TestCallHookAgw:
             "parts": [{"kind": "text", "text": "hi"}],
         }
         message.model_dump.assert_called_once_with(mode="json", exclude_none=True)
+
+
+# ---------------------------------------------------------------------------
+# Tests for MCPTool caching in _discover_n8n_tools
+# ---------------------------------------------------------------------------
+
+
+class TestCallHookAgwCaching:
+    """list_mcp_tools is called once per unique (user_token, tenant_subdomain, card_ord_id, tool_name)."""
+
+    def _make_client(self) -> ExtensibilityClient:
+        return ExtensibilityClient(MagicMock())
+
+    @pytest.mark.asyncio
+    async def test_second_call_uses_cache(self):
+        """list_mcp_tools is only called on the first invocation; subsequent calls hit cache."""
+        agw1 = _make_agw_client(
+            tools=[_make_hook_tool()],
+            tool_responses=[_success_payload()],
+        )
+        agw2 = _make_agw_client(
+            tools=[_make_hook_tool()],
+            tool_responses=[_success_payload()],
+        )
+        client = self._make_client()
+        with patch(
+            "sap_cloud_sdk.extensibility.client.create_agw_client",
+            side_effect=[agw1, agw2],
+        ):
+            await client.call_hook_agw(hook=_make_hook(), tenant_subdomain="t")
+            await client.call_hook_agw(hook=_make_hook(), tenant_subdomain="t")
+
+        agw1.list_mcp_tools.assert_called_once()
+        agw2.list_mcp_tools.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_different_user_token_bypasses_cache(self):
+        """A different user_token is a distinct cache key — list_mcp_tools is called again."""
+        agw1 = _make_agw_client(
+            tools=[_make_hook_tool()],
+            tool_responses=[_success_payload()],
+        )
+        agw2 = _make_agw_client(
+            tools=[_make_hook_tool()],
+            tool_responses=[_success_payload()],
+        )
+        client = self._make_client()
+        with patch(
+            "sap_cloud_sdk.extensibility.client.create_agw_client",
+            side_effect=[agw1, agw2],
+        ):
+            await client.call_hook_agw(
+                hook=_make_hook(), user_token="token-a", tenant_subdomain="t"
+            )
+            await client.call_hook_agw(
+                hook=_make_hook(), user_token="token-b", tenant_subdomain="t"
+            )
+
+        agw1.list_mcp_tools.assert_called_once()
+        agw2.list_mcp_tools.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_different_tenant_subdomain_bypasses_cache(self):
+        """A different tenant_subdomain is a distinct cache key — prevents cross-tenant MCPTool reuse."""
+        agw1 = _make_agw_client(
+            tools=[_make_hook_tool()],
+            tool_responses=[_success_payload()],
+        )
+        agw2 = _make_agw_client(
+            tools=[_make_hook_tool()],
+            tool_responses=[_success_payload()],
+        )
+        client = self._make_client()
+        with patch(
+            "sap_cloud_sdk.extensibility.client.create_agw_client",
+            side_effect=[agw1, agw2],
+        ):
+            await client.call_hook_agw(
+                hook=_make_hook(), user_token=None, tenant_subdomain="tenant-a"
+            )
+            await client.call_hook_agw(
+                hook=_make_hook(), user_token=None, tenant_subdomain="tenant-b"
+            )
+
+        # Each tenant must fetch its own MCPTool — no cross-tenant cache hit
+        agw1.list_mcp_tools.assert_called_once()
+        agw2.list_mcp_tools.assert_called_once()
+
+
+# ---------------------------------------------------------------------------
+# Tests for timeout handling in call_hook_agw
+# ---------------------------------------------------------------------------
+
+
+class TestCallHookAgwTimeout:
+    """hook.timeout is enforced for SYNC executions via asyncio.wait_for."""
+
+    def _make_client(self) -> ExtensibilityClient:
+        return ExtensibilityClient(MagicMock())
+
+    @pytest.mark.asyncio
+    async def test_timeout_raises_transport_error(self):
+        """asyncio.TimeoutError from wait_for is wrapped in TransportError."""
+        agw = _make_agw_client(tools=[_make_hook_tool()], tool_responses=[])
+        client = self._make_client()
+        with patch(
+            "sap_cloud_sdk.extensibility.client.create_agw_client",
+            return_value=agw,
+        ):
+            with patch.object(asyncio, "wait_for", side_effect=asyncio.TimeoutError):
+                with pytest.raises(TransportError, match="timed out"):
+                    await client.call_hook_agw(hook=_make_hook(), tenant_subdomain="t")
+
+
+# ---------------------------------------------------------------------------
+# Tests for ASYNC execution mode in call_hook_agw
+# ---------------------------------------------------------------------------
+
+
+class TestCallHookAgwExecutionMode:
+    """ASYNC hooks are fire-and-forget; SYNC hooks block until completion."""
+
+    def _make_client(self) -> ExtensibilityClient:
+        return ExtensibilityClient(MagicMock())
+
+    @pytest.mark.asyncio
+    async def test_async_mode_returns_none(self):
+        """call_hook_agw returns None immediately for ASYNC hooks."""
+        agw = _make_agw_client(
+            tools=[_make_hook_tool()], tool_responses=[_success_payload()]
+        )
+        client = self._make_client()
+        hook = _make_hook(execution_mode=ExecutionMode.ASYNC)
+        with patch(
+            "sap_cloud_sdk.extensibility.client.create_agw_client",
+            return_value=agw,
+        ):
+            with patch.object(asyncio, "ensure_future") as mock_ef:
+                result = await client.call_hook_agw(hook=hook, tenant_subdomain="t")
+
+        assert result is None
+        mock_ef.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_async_mode_schedules_tool_call(self):
+        """ensure_future is called (not await) for ASYNC hooks."""
+        agw = _make_agw_client(
+            tools=[_make_hook_tool()], tool_responses=[_success_payload()]
+        )
+        client = self._make_client()
+        hook = _make_hook(execution_mode=ExecutionMode.ASYNC)
+        with patch(
+            "sap_cloud_sdk.extensibility.client.create_agw_client",
+            return_value=agw,
+        ):
+            with patch.object(asyncio, "ensure_future") as mock_ef:
+                await client.call_hook_agw(hook=hook, tenant_subdomain="t")
+
+        # call_mcp_tool must NOT have been awaited directly
+        agw.call_mcp_tool.assert_not_awaited()
+        # but ensure_future must have been called with a coroutine
+        mock_ef.assert_called_once()
+        scheduled = mock_ef.call_args[0][0]
+        assert asyncio.iscoroutine(scheduled)
+        scheduled.close()  # clean up the unawaited coroutine
+
+    @pytest.mark.asyncio
+    async def test_sync_mode_awaits_and_returns_message(self):
+        """SYNC hook (the default) awaits the tool call and returns the Message."""
+        agw = _make_agw_client(
+            tools=[_make_hook_tool()], tool_responses=[_success_payload()]
+        )
+        client = self._make_client()
+        hook = _make_hook(execution_mode=ExecutionMode.SYNC)
+        with patch(
+            "sap_cloud_sdk.extensibility.client.create_agw_client",
+            return_value=agw,
+        ):
+            result = await client.call_hook_agw(hook=hook, tenant_subdomain="t")
+
+        assert result is not None
+        assert result.message_id == "msg-1"
+        agw.call_mcp_tool.assert_awaited_once()
